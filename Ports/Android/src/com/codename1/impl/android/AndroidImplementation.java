@@ -36,7 +36,6 @@ import com.codename1.codescan.ScanResult;
 import com.codename1.media.Media;
 import com.codename1.ui.geom.Dimension;
 
-
 import android.webkit.CookieSyncManager;
 import android.content.*;
 import android.content.pm.*;
@@ -213,10 +212,11 @@ import org.xml.sax.SAXException;
 //import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
+
     public static final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread t, Throwable e) {
-            if(com.codename1.io.Log.isCrashBound()) {
+            if (com.codename1.io.Log.isCrashBound()) {
                 com.codename1.io.Log.p("Uncaught exception in thread " + t.getName());
                 com.codename1.io.Log.e(e);
                 com.codename1.io.Log.sendLog();
@@ -264,7 +264,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (activity != null) {
             activityComponentName = activity.getComponentName();
         }
-        
+
     }
     CodenameOneSurface myView = null;
     CodenameOneTextPaint defaultFont;
@@ -277,7 +277,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int displayHeight;
     static CodenameOneActivity activity;
     static ComponentName activityComponentName;
-    
+
     private static Context context;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
@@ -299,22 +299,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private boolean statusBarHidden;
     private boolean superPeerMode = true;
-    
-    
+
     private ValueCallback<Uri> mUploadMessage;
     public ValueCallback<Uri[]> uploadMessage;
 
     /**
      * Keeps track of running contexts.
+     *
      * @see #startContext(Context)
      * @see #stopContext(Context)
      */
     private static HashSet<Context> activeContexts = new HashSet<Context>();
 
     /**
-     * A method to be called when a Context begins its execution.  This adds the
-     * context to the context set.  When the contenxt's execution completes, it should
-     * call {@link #stopContext} to clear up resources.
+     * A method to be called when a Context begins its execution. This adds the
+     * context to the context set. When the contenxt's execution completes, it
+     * should call {@link #stopContext} to clear up resources.
+     *
      * @param ctx The context that is starting.
      * @see #stopContext(Context)
      */
@@ -329,12 +330,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 Thread.sleep(30);
 
-            } catch (Exception ex){}
+            } catch (Exception ex) {
+            }
         }
         if (deinitializing && instance != null) {
             instance.deinitialize();
         }
-        synchronized(activeContexts) {
+        synchronized (activeContexts) {
             activeContexts.add(ctx);
             if (instance == null) {
                 // If this is our first rodeo, just call Display.init() as that should
@@ -350,14 +352,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Cleans up resources in the given context.  This method should be called by
+     * Cleans up resources in the given context. This method should be called by
      * any Activity or Service that called startContext() when it started.
+     *
      * @param ctx The context to stop.
      *
      * @see #startContext(Context)
      */
     public static void stopContext(Context ctx) {
-        synchronized(activeContexts) {
+        synchronized (activeContexts) {
             activeContexts.remove(ctx);
             if (activeContexts.isEmpty()) {
                 // If we are the last context, we should deinitialize
@@ -375,18 +378,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setPlatformHint(String key, String value) {
-        if(key.equals("platformHint.compatPaintMode")) {
+        if (key.equals("platformHint.compatPaintMode")) {
             compatPaintMode = value.equalsIgnoreCase("true");
             return;
         }
-        if(key.equals("platformHint.legacyPaint")) {
+        if (key.equals("platformHint.legacyPaint")) {
             AndroidAsyncView.legacyPaintLogic = value.equalsIgnoreCase("true");;
         }
     }
 
-
     /**
      * This method in used internally for ads
+     *
      * @param above shown above the view
      * @param below shown below the view
      */
@@ -397,13 +400,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         belowSpacing = spacingBelow;
     }
 
-    static boolean hasViewAboveBelow(){
+    static boolean hasViewAboveBelow() {
         return viewBelow != null || viewAbove != null;
     }
 
     /**
-     * Copy the input stream into the output stream, closes both streams when finishing or in
-     * a case of an exception
+     * Copy the input stream into the output stream, closes both streams when
+     * finishing or in a case of an exception
      *
      * @param i source
      * @param o destination
@@ -413,18 +416,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Copy the input stream into the output stream, closes both streams when finishing or in
-     * a case of an exception
+     * Copy the input stream into the output stream, closes both streams when
+     * finishing or in a case of an exception
      *
      * @param i source
      * @param o destination
-     * @param bufferSize the size of the buffer, which should be a power of 2 large enoguh
+     * @param bufferSize the size of the buffer, which should be a power of 2
+     * large enoguh
      */
     private static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
         try {
             byte[] buffer = new byte[bufferSize];
             int size = i.read(buffer);
-            while(size > -1) {
+            while (size > -1) {
                 o.write(buffer, 0, size);
                 size = i.read(buffer);
             }
@@ -436,21 +440,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private static void sCleanup(Object o) {
         try {
-            if(o != null) {
-                if(o instanceof InputStream) {
-                    ((InputStream)o).close();
+            if (o != null) {
+                if (o instanceof InputStream) {
+                    ((InputStream) o).close();
                     return;
                 }
-                if(o instanceof OutputStream) {
-                    ((OutputStream)o).close();
+                if (o instanceof OutputStream) {
+                    ((OutputStream) o).close();
                     return;
                 }
             }
-        } catch(Throwable t) {}
+        } catch (Throwable t) {
+        }
     }
 
     /**
-     * Copied here since the cleanup method in util would crash append notification that runs when the app isn't in the foreground
+     * Copied here since the cleanup method in util would crash append
+     * notification that runs when the app isn't in the foreground
      */
     private static byte[] readInputStream(InputStream i) throws IOException {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
@@ -458,11 +464,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return b.toByteArray();
     }
 
-
     public static void appendNotification(String type, String body, Context a) {
         appendNotification(type, body, null, null, a);
     }
-    
+
     public static void appendNotification(String type, String body, String image, String category, Context a) {
         try {
             String[] fileList = a.fileList();
@@ -470,7 +475,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             for (int iter = 0; iter < fileList.length; iter++) {
                 if (fileList[iter].equals("CN1$AndroidPendingNotifications")) {
                     InputStream is = a.openFileInput("CN1$AndroidPendingNotifications");
-                    if(is != null) {
+                    if (is != null) {
                         data = readInputStream(is);
                         sCleanup(a);
                         break;
@@ -478,7 +483,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
             DataOutputStream os = new DataOutputStream(a.openFileOutput("CN1$AndroidPendingNotifications", 0));
-            if(data != null) {
+            if (data != null) {
                 data[0]++;
                 os.write(data);
             } else {
@@ -488,65 +493,72 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (image != null || category != null) {
                 type = "99";
             }
-            if(type != null) {
+            if (type != null) {
                 os.writeBoolean(true);
                 os.writeUTF(type);
             } else {
                 os.writeBoolean(false);
             }
             if ("99".equals(type)) {
-                String msg = "body="+java.net.URLEncoder.encode(body, "UTF-8")
-                        +"&type="+java.net.URLEncoder.encode(bodyType, "UTF-8");
+                String msg = "body=" + java.net.URLEncoder.encode(body, "UTF-8")
+                        + "&type=" + java.net.URLEncoder.encode(bodyType, "UTF-8");
                 if (category != null) {
-                    msg += "&category="+java.net.URLEncoder.encode(category, "UTF-8");
+                    msg += "&category=" + java.net.URLEncoder.encode(category, "UTF-8");
                 }
                 if (image != null) {
-                    image += "&image="+java.net.URLEncoder.encode(image, "UTF-8");
+                    image += "&image=" + java.net.URLEncoder.encode(image, "UTF-8");
                 }
                 os.writeUTF(msg);
-                        
+
             } else {
                 os.writeUTF(body);
             }
             os.writeLong(System.currentTimeMillis());
-        } catch(IOException err) {
+        } catch (IOException err) {
             err.printStackTrace();
         }
     }
 
-    private static Map<String,String> splitQuery(String urlencodeQueryString) {
+    private static Map<String, String> splitQuery(String urlencodeQueryString) {
         String[] parts = urlencodeQueryString.split("&");
-        Map<String,String> out = new HashMap<String,String>();
+        Map<String, String> out = new HashMap<String, String>();
         for (String part : parts) {
             int pos = part.indexOf("=");
-            String k,v;
+            String k, v;
             if (pos > 0) {
                 k = part.substring(0, pos);
-                v = part.substring(pos+1);
+                v = part.substring(pos + 1);
             } else {
                 k = part;
                 v = "";
             }
-            try { k = java.net.URLDecoder.decode(k, "UTF-8");} catch (Exception ex){}
-            try {v = java.net.URLDecoder.decode(v, "UTF-8");} catch (Exception ex){}
+            try {
+                k = java.net.URLDecoder.decode(k, "UTF-8");
+            } catch (Exception ex) {
+            }
+            try {
+                v = java.net.URLDecoder.decode(v, "UTF-8");
+            } catch (Exception ex) {
+            }
             out.put(k, v);
         }
         return out;
     }
 
-
-
     public static void initPushContent(String message, String image, String messageType, String category, Context context) {
         com.codename1.push.PushContent.reset();
-        
+
         int iMessageType = 1;
-        try {iMessageType = Integer.parseInt(messageType);}catch(Throwable t){}
-        
+        try {
+            iMessageType = Integer.parseInt(messageType);
+        } catch (Throwable t) {
+        }
+
         String actionId = null;
         String reply = null;
         boolean cancel = true;
         if (context instanceof Activity) {
-            Activity activity = (Activity)context;
+            Activity activity = (Activity) context;
             Bundle extras = activity.getIntent().getExtras();
             if (extras != null) {
                 actionId = extras.getString("pushActionId");
@@ -555,16 +567,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (actionId != null && RemoteInputWrapper.isSupported()) {
                     Bundle textExtras = RemoteInputWrapper.getResultsFromIntent(activity.getIntent());
                     if (textExtras != null) {
-                        CharSequence cs  = textExtras.getCharSequence(actionId + "$Result");
+                        CharSequence cs = textExtras.getCharSequence(actionId + "$Result");
                         if (cs != null) {
                             reply = cs.toString();
                         }
                     }
 
-                    
                 }
             }
-            
+
         }
         if (cancel) {
             PushNotificationService.cancelNotification(context);
@@ -580,8 +591,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         switch (iMessageType) {
             case 1:
             case 5:
-                com.codename1.push.PushContent.setBody(message);break;
-            case 2: com.codename1.push.PushContent.setMetaData(message);break;
+                com.codename1.push.PushContent.setBody(message);
+                break;
+            case 2:
+                com.codename1.push.PushContent.setMetaData(message);
+                break;
             case 3: {
                 String[] parts = message.split(";");
                 com.codename1.push.PushContent.setMetaData(parts[1]);
@@ -608,27 +622,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
-    
+
     // Name of file where we install the push notification categories as an XML file
     // if the main class implements PushActiosProvider
     private static String FILE_NAME_NOTIFICATION_CATEGORIES = "CN1$AndroidNotificationCategories";
-    
-    
-    
+
     /**
-     * Action categories are defined on the Main class by implementing the PushActionsProvider, however
-     * the main class may not be available to the push receiver, so we need to save these categories
-     * to the file system when the app is installed, then the push receiver can load these actions
+     * Action categories are defined on the Main class by implementing the
+     * PushActionsProvider, however the main class may not be available to the
+     * push receiver, so we need to save these categories to the file system
+     * when the app is installed, then the push receiver can load these actions
      * when it sends a push while the app isn't running.
-     * @param provider A reference to the App's main class 
-     * @throws IOException 
+     *
+     * @param provider A reference to the App's main class
+     * @throws IOException
      */
     public static void installNotificationActionCategories(PushActionsProvider provider) throws IOException {
         // Assume that CN1 is running... this will run when the app starts
         // up
         Context context = getContext();
         boolean requiresUpdate = false;
-        
+
         File categoriesFile = new File(activity.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
         if (!categoriesFile.exists()) {
             requiresUpdate = true;
@@ -643,11 +657,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 ex.printStackTrace();
             }
         }
-        
+
         if (!requiresUpdate) {
             return;
         }
-        
+
         OutputStream os = getContext().openFileOutput(FILE_NAME_NOTIFICATION_CATEGORIES, 0);
         PushActionCategory[] categories = provider.getPushActionCategories();
         javax.xml.parsers.DocumentBuilderFactory docFactory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
@@ -661,21 +675,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         // root elements
         org.w3c.dom.Document doc = docBuilder.newDocument();
-        org.w3c.dom.Element root = (org.w3c.dom.Element)doc.createElement("categories");
+        org.w3c.dom.Element root = (org.w3c.dom.Element) doc.createElement("categories");
         doc.appendChild(root);
         for (PushActionCategory category : categories) {
-            org.w3c.dom.Element categoryEl = (org.w3c.dom.Element)doc.createElement("category");
+            org.w3c.dom.Element categoryEl = (org.w3c.dom.Element) doc.createElement("category");
             org.w3c.dom.Attr idAttr = doc.createAttribute("id");
             idAttr.setValue(category.getId());
             categoryEl.setAttributeNode(idAttr);
-            
+
             for (PushAction action : category.getActions()) {
-                org.w3c.dom.Element actionEl = (org.w3c.dom.Element)doc.createElement("action");
+                org.w3c.dom.Element actionEl = (org.w3c.dom.Element) doc.createElement("action");
                 org.w3c.dom.Attr actionIdAttr = doc.createAttribute("id");
                 actionIdAttr.setValue(action.getId());
                 actionEl.setAttributeNode(actionIdAttr);
-                
-                
+
                 org.w3c.dom.Attr actionTitleAttr = doc.createAttribute("title");
                 if (action.getTitle() != null) {
                     actionTitleAttr.setValue(action.getTitle());
@@ -683,7 +696,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     actionTitleAttr.setValue(action.getId());
                 }
                 actionEl.setAttributeNode(actionTitleAttr);
-                
+
                 if (action.getIcon() != null) {
                     org.w3c.dom.Attr actionIconAttr = doc.createAttribute("icon");
                     String iconVal = action.getIcon();
@@ -691,16 +704,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         // We'll store the resource IDs for the icon
                         // rather than the icon name because that is what
                         // the push notifications require.
-                        iconVal = ""+context.getResources().getIdentifier(iconVal, "drawable", context.getPackageName());
+                        iconVal = "" + context.getResources().getIdentifier(iconVal, "drawable", context.getPackageName());
                         actionIconAttr.setValue(iconVal);
                         actionEl.setAttributeNode(actionIconAttr);
                     } catch (Exception ex) {
                         ex.printStackTrace();
-                        
+
                     }
-                    
+
                 }
-                
+
                 if (action.getTextInputPlaceholder() != null) {
                     org.w3c.dom.Attr textInputPlaceholderAttr = doc.createAttribute("textInputPlaceholder");
                     textInputPlaceholderAttr.setValue(action.getTextInputPlaceholder());
@@ -714,7 +727,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 categoryEl.appendChild(actionEl);
             }
             root.appendChild(categoryEl);
-            
+
         }
         try {
             javax.xml.transform.TransformerFactory transformerFactory = javax.xml.transform.TransformerFactory.newInstance();
@@ -722,24 +735,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             javax.xml.transform.dom.DOMSource source = new javax.xml.transform.dom.DOMSource(doc);
             javax.xml.transform.stream.StreamResult result = new javax.xml.transform.stream.StreamResult(os);
             transformer.transform(source, result);
-            
+
         } catch (Exception ex) {
             throw new IOException("Failed to save notification categories as XML.", ex);
         }
-        
+
     }
-    
+
     /**
-     * Retrieves the app's available push action categories from the XML file in which they
-     * should have been installed on the first load.
+     * Retrieves the app's available push action categories from the XML file in
+     * which they should have been installed on the first load.
+     *
      * @param context
      * @return
-     * @throws IOException 
+     * @throws IOException
      */
     private static PushActionCategory[] getInstalledPushActionCategories(Context context) throws IOException {
         // NOTE:  This method may be called from the PushReceiver when the app isn't running so we can't access
         // the main activity context, display properties, or any CN1 stuff.  Just native android
-        
+
         File categoriesFile = new File(context.getFilesDir().getAbsolutePath() + "/" + FILE_NAME_NOTIFICATION_CATEGORIES);
         if (!categoriesFile.exists()) {
             return new PushActionCategory[0];
@@ -763,22 +777,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         java.util.List<PushActionCategory> out = new ArrayList<PushActionCategory>();
         org.w3c.dom.NodeList l = root.getElementsByTagName("category");
         int len = l.getLength();
-        for (int i=0; i<len; i++) {
-            org.w3c.dom.Element el = (org.w3c.dom.Element)l.item(i);
+        for (int i = 0; i < len; i++) {
+            org.w3c.dom.Element el = (org.w3c.dom.Element) l.item(i);
             java.util.List<PushAction> actions = new ArrayList<PushAction>();
             org.w3c.dom.NodeList al = el.getElementsByTagName("action");
             int alen = al.getLength();
-            for (int j=0; j<alen; j++) {
-                org.w3c.dom.Element actionEl = (org.w3c.dom.Element)al.item(j);
+            for (int j = 0; j < alen; j++) {
+                org.w3c.dom.Element actionEl = (org.w3c.dom.Element) al.item(j);
                 String textInputPlaceholder = actionEl.hasAttribute("textInputPlaceholder") ? actionEl.getAttribute("textInputPlaceholder") : null;
                 String textInputButtonText = actionEl.hasAttribute("textInputButtonText") ? actionEl.getAttribute("textInputButtonText") : null;
                 PushAction action = new PushAction(actionEl.getAttribute("id"), actionEl.getAttribute("title"), actionEl.getAttribute("icon"), textInputPlaceholder, textInputButtonText);
                 actions.add(action);
             }
-            
-            PushActionCategory cat = new PushActionCategory((String)el.getAttribute("id"), actions.toArray(new PushAction[actions.size()]));
+
+            PushActionCategory cat = new PushActionCategory((String) el.getAttribute("id"), actions.toArray(new PushAction[actions.size()]));
             out.add(cat);
-            
+
         }
         return out.toArray(new PushActionCategory[out.size()]);
     }
@@ -817,19 +831,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Adds actions to a push notification.  This is called by the Push broadcast receiver probably before 
-     * Codename One is initialized
-     * @param provider Reference to the app's main class which implements PushActionsProvider
+     * Adds actions to a push notification. This is called by the Push broadcast
+     * receiver probably before Codename One is initialized
+     *
+     * @param provider Reference to the app's main class which implements
+     * PushActionsProvider
      * @param categoryId The category ID of the push notification.
      * @param builder The builder for the push notification.
-     * @param targetIntent The target intent... this should go to the app's main Activity.
+     * @param targetIntent The target intent... this should go to the app's main
+     * Activity.
      * @param context The current context (inside the Broadcast receiver).
-     * @throws IOException 
+     * @throws IOException
      */
     public static void addActionsToNotification(PushActionsProvider provider, String categoryId, NotificationCompat.Builder builder, Intent targetIntent, Context context) throws IOException {
         // NOTE:  THis will likely run when the main activity isn't running so we won't have
         // access to any display properties... just native Android APIs will be accessible.
-        
+
         PushActionCategory category = null;
         PushActionCategory[] categories;
         if (provider != null) {
@@ -846,22 +863,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (category == null) {
             return;
         }
-        
+
         int requestCode = 1;
         for (PushAction action : category.getActions()) {
-            Intent newIntent = (Intent)targetIntent.clone();
+            Intent newIntent = (Intent) targetIntent.clone();
             newIntent.putExtra("pushActionId", action.getId());
             PendingIntent contentIntent = createMutablePendingIntent(context, requestCode++, newIntent);
             try {
                 int iconId = 0;
-                try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
+                try {
+                    iconId = Integer.parseInt(action.getIcon());
+                } catch (Exception ex) {
+                }
                 if (ActionWrapper.BuilderWrapper.isSupported()) {
                     // We need to take this abstracted "wrapper" approach because the Action.Builder class, and RemoteInput class
                     // aren't available until API 22.
                     // These classes use reflection to provide support for these classes safely.
                     ActionWrapper.BuilderWrapper actionBuilder = new ActionWrapper.BuilderWrapper(iconId, action.getTitle(), contentIntent);
                     if (action.getTextInputPlaceholder() != null && RemoteInputWrapper.isSupported()) {
-                        RemoteInputWrapper.BuilderWrapper remoteInputBuilder = new RemoteInputWrapper.BuilderWrapper(action.getId()+"$Result");
+                        RemoteInputWrapper.BuilderWrapper remoteInputBuilder = new RemoteInputWrapper.BuilderWrapper(action.getId() + "$Result");
                         remoteInputBuilder.setLabel(action.getTextInputPlaceholder());
 
                         RemoteInputWrapper remoteInput = remoteInputBuilder.build();
@@ -876,22 +896,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 ex.printStackTrace();
             }
         }
-        
+
     }
-    
+
     public static void firePendingPushes(final PushCallback c, final Context a) {
         try {
-            if(c != null) {
+            if (c != null) {
                 InputStream i = a.openFileInput("CN1$AndroidPendingNotifications");
-                if(i == null) {
+                if (i == null) {
                     return;
                 }
                 DataInputStream is = new DataInputStream(i);
                 int count = is.readByte();
-                for(int iter = 0 ; iter < count ; iter++) {
+                for (int iter = 0; iter < count; iter++) {
                     boolean hasType = is.readBoolean();
                     String actualType = null;
-                    if(hasType) {
+                    if (hasType) {
                         actualType = is.readUTF();
                     }
                     final String t;
@@ -900,7 +920,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     final String image;
                     if ("99".equals(actualType)) {
                         // This was a rich push
-                        Map<String,String> vals = splitQuery(is.readUTF());
+                        Map<String, String> vals = splitQuery(is.readUTF());
                         t = vals.get("type");
                         b = vals.get("body");
                         category = vals.get("category");
@@ -918,12 +938,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             Display.getInstance().setProperty("pendingPush", "true");
                             Display.getInstance().setProperty("pushType", t);
                             initPushContent(b, image, t, category, a);
-                            if(t != null && ("3".equals(t) || "6".equals(t))) {
+                            if (t != null && ("3".equals(t) || "6".equals(t))) {
                                 String[] a = b.split(";");
                                 c.push(a[0]);
                                 c.push(a[1]);
                             } else if (t != null && ("101".equals(t))) {
-                                c.push(b.substring(b.indexOf(" ")+1));
+                                c.push(b.substring(b.indexOf(" ") + 1));
                             } else {
                                 c.push(b);
                             }
@@ -933,7 +953,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 a.deleteFile("CN1$AndroidPendingNotifications");
             }
-        } catch(IOException err) {
+        } catch (IOException err) {
         }
     }
 
@@ -953,12 +973,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (hasType) {
                     actualType = is.readUTF();
                 }
-                
+
                 final String t;
                 final String b;
                 if ("99".equals(actualType)) {
                     // This was a rich push
-                    Map<String,String> vals = splitQuery(is.readUTF());
+                    Map<String, String> vals = splitQuery(is.readUTF());
                     t = vals.get("type");
                     b = vals.get("body");
                     //category = vals.get("category");
@@ -970,23 +990,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     //image = null;
                 }
                 long s = is.readLong();
-                if(t != null && ("3".equals(t) || "6".equals(t))) {
+                if (t != null && ("3".equals(t) || "6".equals(t))) {
                     String[] m = b.split(";");
                     v.add(m[0]);
-                } else if(t != null && "4".equals(t)){
+                } else if (t != null && "4".equals(t)) {
                     String[] m = b.split(";");
                     v.add(m[1]);
-                } else if(t != null && "2".equals(t)){
+                } else if (t != null && "2".equals(t)) {
                     continue;
-                }else if (t != null && "101".equals(t)) {
-                    v.add(b.substring(b.indexOf(" ")+1));
-                }else{
+                } else if (t != null && "101".equals(t)) {
+                    v.add(b.substring(b.indexOf(" ") + 1));
+                } else {
                     v.add(b);
                 }
             }
-            String [] retVal = new String[v.size()];
+            String[] retVal = new String[v.size()];
             for (int j = 0; j < retVal.length; j++) {
-                retVal[j] = (String)v.get(j);
+                retVal[j] = (String) v.get(j);
             }
             return retVal;
 
@@ -994,7 +1014,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ex.printStackTrace();
         } finally {
             try {
-                if(i != null){
+                if (i != null) {
                     i.close();
                 }
             } catch (IOException ex) {
@@ -1039,11 +1059,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             setActivity((CodenameOneActivity) m);
         } else {
             setActivity(null);
-            setContext((Context)m);
+            setContext((Context) m);
         }
 
         instance = this;
-        if(getActivity() != null && getActivity().hasUI()){
+        if (getActivity() != null && getActivity().hasUI()) {
             if (!hasActionBar()) {
                 try {
                     getActivity().requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -1056,7 +1076,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     getActivity().requestWindowFeature(Window.FEATURE_ACTION_BAR);
                     getActivity().requestWindowFeature(Window.FEATURE_PROGRESS);
 
-                    if(android.os.Build.VERSION.SDK_INT >= 21){
+                    if (android.os.Build.VERSION.SDK_INT >= 21) {
                         //WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
                         getActivity().getWindow().addFlags(-2147483648);
                     }
@@ -1067,21 +1087,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 notify.run();
             }
 
-            if(statusBarHidden) {
+            if (statusBarHidden) {
                 getActivity().getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
                 getActivity().getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
             }
 
-            if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
+            if (Display.getInstance().getProperty("StatusbarHidden", "").equals("true")) {
                 getActivity().getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
             }
 
-            if(Display.getInstance().getProperty("KeepScreenOn", "").equals("true")){
+            if (Display.getInstance().getProperty("KeepScreenOn", "").equals("true")) {
                 getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             }
 
-            if(Display.getInstance().getProperty("DisableScreenshots", "").equals("true")){
+            if (Display.getInstance().getProperty("DisableScreenshots", "").equals("true")) {
                 getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
             }
 
@@ -1091,19 +1111,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             /**
-             * translate our default font height depending on the screen density.
-             * this is required for new high resolution devices. otherwise
-             * everything looks awfully small.
+             * translate our default font height depending on the screen
+             * density. this is required for new high resolution devices.
+             * otherwise everything looks awfully small.
              *
              * we use our default font height value of 16 and go from there. i
-             * thought about using new Paint().getTextSize() for this value but if
-             * some new version of android suddenly returns values already tranlated
-             * to the screen then we might end up with too large fonts. the
-             * documentation is not very precise on that.
+             * thought about using new Paint().getTextSize() for this value but
+             * if some new version of android suddenly returns values already
+             * tranlated to the screen then we might end up with too large
+             * fonts. the documentation is not very precise on that.
              */
             final int defaultFontPixelHeight = 16;
             this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
-
 
             this.defaultFont = (CodenameOneTextPaint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
             Display.getInstance().setTransitionYield(-1);
@@ -1129,19 +1148,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         } else {
             /**
-             * translate our default font height depending on the screen density.
-             * this is required for new high resolution devices. otherwise
-             * everything looks awfully small.
+             * translate our default font height depending on the screen
+             * density. this is required for new high resolution devices.
+             * otherwise everything looks awfully small.
              *
              * we use our default font height value of 16 and go from there. i
-             * thought about using new Paint().getTextSize() for this value but if
-             * some new version of android suddenly returns values already tranlated
-             * to the screen then we might end up with too large fonts. the
-             * documentation is not very precise on that.
+             * thought about using new Paint().getTextSize() for this value but
+             * if some new version of android suddenly returns values already
+             * tranlated to the screen then we might end up with too large
+             * fonts. the documentation is not very precise on that.
              */
             final int defaultFontPixelHeight = 16;
             this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
-
 
             this.defaultFont = (CodenameOneTextPaint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
         }
@@ -1150,10 +1168,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         VideoCaptureConstraints.init(new AndroidVideoCaptureConstraintsCompiler());
     }
 
-
-
     @Override
-    public boolean isInitialized(){
+    public boolean isInitialized() {
 // Removing the check for null view to prevent strange things from happening when
 // calling from a Service context.
 //        if(getActivity() != null && myView == null){
@@ -1168,6 +1184,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     /**
      * Reinitializes CN1.
+     *
      * @param i Context to initialize it with.
      *
      * @see #startContext(Context)
@@ -1180,19 +1197,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         // This is a hack to fix an issue that caused the screen to appear blank when
         // the app is loaded from memory after being unloaded.
-
         // This issue only seems to occur when the Activity had been unloaded
         // so to test this you'll need to check the "Don't keep activities" checkbox under/
         // Developer options.
         // Developer options.
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                Display.getInstance().invokeAndBlock(new Runnable(){ public void run(){
-                    try {
-                        Thread.sleep(50);
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    public void run() {
+                        try {
+                            Thread.sleep(50);
 
-                    } catch (Exception ex){}
-                }});
+                        } catch (Exception ex) {
+                        }
+                    }
+                });
                 if (!Display.isInitialized() || Display.getInstance().isMinimized()) {
                     return;
                 }
@@ -1206,6 +1225,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private static class InvalidateOptionsMenuImpl implements Runnable {
+
         private Activity activity;
 
         public InvalidateOptionsMenuImpl(Activity activity) {
@@ -1221,21 +1241,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Boolean isDarkMode() {
         try {
-            int nightModeFlags = getActivity().getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK; 
-            switch (nightModeFlags) { 
-                case Configuration.UI_MODE_NIGHT_YES: 
+            int nightModeFlags = getActivity().getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+            switch (nightModeFlags) {
+                case Configuration.UI_MODE_NIGHT_YES:
                     return true;
-                case Configuration.UI_MODE_NIGHT_NO: 
+                case Configuration.UI_MODE_NIGHT_NO:
                     return false;
-                default: 
+                default:
                     return null;
-            } 
-        } catch(Throwable t) {
+            }
+        } catch (Throwable t) {
             return null;
         }
     }
 
-    
     private boolean hasActionBar() {
         return android.os.Build.VERSION.SDK_INT >= 11;
     }
@@ -1248,7 +1267,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * Returns the platform EDT thread priority
      */
-    public int getEDTThreadPriority(){
+    public int getEDTThreadPriority() {
         return Thread.NORM_PRIORITY;
     }
 
@@ -1261,31 +1280,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             metrics = getContext().getResources().getDisplayMetrics();
         }
 
-        if(metrics.densityDpi < DisplayMetrics.DENSITY_MEDIUM) {
+        if (metrics.densityDpi < DisplayMetrics.DENSITY_MEDIUM) {
             return Display.DENSITY_LOW;
         }
 
-        if(metrics.densityDpi < 213) {
+        if (metrics.densityDpi < 213) {
             return Display.DENSITY_MEDIUM;
         }
 
         // 213 == TV
-        if(metrics.densityDpi >= 213 &&  metrics.densityDpi <= DisplayMetrics.DENSITY_HIGH) {
+        if (metrics.densityDpi >= 213 && metrics.densityDpi <= DisplayMetrics.DENSITY_HIGH) {
             return Display.DENSITY_HIGH;
         }
 
-        if(metrics.densityDpi > DisplayMetrics.DENSITY_HIGH && metrics.densityDpi < 400) {
+        if (metrics.densityDpi > DisplayMetrics.DENSITY_HIGH && metrics.densityDpi < 400) {
             return Display.DENSITY_VERY_HIGH;
         }
 
-        if(metrics.densityDpi >= 400 && metrics.densityDpi < 560) {
+        if (metrics.densityDpi >= 400 && metrics.densityDpi < 560) {
             return Display.DENSITY_HD;
         }
 
-        if(metrics.densityDpi >= 560 && metrics.densityDpi <= 640) {
+        if (metrics.densityDpi >= 560 && metrics.densityDpi <= 640) {
             return Display.DENSITY_2HD;
         }
-        if(metrics.densityDpi > 640) {
+        if (metrics.densityDpi > 640) {
             return Display.DENSITY_4K;
         }
 
@@ -1299,7 +1318,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static boolean deinitializingEdt;
 
     public static void syncDeinitialize() {
-        if (deinitializingEdt){
+        if (deinitializingEdt) {
             return;
         }
         deinitializingEdt = true; // This will get unset in {@link #deinitialize()}
@@ -1356,15 +1375,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     private void initSurface() {
         if (getActivity() != null && myView == null) {
-            relativeLayout=  new RelativeLayout(getActivity());
+            relativeLayout = new RelativeLayout(getActivity());
             relativeLayout.setLayoutParams(new RelativeLayout.LayoutParams(
                     RelativeLayout.LayoutParams.FILL_PARENT,
                     RelativeLayout.LayoutParams.FILL_PARENT));
             relativeLayout.setFocusable(false);
 
             getActivity().getWindow().setBackgroundDrawable(null);
-            if(asyncView) {
-                if(android.os.Build.VERSION.SDK_INT < 14){
+            if (asyncView) {
+                if (android.os.Build.VERSION.SDK_INT < 14) {
                     myView = new AndroidSurfaceView(getActivity(), AndroidImplementation.this);
                 } else {
                     int hardwareAcceleration = 16777216;
@@ -1384,7 +1403,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             int id = getActivity().getResources().getIdentifier("main", "layout", getActivity().getApplicationInfo().packageName);
             RelativeLayout root = (RelativeLayout) LayoutInflater.from(getActivity()).inflate(id, null);
-            if(viewAbove != null) {
+            if (viewAbove != null) {
                 RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
                 lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
                 lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
@@ -1395,7 +1414,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 root.addView(viewAbove, lp);
             }
             root.addView(relativeLayout);
-            if(viewBelow != null) {
+            if (viewBelow != null) {
                 RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
                 lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
                 lp.addRule(RelativeLayout.CENTER_HORIZONTAL);
@@ -1414,20 +1433,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void confirmControlView() {
-        if(myView == null){
+        if (myView == null) {
             return;
         }
         myView.getAndroidView().setVisibility(View.VISIBLE);
         //ugly workaround for a bug where on some android versions the async view
         //came back black from the background.
-        if(myView instanceof AndroidAsyncView){
+        if (myView instanceof AndroidAsyncView) {
             new Thread(new Runnable() {
 
                 @Override
                 public void run() {
                     try {
                         Thread.sleep(1000);
-                        ((AndroidAsyncView)myView).setPaintViewOnBuffer(false);
+                        ((AndroidAsyncView) myView).setPaintViewOnBuffer(false);
                     } catch (Exception e) {
                     }
                 }
@@ -1446,7 +1465,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isMinimized() {
-        return getActivity() == null || ((CodenameOneActivity)getActivity()).isBackground();
+        return getActivity() == null || ((CodenameOneActivity) getActivity()).isBackground();
     }
 
     @Override
@@ -1512,7 +1531,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         stopEditing(false);
     }
 
-    public static void stopEditing(final boolean forceVKBClose){
+    public static void stopEditing(final boolean forceVKBClose) {
         if (getActivity() == null) {
             return;
         }
@@ -1574,7 +1593,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         stopEditing(true);
     }
 
-
     protected void setLastSizeChangedWH(int w, int h) {
         // not used?
         //this.lastSizeChangeW = w;
@@ -1633,7 +1651,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return true;
     }*/
-
     @Override
     public InputStream getResourceAsStream(Class cls, String resource) {
         try {
@@ -1745,9 +1762,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public int getHeight(Object nativeFont) {
         CodenameOneTextPaint font = (nativeFont == null ? this.defaultFont
                 : (CodenameOneTextPaint) ((NativeFont) nativeFont).font);
-        if(font.fontHeight < 0) {
+        if (font.fontHeight < 0) {
             Paint.FontMetrics fm = font.getFontMetrics();
-            font.fontHeight = (int)Math.ceil(fm.bottom - fm.top);
+            font.fontHeight = (int) Math.ceil(fm.bottom - fm.top);
         }
         return font.fontHeight;
     }
@@ -1770,11 +1787,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isBaselineTextSupported() {
         return true;
     }
-
-
-
-
-
 
     public int getFace(Object nativeFont) {
         if (nativeFont == null) {
@@ -1809,41 +1821,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private Typeface fontToRoboto(String fontName) {
-        if("native:MainThin".equals(fontName)) {
+        if ("native:MainThin".equals(fontName)) {
             return Typeface.create("sans-serif-thin", Typeface.NORMAL);
         }
-        if("native:MainLight".equals(fontName)) {
+        if ("native:MainLight".equals(fontName)) {
             return Typeface.create("sans-serif-light", Typeface.NORMAL);
         }
-        if("native:MainRegular".equals(fontName)) {
+        if ("native:MainRegular".equals(fontName)) {
             return Typeface.create("sans-serif", Typeface.NORMAL);
         }
 
-        if("native:MainBold".equals(fontName)) {
+        if ("native:MainBold".equals(fontName)) {
             return Typeface.create("sans-serif-condensed", Typeface.BOLD);
         }
 
-        if("native:MainBlack".equals(fontName)) {
+        if ("native:MainBlack".equals(fontName)) {
             return Typeface.create("sans-serif-black", Typeface.BOLD);
         }
 
-        if("native:ItalicThin".equals(fontName)) {
+        if ("native:ItalicThin".equals(fontName)) {
             return Typeface.create("sans-serif-thin", Typeface.ITALIC);
         }
 
-        if("native:ItalicLight".equals(fontName)) {
+        if ("native:ItalicLight".equals(fontName)) {
             return Typeface.create("sans-serif-thin", Typeface.ITALIC);
         }
 
-        if("native:ItalicRegular".equals(fontName)) {
+        if ("native:ItalicRegular".equals(fontName)) {
             return Typeface.create("sans-serif", Typeface.ITALIC);
         }
 
-        if("native:ItalicBold".equals(fontName)) {
+        if ("native:ItalicBold".equals(fontName)) {
             return Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC);
         }
 
-        if("native:ItalicBlack".equals(fontName)) {
+        if ("native:ItalicBlack".equals(fontName)) {
             return Typeface.create("sans-serif-black", Typeface.BOLD_ITALIC);
         }
 
@@ -1852,13 +1864,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
-        if(fontName.startsWith("native:")) {
+        if (fontName.startsWith("native:")) {
             Typeface t = fontToRoboto(fontName);
             int fontStyle = com.codename1.ui.Font.STYLE_PLAIN;
-            if(t.isBold()) {
+            if (t.isBold()) {
                 fontStyle |= com.codename1.ui.Font.STYLE_BOLD;
             }
-            if(t.isItalic()) {
+            if (t.isItalic()) {
                 fontStyle |= com.codename1.ui.Font.STYLE_ITALIC;
             }
             CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
@@ -1868,7 +1880,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
         }
         Typeface t = Typeface.createFromAsset(getContext().getAssets(), fileName);
-        if(t == null) {
+        if (t == null) {
             throw new RuntimeException("Font not found: " + fileName);
         }
         CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
@@ -1879,6 +1891,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public static class NativeFont {
+
         int face;
         int style;
         int size;
@@ -1902,11 +1915,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public boolean equals(Object o) {
-            if(o == null) {
+            if (o == null) {
                 return false;
             }
-            NativeFont n = ((NativeFont)o);
-            if(fileName != null) {
+            NativeFont n = ((NativeFont) o);
+            if (fileName != null) {
                 return n.fileName != null && fileName.equals(n.fileName) && n.height == height && n.weight == weight;
             }
             return n.face == face && n.style == style && n.size == size && font.equals(n.font);
@@ -1919,8 +1932,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
-        NativeFont fnt = (NativeFont)font;
-        CodenameOneTextPaint paint = (CodenameOneTextPaint)fnt.font;
+        NativeFont fnt = (NativeFont) font;
+        CodenameOneTextPaint paint = (CodenameOneTextPaint) fnt.font;
         paint.setAntiAlias(true);
         Typeface type = paint.getTypeface();
         int fontstyle = Typeface.NORMAL;
@@ -1957,7 +1970,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if ((style & Font.STYLE_ITALIC) != 0) {
             fontstyle |= Typeface.ITALIC;
         }
-
 
         int height = this.defaultFontHeight;
         int diff = height / 3;
@@ -2028,8 +2040,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setAntiAliasedText(Object graphics, boolean a) {
-        android.graphics.Paint p  = ((AndroidGraphics) graphics).getFont();
-        if(p != null) {
+        android.graphics.Paint p = ((AndroidGraphics) graphics).getFont();
+        if (p != null) {
             p.setAntiAlias(a);
         }
     }
@@ -2040,39 +2052,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new NativeFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM, paint);
     }
 
-
     private AndroidGraphics nullGraphics;
 
     private AndroidGraphics getNullGraphics() {
         if (nullGraphics == null) {
-            Bitmap bitmap = Bitmap.createBitmap(getDisplayWidth()==0?100:getDisplayWidth(), getDisplayHeight()==0?100:getDisplayHeight(),
+            Bitmap bitmap = Bitmap.createBitmap(getDisplayWidth() == 0 ? 100 : getDisplayWidth(), getDisplayHeight() == 0 ? 100 : getDisplayHeight(),
                     Bitmap.Config.ARGB_8888);
             nullGraphics = (AndroidGraphics) this.getNativeGraphics(bitmap);
         }
         return nullGraphics;
     }
 
-
     @Override
     public Object getNativeGraphics() {
-        if(myView != null){
+        if (myView != null) {
             nullGraphics = null;
             return myView.getGraphics();
-        }else{
+        } else {
             return getNullGraphics();
         }
     }
 
     @Override
     public Object getNativeGraphics(Object image) {
-        AndroidGraphics g =  new AndroidGraphics(this, new Canvas((Bitmap) image), true);
-        g.setClip(0, 0, ((Bitmap)image).getWidth(), ((Bitmap)image).getHeight());
+        AndroidGraphics g = new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        g.setClip(0, 0, ((Bitmap) image).getWidth(), ((Bitmap) image).getHeight());
         return g;
     }
 
     @Override
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y,
-                       int width, int height) {
+            int width, int height) {
         ((Bitmap) nativeImage).getPixels(arr, offset, width, x, y, width,
                 height);
     }
@@ -2103,11 +2113,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 BitmapFactory.Options o2 = new BitmapFactory.Options();
                 o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
 
-                if(sampleSizeOverride != -1) {
+                if (sampleSizeOverride != -1) {
                     o2.inSampleSize = sampleSizeOverride;
                 } else {
                     String sampleSize = Display.getInstance().getProperty("android.sampleSize", null);
-                    if(sampleSize != null) {
+                    if (sampleSize != null) {
                         o2.inSampleSize = Integer.parseInt(sampleSize);
                     } else {
                         o2.inSampleSize = scale;
@@ -2167,21 +2177,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean areMutableImagesFast() {
-        if (myView == null) return false;
+        if (myView == null) {
+            return false;
+        }
         return !myView.alwaysRepaintAll();
     }
 
     @Override
     public void repaint(Animation cmp) {
-        if(myView != null && myView.alwaysRepaintAll()) {
-            if(cmp instanceof Component) {
-                Component c = (Component)cmp;
+        if (myView != null && myView.alwaysRepaintAll()) {
+            if (cmp instanceof Component) {
+                Component c = (Component) cmp;
                 c.setDirtyRegion(null);
-                if(c.getParent() != null) {
+                if (c.getParent() != null) {
                     cmp = c.getComponentForm();
                 } else {
                     Form f = getCurrentForm();
-                    if(f != null) {
+                    if (f != null) {
                         cmp = f;
                     }
                 }
@@ -2189,7 +2201,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 // make sure the form is repainted for standalone anims e.g. in the case
                 // of replace animation
                 Form f = getCurrentForm();
-                if(f != null) {
+                if (f != null) {
                     super.repaint(f);
                 }
             }
@@ -2263,21 +2275,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * Returns true if the underlying OS supports opening the native navigation
      * application
-     * @return true if the underlying OS supports launch of native navigation app
+     *
+     * @return true if the underlying OS supports launch of native navigation
+     * app
      */
-    public boolean isOpenNativeNavigationAppSupported(){
+    public boolean isOpenNativeNavigationAppSupported() {
         return true;
     }
 
     /**
      * Opens the native navigation app in the given coordinate.
+     *
      * @param latitude
      * @param longitude
      */
-    public void openNativeNavigationApp(double latitude, double longitude){
-        execute("google.navigation:ll=" + latitude+ "," + longitude);
+    public void openNativeNavigationApp(double latitude, double longitude) {
+        execute("google.navigation:ll=" + latitude + "," + longitude);
     }
-
 
     @Override
     public void openNativeNavigationApp(String location) {
@@ -2348,7 +2362,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x,
-                        int y, int w, int h, boolean processAlpha) {
+            int y, int w, int h, boolean processAlpha) {
         ((AndroidGraphics) graphics).drawRGB(rgbData, offset, x, y, w, h, processAlpha);
     }
 
@@ -2359,7 +2373,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void drawRoundRect(Object graphics, int x, int y, int width,
-                              int height, int arcWidth, int arcHeight) {
+            int height, int arcWidth, int arcHeight) {
         ((AndroidGraphics) graphics).drawRoundRect(x, y, width, height, arcWidth, arcHeight);
     }
 
@@ -2370,13 +2384,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void drawArc(Object graphics, int x, int y, int width, int height,
-                        int startAngle, int arcAngle) {
+            int startAngle, int arcAngle) {
         ((AndroidGraphics) graphics).drawArc(x, y, width, height, startAngle, arcAngle);
     }
 
     @Override
     public void fillArc(Object graphics, int x, int y, int width, int height,
-                        int startAngle, int arcAngle) {
+            int startAngle, int arcAngle) {
         ((AndroidGraphics) graphics).fillArc(x, y, width, height, startAngle, arcAngle);
     }
 
@@ -2392,7 +2406,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void paintComponentBackground(Object graphics, int x, int y, int width, int height, Style s) {
-        if((!asyncView) || compatPaintMode ) {
+        if ((!asyncView) || compatPaintMode) {
             super.paintComponentBackground(graphics, x, y, width, height, s);
             return;
         }
@@ -2401,47 +2415,46 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
-        if(!asyncView) {
+        if (!asyncView) {
             super.fillLinearGradient(graphics, startColor, endColor, x, y, width, height, horizontal);
             return;
         }
-        ((AndroidGraphics)graphics).fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
+        ((AndroidGraphics) graphics).fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
 
     @Override
     public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
-        if(!asyncView) {
+        if (!asyncView) {
             super.fillRectRadialGradient(graphics, startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
             return;
         }
-        ((AndroidGraphics)graphics).fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+        ((AndroidGraphics) graphics).fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
     }
 
     @Override
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
-        ((AndroidGraphics)graphics).fillRadialGradient(startColor, endColor, x, y, width, height);
+        ((AndroidGraphics) graphics).fillRadialGradient(startColor, endColor, x, y, width, height);
     }
 
     @Override
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        ((AndroidGraphics)graphics).fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);
+        ((AndroidGraphics) graphics).fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);
     }
 
     @Override
     public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
-        if(AndroidAsyncView.legacyPaintLogic) {
+        if (AndroidAsyncView.legacyPaintLogic) {
             super.drawLabelComponent(nativeGraphics, cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth, isTickerRunning, tickerShiftText, endsWith3Points, valign);
             return;
         }
-        ((AndroidGraphics)nativeGraphics).drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text,
-                (Bitmap)icon, (Bitmap)stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth,
+        ((AndroidGraphics) nativeGraphics).drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text,
+                (Bitmap) icon, (Bitmap) stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth,
                 isTickerRunning, tickerShiftText, endsWith3Points, valign);
     }
 
-
     @Override
     public void fillRoundRect(Object graphics, int x, int y, int width,
-                              int height, int arcWidth, int arcHeight) {
+            int height, int arcWidth, int arcHeight) {
         ((AndroidGraphics) graphics).fillRoundRect(x, y, width, height, arcWidth, arcHeight);
     }
 
@@ -2506,7 +2519,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public boolean isShapeClipSupported(Object graphics){
+    public boolean isShapeClipSupported(Object graphics) {
         return Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB;
     }
 
@@ -2515,7 +2528,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         //Path p = cn1ShapeToAndroidPath(shape);
         ((AndroidGraphics) graphics).setClip(shape);
     }
-
 
     @Override
     public void clipRect(Object graphics, int x, int y, int width, int height) {
@@ -2707,6 +2719,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private static class NotifyActionBar implements Runnable {
+
         private Activity activity;
         private boolean show;
 
@@ -2755,11 +2768,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (u == null && intent.getExtras() != null) {
                 if (intent.getExtras().keySet().contains("android.intent.extra.STREAM")) {
                     try {
-                        u = (Uri)intent.getParcelableExtra("android.intent.extra.STREAM");
+                        u = (Uri) intent.getParcelableExtra("android.intent.extra.STREAM");
                         scheme = u.getScheme();
-                        System.out.println("u="+u);
+                        System.out.println("u=" + u);
                     } catch (Exception ex) {
-                        Log.d("Codename One", "Failed to load parcelable extra from intent: "+ex.getMessage());
+                        Log.d("Codename One", "Failed to load parcelable extra from intent: " + ex.getMessage());
                     }
                 }
 
@@ -2775,7 +2788,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (name != null) {
                                 String filePath = getAppHomePath()
                                         + getFileSystemSeparator() + name;
-                                if(filePath.startsWith("file:")) {
+                                if (filePath.startsWith("file:")) {
                                     filePath = filePath.substring(5);
                                 }
                                 File f = new File(filePath);
@@ -2819,7 +2832,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         setAppArg(encodedPath);
                         return encodedPath;
                     }
-                    */
+                     */
                     if (sharedText != null) {
                         setAppArg(sharedText);
                         return sharedText;
@@ -2836,7 +2849,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
-    
+
     // taken from https://stackoverflow.com/a/70380413/756809
     private boolean isRunningOnAndroidStudioEmulator() {
         return Build.FINGERPRINT.startsWith("google/sdk_gphone")
@@ -2847,8 +2860,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     // taken from https://stackoverflow.com/a/57960169/756809
     private boolean isEmulator() {
-        return isRunningOnAndroidStudioEmulator() ||
-                ((Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+        return isRunningOnAndroidStudioEmulator()
+                || ((Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
                 || Build.FINGERPRINT.startsWith("generic")
                 || Build.FINGERPRINT.startsWith("unknown")
                 || Build.HARDWARE.contains("goldfish")
@@ -2867,17 +2880,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 || Build.PRODUCT.contains("simulator"));
     }
 
-
     /**
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
-        if(key.equalsIgnoreCase("cn1_push_prefix")) {
+        if (key.equalsIgnoreCase("cn1_push_prefix")) {
             /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
                 return "";
             }*/
             boolean has = hasAndroidMarket();
-            if(has) {
+            if (has) {
                 return "gcm";
             }
             return defaultValue;
@@ -2912,7 +2924,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 ai = null;
             }
             String applicationName = (String) (ai != null ? pm.getApplicationLabel(ai) : null);
-            if(applicationName == null){
+            if (applicationName == null) {
                 return defaultValue;
             }
             return applicationName;
@@ -2928,25 +2940,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if ("Platform".equals(key)) {
             String p = System.getProperty("platform");
-            if(p == null) {
+            if (p == null) {
                 return defaultValue;
             }
             return p;
         }
         if ("User-Agent".equals(key)) {
             String ua = getUserAgent();
-            if(ua == null) {
+            if (ua == null) {
                 return defaultValue;
             }
             return ua;
         }
-        if("OSVer".equals(key)) {
+        if ("OSVer".equals(key)) {
             return "" + android.os.Build.VERSION.RELEASE;
         }
-        if("DeviceName".equals(key)) {
+        if ("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
         }
-        if("Emulator".equals(key)) {
+        if ("Emulator".equals(key)) {
             return "" + isEmulator();
         }
         /*try {
@@ -2982,18 +2994,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         if (getActivity() != null) {
             android.content.Intent intent = getActivity().getIntent();
-            if(intent != null){
+            if (intent != null) {
                 Bundle extras = intent.getExtras();
                 if (extras != null) {
                     String value = extras.getString(key);
-                    if(value != null) {
+                    if (value != null) {
                         return value;
                     }
                 }
             }
         }
 
-        if(!key.startsWith("android.permission")) {
+        if (!key.startsWith("android.permission")) {
             //these keys/values are from the Application Resources (strings values)
             try {
                 int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
@@ -3022,7 +3034,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private String getUserAgent() {
         try {
             String userAgent = System.getProperty("http.agent");
-            if(userAgent != null){
+            if (userAgent != null) {
                 return userAgent;
             }
         } catch (Exception e) {
@@ -3075,7 +3087,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-    private String getMimeType(String url){
+    private String getMimeType(String url) {
         String type = null;
         String extension = MimeTypeMap.getFileExtensionFromUrl(url);
         if (extension != null) {
@@ -3125,13 +3137,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        File copy = new File(cacheDir, "tmp-"+System.currentTimeMillis()+file.getName());
+        File copy = new File(cacheDir, "tmp-" + System.currentTimeMillis() + file.getName());
         copy(file, copy);
         return copy;
 
     }
-
-
 
     private Intent createIntentForURL(String url) {
         Intent intent;
@@ -3140,9 +3150,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (url.startsWith("intent")) {
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
-                if(url.startsWith("/") || url.startsWith("file:")) {
+                if (url.startsWith("/") || url.startsWith("file:")) {
                     if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
-                        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
+                        if (!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")) {
                             return null;
                         }
                     }
@@ -3154,13 +3164,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     File f = new File(url);
                     Uri furi = null;
                     try {
-                        furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                        furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", f);
                     } catch (Exception ex) {
                         f = makeTempCacheCopy(f);
-                        furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                        furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", f);
                     }
-        
-        
+
                     if (Build.VERSION.SDK_INT < 21) {
                         List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
                         for (ResolveInfo resolveInfo : resInfoList) {
@@ -3168,23 +3177,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             getContext().grantUriPermission(packageName, furi, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         }
                     }
-                    
+
                     uri = furi;
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                }else{
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } else {
 
                     if (url.startsWith("file:")) {
                         File f = new File(removeFilePrefix(url));
-                        System.out.println("File size: "+f.length());
+                        System.out.println("File size: " + f.length());
 
                         Uri furi = null;
                         try {
-                            furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                            furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", f);
                         } catch (Exception ex) {
                             f = makeTempCacheCopy(f);
-                            furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", f);
+                            furi = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", f);
                         }
-
 
                         if (Build.VERSION.SDK_INT < 21) {
                             List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
@@ -3194,23 +3202,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         }
                         uri = furi;
-                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
                     } else {
                         uri = Uri.parse(url);
                     }
                 }
                 String mimeType = getMimeType(url);
-                if(mimeType != null){
+                if (mimeType != null) {
                     intent.setDataAndType(uri, mimeType);
-                }else{
+                } else {
                     intent.setData(uri);
                 }
             }
 
             return intent;
-        } catch(Exception err) {
+        } catch (Exception err) {
             com.codename1.io.Log.e(err);
             return null;
         }
@@ -3220,18 +3227,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Boolean canExecute(String url) {
         try {
             Intent it = createIntentForURL(url);
-            if(it == null) {
+            if (it == null) {
                 return false;
             }
             final PackageManager mgr = getContext().getPackageManager();
             List<ResolveInfo> list = mgr.queryIntentActivities(it, PackageManager.MATCH_DEFAULT_ONLY);
             return list.size() > 0;
-        } catch(Exception err) {
+        } catch (Exception err) {
             com.codename1.io.Log.e(err);
             return false;
         }
     }
-
 
     public void execute(String url, ActionListener response) {
         if (response != null) {
@@ -3241,12 +3247,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         try {
             Intent intent = createIntentForURL(url);
-            if(intent == null) {
+            if (intent == null) {
                 return;
             }
-            if(response != null && getActivity() != null){
+            if (response != null && getActivity() != null) {
                 getActivity().startActivityForResult(intent, IntentResultListener.URI_SCHEME);
-            }else {
+            } else {
                 getContext().startActivity(intent);
             }
             return;
@@ -3255,7 +3261,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         try {
-            if(editInProgress()) {
+            if (editInProgress()) {
                 stopEditing(true);
             }
             getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
@@ -3263,7 +3269,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             e.printStackTrace();
         }
     }
-
 
     /**
      * @inheritDoc
@@ -3308,7 +3313,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isNativeVideoPlayerControlsIncluded() {
         return true;
     }
-    
+
     private static final int STATE_PAUSED = 0;
     private static final int STATE_PLAYING = 1;
 
@@ -3316,17 +3321,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private MediaBrowserCompat mMediaBrowserCompat;
     private android.support.v4.media.session.MediaControllerCompat mMediaControllerCompat;
-    
+
     private android.support.v4.media.session.MediaControllerCompat.Callback mMediaControllerCompatCallback = new android.support.v4.media.session.MediaControllerCompat.Callback() {
 
         @Override
         public void onPlaybackStateChanged(PlaybackStateCompat state) {
             super.onPlaybackStateChanged(state);
-            if( state == null ) {
+            if (state == null) {
                 return;
             }
 
-            switch( state.getState() ) {
+            switch (state.getState()) {
                 case PlaybackStateCompat.STATE_PLAYING: {
                     mCurrentState = STATE_PLAYING;
                     break;
@@ -3338,7 +3343,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     };
-    
+
     private MediaBrowserCompat.ConnectionCallback mMediaBrowserCompatConnectionCallback = new MediaBrowserCompat.ConnectionCallback() {
 
         @Override
@@ -3350,21 +3355,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 MediaControllerCompat.setMediaController(getActivity(), mMediaControllerCompat);
                 MediaControllerCompat.getMediaController(getActivity()).getTransportControls().play();
 
-            } catch( RemoteException e ) {
+            } catch (RemoteException e) {
                 e.printStackTrace();
             }
         }
     };
 
     //BackgroundAudioService remoteControl;
-
     @Override
     public void startRemoteControl() {
         super.startRemoteControl();
         getActivity().runOnUiThread(new Runnable() {
             public void run() {
                 mMediaBrowserCompat = new MediaBrowserCompat(getActivity(), new ComponentName(getActivity(), BackgroundAudioService.class),
-                mMediaBrowserCompatConnectionCallback, getActivity().getIntent().getExtras());
+                        mMediaBrowserCompatConnectionCallback, getActivity().getIntent().getExtras());
 
                 mMediaBrowserCompat.connect();
                 AndroidNativeUtil.addLifecycleListener(new LifecycleListener() {
@@ -3386,7 +3390,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     @Override
                     public void onDestroy() {
                         if (mMediaBrowserCompat != null) {
-                            if( MediaControllerCompat.getMediaController(getActivity()).getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING ) {
+                            if (MediaControllerCompat.getMediaController(getActivity()).getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING) {
                                 MediaControllerCompat.getMediaController(getActivity()).getTransportControls().pause();
                             }
 
@@ -3406,16 +3410,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 });
             }
-            
+
         });
-        
+
     }
 
     @Override
     public void stopRemoteControl() {
-        super.stopRemoteControl(); 
+        super.stopRemoteControl();
         if (mMediaBrowserCompat != null) {
-            if( MediaControllerCompat.getMediaController(getActivity()).getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING ) {
+            if (MediaControllerCompat.getMediaController(getActivity()).getPlaybackState().getState() == PlaybackStateCompat.STATE_PLAYING) {
                 MediaControllerCompat.getMediaController(getActivity()).getTransportControls().pause();
             }
 
@@ -3423,7 +3427,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             mMediaBrowserCompat = null;
         }
     }
-
 
     @Override
     public AsyncResource<Media> createBackgroundMediaAsync(final String uri) {
@@ -3444,6 +3447,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int nextMediaId;
     private int backgroundMediaCount;
     private ServiceConnection backgroundMediaServiceConnection;
+
     @Override
     public Media createBackgroundMedia(final String uri) throws IOException {
         int mediaId = nextMediaId++;
@@ -3463,14 +3467,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 public void onServiceConnected(ComponentName name, IBinder service) {
                     AudioService.LocalBinder mLocalBinder = (AudioService.LocalBinder) service;
-                    AudioService svc = (AudioService)mLocalBinder.getService();
+                    AudioService svc = (AudioService) mLocalBinder.getService();
                     background = svc;
                 }
             };
             backgroundMediaServiceConnection = mConnection;
             boolean boundSuccess = getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
             if (!boundSuccess) {
-                throw new RuntimeException("Failed to bind background media service for uri "+uri);
+                throw new RuntimeException("Failed to bind background media service for uri " + uri);
             }
             ContextCompat.startForegroundService(getContext(), serviceIntent);
             while (background == null) {
@@ -3495,7 +3499,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         Media ret = new MediaProxy(background.getMedia(mediaId)) {
 
-            
             @Override
             public void cleanup() {
                 super.cleanup();
@@ -3510,11 +3513,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         };
-        
+
         return ret;
 
     }
-
 
     /**
      * @inheritDoc
@@ -3524,8 +3526,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
-        if(!uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
-            if(!PermissionsHelper.checkForPermission(isVideo ? DevicePermission.PERMISSION_READ_VIDEO : DevicePermission.PERMISSION_READ_AUDIO, "This is required to play media")){
+        if (!uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
+            if (!PermissionsHelper.checkForPermission(isVideo ? DevicePermission.PERMISSION_READ_VIDEO : DevicePermission.PERMISSION_READ_AUDIO, "This is required to play media")) {
                 return null;
             }
         }
@@ -3590,11 +3592,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void addCompletionHandler(Media media, Runnable onCompletion) {
         super.addCompletionHandler(media, onCompletion);
         if (media instanceof Video) {
-            ((Video)media).addCompletionHandler(onCompletion);
+            ((Video) media).addCompletionHandler(onCompletion);
         } else if (media instanceof Audio) {
-            ((Audio)media).addCompletionHandler(onCompletion);
+            ((Audio) media).addCompletionHandler(onCompletion);
         } else if (media instanceof MediaProxy) {
-            ((MediaProxy)media).addCompletionHandler(onCompletion);
+            ((MediaProxy) media).addCompletionHandler(onCompletion);
         }
     }
 
@@ -3602,16 +3604,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void removeCompletionHandler(Media media, Runnable onCompletion) {
         super.removeCompletionHandler(media, onCompletion);
         if (media instanceof Video) {
-            ((Video)media).removeCompletionHandler(onCompletion);
+            ((Video) media).removeCompletionHandler(onCompletion);
         } else if (media instanceof Audio) {
-            ((Audio)media).removeCompletionHandler(onCompletion);
+            ((Audio) media).removeCompletionHandler(onCompletion);
         } else if (media instanceof MediaProxy) {
-            ((MediaProxy)media).removeCompletionHandler(onCompletion);
+            ((MediaProxy) media).removeCompletionHandler(onCompletion);
         }
     }
 
-    
-    
     /**
      * @inheritDoc
      */
@@ -3648,7 +3648,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             @Override
             public void run() {
-                if(onCompletion != null){
+                if (onCompletion != null) {
                     Display.getInstance().callSerially(onCompletion);
 
                     // makes sure the file is only deleted after the onCompletion was invoked
@@ -3709,14 +3709,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 .mimeType(mimeType);
         return createMediaRecorder(builder);
     }
-    
-   
-    
-    private  Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration, final boolean redirectToAudioBuffer) throws IOException {
+
+    private Media createMediaRecorder(final String path, final String mimeType, final int sampleRate, final int bitRate, final int audioChannels, final int maxDuration, final boolean redirectToAudioBuffer) throws IOException {
         if (getActivity() == null) {
             return null;
         }
-        if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record audio")){
+        if (!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record audio")) {
             return null;
         }
         final Media[] record = new Media[1];
@@ -3729,23 +3727,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     synchronized (lock) {
                         if (redirectToAudioBuffer) {
-                            final int channelConfig =audioChannels == 1 ? android.media.AudioFormat.CHANNEL_IN_MONO
-                                            : audioChannels == 2 ? android.media.AudioFormat.CHANNEL_IN_STEREO
-                                                    : android.media.AudioFormat.CHANNEL_IN_MONO;
+                            final int channelConfig = audioChannels == 1 ? android.media.AudioFormat.CHANNEL_IN_MONO
+                                    : audioChannels == 2 ? android.media.AudioFormat.CHANNEL_IN_STEREO
+                                            : android.media.AudioFormat.CHANNEL_IN_MONO;
                             final AudioRecord recorder = new AudioRecord(
-                                    MediaRecorder.AudioSource.MIC, 
-                                    sampleRate, 
+                                    MediaRecorder.AudioSource.MIC,
+                                    sampleRate,
                                     channelConfig,
                                     AudioFormat.ENCODING_PCM_16BIT,
                                     AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT)
                             );
-                            
+
                             final com.codename1.media.AudioBuffer audioBuffer = com.codename1.media.MediaManager.getAudioBuffer(path, true, 64);
                             final boolean[] stop = new boolean[1];
 
                             record[0] = new AbstractMedia() {
                                 private int lastTime;
                                 private boolean isRecording;
+
                                 @Override
                                 protected void playImpl() {
                                     if (isRecording) {
@@ -3760,11 +3759,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                             short[] buffer = new short[AudioRecord.getMinBufferSize(recorder.getSampleRate(), recorder.getChannelCount(), AudioFormat.ENCODING_PCM_16BIT)];
                                             int read = -1;
                                             int index = 0;
-                                            
+
                                             while (isRecording && (read = recorder.read(buffer, 0, buffer.length)) >= 0) {
                                                 if (read > 0) {
-                                                    for (int i=0; i<read; i++) {
-                                                        audioData[index] = ((float)buffer[i]) / 0x8000;
+                                                    for (int i = 0; i < read; i++) {
+                                                        audioData[index] = ((float) buffer[i]) / 0x8000;
                                                         index++;
                                                         if (index >= audioData.length) {
                                                             audioBuffer.copyFrom(sampleRate, audioChannels, audioData, 0, index);
@@ -3791,13 +3790,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     isRecording = false;
                                     recorder.stop();
 
-
                                     fireMediaStateChange(State.Paused);
                                 }
 
                                 @Override
                                 public void prepare() {
-                                    
+
                                 }
 
                                 @Override
@@ -3805,7 +3803,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     pauseImpl();
                                     recorder.release();
                                     com.codename1.media.MediaManager.releaseAudioBuffer(path);
-                                    
+
                                 }
 
                                 @Override
@@ -3822,7 +3820,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                                 @Override
                                 public void setTime(int time) {
-                                    
+
                                 }
 
                                 @Override
@@ -3832,7 +3830,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                                 @Override
                                 public void setVolume(int vol) {
-                                    
+
                                 }
 
                                 @Override
@@ -3862,12 +3860,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                                 @Override
                                 public void setFullScreen(boolean fullScreen) {
-                                    
+
                                 }
 
                                 @Override
                                 public void setNativePlayerMode(boolean nativePlayer) {
-                                    
+
                                 }
 
                                 @Override
@@ -3877,24 +3875,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                                 @Override
                                 public void setVariable(String key, Object value) {
-                                    
+
                                 }
 
                                 @Override
                                 public Object getVariable(String key) {
                                     return null;
                                 }
-                                
+
                             };
                             lock.notify();
                         } else {
                             MediaRecorder recorder = new MediaRecorder();
                             recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-                        
-                            if(mimeType.contains("amr")){
-                            recorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
-                            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-                            }else{
+
+                            if (mimeType.contains("amr")) {
+                                recorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
+                                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+                            } else {
                                 recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
                                 recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
                                 recorder.setAudioSamplingRate(sampleRate);
@@ -3918,8 +3916,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 lock.notify();
                             }
                         }
-                        
-
 
                     }
                 }
@@ -3939,12 +3935,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-    public String [] getAvailableRecordingMimeTypes(){
+    public String[] getAvailableRecordingMimeTypes() {
         // audio/aac and audio/mp4 result in the same thing
         // AAC are wrapped in an mp4 container.
         return new String[]{"audio/amr", "audio/aac", "audio/mp4"};
     }
-
 
     /**
      * @inheritDoc
@@ -4026,16 +4021,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void edtIdle(boolean enter) {
         super.edtIdle(enter);
-        if(enter) {
+        if (enter) {
             // check if we have peers waiting for resize...
-            if(myView instanceof AndroidAsyncView) {
-                ((AndroidAsyncView)myView).resizeViews();
+            if (myView instanceof AndroidAsyncView) {
+                ((AndroidAsyncView) myView).resizeViews();
             }
         }
     }
 
-    static final Map<View,AndroidPeer> activePeers = new HashMap<View,AndroidPeer>();
-
+    static final Map<View, AndroidPeer> activePeers = new HashMap<View, AndroidPeer>();
 
     /**
      * wrapper component that capsules a native view object in a Codename One
@@ -4067,7 +4061,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public AndroidPeer(View vv) {
             super(vv);
             this.v = vv;
-            if(!superPeerMode) {
+            if (!superPeerMode) {
                 v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
                         MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
             }
@@ -4077,12 +4071,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         protected Image generatePeerImage() {
             try {
                 Bitmap bmp = AndroidNativeUtil.renderViewOnBitmap(v, getWidth(), getHeight());
-                if(bmp == null) {
+                if (bmp == null) {
                     return Image.createImage(5, 5);
                 }
                 Image image = new AndroidImplementation.NativeImage(bmp);
                 return image;
-            } catch(Throwable t) {
+            } catch (Throwable t) {
                 t.printStackTrace();
                 return Image.createImage(5, 5);
             }
@@ -4093,7 +4087,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         protected void setLightweightMode(boolean l) {
-            if(superPeerMode) {
+            if (superPeerMode) {
                 if (l != lightweightMode) {
                     lightweightMode = l;
                     if (lightweightMode) {
@@ -4132,7 +4126,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 }
             });
-            if(visible){
+            if (visible) {
                 layoutPeer();
             }
         }
@@ -4153,7 +4147,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         protected void deinitialize() {
-            if(!superPeerMode) {
+            if (!superPeerMode) {
                 Image i = generatePeerImage();
                 setPeerImage(i);
                 super.deinitialize();
@@ -4161,27 +4155,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     nativePeers.remove(this);
                 }
                 deinit();
-            }else{
+            } else {
                 Image img = generatePeerImage();
                 if (img != null) {
                     peerImage = img;
                 }
 
-                if(myView instanceof AndroidAsyncView){
-                    ((AndroidAsyncView)myView).removePeerView(v);
+                if (myView instanceof AndroidAsyncView) {
+                    ((AndroidAsyncView) myView).removePeerView(v);
                 }
                 super.deinitialize();
             }
         }
 
-        public void deinit(){
+        public void deinit() {
             if (getActivity() == null) {
                 return;
             }
             if (peerImage == null) {
                 peerImage = generatePeerImage();
             }
-            final boolean [] removed = new boolean[1];
+            final boolean[] removed = new boolean[1];
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     try {
@@ -4201,7 +4195,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         if (!removed[0]) {
                             try {
                                 Thread.sleep(5);
-                            } catch(InterruptedException er) {}
+                            } catch (InterruptedException er) {
+                            }
                         }
                     }
                 });
@@ -4210,7 +4205,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         protected void initComponent() {
             super.initComponent();
-            if(!superPeerMode) {
+            if (!superPeerMode) {
                 synchronized (nativePeers) {
                     nativePeers.add(this);
                 }
@@ -4219,8 +4214,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        public void init(){
-            if(superPeerMode || getActivity() == null) {
+        public void init() {
+            if (superPeerMode || getActivity() == null) {
                 return;
             }
             runOnUiThreadAndBlock(new Runnable() {
@@ -4257,16 +4252,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     lastDirectionalKeyEventReceivedByWrapper = CodenameOneView.internalKeyCodeTranslate(ke.getKeyCode());
 
                                     // move focus back to base view.
-                                    if (AndroidImplementation.this.myView == null) return false;
+                                    if (AndroidImplementation.this.myView == null) {
+                                        return false;
+                                    }
                                     AndroidImplementation.this.myView.getAndroidView().requestFocus();
 
                                     /**
-                                     * if the wrapper has focus, then only because
-                                     * the wrapped native component just lost focus.
-                                     * we consume whatever key events we receive,
-                                     * just to make sure no half press/release
-                                     * sequence reaches the base view (and therefore
-                                     * Codename One).
+                                     * if the wrapper has focus, then only
+                                     * because the wrapped native component just
+                                     * lost focus. we consume whatever key
+                                     * events we receive, just to make sure no
+                                     * half press/release sequence reaches the
+                                     * base view (and therefore Codename One).
                                      */
                                     return true;
                                 }
@@ -4278,16 +4275,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             });
                             layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
                                 public boolean onTouch(View v, MotionEvent me) {
-                                    if (myView == null) return false;
+                                    if (myView == null) {
+                                        return false;
+                                    }
                                     return myView.getAndroidView().onTouchEvent(me);
                                 }
                             });
                         }
-                        if(AndroidImplementation.this.relativeLayout != null){
+                        if (AndroidImplementation.this.relativeLayout != null) {
                             // not sure why this happens but we got an exception where add view was called with
                             // a layout that was already added...
-                            if(layoutWrapper.getParent() != null) {
-                                ((ViewGroup)layoutWrapper.getParent()).removeView(layoutWrapper);
+                            if (layoutWrapper.getParent() != null) {
+                                ((ViewGroup) layoutWrapper.getParent()).removeView(layoutWrapper);
                             }
                             AndroidImplementation.this.relativeLayout.addView(layoutWrapper);
                         }
@@ -4296,13 +4295,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
         }
         private Image peerImage;
+
         public void paint(final Graphics g) {
-            if(superPeerMode) {
+            if (superPeerMode) {
                 Object nativeGraphics = com.codename1.ui.Accessor.getNativeGraphics(g);
 
                 Object o = v.getLayoutParams();
                 AndroidAsyncView.LayoutParams lp;
-                if(o instanceof AndroidAsyncView.LayoutParams) {
+                if (o instanceof AndroidAsyncView.LayoutParams) {
                     lp = (AndroidAsyncView.LayoutParams) o;
                     if (lp == null) {
                         lp = new AndroidAsyncView.LayoutParams(
@@ -4349,15 +4349,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 // this is a mutable image or side menu etc. where the peer is drawn on a different form...
                 // Special case...
-                if(nativeGraphics.getClass() == AndroidGraphics.class) {
-                    if(peerImage == null) {
+                if (nativeGraphics.getClass() == AndroidGraphics.class) {
+                    if (peerImage == null) {
                         peerImage = generatePeerImage();
                     }
                     //systemOut("Drawing native image");
                     g.drawImage(peerImage, getX(), getY());
                     return;
                 }
-                synchronized(activePeers) {
+                synchronized (activePeers) {
                     activePeers.put(v, this);
                 }
                 ((AndroidGraphics) nativeGraphics).drawView(v, lp);
@@ -4375,7 +4375,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected void onPositionSizeChange() {
-            if(!superPeerMode) {
+            if (!superPeerMode) {
                 Form f = getComponentForm();
                 if (v.getVisibility() == View.INVISIBLE
                         && f != null
@@ -4387,11 +4387,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        protected void layoutPeer(){
+        protected void layoutPeer() {
             if (getActivity() == null) {
                 return;
             }
-            if(!superPeerMode) {
+            if (!superPeerMode) {
                 // called by Codename One EDT to position the native component.
                 activity.runOnUiThread(new Runnable() {
                     public void run() {
@@ -4477,7 +4477,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (layoutWrapper != null && getActivity() != null) {
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
-                        if(isInitialized()) {
+                        if (isInitialized()) {
                             // request focus of the wrapper. that will trigger the
                             // android focus listener and move focus back to the
                             // base view.
@@ -4504,12 +4504,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             w = Math.max(v.getMeasuredWidth(), w);
             h = Math.max(v.getMeasuredHeight(), h);
             if (v instanceof TextView) {
-                TextView tv = (TextView)v;
+                TextView tv = (TextView) v;
                 w = (int) android.text.Layout.getDesiredWidth(((TextView) v).getText(), ((TextView) v).getPaint());
                 int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
                 tv.measure(w, heightMeasureSpec);
-                h = (int)Math.max(h, tv.getMeasuredHeight());
-
+                h = (int) Math.max(h, tv.getMeasuredHeight());
 
             }
             return new Dimension(w, h);
@@ -4531,7 +4530,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.setLayoutParams(createMyLayoutParams(peer.getAbsoluteX(), peer.getAbsoluteY(),
                     peer.getWidth(), peer.getHeight()));
             if (v.getParent() != null) {
-                ((ViewGroup)v.getParent()).removeView(v);
+                ((ViewGroup) v.getParent()).removeView(v);
             }
             this.addView(v, new RelativeLayout.LayoutParams(
                     RelativeLayout.LayoutParams.FILL_PARENT,
@@ -4582,7 +4581,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return super.dispatchKeyEvent(event);
             }
         }
-
 
     }
 
@@ -4649,7 +4647,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         getActivity().runOnUiThread(new Runnable() {
             public void run() {
-                AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
+                AndroidBrowserComponent bc = (AndroidBrowserComponent) browserPeer;
                 bc.setScrollingEnabled(e);
             }
         });
@@ -4663,7 +4661,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         getActivity().runOnUiThread(new Runnable() {
             public void run() {
-                AndroidBrowserComponent bc = (AndroidBrowserComponent)browserPeer;
+                AndroidBrowserComponent bc = (AndroidBrowserComponent) browserPeer;
                 bc.setPinchZoomEnabled(e);
             }
         });
@@ -4690,9 +4688,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                                 int keycode = event.getKeyCode();
                                 keycode = CodenameOneView.internalKeyCodeTranslate(keycode);
-                                if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK || 
-                                    (keycode == KeyEvent.KEYCODE_MENU && 
-                                        Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE)) {
+                                if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK
+                                        || (keycode == KeyEvent.KEYCODE_MENU
+                                        && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE)) {
                                     switch (event.getAction()) {
                                         case KeyEvent.ACTION_DOWN:
                                             Display.getInstance().keyPressed(keycode);
@@ -4703,10 +4701,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     }
                                     return true;
                                 } else {
-                                    if(Display.getInstance().getProperty(
-                                        "android.propogateKeyEvents", "false").
-                                            equalsIgnoreCase("true") && 
-                                        myView instanceof AndroidAsyncView) {
+                                    if (Display.getInstance().getProperty(
+                                            "android.propogateKeyEvents", "false").
+                                            equalsIgnoreCase("true")
+                                            && myView instanceof AndroidAsyncView) {
                                         switch (event.getAction()) {
                                             case KeyEvent.ACTION_DOWN:
                                                 Display.getInstance().keyPressed(keycode);
@@ -4716,8 +4714,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                                 break;
                                         }
                                         return true;
-                                    }                                    
-                                                                        
+                                    }
+
                                     return super.dispatchKeyEvent(event);
                                 }
                             }
@@ -4737,7 +4735,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 return false;
                             }
                         });
-                        
+
                         if (android.os.Build.VERSION.SDK_INT >= 19) {
                             if ("true".equals(Display.getInstance().getProperty("android.webContentsDebuggingEnabled", "false"))) {
                                 wv.setWebContentsDebuggingEnabled(true);
@@ -4798,14 +4796,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
         if (url.startsWith("jar:")) {
             url = url.substring(6);
-            if(url.indexOf("/") != 0) {
-                url = "/"+url;
+            if (url.indexOf("/") != 0) {
+                url = "/" + url;
             }
 
-            url = "file:///android_asset"+url;
+            url = "file:///android_asset" + url;
         }
         AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
-        if(bc.parent.fireBrowserNavigationCallbacks(url)) {
+        if (bc.parent.fireBrowserNavigationCallbacks(url)) {
             bc.setURL(url, headers);
         }
     }
@@ -4874,15 +4872,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean useEvaluateJavascript() {
         return android.os.Build.VERSION.SDK_INT >= 19;
     }
-    
 
-    private int jsCallbackIndex=0;
+    private int jsCallbackIndex = 0;
 
     private void execJSUnsafe(WebView web, String js) {
         if (useEvaluateJavascript()) {
             web.evaluateJavascript(js, null);
         } else {
-            web.loadUrl("javascript:(function(){"+js+"})()");
+            web.loadUrl("javascript:(function(){" + js + "})()");
         }
     }
 
@@ -4920,12 +4917,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             // The jsCallback is a special java object exposed to javascript that we use
             // to return values from javascript to java.
-            synchronized (bc.jsCallback){
+            synchronized (bc.jsCallback) {
                 // Initialize the return value to null
                 while (!bc.jsCallback.isIndexAvailable(index)) {
                     index++;
                 }
-                jsCallbackIndex = index+1;
+                jsCallbackIndex = index + 1;
             }
             final int fIndex = index;
             // We are placing the javascript inside eval() so we need to escape
@@ -4934,15 +4931,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             escaped = StringUtil.replaceAll(escaped, "'", "\\'");
 
             final String js = "javascript:(function(){"
-
                     + "try{"
-                    +bc.jsCallback.jsInit()
-                    +bc.jsCallback.jsCleanup()
-                    + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
-                    + "=eval('"+escaped +"');} catch (e){console.log(e)};"
-                    + AndroidBrowserComponentCallback.JS_VAR_NAME+".addReturnValue(" + index+", ''+"
-
-                    + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
+                    + bc.jsCallback.jsInit()
+                    + bc.jsCallback.jsCleanup()
+                    + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME + "[" + index + "]"
+                    + "=eval('" + escaped + "');} catch (e){console.log(e)};"
+                    + AndroidBrowserComponentCallback.JS_VAR_NAME + ".addReturnValue(" + index + ", ''+"
+                    + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME + "[" + index + "]"
                     + ");})()";
 
             // Send the Javascript string via SetURL.
@@ -4959,7 +4954,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                     // If we are not on the EDT, then it is safe to just loop and wait.
                     while (!bc.jsCallback.isValueSet(fIndex) && tryCounter++ < maxTries) {
-                        synchronized(bc.jsCallback){
+                        synchronized (bc.jsCallback) {
                             Util.wait(bc.jsCallback, 20);
                         }
                     }
@@ -4970,7 +4965,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         resultCallback.onReceiveValue(retval != null ? JSONObject.quote(retval) : null);
 
                     } else {
-                        com.codename1.io.Log.e(new RuntimeException("Failed to execute javascript "+js+" after maximum wait time."));
+                        com.codename1.io.Log.e(new RuntimeException("Failed to execute javascript " + js + " after maximum wait time."));
                         resultCallback.onReceiveValue(null);
                     }
                 }
@@ -5000,8 +4995,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-
-
     @Override
     public void browserExecute(final PeerComponent browserPeer, final String javaScript) {
         final AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
@@ -5009,6 +5002,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private com.codename1.util.EasyThread jsDispatchThread;
+
     private com.codename1.util.EasyThread jsDispatchThread() {
         if (jsDispatchThread == null) {
             jsDispatchThread = com.codename1.util.EasyThread.start("JS Dispatch Thread");
@@ -5042,9 +5036,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return false;
     }
-    
+
     /**
      * Executes javascript and returns a string result where appropriate.
+     *
      * @param browserPeer
      * @param javaScript
      * @return
@@ -5058,14 +5053,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         execJSSafe(bc, javaScript, new ValueCallback<String>() {
             @Override
             public void onReceiveValue(String value) {
-                synchronized(result) {
+                synchronized (result) {
                     complete[0] = true;
                     result[0] = value;
                     result.notify();
                 }
             }
         });
-        synchronized(result) {
+        synchronized (result) {
             if (!complete[0]) {
                 Util.wait(result, 10000);
             }
@@ -5073,7 +5068,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (result[0] == null) {
             return null;
         } else {
-            org.json.JSONTokener tok = new org.json.JSONTokener("{\"result\":"+result[0]+"}");
+            org.json.JSONTokener tok = new org.json.JSONTokener("{\"result\":" + result[0] + "}");
             try {
                 JSONObject jso = new JSONObject(tok);
                 return jso.getString("result");
@@ -5083,7 +5078,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
         }
-
 
     }
 
@@ -5099,9 +5093,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return;
         }
-        if(portrait){
+        if (portrait) {
             getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-        }else{
+        } else {
             getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         }
     }
@@ -5112,8 +5106,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
     }
-
-
 
     public boolean isAffineSupported() {
         return true;
@@ -5146,6 +5138,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     /**
      * Executes r on the UI thread and blocks the EDT to completion
+     *
      * @param r runnable to execute
      */
     public static void runOnUiThreadAndBlock(final Runnable r) {
@@ -5159,10 +5152,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             public void run() {
                 try {
                     r.run();
-                } catch(Throwable t) {
+                } catch (Throwable t) {
                     com.codename1.io.Log.e(t);
                 }
-                synchronized(completed) {
+                synchronized (completed) {
                     completed[0] = true;
                     completed.notify();
                 }
@@ -5171,17 +5164,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
-                synchronized(completed) {
-                    while(!completed[0]) {
+                synchronized (completed) {
+                    while (!completed[0]) {
                         try {
                             completed.wait();
-                        } catch(InterruptedException err) {}
+                        } catch (InterruptedException err) {
+                        }
                     }
                 }
             }
         });
     }
-    
+
     public static void runOnUiThreadSync(final Runnable r) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot run on UI thread because getActivity() is null.  This generally means we are running inside a service in the background so UI access is disabled.");
@@ -5193,24 +5187,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             public void run() {
                 try {
                     r.run();
-                } catch(Throwable t) {
+                } catch (Throwable t) {
                     com.codename1.io.Log.e(t);
                 }
-                synchronized(completed) {
+                synchronized (completed) {
                     completed[0] = true;
                     completed.notify();
                 }
             }
         });
-        synchronized(completed) {
-            while(!completed[0]) {
+        synchronized (completed) {
+            while (!completed[0]) {
                 try {
                     completed.wait();
-                } catch(InterruptedException err) {}
+                } catch (InterruptedException err) {
+                }
             }
         }
     }
-
 
     public int convertToPixels(int dipCount, boolean horizontal) {
         DisplayMetrics dm = getContext().getResources().getDisplayMetrics();
@@ -5228,8 +5222,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Checks if this platform supports sharing cookies between Native components (e.g. BrowserComponent)
-     * and ConnectionRequests.  Currently only Android and iOS ports support this.
+     * Checks if this platform supports sharing cookies between Native
+     * components (e.g. BrowserComponent) and ConnectionRequests. Currently only
+     * Android and iOS ports support this.
+     *
      * @return
      */
     @Override
@@ -5243,6 +5239,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         mgr.removeAllCookie();
     }
     private static CookieManager cookieManager;
+
     private static CookieManager getCookieManager() {
         if (android.os.Build.VERSION.SDK_INT > 28) {
             return CookieManager.getInstance();
@@ -5260,7 +5257,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (isUseNativeCookieStore()) {
             try {
                 URI uri = new URI(url);
-
 
                 CookieManager mgr = getCookieManager();
                 mgr.removeExpiredCookie();
@@ -5293,8 +5289,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public class WebAppInterface {
+
         BrowserComponent bc;
-        /** Instantiate the interface and set the context */
+
+        /**
+         * Instantiate the interface and set the context
+         */
         WebAppInterface(BrowserComponent bc) {
             this.bc = bc;
         }
@@ -5304,7 +5304,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return bc.fireBrowserNavigationCallbacks(url);
         }
     }
-    
+
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
         private Activity act;
@@ -5317,10 +5317,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private boolean hideProgress;
         private int layerType;
 
-
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
-            if(!superPeerMode) {
+            if (!superPeerMode) {
                 doSetVisibility(false);
             }
             parent = (BrowserComponent) p;
@@ -5339,9 +5338,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             web.setWebViewClient(new WebViewClient() {
-                
-                
-                
+
                 public void onLoadResource(WebView view, String url) {
                     if (Display.getInstance().getProperty("syncNativeCookies", "false").equals("true")) {
                         try {
@@ -5391,11 +5388,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     super.onPageStarted(view, url, favicon);
                     dismissProgress();
                     //show the progress only if there is no ActionBar
-                    if(!hideProgress && !isNativeTitle()){
+                    if (!hideProgress && !isNativeTitle()) {
                         progressBar = ProgressDialog.show(getActivity(), null, "Loading...");
                         //if the page hasn't finished for more the 10 sec, dismiss
                         //the dialog
-                        Timer t= new Timer();
+                        Timer t = new Timer();
                         t.schedule(new TimerTask() {
                             @Override
                             public void run() {
@@ -5448,36 +5445,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
 
                     // this will fail if dial permission isn't declared
-                    if(url.startsWith("tel:")) {
-                        if(parent.fireBrowserNavigationCallbacks(url)) {
+                    if (url.startsWith("tel:")) {
+                        if (parent.fireBrowserNavigationCallbacks(url)) {
                             try {
                                 Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse(url));
                                 getContext().startActivity(dialer);
-                            } catch(Throwable t) {}
+                            } catch (Throwable t) {
+                            }
                         }
                         return true;
                     }
                     // this will fail if dial permission isn't declared
-                    if(url.startsWith("mailto:")) {
-                        if(parent.fireBrowserNavigationCallbacks(url)) {
+                    if (url.startsWith("mailto:")) {
+                        if (parent.fireBrowserNavigationCallbacks(url)) {
                             try {
                                 Intent emailIntent = new Intent(Intent.ACTION_SENDTO, Uri.parse(url));
                                 getContext().startActivity(emailIntent);
-                            } catch(Throwable t) {}
+                            } catch (Throwable t) {
+                            }
                         }
                         return true;
                     }
                     return !parent.fireBrowserNavigationCallbacks(url);
                 }
 
-
             });
 
-            web.setWebChromeClient(new WebChromeClient(){
+            web.setWebChromeClient(new WebChromeClient() {
                 // For 3.0+ Devices (Start)
                 // onActivityResult attached before constructor
-                protected void openFileChooser(ValueCallback uploadMsg, String acceptType)
-                {
+                protected void openFileChooser(ValueCallback uploadMsg, String acceptType) {
                     mUploadMessage = uploadMsg;
                     Intent i = new Intent(Intent.ACTION_GET_CONTENT);
                     i.addCategory(Intent.CATEGORY_OPENABLE);
@@ -5485,10 +5482,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(i, "File Browser"), FILECHOOSER_RESULTCODE);
                 }
 
-
                 // For Lollipop 5.0+ Devices
-                public boolean onShowFileChooser(WebView mWebView, ValueCallback<Uri[]> filePathCallback, WebChromeClient.FileChooserParams fileChooserParams)
-                {
+                public boolean onShowFileChooser(WebView mWebView, ValueCallback<Uri[]> filePathCallback, WebChromeClient.FileChooserParams fileChooserParams) {
                     if (uploadMessage != null) {
                         uploadMessage.onReceiveValue(null);
                         uploadMessage = null;
@@ -5497,11 +5492,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     uploadMessage = filePathCallback;
 
                     Intent intent = fileChooserParams.createIntent();
-                    try
-                    {
+                    try {
                         AndroidNativeUtil.getActivity().startActivityForResult(intent, REQUEST_SELECT_FILE);
-                    } catch (ActivityNotFoundException e)
-                    {
+                    } catch (ActivityNotFoundException e) {
                         uploadMessage = null;
                         Toast.makeText(getActivity().getApplicationContext(), "Cannot Open File Chooser", Toast.LENGTH_LONG).show();
                         return false;
@@ -5510,18 +5503,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
 
                 //For Android 4.1 only
-                protected void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture)
-                {
+                protected void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture) {
                     mUploadMessage = uploadMsg;
                     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                     intent.addCategory(Intent.CATEGORY_OPENABLE);
                     intent.setType(acceptType);
-                    
+
                     AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(intent, "File Browser"), FILECHOOSER_RESULTCODE);
                 }
 
-                protected void openFileChooser(ValueCallback<Uri> uploadMsg)
-                {
+                protected void openFileChooser(ValueCallback<Uri> uploadMsg) {
                     mUploadMessage = uploadMsg;
                     Intent i = new Intent(Intent.ACTION_GET_CONTENT);
                     i.addCategory(Intent.CATEGORY_OPENABLE);
@@ -5529,25 +5520,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     AndroidNativeUtil.getActivity().startActivityForResult(Intent.createChooser(i, "File Chooser"), FILECHOOSER_RESULTCODE);
                 }
 
-                
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
-                    com.codename1.io.Log.p("["+consoleMessage.messageLevel()+"] "+consoleMessage.message()+" On line "+consoleMessage.lineNumber()+" of "+consoleMessage.sourceId());
+                    com.codename1.io.Log.p("[" + consoleMessage.messageLevel() + "] " + consoleMessage.message() + " On line " + consoleMessage.lineNumber() + " of " + consoleMessage.sourceId());
                     return true;
                 }
 
                 @Override
                 public void onProgressChanged(WebView view, int newProgress) {
                     parent.fireWebEvent("Progress", new ActionEvent(parent, ActionEvent.Type.Progress, newProgress));
-                    if(!hideProgress && isNativeTitle() && getCurrentForm() != null && getCurrentForm().getTitle() != null && getCurrentForm().getTitle().length() > 0 ){
-                        if(getActivity() != null){
-                            try{
+                    if (!hideProgress && isNativeTitle() && getCurrentForm() != null && getCurrentForm().getTitle() != null && getCurrentForm().getTitle().length() > 0) {
+                        if (getActivity() != null) {
+                            try {
                                 getActivity().setProgressBarVisibility(true);
                                 getActivity().setProgress(newProgress * 100);
-                                if(newProgress == 100){
+                                if (newProgress == 100) {
                                     getActivity().setProgressBarVisibility(false);
                                 }
-                            }catch(Throwable t){
+                            } catch (Throwable t) {
                             }
                         }
                     }
@@ -5555,7 +5545,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 @Override
                 public void onGeolocationPermissionsShowPrompt(String origin,
-                                                               GeolocationPermissions.Callback callback) {
+                        GeolocationPermissions.Callback callback) {
                     // Always grant permission since the app itself requires location
                     // permission and the user has therefore already granted it
                     callback.invoke(origin, true, false);
@@ -5580,10 +5570,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     }
                                 }
                                 if (allowed) {
-                                    Log.d("Codename One", "Allowing permission for "+Arrays.toString(request.getResources())+" in web view for origin "+request.getOrigin());
+                                    Log.d("Codename One", "Allowing permission for " + Arrays.toString(request.getResources()) + " in web view for origin " + request.getOrigin());
                                     request.grant(request.getResources());
                                 } else {
-                                    Log.d("Codename One", "Denying permission for "+Arrays.toString(request.getResources())+" in web view for origin "+request.getOrigin());
+                                    Log.d("Codename One", "Denying permission for " + Arrays.toString(request.getResources()) + " in web view for origin " + request.getOrigin());
                                     request.deny();
                                 }
                             }
@@ -5596,7 +5586,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected void initComponent() {
-            if(android.os.Build.VERSION.SDK_INT == 21 && web.getLayerType() != layerType){
+            if (android.os.Build.VERSION.SDK_INT == 21 && web.getLayerType() != layerType) {
                 act.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -5608,7 +5598,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             blockNativeFocus(false);
             setPeerImage(null);
         }
-
 
         @Override
         protected Image generatePeerImage() {
@@ -5622,13 +5611,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         try {
                             Canvas canvas = new Canvas(nativeBuffer);
                             web.draw(canvas);
-                        } catch(Throwable t) {
+                        } catch (Throwable t) {
                             t.printStackTrace();
                         }
                     }
                 });
                 return image;
-            } catch(Throwable t) {
+            } catch (Throwable t) {
                 t.printStackTrace();
                 return Image.createImage(5, 5);
             }
@@ -5646,16 +5635,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             lightweightMode = l;
         }
 
-
-
-        public void setScrollingEnabled(final boolean enabled){
+        public void setScrollingEnabled(final boolean enabled) {
             this.scrollingEnabled = enabled;
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     web.setHorizontalScrollBarEnabled(enabled);
                     web.setVerticalScrollBarEnabled(enabled);
-                    if ( !enabled ){
-                        web.setOnTouchListener(new View.OnTouchListener(){
+                    if (!enabled) {
+                        web.setOnTouchListener(new View.OnTouchListener() {
 
                             @Override
                             public boolean onTouch(View view, MotionEvent me) {
@@ -5671,7 +5658,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         }
 
-        public boolean isScrollingEnabled(){
+        public boolean isScrollingEnabled() {
             return scrollingEnabled;
         }
 
@@ -5679,13 +5666,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     WebSettings s = web.getSettings();
-                    if(key.equalsIgnoreCase("useragent")) {
-                        s.setUserAgentString((String)value);
+                    if (key.equalsIgnoreCase("useragent")) {
+                        s.setUserAgentString((String) value);
                         return;
                     }
                     try {
                         s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-                    } catch(Throwable t) {
+                    } catch (Throwable t) {
                         // the method isn't available in Android 4.x
                     }
                     String methodName = "set" + key;
@@ -5763,7 +5750,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void setURL(final String url, final Map<String, String> headers) {
             act.runOnUiThread(new Runnable() {
                 public void run() {
-                    if(headers != null) {
+                    if (headers != null) {
                         web.loadUrl(url, headers);
                     } else {
                         web.loadUrl(url);
@@ -5781,7 +5768,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public boolean hasBack() {
-            final Boolean [] retVal = new Boolean[1];
+            final Boolean[] retVal = new Boolean[1];
             final boolean[] complete = new boolean[1];
 
             act.runOnUiThread(new Runnable() {
@@ -5810,7 +5797,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public boolean hasForward() {
-            final Boolean [] retVal = new Boolean[1];
+            final Boolean[] retVal = new Boolean[1];
             final boolean[] complete = new boolean[1];
 
             act.runOnUiThread(new Runnable() {
@@ -5895,7 +5882,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
         }
 
-        public  void setPinchZoomEnabled(final boolean e) {
+        public void setPinchZoomEnabled(final boolean e) {
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     web.getSettings().setSupportZoom(e);
@@ -5909,7 +5896,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             act.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(android.os.Build.VERSION.SDK_INT == 21) { // bugfix for Android 5.0.x
+                    if (android.os.Build.VERSION.SDK_INT == 21) { // bugfix for Android 5.0.x
                         web.setLayerType(View.LAYER_TYPE_SOFTWARE, null); //setting layer type to software to prevent the sigseg 11 crash
                     }
                 }
@@ -5917,8 +5904,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             super.deinitialize();
         }
     }
-
-
 
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
         URL u = new URL(url);
@@ -5929,7 +5914,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             c.setUseCaches(false);
             c.setDefaultUseCaches(false);
             c.setInstanceFollowRedirects(false);
-            if(timeout > -1) {
+            if (timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
 
@@ -5941,26 +5926,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         con.setDoOutput(write);
         return con;
     }
-    
+
     @Override
     public void setReadTimeout(Object connection, int readTimeout) {
         if (connection instanceof URLConnection) {
-            ((URLConnection)connection).setReadTimeout(readTimeout);
+            ((URLConnection) connection).setReadTimeout(readTimeout);
         }
     }
-    
-    
 
     @Override
     public boolean isReadTimeoutSupported() {
         return true;
     }
-    
+
     @Override
     public void setInsecure(Object connection, boolean insecure) {
         if (insecure) {
             if (connection instanceof HttpsURLConnection) {
-                HttpsURLConnection conn = (HttpsURLConnection)connection;
+                HttpsURLConnection conn = (HttpsURLConnection) connection;
                 try {
                     TrustModifier.relaxHostChecking(conn);
                 } catch (Exception ex) {
@@ -5969,7 +5952,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
     }
-    
 
     /**
      * @inheritDoc
@@ -5977,7 +5959,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object connect(String url, boolean read, boolean write) throws IOException {
         return connect(url, read, write, timeout);
     }
-
 
     private static final char[] HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
@@ -5997,13 +5978,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String[] getSSLCertificates(Object connection, String url) throws IOException {
         if (connection instanceof HttpsURLConnection) {
-            HttpsURLConnection conn = (HttpsURLConnection)connection;
+            HttpsURLConnection conn = (HttpsURLConnection) connection;
 
             try {
                 conn.connect();
                 java.security.cert.Certificate[] certs = conn.getServerCertificates();
                 String[] out = new String[certs.length * 2];
-                int i=0;
+                int i = 0;
                 for (java.security.cert.Certificate cert : certs) {
                     {
                         MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -6039,19 +6020,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void setChunkedStreamingMode(Object connection, int bufferLen){
+    public void setChunkedStreamingMode(Object connection, int bufferLen) {
         HttpURLConnection con = ((HttpURLConnection) connection);
         con.setChunkedStreamingMode(bufferLen);
     }
-
-
 
     /**
      * @inheritDoc
      */
     public OutputStream openOutputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            String con = (String)connection;
+            String con = (String) connection;
             if (con.startsWith("file://")) {
                 con = con.substring(7);
             }
@@ -6106,9 +6085,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             BufferedInputStream o = new BufferedInputStream(fc, con);
             return o;
         }
-        if(connection instanceof HttpURLConnection) {
-            HttpURLConnection ht = (HttpURLConnection)connection;
-            if(ht.getResponseCode() < 400) {
+        if (connection instanceof HttpURLConnection) {
+            HttpURLConnection ht = (HttpURLConnection) connection;
+            if (ht.getResponseCode() < 400) {
                 return new BufferedInputStream(ht.getInputStream());
             }
             return new BufferedInputStream(ht.getErrorStream());
@@ -6121,7 +6100,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void setHttpMethod(Object connection, String method) throws IOException {
-        if(method.equalsIgnoreCase("patch")) {
+        if (method.equalsIgnoreCase("patch")) {
             allowPatch((HttpURLConnection) connection);
         }
         ((HttpURLConnection) connection).setRequestMethod(method);
@@ -6131,11 +6110,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     // answer https://stackoverflow.com/questions/25163131/httpurlconnection-invalid-http-method-patch
     private static boolean enabledPatch;
     private static boolean patchFailed;
+
     private static void allowPatch(HttpURLConnection connection) {
-        if(enabledPatch) {
+        if (enabledPatch) {
             return;
         }
-        if(patchFailed) {
+        if (patchFailed) {
             connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
             return;
         }
@@ -6158,12 +6138,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (NoSuchFieldException e) {
             patchFailed = true;
             connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
-        } catch(IllegalAccessException ee) {
+        } catch (IllegalAccessException ee) {
             patchFailed = true;
             connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
         }
-    }    
-    
+    }
+
     /**
      * @inheritDoc
      */
@@ -6186,9 +6166,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public int getResponseCode(Object connection) throws IOException {
         // workaround for Android bug discussed here: http://stackoverflow.com/questions/17638398/androids-httpurlconnection-throws-eofexception-on-head-requests
         HttpURLConnection con = (HttpURLConnection) connection;
-        if("head".equalsIgnoreCase(con.getRequestMethod())) {
+        if ("head".equalsIgnoreCase(con.getRequestMethod())) {
             con.setDoOutput(false);
-            con.setRequestProperty( "Accept-Encoding", "" );
+            con.setRequestProperty("Accept-Encoding", "");
         }
         return ((HttpURLConnection) connection).getResponseCode();
     }
@@ -6232,8 +6212,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         List<String> headers = new ArrayList<String>();
 
         // we need to merge headers with differing case since this should be case insensitive
-        for(String key : c.getHeaderFields().keySet()) {
-            if(key != null && key.equalsIgnoreCase(name)) {
+        for (String key : c.getHeaderFields().keySet()) {
+            if (key != null && key.equalsIgnoreCase(name)) {
                 headers.addAll(c.getHeaderFields().get(key));
             }
         }
@@ -6247,12 +6227,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         // workaround for a bug in some android devices
         String f = c.getHeaderField(name);
-        if(f != null && f.length() > 0) {
-            return new String[] {f};
+        if (f != null && f.length() > 0) {
+            return new String[]{f};
         }
         return null;
-
-
 
     }
 
@@ -6301,12 +6279,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public int getStorageEntrySize(String name) {
-        return (int)new File(getContext().getFilesDir(), name).length();
+        return (int) new File(getContext().getFilesDir(), name).length();
     }
 
     private String addFile(String s) {
         // I explicitly don't create a "proper URL" since code might rely on the fact that the file isn't encoded
-        if(s != null && s.startsWith("/")) {
+        if (s != null && s.startsWith("/")) {
             return "file://" + s;
         }
         return s;
@@ -6317,13 +6295,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String[] listFilesystemRoots() {
 
-        if(!checkForPermission(Manifest.permission.READ_EXTERNAL_STORAGE, "This is required to browse the file system")){
+        if (!checkForPermission(Manifest.permission.READ_EXTERNAL_STORAGE, "This is required to browse the file system")) {
             return new String[]{};
         }
 
-        String [] storageDirs = getStorageDirectories();
-        if(storageDirs != null){
-            String [] roots = new String[storageDirs.length + 1];
+        String[] storageDirs = getStorageDirectories();
+        if (storageDirs != null) {
+            String[] roots = new String[storageDirs.length + 1];
             System.arraycopy(storageDirs, 0, roots, 0, storageDirs.length);
             roots[roots.length - 1] = addFile(Environment.getRootDirectory().getAbsolutePath());
             return roots;
@@ -6341,10 +6319,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return getContext().getCacheDir().getAbsolutePath();
     }
 
-
-
     private String[] getStorageDirectories() {
-        String [] storageDirs = null;
+        String[] storageDirs = null;
 
         String storageDev = Environment.getExternalStorageDirectory().getPath();
         String storageRoot = storageDev.substring(0, storageDev.length() - 1);
@@ -6380,26 +6356,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             int count = list.size();
 
             if (count < 2) {
-                storageDirs = new String[] {
-                        storageDev
+                storageDirs = new String[]{
+                    storageDev
                 };
-            }
-            else {
+            } else {
                 storageDirs = new String[count];
 
                 for (int i = 0; i < count; i++) {
                     storageDirs[i] = (String) list.get(i);
                 }
             }
-        }
-        catch (FileNotFoundException e) {}
-        catch (IOException e) {}
-        finally {
+        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
+        } finally {
             if (bufReader != null) {
                 try {
                     bufReader.close();
+                } catch (IOException e) {
                 }
-                catch (IOException e) {}
             }
 
             return storageDirs;
@@ -6417,8 +6391,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String toNativePath(String path) {
         return removeFilePrefix(path);
     }
-    
-    
 
     /**
      * @inheritDoc
@@ -6510,24 +6482,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public OutputStream openFileOutputStream(String file) throws IOException {
         file = removeFilePrefix(file);
         OutputStream os = null;
-        try{
+        try {
             os = createFileOuputStream(file);
-        }catch(FileNotFoundException fne){
+        } catch (FileNotFoundException fne) {
             //It is impossible to know if a path is considered an external
             //storage on the various android's versions.
             //So we try to open the path and if failed due to permission we will
             //ask for the permission from the user
-            if(fne.getMessage().contains("Permission denied")){
+            if (fne.getMessage().contains("Permission denied")) {
 
-                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to access the file")){
+                if (!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to access the file")) {
                     //The user refused to give access.
                     return null;
-                }else{
+                } else {
                     //The user gave permission try again to access the path
                     return createFileOuputStream(file);
                 }
 
-            }else{
+            } else {
                 throw fne;
             }
         }
@@ -6551,24 +6523,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public InputStream openFileInputStream(String file) throws IOException {
         file = removeFilePrefix(file);
         InputStream is = null;
-        try{
+        try {
             is = createFileInputStream(file);
-        }catch(FileNotFoundException fne){
+        } catch (FileNotFoundException fne) {
             //It is impossible to know if a path is considered an external
             //storage on the various android's versions.
             //So we try to open the path and if failed due to permission we will
             //ask for the permission from the user
-            if(fne.getMessage().contains("Permission denied")){
+            if (fne.getMessage().contains("Permission denied")) {
 
-                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to access the file")){
+                if (!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to access the file")) {
                     //The user refused to give access.
                     return null;
-                }else{
+                } else {
                     //The user gave permission try again to access the path
                     return openFileInputStream(file);
                 }
 
-            }else{
+            } else {
                 throw fne;
             }
         }
@@ -6624,7 +6596,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-
     /**
      * @inheritDoc
      */
@@ -6663,23 +6634,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public LocationManager getLocationManager() {
         boolean permissionGranted = false;
-        if (Build.VERSION.SDK_INT >= 29  && "true".equals(Display.getInstance().getProperty("android.requiresBackgroundLocationPermissionForAPI29", "false"))) {
+        if (Build.VERSION.SDK_INT >= 29 && "true".equals(Display.getInstance().getProperty("android.requiresBackgroundLocationPermissionForAPI29", "false"))) {
 
             if (checkForPermission("android.permission.ACCESS_BACKGROUND_LOCATION", "This is required to get the location")) {
                 permissionGranted = true;
             }
 
         }
-        if (!permissionGranted && !checkForPermission( Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")) {
+        if (!permissionGranted && !checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")) {
             return null;
         }
-
 
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
         if (includesPlayServices && hasAndroidMarket()) {
             try {
                 Class clazz = Class.forName("com.codename1.location.AndroidLocationPlayServiceManager");
-                return (com.codename1.location.LocationManager)clazz.getMethod("getInstance").invoke(null);
+                return (com.codename1.location.LocationManager) clazz.getMethod("getInstance").invoke(null);
             } catch (Exception e) {
                 return AndroidLocationManager.getInstance(getContext());
             }
@@ -6701,26 +6671,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         File newFile = new File(mediaStorageDir.getPath() + File.separator
-                    + cn1File.getName());
-        if(newFile.exists()) {
-            // Create a media file name
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            newFile = new File(mediaStorageDir.getPath() + File.separator
-                    + "IMG_" + timeStamp + "_" + cn1File.getName());
+                + cn1File.getName());
+        if (newFile.exists()) {
+            if (Display.getInstance().getProperty("DeleteCachedFileAfterShare", "false").equals("true")) {
+                newFile.delete();
+            } else {
+                // Create a media file name
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+                newFile = new File(mediaStorageDir.getPath() + File.separator
+                        + "IMG_" + timeStamp + "_" + cn1File.getName());
+            }
         }
-
 
         //Uri fileUri = Uri.fromFile(newFile);
         newFile.getParentFile().mkdirs();
         //Uri imageUri = Uri.fromFile(newFile);
-        Uri fileUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
+        Uri fileUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", newFile);
 
         try {
             InputStream is = FileSystemStorage.getInstance().openInputStream(attachment);
             OutputStream os = new FileOutputStream(newFile);
-            byte [] buf = new byte[1024];
+            byte[] buf = new byte[1024];
             int len;
-            while((len = is.read(buf)) > -1){
+            while ((len = is.read(buf)) > -1) {
                 os.write(buf, 0, len);
             }
             is.close();
@@ -6736,14 +6709,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
-        if(editInProgress()) {
+        if (editInProgress()) {
             stopEditing(true);
         }
         Intent emailIntent;
         String attachment = msg.getAttachment();
         boolean hasAttachment = (attachment != null && attachment.length() > 0) || msg.getAttachments().size() > 0;
 
-        if(msg.getMimeType().equals(Message.MIME_TEXT) && !hasAttachment){
+        if (msg.getMimeType().equals(Message.MIME_TEXT) && !hasAttachment) {
             StringBuilder to = new StringBuilder();
             for (int i = 0; i < recipients.length; i++) {
                 to.append(recipients[i]);
@@ -6752,18 +6725,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             emailIntent = new Intent(Intent.ACTION_SENDTO,
                     Uri.parse(
                             "mailto:" + to.toString()
-                                    + "?subject=" + Uri.encode(subject)
-                                    + "&body=" + Uri.encode(msg.getContent())));
-        }else{
+                            + "?subject=" + Uri.encode(subject)
+                            + "&body=" + Uri.encode(msg.getContent())));
+        } else {
             if (hasAttachment) {
-                if(msg.getAttachments().size() > 1) {
+                if (msg.getAttachments().size() > 1) {
                     emailIntent = new Intent(android.content.Intent.ACTION_SEND_MULTIPLE);
                     emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
                     emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
                     emailIntent.setType(msg.getMimeType());
                     ArrayList<Uri> uris = new ArrayList<Uri>();
 
-                    for(String path : msg.getAttachments().keySet()) {
+                    for (String path : msg.getAttachments().keySet()) {
                         uris.add(Uri.parse(fixAttachmentPath(path)));
                     }
 
@@ -6787,7 +6760,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             if (msg.getMimeType().equals(Message.MIME_HTML)) {
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));
-            }else{
+            } else {
                 /*
                 // Attempted this workaround to fix the ClassCastException that occurs on android when
                 // there are multiple attachments.  Unfortunately, this fixes the stack trace, but
@@ -6813,7 +6786,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             @Override
             public void onActivityResult(int requestCode, int resultCode, Intent data) {
-                if(attach != null && attach.length() > 0 && attach.contains("tmp")){
+                if (attach != null && attach.length() > 0 && attach.contains("tmp")) {
                     FileSystemStorage.getInstance().delete(attach);
                 }
             }
@@ -6830,7 +6803,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public int getSMSSupport() {
-        if(canDial()) {
+        if (canDial()) {
             return Display.SMS_INTERACTIVE;
         }
         return Display.SMS_NOT_SUPPORTED;
@@ -6843,24 +6816,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         /*if(!checkForPermission(Manifest.permission.SEND_SMS, "This is required to send a SMS")){
             return;
         }*/
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to send a SMS")){
+        if (!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to send a SMS")) {
             return;
         }
-        if(i) {
+        if (i) {
             Intent smsIntent = null;
-            if(android.os.Build.VERSION.SDK_INT < 19){
+            if (android.os.Build.VERSION.SDK_INT < 19) {
                 smsIntent = new Intent(Intent.ACTION_VIEW);
                 smsIntent.setType("vnd.android-dir/mms-sms");
                 smsIntent.putExtra("address", phoneNumber);
-                smsIntent.putExtra("sms_body",message);
-            }else{
+                smsIntent.putExtra("sms_body", message);
+            } else {
                 smsIntent = new Intent(Intent.ACTION_SENDTO);
                 smsIntent.setData(Uri.parse("smsto:" + Uri.encode(phoneNumber)));
                 smsIntent.putExtra("sms_body", message);
             }
             getContext().startActivity(smsIntent);
 
-        } /*else {
+        }
+        /*else {
             SmsManager sms = SmsManager.getDefault();
             ArrayList<String> parts = sms.divideMessage(message);
             sms.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
@@ -6870,10 +6844,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void dismissNotification(Object o) {
         NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Activity.NOTIFICATION_SERVICE);
-        if(o != null){
-            Integer n = (Integer)o;
+        if (o != null) {
+            Integer n = (Integer) o;
             notificationManager.cancel("CN1", n.intValue());
-        }else{
+        } else {
             notificationManager.cancelAll();
         }
     }
@@ -6886,10 +6860,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * Keys of display properties that need to be made available to Services
      * i.e. must be accessible even if CN1 is not initialized.
-     * 
-     * This is accomplished by setting them inside init().  Then they
-     * are written to file so that they can be accessed inside a service
-     * like push notification service.
+     *
+     * This is accomplished by setting them inside init(). Then they are written
+     * to file so that they can be accessed inside a service like push
+     * notification service.
      */
     private static final String[] servicePropertyKeys = new String[]{
         "android.NotificationChannel.id",
@@ -6902,7 +6876,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         "android.NotificationChannel.vibrationPattern",
         "android.NotoficationChannel.soundUri"
     };
-    
+
     /**
      * Flag to indicate if any of the service properties have been changed.
      */
@@ -6914,37 +6888,39 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return false;
     }
-    
+
     /**
-     * Stores properties that need to be accessible to services.   
-     * i.e. must be accessible even if CN1 is not initialized.
-     * 
-     * This is accomplished by setting them inside init().  Then they
-     * are written to file so that they can be accessed inside a service
-     * like push notification service.
+     * Stores properties that need to be accessible to services. i.e. must be
+     * accessible even if CN1 is not initialized.
+     *
+     * This is accomplished by setting them inside init(). Then they are written
+     * to file so that they can be accessed inside a service like push
+     * notification service.
      */
-    private static Map<String,String> serviceProperties;
-    
+    private static Map<String, String> serviceProperties;
+
     /**
-     * Gets the service properties.  Will read properties from file so that
-     * they are available even if CN1 is not initialized.
+     * Gets the service properties. Will read properties from file so that they
+     * are available even if CN1 is not initialized.
+     *
      * @param a
-     * @return 
+     * @return
      */
-    public static Map<String,String> getServiceProperties(Context a) {
+    public static Map<String, String> getServiceProperties(Context a) {
         if (serviceProperties == null) {
             InputStream i = null;
             try {
-                serviceProperties = new HashMap<String,String>();
+                serviceProperties = new HashMap<String, String>();
                 try {
                     i = a.openFileInput("CN1$AndroidServiceProperties");
-                } catch (FileNotFoundException notFoundEx){}
-                if(i == null) {
+                } catch (FileNotFoundException notFoundEx) {
+                }
+                if (i == null) {
                     return serviceProperties;
                 }
                 DataInputStream is = new DataInputStream(i);
                 int count = is.readInt();
-                for (int idx=0; idx<count; idx++) {
+                for (int idx = 0; idx < count; idx++) {
                     String key = is.readUTF();
                     String value = is.readUTF();
                     serviceProperties.put(key, value);
@@ -6953,7 +6929,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
             } finally {
                 try {
-                    if (i != null) i.close();
+                    if (i != null) {
+                        i.close();
+                    }
                 } catch (Throwable ex) {
                     Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -6961,24 +6939,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return serviceProperties;
     }
-    
+
     public static void writeServiceProperties(Context a) {
         if (servicePropertiesDirty()) {
-            Map<String,String> out = getServiceProperties(a);
-            
-            
+            Map<String, String> out = getServiceProperties(a);
+
             for (String key : servicePropertyKeys) {
-                
+
                 String val = Display.getInstance().getProperty(key, null);
                 if (val != null) {
                     out.put(key, val);
                 }
-                if ("true".equals(Display.getInstance().getProperty(key+"#delete", null))) {
+                if ("true".equals(Display.getInstance().getProperty(key + "#delete", null))) {
                     out.remove(key);
-                    
+
                 }
             }
-            
+
             OutputStream os = null;
             try {
                 os = a.openFileOutput("CN1$AndroidServiceProperties", 0);
@@ -6990,28 +6967,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 dos.writeInt(out.size());
                 for (String key : out.keySet()) {
                     dos.writeUTF(key);
-                    dos.writeUTF((String)out.get(key));
+                    dos.writeUTF((String) out.get(key));
                 }
                 serviceProperties = null;
             } catch (FileNotFoundException ex) {
                 System.out.println("Service properties file not found.  This is normal for the first run.   On subsequent runs, the file should exist.");
             } catch (IOException ex) {
-                
+
                 Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
             } finally {
                 try {
-                    if (os != null) os.close();
+                    if (os != null) {
+                        os.close();
+                    }
                 } catch (Throwable ex) {
                     Logger.getLogger(AndroidImplementation.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         }
     }
-    
+
     /**
-     * Gets a "service" display property.  This is a property that is available
-     * even if CN1 is not initialized.  They are written to file after init() so that 
-     * they are available thereafter to services like push notification services.
+     * Gets a "service" display property. This is a property that is available
+     * even if CN1 is not initialized. They are written to file after init() so
+     * that they are available thereafter to services like push notification
+     * services.
+     *
      * @param key THe key
      * @param defaultValue The default value
      * @param context Context
@@ -7024,68 +7005,72 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String val = getServiceProperties(context).get(key);
         return val == null ? defaultValue : val;
     }
-    
+
     /**
-     * Sets the notification channel on a notification builder.  Uses service properties to 
-     * set properties of channel.
+     * Sets the notification channel on a notification builder. Uses service
+     * properties to set properties of channel.
+     *
      * @param nm The notification manager.
      * @param mNotifyBuilder The notify builder
      * @param context The context
      * @since 7.0
      */
     public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context) {
-        setNotificationChannel(nm, mNotifyBuilder, context, (String)null);
-        
+        setNotificationChannel(nm, mNotifyBuilder, context, (String) null);
+
     }
-    
+
     /**
-     * Sets the notification channel on a notification builder.  Uses service properties to 
-     * set properties of channel.
+     * Sets the notification channel on a notification builder. Uses service
+     * properties to set properties of channel.
+     *
      * @param nm The notification manager.
      * @param mNotifyBuilder The notify builder
      * @param context The context
-     * @param soundName The name of the sound to use for notifications on this channel.  E.g. mysound.mp3.  This feature is not yet implemented, but
-     *  parameter is added now to scaffold compatibility with build daemon until implementation is complete.
+     * @param soundName The name of the sound to use for notifications on this
+     * channel. E.g. mysound.mp3. This feature is not yet implemented, but
+     * parameter is added now to scaffold compatibility with build daemon until
+     * implementation is complete.
      * @since 8.0
      */
     public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context, String soundName) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             try {
                 NotificationManager mNotificationManager = nm;
-                              
+
                 String id = getServiceProperty("android.NotificationChannel.id", "cn1-channel", context);
-                
+
                 CharSequence name = getServiceProperty("android.NotificationChannel.name", "Notifications", context);
-                
+
                 String description = getServiceProperty("android.NotificationChannel.description", "Remote notifications", context);
-                
+
                 // NotificationManager.IMPORTANCE_LOW = 2
                 // NotificationManager.IMPORTANCE_HIGH = 4  // <-- Minimum level to produce sound.
                 int importance = Integer.parseInt(getServiceProperty("android.NotificationChannel.importance", "4", context));
-                    // Note: Currently we use a single notification channel for the app, but if the app uses different kinds of 
-                    // push notifications, then this may not be sufficient.   E.g. The app may send both silent push notifications
-                    // and regular notifications - but their settings (e.g. sound) are all managed through one channel with
-                    // same settings. 
-                    // TODO Add support for multiple channels.
-                    // See https://github.com/codenameone/CodenameOne/issues/2583
-                
+                // Note: Currently we use a single notification channel for the app, but if the app uses different kinds of 
+                // push notifications, then this may not be sufficient.   E.g. The app may send both silent push notifications
+                // and regular notifications - but their settings (e.g. sound) are all managed through one channel with
+                // same settings. 
+                // TODO Add support for multiple channels.
+                // See https://github.com/codenameone/CodenameOne/issues/2583
+
                 Class clsNotificationChannel = Class.forName("android.app.NotificationChannel");
                 //android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name, importance);
                 Constructor constructor = clsNotificationChannel.getConstructor(java.lang.String.class, java.lang.CharSequence.class, int.class);
                 Object mChannel = constructor.newInstance(new Object[]{id, name, importance});
-                
+
                 Method method = clsNotificationChannel.getMethod("setDescription", java.lang.String.class);
                 method.invoke(mChannel, new Object[]{description});
                 //mChannel.setDescription(description);
-                
+
                 method = clsNotificationChannel.getMethod("enableLights", boolean.class);
                 method.invoke(mChannel, new Object[]{Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableLights", "true", context))});
                 //mChannel.enableLights(Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableLights", "true", context)));
-                
+
                 method = clsNotificationChannel.getMethod("setLightColor", int.class);
                 method.invoke(mChannel, new Object[]{Integer.parseInt(getServiceProperty("android.NotificationChannel.lightColor", "" + android.graphics.Color.RED, context))});
                 //mChannel.setLightColor(Integer.parseInt(getServiceProperty("android.NotificationChannel.lightColor", "" + android.graphics.Color.RED, context)));
-                
+
                 method = clsNotificationChannel.getMethod("enableVibration", boolean.class);
                 method.invoke(mChannel, new Object[]{Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableVibration", "false", context))});
                 //mChannel.enableVibration(Boolean.parseBoolean(getServiceProperty("android.NotificationChannel.enableVibration", "false", context)));
@@ -7101,11 +7086,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     method.invoke(mChannel, new Object[]{pattern});
                     //mChannel.setVibrationPattern(pattern);
                 }
-                
+
                 String soundUri = getServiceProperty("android.NotificationChannel.soundUri", null, context);
                 if (soundUri != null) {
-                    Uri uri= android.net.Uri.parse(soundUri);
-                    
+                    Uri uri = android.net.Uri.parse(soundUri);
+
                     android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
                             .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                             .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
@@ -7113,7 +7098,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     method = clsNotificationChannel.getMethod("setSound", android.net.Uri.class, android.media.AudioAttributes.class);
                     method.invoke(mChannel, new Object[]{uri, audioAttributes});
                 }
-                
+
                 method = NotificationManager.class.getMethod("createNotificationChannel", clsNotificationChannel);
                 method.invoke(mNotificationManager, new Object[]{mChannel});
                 //mNotificationManager.createNotificationChannel(mChannel);
@@ -7147,9 +7132,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
     }
-    
+
     public Object notifyStatusBar(String tickerText, String contentTitle,
-                                  String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
+            String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
         int id = getContext().getResources().getIdentifier("icon", "drawable", getContext().getApplicationInfo().packageName);
 
         NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Activity.NOTIFICATION_SERVICE);
@@ -7158,21 +7143,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         notificationIntent.setComponent(activityComponentName);
         PendingIntent contentIntent = createPendingIntent(getContext(), 0, notificationIntent);
 
-
         NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext())
                 .setContentIntent(contentIntent)
                 .setSmallIcon(id)
                 .setContentTitle(contentTitle)
                 .setTicker(tickerText);
-        if(flashLights){
+        if (flashLights) {
             builder.setLights(0, 1000, 1000);
         }
-        if(vibrate){
+        if (vibrate) {
             builder.setVibrate(new long[]{0, 100, 1000});
         }
-        if(args != null) {
-            Boolean b = (Boolean)args.get("persist");
-            if(b != null && b.booleanValue()) {
+        if (args != null) {
+            Boolean b = (Boolean) args.get("persist");
+            if (b != null && b.booleanValue()) {
                 builder.setAutoCancel(false);
                 builder.setOngoing(true);
             } else {
@@ -7200,10 +7184,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-
     @Override
     public String[] getAllContacts(boolean withNumbers) {
-        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+        if (!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")) {
             return new String[]{};
         }
         return AndroidContactsManager.getInstance().getContacts(getContext(), withNumbers);
@@ -7211,7 +7194,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Contact getContactById(String id) {
-        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+        if (!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")) {
             return null;
         }
         return AndroidContactsManager.getInstance().getContact(getContext(), id);
@@ -7219,8 +7202,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture,
-                                  boolean includesNumbers, boolean includesEmail, boolean includeAddress){
-        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+            boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        if (!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")) {
             return null;
         }
         return AndroidContactsManager.getInstance().getContact(getContext(), id, includesFullName, includesPicture,
@@ -7229,7 +7212,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
-        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+        if (!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")) {
             return new Contact[]{};
         }
         return AndroidContactsManager.getInstance().getAllContacts(getContext(), withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
@@ -7241,14 +7224,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
-        if(!checkForPermission(Manifest.permission.WRITE_CONTACTS, "This is required to create a contact")){
+        if (!checkForPermission(Manifest.permission.WRITE_CONTACTS, "This is required to create a contact")) {
             return null;
         }
         return AndroidContactsManager.getInstance().createContact(getContext(), firstName, surname, officePhone, homePhone, cellPhone, email);
     }
 
     public boolean deleteContact(String id) {
-        if(!checkForPermission(Manifest.permission.WRITE_CONTACTS, "This is required to delete a contact")){
+        if (!checkForPermission(Manifest.permission.WRITE_CONTACTS, "This is required to delete a contact")) {
             return false;
         }
         return AndroidContactsManager.getInstance().deleteContact(getContext(), id);
@@ -7260,12 +7243,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void share(String text, String image, String mimeType, Rectangle sourceRect){
+    public void share(String text, String image, String mimeType, Rectangle sourceRect) {
         /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
             return;
         }*/
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
-        if(image == null){
+        if (image == null) {
             if (text.startsWith("file:") && mimeType != null && new com.codename1.io.File(text).exists()) {
                 shareIntent.setType(mimeType);
                 shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(text)));
@@ -7273,7 +7256,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 shareIntent.setType("text/plain");
                 shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, text);
             }
-        }else{
+        } else {
             shareIntent.setType(mimeType);
             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(image)));
             shareIntent.putExtra(Intent.EXTRA_TEXT, text);
@@ -7388,9 +7371,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new MediaException(type, message);
     }
 
-
     public class Video extends AndroidImplementation.AndroidPeer implements AsyncMedia {
-        
+
         private VideoView nativeVideo;
         private Activity activity;
         private boolean fullScreen = false;
@@ -7400,7 +7382,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private Form curentForm;
         private List<Runnable> completionHandlers;
         private final EventDispatcher errorListeners = new EventDispatcher();
-        
+
         private final EventDispatcher stateChangeListeners = new EventDispatcher();
         private PlayRequest pendingPlayRequest;
         private PauseRequest pendingPauseRequest;
@@ -7413,35 +7395,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return State.Paused;
             }
         }
-        
+
         protected void fireMediaStateChange(State newState) {
             if (stateChangeListeners.hasListeners() && newState != getState()) {
                 stateChangeListeners.fireActionEvent(new MediaStateChangeEvent(this, getState(), newState));
             }
         }
-        
+
         @Override
         public void addMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l) {
-            
+
             stateChangeListeners.addListener(l);
         }
-        
+
         @Override
         public void removeMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l) {
-            
+
             stateChangeListeners.removeListener(l);
         }
-        
+
         @Override
         public void addMediaErrorListener(ActionListener<MediaErrorEvent> l) {
             errorListeners.addListener(l);
         }
-        
+
         @Override
         public void removeMediaErrorListener(ActionListener<MediaErrorEvent> l) {
             errorListeners.removeListener(l);
         }
-        
+
         @Override
         public PlayRequest playAsync() {
             final PlayRequest out = new PlayRequest();
@@ -7481,7 +7463,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 pendingPlayRequest = out;
             }
-            
+
             ActionListener<MediaStateChangeEvent> onStateChange = new ActionListener<MediaStateChangeEvent>() {
                 @Override
                 public void actionPerformed(MediaStateChangeEvent evt) {
@@ -7491,18 +7473,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             out.complete(Video.this);
                         }
                     }
-                    
+
                 }
-                
+
             };
-            
+
             stateChangeListeners.addListener(onStateChange);
             play();
-            
+
             return out;
-            
+
         }
-        
+
         @Override
         public PauseRequest pauseAsync() {
             final PauseRequest out = new PauseRequest();
@@ -7542,7 +7524,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 pendingPauseRequest = out;
             }
-            
+
             ActionListener<MediaStateChangeEvent> onStateChange = new ActionListener<MediaStateChangeEvent>() {
                 @Override
                 public void actionPerformed(MediaStateChangeEvent evt) {
@@ -7552,22 +7534,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             out.complete(Video.this);
                         }
                     }
-                    
+
                 }
-                
+
             };
-            
+
             stateChangeListeners.addListener(onStateChange);
             play();
-            
+
             return out;
         }
-        
 
         public Video(final VideoView nativeVideo, final Activity activity, final Runnable onCompletion) {
             super(new RelativeLayout(activity));
             this.nativeVideo = nativeVideo;
-            RelativeLayout rl = (RelativeLayout)getNativePeer();
+            RelativeLayout rl = (RelativeLayout) getNativePeer();
 
             rl.addView(nativeVideo);
             RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
@@ -7586,7 +7567,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 @Override
                 public void onCompletion(MediaPlayer arg0) {
                     fireMediaStateChange(State.Paused);
-                    
+
                     fireCompletionHandlers();
                 }
             });
@@ -7606,16 +7587,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             });
 
         }
-        
-        
-        
+
         private void fireCompletionHandlers() {
             if (completionHandlers != null && !completionHandlers.isEmpty()) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (completionHandlers != null && !completionHandlers.isEmpty()) {
                             ArrayList<Runnable> toRun;
-                            synchronized(Video.this) {
+                            synchronized (Video.this) {
                                 toRun = new ArrayList<Runnable>(completionHandlers);
                             }
                             for (Runnable r : toRun) {
@@ -7626,6 +7605,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 });
             }
         }
+
         private void setNativeController(final boolean nativeController) {
             if (nativeController != this.nativeController) {
                 this.nativeController = nativeController;
@@ -7639,8 +7619,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 if (nativeVideo != null) {
                                     MediaController mc = new AndroidImplementation.CN1MediaController();
                                     nativeVideo.setMediaController(mc);
-                                    if (!nativeController) mc.setVisibility(View.GONE);
-                                    else mc.setVisibility(View.VISIBLE);
+                                    if (!nativeController) {
+                                        mc.setVisibility(View.GONE);
+                                    } else {
+                                        mc.setVisibility(View.VISIBLE);
+                                    }
 
                                 }
                             }
@@ -7671,7 +7654,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     @Override
                     public void actionPerformed(ActionEvent evt) {
                         Component cmp = getVideoComponent();
-                        if(cmp != null) {
+                        if (cmp != null) {
                             cmp.remove();
                             pause();
                         }
@@ -7681,7 +7664,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 });
                 f.setLayout(new BorderLayout());
 
-                if(cmp.getParent() != null) {
+                if (cmp.getParent() != null) {
                     cmp.getParent().removeComponent(cmp);
                 }
                 f.addComponent(BorderLayout.CENTER, cmp);
@@ -7693,7 +7676,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void pause() {
-            if(nativeVideo != null && nativeVideo.canPause()){
+            if (nativeVideo != null && nativeVideo.canPause()) {
                 nativeVideo.pause();
                 fireMediaStateChange(State.Paused);
             }
@@ -7701,7 +7684,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void cleanup() {
-            if(nativeVideo != null) {
+            if (nativeVideo != null) {
                 nativeVideo.stopPlayback();
                 fireMediaStateChange(State.Paused);
             }
@@ -7714,7 +7697,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public int getTime() {
-            if(nativeVideo != null){
+            if (nativeVideo != null) {
                 return nativeVideo.getCurrentPosition();
             }
             return -1;
@@ -7722,14 +7705,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void setTime(int time) {
-            if(nativeVideo != null){
+            if (nativeVideo != null) {
                 nativeVideo.seekTo(time);
             }
         }
 
         @Override
         public int getDuration() {
-            if(nativeVideo != null){
+            if (nativeVideo != null) {
                 return nativeVideo.getDuration();
             }
             return -1;
@@ -7786,7 +7769,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected Dimension calcPreferredSize() {
-            if(nativeVideo != null){
+            if (nativeVideo != null) {
                 return new Dimension(nativeVideo.getWidth(), nativeVideo.getHeight());
             }
             return new Dimension();
@@ -7796,7 +7779,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void setWidth(final int width) {
             super.setWidth(width);
             final int currH = getHeight();
-            if(nativeVideo != null){
+            if (nativeVideo != null) {
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
@@ -7815,7 +7798,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 h = w * nh / nw;
                             }
                         }
-                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int)w, (int)h);
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int) w, (int) h);
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);
                         nativeVideo.setLayoutParams(layout);
@@ -7830,7 +7813,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void setHeight(final int height) {
             super.setHeight(height);
             final int currW = getWidth();
-            if(nativeVideo != null){
+            if (nativeVideo != null) {
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
@@ -7849,7 +7832,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 h = w * nh / nw;
                             }
                         }
-                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int)w, (int)h);
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int) w, (int) h);
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);
                         nativeVideo.setLayoutParams(layout);
@@ -7872,7 +7855,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public boolean isPlaying() {
-            if(nativeVideo != null){
+            if (nativeVideo != null) {
                 return nativeVideo.isPlaying();
             }
             return false;
@@ -7880,7 +7863,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public void setVariable(String key, Object value) {
             if (nativeVideo != null && Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED.equals(key) && value instanceof Boolean) {
-                setNativeController((Boolean)value);
+                setNativeController((Boolean) value);
             }
         }
 
@@ -7893,28 +7876,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             addCompletionHandler(onComplete);
         }
 
-        
-        
         private void addCompletionHandler(Runnable onCompletion) {
-            synchronized(this) {
+            synchronized (this) {
                 if (completionHandlers == null) {
                     completionHandlers = new ArrayList<Runnable>();
                 }
                 completionHandlers.add(onCompletion);
             }
         }
-        
+
         private void removeCompletionHandler(Runnable onCompletion) {
-            synchronized(this) {
+            synchronized (this) {
                 if (completionHandlers != null) {
                     completionHandlers.remove(onCompletion);
                 }
             }
         }
 
-      
     }
-
 
     private String getImageFilePath(Uri uri) {
 
@@ -7925,7 +7904,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String[] filePathColumn = {MediaStore.Images.Media.DATA};
         Cursor cursor = getContext().getContentResolver().query(
                 android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                new String[]{ MediaStore.Images.Media.DATA},
+                new String[]{MediaStore.Images.Media.DATA},
                 null,
                 null,
                 null
@@ -7945,7 +7924,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (name != null) {
                         String homePath = getAppHomePath();
                         if (homePath.endsWith("/")) {
-                            homePath = homePath.substring(0, homePath.length()-1);
+                            homePath = homePath.substring(0, homePath.length() - 1);
                         }
                         filePath = homePath
                                 + getFileSystemSeparator() + name;
@@ -7967,10 +7946,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         //long len = new com.codename1.io.File(filePath).length();
         return filePath;
     }
-    
-    
-    
-    
+
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
 
@@ -7980,9 +7956,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         if (requestCode == REQUEST_SELECT_FILE || requestCode == FILECHOOSER_RESULTCODE) {
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 if (requestCode == REQUEST_SELECT_FILE) {
-                    if (uploadMessage == null) return;
+                    if (uploadMessage == null) {
+                        return;
+                    }
                     Uri[] results = null;
 
                     // Check that the response is a good one
@@ -8007,32 +7985,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     uploadMessage.onReceiveValue(results);
                     uploadMessage = null;
                 }
-            }
-            else if (requestCode == FILECHOOSER_RESULTCODE) {
+            } else if (requestCode == FILECHOOSER_RESULTCODE) {
                 if (null == mUploadMessage) {
                     return;
                 }
-            // Use MainActivity.RESULT_OK if you're implementing WebView inside Fragment
-            // Use RESULT_OK only if you're implementing WebView inside an Activity
+                // Use MainActivity.RESULT_OK if you're implementing WebView inside Fragment
+                // Use RESULT_OK only if you're implementing WebView inside an Activity
                 Uri result = intent == null || resultCode != Activity.RESULT_OK ? null : intent.getData();
                 mUploadMessage.onReceiveValue(result);
                 mUploadMessage = null;
-            }
-            else {
+            } else {
 
                 Toast.makeText(getActivity().getApplicationContext(), "Failed to Upload File", Toast.LENGTH_LONG).show();
             }
             return;
         }
 
-        
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == CAPTURE_IMAGE) {
                 try {
                     String imageUri = (String) Storage.getInstance().readObject("imageUri");
                     Vector pathandId = StringUtil.tokenizeString(imageUri, ";");
-                    String path = (String)pathandId.get(0);
-                    String lastId = (String)pathandId.get(1);
+                    String path = (String) pathandId.get(0);
+                    String lastId = (String) pathandId.get(1);
                     Storage.getInstance().deleteStorageFile("imageUri");
                     clearMediaDB(lastId, path);
                     callback.fireActionEvent(new ActionEvent(addFile(path)));
@@ -8050,14 +8025,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String path = convertImageUriToFilePath(data, getContext());
                 callback.fireActionEvent(new ActionEvent(addFile(path)));
                 return;
-                
+
             } else if (requestCode == OPEN_GALLERY_MULTI) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    if(intent.getClipData() != null){
+                    if (intent.getClipData() != null) {
                         // If it was a multi-request
                         ArrayList<String> selectedPaths = new ArrayList<String>();
                         int count = intent.getClipData().getItemCount();
-                        for (int i=0; i<count; i++){
+                        for (int i = 0; i < count; i++) {
 
                             Uri uri = intent.getClipData().getItemAt(i).getUri();
                             String p = getImageFilePath(uri);
@@ -8080,7 +8055,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 Cursor cursor = getContext().getContentResolver().query(selectedImage, filePathColumn, null, null, null);
 
                 // this happens on Android devices, not exactly sure what the use case is
-                if(cursor == null) {
+                if (cursor == null) {
                     callback.fireActionEvent(null);
                     return;
                 }
@@ -8124,7 +8099,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 callback.fireActionEvent(new ActionEvent(new String[]{filePath}));
                 return;
             } else if (requestCode == OPEN_GALLERY) {
-                
+
                 Uri selectedImage = intent.getData();
                 String scheme = intent.getScheme();
 
@@ -8132,7 +8107,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 Cursor cursor = getContext().getContentResolver().query(selectedImage, filePathColumn, null, null, null);
 
                 // this happens on Android devices, not exactly sure what the use case is
-                if(cursor == null) {
+                if (cursor == null) {
                     callback.fireActionEvent(null);
                     return;
                 }
@@ -8176,7 +8151,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 callback.fireActionEvent(new ActionEvent(filePath));
                 return;
             } else {
-                if(callback != null) {
+                if (callback != null) {
                     callback.fireActionEvent(new ActionEvent("ok"));
                 }
                 return;
@@ -8184,16 +8159,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         //clean imageUri
         String imageUri = (String) Storage.getInstance().readObject("imageUri");
-        if(imageUri != null){
+        if (imageUri != null) {
             Storage.getInstance().deleteStorageFile("imageUri");
         }
 
-        if(callback != null) {
+        if (callback != null) {
             callback.fireActionEvent(null);
         }
     }
-
-
 
     @Override
     public void capturePhoto(ActionListener response) {
@@ -8201,7 +8174,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             throw new RuntimeException("Cannot capture photo in background mode");
         }
         if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
-            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")){
+            if (!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")) {
                 return;
             }
         }
@@ -8213,7 +8186,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // intent will defer to the app's permissions, and on Android 6, 
             // the permission is denied unless we do the runtime check for permission.
             // See https://github.com/codenameone/CodenameOne/issues/2409#issuecomment-391696058
-            if(!checkForPermission(Manifest.permission.CAMERA, "This is required to take a picture")){
+            if (!checkForPermission(Manifest.permission.CAMERA, "This is required to take a picture")) {
                 return;
             }
         }
@@ -8225,7 +8198,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         newFile.getParentFile().mkdirs();
         newFile.getParentFile().setWritable(true, false);
         //Uri imageUri = Uri.fromFile(newFile);
-        Uri imageUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
+        Uri imageUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", newFile);
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
 
         String lastImageID = getLastImageId();
@@ -8233,7 +8206,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, imageUri);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        
+
         if (Build.VERSION.SDK_INT < 21) {
             List<ResolveInfo> resInfoList = getContext().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
             for (ResolveInfo resolveInfo : resInfoList) {
@@ -8249,14 +8222,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void captureVideo(ActionListener response) {
         captureVideo(null, response);
     }
-    
+
     @Override
     public void captureVideo(VideoCaptureConstraints cnst, ActionListener response) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot capture video in background mode");
         }
         if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
-            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")){
+            if (!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")) {
                 return;
             }
         }
@@ -8268,7 +8241,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // intent will defer to the app's permissions, and on Android 6, 
             // the permission is denied unless we do the runtime check for permission.
             // See https://github.com/codenameone/CodenameOne/issues/2409#issuecomment-391696058
-            if(!checkForPermission(Manifest.permission.CAMERA, "This is required to take a video")){
+            if (!checkForPermission(Manifest.permission.CAMERA, "This is required to take a video")) {
                 return;
             }
         }
@@ -8284,7 +8257,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
                     break;
             }
-            
+
             if (cnst.getMaxFileSize() > 0) {
                 intent.putExtra(MediaStore.EXTRA_SIZE_LIMIT, cnst.getMaxFileSize());
             }
@@ -8292,12 +8265,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 intent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, cnst.getMaxLength());
             }
         }
-        
 
         File newFile = getOutputMediaFile(true);
         newFile.getParentFile().mkdirs();
         newFile.getParentFile().setWritable(true, false);
-        Uri videoUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName()+".provider", newFile);
+        Uri videoUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", newFile);
 
         Storage.getInstance().writeObject("videoUri", newFile.getAbsolutePath());
 
@@ -8310,16 +8282,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 getContext().grantUriPermission(packageName, videoUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             }
         }
-        
+
         this.getActivity().startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
     public void captureAudio(final ActionListener response) {
 
-        if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record the audio")){
+        if (!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record the audio")) {
             return;
         }
-        
+
         try {
             final Form current = Display.getInstance().getCurrent();
 
@@ -8424,27 +8396,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      *
      * @param response callback for the resulting image
      *
-     * 
-     * DISABLING:  openGallery() should take care of this
-    public void openImageGallery(ActionListener response) {
-        if (getActivity() == null) {
-            throw new RuntimeException("Cannot open image gallery in background mode");
-        }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
-            return;
-        }
-
-        if(editInProgress()) {
-            stopEditing(true);
-        }
-
-        callback = new EventDispatcher();
-        callback.addListener(response);
-        Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
-        this.getActivity().startActivityForResult(galleryIntent, OPEN_GALLERY);
-    }
-    * */
-
+     *
+     * DISABLING: openGallery() should take care of this public void
+     * openImageGallery(ActionListener response) { if (getActivity() == null) {
+     * throw new RuntimeException("Cannot open image gallery in background
+     * mode"); }
+     * if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This
+     * is required to browse the photos")){ return; }
+     *
+     * if(editInProgress()) { stopEditing(true); }
+     *
+     * callback = new EventDispatcher(); callback.addListener(response); Intent
+     * galleryIntent = new Intent(Intent.ACTION_PICK,
+     * android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
+     * this.getActivity().startActivityForResult(galleryIntent, OPEN_GALLERY); }
+     *
+     */
     @Override
     public boolean isGalleryTypeSupported(int type) {
         if (super.isGalleryTypeSupported(type)) {
@@ -8465,31 +8432,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return false;
     }
 
-    
-    
-    public void openGallery(final ActionListener response, int type){
+    public void openGallery(final ActionListener response, int type) {
         if (!isGalleryTypeSupported(type)) {
-            throw new IllegalArgumentException("Gallery type "+type+" not supported on this platform.");
+            throw new IllegalArgumentException("Gallery type " + type + " not supported on this platform.");
         }
         if (getActivity() == null) {
             throw new RuntimeException("Cannot open galery in background mode");
         }
         if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
-            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
+            if (!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")) {
                 return;
             }
         }
-        if(editInProgress()) {
+        if (editInProgress()) {
             stopEditing(true);
         }
         final boolean multi;
         switch (type) {
             case Display.GALLERY_ALL_MULTI:
-                multi=true;
+                multi = true;
                 type = Display.GALLERY_ALL;
                 break;
             case Display.GALLERY_VIDEO_MULTI:
-                multi=true;
+                multi = true;
                 type = Display.GALLERY_VIDEO;
                 break;
             case Display.GALLERY_IMAGE_MULTI:
@@ -8503,20 +8468,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             default:
                 multi = false;
         }
-        
+
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
         if (multi) {
             galleryIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         }
-        if(type == Display.GALLERY_VIDEO){
+        if (type == Display.GALLERY_VIDEO) {
             galleryIntent.setType("video/*");
-        }else if(type == Display.GALLERY_IMAGE){
+        } else if (type == Display.GALLERY_IMAGE) {
             galleryIntent.setType("image/*");
-        }else if(type == Display.GALLERY_ALL){
+        } else if (type == Display.GALLERY_ALL) {
             galleryIntent.setType("image/* video/*");
-        }else if (type == -9999) {
+        } else if (type == -9999) {
             galleryIntent = new Intent();
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
                 galleryIntent.setAction(Intent.ACTION_OPEN_DOCUMENT);
@@ -8528,10 +8493,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // set MIME type for image
             galleryIntent.setType("*/*");
             galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, Display.getInstance().getProperty("android.openGallery.accept", "*/*").split(","));
-        }else{
+        } else {
             galleryIntent.setType("*/*");
         }
-        this.getActivity().startActivityForResult(galleryIntent, multi ? OPEN_GALLERY_MULTI: OPEN_GALLERY);
+        this.getActivity().startActivityForResult(galleryIntent, multi ? OPEN_GALLERY_MULTI : OPEN_GALLERY);
     }
 
     class NativeImage extends Image {
@@ -8556,15 +8521,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private static class GetOutputMediaFile {
 
-        public static File getOutputMediaFile(boolean isVideo,Activity activity) {
+        public static File getOutputMediaFile(boolean isVideo, Activity activity) {
             activity.getComponentName();
             return getOutputMediaFile(isVideo, activity, activity.getTitle());
         }
 
         public static File getOutputMediaFile(boolean isVideo, Context activity, CharSequence title) {
 
-
-            File mediaStorageDir = new File(new File(getContext().getCacheDir(), "intent_files"), ""+title);
+            File mediaStorageDir = new File(new File(getContext().getCacheDir(), "intent_files"), "" + title);
 
             // Create the storage directory if it does not exist
             if (!mediaStorageDir.exists()) {
@@ -8590,7 +8554,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void systemOut(String content){
+    public void systemOut(String content) {
         Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), content);
     }
 
@@ -8609,8 +8573,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         final PackageManager packageManager = activity.getPackageManager();
         List<PackageInfo> packages = packageManager.getInstalledPackages(PackageManager.GET_UNINSTALLED_PACKAGES);
         for (PackageInfo packageInfo : packages) {
-            if (packageInfo.packageName.equals(GooglePlayStorePackageNameOld) ||
-                    packageInfo.packageName.equals(GooglePlayStorePackageNameNew)) {
+            if (packageInfo.packageName.equals(GooglePlayStorePackageNameOld)
+                    || packageInfo.packageName.equals(GooglePlayStorePackageNameNew)) {
                 return true;
             }
         }
@@ -8624,7 +8588,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         if (android.os.Build.VERSION.SDK_INT >= 33) {
-            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive push notifications")){
+            if (!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive push notifications")) {
                 return;
             }
         }
@@ -8634,16 +8598,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
             return;
         }
-        String id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
+        String id = (String) metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
         if (id == null) {
             id = Display.getInstance().getProperty("gcm.sender_id", null);
         }
-        if(has) {
+        if (has) {
             Log.d("Codename One", "Sending async push request for id: " + id);
             ((CodenameOneActivity) getActivity()).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(getActivity().getPackageName() + ".PushNotificationService", getActivity());
-            if(!registerServerPush(id, getApplicationKey(), (byte)10, "", getPackageName())) {
+            if (!registerServerPush(id, getApplicationKey(), (byte) 10, "", getPackageName())) {
                 sendPushRegistrationError("Server registration error", 1);
             }
         }
@@ -8726,8 +8690,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("MMM", l);
                     return fmt.format(date);
                 }
-                
-                
 
                 public String format(int number) {
                     return NumberFormat.getNumberInstance().format(number);
@@ -8796,7 +8758,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                     // if the image is in portrait mode
                     int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-                    if(orientation == ExifInterface.ORIENTATION_ROTATE_90 || orientation == ExifInterface.ORIENTATION_ROTATE_270) {
+                    if (orientation == ExifInterface.ORIENTATION_ROTATE_90 || orientation == ExifInterface.ORIENTATION_ROTATE_270) {
                         return new Dimension(o.outHeight, o.outWidth);
                     }
                     return new Dimension(o.outWidth, o.outHeight);
@@ -8826,38 +8788,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
 
                 @Override
-                public String saveAndKeepAspect(String imageFilePath, String preferredOutputPath, String format, int width, int height, float quality, boolean onlyDownscale, boolean scaleToFill) throws IOException{
+                public String saveAndKeepAspect(String imageFilePath, String preferredOutputPath, String format, int width, int height, float quality, boolean onlyDownscale, boolean scaleToFill) throws IOException {
                     ExifInterface exif = new ExifInterface(removeFilePrefix(imageFilePath));
                     Dimension d = getImageSizeNoRotation(imageFilePath);
-                    if(onlyDownscale) {
-                        if(scaleToFill) {
-                            if(d.getHeight() <= height || d.getWidth() <= width) {
+                    if (onlyDownscale) {
+                        if (scaleToFill) {
+                            if (d.getHeight() <= height || d.getWidth() <= width) {
                                 return imageFilePath;
                             }
                         } else {
-                            if(d.getHeight() <= height && d.getWidth() <= width) {
+                            if (d.getHeight() <= height && d.getWidth() <= width) {
                                 return imageFilePath;
                             }
                         }
                     }
 
-                    float ratio = ((float)d.getWidth()) / ((float)d.getHeight());
-                    int heightBasedOnWidth = (int)(((float)width) / ratio);
-                    int widthBasedOnHeight = (int)(((float)height) * ratio);
-                    if(scaleToFill) {
-                        if(heightBasedOnWidth >= width) {
+                    float ratio = ((float) d.getWidth()) / ((float) d.getHeight());
+                    int heightBasedOnWidth = (int) (((float) width) / ratio);
+                    int widthBasedOnHeight = (int) (((float) height) * ratio);
+                    if (scaleToFill) {
+                        if (heightBasedOnWidth >= width) {
                             height = heightBasedOnWidth;
                         } else {
                             width = widthBasedOnHeight;
                         }
                     } else {
-                        if(heightBasedOnWidth > width) {
+                        if (heightBasedOnWidth > width) {
                             width = widthBasedOnHeight;
                         } else {
                             height = heightBasedOnWidth;
                         }
                     }
-                    sampleSizeOverride = Math.max(d.getWidth()/width, d.getHeight()/height);
+                    sampleSizeOverride = Math.max(d.getWidth() / width, d.getHeight() / height);
                     OutputStream im = FileSystemStorage.getInstance().openOutputStream(preferredOutputPath);
                     Image i = Image.createImage(imageFilePath);
                     Image newImage = i.scaled(width, height);
@@ -8878,7 +8840,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (angle != 0) {
                         Matrix mat = new Matrix();
                         mat.postRotate(angle);
-                        Bitmap b = (Bitmap)newImage.getImage();
+                        Bitmap b = (Bitmap) newImage.getImage();
                         Bitmap correctBmp = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), mat, true);
                         b.recycle();
                         newImage.dispose();
@@ -8888,7 +8850,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     } else {
                         save(imageFilePath, im, format, width, height, quality);
                     }
-                    sampleSizeOverride =  -1;
+                    sampleSizeOverride = -1;
                     return preferredOutputPath;
                 }
 
@@ -8935,8 +8897,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isDatabaseCustomPathSupported() {
         return true;
     }
-    
-    
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
@@ -8965,25 +8925,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public boolean isNativeTitle() {
-        if(com.codename1.ui.Toolbar.isGlobalToolbar()) {
+        if (com.codename1.ui.Toolbar.isGlobalToolbar()) {
             return false;
         }
         Form f = getCurrentForm();
         boolean nativeCommand;
-        if(f != null){
+        if (f != null) {
             nativeCommand = f.getMenuBar().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
-        }else{
+        } else {
             nativeCommand = getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE;
         }
         return hasActionBar() && nativeCommand;
     }
 
-    public void refreshNativeTitle(){
+    public void refreshNativeTitle() {
         if (getActivity() == null || com.codename1.ui.Toolbar.isGlobalToolbar()) {
             return;
         }
         Form f = getCurrentForm();
-        if (f != null && isNativeTitle() &&  !(f instanceof Dialog)) {
+        if (f != null && isNativeTitle() && !(f instanceof Dialog)) {
             getActivity().runOnUiThread(new SetCurrentFormImpl(getActivity(), f));
         }
     }
@@ -8992,14 +8952,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return;
         }
-        if(getCurrentForm() == null){
+        if (getCurrentForm() == null) {
             flushGraphics();
         }
-        if(editInProgress()) {
+        if (editInProgress()) {
             stopEditing(true);
         }
         super.setCurrentForm(f);
-        if (isNativeTitle() &&  !(f instanceof Dialog)) {
+        if (isNativeTitle() && !(f instanceof Dialog)) {
             getActivity().runOnUiThread(new SetCurrentFormImpl(getActivity(), f));
         }
     }
@@ -9015,16 +8975,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void lockScreen(){
-        ((CodenameOneActivity)getContext()).lockScreen();
+    public void lockScreen() {
+        ((CodenameOneActivity) getContext()).lockScreen();
     }
 
     @Override
-    public void unlockScreen(){
-        ((CodenameOneActivity)getContext()).unlockScreen();
+    public void unlockScreen() {
+        ((CodenameOneActivity) getContext()).unlockScreen();
     }
 
     private static class SetCurrentFormImpl implements Runnable {
+
         private Activity activity;
         private Form f;
 
@@ -9035,42 +8996,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void run() {
-            if(com.codename1.ui.Toolbar.isGlobalToolbar()) {
+            if (com.codename1.ui.Toolbar.isGlobalToolbar()) {
                 return;
             }
             ActionBar ab = activity.getActionBar();
             String title = f.getTitle();
             boolean hasMenuBtn = false;
-            if(android.os.Build.VERSION.SDK_INT >= 14){
+            if (android.os.Build.VERSION.SDK_INT >= 14) {
                 try {
                     ViewConfiguration vc = ViewConfiguration.get(activity);
-                    Method m = vc.getClass().getMethod("hasPermanentMenuKey", (Class[])null);
-                    hasMenuBtn = ((Boolean)m.invoke(vc, (Object[])null)).booleanValue();
-                } catch(Throwable t) {
+                    Method m = vc.getClass().getMethod("hasPermanentMenuKey", (Class[]) null);
+                    hasMenuBtn = ((Boolean) m.invoke(vc, (Object[]) null)).booleanValue();
+                } catch (Throwable t) {
                     t.printStackTrace();
                 }
             }
-            if((title != null && title.length() > 0) || (f.getCommandCount() > 0 && !hasMenuBtn)){
+            if ((title != null && title.length() > 0) || (f.getCommandCount() > 0 && !hasMenuBtn)) {
                 activity.runOnUiThread(new NotifyActionBar(activity, true));
-            }else{
+            } else {
                 activity.runOnUiThread(new NotifyActionBar(activity, false));
                 return;
             }
 
             ab.setTitle(title);
             ab.setDisplayHomeAsUpEnabled(f.getBackCommand() != null);
-            if(android.os.Build.VERSION.SDK_INT >= 14){
+            if (android.os.Build.VERSION.SDK_INT >= 14) {
                 Image icon = f.getTitleComponent().getIcon();
                 try {
-                    if(icon != null){
-                        ab.getClass().getMethod("setIcon", Drawable.class).invoke(ab, new BitmapDrawable(activity.getResources(), (Bitmap)icon.getImage()));
-                    }else{
-                        if(activity.getApplicationInfo().icon != 0){
+                    if (icon != null) {
+                        ab.getClass().getMethod("setIcon", Drawable.class).invoke(ab, new BitmapDrawable(activity.getResources(), (Bitmap) icon.getImage()));
+                    } else {
+                        if (activity.getApplicationInfo().icon != 0) {
                             ab.getClass().getMethod("setIcon", Integer.TYPE).invoke(ab, activity.getApplicationInfo().icon);
                         }
                     }
                     activity.runOnUiThread(new InvalidateOptionsMenuImpl(activity));
-                } catch(Throwable t) {
+                } catch (Throwable t) {
                     t.printStackTrace();
                 }
             }
@@ -9086,7 +9047,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             pur = ZoozPurchase.class.newInstance();
             return pur;
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             return super.getInAppPurchase();
         }
     }
@@ -9103,33 +9064,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public CodeScanner getCodeScanner() {
-        if(scannerInstance == null) {
+        if (scannerInstance == null) {
             scannerInstance = new CodeScannerImpl();
         }
         return scannerInstance;
     }
 
     public void addCookie(Cookie c, boolean addToWebViewCookieManager, boolean sync) {
-        if(addToWebViewCookieManager) {
+        if (addToWebViewCookieManager) {
             CookieManager mgr;
             CookieSyncManager syncer;
             try {
                 syncer = CookieSyncManager.getInstance();
                 mgr = getCookieManager();
-            } catch(IllegalStateException ex) {
+            } catch (IllegalStateException ex) {
                 syncer = CookieSyncManager.createInstance(this.getContext());
                 mgr = getCookieManager();
             }
             java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
             format.setTimeZone(TimeZone.getTimeZone("GMT"));
             addCookie(c, mgr, format);
-            if(sync) {
+            if (sync) {
                 syncer.sync();
             }
         }
         super.addCookie(c);
-
-
 
     }
 
@@ -9141,31 +9100,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // For some reason, the port must be stripped and stored separately
             // or it won't retrieve it properly.
             // https://github.com/codenameone/CodenameOne/issues/2804
-            port = "; Port=" + d.substring(d.indexOf(":")+1);
+            port = "; Port=" + d.substring(d.indexOf(":") + 1);
             d = d.substring(0, d.indexOf(":"));
         }
-        String cookieString = c.getName() + "=" + c.getValue() +
-                "; Domain=" + d +
-                port +
-                "; Path=" + c.getPath() +
-                "; " + (c.isSecure() ? "Secure;" : "")
-                + (c.getExpires() != 0 ? (" Expires="+format.format(new Date(c.getExpires()))+";") : "")
+        String cookieString = c.getName() + "=" + c.getValue()
+                + "; Domain=" + d
+                + port
+                + "; Path=" + c.getPath()
+                + "; " + (c.isSecure() ? "Secure;" : "")
+                + (c.getExpires() != 0 ? (" Expires=" + format.format(new Date(c.getExpires())) + ";") : "")
                 + (c.isHttpOnly() ? "httpOnly;" : "");
-        String cookieUrl = "http" +
-                (c.isSecure() ? "s" : "") + "://" +
-                d +
-                c.getPath();
+        String cookieUrl = "http"
+                + (c.isSecure() ? "s" : "") + "://"
+                + d
+                + c.getPath();
         mgr.setCookie(cookieUrl, cookieString);
     }
 
     public void addCookie(Cookie[] cs, boolean addToWebViewCookieManager, boolean sync) {
-        if(addToWebViewCookieManager) {
+        if (addToWebViewCookieManager) {
             CookieManager mgr;
             CookieSyncManager syncer;
             try {
                 syncer = CookieSyncManager.getInstance();
                 mgr = getCookieManager();
-            } catch(IllegalStateException ex) {
+            } catch (IllegalStateException ex) {
                 syncer = CookieSyncManager.createInstance(this.getContext());
                 mgr = getCookieManager();
             }
@@ -9177,44 +9136,39 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             }
 
-            if(sync) {
+            if (sync) {
                 syncer.sync();
             }
         }
         super.addCookie(cs);
 
-
-
     }
 
     @Override
     public void addCookie(Cookie c) {
-        if(isUseNativeCookieStore()) {
+        if (isUseNativeCookieStore()) {
             this.addCookie(c, true, true);
         } else {
             super.addCookie(c);
         }
     }
 
-
-
     @Override
     public void addCookie(Cookie[] cookiesArray) {
-        if(isUseNativeCookieStore()) {
+        if (isUseNativeCookieStore()) {
             this.addCookie(cookiesArray, true);
         } else {
             super.addCookie(cookiesArray);
         }
     }
 
-    public void addCookie(Cookie[] cookiesArray, boolean addToWebViewCookieManager){
+    public void addCookie(Cookie[] cookiesArray, boolean addToWebViewCookieManager) {
         addCookie(cookiesArray, addToWebViewCookieManager, false);
 
     }
 
-
-
     class CodeScannerImpl extends CodeScanner implements IntentResultListener {
+
         private ScanResult callback;
 
         @Override
@@ -9227,12 +9181,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             this.callback = callback;
             IntentIntegrator in = new IntentIntegrator(getActivity());
-            if(!in.initiateScan(IntentIntegrator.QR_CODE_TYPES, "QR_CODE_MODE")){
+            if (!in.initiateScan(IntentIntegrator.QR_CODE_TYPES, "QR_CODE_MODE")) {
                 // restore old activity handling
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
-                        if(CodeScannerImpl.this != null && CodeScannerImpl.this.callback != null) {
+                        if (CodeScannerImpl.this != null && CodeScannerImpl.this.callback != null) {
                             CodeScannerImpl.this.callback.scanError(-1, "no scan app");
                             CodeScannerImpl.this.callback = null;
                         }
@@ -9256,15 +9210,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.callback = callback;
             IntentIntegrator in = new IntentIntegrator(getActivity());
             Collection<String> types = IntentIntegrator.PRODUCT_CODE_TYPES;
-            if(Display.getInstance().getProperty("scanAllCodeTypes", "false").equals("true")) {
+            if (Display.getInstance().getProperty("scanAllCodeTypes", "false").equals("true")) {
                 types = IntentIntegrator.ALL_CODE_TYPES;
             }
-            if(Display.getInstance().getProperty("android.scanTypes", null) != null) {
+            if (Display.getInstance().getProperty("android.scanTypes", null) != null) {
                 String[] arr = Display.getInstance().getProperty("android.scanTypes", null).split(";");
                 types = Arrays.asList(arr);
             }
 
-            if(!in.initiateScan(types, "ONE_D_MODE")){
+            if (!in.initiateScan(types, "ONE_D_MODE")) {
                 // restore old activity handling
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
@@ -9293,7 +9247,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             sr.scanCompleted(contents, formatName, rawBytes);
                         }
                     });
-                } else if(resultCode == Activity.RESULT_CANCELED) {
+                } else if (resultCode == Activity.RESULT_CANCELED) {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
@@ -9323,7 +9277,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             int numCameras = Camera.getNumberOfCameras();
             return numCameras > 0;
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             return true;
         }
     }
@@ -9406,7 +9360,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 1-23 Mbps
                 case TelephonyManager.NETWORK_TYPE_UMTS:
                     return NetworkManager.ACCESS_POINT_TYPE_NETWORK3G; // ~ 400-7000 kbps
-            /*
+                /*
                  * Above API level 7, make sure to set android:targetSdkVersion
                  * to appropriate level to use these
                  */
@@ -9497,10 +9451,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         imageCursor.close();
     }
 
-
     @Override
     public boolean isNativePickerTypeSupported(int pickerType) {
-        if(android.os.Build.VERSION.SDK_INT >= 11) {
+        if (android.os.Build.VERSION.SDK_INT >= 11) {
             return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME || pickerType == Display.PICKER_TYPE_STRINGS;
         }
         return pickerType == Display.PICKER_TYPE_DATE || pickerType == Display.PICKER_TYPE_TIME;
@@ -9511,30 +9464,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
-        final boolean [] canceled = new boolean[1];
-        final boolean [] dismissed = new boolean[1];
+        final boolean[] canceled = new boolean[1];
+        final boolean[] dismissed = new boolean[1];
 
-        if(editInProgress()) {
+        if (editInProgress()) {
             stopEditing(true);
         }
-        if(type == Display.PICKER_TYPE_TIME) {
+        if (type == Display.PICKER_TYPE_TIME) {
 
             class TimePick implements TimePickerDialog.OnTimeSetListener, TimePickerDialog.OnCancelListener, Runnable {
-                int result = ((Integer)currentValue).intValue();
+
+                int result = ((Integer) currentValue).intValue();
+
                 public void onTimeSet(TimePicker tp, int hour, int minute) {
                     result = hour * 60 + minute;
                     dismissed[0] = true;
-                    synchronized(this) {
+                    synchronized (this) {
                         notify();
                     }
                 }
 
                 public void run() {
-                    while(!dismissed[0]) {
-                        synchronized(this) {
+                    while (!dismissed[0]) {
+                        synchronized (this) {
                             try {
                                 wait(50);
-                            } catch(InterruptedException er) {}
+                            } catch (InterruptedException er) {
+                            }
                         }
                     }
                 }
@@ -9551,9 +9507,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final TimePick pickInstance = new TimePick();
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
-                    int hour = ((Integer)currentValue).intValue() / 60;
-                    int minute = ((Integer)currentValue).intValue() % 60;
-                    TimePickerDialog tp = new TimePickerDialog(getActivity(), pickInstance, hour, minute, true){
+                    int hour = ((Integer) currentValue).intValue() / 60;
+                    int minute = ((Integer) currentValue).intValue() % 60;
+                    TimePickerDialog tp = new TimePickerDialog(getActivity(), pickInstance, hour, minute, true) {
 
                         @Override
                         public void cancel() {
@@ -9575,18 +9531,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
             Display.getInstance().invokeAndBlock(pickInstance);
-            if(canceled[0]) {
+            if (canceled[0]) {
                 return null;
             }
             return new Integer(pickInstance.result);
         }
-        if(type == Display.PICKER_TYPE_DATE) {
+        if (type == Display.PICKER_TYPE_DATE) {
             final java.util.Calendar cl = java.util.Calendar.getInstance();
-            if(currentValue != null) {
-                cl.setTime((Date)currentValue);
+            if (currentValue != null) {
+                cl.setTime((Date) currentValue);
             }
-            class DatePick implements DatePickerDialog.OnDateSetListener,DatePickerDialog.OnCancelListener, Runnable {
-                Date result = (Date)currentValue;
+            class DatePick implements DatePickerDialog.OnDateSetListener, DatePickerDialog.OnCancelListener, Runnable {
+
+                Date result = (Date) currentValue;
 
                 public void onDateSet(DatePicker dp, int year, int month, int day) {
                     java.util.Calendar c = java.util.Calendar.getInstance();
@@ -9595,17 +9552,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     c.set(java.util.Calendar.DAY_OF_MONTH, day);
                     result = c.getTime();
                     dismissed[0] = true;
-                    synchronized(this) {
+                    synchronized (this) {
                         notify();
                     }
                 }
 
                 public void run() {
-                    while(!dismissed[0]) {
-                        synchronized(this) {
+                    while (!dismissed[0]) {
+                        synchronized (this) {
                             try {
                                 wait(50);
-                            } catch(InterruptedException er) {}
+                            } catch (InterruptedException er) {
+                            }
                         }
                     }
                 }
@@ -9614,7 +9572,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     result = null;
                     dismissed[0] = true;
                     canceled[0] = true;
-                    synchronized(this) {
+                    synchronized (this) {
                         notify();
                     }
                 }
@@ -9622,7 +9580,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final DatePick pickInstance = new DatePick();
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
-                    DatePickerDialog tp = new DatePickerDialog(getActivity(), pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH), cl.get(java.util.Calendar.DAY_OF_MONTH)){
+                    DatePickerDialog tp = new DatePickerDialog(getActivity(), pickInstance, cl.get(java.util.Calendar.YEAR), cl.get(java.util.Calendar.MONTH), cl.get(java.util.Calendar.DAY_OF_MONTH)) {
 
                         @Override
                         public void cancel() {
@@ -9645,20 +9603,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Display.getInstance().invokeAndBlock(pickInstance);
             return pickInstance.result;
         }
-        if(type == Display.PICKER_TYPE_STRINGS) {
-            final String[] values = (String[])data;
+        if (type == Display.PICKER_TYPE_STRINGS) {
+            final String[] values = (String[]) data;
             class StringPick implements Runnable, NumberPicker.OnValueChangeListener {
+
                 int result = -1;
 
                 StringPick() {
                 }
 
                 public void run() {
-                    while(!dismissed[0]) {
-                        synchronized(this) {
+                    while (!dismissed[0]) {
+                        synchronized (this) {
                             try {
                                 wait(50);
-                            } catch(InterruptedException er) {}
+                            } catch (InterruptedException er) {
+                            }
                         }
                     }
                 }
@@ -9666,7 +9626,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void cancel() {
                     dismissed[0] = true;
                     canceled[0] = true;
-                    synchronized(this) {
+                    synchronized (this) {
                         notify();
                     }
                 }
@@ -9674,7 +9634,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void ok() {
                     canceled[0] = false;
                     dismissed[0] = true;
-                    synchronized(this) {
+                    synchronized (this) {
                         notify();
                     }
                 }
@@ -9686,8 +9646,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             final StringPick pickInstance = new StringPick();
-            for(int iter = 0 ; iter < values.length ; iter++) {
-                if(values[iter].equals(currentValue)) {
+            for (int iter = 0; iter < values.length; iter++) {
+                if (values[iter].equals(currentValue)) {
                     pickInstance.result = iter;
                     break;
                 }
@@ -9703,14 +9663,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     NumberPicker picker = new NumberPicker(getActivity());
-                    if(source.getClientProperty("showKeyboard") == null) {
+                    if (source.getClientProperty("showKeyboard") == null) {
                         picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
                     }
                     picker.setMinValue(0);
                     picker.setMaxValue(values.length - 1);
                     picker.setDisplayedValues(values);
                     picker.setOnValueChangedListener(pickInstance);
-                    if(pickInstance.result > -1) {
+                    if (pickInstance.result > -1) {
                         picker.setValue(pickInstance.result);
                     }
                     RelativeLayout linearLayout = new RelativeLayout(getActivity());
@@ -9719,7 +9679,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     numPicerParams.addRule(RelativeLayout.CENTER_HORIZONTAL);
 
                     linearLayout.setLayoutParams(params);
-                    linearLayout.addView(picker,numPicerParams);
+                    linearLayout.addView(picker, numPicerParams);
 
                     AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(getActivity());
                     alertDialogBuilder.setView(linearLayout);
@@ -9727,46 +9687,48 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             .setCancelable(false)
                             .setPositiveButton("Ok",
                                     new DialogInterface.OnClickListener() {
-                                        public void onClick(DialogInterface dialog,
-                                                            int id) {
-                                            pickInstance.ok();
-                                        }
-                                    })
+                                public void onClick(DialogInterface dialog,
+                                        int id) {
+                                    pickInstance.ok();
+                                }
+                            })
                             .setNegativeButton("Cancel",
                                     new DialogInterface.OnClickListener() {
-                                        public void onClick(DialogInterface dialog,
-                                                            int id) {
-                                            dialog.cancel();
-                                            pickInstance.cancel();
-                                        }
-                                    });
+                                public void onClick(DialogInterface dialog,
+                                        int id) {
+                                    dialog.cancel();
+                                    pickInstance.cancel();
+                                }
+                            });
                     AlertDialog alertDialog = alertDialogBuilder.create();
                     alertDialog.show();
                 }
             });
             Display.getInstance().invokeAndBlock(pickInstance);
-            if(canceled[0]) {
+            if (canceled[0]) {
                 return null;
             }
-            if(pickInstance.result < 0) {
+            if (pickInstance.result < 0) {
                 return null;
             }
             return values[pickInstance.result];
         }
         return null;
     }
-    
+
     private ServerSockets serverSockets;
+
     private synchronized ServerSockets getServerSockets() {
         if (serverSockets == null) {
             serverSockets = new ServerSockets();
         }
         return serverSockets;
     }
-    
+
     class ServerSockets {
-        Map<Integer,ServerSocket> socks = new HashMap<Integer,ServerSocket>();
-        
+
+        Map<Integer, ServerSocket> socks = new HashMap<Integer, ServerSocket>();
+
         public synchronized ServerSocket get(int port) throws IOException {
             if (socks.containsKey(port)) {
                 ServerSocket sock = socks.get(port);
@@ -9781,11 +9743,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return sock;
             }
         }
-        
-        
+
     }
 
     class SocketImpl {
+
         java.net.Socket socketInstance;
         int errorCode = -1;
         String errorMessage = null;
@@ -9797,7 +9759,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 socketInstance = new java.net.Socket();
                 socketInstance.connect(new InetSocketAddress(param, param1), connectTimeout);
                 return true;
-            } catch(Exception err) {
+            } catch (Exception err) {
                 err.printStackTrace();
                 errorMessage = err.toString();
                 return false;
@@ -9805,8 +9767,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         private InputStream getInput() throws IOException {
-            if(is == null) {
-                if(socketInstance != null) {
+            if (is == null) {
+                if (socketInstance != null) {
                     is = socketInstance.getInputStream();
                 } else {
 
@@ -9816,7 +9778,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         private OutputStream getOutput() throws IOException {
-            if(os == null) {
+            if (os == null) {
                 os = socketInstance.getOutputStream();
             }
             return os;
@@ -9825,7 +9787,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public int getAvailableInput() {
             try {
                 return getInput().available();
-            } catch(IOException err) {
+            } catch (IOException err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
             }
@@ -9839,21 +9801,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public byte[] readFromStream() {
             try {
                 int av = getAvailableInput();
-                if(av > 0) {
+                if (av > 0) {
                     byte[] arr = new byte[av];
                     int size = getInput().read(arr);
-                    if(size == arr.length) {
+                    if (size == arr.length) {
                         return arr;
                     }
                     return shrink(arr, size);
                 }
                 byte[] arr = new byte[8192];
                 int size = getInput().read(arr);
-                if(size == arr.length) {
+                if (size == arr.length) {
                     return arr;
                 }
                 return shrink(arr, size);
-            } catch(IOException err) {
+            } catch (IOException err) {
                 err.printStackTrace();
                 errorMessage = err.toString();
                 return null;
@@ -9861,7 +9823,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         private byte[] shrink(byte[] arr, int size) {
-            if(size == -1) {
+            if (size == -1) {
                 return null;
             }
             byte[] n = new byte[size];
@@ -9874,7 +9836,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 OutputStream os = getOutput();
                 os.write(param);
                 os.flush();
-            } catch(IOException err) {
+            } catch (IOException err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
             }
@@ -9882,21 +9844,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public void disconnect() {
             try {
-                if(socketInstance != null) {
-                    if(is != null) {
+                if (socketInstance != null) {
+                    if (is != null) {
                         try {
                             is.close();
-                        } catch(IOException err) {}
+                        } catch (IOException err) {
+                        }
                     }
-                    if(os != null) {
+                    if (os != null) {
                         try {
                             os.close();
-                        } catch(IOException err) {}
+                        } catch (IOException err) {
+                        }
                     }
                     socketInstance.close();
                     socketInstance = null;
                 }
-            } catch(IOException err) {
+            } catch (IOException err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
             }
@@ -9909,7 +9873,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 SocketImpl si = new SocketImpl();
                 si.socketInstance = socketInstance;
                 return si;
-            } catch(Exception err) {
+            } catch (Exception err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
                 return null;
@@ -9930,12 +9894,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return connectSocket(host, port, 0);
     }
 
-    
-    
     @Override
     public Object connectSocket(String host, int port, int connectTimeout) {
         SocketImpl i = new SocketImpl();
-        if(i.connect(host, port, connectTimeout)) {
+        if (i.connect(host, port, connectTimeout)) {
             return i;
         }
         return null;
@@ -9950,15 +9912,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String getHostOrIP() {
         try {
             InetAddress i = java.net.InetAddress.getLocalHost();
-            if(i.isLoopbackAddress()) {
+            if (i.isLoopbackAddress()) {
                 Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
-                while(nie.hasMoreElements()) {
+                while (nie.hasMoreElements()) {
                     NetworkInterface current = nie.nextElement();
-                    if(!current.isLoopback()) {
+                    if (!current.isLoopback()) {
                         Enumeration<InetAddress> iae = current.getInetAddresses();
-                        while(iae.hasMoreElements()) {
+                        while (iae.hasMoreElements()) {
                             InetAddress currentI = iae.nextElement();
-                            if(!currentI.isLoopbackAddress()) {
+                            if (!currentI.isLoopbackAddress()) {
                                 return currentI.getHostAddress();
                             }
                         }
@@ -9966,7 +9928,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
             return i.getHostAddress();
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             com.codename1.io.Log.e(t);
             return null;
         }
@@ -9974,15 +9936,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void disconnectSocket(Object socket) {
-        ((SocketImpl)socket).disconnect();
+        ((SocketImpl) socket).disconnect();
     }
 
     @Override
     public boolean isSocketConnected(Object socket) {
-        return ((SocketImpl)socket).isConnected();
+        return ((SocketImpl) socket).isConnected();
     }
-
-    
 
     @Override
     public boolean isServerSocketAvailable() {
@@ -9996,27 +9956,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public String getSocketErrorMessage(Object socket) {
-        return ((SocketImpl)socket).getErrorMessage();
+        return ((SocketImpl) socket).getErrorMessage();
     }
 
     @Override
     public int getSocketErrorCode(Object socket) {
-        return ((SocketImpl)socket).getErrorCode();
+        return ((SocketImpl) socket).getErrorCode();
     }
 
     @Override
     public int getSocketAvailableInput(Object socket) {
-        return ((SocketImpl)socket).getAvailableInput();
+        return ((SocketImpl) socket).getAvailableInput();
     }
 
     @Override
     public byte[] readFromSocketStream(Object socket) {
-        return ((SocketImpl)socket).readFromStream();
+        return ((SocketImpl) socket).readFromStream();
     }
 
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
-        ((SocketImpl)socket).writeToStream(data);
+        ((SocketImpl) socket).writeToStream(data);
     }
 
     //Begin new Graphics Work
@@ -10031,20 +9991,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public boolean isPerspectiveTransformSupported(Object graphics){
+    public boolean isPerspectiveTransformSupported(Object graphics) {
         return android.os.Build.VERSION.SDK_INT >= 14;
     }
 
     @Override
     public void fillShape(Object graphics, com.codename1.ui.geom.Shape shape) {
-        AndroidGraphics ag = (AndroidGraphics)graphics;
+        AndroidGraphics ag = (AndroidGraphics) graphics;
         Path p = cn1ShapeToAndroidPath(shape);
         ag.fillPath(p);
     }
 
     @Override
     public void drawShape(Object graphics, com.codename1.ui.geom.Shape shape, com.codename1.ui.Stroke stroke) {
-        AndroidGraphics ag = (AndroidGraphics)graphics;
+        AndroidGraphics ag = (AndroidGraphics) graphics;
         Path p = cn1ShapeToAndroidPath(shape);
         ag.drawPath(p, stroke);
 
@@ -10052,7 +10012,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
-        AndroidGraphics ag = (AndroidGraphics)graphics;
+        AndroidGraphics ag = (AndroidGraphics) graphics;
 
         ag.drawShadow(image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
     }
@@ -10068,16 +10028,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 
-
-
     @Override
     public boolean transformEqualsImpl(Transform t1, Transform t2) {
         Object o1 = null;
-        if(t1 != null) {
+        if (t1 != null) {
             o1 = t1.getNativeTransform();
         }
         Object o2 = null;
-        if(t2 != null) {
+        if (t2 != null) {
             o2 = t2.getNativeTransform();
         }
         return transformNativeEqualsImpl(o1, o2);
@@ -10085,15 +10043,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean transformNativeEqualsImpl(Object t1, Object t2) {
-        if ( t1 != null ){
-            CN1Matrix4f m1 = (CN1Matrix4f)t1;
-            CN1Matrix4f m2 = (CN1Matrix4f)t2;
+        if (t1 != null) {
+            CN1Matrix4f m1 = (CN1Matrix4f) t1;
+            CN1Matrix4f m2 = (CN1Matrix4f) t2;
             return m1.equals(m2);
         } else {
             return t2 == null;
         }
     }
-
 
     @Override
     public boolean isTransformSupported() {
@@ -10109,25 +10066,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
         CN1Matrix4f t = CN1Matrix4f.make(new float[]{
-                (float)m00, (float)m10, 0, 0,
-                (float)m01, (float)m11, 0, 0,
-                0, 0, 1, 0,
-                (float)m02, (float)m12, 0, 1
+            (float) m00, (float) m10, 0, 0,
+            (float) m01, (float) m11, 0, 0,
+            0, 0, 1, 0,
+            (float) m02, (float) m12, 0, 1
         });
         return t;
     }
 
     @Override
     public void setTransformAffine(Object nativeTransform, double m00, double m10, double m01, double m11, double m02, double m12) {
-        ((CN1Matrix4f)nativeTransform).setData(new float[]{
-                (float)m00, (float)m10, 0, 0,
-                (float)m01, (float)m11, 0, 0,
-                0, 0, 1, 0,
-                (float)m02, (float)m12, 0, 1
+        ((CN1Matrix4f) nativeTransform).setData(new float[]{
+            (float) m00, (float) m10, 0, 0,
+            (float) m01, (float) m11, 0, 0,
+            0, 0, 1, 0,
+            (float) m02, (float) m12, 0, 1
         });
     }
-    
-    
+
     @Override
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         return CN1Matrix4f.makeTranslation(translateX, translateY, translateZ);
@@ -10135,7 +10091,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
-        CN1Matrix4f m = (CN1Matrix4f)nativeTransform;
+        CN1Matrix4f m = (CN1Matrix4f) nativeTransform;
         m.reset();
         m.translate(translateX, translateY, translateZ);
     }
@@ -10149,7 +10105,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
-        CN1Matrix4f t = (CN1Matrix4f)nativeTransform;
+        CN1Matrix4f t = (CN1Matrix4f) nativeTransform;
         t.reset();
         t.scale(scaleX, scaleY, scaleZ);
     }
@@ -10161,7 +10117,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
-        CN1Matrix4f m = (CN1Matrix4f)nativeTransform;
+        CN1Matrix4f m = (CN1Matrix4f) nativeTransform;
         m.reset();
         m.rotate(angle, x, y, z);
     }
@@ -10173,7 +10129,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setTransformPerspective(Object nativeGraphics, float fovy, float aspect, float zNear, float zFar) {
-        CN1Matrix4f m = (CN1Matrix4f)nativeGraphics;
+        CN1Matrix4f m = (CN1Matrix4f) nativeGraphics;
         m.setPerspective(fovy, aspect, zNear, zFar);
     }
 
@@ -10184,7 +10140,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
-        CN1Matrix4f m = (CN1Matrix4f)nativeGraphics;
+        CN1Matrix4f m = (CN1Matrix4f) nativeGraphics;
         m.setOrtho(left, right, bottom, top, near, far);
     }
 
@@ -10195,34 +10151,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
-        CN1Matrix4f m = (CN1Matrix4f)nativeGraphics;
+        CN1Matrix4f m = (CN1Matrix4f) nativeGraphics;
         m.setCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
     }
 
-
     @Override
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
-        ((CN1Matrix4f)nativeTransform).rotate(angle, x, y, z);
+        ((CN1Matrix4f) nativeTransform).rotate(angle, x, y, z);
     }
 
     @Override
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
         //((Matrix) nativeTransform).preTranslate(x, y);
-        ((CN1Matrix4f)nativeTransform).translate(x, y, z);
+        ((CN1Matrix4f) nativeTransform).translate(x, y, z);
     }
 
     @Override
     public void transformScale(Object nativeTransform, float x, float y, float z) {
         //((Matrix) nativeTransform).preScale(x, y);
-        ((CN1Matrix4f)nativeTransform).scale(x, y, z);
+        ((CN1Matrix4f) nativeTransform).scale(x, y, z);
     }
 
     @Override
     public Object makeTransformInverse(Object nativeTransform) {
 
         CN1Matrix4f inverted = CN1Matrix4f.makeIdentity();
-        inverted.setData(((CN1Matrix4f)nativeTransform).getData());
-        if( inverted.invert()){
+        inverted.setData(((CN1Matrix4f) nativeTransform).getData());
+        if (inverted.invert()) {
             return inverted;
         }
         return null;
@@ -10237,7 +10192,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void setTransformInverse(Object nativeTransform) throws com.codename1.ui.Transform.NotInvertibleException {
 
-        CN1Matrix4f m = (CN1Matrix4f)nativeTransform;
+        CN1Matrix4f m = (CN1Matrix4f) nativeTransform;
         if (!m.invert()) {
             throw new com.codename1.ui.Transform.NotInvertibleException();
         }
@@ -10245,7 +10200,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setTransformIdentity(Object transform) {
-        CN1Matrix4f m = (CN1Matrix4f)transform;
+        CN1Matrix4f m = (CN1Matrix4f) transform;
         m.setIdentity();
     }
 
@@ -10264,14 +10219,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void concatenateTransform(Object t1, Object t2) {
         //((Matrix) t1).preConcat((Matrix) t2);
-        ((CN1Matrix4f)t1).concatenate((CN1Matrix4f)t2);
+        ((CN1Matrix4f) t1).concatenate((CN1Matrix4f) t2);
     }
 
     @Override
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         //Matrix t = (Matrix) nativeTransform;
         //t.mapPoints(in, 0, out, 0, 2);
-        ((CN1Matrix4f)nativeTransform).transformCoord(in, out);
+        ((CN1Matrix4f) nativeTransform).transformCoord(in, out);
     }
 
     @Override
@@ -10313,14 +10268,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-
     // END TRANSFORM STUFF
-
-
     static Path cn1ShapeToAndroidPath(com.codename1.ui.geom.Shape shape, Path p) {
         //Path p = new Path();
         p.rewind();
-        
+
         com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
         switch (it.getWindingRule()) {
             case GeneralPath.WIND_EVEN_ODD:
@@ -10363,19 +10315,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * The ID used for a local notification that should actually trigger a background
-     * fetch.  This type of notification is handled specially by the {@link LocalNotificationPublisher}.  It
-     * doesn't display a notification to the user, but instead just calls the {@link #performBackgroundFetch() }
+     * The ID used for a local notification that should actually trigger a
+     * background fetch. This type of notification is handled specially by the
+     * {@link LocalNotificationPublisher}. It doesn't display a notification to
+     * the user, but instead just calls the {@link #performBackgroundFetch() }
      * method.
      */
-    static final String BACKGROUND_FETCH_NOTIFICATION_ID="$$$CN1_BACKGROUND_FETCH$$$";
-
+    static final String BACKGROUND_FETCH_NOTIFICATION_ID = "$$$CN1_BACKGROUND_FETCH$$$";
 
     /**
-     * Calls the background fetch callback.  If the app is in teh background, this will
-     * check to see if the lifecycle class implements the {@link com.codename1.background.BackgroundFetch}
-     * interface.  If it does, it will execute its {@link com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback) }
+     * Calls the background fetch callback. If the app is in teh background,
+     * this will check to see if the lifecycle class implements the
+     * {@link com.codename1.background.BackgroundFetch} interface. If it does,
+     * it will execute its {@link com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback)
+     * }
      * method.
+     *
      * @param blocking True if this should block until it is complete.
      */
     public static void performBackgroundFetch(boolean blocking) {
@@ -10387,7 +10342,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final boolean[] complete = new boolean[1];
             final Object lock = new Object();
             final BackgroundFetch bgFetchListener = instance.getBackgroundFetchListener();
-            final long timeout = System.currentTimeMillis()+25000;
+            final long timeout = System.currentTimeMillis() + 25000;
             if (bgFetchListener != null) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
@@ -10419,10 +10374,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             while (blocking && !complete[0]) {
-                synchronized(lock) {
+                synchronized (lock) {
                     try {
                         lock.wait(1000);
-                    } catch (Exception ex){}
+                    } catch (Exception ex) {
+                    }
                 }
                 if (!complete[0]) {
                     System.out.println("Waiting for background fetch to complete.  Make sure your background fetch handler calls onSuccess() or onError() in the callback when complete");
@@ -10434,7 +10390,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
 
             }
-
 
         }
     }
@@ -10457,7 +10412,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         cancelLocalNotification(BACKGROUND_FETCH_NOTIFICATION_ID);
     }
 
-
     private boolean backgroundFetchInitialized;
 
     @Override
@@ -10475,8 +10429,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-
-
     @Override
     public boolean isBackgroundFetchSupported() {
         return true;
@@ -10485,7 +10437,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     BackgroundFetch getBackgroundFetchListener() {
         if (getActivity() != null && getActivity().getApp() instanceof BackgroundFetch) {
-            return (BackgroundFetch)getActivity().getApp();
+            return (BackgroundFetch) getActivity().getApp();
         } else if (backgroundFetchListener != null) {
             return backgroundFetchListener;
         } else {
@@ -10495,7 +10447,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
         if (android.os.Build.VERSION.SDK_INT >= 33) {
-            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")){
+            if (!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")) {
                 com.codename1.io.Log.e(new RuntimeException("Local notification was prevented the POST_NOTIFICATIONS permission was not granted by the user."));
                 return;
             }
@@ -10530,12 +10482,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
 
         } else {
-            contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID="+Uri.encode(notif.getId())));
+            contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID=" + Uri.encode(notif.getId())));
         }
         PendingIntent pendingContentIntent = createPendingIntent(getContext(), 0, contentIntent);
 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
-
 
         PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
 
@@ -10543,22 +10494,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
             alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, getPreferredBackgroundFetchInterval() * 1000, pendingIntent);
         } else {
-            if(repeat == LocalNotification.REPEAT_NONE){
+            if (repeat == LocalNotification.REPEAT_NONE) {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, firstTime, pendingIntent);
 
-            }else if(repeat == LocalNotification.REPEAT_MINUTE){
+            } else if (repeat == LocalNotification.REPEAT_MINUTE) {
 
-                alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, 60*1000, pendingIntent);
+                alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, 60 * 1000, pendingIntent);
 
-            }else if(repeat == LocalNotification.REPEAT_HOUR){
+            } else if (repeat == LocalNotification.REPEAT_HOUR) {
 
                 alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_HALF_HOUR, pendingIntent);
 
-            }else if(repeat == LocalNotification.REPEAT_DAY){
+            } else if (repeat == LocalNotification.REPEAT_DAY) {
 
                 alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY, pendingIntent);
 
-            }else if(repeat == LocalNotification.REPEAT_WEEK){
+            } else if (repeat == LocalNotification.REPEAT_WEEK) {
 
                 alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY * 7, pendingIntent);
 
@@ -10575,7 +10526,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         alarmManager.cancel(pendingIntent);
     }
 
-    static Bundle createBundleFromNotification(LocalNotification notif){
+    static Bundle createBundleFromNotification(LocalNotification notif) {
         Bundle b = new Bundle();
         b.putString("NOTIF_ID", notif.getId());
         b.putString("NOTIF_TITLE", notif.getAlertTitle());
@@ -10586,7 +10537,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return b;
     }
 
-    static LocalNotification createNotificationFromBundle(Bundle b){
+    static LocalNotification createNotificationFromBundle(Bundle b) {
         LocalNotification n = new LocalNotification();
         n.setId(b.getString("NOTIF_ID"));
         n.setAlertTitle(b.getString("NOTIF_TITLE"));
@@ -10598,14 +10549,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     boolean brokenGaussian;
+
     public Image gaussianBlurImage(Image image, float radius) {
         try {
-            Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
+            Bitmap outputBitmap = Bitmap.createBitmap((Bitmap) image.getImage());
 
             RenderScript rs = RenderScript.create(getContext());
             try {
                 ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-                Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
+                Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap) image.getImage());
                 Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
                 theIntrinsic.setRadius(radius);
                 theIntrinsic.setInput(tmpIn);
@@ -10619,7 +10571,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             return new NativeImage(outputBitmap);
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             brokenGaussian = true;
             return image;
         }
@@ -10629,19 +10581,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return (!brokenGaussian) && android.os.Build.VERSION.SDK_INT >= 11;
     }
 
-    public static boolean checkForPermission(String permission, String description){
+    public static boolean checkForPermission(String permission, String description) {
         return checkForPermission(permission, description, false);
     }
 
     /**
-     * Return a list of all of the permissions that have been requested by the app (granted or no).
-     * This can be used to see which permissions are included in the manifest file.
-     * @return 
+     * Return a list of all of the permissions that have been requested by the
+     * app (granted or no). This can be used to see which permissions are
+     * included in the manifest file.
+     *
+     * @return
      */
     public static List<String> getRequestedPermissions() {
         PackageManager pm = getContext().getPackageManager();
-        try
-        {
+        try {
             PackageInfo packageInfo = pm.getPackageInfo(getContext().getPackageName(), PackageManager.GET_PERMISSIONS);
             String[] requestedPermissions = null;
             if (packageInfo != null) {
@@ -10649,17 +10602,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return Arrays.asList(requestedPermissions);
             }
             return new ArrayList<String>();
-        }
-        catch (PackageManager.NameNotFoundException e)
-        {
+        } catch (PackageManager.NameNotFoundException e) {
             com.codename1.io.Log.e(e);
             return new ArrayList<String>();
         }
     }
-    
-    public static boolean checkForPermission(String permission, String description, boolean forceAsk){
+
+    public static boolean checkForPermission(String permission, String description, boolean forceAsk) {
         //before sdk 23 no need to ask for permission
-        if(android.os.Build.VERSION.SDK_INT < 23){
+        if (android.os.Build.VERSION.SDK_INT < 23) {
             return true;
         }
 
@@ -10678,16 +10629,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     permission)) {
 
                 // Show an expanation to the user *asynchronously* -- don't block
-                if(Dialog.show("Requires permission", prompt, "Ask again", "Don't Ask")){
+                if (Dialog.show("Requires permission", prompt, "Ask again", "Don't Ask")) {
                     return checkForPermission(permission, description, true);
-                }else {
+                } else {
                     return false;
                 }
             } else {
 
                 // No explanation needed, we can request the permission.
-                ((CodenameOneActivity)getActivity()).setRequestForPermission(true);
-                ((CodenameOneActivity)getActivity()).setWaitingForPermissionResult(true);
+                ((CodenameOneActivity) getActivity()).setRequestForPermission(true);
+                ((CodenameOneActivity) getActivity()).setWaitingForPermissionResult(true);
                 android.support.v4.app.ActivityCompat.requestPermissions(getActivity(),
                         new String[]{permission},
                         1);
@@ -10695,7 +10646,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 Display.getInstance().invokeAndBlock(new Runnable() {
                     @Override
                     public void run() {
-                        while(((CodenameOneActivity)getActivity()).isRequestForPermission()) {
+                        while (((CodenameOneActivity) getActivity()).isRequestForPermission()) {
                             try {
                                 Thread.sleep(50);
                             } catch (InterruptedException e) {
@@ -10717,7 +10668,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             Runtime.getRuntime().exec("su");
             return true;
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
         return false;
