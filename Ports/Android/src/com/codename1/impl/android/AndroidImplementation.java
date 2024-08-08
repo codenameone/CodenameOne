@@ -6702,11 +6702,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         File newFile = new File(mediaStorageDir.getPath() + File.separator
                     + cn1File.getName());
-        if(newFile.exists()) {
-            // Create a media file name
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            newFile = new File(mediaStorageDir.getPath() + File.separator
-                    + "IMG_" + timeStamp + "_" + cn1File.getName());
+        if (newFile.exists()) {
+            if (Display.getInstance().getProperty("DeleteCachedFileAfterShare", "false").equals("true")) {
+                newFile.delete();
+            } else {
+                // Create a media file name
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+                newFile = new File(mediaStorageDir.getPath() + File.separator
+                        + "IMG_" + timeStamp + "_" + cn1File.getName());
+            }
         }
 
 
