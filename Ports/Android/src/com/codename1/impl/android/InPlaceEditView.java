@@ -1118,7 +1118,7 @@ public class InPlaceEditView extends FrameLayout{
     }
 
     private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode) {
-	endEditing(reason, forceVKBOpen, false, actionCode, -1);
+	endEditing(reason, forceVKBOpen, forceVKBOpen, actionCode, -1);
     }
 
     /**
