@@ -67,6 +67,7 @@
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
+        <module>sqlite-jdbc</module>
         <module>javase</module>
         <module>javase-svg</module>
         <module>android</module>
@@ -92,6 +93,11 @@
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>sqlite-jdbc</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
