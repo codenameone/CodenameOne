@@ -19,9 +19,8 @@
 
         </dependency>
         <dependency>
-            <groupId>org.xerial</groupId>
+            <groupId>com.codenameone</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.46.0.1</version>
         </dependency>
         <dependency>
             <groupId>com.jhlabs</groupId>
