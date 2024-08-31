@@ -86,6 +86,10 @@ public class AndroidGradleBuilder extends Executor {
     private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.1-bin.zip";
     public boolean PREFER_MANAGED_GRADLE=true;
 
+    private boolean rootCheck = false;
+
+    private boolean fridaDetection = false;
+
     private boolean useGradle8 = true;
 
     // Flag to indicate whether we should strip kotlin from user classes
@@ -491,6 +495,8 @@ public class AndroidGradleBuilder extends Executor {
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
+        rootCheck = request.getArg("android.rootCheck", "false").equals("true");
+        fridaDetection = request.getArg("android.fridaDetection", "false").equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
@@ -1316,11 +1322,11 @@ public class AndroidGradleBuilder extends Executor {
 
         debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
+        String compile = "compile";
+        if (useAndroidX || useArrImplementation) {
+            compile = "implementation";
+        }
         if (useFCM) {
-            String compile = "compile";
-            if (useAndroidX || useArrImplementation) {
-                compile = "implementation";
-            }
             if (!googleServicesJson.exists()) {
                 error("google-services.json not found.  When using FCM for push notifications (i.e. android.messagingService=fcm), you must include valid google-services.json file.  Use the Firebase console to add Firebase messaging to your app.  https://console.firebase.google.com/u/0/ Then download the google-services.json file and place it in the native/android directory of your project. If you still want to use GCM (which no longer works) define the build hint android.messagingService=gcm", new RuntimeException());
                 return false;
@@ -2532,6 +2538,30 @@ public class AndroidGradleBuilder extends Executor {
 
         }
 
+        String rootCheckCall = "";
+        if (rootCheck) {
+            if (!request.getArg("gradleDependencies", "").contains("com.scottyab:rootbeer-lib")) {
+                String rootbeerVersion = request.getArg("android.rootbeerVersion", "0.1.0");
+                request.putArgument(
+                        "gradleDependencies",
+                        request.getArg("gradleDependencies", "") +
+                                "\n"+compile+" \"com.scottyab:rootbeer-lib:" + rootbeerVersion + "\"\n"
+                );
+            }
+
+            rootCheckCall = "        com.scottyab.rootbeer.RootBeer rootBeer = new com.scottyab.rootbeer.RootBeer(this);\n"
+                    + "        if (rootBeer.isRooted()) {\n"
+                    + "            android.util.Log.e(\"Codename One\", \"Device is rooted. Exiting app.\");\n"
+                    + "            System.exit(0);\n"
+                    + "        }\n";
+        }
+
+        String fridaDetectionCall = "";
+        if (fridaDetection) {
+            fridaDetectionCall = "        com.codename1.impl.android.FridaDetectionUtil.runFridaDetection(this);\n";
+        }
+
+
         String waitingForPermissionsRequest=
                 "        if (isWaitingForPermissionResult()) {\n" +
                         "            setWaitingForPermissionResult(false);\n" +
@@ -2588,6 +2618,8 @@ public class AndroidGradleBuilder extends Executor {
                     + "    }\n\n"
                     + "    public void onCreate(Bundle savedInstanceState) {\n"
                     + "        super.onCreate(savedInstanceState);\n"
+                    + fridaDetectionCall
+                    + rootCheckCall
                     + facebookHashCode
                     + facebookSupport
                     + streamMode
@@ -2637,7 +2669,6 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failed to generate stub source code", ex);
         }
-
 
         String fcmRegisterPushCode = "";
         if (useFCM) {
@@ -3319,10 +3350,6 @@ public class AndroidGradleBuilder extends Executor {
         request.putArgument("var.android.playServicesVersion", playServicesVersion);
         String additionalDependencies = request.getArg("gradleDependencies", "");
         if (facebookSupported) {
-            String compile = "compile";
-            if (useAndroidX || useArrImplementation) {
-                compile = "implementation";
-            }
             minSDK = maxInt("15", minSDK);
 
             if(request.getArg("android.excludeBolts", "false").equals("true")) {
@@ -3335,10 +3362,7 @@ public class AndroidGradleBuilder extends Executor {
                                 facebookSdkVersion + "'\n";
             }
         }
-        String compile = "compile";
-        if (useAndroidX || useArrImplementation) {
-            compile = "implementation";
-        }
+
         if (legacyGplayServicesMode) {
             additionalDependencies += " "+compile+" 'com.google.android.gms:play-services:6.5.87'\n";
         } else {
