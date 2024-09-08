@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 #ifdef CN1_DETECT_JAILBREAK
+#import "CN1JailbreakDetector.h"
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
