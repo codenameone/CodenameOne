@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+//#define CN1_DETECT_JAILBREAK 1
 #ifdef CN1_DETECT_JAILBREAK
 void cn1DetectJailbreakBypassesAndExit();
 #endif

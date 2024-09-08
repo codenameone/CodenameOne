@@ -20,14 +20,18 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-#ifdef CN1_DETECT_JAILBREAK
+
 #import "CN1JailbreakDetector.h"
+#ifdef CN1_DETECT_JAILBREAK
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
 #import <mach-o/dyld.h>
 
 void cn1DetectJailbreakBypassesAndExit() {
+#if (TARGET_IPHONE_SIMULATOR)
+    return;
+#endif
     // List of known libraries used by bypass tools like Liberty Lite and Substrate
     NSArray *bypassLibraries = @[
         @"LibertyLite.dylib",

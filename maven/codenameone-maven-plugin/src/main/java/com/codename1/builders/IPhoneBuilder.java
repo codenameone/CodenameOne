@@ -1283,6 +1283,11 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_INCLUDE", glAppDelegeateHeader);
             }
 
+            File jailbreakH = new File(buildinRes, "CN1JailbreakDetector.h");
+            if (jailbreakH.exists() && detectJailbreak) {
+                replaceInFile(jailbreakH, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
+            }
+
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
             if (glAppDelegeateBody != null && glAppDelegeateBody.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_BODY", glAppDelegeateBody);
@@ -1297,10 +1302,6 @@ public class IPhoneBuilder extends Executor {
             String beforeFinishLaunching = request.getArg("ios.beforeFinishLaunching", null);
             if (beforeFinishLaunching != null) {
                 replaceInFile(glAppDelegate, "//beforeDidFinishLaunchingWithOptionsMarkerEntry", beforeFinishLaunching);
-            }
-
-            if (detectJailbreak) {
-                replaceInFile(glAppDelegate, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
             }
 
             String afterFinishLaunching = request.getArg("ios.afterFinishLaunching", null);

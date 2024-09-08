@@ -21,10 +21,7 @@
  * need additional information or have any questions.
  */
 #import "CodenameOne_GLAppDelegate.h"
-//#define CN1_DETECT_JAILBREAK 1
-#ifdef CN1_DETECT_JAILBREAK
 #import "CN1JailbreakDetector.h"
-#endif
 #include "xmlvm.h"
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
@@ -120,7 +117,7 @@ static void installSignalHandlers() {
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
 #ifdef CN1_DETECT_JAILBREAK
-    cn1DetectJailbreakBypassesAndExit()
+    cn1DetectJailbreakBypassesAndExit();
 #endif
     //beforeDidFinishLaunchingWithOptionsMarkerEntry
     
