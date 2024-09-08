@@ -66,6 +66,8 @@ public class IPhoneBuilder extends Executor {
     // which adds localized strings files to the project.
     private StringBuilder installLocalizedStringsScript = new StringBuilder();
 
+    private boolean detectJailbreak;
+
     private boolean runPods=false;
     private boolean photoLibraryUsage;
     private String buildVersion;
@@ -212,6 +214,7 @@ public class IPhoneBuilder extends Executor {
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
+        detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
         useMetal = "true".equals(request.getArg("ios.metal", "false"));
@@ -939,9 +942,6 @@ public class IPhoneBuilder extends Executor {
                 + "            }\n"
                 + "        });\n";
 
-
-
-
         try (OutputStream stubSourceStream = new FileOutputStream(new File(stubSource, request.getMainClass() + "Stub.java"))) {
             String stubSourceCode = "package " + request.getPackageName() + ";\n\n"
                     + "import com.codename1.ui.*;\n"
@@ -1281,6 +1281,11 @@ public class IPhoneBuilder extends Executor {
             String glAppDelegeateHeader = request.getArg("ios.glAppDelegateHeader", null);
             if (glAppDelegeateHeader != null && glAppDelegeateHeader.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_INCLUDE", glAppDelegeateHeader);
+            }
+
+            File jailbreakH = new File(buildinRes, "CN1JailbreakDetector.h");
+            if (jailbreakH.exists() && detectJailbreak) {
+                replaceInFile(jailbreakH, "//#define CN1_DETECT_JAILBREAK", "#define CN1_DETECT_JAILBREAK");
             }
 
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
