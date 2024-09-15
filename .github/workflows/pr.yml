@@ -67,7 +67,7 @@ jobs:
       run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
 
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.2.4
+      uses: actions/upload-artifact@v4
       with:
         name: JavaAPI.jar
         path: vm/JavaAPI/dist/JavaAPI.jar
@@ -79,13 +79,13 @@ jobs:
       run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
 
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.2.4
+      uses: actions/upload-artifact@v4
       with:
         name: ByteCodeTranslator.jar
         path: vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar
 
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.2.4
+      uses: actions/upload-artifact@v4
       with:
         name: CLDC11.jar
         path: Ports/CLDC11/dist/CLDC11.jar
@@ -105,7 +105,7 @@ jobs:
         local: result.zip
         
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.2.4
+      uses: actions/upload-artifact@v4
       with:
         name: JavaSE.jar
         path: Ports/JavaSE/dist/JavaSE.jar
