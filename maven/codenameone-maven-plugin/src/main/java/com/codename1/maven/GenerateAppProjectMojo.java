@@ -38,6 +38,9 @@ import static com.codename1.maven.PathUtil.path;
 @Mojo(name="generate-app-project", requiresProject = false)
 public class GenerateAppProjectMojo extends AbstractMojo {
 
+    @Parameter(property = "cn1.tidy", defaultValue = "true")
+    private boolean tidy;
+
     @Parameter(property = "sourceProject")
     private File sourceProject;
 
@@ -63,6 +66,30 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
         }
         return props;
+    }
+
+    private void tidyPomXmlFiles(File projectDirectory) {
+        InvocationRequest request = new DefaultInvocationRequest();
+        request.setBaseDirectory(projectDirectory);
+        if (getLog().isDebugEnabled()) {
+            request.setDebug(true);
+        }
+        request.setGoals(Collections.singletonList("com.diffplug.spotless:spotless-maven-plugin:2.43.0:apply"));
+        Properties props = new Properties();
+        props.setProperty("spotless.pom.includes", "pom.xml");
+        props.setProperty("spotless.pom.sortPom.keepBlankLines", "false");
+
+        request.setProperties(props);
+
+        Invoker invoker = new DefaultInvoker();
+        try {
+            InvocationResult result = invoker.execute(request);
+            if (result.getExitCode() != 0) {
+                getLog().warn("Failed to tidy pom.xml files.  Exit code "+result.getExitCode());
+            }
+        } catch (MavenInvocationException ex) {
+            getLog().warn("Failed to tidy pom.xml files", ex);
+        }
     }
 
     private void generateProject() throws MojoExecutionException{
@@ -926,7 +953,9 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to copy files", ex);
         }
-
+        if (tidy) {
+            tidyPomXmlFiles(targetProjectDir());
+        }
     }
 
     private Project antProject;
