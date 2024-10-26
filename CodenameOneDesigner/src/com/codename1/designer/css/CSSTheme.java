@@ -3128,38 +3128,43 @@ public class CSSTheme {
                     boxShadow = tmp;
                 }
             }
-            
-            
+
             if (isNone(boxShadow)) {
                 return i;
             }
-            
-            
-            
+
             ScaledUnit insetUnit = boxShadow;
             while (insetUnit != null) {
                 if ("inset".equals(insetUnit.getStringValue())) {
-                    
                     return i;
                 }
                 insetUnit = (ScaledUnit)insetUnit.getNextLexicalUnit();
             }
-            
-            
+
             double hShadow = boxShadow.getPixelValue();
-            
             boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
-            
-            double vShadow = boxShadow.getPixelValue();
-            boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
+
+            double vShadow = 0;
+            if (boxShadow == null) {
+                boxShadow = (ScaledUnit)style.get("cn1-box-shadow-v");
+            }
+            if (boxShadow != null) {
+                vShadow = boxShadow.getPixelValue();
+                boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
+            }
             
             double blur = 0;
-            
+            if (boxShadow == null) {
+                boxShadow = (ScaledUnit)style.get("cn1-box-shadow-blur");
+            }
             if (boxShadow != null) {
                 blur = boxShadow.getPixelValue();
                 boxShadow = (ScaledUnit)boxShadow.getNextLexicalUnit();
             }
             double spread = 0;
+            if (boxShadow == null) {
+                boxShadow = (ScaledUnit)style.get("cn1-box-shadow-spread");
+            }
             if (boxShadow != null) {
                 spread = boxShadow.getPixelValue();
             }
@@ -3168,12 +3173,8 @@ public class CSSTheme {
             i.left = Math.max(0, (int)Math.ceil(spread - hShadow + blur/2));
             i.bottom = Math.max(0, (int)Math.ceil(spread + vShadow + blur/2));
             i.right = Math.max(0, (int)Math.ceil(spread + hShadow + blur/2));
-            
-           
+
             return i;
-            
-            
-                    
         }
         
         String generateBoxShadowPaddingString() {
