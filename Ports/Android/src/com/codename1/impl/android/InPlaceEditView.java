@@ -2160,6 +2160,10 @@ public class InPlaceEditView extends FrameLayout{
                 case KeyEvent.KEYCODE_MENU:
                     endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
                     break;
+		case KeyEvent.KEYCODE_ENTER:
+                    if (mEditText.mTextArea != null && mEditText.mTextArea.isSingleLineTextArea())
+                        onEditorAction(EditorInfo.IME_ACTION_DONE);
+                    break;
                 case KeyEvent.KEYCODE_ESCAPE:
                     endEditing(InPlaceEditView.REASON_IME_ACTION, false, true, EditorInfo.IME_ACTION_DONE, keyCode);
                     break;
