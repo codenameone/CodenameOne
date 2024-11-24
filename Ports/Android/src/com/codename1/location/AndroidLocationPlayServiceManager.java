@@ -477,12 +477,12 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
             }
             Intent intent = new Intent(context, BackgroundLocationBroadcastReceiver.class);
             intent.setAction(BackgroundLocationBroadcastReceiver.ACTION_PROCESS_GEOFENCE_TRANSITIONS);
-            intent.setData(Uri.parse("http://codenameone.com/a?" + geofenceListenerClass.getName()));
+            intent.putExtra("geofenceListenerClass", geofenceListenerClass.getName());
             geofencePendingIntent = PendingIntent.getBroadcast(
                     AndroidNativeUtil.getContext().getApplicationContext(),
                     0,
                     intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE
             );
             return geofencePendingIntent;
         } else {
