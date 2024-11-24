@@ -105,7 +105,11 @@ public class BackgroundLocationBroadcastReceiver extends BroadcastReceiver {
 
                     String dataString = intent.getDataString();
                     if (dataString == null) {
-                        return;
+                        if (intent.getExtras() != null && intent.getExtras().get("geofenceListenerClass") != null) {
+                            dataString = "-?" + intent.getExtras().get("geofenceListenerClass");
+                        } else {
+                            return;
+                        }
                     }
                     String[] params = dataString.split("[?]");
                     if (params.length < 2) {
