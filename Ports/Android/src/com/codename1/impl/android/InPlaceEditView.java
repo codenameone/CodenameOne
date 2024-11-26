@@ -1226,7 +1226,7 @@ public class InPlaceEditView extends FrameLayout{
 
 	if (((TextArea) mEditText.mTextArea).getTabListener() != null
                 && (actionCode == EditorInfo.IME_ACTION_NEXT)) {
-            ((TextArea) mEditText.mTextArea).fireTabEvent(keyEvent);
+            ((TextArea) mEditText.mTextArea).fireTabEvent(KeyEvent.KEYCODE_TAB);
         }
 	    
         if (EditorInfo.IME_ACTION_NEXT == actionCode && mEditText != null &&
