@@ -63,7 +63,7 @@ import java.util.ArrayList;
  */
 public class TextArea extends Component implements ActionSource, TextHolder {
     private EventDispatcher listeners = new EventDispatcher();
-    private ActionListener doneListener;
+    private ActionListener doneListener, tabListener;
     
     private static int defaultValign = TOP;
 
@@ -2211,6 +2211,46 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 return;
             }
             doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done,keyEvent));
+        }
+    }
+
+    /**
+     * Sets a Tab listener on the TextField - notice this listener will be called
+     * only on supported platforms that supports tab action on the keyboard
+     * 
+     * @param l the listener
+     */
+    public void setTabListener(ActionListener l) {
+        tabListener = l;
+    }
+
+    /**
+     * Gets the tab listener of this TextField.
+     * 
+     * @return the tab listener or null if not exists
+     */ 
+    public ActionListener getTabListener() {
+        return tabListener;
+    }
+    
+    /**
+     * Fire the tab event to tab listener
+     */ 
+    public void fireTabEvent() {
+        fireTabEvent(-1);
+    }
+    public void fireTabEvent(final int keyEvent) {
+        if (tabListener != null) {
+            if (!Display.getInstance().isEdt()) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    public void run() {
+                        fireTabEvent(keyEvent);
+                    }
+                });
+                return;
+            }
+            tabListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Change,keyEvent));
         }
     }
 
