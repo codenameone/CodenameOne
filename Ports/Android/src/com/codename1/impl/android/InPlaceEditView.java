@@ -1223,6 +1223,12 @@ public class InPlaceEditView extends FrameLayout{
         final int fActionCode = actionCode;
         boolean hasNext = false;
         Component next = null;
+
+	if (((TextArea) mEditText.mTextArea).getTabListener() != null
+                && (actionCode == EditorInfo.IME_ACTION_NEXT)) {
+            ((TextArea) mEditText.mTextArea).fireTabEvent(keyEvent);
+        }
+	    
         if (EditorInfo.IME_ACTION_NEXT == actionCode && mEditText != null &&
                 mEditText.mTextArea != null) {
             next = mEditText.mTextArea.getComponentForm().getNextComponent(mEditText.mTextArea);
