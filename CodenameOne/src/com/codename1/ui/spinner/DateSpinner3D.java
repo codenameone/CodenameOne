@@ -403,13 +403,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         if (!explicitStartYear && startYear > currentYear) {
             startYear = currentYear;
         }
-        if (!explicitEndYear && endYear -1 < currentYear) {
-            endYear = currentYear+1;
+        if (!explicitEndYear && endYear < currentYear) {
+            endYear = currentYear;
         }
         if (currentYear < startYear) {
             throw new IllegalArgumentException("Current year "+currentYear+" before start year "+startYear);
         }
-        if (currentYear > endYear - 1) {
+        if (currentYear > endYear) {
             throw new IllegalArgumentException("Current year "+currentYear+" after end year "+endYear);
         }
         if(year != null) {
@@ -433,13 +433,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         if (!explicitStartDay && startDay > currentDay) {
             startDay = currentDay;
         }
-        if (!explicitEndDay && endDay -1 < currentDay) {
-            endDay = currentDay + 1;
+        if (!explicitEndDay && endDay < currentDay) {
+            endDay = currentDay;
         }
         if (startDay > currentDay) {
             throw new IllegalArgumentException("Start day "+startDay+" after current day "+currentDay);
         }
-        if (endDay -1 < currentDay) {
+        if (endDay < currentDay) {
             throw new IllegalArgumentException("End day "+endDay+" before current day "+currentDay);
         }
         if(day != null) {
@@ -466,13 +466,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         if (!explicitStartMonth && startMonth > currentMonth) {
             startMonth = currentMonth;
         }
-        if (!explicitEndMonth && endMonth -1 < currentMonth) {
-            endMonth = currentMonth+1;
+        if (!explicitEndMonth && endMonth < currentMonth) {
+            endMonth = currentMonth;
         }
         if (startMonth > currentMonth) {
             throw new IllegalArgumentException("Start month "+startMonth+" after current month "+currentMonth);
         }
-        if (endMonth -1 < currentMonth) {
+        if (endMonth < currentMonth) {
             throw new IllegalArgumentException("End month "+endMonth+" before current month "+currentMonth);
         }
         if(month != null) {
