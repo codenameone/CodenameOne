@@ -30,6 +30,9 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.prefs.Preferences;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.concurrent.Worker;
 import javafx.embed.swing.JFXPanel;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
@@ -83,7 +86,7 @@ public class LocationSimulation extends JFrame {
 
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
         int startingZoom = p.getInt("lastZoom", 9);
-        final String htmlpage2 = "<!DOCTYPE html>\n"
+        final String htmlPage = "<!DOCTYPE html>\n"
                 + "<html>\n"
                 + "  <head>\n"
                 + "    <title>Location Simulator</title>\n"
@@ -156,200 +159,120 @@ public class LocationSimulation extends JFrame {
                 + "  </body>\n"
                 + "</html>";
 
-//        final String htmlPage = "<!DOCTYPE html>\n"
-//                + "<html>\n"
-//                + "  <head>\n"
-//                + " <script>\n"
-//                + "(function() {\n" +
-//                "    var lastTime = 0;\n" +
-//                "    var vendors = ['ms', 'moz', 'webkit', 'o'];\n" +
-//                "    for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {\n" +
-//                "        window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];\n" +
-//                "        window.cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame'] \n" +
-//                "                                   || window[vendors[x]+'CancelRequestAnimationFrame'];\n" +
-//                "    }\n" +
-//                " \n" +
-//                "    if (!window.requestAnimationFrame)\n" +
-//                "        window.requestAnimationFrame = function(callback, element) {\n" +
-//                "            var currTime = new Date().getTime();\n" +
-//                "            var timeToCall = Math.max(0, 16 - (currTime - lastTime));\n" +
-//                "            var id = window.setTimeout(function() { callback(currTime + timeToCall); }, \n" +
-//                "              timeToCall);\n" +
-//                "            lastTime = currTime + timeToCall;\n" +
-//                "            return id;\n" +
-//                "        };\n" +
-//                " \n" +
-//                "    if (!window.cancelAnimationFrame)\n" +
-//                "        window.cancelAnimationFrame = function(id) {\n" +
-//                "            clearTimeout(id);\n" +
-//                "        };\n" +
-//                "}());\n"
-//                + "</script>"
-//                + "    <meta name=\"viewport\" content=\"initial-scale=1.0, user-scalable=no\" />\n"
-//                + "    <style type=\"text/css\">\n"
-//                + "      html { height: 100% }\n"
-//                + "      body { height: 100%; margin: 0; padding: 0 }\n"
-//                + "      #map-canvas { height: 100% }\n"
-//                + "      .gm-style-mtc > div, .gm-style > div, .gm-style-cc > div, .gm-style {font-family:sans-serif !important;}\n"
-//                + "    </style>\n"
-//                //+ " <script>"
-//                //+ "if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}"
-//                //+"  </script>"
-//                + "    <script type=\"text/javascript\"\n"
-//                + "      src=\"https://maps.googleapis.com/maps/api/js?key=API_KEY\">\n"
-//                + "    </script>\n"
-//                + "    <script type=\"text/javascript\">\n"
-//                + "function moveToLocation(lat, lng){\n"
-//                + "    var center = new google.maps.LatLng(lat, lng);\n"
-//                + "    // using global variable:\n"
-//                + "    document.map.panTo(center);\n"
-//                + "}\n"
-//                + "function initialize() {\n"
-//                + "var latlng = new google.maps.LatLng(40.714353, -74.005973 );\n"
-//                + "var myOptions = {\n"
-//                + "  zoom: "+startingZoom+",\n"
-//                + "  center: latlng,\n"
-//                + "  mapTypeControl: true,\n"
-//                + "  navigationControl: true,\n"
-//                + "  streetViewControl: true,\n"
-//                + "  backgroundColor: \"#FFFFFF\"\n"
-//                + "};\n"
-//                + "\n"
-//                + "document.geocoder = new google.maps.Geocoder();\n"
-//                + "document.map = new google.maps.Map(document.getElementById(\"map_canvas\"),myOptions);\n"
-//                + "console.log('map', document.map);\n"
-//                + "\n"
-//                + "document.marker = new google.maps.Marker({\n"
-//                + "    position: document.map.getCenter(),\n"
-//                + "    icon: {\n"
-//                + "      path: google.maps.SymbolPath.CIRCLE,\n"
-//                + "      scale: 5\n"
-//                + "    },\n"
-//                + "    map: document.map\n"
-//                + "  });"
-//                + "google.maps.event.addListener(document.map, 'drag', function() { document.marker.setPosition(document.map.getCenter()); } );"
-//                + "}"
-//                + "document.updateJavaFX = function updateJavaFX() {\n"
-//                + "    document.currentCenter  = document.map.getCenter();\n"
-//                + "    document.currentBounds  = document.map.getBounds();\n"
-//                + "    document.currentHeading = document.map.getHeading();\n"
-//                + "    document.currentZoom    = document.map.getZoom();\n"
-//                + "    document.marker.setPosition(document.currentCenter);\n"
-//                + "}"
-//                + "    </script>\n"
-//                + "  </head>\n"
-//                + " <body onload=\"initialize()\">\n"
-//                + "    <div id=\"map_canvas\" style=\"width:100%; height:100%\"></div>\n"
-//                + " </body>"
-//                + "</html>";
-
         final JFXPanel webContainer = new JFXPanel();
         mapPanel.setLayout(new BorderLayout());
         mapPanel.add(BorderLayout.CENTER, webContainer);
 
-        Platform.runLater(() -> {
-            StackPane root = new StackPane();
-            WebView webView = new WebView();
-            WebEngine webEngine = webView.getEngine();
-            this.webView = webView;
-            this.webEngine = webEngine;
-            root.getChildren().add(webView);
-            webContainer.setScene(new Scene(root));
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                StackPane root = new StackPane();
+                webView = new WebView();
+                webEngine = webView.getEngine();
+                root.getChildren().add(webView);
+                webContainer.setScene(new Scene(root));
 
-            // Load the HTML content
-            webEngine.loadContent(htmlpage2, "text/html");
+                // Load the HTML content
+                webEngine.loadContent(htmlPage, "text/html");
 
-            // Add a listener for the load state
-            webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
-                if (newState == javafx.concurrent.Worker.State.SUCCEEDED) {
-                    // Script is fully loaded, you can now call moveToLocation
-                    timer = new Timer();
-                    timer.scheduleAtFixedRate(new TimerTask() {
+                // Add a listener for the load state
+                webEngine.getLoadWorker().stateProperty().addListener(new ChangeListener<Worker.State>() {
+                    @Override
+                    public void changed(ObservableValue<? extends Worker.State> obs,
+                                        Worker.State oldState,
+                                        Worker.State newState) {
+                        if (newState == javafx.concurrent.Worker.State.SUCCEEDED) {
+                            // Script is fully loaded, you can now call moveToLocation
+                            timer = new Timer();
+                            timer.scheduleAtFixedRate(new TimerTask() {
+                                @Override
+                                public void run() {
+                                    if (!isTextFieldFocused) {
+                                        Platform.runLater(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                try {
+                                                    Object result = webEngine.executeScript("document.updateJavaFX()");
 
-                        @Override
-                        public void run() {
-                            if (!isTextFieldFocused) {
-                                Platform.runLater(() -> {
-                                try {
-                                    Object result = webEngine.executeScript("document.updateJavaFX()");
+                                                    if (result != null) {
+                                                        // Parse the coordinates more safely
+                                                        String jsonStr = result.toString();
+                                                        // Remove the curly braces and quotes
+                                                        jsonStr = jsonStr.replaceAll("[{}\"]", "");
 
+                                                        // Create a map to store our values
+                                                        Map<String, Double> values = new HashMap<>();
 
-                                    if (result != null) {
-                                        // Parse the coordinates more safely
-                                        String jsonStr = result.toString();
-                                        // Remove the curly braces and quotes
-                                        jsonStr = jsonStr.replaceAll("[{}\"]", "");
+                                                        // Split by comma and process each key-value pair
+                                                        for (String pair : jsonStr.split(",")) {
+                                                            try {
+                                                                String[] keyValue = pair.trim().split(":");
+                                                                if (keyValue.length == 2) {  // Make sure we have both key and value
+                                                                    String key = keyValue[0].trim();
+                                                                    double value = Double.parseDouble(keyValue[1].trim());
+                                                                    values.put(key, value);
+                                                                }
+                                                            } catch (Exception e) {
+                                                                // Skip this pair if there's an error
+                                                                continue;
+                                                            }
+                                                        }
 
-                                        // Create a map to store our values
-                                        Map<String, Double> values = new HashMap<>();
+                                                        // Only update if we have both latitude and longitude
+                                                        if (values.containsKey("lat") && values.containsKey("lng")) {
+                                                            double newLat = values.get("lat");
+                                                            double newLon = values.get("lng");
+                                                            int zoom = values.getOrDefault("zoom", 13.0).intValue();
 
-                                        // Split by comma and process each key-value pair
-                                        for (String pair : jsonStr.split(",")) {
-                                            try {
-                                                String[] keyValue = pair.trim().split(":");
-                                                if (keyValue.length == 2) {  // Make sure we have both key and value
-                                                    String key = keyValue[0].trim();
-                                                    double value = Double.parseDouble(keyValue[1].trim());
-                                                    values.put(key, value);
+                                                            // Update preferences
+                                                            Preferences prefs = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+                                                            prefs.putInt("lastZoom", zoom);
+                                                            prefs.putDouble("lastGoodLat", newLat);
+                                                            prefs.putDouble("lastGoodLon", newLon);
+
+                                                            // Update the text fields
+                                                            latitude.setText(String.format("%.6f", newLat));
+                                                            longitude.setText(String.format("%.6f", newLon));
+                                                        }
+                                                    }
+                                                } catch (Exception e) {
+                                                    e.printStackTrace();
                                                 }
-                                            } catch (Exception e) {
-                                                // Skip this pair if there's an error
-                                                continue;
                                             }
-                                        }
-
-                                        // Only update if we have both latitude and longitude
-                                        if (values.containsKey("lat") && values.containsKey("lng")) {
-                                            double newLat = values.get("lat");
-                                            double newLon = values.get("lng");
-                                            int zoom = values.getOrDefault("zoom", 13.0).intValue();
-
-                                            // Update preferences
-                                            Preferences prefs = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
-                                            prefs.putInt("lastZoom", zoom);
-                                            prefs.putDouble("lastGoodLat", newLat);
-                                            prefs.putDouble("lastGoodLon", newLon);
-
-                                            // Update the text fields
-                                            latitude.setText(String.format("%.6f", newLat));
-                                            longitude.setText(String.format("%.6f", newLon));
-                                        }
+                                        });
                                     }
-                                } catch (Exception e) {
-                                    e.printStackTrace();
+                                }
+                            }, 1000, 1000);
+
+                            // Add focus listeners to the text fields
+                            latitude.addFocusListener(new java.awt.event.FocusListener() {
+                                @Override
+                                public void focusGained(java.awt.event.FocusEvent e) {
+                                    isTextFieldFocused = true;
+                                }
+
+                                @Override
+                                public void focusLost(java.awt.event.FocusEvent e) {
+                                    isTextFieldFocused = false;
+                                }
+                            });
+
+                            longitude.addFocusListener(new java.awt.event.FocusListener() {
+                                @Override
+                                public void focusGained(java.awt.event.FocusEvent e) {
+                                    isTextFieldFocused = true;
+                                }
+
+                                @Override
+                                public void focusLost(java.awt.event.FocusEvent e) {
+                                    isTextFieldFocused = false;
                                 }
                             });
                         }
-                        }
-                    }, 1000, 1000);
+                    }
 
-                    // Add focus listeners to the text fields
-                    latitude.addFocusListener(new java.awt.event.FocusListener() {
-                        @Override
-                        public void focusGained(java.awt.event.FocusEvent e) {
-                            isTextFieldFocused = true;
-                        }
-
-                        @Override
-                        public void focusLost(java.awt.event.FocusEvent e) {
-                            isTextFieldFocused = false;
-                        }
-                    });
-
-                    longitude.addFocusListener(new java.awt.event.FocusListener() {
-                        @Override
-                        public void focusGained(java.awt.event.FocusEvent e) {
-                            isTextFieldFocused = true;
-                        }
-
-                        @Override
-                        public void focusLost(java.awt.event.FocusEvent e) {
-                            isTextFieldFocused = false;
-                        }
-                    });
-                }
-            });
-
+                });
+            }
         });
     }
 
