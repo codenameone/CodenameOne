@@ -325,6 +325,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/DB107"><img src="https://avatars.githubusercontent.com/u/154587979?v=4?s=100" width="100px;" alt="DB107"/><br /><sub><b>DB107</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=DB107" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://speakerdeck.com/eltociear"><img src="https://avatars.githubusercontent.com/u/22633385?v=4?s=100" width="100px;" alt="Ikko Eltociear Ashimine"/><br /><sub><b>Ikko Eltociear Ashimine</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=eltociear" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/SamC1832js"><img src="https://avatars.githubusercontent.com/u/79888848?v=4?s=100" width="100px;" alt="Sam C"/><br /><sub><b>Sam C</b></sub></a><br /><a href="https://github.com/codenameone/CodenameOne/commits?author=SamC1832js" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
