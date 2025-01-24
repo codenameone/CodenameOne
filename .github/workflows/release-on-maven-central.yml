@@ -5,8 +5,6 @@ name: Release on Maven Central
 on:
   push:
     tags: '*'
-  release:
-    types: [published]
 jobs:
   build:
     runs-on: ubuntu-latest
