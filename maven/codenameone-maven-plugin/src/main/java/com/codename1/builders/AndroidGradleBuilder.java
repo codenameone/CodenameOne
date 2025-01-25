@@ -309,7 +309,7 @@ public class AndroidGradleBuilder extends Executor {
     private static final Map<String,String> defaultPlayServiceVersions = new HashMap<>();
     static {
         // Defaults obtained from https://developers.google.com/android/guides/setup
-        defaultPlayServiceVersions.put("ads", "19.8.0");
+        defaultPlayServiceVersions.put("ads", "22.6.0");
         defaultPlayServiceVersions.put("ads-identifier", "18.0.1");
         defaultPlayServiceVersions.put("ads-lite", "21.5.0");
         defaultPlayServiceVersions.put("afs-native", "19.0.3");
@@ -1098,6 +1098,9 @@ public class AndroidGradleBuilder extends Executor {
         String googlePlayObfuscation = "";
         String googleAdUnitId = request.getArg("android.googleAdUnitId", request.getArg("google.adUnitId", null));
         String googlePlayAdViewCode = "";
+        if (playServicesAds) {
+            minSDK = maxInt("21", minSDK);
+        }
         if (googleAdUnitId != null && googleAdUnitId.length() > 0) {
             minSDK = maxInt("9", minSDK);
             googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
