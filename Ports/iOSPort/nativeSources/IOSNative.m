@@ -2505,7 +2505,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
 
-            if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {}
+            if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {
                 com_codename1_impl_ios_IOSNative_createWKBrowserComponent.inspectable = YES;
             }
             
