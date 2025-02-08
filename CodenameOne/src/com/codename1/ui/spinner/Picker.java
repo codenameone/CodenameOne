@@ -505,6 +505,16 @@ public class Picker extends Button {
                     if (defaultValue.getTime() > endDate.getTime()) {
                         defaultValue = startDate;
                     }
+                } else if (startDate != null) {
+                    out.setDateRange(startDate, null);
+                    if (defaultValue.getTime() < startDate.getTime()) {
+                        defaultValue = startDate;
+                    }
+                } else if (endDate != null) {
+                    out.setDateRange(null, endDate);
+                    if (defaultValue.getTime() > endDate.getTime()) {
+                        defaultValue = endDate;
+                    }
                 }
                 if (value != null) {
                     out.setValue(value);
