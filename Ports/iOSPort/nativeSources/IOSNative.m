@@ -427,6 +427,21 @@ void releaseCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
     com_codename1_impl_ios_IOSImplementation_release___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);
 }
 
+JAVA_OBJECT getClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString* key){
+    return com_codename1_ui_Component_getClientProperty___java_lang_String_R_java_lang_Object(
+        CN1_THREAD_STATE_PASS_ARG o,
+        fromNSString(CN1_THREAD_STATE_PASS_ARG key)
+    );
+}
+
+BOOL getBooleanClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString* key){
+    JAVA_OBJECT val = getClientProperty(CN1_THREAD_STATE_PASS_ARG o, key);
+    if(val == JAVA_NULL){
+        return NO;
+    }
+    return val == get_static_java_lang_Boolean_TRUE(threadStateData);
+}
+
 #ifndef NEW_CODENAME_ONE_VM
 NSString* toNSString(JAVA_OBJECT str) {
     if(str == JAVA_NULL) {
@@ -2489,6 +2504,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
+
+            if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {
+                com_codename1_impl_ios_IOSNative_createWKBrowserComponent.inspectable = YES;
+            }
             
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
