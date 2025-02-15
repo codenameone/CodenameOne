@@ -83,13 +83,16 @@ public class FridaDetectionUtil {
         try {
             List<String> suspiciousProperties = new ArrayList<String>();
             suspiciousProperties.add(getSystemProperty("ro.debuggable"));
-            suspiciousProperties.add(getSystemProperty("ro.secure"));
 
             for (String property : suspiciousProperties) {
                 if ("1".equals(property)) {
                     Log.e(TAG, "Suspicious system property detected: " + property);
                     return true;
                 }
+            }
+            if ("0".equals(getSystemProperty("ro.secure"))) {
+                Log.e(TAG, "Suspicious system property detected: ro.secure=0");
+                return true;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error checking for Frida properties: " + e.getMessage());
