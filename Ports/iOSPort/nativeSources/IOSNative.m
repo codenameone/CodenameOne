@@ -7610,7 +7610,17 @@ void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(
             NSString* nsText = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
             NSString* currText = ((UITextView*)editingComponent).text;
             if (![nsText isEqualToString:currText]) {
-                ((UITextView*)editingComponent).text = nsText;
+                UITextView *textView = (UITextView *)editingComponent;
+
+                // Save current cursor position
+                NSRange selectedRange = textView.selectedRange;
+
+                // Update the text
+                textView.text = nsText;
+
+                // Restore the cursor position
+                NSUInteger newPosition = MIN(selectedRange.location, textView.text.length);
+                textView.selectedRange = NSMakeRange(newPosition, 0);
             }
         }
         POOL_END();
