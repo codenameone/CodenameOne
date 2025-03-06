@@ -7610,17 +7610,25 @@ void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(
             NSString* nsText = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
             NSString* currText = ((UITextView*)editingComponent).text;
             if (![nsText isEqualToString:currText]) {
-                UITextView *textView = (UITextView *)editingComponent;
+                if ([editingComponent respondsToSelector:@selector(selectedRange)] &&
+                    [editingComponent respondsToSelector:@selector(setSelectedRange:)]) {
+                    UITextView *textView = (UITextView *)editingComponent;
 
-                // Save current cursor position
-                NSRange selectedRange = textView.selectedRange;
+                    // Save current cursor position
+                    NSRange selectedRange = textView.selectedRange;
 
-                // Update the text
-                textView.text = nsText;
+                    // Update the text
+                    textView.text = nsText;
 
-                // Restore the cursor position
-                NSUInteger newPosition = MIN(selectedRange.location, textView.text.length);
-                textView.selectedRange = NSMakeRange(newPosition, 0);
+                    // Restore the cursor position
+                    NSUInteger newPosition = MIN(selectedRange.location, textView.text.length);
+                    textView.selectedRange = NSMakeRange(newPosition, 0);
+                } else if ([editingComponent respondsToSelector:@selector(setText:)]) {
+                    // Fallback for UITextField, UILabel, or other classes supporting setText
+                    [(id)editingComponent setText:nsText];
+                } else {
+                    NSLog(@"editingComponent does not support text assignment");
+                }
             }
         }
         POOL_END();
