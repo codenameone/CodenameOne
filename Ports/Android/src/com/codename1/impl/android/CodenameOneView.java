@@ -167,26 +167,34 @@ public class CodenameOneView {
         Rect rect = this.safeArea;
         View rootView = activity.getWindow().getDecorView();
         if (Build.VERSION.SDK_INT >= VERSION_CODE_P) {
-            Method getRootWindowInsetsMethod = View.class.getMethod("getRootWindowInsets");
-            Object insets = getRootWindowInsetsMethod.invoke(rootView);
-            if (insets != null) {
-                Class<?> windowInsetsClass = Class.forName("android.view.WindowInsets");
-                Method getDisplayCutoutMethod = windowInsetsClass.getMethod("getDisplayCutout");
-                Object cutout = getDisplayCutoutMethod.invoke(insets);
+            try {
+                Method getRootWindowInsetsMethod = View.class.getMethod("getRootWindowInsets");
+                Object insets = getRootWindowInsetsMethod.invoke(rootView);
+                if (insets != null) {
+                    Class<?> windowInsetsClass = Class.forName("android.view.WindowInsets");
+                    Method getDisplayCutoutMethod = windowInsetsClass.getMethod("getDisplayCutout");
+                    Object cutout = getDisplayCutoutMethod.invoke(insets);
 
-                if (cutout != null) {
-                    Class<?> displayCutoutClass = Class.forName("android.view.DisplayCutout");
-                    Method getSafeInsetLeft = displayCutoutClass.getMethod("getSafeInsetLeft");
-                    Method getSafeInsetTop = displayCutoutClass.getMethod("getSafeInsetTop");
-                    Method getSafeInsetRight = displayCutoutClass.getMethod("getSafeInsetRight");
-                    Method getSafeInsetBottom = displayCutoutClass.getMethod("getSafeInsetBottom");
+                    if (cutout != null) {
+                        Class<?> displayCutoutClass = Class.forName("android.view.DisplayCutout");
+                        Method getSafeInsetLeft = displayCutoutClass.getMethod("getSafeInsetLeft");
+                        Method getSafeInsetTop = displayCutoutClass.getMethod("getSafeInsetTop");
+                        Method getSafeInsetRight = displayCutoutClass.getMethod("getSafeInsetRight");
+                        Method getSafeInsetBottom = displayCutoutClass.getMethod("getSafeInsetBottom");
 
-                    rect.left = (int) getSafeInsetLeft.invoke(cutout);
-                    rect.top = (int) getSafeInsetTop.invoke(cutout);
-                    rect.right = (int) getSafeInsetRight.invoke(cutout);
-                    rect.bottom = (int) getSafeInsetBottom.invoke(cutout);
+                        rect.left = ((Integer) getSafeInsetLeft.invoke(cutout)).intValue();
+                        rect.top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();
+                        rect.right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();
+                        rect.bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();
+                    }
                 }
+            } catch (Exception e) {
+                rect.top = 0;
+                rect.left = 0;
+                rect.right = 0;
+                rect.bottom = 0;
             }
+
         } else if (Build.VERSION.SDK_INT >= VERSION_CODE_M) {
             rootView.post(new Runnable() {
                 public void run() {
