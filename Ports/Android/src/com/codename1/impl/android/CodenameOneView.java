@@ -163,9 +163,9 @@ public class CodenameOneView {
     }
 
     private void updateSafeArea() {
-        Activity activity = CodenameOneView.this.implementation.getActivity();
-        Rect rect = this.safeArea;
-        View rootView = activity.getWindow().getDecorView();
+        final Activity activity = CodenameOneView.this.implementation.getActivity();
+        final Rect rect = this.safeArea;
+        final View rootView = activity.getWindow().getDecorView();
         if (Build.VERSION.SDK_INT >= VERSION_CODE_P) {
             try {
                 Method getRootWindowInsetsMethod = View.class.getMethod("getRootWindowInsets");
