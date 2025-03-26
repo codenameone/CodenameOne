@@ -80,6 +80,10 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         public boolean dirty;
     }
 
+    public Rect getSafeAreaInsets() {
+        return cn1View.getSafeArea();
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         final int count = getChildCount();
