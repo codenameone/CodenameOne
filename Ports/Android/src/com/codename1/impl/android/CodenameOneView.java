@@ -99,7 +99,11 @@ public class CodenameOneView {
         width = androidDisplay.getWidth();
         height = androidDisplay.getHeight();
         View rootView = activity.getWindow().getDecorView();
-        rootView.post(() -> updateSafeArea());
+        rootView.post(new Runnable() {
+            public void run() {
+                updateSafeArea();
+            }
+        });
         initBitmaps(width, height);
     }
 
