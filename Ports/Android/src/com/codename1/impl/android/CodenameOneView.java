@@ -173,29 +173,20 @@ public class CodenameOneView {
                 // Use cutout insets instead
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            rootView.post(() -> {
-                WindowInsets insets = rootView.getRootWindowInsets();
-                if (insets != null) {
-                    int left = insets.getSystemWindowInsetLeft();
-                    int top = insets.getSystemWindowInsetTop();
-                    int right = insets.getSystemWindowInsetRight();
-                    int bottom = insets.getSystemWindowInsetBottom();
-
-                    int screenWidth = Display.getInstance().getDisplayWidth();
-                    int screenHeight = Display.getInstance().getDisplayHeight();
-
-                    int width = screenWidth - left - right;
-                    int height = screenHeight - top - bottom;
-
-                    rect.top = top;
-                    rect.left = left;
-                    rect.right = right;
-                    rect.bottom = bottom;
-                } else {
-                    rect.top = 0;
-                    rect.left = 0;
-                    rect.right = 0;
-                    rect.bottom = 0;
+            rootView.post(new Runnable() {
+                public void run() {
+                    WindowInsets insets = rootView.getRootWindowInsets();
+                    if (insets != null) {
+                        rect.top = insets.getSystemWindowInsetTop();
+                        rect.left = insets.getSystemWindowInsetLeft();;
+                        rect.right = insets.getSystemWindowInsetRight();
+                        rect.bottom = insets.getSystemWindowInsetBottom();
+                    } else {
+                        rect.top = 0;
+                        rect.left = 0;
+                        rect.right = 0;
+                        rect.bottom = 0;
+                    }
                 }
             });
         } else {
