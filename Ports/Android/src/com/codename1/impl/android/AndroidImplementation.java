@@ -1292,6 +1292,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Display.DENSITY_MEDIUM;
     }
 
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        if (rect == null) {
+            rect = new Rectangle();
+        }
+        if (this.myView != null) {
+            rect.setBounds(
+                    this.myView.getSafeAreaInsets().left,
+                    this.myView.getSafeAreaInsets().top,
+                    getDisplayWidth() - this.myView.getSafeAreaInsets().right - this.myView.getSafeAreaInsets().left,
+                    getDisplayHeight() - this.myView.getSafeAreaInsets().top - this.myView.getSafeAreaInsets().bottom
+            );
+            return rect;
+        }
+
+        return super.getDisplaySafeArea(rect);
+    }
+
     /**
      * A status flag to indicate that CN1 is in the process of deinitializing.
      */
