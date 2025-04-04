@@ -1296,6 +1296,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (rect == null) {
             rect = new Rectangle();
         }
+        if (getProperty("android.useSafeAreaInsets", "false").equals("false")) {
+            return super.getDisplaySafeArea(rect);
+        }
         if (this.myView != null) {
             rect.setBounds(
                     this.myView.getSafeAreaInsets().left,
