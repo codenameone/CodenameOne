@@ -2905,9 +2905,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if ("OS".equals(key)) {
             return "Android";
         }
-        if ("androidId".equals(key)) {
+
+        // It's possible that this is triggering a Google Play data collection verification error
+        /*if ("androidId".equals(key)) {
             return Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
-        }
+        }*/
 
         /*if ("cellId".equals(key)) {
             try {
