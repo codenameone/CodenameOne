@@ -1927,7 +1927,18 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
             preview.delegate = [CodenameOne_GLViewController instance];
             [preview presentPreviewAnimated:YES];
         } else {
-            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
+            NSURL* url = [NSURL URLWithString:ns];
+            if (@available(iOS 10.0, *)) {
+                [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success) {
+                    if (success) {
+                        NSLog(@"URL opened : %@", url);
+                    } else {
+                        NSLog(@"Error opening URL: %@", url);
+                    }
+                }];
+            } else {
+                [[UIApplication sharedApplication] openURL:url];
+            }
         }
 #ifdef CN1_USE_ARC
         [ns release];
