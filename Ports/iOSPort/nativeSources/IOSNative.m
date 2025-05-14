@@ -6180,6 +6180,7 @@ JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_i
 
 #ifdef NEW_CODENAME_ONE_VM
 //------------------------------------------------------------------------------
+// Bug Report – Emoji corruption when retrieving TEXT from SQLite on iOS
 //Solution to issue : https://github.com/codenameone/CodenameOne/issues/3898
 //------------------------------------------------------------------------------
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
