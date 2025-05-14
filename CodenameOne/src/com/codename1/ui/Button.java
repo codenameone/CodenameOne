@@ -24,13 +24,14 @@
 
 package com.codename1.ui;
 
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.util.EventDispatcher;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Vector;
 
