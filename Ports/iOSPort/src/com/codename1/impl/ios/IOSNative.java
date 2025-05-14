@@ -535,7 +535,7 @@ public final class IOSNative {
     native void drawTextureAlphaMask(long textureId, int color, int alpha, int x, int y, int w, int h);
     
     native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr); 
-
+    native void nativeDrawShadowMutable(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity);
     native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
     
     // End paths
@@ -719,5 +719,6 @@ public final class IOSNative {
 
     native int getDisplaySafeInsetBottom();
 
+    native boolean isRTLString(String javaString);
     
 }

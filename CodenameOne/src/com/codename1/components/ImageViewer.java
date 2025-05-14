@@ -28,6 +28,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.DataChangedListener;
@@ -220,7 +221,7 @@ public class ImageViewer extends Component {
         super.initComponent();
         if(image == null) {
             // gui builder?
-            image = Image.createImage(50, 50, 0);
+            image = ImageFactory.createImage(this, 50, 50, 0);
         } else {
             image.lock();
         }
@@ -324,6 +325,11 @@ public class ImageViewer extends Component {
         getComponentForm().addComponentAwaitingRelease(this);
     }
 
+    @Override
+    protected void dragFinished(int x, int y) {
+        super.dragFinished(x, y);
+    }
+
     private Image getImageRight() {
         return swipeableImages.getItemAt(getImageRightPos());
     }
@@ -415,7 +421,7 @@ public class ImageViewer extends Component {
             panPositionX = panPositionX + distanceX * getZoom();
             panPositionX = Math.min(1, Math.max(0, panPositionX));
             panPositionY = Math.min(1, Math.max(0, panPositionY + distanceY * getZoom()));
-            
+
             updatePositions();
             repaint();
         } else {
@@ -499,7 +505,7 @@ public class ImageViewer extends Component {
             imageY = prefY;
             cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
             return;
-        } 
+        }
         int iW = image.getWidth();
         int iH = image.getHeight();
         Style s = getStyle();
@@ -514,7 +520,15 @@ public class ImageViewer extends Component {
         imageDrawWidth = (int)(((float)iW) * r2 * zoom);
         imageDrawHeight = (int)(((float)iH) * r2 * zoom);
         imageX = (int)(s.getPaddingLeftNoRTL()+ imageDrawWidth * (0.5-panPositionX));
+        if (imageDrawWidth < getInnerWidth()) {
+
+            imageX += (getInnerWidth() - imageDrawWidth)/2;
+        }
         imageY = (int)(s.getPaddingTop() + imageDrawHeight * (0.5 - panPositionY));
+        if (imageDrawHeight < getInnerHeight()) {
+
+            imageY += (getInnerHeight() - imageDrawHeight)/2;
+        }
         cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
     }
     
@@ -556,7 +570,7 @@ public class ImageViewer extends Component {
             height = (int)Math.round(width * getHeight() / (double)getWidth());
         }
         
-        Image out = Image.createImage(width, height, backgroundColor);
+        Image out = ImageFactory.createImage(this, width, height, backgroundColor);
         Graphics g = out.getGraphics();
         g.setColor(backgroundColor);
         g.fillRect(0, 0, width, height);
@@ -759,7 +773,22 @@ public class ImageViewer extends Component {
             if (isPinchZooming) {
                 g.setRenderingHints(Graphics.RENDERING_HINT_FAST);
             }
-            g.drawImage(image, getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
+
+            g.drawImage(image,
+                    (imageDrawWidth <= getInnerWidth()) ? getX() + imageX : Math.max(
+                            Math.min( //
+                                    getX(),
+                                    getX() + imageX
+                            ),
+                            getX() - imageDrawWidth + getInnerWidth()),
+                    (imageDrawHeight <= getInnerHeight()) ? getY() + imageY : Math.max(
+                            Math.min(
+                                    getY(), getY() + imageY
+                            ), getY() - imageDrawHeight + getInnerHeight()
+                    ),
+                    imageDrawWidth, imageDrawHeight);
+
+
             g.setRenderingHints(0);
         }
     }

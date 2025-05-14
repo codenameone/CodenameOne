@@ -27,6 +27,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
@@ -388,7 +389,7 @@ public class RoundBorder extends Border {
     
     
     private Image createTargetImage(Component c, int w, int h, boolean fast) {
-        Image target = Image.createImage(w, h, 0);
+        Image target = ImageFactory.createImage(c, w, h, 0);
         
         int shapeX = 0;
         int shapeY = 0;
@@ -419,7 +420,7 @@ public class RoundBorder extends Border {
             }
             if(Display.getInstance().isGaussianBlurSupported() && !fast) {
                 Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur/2);
-                target = Image.createImage(w, h, 0);
+                target = ImageFactory.createImage(c, w, h, 0);
                 tg = target.getGraphics();
                 tg.drawImage(blured, 0, 0);
                 tg.setAntiAliased(true);

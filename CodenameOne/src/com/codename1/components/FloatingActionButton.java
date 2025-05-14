@@ -398,14 +398,20 @@ public class FloatingActionButton extends Button {
      */
     protected Container createPopupContent(List<FloatingActionButton> fabs) {
         Container con = new Container(new BoxLayout(BoxLayout.Y_AXIS));
-        for (FloatingActionButton next : subMenu) {
+        for (final FloatingActionButton next : subMenu) {
             next.setPreferredW(getWidth());
             Container c = new Container(new BorderLayout());
-            Label txt = new Label(next.text);
+            Button txt = new Button(next.text);
             txt.setUIID(floatingActionTextUIID);
             c.add(BorderLayout.CENTER, FlowLayout.encloseRight(txt));
             c.add(BorderLayout.EAST, next);
             con.add(c);
+            txt.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    next.pressed();
+                    next.released();
+                }
+            });
         }
         return con;
     }

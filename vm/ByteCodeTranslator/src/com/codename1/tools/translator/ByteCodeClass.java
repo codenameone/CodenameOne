@@ -72,9 +72,11 @@ public class ByteCodeClass {
     private boolean isSynthetic;
     private boolean isAnnotation;
     private boolean isAnonymous;
-    private boolean usedByNative;
+    private boolean eliminated;
+
     private static boolean saveUnitTests;
     private boolean isUnitTest;
+
 
     private static Set<String> arrayTypes = new TreeSet<String>();
     
@@ -100,6 +102,36 @@ public class ByteCodeClass {
     public ByteCodeClass(String clsName, String originalClassName) {
         this.clsName = clsName;
         this.originalClassName = originalClassName;
+    }
+
+    /**
+     * Checks if this class has been eliminated.
+     * @return
+     */
+    public boolean isEliminated() {
+        return eliminated;
+    }
+
+    /**
+     * Marks class as eliminated.  Will recursively set all class methods
+     * as eliminated too.
+     * @param eliminated True to set eliminated.
+     * @return Number of methods that were newly marked as eliminated by this call.
+     */
+    public int setEliminated(boolean eliminated) {
+        int nfound = 0;
+        if (this.eliminated) return nfound;
+        this.eliminated = eliminated;
+        if (eliminated) {
+            for (BytecodeMethod m : methods) {
+                if (!m.isEliminated()) {
+                    m.setEliminated(true);
+                    nfound++;
+                }
+            }
+        }
+        return nfound;
+
     }
     
     /**
@@ -130,6 +162,7 @@ public class ByteCodeClass {
         methods.add(m);
     }
 
+
     public void addField(ByteCodeField m) {
         fields.add(m);
     }
@@ -142,10 +175,19 @@ public class ByteCodeClass {
         writableFields.add(field);
     }
 
-    public static void markDependencies(List<ByteCodeClass> lst) {
+    /**
+     * Marks dependencies in this class based on the provided classes in this round of optimization.
+     * @param lst The list of classes that are available in this optimization step.
+     * @param nativeSources Array of native sources in this round. Used to check if native files reference
+     *                      this class or methods.
+     */
+    public static void markDependencies(List<ByteCodeClass> lst, String[] nativeSources) {
         mainClass.markDependent(lst);
         for(ByteCodeClass bc : lst) {
             if (bc.marked) {
+                continue;
+            }
+            if (bc.isEliminated()) {
                 continue;
             }
             if(bc.clsName.equals("java_lang_Boolean")) {
@@ -192,7 +234,12 @@ public class ByteCodeClass {
                 bc.markDependent(lst);
                 continue;
             }
-            if(bc.isUsedByNative()){
+            if (bc.getUsedByNative() == UsedByNativeResult.Unknown) {
+                // We don't yet know if this class is used by native
+                // calculate it now.
+                bc.calcUsedByNative(nativeSources);
+            }
+            if(bc.getUsedByNative() == UsedByNativeResult.Used){
                 bc.markDependent(lst);
                 continue;
             }
@@ -250,6 +297,7 @@ public class ByteCodeClass {
         if(marked) {
             return;
         }
+
         marked = true;
         
         // make sure the method/classname are in the constant pool so we can later 
@@ -316,6 +364,7 @@ public class ByteCodeClass {
             if(m.isEliminated()) {
                 continue;
             }
+
             for(String s : m.getDependentClasses()) {
                 if(!dependsClassesInterfaces.contains(s)) {
                     dependsClassesInterfaces.add(s);
@@ -384,8 +433,11 @@ public class ByteCodeClass {
             arrayTypes.add(arr);
         }
     }
-    
-    public String generateCCode(List<ByteCodeClass> allClasses) {        
+
+
+
+    public String generateCCode(List<ByteCodeClass> allClasses) {
+
         StringBuilder b = new StringBuilder();
         b.append("#include \"");
         b.append(clsName);
@@ -910,7 +962,9 @@ public class ByteCodeClass {
                 b.append("(threadStateData, vtable);\n");
             }
             for(int iter = 0 ; iter < virtualMethodList.size() ; iter++) {
+
                 BytecodeMethod bm = virtualMethodList.get(iter);
+
                 if(bm.getClsName().equals(clsName) && !bm.isVirtualOverriden()) {
                     b.append("    vtable[");
                     b.append(iter);
@@ -930,7 +984,7 @@ public class ByteCodeClass {
                 b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)values->data;\n");
                 b.append("    int len = values->length;\n");
                 b.append("    for (int i=0; i<len; i++) {\n");
-                b.append("        JAVA_OBJECT name = get_field_").append(clsName).append("_name(data[i]);\n");
+                b.append("        JAVA_OBJECT name = (*(struct obj__").append(clsName).append("*)data[i]).java_lang_Enum_name;\n");
                 b.append("        if (name != JAVA_NULL && java_lang_String_equals___java_lang_Object_R_boolean(threadStateData, name, value)) { return data[i];}\n");
                 b.append("    }\n");
                 b.append("    return JAVA_NULL;\n");
@@ -1023,15 +1077,7 @@ public class ByteCodeClass {
             b.append("(threadStateData, class__");
             b.append(clsName);
             b.append(".vtable);\n");
-            /*for(int iter = 0 ; iter < virtualMethodList.size() ; iter++) {
-                b.append("    class__");
-                b.append(clsName);
-                b.append(".vtable[");
-                b.append(iter);
-                b.append("] = &");
-                virtualMethodList.get(iter).appendFunctionPointer(b);
-                b.append(";\n");
-            }*/
+
         }
         b.append("    class__");
         b.append(clsName);
@@ -1102,19 +1148,31 @@ public class ByteCodeClass {
     }
     
     private void buildInstanceFieldList(List<ByteCodeField> fieldList) {
+        buildInstanceFieldList(fieldList, true);
+    }
+    
+    private void buildInstanceFieldList(List<ByteCodeField> fieldList, boolean includePrivateFields) {
         for(ByteCodeField bf : fields) {
+            // We don't include private fields from parent classes.
+            if (!includePrivateFields && bf.isPrivate()) continue;
             if(!bf.isStaticField() && !fieldList.contains(bf)) {
                 fieldList.add(bf);
             } 
         }
         if(baseClassObject != null) {
-            baseClassObject.buildInstanceFieldList(fieldList);
+            baseClassObject.buildInstanceFieldList(fieldList, false);
         }        
     } 
 
     private List<ByteCodeField> buildStaticFieldList(List<ByteCodeField> fieldList) {
+        return buildStaticFieldList(fieldList, true);
+    }
+    
+    private List<ByteCodeField> buildStaticFieldList(List<ByteCodeField> fieldList, boolean includePrivateFields) {
         if (fields != null) {
             for(ByteCodeField bf : fields) {
+                // We don't include private fields from parent classes.
+                if (!includePrivateFields && bf.isPrivate()) continue;
                 if(bf.isStaticField() && !fieldList.contains(bf)) {
                     fieldList.add(bf);
                 } 
@@ -1122,11 +1180,11 @@ public class ByteCodeClass {
         }
         if(baseInterfacesObject != null) {
             for(ByteCodeClass baseInterface : baseInterfacesObject) {
-                baseInterface.buildStaticFieldList(fieldList);
+                baseInterface.buildStaticFieldList(fieldList, false);
             }
         }
         if(baseClassObject != null) {
-            baseClassObject.buildStaticFieldList(fieldList);
+            baseClassObject.buildStaticFieldList(fieldList, false);
         }        
         return fieldList;
     } 
@@ -1494,6 +1552,7 @@ public class ByteCodeClass {
             }
         }
         for(BytecodeMethod bm : methods) {
+            if (bm.isEliminated()) continue;
             if(bm.canBeVirtual()) {
                 int offset = virtualMethods.indexOf(bm);
                 if(offset < 0) {
@@ -1580,6 +1639,10 @@ public class ByteCodeClass {
     
     public List<BytecodeMethod> getMethods() {
         return methods;
+    }
+
+    public List<ByteCodeField> getFields() {
+        return fields;
     }
 
     /**
@@ -1714,18 +1777,60 @@ public class ByteCodeClass {
     }
 
     /**
-     * @return the isUsedByNative
+     * 3-state variable to keep track of whether the class is used by native sources.
+     * 3 states, because we need to know if it is unknown.
      */
-    public boolean isUsedByNative() {
-        if (!usedByNative){
-            for (BytecodeMethod m : methods){
-                if (m.isUsedByNative()){
-                    usedByNative = true;
-                    break;
-                }
+    private UsedByNativeResult usedByNative = UsedByNativeResult.Unknown;
+
+
+    /**
+     * Sets usedByNative flag in this class.
+     * @param usedByNative True if this class is used by native sources.
+     */
+    public void setUsedByNative(boolean usedByNative) {
+        this.usedByNative = usedByNative ? UsedByNativeResult.Used : UsedByNativeResult.Unused;
+    }
+
+    /**
+     * Enum to track possible values of {@link #usedByNative}.
+     */
+    public static enum UsedByNativeResult {
+        /**
+         * The class is used by native sources.
+         */
+        Used,
+        /**
+         * The class is not used by native sources.
+         */
+        Unused,
+        /**
+         * We don't yet know if this class is used by native sources.
+         */
+        Unknown;
+    }
+
+
+    /**
+     * Check whether this class is used by native sources.
+     * @return
+     */
+    public UsedByNativeResult getUsedByNative() {
+       return usedByNative;
+    }
+
+    /**
+     * Calculates whether this class is used in any of the native sources.
+     * @param nativeSources The native sources to check.
+     * @see #getUsedByNative() 
+     * @see #setUsedByNative(boolean)
+     */
+    public void calcUsedByNative(String[] nativeSources) {
+        for (BytecodeMethod m : methods) {
+            if (usedByNative != UsedByNativeResult.Unknown) {
+                return;
             }
+            m.isMethodUsedByNative(nativeSources, this);
         }
-        return usedByNative;
     }
 
     boolean isUnitTest() {

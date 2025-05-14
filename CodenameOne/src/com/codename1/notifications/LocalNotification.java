@@ -47,7 +47,7 @@ import com.codename1.ui.Image;
  * be repeating).
  * 
  * <h3>Usage</h3>
- * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+ * <script src="https://gist.github.com/shannah/a5592313da97e085822120af16518874.js"></script>
  * 
  * <p><strong>Android Note:</strong> The default image that is used on the android top status bar
  * and on the notification itself is the App's icon.  However Android 5 and above will only display

@@ -23,14 +23,14 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.impl.javase.util.MavenUtils;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.util.*;
 
 /**
  * A simple class that can invoke a lifecycle object to allow it to run a
@@ -43,12 +43,49 @@ public class Simulator {
     
     private static final String DEFAULT_SKIN="/iPhoneX.skin";
     private static ClassPathLoader rootClassLoader;
-    
+
+
+    /**
+     * Loads properties from the target/codenameone/simulator.properties file into the System properties.
+     * This file is created by the PrepareSimulatorClasspathMojo
+     * @param projectDir
+     */
+    private static void loadSimulatorProperties(File projectDir) {
+       if (!MavenUtils.isRunningInMaven()) {
+           // simulator.properties file is only for maven.
+           // The PrepareSimulatorClassPathMojo writes the simulator.properties file in the target/codenameone folder.
+           return;
+       }
+       if (System.getProperty("cn1.simulator.properties.loaded") != null) {
+           // properties are already loaded.
+           return;
+       }
+       System.setProperty("cn1.simulator.properties.loaded", "true");
+       File simulatorProperties = new File(projectDir, "target" + File.separator + "codenameone" + File.separator + "simulator.properties");
+       if (simulatorProperties.exists()) {
+           Properties props = new Properties();
+           try (FileInputStream fis = new FileInputStream(simulatorProperties)) {
+               props.load(fis);
+           } catch (IOException ex) {
+               System.err.println("Failed to load simulator.properties file");
+               ex.printStackTrace();
+           }
+           for (Object key : props.keySet()) {
+               String stringKey = (String)key;
+               if (stringKey.isEmpty()) continue;
+               System.setProperty(stringKey, props.getProperty(stringKey));
+           }
+
+
+       }
+
+   }
 
     /**
      * Accepts the classname to launch
      */
     public static void main(final String[] argv) throws Exception {
+
         try {
             // Load the sqlite database Engine JDBC driver in the top level classloader so it's shared
             // this works around the exception: java.lang.UnsatisfiedLinkError: Native Library sqlite already loaded in another classloader
@@ -73,7 +110,7 @@ public class Simulator {
         if (System.getenv("CN1_SIMULATOR_SKIN") != null) {
             System.setProperty("skin", System.getenv("CN1_SIMULATOR_SKIN"));
         }
-        
+
         String classPathStr = System.getProperty("java.class.path");
         if (System.getProperty("cn1.class.path") != null) {
             classPathStr += File.pathSeparator + System.getProperty("cn1.class.path");
@@ -83,9 +120,38 @@ public class Simulator {
             System.setProperty("MainClass", argv[0]);
         }
         List<File> files = new ArrayList<File>();
+        // Support for instant reload:
+        // If running with HotswapAgent (https://github.com/HotswapProjects/HotswapAgent) in debug mode
+        // we add special support for instant refresh when source files are changed.
+        // The easiest way to enable this is to install DCEVM JDK https://github.com/TravaOpenJDK/trava-jdk-11-dcevm/releases
+        // and use that as the project JDK.  Then add "-XX:HotswapAgent=core" to the java VM options.
+        // 
+        List<String> inputArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
+        final boolean isDebug = inputArgs.toString().indexOf("-agentlib:jdwp") > 0;
+        final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
+        File cn1Props = new File("codenameone_settings.properties");
+        if (!cn1Props.exists()) {
+            cn1Props = new File("common" + File.separator + "codenameone_settings.properties");
+
+        }
+        if (!cn1Props.exists()) {
+            cn1Props = new File(".." + File.separator + "common" + File.separator + "codenameone_settings.properties").getAbsoluteFile();
+
+        }
+        if (cn1Props.exists()) {
+            File commonClasses = new File(cn1Props.getParentFile(), "target" + File.separator + "classes");
+            if (commonClasses.exists()) {
+                files.add(commonClasses.getAbsoluteFile());
+            }
+            loadSimulatorProperties(cn1Props.getParentFile());
+        }
+        if (isDebug && usingHotswapAgent) { 
+            HotswapProperties hotswapProperties = new HotswapProperties();
+            files.addAll(hotswapProperties.getExtraClasses());
+        }
         int len = t.countTokens();
         for (int iter = 0; iter < len; iter++) {
-            files.add(new File(t.nextToken()));
+            files.add(new File(t.nextToken()).getAbsoluteFile());
         }
         File javase = new File("native" + File.separator + "javase");
         File libJavase = new File("lib" + File.separator + "impl" + File.separator + "native" + File.separator + "javase");
@@ -95,7 +161,7 @@ public class Simulator {
                 for (File jar : dir.listFiles()) {
                     if (jar.getName().endsWith(".jar")) {
                         if (!files.contains(jar)) {
-                            files.add(jar);
+                            files.add(jar.getAbsoluteFile());
                             System.setProperty("java.class.path", System.getProperty("java.class.path")+File.pathSeparator+jar.getAbsolutePath());
                         }
                     }
@@ -128,61 +194,16 @@ public class Simulator {
                 System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
                 for (File jar : cef.listFiles()) {
                     if (jar.getName().endsWith(".jar") && !jar.getName().endsWith("-tests.jar")) {
-                        files.add(jar);
+                        files.add(jar.getAbsoluteFile());
                     }
                 }
             }
         }
-        
-        /*
-        Tried to add JavaDX to classpath dynamically, but was dismal failure.
-        if (!fxSupported) {
-            if (getJavaVersion() == 8) {
-                File fx = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx8");
-                File fxLibDir = new File(fx, "lib");
-                File fxJarDir = new File(fxLibDir, "ext");
-                if (fxLibDir.exists() && fxJarDir.exists()) {
-                    System.setProperty("java.class.path", System.getProperty("java.class.path") 
-                        + File.pathSeparator + fxJarDir.getAbsolutePath());
-                    String cn1LibPath = System.getProperty("cn1.library.path", ".");
-                    System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + fxLibDir.getPath());
-                     for (File jar : fxJarDir.listFiles()) {
-                        if (jar.getName().endsWith(".jar")) {
-                            System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jar.getAbsolutePath());
-                            files.add(jar);
-                        }
-                    }
-                     fxSupported = true;
-                }
-            } else if (getJavaVersion() >= 9) {
-                File fx = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "javafx");
-                File fxLibDir = new File(fx, "lib");
-                File fxJarDir = fxLibDir;
-                if (fxLibDir.exists() && fxJarDir.exists()) {
-                    
-                    System.setProperty("java.class.path", System.getProperty("java.class.path") 
-                        + File.pathSeparator + fxJarDir.getAbsolutePath());
-                    String cn1LibPath = System.getProperty("cn1.library.path", ".");
-                    System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + fxLibDir.getPath());
-                     for (File jar : fxJarDir.listFiles()) {
-                        if (jar.getName().endsWith(".jar")) {
-                            System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jar.getAbsolutePath());
-                            files.add(jar);
-                        }
-                    }
-                    fxSupported = true;
-                    System.out.println("Classpath now "+System.getProperty("java.class.path"));
-                }
-            }
-            
-        }
-        */
-        
         
         File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
         if (jmf.exists()) {
             System.setProperty("java.class.path", System.getProperty("java.class.path") + File.pathSeparator + jmf.getAbsolutePath());
-            files.add(jmf);
+            files.add(jmf.getAbsoluteFile());
         }
         
         String implementation = System.getProperty("cn1.javase.implementation", "");
@@ -217,9 +238,18 @@ public class Simulator {
             ldr = new ClassPathLoader(rootClassLoader, files.toArray(new File[files.size()]));
             
         }
+        StringBuilder filesPath = new StringBuilder();
+        for (File f : files) {
+            if (filesPath.length() > 0) {
+                filesPath.append(File.pathSeparator);
+            }
+            filesPath.append(f.getAbsolutePath());
+        }
+        System.setProperty("cn1.classPathLoader.Path", filesPath.toString());
         ((ClassPathLoader)ldr).addExclude("org.cef.");
         
         final ClassLoader fLdr = ldr;
+        Thread.currentThread().setContextClassLoader(fLdr);
         Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});
@@ -233,8 +263,9 @@ public class Simulator {
                     }
                     String r = System.getProperty("reload.simulator");
                     if (r != null && r.equals("true")) {
-                        System.out.println("Detected reload of simulator");
                         System.setProperty("reload.simulator", "");
+                        int version = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                        System.setProperty("reload.simulator.count", String.valueOf(version+1));
                         try {
                             main(argv);
                         } catch (Exception ex) {
@@ -326,6 +357,105 @@ public class Simulator {
             return true;
         }
         return false;
+    }
+    
+    /**
+     * Encapsulates the hotswap-agent.properties file that is used when running with HotswapAgent.
+     * See https://github.com/HotswapProjects/HotswapAgent
+     */
+    private static class HotswapProperties {
+        Properties props;
+        
+        /**
+         * Finds the hotswap-agent.properties file.
+         * @return 
+         */
+        private File findHotswapPropertiesFile() {
+        
+            try {
+                File currDir = new File(System.getProperty("user.dir")).getCanonicalFile();
+                while (!new File(currDir, "javase").exists()) {
+                    currDir = currDir.getParentFile();
+                    if (currDir == null) {
+                        return null;
+                    }
+                }
+
+                //System.out.println("Curr Directory is "+currDir);
+                File hotswapProps = new File(currDir, "javase" + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "hotswap-agent.properties");
+                if (hotswapProps.exists()) {
+                    return hotswapProps;
+                }
+            } catch (IOException ex){
+                ex.printStackTrace();
+            }
+
+            return null;
+
+        }
+
+
+        /**
+         * The hotswap-agent.properties file may be added to the root of the
+         * classpath to tune the Hotswap Agent to support enhanced live
+         * class-reloading.
+         *
+         * https://github.com/HotswapProjects/HotswapAgent
+         *
+         * @return
+         */
+        private Properties loadHotswapProperties() {
+            Properties out = new Properties();
+            File hotswapProps = findHotswapPropertiesFile();
+            if (hotswapProps != null) {
+                FileInputStream fis = null;
+                try {
+                   fis = new FileInputStream(hotswapProps);
+                   out.load(fis);
+
+                } catch (IOException ex) {
+                    System.err.println("Failed to load hotswap properties file from "+hotswapProps);
+                    ex.printStackTrace();
+                } finally {
+                    if (fis != null) {
+                        try {
+                            fis.close();
+                        } catch (Exception ex){}
+                    }
+                }
+            }
+            return out;
+
+        }
+        
+        private Properties getProperties() {
+            if (props == null) {
+                props = loadHotswapProperties();
+            }
+            return props;
+        }
+        
+        /**
+         * Gets the extraClasspath from the hotswap-agent.properties file.  These paths
+         * are prepended to the classpath of the classloader to allow for live code refresh.
+         * 
+         * @return 
+         */
+        private List<File> getExtraClasses() {
+            String extraClasspath = getProperties().getProperty("extraClasspath");
+            // NOTE: The hotswap-agent.properties file  uses semicolon to separate entries in extraClasspath on all
+            // platforms - not just windows.
+            if (extraClasspath == null || extraClasspath.trim().isEmpty()) {
+                return new ArrayList();
+            }
+            String[] parts = extraClasspath.split(";");
+            List<File> files = new ArrayList<File>();
+            for (String part : parts) {
+                part = part.trim();
+                files.add(new File(part).getAbsoluteFile());
+            }
+            return files;
+        }
     }
     
 }

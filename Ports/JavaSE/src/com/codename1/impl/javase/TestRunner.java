@@ -22,13 +22,12 @@
  */
 package com.codename1.impl.javase;
 
-//import com.codename1.impl.javase.fx.JavaFXLoader;
-import com.codename1.testing.JUnitXMLReporting;
 import com.codename1.testing.TestReporting;
+import com.codename1.ui.Display;
+
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.StringTokenizer;
 import java.util.prefs.Preferences;
@@ -118,6 +117,8 @@ public class TestRunner {
 
                     if(s.equalsIgnoreCase("-junitXML")) {
                         TestReporting.setInstance(new JUnitXMLReporting());
+                        pos++;
+                        continue;
                     }
                     
                     if(s.equalsIgnoreCase("-cleanMode")) {
@@ -178,8 +179,15 @@ public class TestRunner {
             }
             
             System.out.println("Preparing to execute " + tests.length + " tests");
-            
-            StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
+            // Required to provide implementations of Util for static functions in Log using the current classloader
+            Display.init(new java.awt.Container());
+
+            String classPathStr = System.getProperty("java.class.path");
+            if (System.getProperty("cn1.class.path") != null) {
+                classPathStr += File.pathSeparator + System.getProperty("cn1.class.path");
+            }
+
+            StringTokenizer t = new StringTokenizer(classPathStr, File.pathSeparator);
             File[] files = new File[t.countTokens()];
             for (int iter = 0; iter < files.length; iter++) {
                 files[iter] = new File(t.nextToken());
@@ -189,11 +197,11 @@ public class TestRunner {
 
             if(cleanMode) {
                 for(String currentTestClass : tests) {
-                    ClassLoader ldr = new ClassPathLoader(files);
-                    Class c = Class.forName("com.codename1.impl.javase.TestExecuter", true, ldr);
+                    ClassLoader ldr = createClassLoader(files);
+                    Class<?> c = Class.forName("com.codename1.impl.javase.TestExecuter", true, ldr);
                     Method m = c.getDeclaredMethod("runTest", String.class, String.class, Boolean.TYPE);
                     Boolean passed = (Boolean)m.invoke(null, mainClass, currentTestClass, quietMode);
-                    if(passed.booleanValue()) {
+                    if(passed) {
                         passedTests++;
                     } else {
                         failedTests++;
@@ -204,12 +212,12 @@ public class TestRunner {
                     }
                 }
             } else {
-                ClassLoader ldr = new ClassPathLoader(files);
-                Class c = Class.forName("com.codename1.impl.javase.TestExecuter", true, ldr);
+                ClassLoader ldr = createClassLoader(files);
+                Class<?> c = Class.forName("com.codename1.impl.javase.TestExecuter", true, ldr);
                 for(String currentTestClass : tests) {
                     Method m = c.getDeclaredMethod("runTest", String.class, String.class, Boolean.TYPE);
                     Boolean passed = (Boolean)m.invoke(null, mainClass, currentTestClass, quietMode);
-                    if(passed.booleanValue()) {
+                    if(passed) {
                         System.out.println(currentTestClass + " passed!");
                         passedTests++;
                     } else {
@@ -221,11 +229,11 @@ public class TestRunner {
                         }
                     }
                 }
-            }      
-            TestReporting.getInstance().testExecutionFinished();
+            }
+            TestReporting.getInstance().testExecutionFinished(mainClass);
             int exitCode = 0;
             if(failedTests > 0) {
-                System.out.println("Test execution finished, some failed tests occured. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
+                System.out.println("Test execution finished, some failed tests occurred. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
                 exitCode = 100;
             } else {
                 System.out.println("All tests passed. Total " + passedTests + " tests passed");
@@ -236,15 +244,22 @@ public class TestRunner {
             System.exit(3);
         }
     }
-    
+
+    private ClassLoader createClassLoader(File[] files) {
+        ClassPathLoader ldr = new ClassPathLoader(files);
+        ldr.addExclude("com.codename1.testing.TestReporting");
+        return ldr;
+    }
     
  
     /**
      * The main method accepts several arguments of which only the main class is a requirement
      * @param argv
      */
-    public static void main(String[] argv) {
-        
+    public static void main(String[] argv) throws Exception {
+        if (CN1Bootstrap.run(TestRunner.class, argv)) {
+            return;
+        }
         new TestRunner().init(argv);
     }
 }

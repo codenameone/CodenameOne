@@ -80,10 +80,6 @@ public class Calendar extends Container implements ActionSource {
     private static final String[] MONTHS = new String[]{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     private static final String[] DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     private static final String[] LABELS = {"Su", "M", "Tu", "W", "Th", "F", "Sa"};
-    static final long MINUTE = 1000 * 60;
-    static final long HOUR = MINUTE * 60;
-    static final long DAY = HOUR * 24;
-    static final long WEEK = DAY * 7;
     private EventDispatcher dispatcher = new EventDispatcher();
     private EventDispatcher dataChangedListeners = new EventDispatcher();
     private EventDispatcher monthChangedListeners = new EventDispatcher();
@@ -1047,19 +1043,15 @@ public class Calendar extends Container implements ActionSource {
                 cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
                 long startDate = cal.getTime().getTime();
                 int dow = cal.get(java.util.Calendar.DAY_OF_WEEK);
-                cal.setTime(new Date(cal.getTime().getTime() - DAY));
-                cal.set(java.util.Calendar.HOUR, 1);
-                cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
-                cal.set(java.util.Calendar.MINUTE, 0);
-                cal.set(java.util.Calendar.SECOND, 0);
-                cal.set(java.util.Calendar.MILLISECOND, 0);
+                cal.setTime(new Date(cal.getTime().getTime()));
+                cal.add(java.util.Calendar.DAY_OF_MONTH, -1);
                 int lastDay = cal.get(java.util.Calendar.DAY_OF_MONTH);
                 int i = 0;
                 if (dow > java.util.Calendar.SUNDAY) {
                     //last day of previous month
 
                     while (dow > java.util.Calendar.SUNDAY) {
-                        cal.setTime(new Date(cal.getTime().getTime() - DAY));
+                        cal.add(java.util.Calendar.DAY_OF_MONTH, -1);
                         dow = cal.get(java.util.Calendar.DAY_OF_WEEK);
                     }
                     int previousMonthSunday = cal.get(java.util.Calendar.DAY_OF_MONTH);
@@ -1071,8 +1063,9 @@ public class Calendar extends Container implements ActionSource {
                 }
                 //last day of current month
                 cal.set(java.util.Calendar.MONTH, (month + 1) % 12);
-                cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
-                cal.setTime(new Date(cal.getTime().getTime() - DAY));
+                while(cal.get(java.util.Calendar.MONTH) != month) {
+                    cal.add(java.util.Calendar.DAY_OF_MONTH, -1);
+                }
 
                 lastDay = cal.get(java.util.Calendar.DAY_OF_MONTH);
 
@@ -1099,7 +1092,9 @@ public class Calendar extends Container implements ActionSource {
                         }
                     }
                     updateButtonDayDate(components[j], yearNew, month, j - i + 1);
-                    startDate += DAY;
+                    cal.setTime(new Date(startDate));
+                    cal.add(java.util.Calendar.DAY_OF_MONTH, 1);
+                    startDate = cal.getTime().getTime();
                 }
                 int d = 1;
                 for (; j < components.length; j++) {
@@ -1156,16 +1151,12 @@ public class Calendar extends Container implements ActionSource {
             cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
             cal.set(java.util.Calendar.YEAR, year);
 
-            Date date = cal.getTime();
-            long d = date.getTime();
-
             // if this is past the last day of the month (e.g. going from January 31st
-            // to Febuary) we need to decrement the day until the month is correct
+            // to February) we need to decrement the day until the month is correct
             while (cal.get(java.util.Calendar.MONTH) != month) {
-                d -= DAY;
-                cal.setTime(new Date(d));
+                cal.add(java.util.Calendar.DAY_OF_MONTH, -1);
             }
-            setCurrentDay(d);
+            setCurrentDay(cal.getTime().getTime());
         }
 
         public void decrementMonth() {

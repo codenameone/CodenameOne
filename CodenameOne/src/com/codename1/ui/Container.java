@@ -31,20 +31,14 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.CodenameOneImplementation;
-import static com.codename1.ui.Component.BOTTOM;
-import static com.codename1.ui.Component.LEFT;
-import static com.codename1.ui.Component.RIGHT;
-import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.Vector;
+
+import java.util.*;
 
 /**
  * <p>A composite pattern with {@link Component}, allows nesting and arranging multiple
@@ -108,6 +102,7 @@ public class Container extends Component implements Iterable<Component>{
     private boolean blockFocus = false;
     private boolean dontRecurseContainer;
     private UIManager uiManager;
+    private boolean surface;
     
     /**
      * Encapsulates a change to the container's children.  Used to keep track of 
@@ -353,7 +348,65 @@ public class Container extends Component implements Iterable<Component>{
         }
         
     }
-    
+
+    /**
+     * Checks if this container acts as a Material Design surface.  "Surface" containers render drop-shadows for their
+     * elevated descendents.
+     * 
+     * @return True if this container is a surface.
+     * @since 8.0
+     */
+    public boolean isSurface() {
+        return surface;
+    }
+
+    /**
+     * Enables or disables "surface" features for this container.  If {@literal surface} is true, then the container
+     * will act as a surface.  As such, it will paint the drop-shadows for elevated descendents.
+     * 
+     * @param surface True to set this container as a surface.
+     * @since 8.0
+     * @see Style#getElevation()
+     * @see Component#paintShadows(Graphics, int, int) 
+     */
+    void setSurface(boolean surface) {
+        if (surface != this.surface) {
+            this.surface = surface;
+            if (!surface) {
+                // This is not a surface anymore.  We need to take all of the
+                // elevated components that currently project against this surface
+                // and reevaluate which surface they should project onto
+                if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
+                    ArrayList<Component> toProcess = new ArrayList<Component>(elevatedComponents);
+                    elevatedComponents.clear();
+                    for (Component elevated : toProcess) {
+                        ((Component)elevated).registerElevatedInternal(elevated);
+                    }
+                }
+            } else {
+                // We are now a surface.  See if there are any projections against parent the parent
+                // surface that this should intercept
+                Container parentSurface = findSurface();
+                if (parentSurface != null) {
+                    if (parentSurface.elevatedComponents != null && !parentSurface.elevatedComponents.isEmpty()) {
+                        ArrayList<Component> toProcess = new ArrayList<Component>(parentSurface.elevatedComponents);
+
+                        for (Component elevated : toProcess) {
+                            if (contains(elevated)) {
+                                // This component is actually inside us, so it should project on
+                                // us now.
+                                ((Component)elevated).registerElevatedInternal(elevated);
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+
+    }
+
+
     
     /**
      * Simpler version of addComponent that allows chaining the calls for shorter syntax
@@ -1245,7 +1298,10 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     public boolean isEnabled() {
-        if(leadComponent != null) {
+        // Normally a container shouldn't be a lead component but this happens
+        // in the GUI builder and this block can cause an infinite recursion
+        // without the second condition
+        if(leadComponent != null && leadComponent != this) {
             return leadComponent.isEnabled();
         }
         return super.isEnabled();
@@ -1800,7 +1856,236 @@ public class Container extends Component implements Iterable<Component>{
     void setAllowEnableLayoutOnPaint(boolean allow) {
         allowEnableLayoutOnPaint = allow;
     }
-    
+
+    /**
+     * Set to keep track of elevated components to render against this surface.
+     */
+    private HashSet<Component> elevatedComponents;
+
+    /**
+     * Registers a component with this surface as an elevated component.
+     * @param cmp
+     */
+    void addElevatedComponent(Component cmp) {
+        if (elevatedComponents == null) elevatedComponents = new HashSet<Component>();
+        elevatedComponents.add(cmp);
+    }
+
+    /**
+     * Unregisters a component with this surface as an elevated components.
+     * @param cmp
+     */
+    void removeElevatedComponent(Component cmp) {
+        if (elevatedComponents == null) return;
+        elevatedComponents.remove(cmp);
+    }
+
+    /**
+     * A set used in {@link #paintElevatedPane(Graphics)} to gather all of the elevated descendent components
+     * of this container.
+     */
+    ArrayList<Component> _tmpRenderingElevatedComponents;
+
+    /**
+     * Paints the all of the elevated components in this surface.
+     * @param g
+     */
+    void paintElevatedPane(Graphics g) {
+        nextElevationComponentIndex = 0;
+        paintElevatedPane(g, false, -1, -1, -1, -1, -1, -1, false);
+    }
+
+
+    /**
+     * Index variable used to assign indices to components within the same elevation level.
+     */
+    private int nextElevationComponentIndex;
+
+    /**
+     * Paints the elevated pane for a surface.
+     * @param g THe graphics context
+     * @param useIntersection Enable intersection checking.  This is used when trying to paint components above and below other components,
+     *                        as it checks the intersection for painting.
+     * @param intersectionX IntersectionX in abs screen coords.
+     * @param intersectionY The intersectonY in abs screen coords
+     * @param intersectionWidth THe intersection width in abs screen coords
+     * @param intersectionHeight The intersection height in abs screen coords
+     * @param elevationThreshold The elevation threshold used when useIntersection is true. If above is true, then this threshold is used to paint
+     *                           only the components on the same elevation level and higher.
+     * @param elevationComponentIndexThreshold The elevation component index threshold used when useIntersection is true.  This is used to differentiate the
+     *                                         z-index of components in the same elevation level.
+     * @param above Indicate whether to render components above or below the thresholds specified by elevationThreshold and elevationComponentIndexThreshold.  Only used if useIntersection is true.
+     */
+    void paintElevatedPane(Graphics g, final boolean useIntersection, int intersectionX, int intersectionY, int intersectionWidth, int intersectionHeight, int elevationThreshold, int elevationComponentIndexThreshold, boolean above) {
+        CodenameOneImplementation impl = Display.impl;
+        int absX = getAbsoluteX();
+        int absY = getAbsoluteY();
+
+        g.translate(-absX, -absY);
+
+        if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
+            if (_tmpRenderingElevatedComponents == null) _tmpRenderingElevatedComponents = new ArrayList<Component>(elevatedComponents);
+            else {
+                _tmpRenderingElevatedComponents.clear();
+                _tmpRenderingElevatedComponents.addAll(elevatedComponents);
+            }
+            Collections.sort(_tmpRenderingElevatedComponents, new Comparator<Component>() {
+
+                public int compare(Component o1, Component o2) {
+                    int e1 = o1.getStyle().getElevation();
+                    int e2 = o2.getStyle().getElevation();
+                    if (e1 < e2) return -1;
+                    else if (e1 > e2) return 1;
+                    else {
+                        return o1.renderedElevationComponentIndex - o2.renderedElevationComponentIndex;
+                    }
+                }
+            });
+            for (Component child : _tmpRenderingElevatedComponents) {
+                int relativeX = child.getRelativeX(this) + child.getScrollX();
+                int relativeY = child.getRelativeY(this) + child.getScrollY();
+                int clipX = g.getClipX();
+                int clipW = g.getClipWidth();
+                int shadowX = relativeX + child.calculateShadowOffsetX();
+                int shadowW = child.calculateShadowWidth();
+                if (shadowX + shadowW <= clipX || shadowX >= clipX + clipW) continue;
+                int clipY = g.getClipY();
+                int clipH = g.getClipHeight();
+                int shadowY = relativeY + child.calculateShadowOffsetY();
+                int shadowH = child.calculateShadowHeight();
+                if (shadowY + shadowH <= clipY || shadowY >= clipY + clipH) continue;
+
+
+
+                if (!useIntersection || Rectangle.intersects(child.getAbsoluteX() + child.getScrollX() + child.calculateShadowOffsetX(),
+                        child.getAbsoluteY() + child.getScrollY() + child.calculateShadowOffsetY(),
+                        child.calculateShadowWidth(),
+                        child.calculateShadowHeight(),
+                        intersectionX, intersectionY, intersectionWidth, intersectionHeight)
+                ) {
+                    if (!useIntersection) {
+                        child.renderedElevation = child.getStyle().getElevation();
+                        child.renderedElevationComponentIndex = nextElevationComponentIndex++;
+                    }
+                    if (!useIntersection || elevationThreshold < 0 ||
+                            (above && (elevationThreshold < child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold < child.renderedElevationComponentIndex)) ||
+                            (!above && (elevationThreshold > child.renderedElevation || elevationThreshold == child.renderedElevation && elevationComponentIndexThreshold > child.renderedElevationComponentIndex))) {
+                        g.translate(absX, absY);
+                        child.paintShadows(impl.getComponentScreenGraphics(this, g), child.getRelativeX(this), child.getRelativeY(this));
+                        g.translate(-absX, -absY);
+                        int tx = child.getParent().getRelativeX(this) + child.getScrollX();
+                        int ty = child.getParent().getRelativeY(this) + child.getScrollY();
+                        g.translate(tx, ty);
+
+                        child.paintInternal(impl.getComponentScreenGraphics(this, g), false);
+                        g.translate(-tx, -ty);
+                    }
+
+                }
+
+
+                Container cnt = child.getParent();
+                Component currCmp = child;
+                boolean foundOverlap = false;
+
+                // We need to paint all components that should be "on top" of the elevated component
+                // also.
+                paintOnTopLoop: while (cnt != this && cnt != null) {
+                    Layout cntLayout = cnt.getLayout();
+                    if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
+                    if (foundOverlap) {
+                        int currCmpIndex = cnt.getComponentIndex(currCmp);
+                        if (currCmpIndex >= 0) {
+                            int count = cnt.getComponentCount();
+                            for (int i=currCmpIndex+1; i < count; i++) {
+                                Component cntChild = cnt.getComponentAt(i);
+                                if (elevatedComponents.contains(cntChild)) {
+                                    // if this component is itself an elevated component
+                                    // then it, and all of its subsequent
+                                    break paintOnTopLoop;
+                                }
+                                if (!useIntersection || Rectangle.intersects(cntChild.getAbsoluteX() + cntChild.getScrollX(), cntChild.getAbsoluteY() + cntChild.getScrollY(), cntChild.getWidth(), cntChild.getHeight(),
+                                        intersectionX, intersectionY, intersectionWidth, intersectionHeight)
+                                ) {
+                                    if (!useIntersection) {
+                                        cntChild.renderedElevation = child.renderedElevation;
+                                        cntChild.renderedElevationComponentIndex = nextElevationComponentIndex++;
+                                    }
+                                    if (!useIntersection || elevationThreshold < 0 ||
+                                            (above && (elevationThreshold < cntChild.renderedElevation || elevationThreshold == cntChild.renderedElevation && elevationComponentIndexThreshold < cntChild.renderedElevationComponentIndex)) ||
+                                            (!above && (elevationThreshold > cntChild.renderedElevation || elevationThreshold == cntChild.renderedElevation && elevationComponentIndexThreshold > cntChild.renderedElevationComponentIndex))) {
+                                        int tx = cntChild.getParent().getRelativeX(this) + cntChild.getParent().getScrollX();
+                                        int ty = cntChild.getParent().getRelativeY(this) + cntChild.getParent().getScrollY();
+                                        g.translate(tx, ty);
+
+                                        cntChild.paintInternal(impl.getComponentScreenGraphics(this, g), false);
+
+                                        g.translate(-tx, -ty);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    currCmp = cnt;
+                    cnt = cnt.getParent();
+
+
+                }
+
+            }
+        }
+        g.translate(absX, absY);
+
+    }
+
+    /**
+     * This is used to "tag" components in this surface that should be rendered in the elevated pane.
+     * This just sets or unsets the {@link Component#doNotPaint} flag so that rendering of the non-elevated
+     * pane can proceed without rendering elevated components.
+     *
+     *
+     * @param shouldPaintInElevatedPane True if we are setting the doNotPaint flag.  False if we are unsetting it.
+     */
+    void markComponentsToBePaintedInElevatedPane(boolean shouldPaintInElevatedPane) {
+        if (elevatedComponents != null && !elevatedComponents.isEmpty()) {
+            for (Component child : elevatedComponents) {
+                child.doNotPaint = shouldPaintInElevatedPane;
+                Container cnt = child.getParent();
+                Component currCmp = child;
+                boolean foundOverlap = false;
+
+                // We need to paint all components that should be "on top" of the elevated component
+                // also.
+                paintOnTopLoop: while (cnt != this && cnt != null) {
+                    Layout cntLayout = cnt.getLayout();
+                    if (!foundOverlap && cntLayout.isOverlapSupported()) foundOverlap = true;
+                    if (foundOverlap) {
+                        int currCmpIndex = cnt.getComponentIndex(currCmp);
+                        if (currCmpIndex >= 0) {
+                            int count = cnt.getComponentCount();
+                            for (int i=currCmpIndex+1; i < count; i++) {
+                                Component cntChild = cnt.getComponentAt(i);
+                                if (elevatedComponents.contains(cntChild)) {
+                                    // if this component is itself an elevated component
+                                    // then it, and all of its subsequent
+                                    break paintOnTopLoop;
+                                }
+                                child.doNotPaint = shouldPaintInElevatedPane;
+
+                            }
+                        }
+                    }
+                    currCmp = cnt;
+                    cnt = cnt.getParent();
+
+                }
+
+            }
+        }
+    }
+
+
+
     /**
      * {@inheritDoc}
      */
@@ -1812,10 +2097,11 @@ public class Container extends Component implements Iterable<Component>{
         //    they can enable/disable this behaviour at form level via the setAllowEnableLayoutOnPaint(boolean)
         //    method.  See javadocs for Form.setAllowEnableOnPaint(boolean) for historical background
         //    this feature.  
-        if(allowEnableLayoutOnPaint && enableLayoutOnPaint) {
+        if (allowEnableLayoutOnPaint && enableLayoutOnPaint) {
             layoutContainer();
         }
         g.translate(getX(), getY());
+
         int size = components.size();
         int startIter = 0;
         if (size >= 30) {
@@ -1827,28 +2113,41 @@ public class Container extends Component implements Iterable<Component>{
             if (startIter < 0) {
                 // There was no efficient way to calculate the offset
                 startIter = 0;
-            } else if (startIter < size){
+            } else if (startIter < size) {
                 // There was an efficient way to calculate the offset so we
                 // will continue this approach
-                size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2)+1;
+                size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2) + 1;
             }
         }
+
+        if (isSurface() && elevatedComponents != null && !elevatedComponents.isEmpty()) {
+            // We need to mark all of the elevated components so that they don't render the first time around
+            markComponentsToBePaintedInElevatedPane(true);
+
+        }
+
         CodenameOneImplementation impl = Display.impl;
-        if(dontRecurseContainer) {
-            for(int iter = startIter ; iter < size ; iter++) {
+        if (dontRecurseContainer) {
+            for (int iter = startIter; iter < size; iter++) {
                 Component cmp = components.get(iter);
-                if(cmp.getClass() == Container.class) {
-                    paintContainerChildrenForAnimation((Container)cmp, g);
+                if (cmp.getClass() == Container.class) {
+                    paintContainerChildrenForAnimation((Container) cmp, g);
                 } else {
                     cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
                 }
             }
         } else {
-            for(int iter = startIter ; iter < size ; iter++) {
+            for (int iter = startIter; iter < size; iter++) {
                 Component cmp = components.get(iter);
                 cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
             }
         }
+
+        if (isSurface() && elevatedComponents != null && !elevatedComponents.isEmpty()) {
+            markComponentsToBePaintedInElevatedPane(false);
+            paintElevatedPane(g);
+        }
+
         int tx = g.getTranslateX();
         int ty = g.getTranslateY();
         g.translate(-tx, -ty);
@@ -1879,13 +2178,15 @@ public class Container extends Component implements Iterable<Component>{
         super.paintGlassImpl(g);
         paintGlass(g);
     }
-    
-    void paintIntersecting(Graphics g, Component cmp, int x, int y, int w, int h, boolean above) {
+
+    void paintIntersecting(Graphics g, Component cmp, int x, int y, int w, int h, boolean above, int elevation) {
+
         if (layout.isOverlapSupported() && cmp.getParent() == this) {
             int indexOfComponent = components.indexOf(cmp);
             
             int startIndex;
             int endIndex;
+
             if (above) {
                 startIndex = indexOfComponent + 1;
                 endIndex = components.size();
@@ -1896,6 +2197,7 @@ public class Container extends Component implements Iterable<Component>{
 
             for (int i = startIndex; i < endIndex; i++) {
                 Component cmp2 = (Component) components.get(i);
+                if (cmp2.renderedElevation != elevation) continue;
                 if(Rectangle.intersects(x, y, w, h,
                         cmp2.getAbsoluteX() + cmp2.getScrollX(),
                         cmp2.getAbsoluteY() + cmp2.getScrollY(),
@@ -2220,10 +2522,10 @@ public class Container extends Component implements Iterable<Component>{
         private void set(Style style){
             //boolean suppressEvents = style.isSuppressChangeEvents();
             //style.setSuppressChangeEvents(true);
-            top = style.getPaddingValue(false, TOP);
-            left = style.getPaddingValue(false, LEFT);
-            bottom = style.getPaddingValue(false, BOTTOM);
-            right = style.getPaddingValue(false, RIGHT);
+            top = style.getPaddingFloatValue(false, TOP);
+            left = style.getPaddingFloatValue(false, LEFT);
+            bottom = style.getPaddingFloatValue(false, BOTTOM);
+            right = style.getPaddingFloatValue(false, RIGHT);
             byte[] units = style.getPaddingUnit();
             if (units != null) {
                 topUnit = units[TOP];
@@ -3203,6 +3505,16 @@ public class Container extends Component implements Iterable<Component>{
         if(shouldPaintContainerBackground()) {
             super.paintComponentBackground(g);
         } 
+    }
+
+    @Override
+    protected void paintBackground(Graphics g) {
+        super.paintBackground(g);
+    }
+
+    @Override
+    protected void paintBorderBackground(Graphics g) {
+        super.paintBorderBackground(g);
     }
 
     /**

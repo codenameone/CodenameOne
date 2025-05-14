@@ -165,14 +165,16 @@ int connections = 0;
     
     CFIndex count = SecTrustGetCertificateCount(trustRef);
     for (int i=0; i<count; i++) {
-        SecCertificateRef certRef = SecTrustGetCertificateAtIndex(trustRef, i);
-        if (i>0) {
-            [certs appendString:@","];
+            SecCertificateRef certRef = SecTrustGetCertificateAtIndex(trustRef, i);
+            if (i>0) {
+                [certs appendString:@","];
+            }
+            [certs appendString:@"SHA-256:"];
+            [certs appendString:[self getFingerprint256:certRef]];
+            [certs appendString:@",SHA1:"];
+            [certs appendString:[self getFingerprint:certRef]];
+
         }
-        [certs appendString:@"SHA1:"];
-        [certs appendString:[self getFingerprint:certRef]];
-        
-    }
     sslCertificates = [[NSString stringWithString:certs] retain];
     if (com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
         [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
@@ -194,6 +196,20 @@ int connections = 0;
         [fingerprint appendFormat:@"%02x ", sha1Bytes[i]];
     }
     return [fingerprint stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+}
+
+- (NSString*) getFingerprint256: (SecCertificateRef) cert {
+    NSData* keyData = (__bridge NSData*) SecCertificateCopyData(cert);
+
+    uint8_t digest[CC_SHA256_DIGEST_LENGTH]={0};
+    CC_SHA256(keyData.bytes, keyData.length, digest);
+    NSData *out=[NSData dataWithBytes:digest length:CC_SHA256_DIGEST_LENGTH];
+    NSString *hash=[out description];
+    hash = [hash stringByReplacingOccurrencesOfString:@" " withString:@""];
+    hash = [hash stringByReplacingOccurrencesOfString:@"<" withString:@""];
+    hash = [hash stringByReplacingOccurrencesOfString:@">" withString:@""];
+    return hash;
+
 }
 
 - (NSURLRequest *)connection:(NSURLConnection *)connection

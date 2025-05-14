@@ -23,13 +23,19 @@
  */
 package com.codename1.ui;
 
+import com.codename1.annotations.Async;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.db.Database;
 import com.codename1.location.LocationManager;
+import com.codename1.media.MediaManager;
+import com.codename1.media.RemoteControlListener;
 import com.codename1.messaging.Message;
+import com.codename1.plugin.PluginSupport;
+import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
+import com.codename1.plugin.event.OpenGalleryEvent;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
@@ -51,6 +57,7 @@ import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
@@ -91,6 +98,7 @@ public final class Display extends CN1Constants {
     private EventDispatcher errorHandler;
     boolean codenameOneExited;
     private boolean inNativeUI;
+    private Runnable bookmark;
 
     private EventDispatcher messageListeners;
     
@@ -166,6 +174,32 @@ public final class Display extends CN1Constants {
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
     private boolean disableInvokeAndBlock;
+    
+    
+    /**
+     * Sets a bookmark that can restore the app to a particular state.  This takes a 
+     * {@link Runnable} that will be run when {@link #restoreToBookmark()} () } is called.
+     * 
+     * <p>The primary purpose of this feature is live code refresh.</p>
+     * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
+     * @since 8.0
+     * 
+     */
+    public void setBookmark(Runnable bookmark) {
+        this.bookmark = bookmark;
+    }
+    
+    /**
+     * Runs the last bookmark that was set using {@link #setBookmark(java.lang.Runnable) }
+     * 
+     * @since 8.0
+     */
+    public void restoreToBookmark() {
+        if (this.bookmark != null) {
+            this.bookmark.run();
+        }
+    }
+    
     
     /**
      * Enable Async stack traces.  This is disabled by default, but will cause
@@ -387,6 +421,8 @@ public final class Display extends CN1Constants {
     
     private Boolean darkMode;
 
+    private PluginSupport pluginSupport;
+
      /**
      * Internally track display initialization time as a fixed point to allow tagging of pointer
      * events with an integer timestamp (System.currentTimeMillis() - displayInitTime)
@@ -487,6 +523,7 @@ public final class Display extends CN1Constants {
     public static void init(Object m) {
         if(!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
+            INSTANCE.pluginSupport = new PluginSupport();
             INSTANCE.displayInitTime = System.currentTimeMillis();
             
             //restore menu state from previous run if exists
@@ -574,6 +611,15 @@ public final class Display extends CN1Constants {
      */
     public static Display getInstance(){
         return INSTANCE;
+    }
+
+    /**
+     * Gets reference to plugin support object.
+     * @return The plugin support object.
+     * @since 8.0
+     */
+    public PluginSupport getPluginSupport() {
+        return pluginSupport;
     }
 
     /**
@@ -695,8 +741,8 @@ public final class Display extends CN1Constants {
 
     /**
      * Stops the remote control service.  This should be implemented in the platform
-     * to handle unbinding the {@link RemoteControlListener} with the platform's remote control.
-     * <p>This is executed when a new listener is registered using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     * to handle unbinding the {@link com.codename1.media.RemoteControlListener} with the platform's remote control.
+     * <p>This is executed when a new listener is registered using {@link com.codename1.media.MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
      * @since 7.0
      */
     public void stopRemoteControl() {
@@ -810,7 +856,7 @@ public final class Display extends CN1Constants {
             }
         }
         
-        @Override
+        
         public void run() {
             if (exceptionWrapper != null) {
                 try {
@@ -868,12 +914,18 @@ public final class Display extends CN1Constants {
         }
         if(codenameOneRunning) {
             synchronized(lock) {
-                pendingSerialCalls.add(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
+                scheduleSerialCall(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
                 lock.notifyAll();
             }
         } else {
             r.run();
         }
+    }
+    
+    // We factor out the scheduling of a serial call so that we can 
+    // use the Schedule annotation for IntelliJ async debugging https://www.jetbrains.com/help/idea/debug-asynchronous-code.html
+    private void scheduleSerialCall(@Async.Schedule Runnable r) {
+        pendingSerialCalls.add(r);
     }
 
     /**
@@ -906,7 +958,7 @@ public final class Display extends CN1Constants {
      * 
      * @param r the task to perform in the background
      */
-    public void scheduleBackgroundTask(Runnable r) {
+    public void scheduleBackgroundTask(@Async.Schedule Runnable r) {
         synchronized(lock) {
             if(backgroundTasks == null) {
                 backgroundTasks = new ArrayList<Runnable>();
@@ -930,7 +982,7 @@ public final class Display extends CN1Constants {
                             //preent a runtime exception to crash the 
                             //backgroundThread
                             try {
-                                nextTask.run();                                
+                                executeBackgroundTaskRunnable(nextTask);
                             } catch (Throwable e) {
                                 Log.e(e);
                             }
@@ -945,6 +997,10 @@ public final class Display extends CN1Constants {
                 backgroundThread.start();
             }
         }
+    }
+    
+    private void executeBackgroundTaskRunnable(@Async.Execute Runnable r) {
+        r.run();
     }
     
 
@@ -1335,7 +1391,7 @@ public final class Display extends CN1Constants {
                 }
             }
             while (!runningSerialCallsQueue.isEmpty()) {
-                runningSerialCallsQueue.remove(0).run();
+                executeSerialCall(runningSerialCallsQueue.remove(0));
             }
 
             // after finishing an event cycle there might be serial calls waiting
@@ -1345,6 +1401,13 @@ public final class Display extends CN1Constants {
             }
         }
         processingSerialCalls = false;
+    }
+    
+    // Executes a Runnable from a pending serial call. We wrap it in its 
+    // own function so we can use the Async.Execute annotation for debugging.
+    // https://www.jetbrains.com/help/idea/debug-asynchronous-code.html
+    private void executeSerialCall(@Async.Execute Runnable r) {
+        r.run();
     }
 
     boolean isProcessingSerialCalls() {
@@ -1442,11 +1505,13 @@ public final class Display extends CN1Constants {
                     } catch (InterruptedException ex) {
                         ex.printStackTrace();
                     }
+
+                    while (!runningSerialCallsQueue.isEmpty()) {
+                        pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
+                    }
                 }
                 
-                while (!runningSerialCallsQueue.isEmpty()) {
-                    pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
-                }
+
 
                 // loop over the EDT until the thread completes then return
                 while(!w.isDone() && codenameOneRunning) {
@@ -1538,7 +1603,7 @@ public final class Display extends CN1Constants {
         }
 
         if(current == newForm){
-            current.revalidateWithAnimationSafety();
+            current.revalidate();
             current.repaint();
             current.onShowCompletedImpl();
             return;
@@ -1586,11 +1651,11 @@ public final class Display extends CN1Constants {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
-            newForm.revalidateWithAnimationSafety();
+            newForm.revalidate();
         } else {
             // if shouldLayout is true
             newForm.layoutContainer();
-            newForm.revalidateWithAnimationSafety();
+            newForm.revalidate();
             
         }
 
@@ -2631,6 +2696,62 @@ public final class Display extends CN1Constants {
 
 
     /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public int convertToPixels(float value, byte unitType) {
+        return convertToPixels(value, unitType, true);
+    }
+
+    /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @param horizontal Whether screen percentage units should be based on horitonzal or vertical percentage.
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public int convertToPixels(float value, byte unitType, boolean horizontal) {
+
+
+        switch(unitType) {
+            case Style.UNIT_TYPE_REM:
+                return (int)Math.round(value * Font.getDefaultFont().getHeight());
+            case Style.UNIT_TYPE_VH:
+                return (int)Math.round(value / 100f * CN.getDisplayHeight());
+            case Style.UNIT_TYPE_VW:
+                return (int)Math.round(value / 100f * CN.getDisplayWidth());
+            case Style.UNIT_TYPE_VMIN:
+                return (int)Math.round(value/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+            case Style.UNIT_TYPE_VMAX:
+                return (int)Math.round(value/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+            case Style.UNIT_TYPE_DIPS:
+                return Display.getInstance().convertToPixels(value);
+            case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+                if(!horizontal) {
+                    float h = Display.getInstance().getDisplayHeight();
+                    h = h / 100.0f * value;
+                    return (int)h;
+                } else {
+                    float w = Display.getInstance().getDisplayWidth();
+                    w = w / 100.0f * value;
+                    return (int)w;
+                }
+            default:
+                return (int)value;
+        }
+
+    }
+
+
+    /**
      * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
      * to be relied upon. This version of the method assumes square pixels which is pretty much the norm.
      * 
@@ -3476,6 +3597,7 @@ public final class Display extends CN1Constants {
      *
      * @param soundIdentifier the sound identifier which can match one of the
      * common constants in this class or be a user/implementation defined sound
+     * @deprecated this isn't supported on most platforms
      */
     public void playBuiltinSound(String soundIdentifier) {
         impl.playBuiltinSound(soundIdentifier);
@@ -3511,6 +3633,7 @@ public final class Display extends CN1Constants {
      *
      * @param soundIdentifier the sound string passed to playBuiltinSound
      * @return true if a sound of this given type is avilable
+     * @deprecated this isn't supported on most platforms
      */
     public boolean isBuiltinSoundAvailable(String soundIdentifier) {
         return impl.isBuiltinSoundAvailable(soundIdentifier);
@@ -3889,6 +4012,9 @@ hi.show();}</pre></noscript>
      * @deprecated see openGallery instead
      */
     public void openImageGallery(ActionListener response){
+        if (pluginSupport.firePluginEvent(new OpenGalleryEvent(response, Display.GALLERY_IMAGE)).isConsumed()) {
+            return;
+        }
         impl.openImageGallery(response);
     }
     
@@ -3919,6 +4045,10 @@ hi.show();}</pre></noscript>
      * @see #isGalleryTypeSupported(int) To see if a type is supported on the current platform.
      */
     public void openGallery(ActionListener response, int type){
+        if (pluginSupport.firePluginEvent(new OpenGalleryEvent(response, type)).isConsumed()) {
+            return;
+        }
+
         impl.openGallery(response, type);
     }
     
@@ -3930,6 +4060,10 @@ hi.show();}</pre></noscript>
      * @see #openGallery(com.codename1.ui.events.ActionListener, int) 
      */
     public boolean isGalleryTypeSupported(int type) {
+        IsGalleryTypeSupportedEvent evt = new IsGalleryTypeSupportedEvent(type);
+        if (pluginSupport.firePluginEvent(evt).isConsumed()) {
+            return evt.getPluginEventResponse();
+        }
         return impl.isGalleryTypeSupported(type);
     }
 
@@ -4297,16 +4431,19 @@ hi.show();}</pre></noscript>
      * 
      * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
      * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
-     * 
-     * @param text String to share.
+     *
+     * <p>Since 8.0, you can share files using using the file path in the text parameter.  The file must exist in file system storage, and
+    * you must define the appropriate mimeType in the mimeType parameter.  E.g. {@code share("file:/.../myfile.pdf", null, "application.pdf") }</p>
+    *
+     * @param textOrPath String to share, or path to file to share.
      * @param image file path to the image or null
-     * @param mimeType type of the image or null if no image to share
+     * @param mimeType type of the image or file.  null if just sharing text
      * @param sourceRect The source rectangle of the button that originated the share request.  This is used on
      * some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
      * on the iPad with iOS 8 and higher.
      */
-    public void share(String text, String image, String mimeType, Rectangle sourceRect){
-        impl.share(text, image, mimeType, sourceRect);
+    public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect){
+        impl.share(textOrPath, image, mimeType, sourceRect);
     }
     
     
@@ -4607,7 +4744,18 @@ hi.show();}</pre></noscript>
     public boolean isScreenSaverDisableSupported() {
         return impl.isScreenLockSupported();
     }
-    
+
+    /**
+     * Checks is the scroll-wheel mouse is currently scrolling.  The scroll-wheel simulates pointer presses and drags
+     * so there are cases when you are processing pointer events when you may want to know if it was driggered by
+     * a scroll wheel.
+     * @return True if the scroll-wheel is responsible for current pointer events.
+     * @since 8.0
+     */
+    public boolean isScrollWheeling() {
+        return impl.isScrollWheeling();
+    }
+
     /** 
      * If isScreenSaverDisableSupported() returns true calling this method will 
      * lock the screen display on
@@ -4693,7 +4841,7 @@ hi.show();}</pre></noscript>
      * <p>Schedules a local notification that will occur after the given time elapsed.<br>
      * The sample below combines this with the geofence API to show a local notification
      * when entering a radius with the app in the background:</p>
-     * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+     * <script src="https://gist.github.com/shannah/a5592313da97e085822120af16518874.js"></script>
      * 
      * @param n The notification to schedule.
      * @param firstTime time in milliseconds when to schedule the notification
@@ -4734,7 +4882,7 @@ hi.show();}</pre></noscript>
      * @param seconds The time interval in seconds.
      * 
      * @see #isBackgroundFetchSupported() 
-     * @see #getPreferredBackgroundFetchInterval() 
+     * @see #getPreferredBackgroundFetchInterval(int) () 
      * @see com.codename1.background.BackgroundFetch
      */
     public void setPreferredBackgroundFetchInterval(int seconds) {
@@ -4756,7 +4904,7 @@ hi.show();}</pre></noscript>
      * Checks to see if the current platform supports background fetch.
      * @return True if the current platform supports background fetch.
      * @see #setPreferredBackgroundFetchInterval(int) 
-     * @see #getPreferredBackgroundFetchInterval() 
+     * @see #getPreferredBackgroundFetchInterval(int) ()
      * @see com.codename1.background.BackgroundFetch
      */
     public boolean isBackgroundFetchSupported() {
@@ -4928,15 +5076,19 @@ hi.show();}</pre></noscript>
      * @since 7.0
      * @see #setInterval(int, java.lang.Runnable) 
      */
-    public Timer setTimeout(int timeout, final Runnable r) {
+    public Timer setTimeout(int timeout, @Async.Schedule final Runnable r) {
         
         Timer t = new Timer();
         t.schedule(new TimerTask() {
             public void run() {
-                CN.callSerially(r);
+                executeTimeoutRunnable(r);
             }
         }, (long)timeout);
         return t;
+    }
+    
+    private void executeTimeoutRunnable(@Async.Execute Runnable r) {
+        CN.callSerially(r);
     }
     
     /**
@@ -4948,11 +5100,11 @@ hi.show();}</pre></noscript>
      * @since 7.0
      * @see #setTimeout(int, java.lang.Runnable) 
      */
-    public Timer setInterval(int period, final Runnable r) {
+    public Timer setInterval(int period, @Async.Schedule final Runnable r) {
         Timer t = new Timer();
         t.schedule(new TimerTask(){
             public void run() {
-                CN.callSerially(r);
+                executeTimeoutRunnable(r);
             }
         }, period, period);
         

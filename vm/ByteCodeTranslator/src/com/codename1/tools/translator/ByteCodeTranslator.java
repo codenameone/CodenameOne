@@ -92,6 +92,12 @@ public class ByteCodeTranslator {
         });
         if(fileList != null) {
             for(File f : fileList) {
+                if (f.getName().equals("module-info.class")) {
+                    // Remove module-info.class that might have been added by jdk9 compile
+                    System.out.println("WARNING: Found module-info.class file at "+f+".  One or more of your jars must have been built for JDK9 or higher.  -target 8 or lower is required.");
+                    System.out.println("         Will ignore this warning and attempt build anyways.");
+                    continue;
+                }
                 if(f.getName().endsWith(".class")) {
                     Parser.parse(f);
                 } else {
@@ -313,7 +319,7 @@ public class ByteCodeTranslator {
             includeFrameworks.add("libsqlite3.0.dylib");
             includeFrameworks.add("GameKit.framework");
             includeFrameworks.add("Security.framework");
-            includeFrameworks.add("StoreKit.framework");
+            //includeFrameworks.add("StoreKit.framework");
             includeFrameworks.add("CoreMotion.framework");
             includeFrameworks.add("CoreLocation.framework");
             includeFrameworks.add("MessageUI.framework");

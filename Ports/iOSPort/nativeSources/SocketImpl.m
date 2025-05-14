@@ -46,19 +46,23 @@ static void _resume() {
          });
         
     }
-    [inputStream open];
-    [outputStream open];
-    while ([outputStream streamStatus] == NSStreamStatusOpening) {
+    if (inputStream != nil) {
+        [inputStream open];
+    }
+    if (outputStream != nil) {
+        [outputStream open];
+    }
+    while (outputStream != nil && [outputStream streamStatus] == NSStreamStatusOpening) {
         _yield();
         usleep(100000);
         _resume();
     }
-    while ([inputStream streamStatus] == NSStreamStatusOpening) {
+    while (inputStream != nil && [inputStream streamStatus] == NSStreamStatusOpening) {
         _yield();
         usleep(100000);
         _resume();
     }
-    if ([self isInputShutdown] || [self isOutputShutdown]) {
+    if (outputStream == nil || inputStream == nil || [self isInputShutdown] || [self isOutputShutdown]) {
         connected = NO;
     } else {
         connected = YES;
@@ -69,13 +73,13 @@ static void _resume() {
 -(BOOL)isInputShutdown{
     errorMessage = NULL;
     NSStreamStatus status = [inputStream streamStatus];
-    return (status == NSStreamStatusOpening || status == NSStreamStatusNotOpen || NSStreamStatusClosed == status );
+    return (status == NSStreamStatusOpening || status == NSStreamStatusNotOpen || NSStreamStatusClosed == status || status == NSStreamStatusError);
 }
 
 -(BOOL)isOutputShutdown{
     errorMessage = NULL;
     NSStreamStatus status = [outputStream streamStatus];
-    return (status == NSStreamStatusOpening ||  status == NSStreamStatusNotOpen || NSStreamStatusClosed == status );
+    return (status == NSStreamStatusOpening ||  status == NSStreamStatusNotOpen || NSStreamStatusClosed == status || status == NSStreamStatusError);
 }
 
 -(int)getAvailableInput{
@@ -140,6 +144,8 @@ static void _resume() {
         [outputStream removeFromRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
         [inputStream close];
         [inputStream removeFromRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+        [outputStream release];
+        [inputStream release];
         inputStream = nil;
         outputStream = nil;
     }

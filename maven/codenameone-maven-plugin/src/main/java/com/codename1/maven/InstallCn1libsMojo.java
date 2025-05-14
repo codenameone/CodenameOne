@@ -121,7 +121,7 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
         project.getArtifacts().forEach(artifact -> {
             File jarFile = findArtifactFile(artifact);
             
-            if (Cn1libUtil.isCN1Lib(jarFile)) {
+            if (jarFile != null && Cn1libUtil.isCN1Lib(jarFile)) {
                 cn1libArtifacts.add(artifact);
                  try {
                     if(extractArtifact(artifact)) {

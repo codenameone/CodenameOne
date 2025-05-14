@@ -30,9 +30,13 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.messaging.Message;
+import com.codename1.plugin.Plugin;
+import com.codename1.plugin.PluginSupport;
+import com.codename1.plugin.event.PluginEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.Style;
 import com.codename1.util.RunnableWithResultSync;
 import java.io.IOException;
 import java.io.InputStream;
@@ -218,6 +222,28 @@ public class CN extends  CN1Constants {
     public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
     
     CN() {}
+
+    /**
+     * Sets a bookmark that can restore the app to a particular state.  This takes a
+     * {@link Runnable} that will be run when {@link #restoreToBookmark()} () } is called.
+     *
+     * <p>The primary purpose of this feature is live code refresh.</p>
+     * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
+     * @since 8.0
+     *
+     */
+    public static void setBookmark(Runnable bookmark) {
+        Display.getInstance().setBookmark(bookmark);
+    }
+
+    /**
+     * Runs the last bookmark that was set using {@link #setBookmark(java.lang.Runnable) }
+     *
+     * @since 8.0
+     */
+    public static void restoreToBookmark() {
+        Display.getInstance().restoreToBookmark();
+    }
     
     /**
      * This method allows us to manipulate the drag started detection logic.
@@ -482,6 +508,33 @@ public class CN extends  CN1Constants {
      */
     public static int convertToPixels(int dipCount, boolean horizontal) {
         return Display.impl.convertToPixels(dipCount, horizontal);
+    }
+
+    /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @param horizontal Whether screen percentage units should be based on horitonzal or vertical percentage.
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public static int convertToPixels(float value, byte unitType, boolean horizontal) {
+        return Display.INSTANCE.convertToPixels(value, unitType, horizontal);
+    }
+
+    /**
+     * Converts from specified unit to pixels.
+     * @param value The value to convert, expressed in unitType.
+     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     * @return The value converted to pixels.
+     * @since 8.0
+     */
+    public static int convertToPixels(float value, byte unitType) {
+        return Display.INSTANCE.convertToPixels((float)value, unitType);
     }
 
 
@@ -1345,7 +1398,9 @@ public class CN extends  CN1Constants {
      * last modified.
      * @return A long value representing the time the file was last modified, 
      * measured in milliseconds
-     */ 
+     * @deprecated this API requires additional privacy permissions on iOS
+     *     and might cause problems with iOS submissions
+     */
     public static long getFileLastModifiedFile(String file) {
         return FileSystemStorage.getInstance().getLastModified(file);
     }
@@ -1547,7 +1602,7 @@ public class CN extends  CN1Constants {
     /**
      * Convenience method to schedule a task to run on the EDT after {@literal period}ms
      * repeating every {@literal period}ms.
-     * @param period The delay and repeat in milliseconds.
+     * @param timeout The delay and repeat in milliseconds.
      * @param r The runnable to run on the EDT.
      * @return The timer object which can be used to cancel the task.
      * @since 7.0
@@ -1575,4 +1630,12 @@ public class CN extends  CN1Constants {
         return Display.impl.getSharedJavscriptContext();
     }
 
+    /**
+     * Returns the plugin support object for the current platform.  Use this object for registering plugins.
+     * @return The plugin support object.
+     * @since 8.0
+     */
+    public static PluginSupport getPluginSupport() {
+        return Display.INSTANCE.getPluginSupport();
+    }
 }

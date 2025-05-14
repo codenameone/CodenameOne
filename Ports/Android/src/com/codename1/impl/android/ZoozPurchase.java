@@ -28,6 +28,7 @@ import android.util.Log;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.payment.Receipt;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 /* ZOOZMARKER_START 
@@ -53,6 +54,11 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
     public ZoozPurchase() {
         activity = AndroidImplementation.getActivity();
         hasMarket= AndroidImplementation.hasAndroidMarket(activity);
+    }
+
+    @Override
+    public String getStoreCode() {
+        return Receipt.STORE_CODE_PLAY;
     }
 
     @Override

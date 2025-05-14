@@ -40,7 +40,7 @@ public class Timer {
     }
     
     public void schedule(TimerTask task, Date firstTime, long period) {
-        task.initialDelay = firstTime.getTime();
+        task.initialDelay = firstTime.getTime() - System.currentTimeMillis();
         task.repeatDelay = period;
         T t = new T();
         t.task = task;
@@ -63,7 +63,7 @@ public class Timer {
     }
     
     public void scheduleAtFixedRate(TimerTask task, Date firstTime, long period) {
-        task.initialDelay = firstTime.getTime();
+        task.initialDelay = firstTime.getTime() - System.currentTimeMillis();
         task.repeatDelay = period;
         T t = new T();
         t.task = task;

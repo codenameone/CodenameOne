@@ -46,14 +46,21 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
     
     private Spinner3D days, hours, minutes, seconds, milliseconds;
     private final boolean includeDays, includeHours, includeMinutes, includeSeconds, includeMilliseconds;
-    
+
+    private final int minuteStep;
+
     public DurationSpinner3D(int fields) {
+        this(fields, 5);
+    }
+
+    public DurationSpinner3D(int fields, int minuteStep) {
 
         includeDays = (fields & FIELD_DAY) != 0;
         includeHours = (fields & FIELD_HOUR) != 0;
         includeMinutes = (fields & FIELD_MINUTE) != 0;
         includeSeconds = (fields & FIELD_SECOND) != 0;
         includeMilliseconds = (fields & FIELD_MILLISECOND) != 0;
+        this.minuteStep = minuteStep;
         init();
     }
     
@@ -83,7 +90,7 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
             box.add(new Label(uim.localize("hour", "hour")));
         }
         if (includeMinutes) {
-            minutes = Spinner3D.create(0, includeHours ? 59 : 1000, 0, 1);
+            minutes = Spinner3D.create(0, includeHours ? 59 : 1000, 0,  minuteStep);
             minutes.setPreferredW(new Label("000", "Spinner3DRow").getPreferredW());
             s = Style.createProxyStyle(minutes.getRowStyle(), minutes.getSelectedRowStyle());
             s.setAlignment(Component.RIGHT);

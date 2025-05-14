@@ -2655,7 +2655,16 @@ public class StyleParser {
          * @return A font.
          */
         public Font createFont(Style baseStyle) {
-            Font f = name == null ? baseStyle.getFont() : Font.createTrueTypeFont(name, file);
+            Font f;
+            if(name == null) {
+                if(baseStyle == null) {
+                    f = Font.getDefaultFont();
+                } else {
+                    f = baseStyle.getFont();
+                }
+            } else {
+                f = Font.createTrueTypeFont(name, file);
+            }
             if (f == null || (getSize() != null && !f.isTTFNativeFont())) {
                 f = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR);
             }

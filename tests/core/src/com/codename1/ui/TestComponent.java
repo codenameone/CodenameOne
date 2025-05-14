@@ -9,27 +9,12 @@ import com.codename1.components.InteractionDialog;
 import com.codename1.components.ToastBar;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
-import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
-import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
-import com.codename1.l10n.SimpleDateFormat;
-import com.codename1.maps.Coord;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
-import com.codename1.ui.BrowserComponent;
-import com.codename1.ui.Button;
-import com.codename1.ui.Command;
-import com.codename1.ui.Component;
-import com.codename1.ui.Container;
-import com.codename1.ui.Display;
-import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
-import com.codename1.ui.Label;
-import com.codename1.ui.NavigationCommand;
-import com.codename1.ui.Toolbar;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -103,7 +88,7 @@ public class TestComponent extends AbstractTest {
         cnt.add(new Container(new LayeredLayout()));
         cnt.setWidth(500);
         cnt.setHeight(500);
-        cnt.doLayout();
+        cnt.layoutContainer();
         Component found = cnt.getComponentAt(250, 250);
         assertEqual(l, found);
     }
@@ -134,7 +119,9 @@ public class TestComponent extends AbstractTest {
 
         f.show();
         TestUtils.waitForFormTitle("My Form");
-        Component middleComponent = f.getComponentAt(w/2, h/2);
+        h = f.getContentPane().getHeight();
+        int offsetY = f.getContentPane().getAbsoluteY();
+        Component middleComponent = f.getComponentAt(w/2, offsetY + h/2);
         assertEqual(l, middleComponent, "Found wrong component");
     }
 
@@ -149,7 +136,9 @@ public class TestComponent extends AbstractTest {
 
         f.show();
         TestUtils.waitForFormTitle("My Form", 2000);
-        Component middleComponent = f.getComponentAt(w/2, h/2);
+        h = f.getContentPane().getHeight();
+        int offsetY = f.getContentPane().getAbsoluteY();
+        Component middleComponent = f.getComponentAt(w/2, offsetY + h/2);
         assertEqual(l, middleComponent, "Found wrong component");
 
 
@@ -197,7 +186,9 @@ public class TestComponent extends AbstractTest {
 
         f.show();
         TestUtils.waitForFormTitle("My Form", 2000);
-        Component middleComponent = f.getComponentAt(w/2, h/2);
+        int hInner = f.getContentPane().getHeight();
+        int offsetY = f.getContentPane().getAbsoluteY();
+        Component middleComponent = f.getComponentAt(w/2, offsetY + hInner/2);
         assertEqual(top, middleComponent, "Found wrong component");
     }
     
@@ -246,7 +237,9 @@ public class TestComponent extends AbstractTest {
 
         f.show();
         TestUtils.waitForFormTitle("My Form", 2000);
-        Component middleComponent = f.getComponentAt(w/2, h/2);
+        int hInner = f.getContentPane().getHeight();
+        int offsetY = f.getContentPane().getAbsoluteY();
+        Component middleComponent = f.getComponentAt(w/2, offsetY + hInner/2);
         assertEqual(content, middleComponent, "Found wrong component");
     }
 
@@ -279,8 +272,12 @@ public class TestComponent extends AbstractTest {
         f.show();
 
         TestUtils.waitForFormTitle("Scrolling Labels", 2000);
-        Component res = f.getComponentAt(w/2, h/2);
-        assertTrue(res == cnt || res.getParent() == cnt, "getComponentAt(x,y) should return scrollable container on top of button when in layered pane.");
+        h = f.getContentPane().getHeight();
+        int offsetY = f.getContentPane().getAbsoluteY();
+        Component res = f.getComponentAt(w/2, offsetY + h/2);
+        assertTrue(
+                res == cnt || res.getParent() == cnt,
+                "getComponentAt(x,y) should return scrollable container on top of button when in layered pane, but received " + res + ". Form: " + f);
 
     }
 
@@ -294,7 +291,9 @@ public class TestComponent extends AbstractTest {
 
         f.show();
         TestUtils.waitForFormTitle("My Form", 2000);
-        Component middleComponent = f.getComponentAt(w/2, h/2);
+        h = f.getContentPane().getHeight();
+        int offsetY = f.getContentPane().getAbsoluteY();
+        Component middleComponent = f.getComponentAt(w/2, offsetY + h/2);
         assertEqual(l, middleComponent, "Found wrong component");
     }
 
@@ -322,20 +321,21 @@ public class TestComponent extends AbstractTest {
         mapDemo.show();
 
         TestUtils.waitForFormTitle("Maps", 2000);
-        Component middleComponent = mapDemo.getComponentAt(w/2, h/2);
+        h = mapDemo.getContentPane().getHeight();
+        int offsetY = mapDemo.getContentPane().getAbsoluteY();
+        Component middleComponent = mapDemo.getComponentAt(w/2,offsetY +  h/2);
         assertTrue(mc == middleComponent || mc.contains(middleComponent),  "Wrong component found in middle. Expected "+mc+" but found "+middleComponent);
 
         tb.openSideMenu();
         TestUtils.waitFor(500); // wait for side menu to open
 
         Component res = null;
-
-        res = tb.getComponentAt(10, h/2);
+        res = tb.getComponentAt(10, offsetY + h/2);
 
         //System.out.println("tb size = "+tb.getAbsoluteX()+", "+tb.getAbsoluteY()+", "+tb.getWidth()+", "+tb.getHeight());
         //System.out.println("mb size = "+tb.getMenuBar().getAbsoluteX()+", "+tb.getMenuBar().getAbsoluteY()+", "+tb.getMenuBar().getWidth()+", "+tb.getMenuBar().getHeight());
         //System.out.println("res is "+res);
-        res = mapDemo.getComponentAt(10, h/2);
+        res = mapDemo.getComponentAt(10, offsetY + h/2);
 
         // Let's find the interaction dialog on the form
         Component interactionDialog = $("*", mapDemo).filter(c->{

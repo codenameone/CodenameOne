@@ -37,7 +37,7 @@ import java.util.Hashtable;
  */
 public class TestReporting {
     private static TestReporting instance;
-    private Hashtable testsExecuted = new Hashtable();
+    private final Hashtable<String, Boolean> testsExecuted = new Hashtable<String, Boolean>();
     
     
     /**
@@ -60,10 +60,16 @@ public class TestReporting {
     
     /**
      * Invoked when a unit test is started
-     * @param test the test case
+     */
+    public void startingTestCase(String testName) {
+        Log.p("Starting test case " + testName);
+    }
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #startingTestCase(String)}
      */
     public void startingTestCase(UnitTest test) {
-        Log.p("Starting test case " + test.getClass().getName());
+        startingTestCase(test.getClass().getName());
     }
 
     /**
@@ -84,40 +90,64 @@ public class TestReporting {
     
     /**
      * Invoked when a unit test has completed
-     * @param test the test case
-     * @param passed true if the test passed and false otherwise
+     *
+     * @param testName the name of the test case
+     * @param passed   true if the test passed and false otherwise
+     */
+    public void finishedTestCase(String testName, boolean passed) {
+        if(passed) {
+            Log.p(testName + " passed");
+            testsExecuted.put(testName, Boolean.TRUE);
+        } else {
+            Log.p(testName + " failed");
+            testsExecuted.put(testName, Boolean.FALSE);
+        }
+    }
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #finishedTestCase(String, boolean)}
      */
     public void finishedTestCase(UnitTest test, boolean passed) {
-        if(passed) {
-            Log.p(test.getClass().getName() + " passed");
-            testsExecuted.put(test.getClass().getName(), Boolean.TRUE);
-        } else {
-            Log.p(test.getClass().getName() + " failed");
-            testsExecuted.put(test.getClass().getName(), Boolean.FALSE);
-        }
+        finishedTestCase(test.getClass().getName(), passed);
     }
     
     /**
      * Writes a test report to the given stream
-     * @param os the destination stream
+     *
+     * @param testSuiteName the name of the test suite
+     * @param os            the destination stream
      */
-    public void writeReport(OutputStream os) throws IOException {
-        Enumeration e = testsExecuted.elements();
+    public void writeReport(String testSuiteName, OutputStream os) throws IOException {
+        Enumeration<String> e = testsExecuted.keys();
         while(e.hasMoreElements()) {
-            String key = (String)e.nextElement();
-            Boolean v = (Boolean)testsExecuted.get(key);
-            if(v.booleanValue()) {
+            String key = e.nextElement();
+            if(testsExecuted.get(key)) {
                 os.write((key + " passed\n").getBytes());
             } else {
                 os.write((key + " failed\n").getBytes());
             }
         }
     }
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #writeReport(String, OutputStream)}
+     */
+    public void writeReport(OutputStream os) throws IOException {
+    }
     
     /**
      * Callback to indicate the test execution has finished allowing
      * for a report to be generated if appropriate
      */
+    public void testExecutionFinished(String testSuiteName) {
+        // Call the legacy method in case it has been overridden by a subclass
+        testExecutionFinished();
+    }
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #testExecutionFinished(String)}
+     */
+    @SuppressWarnings("DeprecatedIsStillUsed")
     public void testExecutionFinished() {
     }
 }

@@ -24,6 +24,7 @@
 
 package com.codename1.io;
 
+import com.codename1.annotations.Async;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
@@ -150,6 +151,7 @@ public class NetworkManager {
                 continue;
             }
             if (nt.currentRequest.getId() == connectionId) {
+
                 return nt.currentRequest.checkCertificatesNativeCallback();
             }
         }
@@ -248,7 +250,114 @@ public class NetworkManager {
         public Thread getThreadInstance() {
             return threadInstance;
         }
+        
+        private boolean runCurrentRequest(@Async.Execute ConnectionRequest req) {
+            if(threadAssignements.size() > 0) {
+                String n = currentRequest.getClass().getName();
+                Integer threadOffset = (Integer)threadAssignements.get(n);
+                NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
+                if(networkThreads == null) {
+                    return false;
+                }
+                if(threadOffset != null && networkThreads[threadOffset.intValue()] != this) {
+                    synchronized(LOCK) {
+                        if(pending.size() > 0) {
+                            pending.insertElementAt(currentRequest, 1);
+                            return false;
+                        }
+                        pending.addElement(currentRequest);
+                        LOCK.notify();
+                        try {
+                            LOCK.wait(30);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            }
 
+            int frameRate = -1;
+            boolean requestWasCompleted=true;
+                // Default this to true because if, for some reason an exception is thrown
+                // before calling performOperationComplete(), then the request
+                // won't be retried.
+            try {
+                // for higher priority tasks increase the thread priority, for lower
+                // prioirty tasks decrease it. In critical priority reduce the Codename One
+                // rendering thread speed for even faster download
+                switch(currentRequest.getPriority()) {
+                    case ConnectionRequest.PRIORITY_CRITICAL:
+                        frameRate = Display.getInstance().getFrameRate();
+                        Display.getInstance().setFramerate(4);
+                        Thread.currentThread().setPriority(Thread.MAX_PRIORITY - 1);
+                        break;
+                    case ConnectionRequest.PRIORITY_HIGH:
+                        Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 2);
+                        break;
+                    case ConnectionRequest.PRIORITY_NORMAL:
+                        break;
+                    case ConnectionRequest.PRIORITY_LOW:
+                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY + 2);
+                        break;
+                    case ConnectionRequest.PRIORITY_REDUNDANT:
+                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
+                        break;
+                }
+
+                if(progressListeners != null) {
+                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
+                }
+                if(currentRequest.getShowOnInit() != null) {
+                    currentRequest.getShowOnInit().showModeless();
+                }
+
+                requestWasCompleted = currentRequest.performOperationComplete();
+            } catch(IOException e) {
+                if(!currentRequest.isFailSilently()) {
+                    if(!handleException(currentRequest, e)) {
+                        currentRequest.handleIOException(e);
+                    }
+                } else {
+                    // for the record
+                    Log.e(e);
+                }
+            } catch(RuntimeException er) {
+                if(!currentRequest.isFailSilently()) {
+                    if(!handleException(currentRequest, er)) {
+                        currentRequest.handleRuntimeException(er);
+                    }
+                } else {
+                    // for the record
+                    Log.e(er);
+                }
+            } finally {
+                Thread.currentThread().setPriority(Thread.NORM_PRIORITY);
+                if(frameRate > -1) {
+                    Display.getInstance().setFramerate(frameRate);
+                }
+                if (requestWasCompleted) {
+                    currentRequest.complete = true;
+                }
+                if(progressListeners != null) {
+                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
+                }
+                if(currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
+                    // there may be a race condition where the dialog hasn't yet appeared but the
+                    // network request completed
+                    final ConnectionRequest finalReq = currentRequest;
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Dialog dlg = finalReq.getDisposeOnCompletion();
+                            if (dlg != null) {
+                                dlg.dispose();
+                            }
+                        } 
+                    });
+                }
+            }
+            return true;
+        }
+        
         public void run() {
             threadInstance = Thread.currentThread();
             while(running && !stopped) {
@@ -278,108 +387,8 @@ public class NetworkManager {
                             currentRequest.addRequestHeaderDontRepleace(key, value);
                         }
                     }
-                    if(threadAssignements.size() > 0) {
-                        String n = currentRequest.getClass().getName();
-                        Integer threadOffset = (Integer)threadAssignements.get(n);
-                        NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
-                        if(networkThreads == null) {
-                            return;
-                        }
-                        if(threadOffset != null && networkThreads[threadOffset.intValue()] != this) {
-                            synchronized(LOCK) {
-                                if(pending.size() > 0) {
-                                    pending.insertElementAt(currentRequest, 1);
-                                    continue;
-                                }
-                                pending.addElement(currentRequest);
-                                LOCK.notify();
-                                try {
-                                    LOCK.wait(30);
-                                } catch (InterruptedException ex) {
-                                    ex.printStackTrace();
-                                }
-                            }
-                        }
-                    }
-
-                    int frameRate = -1;
-                    boolean requestWasCompleted=true;
-                        // Default this to true because if, for some reason an exception is thrown
-                        // before calling performOperationComplete(), then the request
-                        // won't be retried.
-                    try {
-                        // for higher priority tasks increase the thread priority, for lower
-                        // prioirty tasks decrease it. In critical priority reduce the Codename One
-                        // rendering thread speed for even faster download
-                        switch(currentRequest.getPriority()) {
-                            case ConnectionRequest.PRIORITY_CRITICAL:
-                                frameRate = Display.getInstance().getFrameRate();
-                                Display.getInstance().setFramerate(4);
-                                Thread.currentThread().setPriority(Thread.MAX_PRIORITY - 1);
-                                break;
-                            case ConnectionRequest.PRIORITY_HIGH:
-                                Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 2);
-                                break;
-                            case ConnectionRequest.PRIORITY_NORMAL:
-                                break;
-                            case ConnectionRequest.PRIORITY_LOW:
-                                Thread.currentThread().setPriority(Thread.MIN_PRIORITY + 2);
-                                break;
-                            case ConnectionRequest.PRIORITY_REDUNDANT:
-                                Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
-                                break;
-                        }
-                        
-                        if(progressListeners != null) {
-                            progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
-                        }
-                        if(currentRequest.getShowOnInit() != null) {
-                            currentRequest.getShowOnInit().showModeless();
-                        }
-
-                        requestWasCompleted = currentRequest.performOperationComplete();
-                    } catch(IOException e) {
-                        if(!currentRequest.isFailSilently()) {
-                            if(!handleException(currentRequest, e)) {
-                                currentRequest.handleIOException(e);
-                            }
-                        } else {
-                            // for the record
-                            Log.e(e);
-                        }
-                    } catch(RuntimeException er) {
-                        if(!currentRequest.isFailSilently()) {
-                            if(!handleException(currentRequest, er)) {
-                                currentRequest.handleRuntimeException(er);
-                            }
-                        } else {
-                            // for the record
-                            Log.e(er);
-                        }
-                    } finally {
-                        Thread.currentThread().setPriority(Thread.NORM_PRIORITY);
-                        if(frameRate > -1) {
-                            Display.getInstance().setFramerate(frameRate);
-                        }
-                        if (requestWasCompleted) {
-                            currentRequest.complete = true;
-                        }
-                        if(progressListeners != null) {
-                            progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
-                        }
-                        if(currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
-                            // there may be a race condition where the dialog hasn't yet appeared but the
-                            // network request completed
-                            final ConnectionRequest finalReq = currentRequest;
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    Dialog dlg = finalReq.getDisposeOnCompletion();
-                                    if (dlg != null) {
-                                        dlg.dispose();
-                                    }
-                                } 
-                            });
-                        }
+                    if (!runCurrentRequest(currentRequest)) {
+                        continue;
                     }
                     currentRequest = null;
 
@@ -800,7 +809,7 @@ public class NetworkManager {
      *
      * @param request network request for execution
      */
-    void addToQueue(ConnectionRequest request, boolean retry) {
+    void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry) {
         Util.getImplementation().addConnectionToQueue(request);
         if(!running) {
             start();

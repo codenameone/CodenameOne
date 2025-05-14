@@ -173,10 +173,13 @@ public class EasyThread {
         synchronized(LOCK) {
             queue.add(new Runnable() {
                 public void run() {
-                    r.run();
-                    synchronized(flag) {
-                        flag[0] = true;
-                        flag.notify();
+                    try {
+                        r.run();
+                    } finally {
+                        synchronized (flag) {
+                            flag[0] = true;
+                            flag.notify();
+                        }
                     }
                 }
             });

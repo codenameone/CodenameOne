@@ -44,13 +44,25 @@ class SpinnerNumberModel implements ListModel {
     private double step;
     boolean realValues;
 
+    /**
+     * The old DateSpinner relies on behavior that was broken in this commit:
+     * https://github.com/codenameone/CodenameOne/commit/cfac9a6a1bb15027b48a9b822e2f21eb2835d38e#diff-d12531ab4b0dd8bf1233a09f3c5e2b2b5634bff3c3cd2f357ad0a001e5f19bbf
+     * This is a workaround to preserve compatibility
+     */
+    private int maxOffset = 1;
+
+    private boolean setSelectedIndexReentrantLock;
+
     void setValue(Object value) {
+        int oldIndex = getSelectedIndex();
         if(value instanceof Integer) {
             currentValue = ((Integer)value).doubleValue();
         } else {
             currentValue = ((Double)value).doubleValue();
         }
-        selectionListener.fireSelectionEvent(-1, -1);
+        if (oldIndex != getSelectedIndex()) {
+            selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());
+        }
     }
 
     Object getValue() {
@@ -73,6 +85,14 @@ class SpinnerNumberModel implements ListModel {
         this.min = min;
         this.currentValue = currentValue;
         this.step = step;
+    }
+
+    SpinnerNumberModel(int min, int max, int currentValue, int step, int maxOffset) {
+        this.max = max;
+        this.min = min;
+        this.currentValue = currentValue;
+        this.step = step;
+        this.maxOffset = maxOffset;
     }
 
     /**
@@ -106,7 +126,7 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSize() {
-        return (int)((max - min) / step);
+        return (int)((max - min) / step) + maxOffset;
     }
 
 
@@ -114,10 +134,7 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSelectedIndex() {
-        // equivalent to round
-        double d = Math.floor((max - currentValue) / step + 0.5);
-        int v = getSize() - (int)d;
-        return v;
+        return (int)((currentValue - min) / step);
     }
 
 
@@ -125,10 +142,20 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
-        int oldIndex = getSelectedIndex();
-        currentValue = min + index * step;
-        int newIndex = getSelectedIndex();
-        selectionListener.fireSelectionEvent(oldIndex, newIndex);
+        if (setSelectedIndexReentrantLock) {
+            return;
+        }
+        setSelectedIndexReentrantLock = true;
+        try {
+            int oldIndex = getSelectedIndex();
+            currentValue = min + index * step;
+            int newIndex = getSelectedIndex();
+            if (oldIndex != newIndex) {
+                selectionListener.fireSelectionEvent(oldIndex, newIndex);
+            }
+        } finally {
+            setSelectedIndexReentrantLock = false;
+        }
     }
 
     /**

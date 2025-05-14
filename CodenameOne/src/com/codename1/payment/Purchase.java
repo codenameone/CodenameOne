@@ -52,11 +52,7 @@ import java.util.Map;
  * @author Shai Almog
  */
 public abstract class Purchase {
-    
-    
     private static ReceiptStore receiptStore;
-    
-    
     private static final String RECEIPTS_KEY="CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_TIME_KEY="CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_PURCHASE_KEY = "PendingPurchases.dat";
@@ -157,8 +153,7 @@ public abstract class Purchase {
             Storage.getInstance().writeObject(RECEIPTS_REFRESH_TIME_KEY, receiptsRefreshTime);
         }
     }
-    
-    
+
     /**
      * Indicates whether the purchasing platform supports manual payments which 
      * are just payments of a specific amount of money.
@@ -267,6 +262,20 @@ public abstract class Purchase {
         throw new RuntimeException("Unsupported");
     }
 
+    /**
+     * Begins the purchase process for the given SKU using a provided promotional offer.
+     *
+     * <p>Promotional offers are currently only supported on iOS.  See <a href="https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc">Apple's documentation</a></p>
+     *
+     * @param sku the SKU with which to perform the purchase process
+     * @param promotionalOffer The promotional offer.
+     * @throws RuntimeException This method is a part of the managed payments API and will fail if
+     * isManagedPaymentSupported() returns false
+     * @see ApplePromotionalOffer
+     */
+    public void purchase(String sku, PromotionalOffer promotionalOffer) {
+        throw new RuntimeException("Unsupported");
+    }
 
     /**
      * Begins subscribe process for the given subscription SKU
@@ -283,6 +292,25 @@ public abstract class Purchase {
     public void subscribe(String sku) {
         if (receiptStore != null) {
             purchase(sku);
+            return;
+        }
+        throw new RuntimeException("Unsupported");
+    }
+
+    /**
+     * Begins subscribe process for the given subscription SKU using a provided promotional offer.
+     *
+     * <p>Promotional offers are currently only supported on iOS.  See <a href="https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/implementing_promotional_offers_in_your_app?language=objc">Apple's documentation</a></p>
+     *
+     * @param sku the SKU with which to perform the purchase process
+     * @param promotionalOffer The promotional offer.
+     * @throws RuntimeException This method is a part of the managed payments API and will fail if
+     * isManagedPaymentSupported() returns false
+     * @see ApplePromotionalOffer
+     */
+    public void subscribe(String sku, PromotionalOffer promotionalOffer) {
+        if (receiptStore != null) {
+            purchase(sku, promotionalOffer);
             return;
         }
         throw new RuntimeException("Unsupported");
@@ -827,6 +855,15 @@ public abstract class Purchase {
     public void manageSubscriptions(String sku) {
         Dialog.show("Not Supported", "This platform doesn't support in-app subscription management. ", "OK", null);
     }
-    
-    
+
+    /**
+     * Returns the store code associated with this in-app purchase object.
+     * @return The store code.  One of {@link Receipt#STORE_CODE_ITUNES}, {@link Receipt#STORE_CODE_PLAY}, {@link Receipt#STORE_CODE_SIMULATOR}, or
+     * {@link Receipt#STORE_CODE_WINDOWS}.
+     * @since 8.0
+     */
+    public String getStoreCode() {
+        return null;
+    }
+
 }

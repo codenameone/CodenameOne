@@ -50,7 +50,6 @@ import com.codename1.ui.plaf.Accessor;
 import com.codename1.ui.plaf.Style;
 import com.codename1.designer.ResourceEditorApp;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
-import com.codename1.ui.Form;
 import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
@@ -65,7 +64,7 @@ import com.codename1.ui.util.xml.Ui;
 import com.codename1.ui.util.xml.Val;
 import com.codename1.ui.util.xml.comps.ComponentEntry;
 import com.codename1.util.StringUtil;
-import java.awt.Frame;
+
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.BufferedWriter;
@@ -91,7 +90,6 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -112,7 +110,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 11;
+    private static final short MINOR_VERSION = 12;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -561,12 +559,20 @@ public class EditableResources extends Resources implements TreeModel {
                                     for(Val v : d.getVal()) {
                                         String key = v.getKey();
                                     
-                                        if(key.endsWith("align") || key.endsWith("textDecoration")) {
+                                        if(key.endsWith("align") || key.endsWith("textDecoration") || key.endsWith(Style.ELEVATION)) {
                                             theme.put(key, Integer.valueOf(v.getValue()));
                                             continue;
                                         }
-                                        if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
+                                        if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT) || key.endsWith(Style.ICON_GAP_UNIT)) {
                                             theme.put(key, Byte.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        if (key.endsWith(Style.SURFACE)) {
+                                            theme.put(key, Boolean.valueOf(v.getValue()));
+                                            continue;
+                                        }
+                                        if (key.endsWith(Style.ICON_GAP)) {
+                                            theme.put(key, Float.valueOf(v.getValue()));
                                             continue;
                                         }
                                         // padding and or margin type
@@ -1947,7 +1953,9 @@ public class EditableResources extends Resources implements TreeModel {
         theme.remove("name");
         
         output.writeShort(theme.size());
-        for(Object currentKey : theme.keySet()) {
+        ArrayList<String> setOfKeys = new ArrayList<String>(theme.keySet());
+        Collections.sort(setOfKeys);
+        for(Object currentKey : setOfKeys) {
             String key = (String)currentKey;
             output.writeUTF(key);
 
@@ -1979,6 +1987,16 @@ public class EditableResources extends Resources implements TreeModel {
             
             if (key.endsWith("opacity")) {
                 output.writeInt(Integer.parseInt((String)theme.get(key)));
+                continue;
+            }
+
+            if (key.endsWith(Style.ICON_GAP)) {
+                output.writeFloat(((Number)theme.get(key)).floatValue());
+                continue;
+            }
+
+            if (key.endsWith(Style.ICON_GAP_UNIT)) {
+                output.writeByte(((Number)theme.get(key)).byteValue());
                 continue;
             }
 
@@ -2020,7 +2038,7 @@ public class EditableResources extends Resources implements TreeModel {
                     output.writeByte(f.getFace());
                     output.writeByte(f.getStyle());
                     output.writeByte(f.getSize());
-                    if(f instanceof EditorTTFFont && (((EditorTTFFont)f).getFontFile() != null || ((EditorTTFFont)f).getNativeFontName() != null)) {
+                    if(f instanceof EditorTTFFont && (getEditorTTFFontFileIfExistsOrNull(f) != null || ((EditorTTFFont)f).getNativeFontName() != null)) {
                         output.writeBoolean(true);
                         EditorTTFFont ed = (EditorTTFFont)f;
                         if(ed.getNativeFontName() != null) {
@@ -2072,6 +2090,19 @@ public class EditableResources extends Resources implements TreeModel {
 
             if(key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
                 output.writeByte(((Number)theme.get(key)).intValue());
+                continue;
+            }
+            if (key.endsWith(Style.ELEVATION)) {
+                output.writeInt(((Number)theme.get(key)).intValue());
+                continue;
+            }
+
+            if (key.endsWith(Style.FG_ALPHA)) {
+                output.writeInt(((Number)theme.get(key)).intValue());
+                continue;
+            }
+            if (key.endsWith(Style.SURFACE)) {
+                output.writeBoolean((Boolean)theme.get(key));
                 continue;
             }
 
@@ -3523,6 +3554,16 @@ public class EditableResources extends Resources implements TreeModel {
         if(!listeners.contains(l)) {
             listeners.add(l);
         }
+    }
+
+    private File getEditorTTFFontFileIfExistsOrNull(com.codename1.ui.Font f) {
+        if (f instanceof EditorTTFFont) {
+            final File file = ((EditorTTFFont)f).getFontFile();
+            if (file != null && file.exists()) {
+                return file;
+            }
+        }
+        return null;
     }
 
     public void removeTreeModelListener(TreeModelListener l) {

@@ -1,0 +1,43 @@
+bash("MVNW=\"./mvnw\"");
+batch("set MVNW=mvnw.cmd");
+
+function simulator() {
+    global MVNW;
+    call(MVNW, "verify", "-Psimulator", "-DskipTests", "-Dcodename1.platform=javase");
+}
+
+function desktop() {
+    global MVNW;
+    call(MVNW, "verify", "-Prun-desktop", "-DskipTests", "-Dcodename1.platform=javase");
+}
+
+function settings() {
+    global MVNW;
+    call(MVNW, "cn:settings");
+}
+
+function update() {
+    global MVNW;
+    call(MVNW, "cn:update");
+}
+
+function help() {
+    println("run.sh [COMMAND]");
+    println("Commands:");
+    println("  simulator");
+    println("    Runs app using Codename One Simulator");
+    println("  desktop");
+    println("    Runs app as a desktop app.");
+    println("  settings");
+    println("    Opens Codename One settings");
+    println("  update");
+    println("    Update Codename One libraries");
+}
+
+
+bash("CMD=$1");
+batch("SET CMD=%1");
+if (CMD=="") {
+    CMD = "simulator";
+}
+call(CMD);

@@ -90,7 +90,9 @@ public class TextPainter implements NodePainter {
         }
         g.setFont(font);
         g.setColor(style.getFgColor());
+        int alpha = g.concatenateAlpha(style.getFgAlpha());
         g.drawString(text, x, y);
+        g.setAlpha(alpha);
     }
 
     /**

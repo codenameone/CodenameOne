@@ -53,6 +53,7 @@ import android.support.v4.media.session.PlaybackStateCompat;
 
 import android.text.TextUtils;
 
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Display;
 
 
@@ -267,9 +268,6 @@ public class BackgroundAudioService extends MediaBrowserServiceCompat implements
     }
 
 
-
-
-
     private void initMediaSession() {
         ComponentName mediaButtonReceiver = new ComponentName(getApplicationContext(), MediaButtonReceiver.class);
         mMediaSessionCompat = new MediaSessionCompat(getApplicationContext(), "Tag", mediaButtonReceiver, null);
@@ -279,7 +277,7 @@ public class BackgroundAudioService extends MediaBrowserServiceCompat implements
 
         Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
         mediaButtonIntent.setClass(this, MediaButtonReceiver.class);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, mediaButtonIntent, 0);
+        PendingIntent pendingIntent = AndroidImplementation.getBroadcastPendingIntent(this, 0, mediaButtonIntent);
         mMediaSessionCompat.setMediaButtonReceiver(pendingIntent);
 
         setSessionToken(mMediaSessionCompat.getSessionToken());

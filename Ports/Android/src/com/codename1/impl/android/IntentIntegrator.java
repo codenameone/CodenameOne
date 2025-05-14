@@ -28,9 +28,18 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+
+import com.codename1.components.SpanLabel;
+import com.codename1.ui.Button;
+import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 
 /**
  * <p>A utility class which helps ease integration with Barcode Scanner via {@link Intent}s.
@@ -123,11 +132,12 @@ public class IntentIntegrator {
     private static final String BS_PACKAGE = "com.google.zxing.client.android";
     private static final String BSPLUS_PACKAGE = "com.srowen.bs.android";
     private static final String BSSIMPLE_PACKAGE = BSPLUS_PACKAGE+".simple";
+
     // supported barcode formats
     public static final Collection<String> PRODUCT_CODE_TYPES = list("UPC_A", "UPC_E", "EAN_8", "EAN_13", "RSS_14");
     public static final Collection<String> ONE_D_CODE_TYPES =
             list("UPC_A", "UPC_E", "EAN_8", "EAN_13", "CODE_39", "CODE_93", "CODE_128",
-            "ITF", "RSS_14", "RSS_EXPANDED");
+                    "ITF", "RSS_14", "RSS_EXPANDED");
     public static final Collection<String> QR_CODE_TYPES = Collections.singleton("QR_CODE");
     public static final Collection<String> DATA_MATRIX_TYPES = Collections.singleton("DATA_MATRIX");
     public static final Collection<String> ALL_CODE_TYPES = null;
@@ -138,7 +148,7 @@ public class IntentIntegrator {
             BSPLUS_PACKAGE, // Barcode Scanner+
             "la.droid.qr",
             "la.droid.qr.priva"
-            );
+    );
     private final Activity activity;
     private String title;
     private String message;
@@ -300,10 +310,56 @@ public class IntentIntegrator {
     }
 
     private void showDownloadDialog() {
-        Dialog d = new Dialog();
+        final Dialog d = new Dialog();
         d.setTitle(title);
-        if (Dialog.show(title, message, "Yes", "No")) {
-            Uri uri = Uri.parse("market://details?id=" + BSSIMPLE_PACKAGE);
+
+
+        final String[] chosenPackage = new String[1];
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+
+            Button bs = new Button("Barcode Scanner");
+            Button bsSimple = new Button("Barcode Scanner + Simple");
+            Button cancel = new Button("Cancel");
+            bsSimple.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    chosenPackage[0] = BSSIMPLE_PACKAGE;
+                    d.dispose();
+                }
+            });
+
+            bs.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    chosenPackage[0] = BS_PACKAGE;
+                    d.dispose();
+                }
+            });
+            cancel.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    d.dispose();
+                }
+            });
+
+            Container dialogBody = BoxLayout.encloseY(
+                    new SpanLabel("Please select a barcode scanner app to install:"),
+                    bs,
+                    bsSimple,
+                    cancel
+            );
+            d.getContentPane().removeAll();
+            d.getContentPane().setLayout(new BorderLayout());
+            d.getContentPane().add(BorderLayout.CENTER, dialogBody);
+            d.show();
+        } else {
+            if (Dialog.show(title, message, "Yes", "No")) {
+                chosenPackage[0] = BSSIMPLE_PACKAGE;
+            }
+        }
+
+        if (chosenPackage[0] != null) {
+            Uri uri = Uri.parse("market://details?id=" + chosenPackage[0]);
             Intent intent = new Intent(Intent.ACTION_VIEW, uri);
             try {
                 activity.startActivity(intent);

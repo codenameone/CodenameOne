@@ -1972,7 +1972,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             editedTextArea = ta;
         }
 
-        @Override
+
         public void close() throws Exception {
             if (!enabled) {
                 return;
@@ -2197,17 +2197,20 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * Fire the done event to done listener
      */ 
     public void fireDoneEvent() {
+        fireDoneEvent(-1);
+    }
+    public void fireDoneEvent(final int keyEvent) {
         if (doneListener != null) {
             if (!Display.getInstance().isEdt()) {
                 Display.getInstance().callSerially(new Runnable() {
-                    
+
                     public void run() {
-                        fireDoneEvent();
+                        fireDoneEvent(keyEvent);
                     }
                 });
                 return;
             }
-            doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done));
+            doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done,keyEvent));
         }
     }
 
@@ -2289,7 +2292,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     public TextSelection.TextSelectionSupport getTextSelectionSupport() {
         if (textSelectionSupport == null) {
             textSelectionSupport = new TextSelection.TextSelectionSupport() {
-                @Override
+
                 public TextSelection.Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds) {
                     span = calculateTextSelectionSpan(sel);
                     if (span == null) {
@@ -2303,17 +2306,17 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                             
                 }
 
-                @Override
+
                 public boolean isTextSelectionEnabled(TextSelection sel) {
                     return (!isEditable() && textSelectionEnabled)|| (isEditable() && !isEnabled());
                 }
 
-                @Override
+
                 public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
                     return (!isEditable() && textSelectionEnabled)|| (isEditable() && !isEnabled());
                 }
 
-                @Override
+
                 public TextSelection.Span triggerSelectionAt(TextSelection sel, int x, int y) {
                     span = getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, TextArea.this);
                     if (span.isEmpty()) {
@@ -2353,7 +2356,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                     return sp.subspan(startPos, endPos);
                 }
 
-                @Override
+
                 public String getTextForSpan(TextSelection sel, TextSelection.Span span) {
                     int offset = span.getStartPos();
                     offset = Math.max(0, offset);

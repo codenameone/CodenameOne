@@ -23,12 +23,13 @@
 package com.codename1.impl.ios;
 
 import com.codename1.io.Log;
-import com.codename1.payment.Product;
-import com.codename1.payment.Purchase;
-import com.codename1.payment.PurchaseCallback;
+import com.codename1.payment.*;
+import com.codename1.processing.Result;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Implementation of the purchase API
@@ -54,6 +55,11 @@ class ZoozPurchase extends Purchase implements Runnable {
         this.nativeInstance = nativeInstance;
         this.ioImpl = ioImpl;
         this.callback = callback;
+    }
+
+    @Override
+    public String getStoreCode() {
+        return Receipt.STORE_CODE_ITUNES;
     }
 
     public boolean isManagedPaymentSupported() {
@@ -128,6 +134,19 @@ class ZoozPurchase extends Purchase implements Runnable {
         nativeInstance.purchase(sku);
     }
 
+    @Override
+    public void purchase(String sku, PromotionalOffer promotionalOffer) {
+        if (promotionalOffer == null) {
+            nativeInstance.purchase(sku);
+            return;
+        }
+
+        if (!(promotionalOffer instanceof ApplePromotionalOffer)) {
+            throw new RuntimeException("Unsupported promotional offer.  Expected ApplePromotionalOffer but received " + promotionalOffer.getClass());
+        }
+
+        nativeInstance.purchase(skuAndPromotionalOfferToJSON(sku, (ApplePromotionalOffer) promotionalOffer));
+    }
 
     public void subscribe(String sku) {
         if (getReceiptStore() != null) {
@@ -137,7 +156,20 @@ class ZoozPurchase extends Purchase implements Runnable {
         super.subscribe(sku);
     }
 
-   
+    @Override
+    public void subscribe(String sku, PromotionalOffer promotionalOffer) {
+        if (promotionalOffer == null) {
+            subscribe(sku);
+            return;
+        }
+
+        if (!(promotionalOffer instanceof ApplePromotionalOffer)) {
+            throw new RuntimeException("Unsupported promotional offer.  Expected ApplePromotionalOffer but received " + promotionalOffer.getClass());
+        }
+
+        nativeInstance.purchase(skuAndPromotionalOfferToJSON(sku, (ApplePromotionalOffer) promotionalOffer));
+    }
+
     public boolean isSubscriptionSupported() {
         return getReceiptStore() != null;
     }
@@ -212,4 +244,16 @@ class ZoozPurchase extends Purchase implements Runnable {
         CN.execute("itms-apps://apps.apple.com/account/subscriptions");
     }
 
+    private String skuAndPromotionalOfferToJSON(String sku, ApplePromotionalOffer promotionalOffer) {
+        Map<String,Object> payload = new HashMap<String, Object>();
+        payload.put("sku", sku);
+        Map<String,Object> promo = new HashMap<String,Object>();
+        promo.put("offerIdentifier", promotionalOffer.getOfferIdentifier());
+        promo.put("keyIdentifier", promotionalOffer.getKeyIdentifier());
+        promo.put("nonce", promotionalOffer.getNonce());
+        promo.put("signature", promotionalOffer.getSignature());
+        promo.put("timestamp", promotionalOffer.getTimestamp());
+        payload.put("promotionalOffer", promo);
+        return Result.fromContent(payload).toString().trim();
+    }
 }

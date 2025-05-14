@@ -4,7 +4,8 @@
 
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
-    <version>7.0-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
+
     <packaging>pom</packaging>
 
     <name>CodenameOne</name>
@@ -40,53 +41,164 @@
             <timezone>-8</timezone>
         </developer>
     </developers>
-	
+
     <scm>
         <url>https://github.com/codenameone/CodenameOne</url>
         <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
     </scm>
-    <!--
-  <distributionManagement>
-      <snapshotRepository>
-        <id>sonatype-nexus-snapshots</id>
-        <name>Sonatype Nexus Snapshots</name>
-        <url>${sonatypeOssDistMgmtSnapshotsUrl}</url>
-      </snapshotRepository>
-      <repository>
-        <id>sonatype-nexus-staging</id>
-        <name>Nexus Release Repository</name>
-        <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-      </repository>
-    </distributionManagement>-->
-	  
+
+
+
     <properties>
-        <cn1.version>7.0-SNAPSHOT</cn1.version>
+        <cn1.version>${project.version}</cn1.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <sonatypeOssDistMgmtSnapshotsUrl>https://oss.sonatype.org/content/repositories/snapshots/</sonatypeOssDistMgmtSnapshotsUrl>
-	      
+
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
-        <cn1.binaries>${basedir}/../../../cn1-binaries</cn1.binaries>
+        <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
+
+        <jaxb.version>2.3.1</jaxb.version>
     </properties>
     <modules>
+        <!--<module>codenameone-maven-goals</module>-->
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
+        <module>sqlite-jdbc</module>
         <module>javase</module>
         <module>javase-svg</module>
         <module>android</module>
+        <module>ios</module>
+        <module>parparvm</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
-        <module>codenameone-archetypes</module>
-        
-		    
     </modules>
-		  
-		  
+
+
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-model</artifactId>
+                <version>3.3.9</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javase-svg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>sqlite-jdbc</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-designer</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-resources-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-resources-android</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-android</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-ios</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-parparvm</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-designer</artifactId>
+                <version>${project.version}</version>
+                <classifier>jar-with-dependencies</classifier>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-ios</artifactId>
+                <version>${project.version}</version>
+                <classifier>bundle</classifier>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-parparvm</artifactId>
+                <version>${project.version}</version>
+                <classifier>bundle</classifier>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>cn1-builder-resources-common</artifactId>
+                <version>7.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>cn1-builder-resources-android</artifactId>
+                <version>7.0</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/javassist/javassist -->
+            <dependency>
+                <groupId>javassist</groupId>
+                <artifactId>javassist</artifactId>
+                <version>3.12.1.GA</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm</artifactId>
+                <version>9.1</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-util -->
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-util</artifactId>
+                <version>9.1</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-commons -->
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-commons</artifactId>
+                <version>9.1</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-vfs2 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-vfs2</artifactId>
+                <version>2.7.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.13</version>
+            </dependency>
+
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-factory</artifactId>
@@ -102,6 +214,12 @@
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-plugin-api</artifactId>
                 <version>3.3.3</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.maven.surefire</groupId>
+                <artifactId>surefire-api</artifactId>
+                <version>3.0.0-M5</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven.plugin-tools</groupId>
@@ -121,28 +239,16 @@
             <dependency>
                 <groupId>org.apache.ant</groupId>
                 <artifactId>ant</artifactId>
-                <version>1.10.9</version>
-            </dependency>
-            <dependency>
-                <groupId>com.codenameone</groupId>
-                <artifactId>stubber</artifactId>
-                <version>6.0.0</version>
-                <type>pom</type>
-            </dependency>
-           
-            <dependency>
-                <groupId>com.codenameone</groupId>
-                <artifactId>codenameone-buildclient</artifactId>
-                <version>${project.version}</version>
-               
+                <version>1.10.11</version>
             </dependency>
 
-                  
+
+
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase</artifactId>
                 <version>${project.version}</version>
-                
+
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
@@ -174,26 +280,39 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-text</artifactId>
-                <version>1.9</version>
+                <version>1.10.0</version>
             </dependency>
-            
-            <dependency>
-                <groupId>com.guardsquare</groupId>
-                <artifactId>proguard-core</artifactId>
-                <version>7.0.1</version>
-            </dependency>
-            <!-- https://mvnrepository.com/artifact/com.guardsquare/proguard-base -->
+
             <dependency>
                 <groupId>com.guardsquare</groupId>
                 <artifactId>proguard-base</artifactId>
-                <version>7.0.1</version>
+                <version>7.2.0-beta2</version>
             </dependency>
+            <dependency>
+                <groupId>javax.xml.bind</groupId>
+                <artifactId>jaxb-api</artifactId>
+                <version>${jaxb.version}</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-impl -->
+            <dependency>
+                <groupId>com.sun.xml.bind</groupId>
+                <artifactId>jaxb-impl</artifactId>
+                <version>${jaxb.version}</version>
+            </dependency>
+            <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-core -->
+            <dependency>
+                <groupId>com.sun.xml.bind</groupId>
+                <artifactId>jaxb-core</artifactId>
+                <version>2.3.0.1</version>
+            </dependency>
+
 
         </dependencies>
     </dependencyManagement>
-    
-			
+
+
     <build>
+
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -201,8 +320,8 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
+                        <source>1.8</source>
+                        <target>1.8</target>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -222,7 +341,7 @@
                         </execution>
                     </executions>
                     <configuration>
-                        <source>${java.version}</source>
+                        <source>1.8</source>
                         <show>protected</show>
                         <failOnError>false</failOnError>
                     </configuration>
@@ -246,7 +365,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>2.21.0</version>
                 </plugin>
-			        
+
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
@@ -257,71 +376,248 @@
                     <artifactId>maven-shade-plugin</artifactId>
                     <version>3.1.1</version>
                 </plugin>
-                <!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-invoker-plugin -->
+
+
                 <plugin>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.0.0</version>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <version>3.1.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>1.7</version>
             </plugin>
-            <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>build-helper-maven-plugin</artifactId>
-            <version>1.7</version>
-                
-        </plugin>
+
             </plugins>
         </pluginManagement>
+
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.2.0</version>
+                    <configuration>
+                        <additionalOptions>--allow-script-in-comments</additionalOptions>
+                    </configuration>
+                </plugin>
+            </plugins>
+
     </build>
     <distributionManagement>
         <repository>
-            <id>bintray-codenameone-codenameone</id>
-            <name>codenameone-codenameone</name>
-            <url>https://api.bintray.com/maven/codenameone/codenameone/CodenameOne/;publish=1</url>
+            <id>nexus-staging</id>
+            <name>Nexus Release Repository</name>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
-			
+
     <repositories>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-codenameone-codenameone</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/codenameone/codenameone</url>
-        </repository>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-guardsquare-proguard</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/guardsquare/proguard</url>
-        </repository>
+
+
     </repositories>
-    <pluginRepositories>
-        <pluginRepository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-codenameone-codenameone</id>
-            <name>bintray-plugins</name>
-            <url>https://dl.bintray.com/codenameone/codenameone</url>
-        </pluginRepository>
-    </pluginRepositories>
+
     <profiles>
         <profile>
-            <id>build-client</id>
-            <modules>
-                <module>build-client</module>
-            </modules>
+            <id>sign-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.5</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <passphrase>${gpg.passphrase}</passphrase>
+
+                                </configuration>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Prevent gpg from using pinentry programs -->
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
+        <profile>
+            <id>download-cn1-binaries</id>
+            <activation>
+                <file><missing>${cn1.binaries}</missing></file>
+                <property>
+                    <name>!unitTests</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+
+                        <executions>
+                            <execution>
+                                <id>download-cn1-binaries</id>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <mkdir dir="${maven.multiModuleProjectDirectory}/target"/>
+                                        <exec executable="git" dir="${maven.multiModuleProjectDirectory}/target">
+                                            <arg value="clone"/>
+                                            <arg value="https://github.com/codenameone/cn1-binaries"/>
+                                        </exec>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>add-client-dependency</id>
+            <activation>
+                <file>
+                    <missing>${basedir}/../../BuildClient</missing>
+                </file>
+            </activation>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.codenameone</groupId>
+                        <artifactId>codenameone-buildclient</artifactId>
+                        <version>8.0</version><!-- Dummy version to avoid build errors that demand a version -->
+                        <scope>system</scope>
+                        <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+        </profile>
+
         <profile>
             <id>tests</id>
             <modules>
-                <module>tests/core-tests</module>
-                <module>tests/signindemo</module>
-                <module>tests/testnativeinterfaces</module>
+                <module>tests</module>
             </modules>
         
+        </profile>
+        <profile>
+            <id>install-cn1</id>
+            <activation>
+                <file>
+                    <missing>${user.home}/.codenameone/CodeNameOneBuildClient.jar</missing>
+                </file>
+                <property>
+                    <name>!unitTests</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <id>install-cn1</id>
+                                <configuration>
+                                    <target>
+                                        <mkdir dir="${user.home}/.codenameone"/>
+                                        <mkdir dir="${project.build.directory}/generated-sources/project" />
+                                        <mkdir dir="${project.build.directory}/generated-sources/project/lib" />
+                                        <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar" dest="${user.home}/.codenameone/UpdateCodenameOne.jar" skipexisting="true"/>
+                                        <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
+                                            <arg value="${project.build.directory}/generated-sources/project"/>
+                                            <arg value="force" />
+                                        </java>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>sonatype-release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.7</version>
+                        <extensions>true</extensions>
+
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.5</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Prevent gpg from using pinentry programs -->
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+
+            </build>
+        </profile>
+        <profile>
+            <id>unittests</id>
+            <activation>
+                <property>
+                    <name>unitTests</name>
+                </property>
+            </activation>
+            <modules>
+                <module>core-unittests</module>
+            </modules>
         </profile>
     </profiles>
     

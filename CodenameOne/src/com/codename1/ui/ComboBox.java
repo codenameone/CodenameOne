@@ -33,6 +33,8 @@ import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.UIManager;
+
 import java.util.Vector;
 
 /**
@@ -151,6 +153,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         super(model);
         super.setUIID("ComboBox");
         ((DefaultListCellRenderer) super.getRenderer()).setShowNumbers(false);
+
         setInputOnFocus(false);
         setIsScrollVisible(false);
         setFixedSelection(FIXED_NONE_CYCLIC);
@@ -163,6 +166,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         if(c != null){
             c.setUIID("ComboBoxFocus");
         }
+
+        if (UIManager.getInstance().isThemeConstant("comboBoxUseMaterialArrowDropDownBool", false)) {
+            Style comboImageStyle = new Style(getStyle());
+            comboImageStyle.setBgTransparency(0);
+            setComboBoxImage(FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, comboImageStyle));
+        }
+
     }
 
     /**
@@ -198,6 +208,11 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         Component c = getRenderer().getListFocusComponent(this);
         if(c != null){
             c.setUIID(uiid + "Focus");
+        }
+        if (UIManager.getInstance().isThemeConstant("comboBoxUseMaterialArrowDropDownBool", false)) {
+            Style comboImageStyle = new Style(getStyle());
+            comboImageStyle.setBgTransparency(0);
+            setComboBoxImage(FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, comboImageStyle));
         }
     }
 
@@ -301,6 +316,17 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         return popupDialog;
     }
 
+    private boolean showingPopupDialog;
+
+    /**
+     * Returns true if the popup dialog is currently showing for this combobox.
+     * @return
+     * @since 8.0
+     */
+    public boolean isShowingPopupDialog() {
+        return showingPopupDialog;
+    }
+
     /**
      * Shows the popup dialog for the combo box and returns the resulting command.
      * This method can be overriden by subclasses to modify the behavior of the class.
@@ -345,11 +371,17 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             popupDialog.getTitleComponent().setUIID("Container");
             popupDialog.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 200));
             popupDialog.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 200));
-            return popupDialog.show(Display.getInstance().getDisplayHeight() - popupDialog.getDialogComponent().getPreferredH(), 0, 0, 0, true, true);
+            showingPopupDialog = true;
+            Command out = popupDialog.show(Display.getInstance().getDisplayHeight() - popupDialog.getDialogComponent().getPreferredH(), 0, 0, 0, true, true);
+            showingPopupDialog = false;
+            return out;
         }
 
         if(getUIManager().isThemeConstant("centeredPopupBool", false)) {
-            return popupDialog.showPacked(BorderLayout.CENTER, true);
+            showingPopupDialog = true;
+            Command out = popupDialog.showPacked(BorderLayout.CENTER, true);
+            showingPopupDialog = false;
+            return out;
         } else {
             int top, bottom, left, right;
             Form parentForm = getComponentForm();
@@ -398,10 +430,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
                 right = 0;
             }
             popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());
-            return popupDialog.show(Math.max(top, 0),
+            showingPopupDialog = true;
+            Command out =  popupDialog.show(Math.max(top, 0),
                     Math.max(bottom, 0),
                     Math.max(left, 0),
                     Math.max(right, 0), false, true);
+            showingPopupDialog = false;
+            return out;
         }
     }
 

@@ -161,30 +161,35 @@ public class GridLayout extends Layout{
     private boolean isLandscapeMode() {
         return landscapeRows > -1 && (!Display.getInstance().isPortrait());
     }
-    
-    private void autoSizeCols(Container parent, int width, boolean landscapeMode) {
+
+    private int autoSizeCols(Container parent, int width, boolean landscapeMode) {
+        int numOfcomponents = parent.getComponentCount();
+        int totalComponentCount = numOfcomponents;
         if(isAutoFit()) {
-            int numOfcomponents = parent.getComponentCount();
             int maxWidth = 0;
             for(int iter = 0 ; iter < numOfcomponents ; iter++) {
                 Component cmp = parent.getComponentAt(iter);
-                Style s = cmp.getStyle();
-                maxWidth = Math.max(cmp.getPreferredW() + s.getHorizontalMargins(), maxWidth);
+                if(hideZeroSized && cmp.isHidden()) {
+                    totalComponentCount--;
+                } else {
+                    Style s = cmp.getStyle();
+                    maxWidth = Math.max(cmp.getPreferredW() + s.getHorizontalMargins(), maxWidth);
+                }
             }
             if(width < maxWidth) {
                 width = Display.getInstance().getDisplayWidth();
             }
             if(landscapeMode) {
-                // prevent arithmentic exception
+                // prevent arithmetic exception
                 if(maxWidth <= 0) {
                     landscapeColumns = 1;
                 } else {
                     landscapeColumns = Math.max(width / maxWidth, 1);
                 }
-                landscapeRows = Math.max(1, numOfcomponents / landscapeColumns);
-                if(numOfcomponents % landscapeColumns > 0 && numOfcomponents > landscapeColumns) {
+                landscapeRows = Math.max(1, totalComponentCount / landscapeColumns);
+                if(totalComponentCount % landscapeColumns > 0 && totalComponentCount > landscapeColumns) {
                     landscapeRows++;
-                } 
+                }
             } else {
                 // prevent arithmentic exception
                 if(maxWidth <= 0) {
@@ -192,12 +197,13 @@ public class GridLayout extends Layout{
                 } else {
                     portraitColumns = Math.max(width / maxWidth, 1);
                 }
-                portraitRows = Math.max(1, numOfcomponents / portraitColumns);
-                if(numOfcomponents % portraitColumns > 0 && numOfcomponents > portraitColumns) {
+                portraitRows = Math.max(1, totalComponentCount / portraitColumns);
+                if(totalComponentCount % portraitColumns > 0 && totalComponentCount > portraitColumns) {
                     portraitRows++;
-                } 
+                }
             }
         }
+        return totalComponentCount;
     }
 
     /**
@@ -276,19 +282,24 @@ public class GridLayout extends Layout{
 
     /**
      * {@inheritDoc}
-     */    
-    public Dimension getPreferredSize(Container parent) {        
+     */
+    public Dimension getPreferredSize(Container parent) {
         int width = 0;
         int height = 0;
-        
+
         int numOfcomponents = parent.getComponentCount();
+        int totalComponentCount = numOfcomponents;
         for(int i=0; i< numOfcomponents; i++){
             Component cmp = parent.getComponentAt(i);
-            width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL()+ cmp.getStyle().getMarginRightNoRTL());
-            height = Math.max(height, cmp.getPreferredH()+ cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom());
+            if(hideZeroSized && cmp.isHidden()) {
+                totalComponentCount--;
+            } else {
+                width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL());
+                height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());
+            }
         }
 
-        boolean landscapeMode = isLandscapeMode();        
+        boolean landscapeMode = isLandscapeMode();
         autoSizeCols(parent, parent.getWidth(), landscapeMode);
         int rows, columns;
         if(landscapeMode) {
@@ -302,18 +313,18 @@ public class GridLayout extends Layout{
         if(columns > 1){
             width = width*columns;
         }
-        
+
         if(rows > 1){
-            if(numOfcomponents>rows*columns){ //if there are more components than planned
-               height =  height * (numOfcomponents/columns + (numOfcomponents%columns == 0 ? 0 : 1));
+            if(totalComponentCount>rows*columns){ //if there are more components than planned
+                height =  height * (totalComponentCount/columns + (totalComponentCount%columns == 0 ? 0 : 1));
             }else{
                 height = height*rows;
             }
         }
-        
+
         Style s = parent.getStyle();
         return new Dimension(width + s.getHorizontalPadding(),
-            height + s.getVerticalPadding());
+                height + s.getVerticalPadding());
     }
     
     /**

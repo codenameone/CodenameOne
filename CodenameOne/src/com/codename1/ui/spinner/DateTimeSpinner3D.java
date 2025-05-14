@@ -59,12 +59,16 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * Default constructor
      */
-    public DateTimeSpinner3D() {
+    public DateTimeSpinner3D(int minuteStep) {
         off = 0;
-        initSpinner();
+        initSpinner(minuteStep);
+    }
+
+    public DateTimeSpinner3D() {
+        this(TimeSpinner3D.DEFAULT_MINUTE_STEP);
     }
     
-    void initSpinner() {
+    void initSpinner(int minuteStep) {
         if(date == null) {
             date = Spinner3D.createDate(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime());
             date.setPreferredW((int)(new Label("Thu Dec 27", "Spinner3DRow").getPreferredW() * 1.5f ));
@@ -76,13 +80,17 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
             this.setStartDate(startDate);
             this.setEndDate(endDate);
             
-            time = new TimeSpinner3D();
-            //getUnselectedStyle().setBgColor(date.getUnselectedStyle().getBgColor());
-            //getUnselectedStyle().setBgTransparency(255);
+            time = new TimeSpinner3D(minuteStep);
             addComponents();
-            
         }
+    }
 
+    public int getMinuteStep() {
+        return time.getMinuteStep();
+    }
+
+    public void setMinuteStep(int minuteStep) {
+        time.setMinuteStep(minuteStep);
     }
 
     @Override

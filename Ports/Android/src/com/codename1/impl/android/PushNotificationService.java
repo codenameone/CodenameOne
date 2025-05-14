@@ -103,7 +103,8 @@ public abstract class PushNotificationService extends Service implements PushCal
     
     public abstract PushCallback getPushCallbackInstance();
     public abstract Class getStubClass();
-    
+
+
     @Override
     public void push(final String value) {
         final PushCallback callback = getPushCallbackInstance();
@@ -116,7 +117,7 @@ public abstract class PushNotificationService extends Service implements PushCal
         } else {
             NotificationManager nm = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
             Intent newIntent = new Intent(this, getStubClass());
-            PendingIntent contentIntent = PendingIntent.getActivity(this, 0, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            PendingIntent contentIntent = AndroidImplementation.createPendingIntent(this, 0, newIntent);
 
 
 

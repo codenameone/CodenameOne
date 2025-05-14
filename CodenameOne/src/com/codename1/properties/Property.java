@@ -77,6 +77,7 @@ public class Property<T, K> extends PropertyBase<T, K> {
      * @return the property value
      */
     public T get() {
+        internalGet();
         return value;
     }
     
@@ -87,9 +88,10 @@ public class Property<T, K> extends PropertyBase<T, K> {
      */
     public K set(T value) {
         if(!(this.value == value || 
-                (this.value != null && this.value.equals(value)))) { 
+                (this.value != null && this.value.equals(value)))) {
             this.value = value;
             firePropertyChanged();
+            internalSet();
         }
         if(parent == null) {
             // allows properties to work even if they aren't registered in the index

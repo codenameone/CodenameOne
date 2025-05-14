@@ -240,6 +240,8 @@ public class FileSystemStorage {
      * last modified.
      * @return A long value representing the time the file was last modified, 
      * measured in milliseconds
+     * @deprecated this API requires additional privacy permissions on iOS
+     *     and might cause problems with iOS submissions
      */ 
     public long getLastModified(String file) {
         return Util.getImplementation().getFileLastModified(file);

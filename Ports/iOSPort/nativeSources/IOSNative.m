@@ -55,8 +55,9 @@
 #import <MessageUI/MFMessageComposeViewController.h>
 #import "UIWebViewEventDelegate.h"
 #include <sqlite3.h>
-#include "OpenUDID.h"
+#ifdef CN1_USE_STOREKIT
 #import "StoreKit/StoreKit.h"
+#endif
 #include "com_codename1_contacts_Contact.h"
 #include "com_codename1_contacts_Address.h"
 #include "java_util_Hashtable.h"
@@ -75,6 +76,7 @@
 #include "java_util_ArrayList.h"
 #include "com_codename1_ui_Font.h"
 #include "java_util_Vector.h"
+#include "permission_apis.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
 #ifdef ENABLE_WKWEBVIEW
@@ -103,6 +105,13 @@ extern int popoverSupported();
 #define INCLUDE_CN1_PUSH2
 #ifdef CN1_INCLUDE_NOTIFICATIONS2
 #import <UserNotifications/UserNotifications.h>
+#endif
+#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#ifdef ENABLE_GALLERY_MULTISELECT
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+#import <PhotosUI/PhotosUI.h>
+#endif
+#endif
 #endif
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
@@ -133,6 +142,11 @@ extern void deinitVMImpl();
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl();
 
 extern int Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl();
+
+extern JAVA_INT getSafeTop();
+extern JAVA_INT getSafeLeft();
+extern JAVA_INT getSafeBottom();
+extern JAVA_INT getSafeRight();
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 (void* peer, int x, int y, int width, int height);
@@ -267,15 +281,57 @@ extern int isIOS7();
 extern int isIOS8();
 extern int isIOS8_2();
 
+NSString* cn1_getDocumentsDir() {
+    NSArray *writablePaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    return [writablePaths lastObject];  
+}
+NSString* cn1_getContainerRoot() {
+    NSString* appRoot = cn1_getDocumentsDir();
+    if ([appRoot hasSuffix:@"/"]) {
+        appRoot = [appRoot substringWithRange:NSMakeRange(0, [appRoot length]-1)];
+    }
+    return [appRoot substringWithRange:NSMakeRange(0, [appRoot rangeOfString:@"/" options:NSBackwardsSearch].location +1)];
+
+}
+NSString* cn1_fixAppRoot(NSString* path) {
+    NSString* base = @"/var/mobile/Containers/Data/Application/";
+    NSString* containerRoot = cn1_getContainerRoot();
+    if ([path hasPrefix:base] && ![path hasPrefix:containerRoot]) {
+        NSUInteger start = [base length];
+        NSUInteger end = [path length];
+
+        NSString* theRest = [path substringWithRange:NSMakeRange(start, end - start)];
+        NSUInteger slashPos = [theRest rangeOfString:@"/"].location;
+        if (slashPos <= 0) {
+            return path;
+        }
+        start = slashPos+1;
+        end = [theRest length];
+        return [containerRoot stringByAppendingString: [theRest substringWithRange:NSMakeRange(start, end - start)]];
+    }
+    return path;
+}
 NSString* fixFilePath(NSString* ns) {
+    //NSLog(@"Fixing %@", ns);
     if([ns hasPrefix:@"file:"]) {
         ns = [ns substringFromIndex:5];
         while([ns hasPrefix:@"//"]) {
             ns = [ns substringFromIndex:1];
         }
     }
-    return ns;
+    
+    NSString* out = cn1_fixAppRoot(ns);
+    //NSLog(@"Fixed to %@", out);
+    return out;
 }
+
+
+
+
+
+
+
+
 
 bool galleryPopover = NO;
 
@@ -369,6 +425,21 @@ void retainCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
 
 void releaseCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
     com_codename1_impl_ios_IOSImplementation_release___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);
+}
+
+JAVA_OBJECT getClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString* key){
+    return com_codename1_ui_Component_getClientProperty___java_lang_String_R_java_lang_Object(
+        CN1_THREAD_STATE_PASS_ARG o,
+        fromNSString(CN1_THREAD_STATE_PASS_ARG key)
+    );
+}
+
+BOOL getBooleanClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString* key){
+    JAVA_OBJECT val = getClientProperty(CN1_THREAD_STATE_PASS_ARG o, key);
+    if(val == JAVA_NULL){
+        return NO;
+    }
+    return val == get_static_java_lang_Boolean_TRUE(threadStateData);
 }
 
 #ifndef NEW_CODENAME_ONE_VM
@@ -861,7 +932,17 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int
 }
 
 
+//native void nativeDrawShadowMutable(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity);
+extern void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
+    JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity);
 
+void com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable___long_int_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
+    JAVA_LONG image, JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_PASS_ARG image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    POOL_END();
+
+}
 
 extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
 
@@ -1410,6 +1491,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(CN1_THR
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+#ifdef checkModificationDatePermission
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     if([ns hasPrefix:@"file:"]) {
@@ -1430,6 +1512,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_Strin
 #endif
     POOL_END();
     return result;
+#else
+    return 0;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path, JAVA_OBJECT n1) {
@@ -1842,7 +1927,18 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
             preview.delegate = [CodenameOne_GLViewController instance];
             [preview presentPreviewAnimated:YES];
         } else {
-            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
+            NSURL* url = [NSURL URLWithString:ns];
+            if (@available(iOS 10.0, *)) {
+                [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success) {
+                    if (success) {
+                        NSLog(@"URL opened : %@", url);
+                    } else {
+                        NSLog(@"Error opening URL: %@", url);
+                    }
+                }];
+            } else {
+                [[UIApplication sharedApplication] openURL:url];
+            }
         }
 #ifdef CN1_USE_ARC
         [ns release];
@@ -2394,6 +2490,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
 #ifdef supportsWKWebKit
     if (@available(iOS 8, *)) {
         dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
             if (@available(iOS 10, *)) {
@@ -2408,15 +2505,24 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
             };";
             WKUserScript *bootstrapScript = [[WKUserScript alloc] initWithSource:bootstrapSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
             [userContentController addUserScript:bootstrapScript];
+            [bootstrapScript release];
             [userContentController addScriptMessageHandler:del name:@"cn1"];
+            [del release];
             config.userContentController = userContentController;
+            [userContentController release];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
+            [config release];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.backgroundColor = [UIColor clearColor];
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.opaque = NO;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
+
+            if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {
+                com_codename1_impl_ios_IOSNative_createWKBrowserComponent.inspectable = YES;
+            }
             
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
             com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask=(UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth);
+            POOL_END();
             
         });
         id r = com_codename1_impl_ios_IOSNative_createWKBrowserComponent;
@@ -2459,6 +2565,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_jav
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT ua) {
+#ifdef ENABLE_SET_BROWSER_USER_AGENT
     NSString *_ua = toNSString(CN1_THREAD_GET_STATE_PASS_ARG ua);
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2467,6 +2574,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
         [[NSUserDefaults standardUserDefaults] registerDefaults:dictionary];
         POOL_END();
     });
+#endif
 }
 
 
@@ -2820,7 +2928,7 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULT
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
-            WKWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+            WKWebView* w = (BRIDGE_CAST WKWebView*)((void *)peer);
             [w reload];
 #endif
         } else {
@@ -4165,6 +4273,75 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD
 
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
+
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+void openGalleryMultipleWithPhotoKit(JAVA_INT type) {
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+    if (@available(iOS 14, *)) {
+        openGalleryMultipleWithPhotoKit(type);
+        return;
+    }
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+
+        if (@available(iOS 14, *)) {
+            PHPickerFilter *filter;
+            if (type==0 || type == 3){
+                filter = [PHPickerFilter imagesFilter];
+            } else if (type==1 || type == 4){
+                filter = [PHPickerFilter videosFilter];
+            } else {
+                filter = [PHPickerFilter anyFilterMatchingSubfilters:[NSArray arrayWithObjects:[PHPickerFilter imagesFilter], [PHPickerFilter videosFilter], nil]];
+            }
+
+            PHPickerConfiguration *config = [[PHPickerConfiguration alloc] initWithPhotoLibrary:[PHPhotoLibrary sharedPhotoLibrary]];
+            config.filter = filter;
+            config.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
+            if (@available(iOS 15, *)) {
+                config.selection = PHPickerConfigurationSelectionOrdered;
+            } else {
+                // Fallback on earlier versions
+            }
+            config.selectionLimit = 0;
+
+
+            PHPickerViewController *pickerController =[[PHPickerViewController alloc] initWithConfiguration:config];
+
+            pickerController.delegate = [CodenameOne_GLViewController instance];
+
+            if(popoverSupported()) {
+                if (popoverController != nil) {
+    #ifndef CN1_USE_ARC
+                    [popoverController release];
+    #endif
+                    popoverController = nil;
+                }
+                galleryPopover = YES;
+                popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
+                                     initWithContentViewController:pickerController];
+
+                popoverController.delegate = [CodenameOne_GLViewController instance];
+                [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
+                                                   inView:[[CodenameOne_GLViewController instance] view]
+                                 permittedArrowDirections:UIPopoverArrowDirectionAny
+                                                 animated:YES];
+            } else {
+                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+            }
+
+
+        } else {
+            // Fallback on earlier versions
+        }
+
+
+
+        POOL_END();
+    });
+}
+#endif
+
 void openGalleryMultiple(JAVA_INT type) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -4174,8 +4351,6 @@ void openGalleryMultiple(JAVA_INT type) {
         pickerController.showsNumberOfSelectedAssets = YES;
         pickerController.delegate = [CodenameOne_GLViewController instance];
         if (type==0 || type == 3){
-            
-        } else if (type==0 || type == 3){
             pickerController.mediaType = QBImagePickerMediaTypeImage;
         } else if (type==1 || type == 4){
             pickerController.mediaType = QBImagePickerMediaTypeVideo;
@@ -4288,7 +4463,7 @@ int popoverSupported()
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return fromNSString(CN1_THREAD_STATE_PASS_ARG [OpenUDID value]);
+    return JAVA_NULL;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -5140,7 +5315,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkNFCReaderUsage___R_boolean(CN
 
 void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT phone) {
     POOL_BEGIN();
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG phone)]];
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG phone)] options:@{} completionHandler:nil];
     POOL_END();
 }
 
@@ -5194,7 +5369,7 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
                     if (error != nil) {
                         msg = [error localizedDescription];
                     }
-                    JAVA_OBJECT jmsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]);
+                    JAVA_OBJECT jmsg = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG msg);
                     com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jmsg);
                 }   
             }];
@@ -6066,6 +6241,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THR
 JAVA_OBJECT productsArrayPending = nil;
 
 void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_com_codename1_payment_Product_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT skus, JAVA_OBJECT products) {
+#ifdef CN1_USE_STOREKIT
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* strArray = skus;
@@ -6091,23 +6267,89 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     request.delegate = [CodenameOne_GLViewController instance];
     [request start];
     POOL_END();
+#endif
 }
-
+#ifdef CN1_USE_STOREKIT
 SKPayment *paymentInstance = nil;
+NSObject *paymentDiscountInstance = nil;
+#endif
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
+#ifdef CN1_USE_STOREKIT
     NSString *nsSku = toNSString(CN1_THREAD_STATE_PASS_ARG sku);
+    paymentDiscountInstance = nil;
+    if ([nsSku hasPrefix:@"{"] && [nsSku hasSuffix:@"}"]) {
+        NSError *error = nil;
+        NSDictionary *dict = [NSJSONSerialization
+                              JSONObjectWithData:[nsSku dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:NO]
+                              options:0 error:&error
+        ];
+        if (error != nil) {
+            JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG  [error localizedDescription]));
+            throwException(threadStateData, ex);
+            return;
+        }
+        nsSku = [dict valueForKey:@"sku"];
+        NSDictionary *promoDict = [dict valueForKey: @"promotionalOffer"];
+        if (@available(iOS 12.2, *)) {
+            for (NSString* stringKey in @[@"offerIdentifier", @"keyIdentifier", @"signature", @"nonce"]) {
+                if (!promoDict[stringKey] || ! [promoDict[stringKey] isKindOfClass:[NSString class]] ) {
+                    JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                    java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG  [NSString stringWithFormat: @"Promo offer requires string %@", stringKey]));
+                    throwException(threadStateData, ex);
+                    return;
+                }
+            }
+            
+            if (!promoDict[@"timestamp"] || ![promoDict[@"timestamp"] isKindOfClass:[NSNumber class]]) {
+                JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG  [NSString stringWithFormat: @"Promo offer requires timestamp"]));
+                throwException(threadStateData, ex);
+                return;
+            }
+            NSString* offerIdentifier = promoDict[@"offerIdentifier"];
+            NSString* keyIdentifier = promoDict[@"keyIdentifier"];
+            NSUUID* nonce = [[NSUUID UUID] initWithUUIDString:promoDict[@"nonce"]];
+            NSString* signature = promoDict[@"signature"];
+            NSNumber* timestamp = promoDict[@"timestamp"];
+            paymentDiscountInstance = [[SKPaymentDiscount alloc] initWithIdentifier:offerIdentifier keyIdentifier:keyIdentifier nonce:nonce signature:signature timestamp:timestamp];
+        } else {
+            // Silently do not add discount if iOS version is too old.
+            NSLog(@"iOS version 12.2 or later is required for promotional discounts");
+            
+        }
+        
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
-        paymentInstance = [SKPayment paymentWithProductIdentifier:nsSku];
+        if (paymentDiscountInstance != nil) {
+            paymentInstance = [SKMutablePayment paymentWithProductIdentifier:nsSku];
+            if (@available(iOS 12.2, *)) {
+                ((SKMutablePayment*)paymentInstance).paymentDiscount = (SKPaymentDiscount*) paymentDiscountInstance;
+            } else {
+                // Fallback on earlier versions
+                NSLog(@"Log error: Attempt to set payment discount instance on unsupported version of iOS.  This branch should never be reached");
+            }
+        } else {
+            paymentInstance = [SKPayment paymentWithProductIdentifier:nsSku];
+        }
+        
         [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_restorePurchases__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef CN1_USE_STOREKIT
     return (JAVA_BOOLEAN)[SKPaymentQueue canMakePayments];
+#else
+    return JAVA_FALSE;
+#endif
 }
 
 NSLocale *currentLocale = NULL;
@@ -6121,7 +6363,7 @@ NSLocale* cn1DeviceLocale() {
     return deviceLocale;
 }
 
-void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_STATE_MULTI_ARG instanceObject, JAVA_OBJECT localeStr) {
+void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT localeStr) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
     if (currentLocale != NULL) {
@@ -6738,6 +6980,7 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     NSCalendar* cal = [NSCalendar currentCalendar];
     NSDate *date = [cal dateFromComponents:comps];
     JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
+    [comps release];
     POOL_END();
     return result;
 }
@@ -7255,7 +7498,17 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
                 dataToShare = [NSArray arrayWithObjects:i, nil];
             }
         } else {
-            dataToShare = [NSArray arrayWithObjects:someText, nil];
+            BOOL shareFile = NO;
+            if (someText != nil && [someText hasPrefix:@"file:"]) {
+                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+                    shareFile = YES;
+                    dataToShare = [NSArray arrayWithObjects:fileURL, nil];
+                }
+            }
+            if (!shareFile) {
+                dataToShare = [NSArray arrayWithObjects:someText, nil];
+            }
         }
         
         UIActivityViewController* activityViewController = [[UIActivityViewController alloc] initWithActivityItems:dataToShare
@@ -7368,7 +7621,25 @@ void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(
             NSString* nsText = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
             NSString* currText = ((UITextView*)editingComponent).text;
             if (![nsText isEqualToString:currText]) {
-                ((UITextView*)editingComponent).text = nsText;
+                if ([editingComponent respondsToSelector:@selector(selectedRange)] &&
+                    [editingComponent respondsToSelector:@selector(setSelectedRange:)]) {
+                    UITextView *textView = (UITextView *)editingComponent;
+
+                    // Save current cursor position
+                    NSRange selectedRange = textView.selectedRange;
+
+                    // Update the text
+                    textView.text = nsText;
+
+                    // Restore the cursor position
+                    NSUInteger newPosition = MIN(selectedRange.location, textView.text.length);
+                    textView.selectedRange = NSMakeRange(newPosition, 0);
+                } else if ([editingComponent respondsToSelector:@selector(setText:)]) {
+                    // Fallback for UITextField, UILabel, or other classes supporting setText
+                    [(id)editingComponent setText:nsText];
+                } else {
+                    NSLog(@"editingComponent does not support text assignment");
+                }
             }
         }
         POOL_END();
@@ -8148,39 +8419,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_nativeIsAlphaMaskSupportedGlobal__
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetLeft___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        return (JAVA_INT)(window.safeAreaInsets.left * scaleValue);
-    } else {
-        return 0;
-    }
+    return getSafeLeft();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetTop___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        return (JAVA_INT)(window.safeAreaInsets.top * scaleValue);
-    } else {
-        return 0;
-    }
+    return getSafeTop();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetRight___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        return (JAVA_INT)(window.safeAreaInsets.right * scaleValue);
-    } else {
-        return 0;
-    }
+    return getSafeRight();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplaySafeInsetBottom___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    if (@available(iOS 11.0, *)) {
-        UIWindow *window = UIApplication.sharedApplication.keyWindow;
-        return (JAVA_INT)(window.safeAreaInsets.bottom * scaleValue);
-    } else {
-        return 0;
-    }
+    return getSafeBottom();
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -8996,8 +9247,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     }
     
     if (alertBody != NULL) {
-                    
-        tmpStr = [body stringByAppendingFormat:@"\n%@", toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
+        tmpStr = [body stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];     
 #ifndef CN1_USE_ARC
         [body release];
 #endif
@@ -9115,14 +9365,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
 #ifdef __IPHONE_8_0
                 if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
                     [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
-                    //[[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings
-                    //                                             settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|
-                    //                                           UIUserNotificationTypeSound categories:nil]];
                 }
 #endif
-                
                 [[UIApplication sharedApplication] scheduleLocalNotification: notification];
-                
             });
     }
 #endif
@@ -9485,16 +9730,16 @@ JAVA_BOOLEAN isTickerRunning, JAVA_INT tickerShiftText, JAVA_INT textDecoration,
             return drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
     }
 }
-                  
-                  
-                  
+
 JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lang_Object_int_int_int_int_com_codename1_ui_plaf_Style_java_lang_String_java_lang_Object_java_lang_Object_int_int_boolean_boolean_int_int_boolean_int_boolean_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_INT cmpX, JAVA_INT cmpY, JAVA_INT cmpHeight, JAVA_INT cmpWidth, JAVA_OBJECT style, JAVA_OBJECT text, JAVA_OBJECT icon, JAVA_OBJECT stateIcon, JAVA_INT preserveSpaceForState, JAVA_INT gap, JAVA_BOOLEAN rtl, JAVA_BOOLEAN isOppositeSide, JAVA_INT textPosition, JAVA_INT stringWidth, JAVA_BOOLEAN isTickerRunning, JAVA_INT tickerShiftText, JAVA_BOOLEAN endsWith3Points, JAVA_INT valign) {
     JAVA_OBJECT font = com_codename1_ui_plaf_Style_getFont___R_com_codename1_ui_Font(threadStateData, style);
     JAVA_OBJECT nativeFont = com_codename1_ui_Font_getNativeFont___R_java_lang_Object(threadStateData, font);
     com_codename1_impl_ios_IOSImplementation_setNativeFont___java_lang_Object_java_lang_Object(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont);
     JAVA_INT fgColor = com_codename1_ui_plaf_Style_getFgColor___R_int(threadStateData, style);
+    JAVA_INT fgAlpha = com_codename1_ui_plaf_Style_getFgAlpha___R_int(threadStateData, style);
     com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, fgColor);
-    
+    JAVA_INT alpha = com_codename1_impl_ios_IOSImplementation_concatenateAlpha___java_lang_Object_int_R_int(threadStateData, __cn1ThisObject, nativeGraphics, fgAlpha);
+
     JAVA_INT iconWidth = 0;
     JAVA_INT iconHeight = 0;
     if(icon != JAVA_NULL) {
@@ -9707,6 +9952,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 break;
         }
     }
+    com_codename1_impl_ios_IOSImplementation_setAlpha___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, alpha);
 }
    
 JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)
@@ -9731,4 +9977,51 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask___R_long(CN1_THRE
 JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bgTask)
 {
     [[UIApplication sharedApplication] endBackgroundTask:(UIBackgroundTaskIdentifier)bgTask];
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT javaString)
+{
+    POOL_BEGIN();
+    NSString *string = toNSString(CN1_THREAD_STATE_PASS_ARG javaString);
+    // Define Unicode ranges for Hebrew and Arabic
+    NSRange hebrewRange = NSMakeRange(0x0590, 0x05FF - 0x0590 + 1);
+    NSRange arabicRange = NSMakeRange(0x0600, 0x06FF - 0x0600 + 1);
+    // Range for common neutral characters (basic Latin, common punctuation, and digits)
+    NSRange neutralRange = NSMakeRange(0x0020, 0x007E - 0x0020 + 1);
+    // Emoji ranges (covering most common emoji blocks)
+    NSArray<NSValue *> *emojiRanges = @[
+        [NSValue valueWithRange:NSMakeRange(0x1F600, 0x1F64F - 0x1F600 + 1)], // Emoticons
+        [NSValue valueWithRange:NSMakeRange(0x1F300, 0x1F5FF - 0x1F300 + 1)], // Miscellaneous Symbols and Pictographs
+        [NSValue valueWithRange:NSMakeRange(0x1F900, 0x1F9FF - 0x1F900 + 1)], // Supplemental Symbols and Pictographs
+        [NSValue valueWithRange:NSMakeRange(0x2600, 0x26FF - 0x2600 + 1)]   // Miscellaneous Symbols
+    ];
+
+    NSUInteger length = [string length];
+    for (NSUInteger i = 0; i < length; i++) {
+        unichar c = [string characterAtIndex:i];
+        // Continue if the character is within the neutral or emoji ranges
+        BOOL isNeutralOrEmoji = (c >= neutralRange.location && c <= NSMaxRange(neutralRange));
+        for (NSValue *value in emojiRanges) {
+            NSRange range = [value rangeValue];
+            if (c >= range.location && c <= NSMaxRange(range)) {
+                isNeutralOrEmoji = YES;
+                break;
+            }
+        }
+        if (isNeutralOrEmoji) {
+            continue;
+        }
+        // Return true if the character is within the Hebrew or Arabic Unicode ranges
+        if ((c >= hebrewRange.location && c <= NSMaxRange(hebrewRange)) ||
+            (c >= arabicRange.location && c <= NSMaxRange(arabicRange))) {
+            POOL_END();
+            return YES;
+        }
+        // If the first significant character is not Hebrew or Arabic, return false
+        POOL_END();
+        return NO;
+    }
+
+    POOL_END();
+    return NO;
 }

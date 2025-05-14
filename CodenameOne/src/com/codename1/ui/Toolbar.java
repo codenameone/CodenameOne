@@ -33,6 +33,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -344,6 +345,15 @@ public class Toolbar extends Container {
         } else {
             ((SideMenuBar) getMenuBar()).openMenu(null);
         }
+    }
+
+    /**
+     * Returns true if the left or right side menu is open which is useful for walk through
+     * tours etc.
+     */
+    public boolean isSideMenuShowing() {
+        return (sidemenuDialog != null && sidemenuDialog.isShowing()) ||
+            (rightSidemenuDialog != null && rightSidemenuDialog.isShowing());
     }
 
     /**
@@ -2191,7 +2201,7 @@ public class Toolbar extends Container {
             marginLeft = 0;
         }
         int tint = parent.getTintColor();
-        parent.setTintColor(0x00FFFFFF);
+        parent.setTintColor(manager.getThemeConstant("overflowTintColorInt", 0x00FFFFFF));
         parent.tint = false;
         boolean showBelowTitle = manager.isThemeConstant("showMenuBelowTitleBool", true);
         int topPadding = 0;
@@ -2237,6 +2247,7 @@ public class Toolbar extends Container {
     protected void initTitleBarStatus() {
         Form f = getComponentForm();
         if (f != null && !f.shouldPaintStatusBar()) {
+            setSafeArea(true);
             return;
         }
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
@@ -2248,10 +2259,41 @@ public class Toolbar extends Container {
                 } else {
                     bar.setUIID("StatusBar");
                 }
+                reallocateVerticalPaddingAndMarginsToTop(bar);
+                bar.setSafeArea(true);
                 addComponent(BorderLayout.NORTH, bar);
             }
+        } else {
+            setSafeArea(true);
         }
     }
+
+    /**
+     * Reallocates vertical padding and margins to be all on top, so that bottom padding/margin
+     * is zero, but the total padding/margin is the same.
+     *
+     * This is helpful for the status bar so that, when the padding is adjusted by the safeArea
+     * we don't end up with extra padding at the bottom of the component, which would increase
+     * the height of the status bar.
+     * @param cmp
+     */
+    private void reallocateVerticalPaddingAndMarginsToTop(Component cmp) {
+        Style allStyles = cmp.getAllStyles();
+        Style style = cmp.getStyle();
+        int topPadding = style.getPaddingTop();
+        int topMargin = style.getMarginTop();
+        int bottomPadding = style.getPaddingBottom();
+        int bottomMargin = style.getMarginBottom();
+        allStyles.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+        allStyles.setMarginUnitTop(Style.UNIT_TYPE_PIXELS);
+        allStyles.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+        allStyles.setMarginUnitBottom(Style.UNIT_TYPE_PIXELS);
+        allStyles.setPaddingTop(topPadding + bottomPadding);
+        allStyles.setMarginTop(topMargin + bottomMargin);
+        allStyles.setPaddingBottom(0);
+        allStyles.setMarginBottom(0);
+    }
+
 
     private void checkIfInitialized() {
         if (!initialized) {
@@ -2565,6 +2607,9 @@ public class Toolbar extends Container {
         @Override
         protected void initMenuBar(Form parent) {
             Component ta = parent.getTitleArea();
+            if (ta instanceof Container) {
+                ((Container)ta).setSafeArea(true);
+            }
             parent.removeComponentFromForm(ta);
             super.initMenuBar(parent);
             if (layered) {
@@ -2608,7 +2653,7 @@ public class Toolbar extends Container {
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 UIManager uim = UIManager.getInstance();
                 Image i = (Image) uim.getThemeImageConstant("menuImage");
-                if (i == null) {
+                if(uim.getThemeConstant("overflowImageSize", null) != null) {
                     float size = 4.5f;
                     try {
                         size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
@@ -2623,6 +2668,9 @@ public class Toolbar extends Container {
                         sideMenu.showMenu();
                     }
                 });
+                if(i == null) {
+                    menuButton.setMaterialIcon(FontImage.MATERIAL_MORE_VERT);
+                }
                 menuButton.putClientProperty("overflow", Boolean.TRUE);
                 menuButton.setUIID("TitleCommand");
                 menuButton.setName("OverflowButton");

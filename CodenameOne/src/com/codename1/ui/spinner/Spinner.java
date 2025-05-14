@@ -137,7 +137,7 @@ class Spinner extends List {
      * @deprecated use NumericSpinner
      */
     public static Spinner create(int min, int max, int currentValue, int step) {
-        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new SpinnerRenderer<Object>());
+        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step, 0), new SpinnerRenderer<Object>());
         s.setRenderingPrototype(new Integer(max * 10));
         return s;
     }

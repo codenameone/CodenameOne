@@ -99,7 +99,20 @@ public interface IconHolder {
      * @since 7.0
      */
     public Component getIconStyleComponent();
-    
-   
-    
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
+     * @param c one of the constants from {@link com.codename1.ui.FontImage}
+     * @param size the size of the icon in millimeters
+     * @since 8.0
+     */
+    void setMaterialIcon(char c, float size);
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
+     * @param c one of the constants from the font
+     * @param size the size of the icon in millimeters
+     * @since 8.0
+     */
+    void setFontIcon(Font font, char c, float size);
 }

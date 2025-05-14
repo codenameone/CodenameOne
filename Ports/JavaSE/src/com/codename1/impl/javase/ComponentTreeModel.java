@@ -28,6 +28,8 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.List;
 import com.codename1.ui.list.ContainerList;
+import java.util.ArrayList;
+import java.util.LinkedList;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreePath;
 
@@ -125,6 +127,18 @@ class ComponentTreeModel implements javax.swing.tree.TreeModel {
     }
 
     public void removeTreeModelListener(TreeModelListener l) {
+    }
+    
+    public TreePath createPathToComponent(Component cmp) {
+        Component targetCmp = cmp;
+        LinkedList<Component> path = new LinkedList<Component>();
+        while (cmp != null) {
+            path.addFirst(cmp);
+            cmp = cmp.getParent();
+        }
+        return new TreePath(path.toArray(new Object[path.size()]));
+        
+        
     }
 
 }

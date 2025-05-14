@@ -15,10 +15,7 @@ import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.apache.maven.artifact.Artifact;
@@ -27,11 +24,13 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.shared.invoker.*;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.Path;
 
 /**
- *
+ * This mojo runs tests in the Codename One Test Runner.  This goal should be used in place of
+ * the surefire plugin.
  * @author shannah
  */
 @Mojo(name = "test", defaultPhase = LifecyclePhase.TEST, requiresDependencyResolution = ResolutionScope.TEST)
@@ -41,8 +40,29 @@ public class RunTestsMojo extends AbstractCN1Mojo {
     private File getMetaDataFile() {
         return new File(project.getBuild().getTestOutputDirectory()+ File.separator + "tests.dat");
     }
-    
+
+    private boolean isJavaSEProject() {
+        return project.getArtifactId().endsWith("-javase");
+    }
+
+    private boolean isCommonProject() {
+        return project.getArtifactId().endsWith("-common");
+    }
+
+    private File getCommonProjectBaseDir() {
+        if (isJavaSEProject()) {
+            return new File(project.getParent().getBasedir(), "common");
+        }
+        if (isCommonProject()) {
+            return project.getBasedir();
+        }
+        throw new IllegalStateException("Cannot get common project in this context");
+    }
+
     private boolean prepareTests() throws MojoExecutionException {
+
+
+        // At this point, we are running inside the common project.
         try {
             List<File> paths = new ArrayList<File>();
             File cn1ProjectDir = getCN1ProjectDir();
@@ -51,7 +71,12 @@ public class RunTestsMojo extends AbstractCN1Mojo {
             paths.add(new File(project.getBuild().getOutputDirectory()));
             
             for (Artifact artifact : project.getArtifacts()) {
-                paths.add(getJar(artifact));
+                File jar = getJar(artifact);
+                if (jar != null) {
+                    paths.add(jar);
+                } else {
+                    getLog().warn("Failed to resolve artifact "+artifact);
+                }
             }
             Class[] testCases = findTestCases(paths.toArray(new File[paths.size()]));
             if (testCases.length == 0) {
@@ -86,7 +111,12 @@ public class RunTestsMojo extends AbstractCN1Mojo {
     private Class[] findTestCases(File... classesDirectories) throws MalformedURLException, IOException {
         URL[] urls = new URL[classesDirectories.length];
         for(int iter = 0 ; iter < urls.length ; iter++) {
-            urls[iter] = classesDirectories[iter].toURI().toURL();
+            try {
+                urls[iter] = classesDirectories[iter].toURI().toURL();
+            } catch (RuntimeException ex) {
+                getLog().error("Failed to add class directory "+iter+" in directory list: "+Arrays.toString(urls));
+                throw ex;
+            }
         }
         URLClassLoader cl = new URLClassLoader(urls);
         
@@ -95,37 +125,7 @@ public class RunTestsMojo extends AbstractCN1Mojo {
         
         List<Class> classList = new ArrayList<Class>();
         findTestCasesInDir(userClassesDirectory.getAbsolutePath(), userClassesDirectory, cl, classList);
-        
-        if (project.getArtifactId().endsWith("-javase")) {
-            project.getArtifacts().stream().filter(artifact->{
-                String artifactId = project.getArtifactId();
-                artifactId = artifactId.substring(0, artifactId.lastIndexOf("-javase")) + "-common";
-                return project.getGroupId().equals(artifact.getGroupId()) && artifactId.equals(artifact.getArtifactId()) && "tests".equals(artifact.getClassifier());
-            }).findFirst().ifPresent(artifact -> {
-                try {
-                    FileInputStream zipFile = new FileInputStream(getJar(artifact));
-                        ZipInputStream zip = new ZipInputStream(zipFile);
-                        ZipEntry entry;
-                        while ((entry = zip.getNextEntry()) != null) {
-                            if (entry.isDirectory()) {
-                                continue;
-                            }
-                            String baseDir = "";
-                            String entryName = entry.getName();
-                            if (entryName.endsWith(".class") && entryName.indexOf('$') < 0) {
-                                String className = entryName.substring(0, entryName.length() - 6);
-                                className = className.replace('/', '.');
-                                isTestCase(cl, className, classList);
-                            } 
-                        }
-                        zip.close();
-                } catch (IOException ex) {
-                    getLog().error("Failed to scan jar of artifact "+artifact+" for test cases");
-                    getLog().error(ex);
-                }
-            });
-        }
-        
+
         Class[] arr = new Class[classList.size()];
         classList.toArray(arr);
         return arr;
@@ -218,14 +218,28 @@ public class RunTestsMojo extends AbstractCN1Mojo {
                 continue;
             }
             //if (artifact.getScope().equals("compile") || artifact.getScope().equals("system") || artifact.getScope().equals("test")) {
-                cp.add(new Path(antProject, getJar(artifact).getAbsolutePath()));
-            //}
+            File jar = getJar(artifact);
+            if (jar != null) {
+                cp.add(new Path(antProject, jar.getAbsolutePath()));
+            } else {
+                getLog().warn("Failed to resolve artifact: "+artifact);
+            }
         }
         cp.add(new Path(antProject, getProjectInternalTmpJar().getAbsolutePath()));
+        if (!isCefSetup()) {
+            setupCef();
+        }
         java.createJvmarg().setValue("-Dcef.dir="+System.getProperty("cef.dir", System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef"));
         java.setClassname("com.codename1.impl.javase.TestRunner");
         java.createArg().setValue(properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
+        //java.createArg().setValue("-quietMode");
+        java.createArg().setValue("-junitXML");
+        File reportsDir = new File(project.getBuild().getDirectory(), "cn1-reports");
+        //noinspection ResultOfMethodCallIgnored
+        reportsDir.mkdirs();
+        java.setDir(reportsDir);
         java.setFork(true);
+        getLog().debug("Executing Test Runner: " + java.getCommandLine());
         int result = java.executeJava();
         if (result != 0) {
             throw new MojoExecutionException("Tests failed");

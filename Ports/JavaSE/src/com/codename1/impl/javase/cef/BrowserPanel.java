@@ -97,9 +97,6 @@ public abstract class BrowserPanel extends CN1JPanel {
     public BrowserPanel(String startingURL, CEFPeerComponentBuffer buffer, BrowserNavigationCallback navigationCallback, boolean osrEnabled, boolean transparentPaintingEnabled,
             boolean createImmediately, String[] args) {
 
-        setZoom(1);
-        //this.browserComponent = browserComponent;
-        //this.buffer_ = buffer;
         setLayout(new CardLayout());
         
         addFocusListener(new FocusListener() {

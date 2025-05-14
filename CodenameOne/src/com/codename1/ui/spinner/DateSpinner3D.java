@@ -52,9 +52,9 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private int startYear = 1970;
     private int endYear = 2100;
     private int startMonth = 1;
-    private int endMonth = 13;
+    private int endMonth = 12;
     private int startDay = 1;
-    private int endDay = 32;
+    private int endDay = 31;
     private int currentYear;
     private int currentDay;
     private int currentMonth;
@@ -100,7 +100,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     
     void initSpinner() {
         if(month == null) {
-            day = Spinner3D.create(1, 32, currentDay, 1);
+            day = Spinner3D.create(1, 31, currentDay, 1);
             day.setRowFormatter(new SpinnerNode.RowFormatter() {
                 
                 @Override
@@ -112,7 +112,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 }
             });
             
-            month = Spinner3D.create(1, 13, currentMonth, 1);
+            month = Spinner3D.create(1, 12, currentMonth, 1);
             month.setRowFormatter(new SpinnerNode.RowFormatter() {
                 @Override
                 public String format(String input) {
@@ -257,19 +257,19 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         
         if (start != null && end != null && getYear(start) == getYear(end)) {
             startMonth = getMonth(start)+1;
-            endMonth = getMonth(end) + 2;
+            endMonth = getMonth(end) + 1;
         } else {
             startMonth = 1;
-            endMonth = 13;
+            endMonth = 12;
         }
         rebuildMonth();
         
         if (start != null && end != null && getYear(start) == getYear(end) && getMonth(start) == getMonth(end)) {
             startDay = getDate(start);
-            endDay = getDate(end)+1;
+            endDay = getDate(end);
         } else {
             startDay = 1;
-            endDay = 32;
+            endDay = 31;
         }
         rebuildDay();
         
@@ -358,6 +358,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      */
     public void setStartYear(int startYear) {
         this.startYear = startYear;
+        this.currentYear = Math.max(this.startYear, this.currentYear);
         explicitStartYear = true;
         if(year != null) {
             year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));
@@ -376,6 +377,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      */
     public void setEndYear(int endYear) {
         this.endYear = endYear;
+        this.currentYear = Math.min(this.endYear, this.currentYear);
         explicitEndYear = true;
         if(year != null) {
             year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));
@@ -401,13 +403,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         if (!explicitStartYear && startYear > currentYear) {
             startYear = currentYear;
         }
-        if (!explicitEndYear && endYear -1 < currentYear) {
-            endYear = currentYear+1;
+        if (!explicitEndYear && endYear < currentYear) {
+            endYear = currentYear;
         }
         if (currentYear < startYear) {
             throw new IllegalArgumentException("Current year "+currentYear+" before start year "+startYear);
         }
-        if (currentYear > endYear - 1) {
+        if (currentYear > endYear) {
             throw new IllegalArgumentException("Current year "+currentYear+" after end year "+endYear);
         }
         if(year != null) {
@@ -431,13 +433,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         if (!explicitStartDay && startDay > currentDay) {
             startDay = currentDay;
         }
-        if (!explicitEndDay && endDay -1 < currentDay) {
-            endDay = currentDay + 1;
+        if (!explicitEndDay && endDay < currentDay) {
+            endDay = currentDay;
         }
         if (startDay > currentDay) {
             throw new IllegalArgumentException("Start day "+startDay+" after current day "+currentDay);
         }
-        if (endDay -1 < currentDay) {
+        if (endDay < currentDay) {
             throw new IllegalArgumentException("End day "+endDay+" before current day "+currentDay);
         }
         if(day != null) {
@@ -464,13 +466,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         if (!explicitStartMonth && startMonth > currentMonth) {
             startMonth = currentMonth;
         }
-        if (!explicitEndMonth && endMonth -1 < currentMonth) {
-            endMonth = currentMonth+1;
+        if (!explicitEndMonth && endMonth < currentMonth) {
+            endMonth = currentMonth;
         }
         if (startMonth > currentMonth) {
             throw new IllegalArgumentException("Start month "+startMonth+" after current month "+currentMonth);
         }
-        if (endMonth -1 < currentMonth) {
+        if (endMonth < currentMonth) {
             throw new IllegalArgumentException("End month "+endMonth+" before current month "+currentMonth);
         }
         if(month != null) {

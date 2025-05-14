@@ -110,6 +110,7 @@ public class JavaCEFSEPort extends JavaSEPort {
     }
     
     public PeerComponent createCEFBrowserComponent(final Object parent) {
+        Log.p("Attempting to create browser component", Log.DEBUG);
         final PeerComponent[] out = new PeerComponent[1];
         final Throwable[] error = new Throwable[1];
         if (!EventQueue.isDispatchThread()) {
@@ -124,9 +125,11 @@ public class JavaCEFSEPort extends JavaSEPort {
                         }
                 });
             } catch (Throwable ex) {
+                Log.e(ex);
                 throw new RuntimeException("Failed to create CEF browser", ex);
             }
             if (error[0] != null) {
+                Log.e(error[0]);
                 throw new RuntimeException("Failed to create CEF browser", error[0]);
             }
             
@@ -158,6 +161,12 @@ public class JavaCEFSEPort extends JavaSEPort {
         private int duration;
         private int volume;
         private String lastErrorMessage;
+
+        private final Runnable deinitializeCallback = new Runnable() {
+            public void run() {
+                cleanup();
+            }
+        };
         
         
         /**
@@ -226,7 +235,7 @@ public class JavaCEFSEPort extends JavaSEPort {
             init(uri, isVideo, f, onCompletion, callback);
         }
         public void init(String uri, boolean isVideo, JFrame f,  final Runnable onCompletion, final AsyncResource<Media> callback) throws IOException {
-            
+            instance.addDeinitializeHook(deinitializeCallback);
             _callback = callback;
             final JSONParser parser = new JSONParser();
             String mediaTag = isVideo ? "video" : "audio";
@@ -414,6 +423,7 @@ public class JavaCEFSEPort extends JavaSEPort {
         }
         
         public void cleanup() {
+            instance.removeDeinitializeHook(deinitializeCallback);
             pause();
             if (bc != null) {
                 bc.cleanup();

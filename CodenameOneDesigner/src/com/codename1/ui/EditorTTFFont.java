@@ -22,6 +22,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.plaf.Style;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,6 +40,8 @@ public class EditorTTFFont extends Font {
     private int sizeSetting;
     private float actualSize;
     private String nativeFontName;
+
+
     public EditorTTFFont(File fontFile, int sizeSetting, float actualSize, Font systemFont) {
         this.fontFile = fontFile;
         this.sizeSetting = sizeSetting;

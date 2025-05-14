@@ -204,7 +204,7 @@ public class MapComponent extends Container {
         super.paintBackground(g);
         if (Display.getInstance().areMutableImagesFast()) {
             if (buffer == null) {
-                buffer = Image.createImage(getWidth(), getHeight());
+                buffer = ImageFactory.createImage(this, getWidth(), getHeight(), 0);
             }
             if (_needTiles || refreshLayers) {
                 paintmap(buffer.getGraphics());
@@ -491,8 +491,8 @@ public class MapComponent extends Container {
     /**
      * Gets the Coord location on the map from a x, y position.
      *
-     * @param x
-     * @param y
+     * @param x X-coordinate
+     * @param y Y-coordinate
      * @return a Coord Object.
      */
     public Coord getCoordFromPosition(int x, int y) {
@@ -718,6 +718,7 @@ public class MapComponent extends Container {
 
     /**
      * Returns layers count
+     * @return The number of layers.
      */
     public int getLayersConut() {
         return _layers.size();
@@ -727,8 +728,9 @@ public class MapComponent extends Container {
      * Returns Layer at index
      *
      * @param index the index of the layer
+     * @return The layer at the given index.
      * @throws ArrayIndexOutOfBoundsException - if the index is out of range
-     * (index < 0 || index >= size())
+     * (index &lt; 0 || index &gt;= size())
      */
     public Layer getLayerAt(int index) {
         Layer l = ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
@@ -885,7 +887,8 @@ public class MapComponent extends Container {
     }
 
     /**
-     * Returns the center location of the map in WGS84 format.
+     * Gets the center location of the map in WGS84 format.
+     * @return Coordinate of center location of map.
      */
     public Coord getCenter() {
         return _map.projection().toWGS84(_center);
@@ -903,7 +906,7 @@ public class MapComponent extends Container {
     /**
      * Sets the current zoom level of the map.
      *
-     * @return zoom level
+     * @param zoom Zoom level
      */
     public void setZoomLevel(int zoom) {
         if (zoom <= getMaxZoomLevel() && zoom >= getMinZoomLevel()) {
@@ -944,10 +947,12 @@ public class MapComponent extends Container {
     }
 
     /**
-     * Returns true if this is a left keycode
      *
-     * @param keyCode
+     * Checks if key code is left keycode.
+     *
      * @return true if this is a left keycode
+     *
+     * @param keyCode The key-code to check.
      */
     protected boolean isLeftKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -957,8 +962,8 @@ public class MapComponent extends Container {
     /**
      * Returns true if this is a right keycode
      *
-     * @param keyCode
-     * @return
+     * @param keyCode The key code to check
+     * @return true if this is a right keycode.
      */
     protected boolean isRightKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -968,8 +973,8 @@ public class MapComponent extends Container {
     /**
      * Returns true if this is a down keycode
      *
-     * @param keyCode
-     * @return
+     * @param keyCode The key code to check.
+     * @return True if key code is down key.
      */
     protected boolean isDownKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -979,8 +984,8 @@ public class MapComponent extends Container {
     /**
      * Returns true if this is a up keycode
      *
-     * @param keyCode
-     * @return
+     * @param keyCode The key code to check.
+     * @return true if key code is up key.
      */
     protected boolean isUpKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -990,8 +995,8 @@ public class MapComponent extends Container {
     /**
      * Returns true if this is a zoom in keycode
      *
-     * @param keyCode
-     * @return
+     * @param keyCode The key code to check
+     * @return true if key code is zoom-in key.
      */
     protected boolean isZoomInKey(int keyCode) {
         return keyCode == '1';
@@ -1000,8 +1005,8 @@ public class MapComponent extends Container {
     /**
      * Returns true if this is a zoom out keycode
      *
-     * @param keyCode
-     * @return
+     * @param keyCode The key code to check.
+     * @return true if the key code for the zoom-out key.
      */
     protected boolean isZoomOutKey(int keyCode) {
         return keyCode == '3';
@@ -1010,8 +1015,8 @@ public class MapComponent extends Container {
     /**
      * Returns true if this is a zoom to layers keycode
      *
-     * @param keyCode
-     * @return
+     * @param keyCode The key-code to check.
+     * @return true if the key code is for the zoom to layers key.
      */
     protected boolean isZoomToLayersKey(int keyCode) {
         return keyCode == '5';

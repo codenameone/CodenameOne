@@ -132,7 +132,6 @@ public class TestUtils {
 
     /**
      * Selects the given offset in a list
-     * @param listName the name of the list component
      * @param offset the offset to select
      */
     public static void selectInList(int[] path, int offset) {
@@ -1083,6 +1082,16 @@ public class TestUtils {
         }
     }
 
+    private static void assertErrorNotExceeded(double expected, double actual, double maxError, String errorMessage) {
+        if(verbose) {
+            log("assertErrorNotExceeded(" + expected + ", " + actual + ", " + maxError + ", " + errorMessage + ")");
+        }
+        double error = Math.abs((expected - actual));
+        if (error > maxError) {
+            assertBool(false, errorMessage);
+        }
+    }
+
     /**
      * Asserts that the given bytes are equal
      */
@@ -1148,7 +1157,6 @@ public class TestUtils {
 
     /**
      * Asserts that the given longs are equal
-     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      */
     public static void assertEqual(long expected, long actual) {
         if(verbose) {
@@ -1159,7 +1167,6 @@ public class TestUtils {
 
     /**
      * Asserts that the given longs are equal
-     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      * @param errorMessage is a string describing the failure
      */
     public static void assertEqual(long expected, long actual, String errorMessage) {
@@ -1172,7 +1179,7 @@ public class TestUtils {
     /**
      * Asserts that the given floats are equal
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     *
      */
     public static void assertEqual(float expected, float actual, double maxRelativeError) {
         if(verbose) {
@@ -1200,7 +1207,7 @@ public class TestUtils {
     /**
      * Asserts that the given doubles are equal
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     *
      */
     public static void assertEqual(double expected, double actual, double maxRelativeError) {
         if(verbose) {
@@ -1213,6 +1220,25 @@ public class TestUtils {
 
     /**
      * Asserts that the given doubles are equal
+     * @param expected Expected value
+     * @param actual Actual value
+     * @param absoluteError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @since 8.0
+     */
+    public static void assertRange(double expected, double actual, double absoluteError) {
+        if(verbose) {
+            log("assertRange(" + expected + ", " + actual + ")");
+        }
+        if (expected != actual) {
+            assertErrorNotExceeded(expected, actual, absoluteError, "Expected ["+expected+"], Actual ["+actual+"]");
+        }
+    }
+
+
+
+
+    /**
+     * Asserts that the given doubles are equal
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      * @param errorMessage is a string describing the failure
      */
@@ -1222,6 +1248,20 @@ public class TestUtils {
         }
         if (expected != actual) {
             assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
+        }
+    }
+
+    /**
+     * Asserts that the given doubles are equal
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertRange(double expected, double actual, double maxAbsoluteError, String errorMessage) {
+        if(verbose) {
+            log("assertRange(" + expected + ", " + actual + ", " + errorMessage + ")");
+        }
+        if (expected != actual) {
+            assertErrorNotExceeded(expected, actual, maxAbsoluteError, errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
         }
     }
 

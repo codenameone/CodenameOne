@@ -376,7 +376,8 @@ public class InteractionDialog extends Container {
             }
             getLayeredPane(f).animateLayout(getUIManager().getThemeConstant("interactionDialogSpeedInt", 400));
         } else {
-            getLayeredPane(f).revalidate();
+            //getLayeredPane(f).revalidate();
+            f.revalidateWithAnimationSafety();
         }
         /*
         Form f = Display.getInstance().getCurrent();
@@ -760,11 +761,11 @@ public class InteractionDialog extends Container {
 
         // if we don't have enough space then disregard device orientation
         if(showPortrait) {
-            if(availableHeight < (availableWidth - rect.getWidth()) / 2) {
+            if(availableHeight < prefHeight && availableHeight < (availableWidth - rect.getWidth()) / 2) {
                 showPortrait = false;
             }
         } else {
-            if(availableHeight / 2 > availableWidth - rect.getWidth()) {
+            if(availableWidth < prefWidth && availableHeight / 2 > availableWidth - rect.getWidth()) {
                 showPortrait = true;
             }
         }
@@ -789,7 +790,7 @@ public class InteractionDialog extends Container {
                 y = rect.getY() + rect.getHeight();
                 int height = Math.min(prefHeight, Math.max(0, availableHeight - y));
                 padOrientation(contentPaneStyle, TOP, 1);
-                show(y, Math.max(0, availableHeight - height - y), 
+                show(Math.max(0, y), Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
             } else if (rect.getY() > availableHeight / 2){
@@ -860,7 +861,7 @@ public class InteractionDialog extends Container {
         if(unit != Style.UNIT_TYPE_DIPS) {
             padding = Display.getInstance().convertToPixels(padding);
         }
-        s.setPadding(orientation, s.getPaddingValue(isRTL(), 
+        s.setPadding(orientation, s.getPaddingFloatValue(isRTL(),
                 orientation) + padding);
     }
 

@@ -23,6 +23,7 @@
  */
 package java.lang;
 
+import java.nio.charset.Charset;
 import java.util.Comparator;
 
 /**
@@ -74,6 +75,16 @@ public final class String implements CharSequence, Comparable<String> {
      */
     public String(byte[] bytes, int off, int len, java.lang.String enc) throws java.io.UnsupportedEncodingException{
          //TODO codavaj!!
+    }
+    
+    /**
+     * Construct a new String by converting the specified array of bytes using the specified character encoding. The length of the new String is a function of the encoding, and hence may not be equal to the length of the byte array.
+     * bytes - The bytes to be converted into charactersenc - The name of a supported character encoding
+     * - If the named encoding is not supported
+     * @since 8.0
+     */
+    public String(byte[] bytes, java.nio.charset.Charset charset) throws java.io.UnsupportedEncodingException {
+        this(bytes, 0, bytes.length, charset.displayName());
     }
 
     /**
@@ -207,6 +218,13 @@ public final class String implements CharSequence, Comparable<String> {
      */
     public byte[] getBytes(java.lang.String enc) throws java.io.UnsupportedEncodingException{
         return null; //TODO codavaj!!
+    }
+    
+    /**
+     * Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
+     */
+    public byte[] getBytes(Charset charset) throws java.io.UnsupportedEncodingException {
+        return getBytes(charset.displayName());
     }
 
     /**
@@ -444,6 +462,10 @@ public final class String implements CharSequence, Comparable<String> {
      * Converts all of the characters in this String to upper case.
      */
     public java.lang.String toUpperCase(){
+        return null; //TODO codavaj!!
+    }
+
+    public java.lang.String toUpperCase(java.util.Locale locale) {
         return null; //TODO codavaj!!
     }
 

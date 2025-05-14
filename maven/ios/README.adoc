@@ -1,0 +1,53 @@
+= Codename One iOS Port
+
+This module includes the Codename One support for building to iOS.  Codename One projects don't include any direct dependencies on this project.  Only the link:../codenameone-maven-plugin/[Codename One Maven Plugin] depends on this project for building to iOS.
+
+== Sources
+
+link:../../Ports/iOSPort/src[Java Sources]::
+Java sources, including the link:../../Ports/iOSPort/src/com/codename1/impl/ios/IOSImplementation.java[IOSImplementation] class which is the basis for the iOS port.
+link:../../Ports/iOSPort/nativeSources/[Native Sources]::
+Native sources, mostly Objective-C which implement native functionality.  All native calls go through link:../../Ports/iOSPort/src/com/codename1/impl/ios/IOSNative.java[IOSNative], whose native implementation is in link:../../Ports/iOSPort/nativeSources/IOSNative.m[IOSNative.m].
+
+== Build Artifacts
+
+This module produces the following artifacts as output:
+
+jar::
+The java class files.
++
+[source,xml]
+----
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-ios</artifactId>
+    <version>${cn1.version}</version>
+</dependency>
+----
+
+jar-with-dependencies:jar::
+The java class files and all dependent class files.  Basically this is the equivalent of the old iOSPort.jar output from the Ant project.  It just merges the codenameone-core classes with the ios classes.
++
+[source,xml]
+----
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-ios</artifactId>
+    <version>${cn1.version}</version>
+    <classifier>jar-with-dependencies</classifier>
+</dependency>
+----
+
+bundle:jar::
+A jar bundle including the iOSPort.jar and nativeios.jar files in its root.  The nativeios.jar file is a jar containing all of the contents the native sources.  iOSPort.jar is the jar-with-dependencies jar.  This artifact is used by the link:../codenameone-maven-plugin/[Codename One Maven Plugin] (specifically link:../codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java[IPhoneBuilder]) to be able to load the iOS port files required to build projects for iOS.
++
+[source,xml]
+----
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-ios</artifactId>
+    <version>${cn1.version}</version>
+    <classifier>bundle</classifier>
+</dependency>
+----
+

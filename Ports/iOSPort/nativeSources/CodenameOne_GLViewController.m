@@ -74,6 +74,8 @@
 #endif
 #import "com_codename1_payment_Purchase.h"
 
+
+
 //#define CN1_USE_SPLASH_SCREEN
 
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
@@ -122,6 +124,26 @@ int displayHeight = -1;
 BOOL CN1_blockPaste=NO;
 BOOL CN1_blockCut=NO;
 BOOL CN1_blockCopy=NO;
+JAVA_INT safeLeft = 0;
+JAVA_INT safeRight = 0;
+JAVA_INT safeTop = 0;
+JAVA_INT safeBottom = 0;
+
+JAVA_INT getSafeLeft() {
+    return safeLeft;
+}
+
+JAVA_INT getSafeRight() {
+    return safeRight;
+}
+
+JAVA_INT getSafeBottom() {
+    return safeBottom;
+}
+
+JAVA_INT getSafeTop() {
+    return safeTop;
+}
 
 UIView *editingComponent;
 
@@ -1119,6 +1141,111 @@ CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_S
     return context;
 }
 
+
+static CGContextRef cn1CreateARGBBitmapContext(CGSize size) {
+
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    if (colorSpace == NULL) {
+        CN1Log(@"Error allocating color space");
+        return NULL;
+    }
+    void *bitmapData = malloc(size.width * size.height * 4);
+    if (bitmapData == NULL) {
+        CN1Log(@"Error: Memory not allocated!");
+        CGColorSpaceRelease(colorSpace);
+        return NULL;
+    }
+    CGContextRef context = CGBitmapContextCreate(bitmapData, size.width, size.height, 8, size.width * 4, colorSpace, kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(colorSpace);
+    if (context == NULL) {
+        CN1Log(@"Error:  Context not created");
+        free(bitmapData);
+        return NULL;
+    }
+    return context;
+}
+
+static UInt8* cn1CreateBitmap(UIImage* image) {
+    CGContextRef context = cn1CreateARGBBitmapContext(image.size);
+    if (context == NULL) return NULL;
+    CGRect rect = CGRectMake(0.0f, 0.0f, image.size.width, image.size.height);
+    CGContextClearRect(context, rect);
+    CGContextDrawImage(context, rect, image.CGImage);
+    UInt8* data = CGBitmapContextGetData(context);
+    CGContextRelease(context);
+    return data;
+}
+
+static void cn1MaskifyBitmap(UInt8* bits, int width, int height) {
+    int len = width * height * 4;
+    
+    for (int i=0; i<len; i+=4) {
+        bits[i+1] = bits[i+2] = bits[i + 3] = 0;
+        
+    }
+}
+
+static UIImage* cn1ImageWithBits(UInt8* bits, int width, int height) {
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    if (colorSpace == NULL) {
+        CN1Log(@"Error allocating color space");
+        return NULL;
+    }
+    CGContextRef context = CGBitmapContextCreate(bits, width, height, 8, width * 4, colorSpace, kCGImageAlphaPremultipliedFirst);
+    if (context == NULL) {
+        NSLog(@"Error: context not created");
+        CGColorSpaceRelease(colorSpace);
+        return NULL;
+    }
+    CGColorSpaceRelease(colorSpace);
+    CGImageRef imageRef = CGBitmapContextCreateImage(context);
+    free(CGBitmapContextGetData(context));
+    CGContextRelease(context);
+    UIImage* newImage = [UIImage imageWithCGImage:imageRef];
+    CFRelease(imageRef);
+    return newImage;
+    
+    
+}
+void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
+    JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
+    
+    UIImage* i = [(BRIDGE_CAST GLUIImage*)image getImage];
+    
+    UInt8 *inbits = cn1CreateBitmap(i);
+    if (inbits == NULL) {
+        CN1Log(@"Error:  Failed to create bitmap for shadow");
+        return;
+    }
+    cn1MaskifyBitmap(inbits, floor(i.size.width), floor(i.size.height));
+    
+    UIImage* mask = cn1ImageWithBits(inbits, floor(i.size.width), floor(i.size.height));
+    //free(inbits);
+    if (mask == NULL) {
+        CN1Log(@"Error: Failed to generate image for shadow from bitmap");
+        return;
+    }
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSaveGState(context);
+    if (currentMutableTransformSet) {
+        
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+
+    int renderWidth = floor(i.size.width) + 2 * spreadRadius;
+    int renderHeight = floor(i.size.height) + 2 * spreadRadius;
+    int renderX = x + offsetX - spreadRadius;
+    int renderY = y + offsetY - spreadRadius;
+
+    CGContextSetShadowWithColor(context, CGSizeMake(0, 0), blurRadius, [UIColorFromRGB(color, 255) CGColor]);
+    [mask drawInRect:CGRectMake(renderX, renderY, renderWidth, renderHeight) blendMode:kCGBlendModeNormal alpha: opacity];
+    
+    CGContextRestoreGState(context);
+    
+    
+
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height, int renderingHints) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
@@ -1128,7 +1255,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
-    [i drawInRect:CGRectMake(x, y, width, height)];
+    if (alpha == 255) {
+        [i drawInRect:CGRectMake(x, y, width, height)];
+    } else {
+        [i drawInRect:CGRectMake(x, y, width, height) blendMode:kCGBlendModeNormal alpha:alpha/(CGFloat)255];
+    }
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
@@ -2096,7 +2227,9 @@ EAGLView* lastFoundEaglView;
         [[self eaglView] presentFramebuffer];
         GLErrorLog;
     }
+#ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
+#endif
 }
 
 CGFloat getOriginY() {
@@ -2529,6 +2662,17 @@ BOOL prefersStatusBarHidden = NO;
     CGFloat bottomAlignedY =size.height - size.height;
     self.adView.frame = CGRectMake(centeredX, bottomAlignedY, adsize.width, adsize.height);
 #endif
+}
+
+- (void)viewSafeAreaInsetsDidChange {
+    [super viewSafeAreaInsetsDidChange];
+    safeLeft = (JAVA_INT)self.view.window.safeAreaInsets.left * scaleValue;
+    safeRight = (JAVA_INT)self.view.window.safeAreaInsets.right * scaleValue;
+    safeTop = (JAVA_INT)self.view.window.safeAreaInsets.top * scaleValue;
+    safeBottom = (JAVA_INT)self.view.window.safeAreaInsets.bottom * scaleValue;
+
+    lockDrawing = NO;
+    repaintUI();
 }
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
@@ -3171,6 +3315,7 @@ void cn1_addSelectedImagePath(NSString* path) {
                         return;
                     }
 
+//$$ DISABLE_IMAGE_ROTATION_FIX_START
 #ifndef LOW_MEM_CAMERA
                     if (image.imageOrientation != UIImageOrientationUp) {
                         UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
@@ -3179,6 +3324,7 @@ void cn1_addSelectedImagePath(NSString* path) {
                         UIGraphicsEndImageContext();
                     }
 #endif
+//$$ DISABLE_IMAGE_ROTATION_FIX_END
 
                     NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
 
@@ -3238,6 +3384,104 @@ void cn1_addSelectedImagePath(NSString* path) {
     galleryPopover = NO;
 }
 
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results API_UNAVAILABLE(watchos)
+{
+    if (cn1_waitingForImages == NULL) {
+        cn1_waitingForImages = [[NSMutableString alloc] init];
+    } else {
+        [cn1_waitingForImages setString:@""];
+    }
+
+    NSMutableArray<PHAsset *> *assets = [NSMutableArray new];
+    for (PHPickerResult *result in results) {
+           NSString *assetIdentifier = result.assetIdentifier;
+           if (assetIdentifier) {
+               PHFetchResult<PHAsset *> *fetchResult = [PHAsset fetchAssetsWithLocalIdentifiers:@[assetIdentifier] options:nil];
+               [assets addObject:fetchResult.firstObject];
+           }
+       }
+
+    cn1_waitingForImagesCount = [assets count];
+    __block int idx=0;
+    PHImageRequestOptions *options = [PHImageRequestOptions new];
+    options.synchronous = YES;
+    options.networkAccessAllowed = YES;
+    for (PHAsset *asset in assets) {
+        @autoreleasepool {
+            if (asset.mediaType == PHAssetMediaTypeImage) {
+                [[PHImageManager defaultManager] requestImageForAsset:asset
+                                  targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
+                                 contentMode:PHImageContentModeDefault
+                                     options:options
+                               resultHandler:^(UIImage *originalImage, NSDictionary *info) {
+                    UIImage* image = originalImage;
+                    if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
+                        return;
+                    }
+
+//$$ DISABLE_IMAGE_ROTATION_FIX_START
+#ifndef LOW_MEM_CAMERA
+                    if (image.imageOrientation != UIImageOrientationUp) {
+                        UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+                        [image drawInRect:(CGRect){0, 0, image.size}];
+                        image = UIGraphicsGetImageFromCurrentImageContext();
+                        UIGraphicsEndImageContext();
+                    }
+#endif
+//$$ DISABLE_IMAGE_ROTATION_FIX_END
+
+                    NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                    NSString *documentsDirectory = [paths objectAtIndex:0];
+                    NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_image_%d.jpg", idx++]];
+                    [data writeToFile:path atomically:YES];
+                    cn1_addSelectedImagePath(path);
+                }];
+            } else {
+                PHVideoRequestOptions *options = [PHVideoRequestOptions new];
+                options.version = PHVideoRequestOptionsVersionOriginal;
+                options.networkAccessAllowed = YES;
+
+                [[PHImageManager defaultManager] requestAVAssetForVideo:asset
+                                                                options:options
+                                                          resultHandler:
+                 ^(AVAsset * _Nullable avasset,
+                   AVAudioMix * _Nullable audioMix,
+                   NSDictionary * _Nullable info)
+                {
+                    NSError *error;
+                    AVURLAsset *avurlasset = (AVURLAsset*) avasset;
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+                    NSString *documentsDirectory = [paths objectAtIndex:0];
+                    NSString *path = [documentsDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"temp_video_%d.%@", idx++, avurlasset.URL.pathExtension]];
+                    // Write to documents folder
+                    NSURL *fileURL = [NSURL fileURLWithPath:path];
+                    [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+                    if ([[NSFileManager defaultManager] copyItemAtURL:avurlasset.URL
+                                                                 toURL:fileURL
+                                                                 error:&error]) {
+                        cn1_addSelectedImagePath(path);
+                    } else {
+                        cn1_addSelectedImagePath([NSString stringWithFormat:@"!{Error: %@}", [error localizedDescription]]);
+                    }
+                 }];
+            }
+        }
+    }
+
+#ifdef LOW_MEM_CAMERA
+    [picker dismissModalViewControllerAnimated:NO];
+#else
+    [picker dismissModalViewControllerAnimated:YES];
+#endif
+    popoverController = nil;
+    popoverControllerInstance = nil;
+    galleryPopover = NO;
+}
+#endif
+
 #endif
 #endif
 
@@ -3254,6 +3498,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
 
     NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
+    NSURL* mediaURL = [info objectForKey:@"UIImagePickerControllerImageURL"];
     if ([mediaType isEqualToString:@"public.image"]) {
         // get the image
         UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
@@ -3268,12 +3513,23 @@ void cn1_addSelectedImagePath(NSString* path) {
             UIGraphicsEndImageContext();
         }
 #endif
-        
-        NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+        NSString* fileName = (mediaURL != nil) ? [mediaURL lastPathComponent] : nil;
+        fileName = fileName == nil ? nil : [fileName lowercaseString];
+        NSData* data;
+        NSString* tempImageName = @"temp_image.jpg";
+        if (fileName == nil || [fileName hasSuffix:@".jpg"] || [fileName hasSuffix:@".jpeg"]) {
+            data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+        } else if ([fileName hasSuffix:@".png"]) {
+            tempImageName = @"temp_image.png";
+            data = UIImagePNGRepresentation(image);
+        } else {
+            tempImageName = @"temp_image.png";
+            data = UIImagePNGRepresentation(image);
+        }
         
         NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:tempImageName];
         [data writeToFile:path atomically:YES];
         com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
     
@@ -3309,6 +3565,7 @@ void cn1_addSelectedImagePath(NSString* path) {
 
 extern JAVA_OBJECT productsArrayPending;
 
+#ifdef CN1_USE_STOREKIT
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
 	POOL_BEGIN();
     if(productsArrayPending != nil) {
@@ -3416,6 +3673,8 @@ extern SKPayment *paymentInstance;
     CN1Log(@"Restore error");
     com_codename1_impl_ios_IOSImplementation_restoreRequestError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG error.localizedDescription));
 }
+
+#endif
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
     CN1Log(@"audioRecorderDidFinishRecording: %i", (int)flag);

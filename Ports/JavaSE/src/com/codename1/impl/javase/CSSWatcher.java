@@ -14,16 +14,13 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -35,13 +32,21 @@ import java.util.logging.Logger;
  * @author shannah
  */
 public class CSSWatcher implements Runnable {
+    private int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
     private Thread watchThread, pulseThread;
     private ServerSocket pulseSocket;
     private Process childProcess;
     private boolean closing;
     private static final int MIN_DESIGNER_VERSION=6;
-    
+
+    private final String themePrefix;
+
     public CSSWatcher() {
+        this("");
+    }
+
+    public CSSWatcher(String themePrefix) {
+        this.themePrefix = themePrefix;
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
 
             @Override
@@ -55,6 +60,20 @@ public class CSSWatcher implements Runnable {
             }
             
         }));
+    }
+
+    public void stop() {
+        closing = true;
+        if (childProcess != null && childProcess.isAlive()) {
+            try {
+                childProcess.destroyForcibly();
+            } catch (Throwable t){}
+        }
+        if (pulseSocket != null && !pulseSocket.isClosed()) {
+            try {
+                pulseSocket.close();
+            } catch (Exception ex){}
+        }
     }
     
     /**
@@ -140,13 +159,14 @@ public class CSSWatcher implements Runnable {
             pulseSocket = new ServerSocket(0);
             pulseThread = new Thread(new Runnable() {
                 public void run() {
-                    while (true) {
+                    while (!closing) {
                         try {
                             Socket clientSocket = pulseSocket.accept();
                             
                         } catch (IOException ex) {
                             Logger.getLogger(CSSWatcher.class.getName()).log(Level.SEVERE, null, ex);
                         }
+
                     }
                 }
             });
@@ -154,22 +174,32 @@ public class CSSWatcher implements Runnable {
             
         }
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
-        final File srcFile = new File("css", "theme.css");
+        final File srcFile = new File("css", themePrefix + "theme.css");
         String overrideInputs = System.getProperty("codename1.css.compiler.args.input", null);
-        
+        if (overrideInputs != null) {
+            overrideInputs = prefixInputs(themePrefix, overrideInputs);
+        }
         if (!srcFile.exists() && overrideInputs == null) {
             //System.out.println("No theme.css file found.  CSSWatcher canceled");
             return;
         } else {
             if (overrideInputs == null) {
-                System.out.println("Found theme.css file.  Watching for changes...");
+                System.out.println("Found "+themePrefix+"theme.css file.  Watching for changes...");
             } else {
-                System.out.println("Watching CSS files for changes: "+overrideInputs);
+                if (overrideInputs.trim().isEmpty()) {
+                    System.out.println("CSS file "+overrideInputs+" does not exist.  Not activating CSS watcher for prefix " + themePrefix);
+                    return;
+                }
+                System.out.println("Watching CSS files for changes: ["+overrideInputs+"]");
             }
         }
-        File destFile = new File("src", "theme.res");
+        File resDir = JavaSEPort.getSourceResourcesDir();
+        
+        File destFile = new File(resDir, themePrefix + "theme.res");
+        
         String overrideOutputs = System.getProperty("codename1.css.compiler.args.output", null);
         if (overrideOutputs != null) {
+            overrideOutputs = prefixInputs(themePrefix, overrideOutputs);
             destFile = new File(overrideOutputs);
         }
         File userHome = new File(System.getProperty("user.home"));
@@ -205,7 +235,7 @@ public class CSSWatcher implements Runnable {
             args.add("-watch");
             args.add("-Dprism.order=sw");
         }
-        
+        System.out.println("Running CSS watch with args " + args);
         
         
         Process p = pb.start();
@@ -223,7 +253,13 @@ public class CSSWatcher implements Runnable {
         final BufferedReader errorReader = new BufferedReader(new InputStreamReader(stderr));
         new Thread(new Runnable() {
             public void run() {
+
                 while (true) {
+                    int reloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                    if (reloadVersion != simulatorReloadVersion) {
+                        stop();
+                        break;
+                    }
                     try {
                         String l = errorReader.readLine();
                         if (l != null) {
@@ -247,6 +283,11 @@ public class CSSWatcher implements Runnable {
         final String fOverrideInputs = overrideInputs;
         while (true) {
             try {
+                int reloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                if (reloadVersion != simulatorReloadVersion) {
+                    stop();
+                    return;
+                }
                 String l = reader.readLine();
                 if (l == null) {
                     if (!p.isAlive()) {
@@ -260,6 +301,9 @@ public class CSSWatcher implements Runnable {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
+                            if (!shouldRefresh()) {
+                                return;
+                            }
                             try {
                                 if (fOverrideInputs != null) {
                                     System.out.println("CSS File "+fOverrideInputs+" has been updated.  Reloading styles from "+fDestFile);
@@ -314,7 +358,49 @@ public class CSSWatcher implements Runnable {
             watchThread.start(); 
         }
     }
-    
-    
-    
+
+    public static Iterable<String> scanForThemePrefixes() {
+        File resourcesDir = getCSSSourceDirectory();
+        List<String> prefixes = new ArrayList<>();
+        int themeCssLen = "theme.css".length();
+        if (resourcesDir != null && resourcesDir.isDirectory()) {
+            for (File resourceFile : resourcesDir.listFiles()) {
+                String fileName = resourceFile.getName();
+                if (fileName.endsWith("theme.css")) {
+                    prefixes.add(fileName.substring(0, fileName.length() - themeCssLen));
+                }
+            }
+        }
+        return prefixes;
+    }
+
+    private static File getCSSSourceDirectory() {
+        File cssDir = new File(JavaSEPort.getCWD(), "src" + File.separator + "main" + File.separator + "css");
+        if (cssDir.isDirectory()) return cssDir;
+        return  new File(JavaSEPort.getCWD(), "css");
+    }
+
+
+    private static String prefixInputs(String themePrefix, String inputs) {
+        StringBuilder sb = new StringBuilder();
+        for (String part : inputs.split(",")) {
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
+            sb.append(prefixFile(themePrefix, new File(part)).getPath());
+        }
+        return sb.toString();
+    }
+
+    private static File prefixFile(String themePrefix, File file) {
+        return new File(file.getParentFile(), themePrefix + file.getName());
+    }
+
+    private boolean shouldRefresh() {
+        Display displayInstance = Display.getInstance();
+        Boolean isDarkMode = displayInstance.isDarkMode();
+        boolean isDarkModeBool = isDarkMode != null && isDarkMode;
+        String localThemePrefix = themePrefix;
+        return !isDarkModeBool && "".equals(localThemePrefix) || isDarkModeBool && "dark-".equals(localThemePrefix);
+    }
 }

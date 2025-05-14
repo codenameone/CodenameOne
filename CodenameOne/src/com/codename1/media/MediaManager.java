@@ -31,6 +31,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
@@ -212,9 +213,8 @@ public class MediaManager {
     }
 
     /**
-     * Creates the Media in the given stream
-     * Notice that a Media is "auto destroyed" on completion and cannot be played
-     * twice!
+     * Creates the Media in the given stream.
+     * Notice that you should invoke cleanup on a media once you are done with it.
      *
      * @param stream the stream containing the media data
      * @param mimeType the type of the data in the stream
@@ -228,8 +228,7 @@ public class MediaManager {
     
     /**
      * Creates the Media in the given stream asynchronously.
-     * Notice that a Media is "auto destroyed" on completion and cannot be played
-     * twice!
+     * Notice that you should invoke cleanup on a media once you are done with it.
      *
      * @param stream the stream containing the media data
      * @param mimeType the type of the data in the stream
@@ -294,8 +293,7 @@ public class MediaManager {
 
     /**
      * Creates the Media in the given stream
-     * Notice that a Media is "auto destroyed" on completion and cannot be played
-     * twice!
+     * Notice that you should invoke cleanup on a media once you are done with it.
      *
      * @param stream the stream containing the media data
      * @param mimeType the type of the data in the stream
@@ -532,4 +530,5 @@ public class MediaManager {
         
         };
     }
+
 }

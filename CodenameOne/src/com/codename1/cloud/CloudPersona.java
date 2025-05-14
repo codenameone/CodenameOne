@@ -39,9 +39,6 @@ import java.io.IOException;
  * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public class CloudPersona {
-    private String persona;
-    private static CloudPersona instance;
-    
     private CloudPersona() {
     }
     
@@ -52,11 +49,7 @@ public class CloudPersona {
      * @return the current persona
      */
     public static CloudPersona getCurrentPersona() {
-        if(instance == null) {
-            instance = new CloudPersona();
-            instance.persona = Preferences.get("CN1Persona", null);
-        }
-        return instance;
+        return null;
         
     }
     
@@ -67,7 +60,7 @@ public class CloudPersona {
      * @return a persona UID
      */
     public String getToken() {
-        return persona;
+        return null;
     }
     
     /**
@@ -76,11 +69,6 @@ public class CloudPersona {
      * @param token the token
      */
     public static void createFromToken(String token) {
-        if(instance == null) {
-            instance = new CloudPersona();
-        } 
-        instance.persona = token;
-        Preferences.set("CN1Persona", token);
     }
     
     /**
@@ -88,36 +76,7 @@ public class CloudPersona {
      * @return false in case login failed e.g. due to bad network connection
      */
     public static boolean createAnonymous() {
-        if(instance == null) {
-            getCurrentPersona();
-        }
-        ConnectionRequest login = new ConnectionRequest();
-        login.setPost(true);
-        login.setUrl(CloudStorage.SERVER_URL + "/objStoreUser");
-        login.addArgument("pk", Display.getInstance().getProperty("package_name", null));
-        login.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
-        NetworkManager.getInstance().addToQueueAndWait(login);
-        if(login.getResposeCode() != 200) {
-            return false;
-        }
-        
-        ByteArrayInputStream bi = new ByteArrayInputStream(login.getResponseData());
-        DataInputStream di = new DataInputStream(bi);
-        
-        if(instance == null) {
-            instance = new CloudPersona();
-        } 
-        try {
-            instance.persona = di.readUTF();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-        Preferences.set("CN1Persona", instance.persona);
-        Preferences.set("CN1PersonaAnonymous", true);
-        
-        Util.cleanup(di);
-        
-        return true;
+        return false;
     }
     
     /**
@@ -129,44 +88,7 @@ public class CloudPersona {
      * @return true if the login is successful false otherwise
      */
     public static boolean createOrLogin(String login, String password) {
-        if(instance == null) {
-            getCurrentPersona();
-            if(instance.persona != null) {
-                return true;
-            }
-        }
-        ConnectionRequest loginRequest = new ConnectionRequest();
-        loginRequest.setPost(true);
-        loginRequest.setUrl(CloudStorage.SERVER_URL + "/objStoreUser");
-        loginRequest.addArgument("l", login);
-        loginRequest.addArgument("p", password);
-        loginRequest.addArgument("pk", Display.getInstance().getProperty("package_name", null));
-        loginRequest.addArgument("bb", Display.getInstance().getProperty("built_by_user", null));
-        NetworkManager.getInstance().addToQueueAndWait(loginRequest);
-        if(loginRequest.getResposeCode() != 200) {
-            return false;
-        }
-        
-        ByteArrayInputStream bi = new ByteArrayInputStream(loginRequest.getResponseData());
-        DataInputStream di = new DataInputStream(bi);
-        
-        try {
-            if(di.readBoolean()) {
-                if(instance == null) {
-                    instance = new CloudPersona();
-                } 
-                instance.persona = di.readUTF();
-                Preferences.set("CN1Persona", instance.persona);
-                Util.cleanup(di);
-            } else {
-                Util.cleanup(di);
-                return false;
-            }
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-
-        return true;
+        return false;
     }
     
     /**
@@ -174,9 +96,5 @@ public class CloudPersona {
      * the data in the cloud!
      */
     public void logout() {
-        if(Preferences.get("CN1PersonaAnonymous", false)) {
-            throw new RuntimeException("Anonymous personas can't be logged out!");
-        }
-        Preferences.delete("CN1Persona");
     }
 }

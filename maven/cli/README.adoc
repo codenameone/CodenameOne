@@ -1,0 +1,130 @@
+= Codename One Maven CLI Wrappers
+
+This module contains some shell wrapper scripts that are used for executing common goals in Codename One maven projects.  This is helpful because some *very* common goals require multiple command-line flags to be set. These shell scripts provide direct access to the most common goals and automatically sets the correct flags.
+
+This module includes two scripts (link:src/main/batsh/build.batsh[build] and link:src/main/batsh/run.batsh[run]), which are written in https://batsh.org[Batsh] and are compiled to both Windows bat and Bash shell scripts (build.sh, build.bat, run.sh, and run.bat).  These compiled bat/shell scripts are included in the link:../maven-archetypes/cn1app-archetype/[cn1app-archetype] so that Codename One projects are always created with these scripts.
+
+== Building From Source
+
+Use maven to compile the batsh scripts into bat and shell scripts.
+
+[source,bash]
+----
+mvn package
+----
+
+You'll find the shell scripts compiled to `target/generated-sources/bat` and `target/generated-sources/bash`.
+
+=== Installing in the cn1app-archetype
+
+These scripts are intended to be run from the main directory of Codename One application projects.  Therefore, you'll want to copy the compiled shell scripts into link:../maven-archetypes/cn1app-archetype/src/main/resources/archetype-resources[its resources directory] whenever they are changed.
+
+The `install` goal of this project will do this automatically.
+
+[source,bash]
+----
+mvn install
+----
+
+== Usage Instructions
+
+=== The "run" script
+
+`./run.[sh|bat] [COMMAND]`
+
+**Synopsis**
+
+Runs the app.
+
+The `COMMAND` is optional, and, if omitted, will default to "simulator".
+
+**Commands**
+
+simulator::
+Runs the project in the Codename One simulator
+
+android::
+Installs and runs the project using `adb`.
++
+====
+E.g.
+
+`./run.sh android`
+
+This command requires the Android development tools to be installed. See <<android-build-environment>> for details about the required environment variables.
+
+TIP: This command uses `adb` to install and run the app on your device.  If you only have a single device connected to your computer, or only have a single Android emulator running, it should automatically choose that device.  Having multiple devices connected is currently not supported.
+====
+
+desktop::
+Runs the project as a desktop application.  This is similar to the `simulator` command since both run on the desktop using JavaSE.  The difference is that the "desktop" command will not be running inside the Codename One simulator.  It will run directly as a desktop application.
+
+settings::
+Opens the Codename One command console.
+
+=== The "build" script
+
+`./build.[sh|bat] [COMMAND]`
+
+**Synopsis**
+
+Builds the app for a specified build target.
+
+**Commands**
+
+jar::
+The default command.  Will build app as an executable jar file.  Jar file will be created inside javase/target directory.
+
+android_local::
+Builds app as APK using local android development tools.  This command requires the Android development tools to be installed. See <<android-build-environment>> for details about the required environment variables.
+
+android::
+Builds the app for android.  Uses the Codename One build server.
+
+ios::
+Builds app for iOS using the Codename One build server.
+
+ios_release::
+Builds app for submission to the iOS appstore.  Uses the Codename One build server.
+
+mac_desktop::
+Builds app for Mac OS.  Uses Codename One build server.
++
+[IMPORTANT]
+====
+Mac Desktop builds are a Pro user feature.  https://www.codenameone.com/pricing.html[See pricing].  You can the `jar` command to build your app as a cross-platform desktop app (executable jar).
+====
+
+windows_desktop::
+Builds app for Windows.  Uses Codename One build server.
++
+[IMPORTANT]
+====
+Windows Desktop builds are a Pro user feature.  https://www.codenameone.com/pricing.html[See pricing].  You can the `jar` command to build your app as a cross-platform desktop app (executable jar).
+====
+
+windows_device::
+Builds app for Windows devices (.appx i.e. UWP).
+
+uwp::
+Alias of `windows_device`
+
+javascript::
+Builds app as Javascript app (for Web).  Uses Codeame One build server.
++
+[IMPORTANT]
++
+Javascript builds are an Enterprise user feature. https://www.codenameone.com/pricing.html[See pricing]
+
+
+
+[#android-build-environment]
+== Android Build Environment
+
+Some commands (e.g. `run android`, `build android_local`) require the android development tools to be installed.  They expect the following environment variables to be defined:
+
+`ANDROID_HOME`::
+The installation location of your Android SDK.  Download the tools https://developer.android.com/studio/#command-tools[here].
+
+`GRADLE_HOME`::
+The installation location of gradle.  See https://gradle.org/install/[Gradle Installation Instructions].  At the time of writing, I'm using Gradle 6.8.1.

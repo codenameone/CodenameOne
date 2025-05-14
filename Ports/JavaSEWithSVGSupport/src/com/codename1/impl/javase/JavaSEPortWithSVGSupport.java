@@ -23,17 +23,15 @@
  */
 package com.codename1.impl.javase;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import static com.codename1.impl.javase.SVGSupport.scaleSVG;
 import java.io.IOException;
-import javax.imageio.ImageIO;
 
 /**
  * Subclass of the AWT port which adds SVG support to the resource editor
  *
  * @author Shai Almog
  */
-public class JavaSEPortWithSVGSupport extends JavaSEPort {
+public class JavaSEPortWithSVGSupport extends JavaJMFSEPort {
     
     @Override
     public boolean isSVGSupported() {
@@ -42,55 +40,23 @@ public class JavaSEPortWithSVGSupport extends JavaSEPort {
     
     @Override
     public Object createSVGImage(String baseURL, byte[] data) throws IOException {
-        try {
-            SVG s = new SVG();
-            s.setBaseURL(baseURL);
-            s.setSvgData(data);
-            org.apache.batik.transcoder.image.PNGTranscoder t = new org.apache.batik.transcoder.image.PNGTranscoder();
-            org.apache.batik.transcoder.TranscoderInput i = new org.apache.batik.transcoder.TranscoderInput(new ByteArrayInputStream(s.getSvgData()));
-            ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            org.apache.batik.transcoder.TranscoderOutput o = new org.apache.batik.transcoder.TranscoderOutput(bo);
-            t.transcode(i, o);
-            bo.close();
-            s.setImg(ImageIO.read(new ByteArrayInputStream(bo.toByteArray())));
-            return s;
-        } catch (org.apache.batik.transcoder.TranscoderException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex);
-        }
+        return SVGSupport.createSVGImage(baseURL, data);
     }
 
     /**
      * @inheritDoc
      */
+    @Override
     public Object getSVGDocument(Object svgImage) {
         return svgImage;
     }
 
-    private SVG scaleSVG(SVG s, int w, int h) {
-        try {
-            SVG dest = new SVG();
-            dest.setBaseURL(s.getBaseURL());
-            dest.setSvgData(s.getSvgData());
-            org.apache.batik.transcoder.image.PNGTranscoder t = new org.apache.batik.transcoder.image.PNGTranscoder();
-            org.apache.batik.transcoder.TranscoderInput i = new org.apache.batik.transcoder.TranscoderInput(new ByteArrayInputStream(s.getSvgData()));
-            ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            org.apache.batik.transcoder.TranscoderOutput o = new org.apache.batik.transcoder.TranscoderOutput(bo);
-            t.addTranscodingHint(org.apache.batik.transcoder.SVGAbstractTranscoder.KEY_WIDTH, new Float(w));
-            t.addTranscodingHint(org.apache.batik.transcoder.SVGAbstractTranscoder.KEY_HEIGHT, new Float(h));
-            t.transcode(i, o);
-            bo.close();
-            dest.setImg(ImageIO.read(new ByteArrayInputStream(bo.toByteArray())));
-            return dest;
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-        return null;
-    }
+    
 
     /**
      * @inheritDoc
      */
+    @Override
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
         if(nativeImage instanceof SVG) {
             super.getRGB(((SVG) nativeImage).getImg(), arr, offset, x, y, width, height);
@@ -112,6 +78,7 @@ public class JavaSEPortWithSVGSupport extends JavaSEPort {
     /**
      * @inheritDoc
      */
+    @Override
     public int getImageHeight(Object i) {
         if(i instanceof SVG) {
             return ((SVG) i).getImg().getHeight();
@@ -122,6 +89,7 @@ public class JavaSEPortWithSVGSupport extends JavaSEPort {
     /**
      * @inheritDoc
      */
+    @Override
     public Object scale(Object nativeImage, int width, int height) {
         if(nativeImage instanceof SVG) {
             return scaleSVG(((SVG)nativeImage), width, height);
@@ -132,6 +100,7 @@ public class JavaSEPortWithSVGSupport extends JavaSEPort {
     /**
      * @inheritDoc
      */
+    @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
         if(img instanceof SVG) {
             drawSVGImage(graphics, (SVG)img, x, y);
@@ -147,6 +116,7 @@ public class JavaSEPortWithSVGSupport extends JavaSEPort {
     /**
      * @inheritDoc
      */
+    @Override
     public void exitApplication() {
         java.awt.Component c = getCanvas();
         while(c != null) {

@@ -33,6 +33,13 @@ import java.io.OutputStream;
  * @author Shai Almog
  */
 public abstract class SocketConnection {
+    /**
+     * Keeping member field so the GC won't collect these objects before the socket itself is collected.
+     * This can cause a problem since there's native reliance on these objects.
+     */
+    InputStream input;
+    OutputStream output;
+
     private int connectTimeout;
     private boolean connected;
     

@@ -79,9 +79,9 @@ public abstract class DeviceRunner {
         } catch(IOException err) {
             TestReporting.getInstance().logException(err);
         }
-        TestReporting.getInstance().testExecutionFinished();
+        TestReporting.getInstance().testExecutionFinished(getClass().getName());
         if(failedTests > 0) {
-            Log.p("Test execution finished, some failed tests occured. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
+            Log.p("Test execution finished, some failed tests occurred. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
         } else {
             Log.p("All tests passed. Total " + passedTests + " tests passed");
         }
@@ -108,7 +108,7 @@ public abstract class DeviceRunner {
         try {
             final UnitTest t = (UnitTest)Class.forName(testClassName).newInstance();
             try {
-                TestReporting.getInstance().startingTestCase(t);
+                TestReporting.getInstance().startingTestCase(t.getClass().getName());
                 startApplicationInstance();
                 class RunTestImpl implements Runnable {
                     boolean result;
@@ -125,10 +125,10 @@ public abstract class DeviceRunner {
                         } catch (Throwable err) {
                             failedTests++;
                             TestReporting.getInstance().logException(err);
-                            TestReporting.getInstance().finishedTestCase(t, false);
+                            TestReporting.getInstance().finishedTestCase(t.getClass().getName(), false);
                         }
                     }
-                };
+                }
                 RunTestImpl runTest = new RunTestImpl();
                 if (t.shouldExecuteOnEDT() && !CN.isEdt()) {
                     CN.callSeriallyAndWait(runTest);
@@ -138,11 +138,11 @@ public abstract class DeviceRunner {
                     runTest.run();
                 }
                 stopApplicationInstance();
-                TestReporting.getInstance().finishedTestCase(t, runTest.result);
+                TestReporting.getInstance().finishedTestCase(t.getClass().getName(), runTest.result);
             } catch(Throwable err) {
                 failedTests++;
                 TestReporting.getInstance().logException(err);
-                TestReporting.getInstance().finishedTestCase(t, false);
+                TestReporting.getInstance().finishedTestCase(t.getClass().getName(), false);
             }
         } catch(Throwable t) {
             TestReporting.getInstance().logMessage("Failed to create instance of " + testClassName);
