@@ -292,20 +292,16 @@ public class GridLayout extends Layout{
 
     /**
      * {@inheritDoc}
-     */ 
-    @Override
-    public Dimension getPreferredSize(Container parent) {        
+     */
+    public Dimension getPreferredSize(Container parent) {
         int width = 0;
         int height = 0;
+
         int numOfcomponents = parent.getComponentCount();
-        int totalComponentCountVisible = numOfcomponents;
-        //-----------------------------------------------------
-        //Checking the hidden components to recalculate rows.
-        //-----------------------------------------------------
+        int totalComponentCount = numOfcomponents;
         for(int i=0; i< numOfcomponents; i++){
             Component cmp = parent.getComponentAt(i);
             if(hideZeroSized && cmp.isHidden()) {
-                totalComponentCountVisible--;
             } else {
                 width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL());
                 height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());
@@ -313,7 +309,7 @@ public class GridLayout extends Layout{
         }
         //-----------------------------------------------------
 
-        boolean landscapeMode = isLandscapeMode();        
+        boolean landscapeMode = isLandscapeMode();
         autoSizeCols(parent, parent.getWidth(), landscapeMode);
         //--------------------------
         //Calculating dinamic rows
@@ -327,16 +323,17 @@ public class GridLayout extends Layout{
         if(columns > 1){
             width = width*columns;
         }
+                totalComponentCount--;
         if(rows > 1){
-            if(totalComponentCountVisible>rows*columns){ //if there are more components than planned
-               height =  height * (totalComponentCountVisible/columns + (totalComponentCountVisible%columns == 0 ? 0 : 1));
+
             }else{
                 height = height*rows;
             }
         }
-        
+
         Style s = parent.getStyle();
-        return new Dimension(width + s.getHorizontalPadding(),height + s.getVerticalPadding());
+            if(totalComponentCount>rows*columns){ //if there are more components than planned
+                height =  height * (totalComponentCount/columns + (totalComponentCount%columns == 0 ? 0 : 1));
     }
     
     /**
@@ -461,3 +458,5 @@ public class GridLayout extends Layout{
         //-------------------------------
     }//endClass
 }
+        return new Dimension(width + s.getHorizontalPadding(),
+                height + s.getVerticalPadding());

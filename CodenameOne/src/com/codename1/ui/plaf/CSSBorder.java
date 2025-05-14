@@ -9,17 +9,14 @@ import com.codename1.charts.util.ColorUtil;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
 import static com.codename1.ui.CN.convertToPixels;
-import com.codename1.ui.Component;
+
+import com.codename1.ui.*;
+
 import static com.codename1.ui.Component.BOTTOM;
 import static com.codename1.ui.Component.LEFT;
 import static com.codename1.ui.Component.RIGHT;
 import static com.codename1.ui.Component.TOP;
-import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Font;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
-import com.codename1.ui.Stroke;
-import com.codename1.ui.Transform;
+
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.util.Resources;
@@ -196,10 +193,6 @@ public class CSSBorder extends Border {
            }
         });
     }
-    
-    
-    
-    
     
     private Color backgroundColor;
     private BackgroundImage[] backgroundImages;
@@ -595,7 +588,14 @@ public class CSSBorder extends Border {
             setColor(g, this.color);
             GeneralPath p = GeneralPath.createFromPool();
             try {
-                createShape(p, contentRect.getX(), contentRect.getY(), contentRect.getWidth(), contentRect.getHeight());
+                createShape(
+                        p,
+                        contentRect.getX(),
+                        contentRect.getY(),
+                        contentRect.getWidth(),
+                        contentRect.getHeight(),
+                        createArrow(c)
+                );
                 p.transform(Transform.makeTranslation(hOffset.floatPx(c, contentRect, true), vOffset.floatPx(c, contentRect, false)));
                 g.fillShape(p);
                 
@@ -1567,33 +1567,103 @@ public class CSSBorder extends Border {
         rect.setHeight(outerHeight-paddingTop-paddingBottom);
     }
     
-    private GeneralPath createShape(GeneralPath out, double x, double y, double width, double height) {
+    private GeneralPath createShape(
+            GeneralPath out,
+            double x,
+            double y,
+            double width,
+            double height,
+            Arrow arrow
+    ) {
+        double tx = x;
+        double ty = y;
+        x = y = 0;
+        if(arrow != null) {
+            int arrowHeightPixels = CN.convertToPixels((float)arrow.size);
+            switch(arrow.direction) {
+                case CN.TOP:
+                    y = arrowHeightPixels;
+                    // intentional fall through to the next statement...
+                case CN.BOTTOM:
+                    height -= arrowHeightPixels;
+                    break;
+                case CN.LEFT:
+                    x = arrowHeightPixels;
+                    // intentional fall through to the next statement...
+                case CN.RIGHT:
+                    width -= arrowHeightPixels;
+                    break;
+            }
+        }
         if (hasBorderRadius()) {
             out.reset();
-            out.moveTo(borderRadius.topLeftRadiusX(), 0);
-            out.lineTo(width - borderRadius.topRightRadiusX(), 0);
-            //out.arcTo(width-borderRadius.topRightRadiusX(), borderRadius.topRightRadiusY(), width, borderRadius.topRightRadiusY(), true);
-            out.quadTo(width, 0, width, borderRadius.topRightRadiusY());
-            out.lineTo(width, height - borderRadius.bottomRightY());
-            //out.arcTo(width-borderRadius.bottomRightX(), height-borderRadius.bottomRightY(), width-borderRadius.bottomRightX(), height, true);
-            out.quadTo(width, height, width-borderRadius.bottomRightX(), height);
-            out.lineTo(borderRadius.bottomLeftX(), height);
-            //out.arcTo(borderRadius.bottomLeftX(), height-borderRadius.bottomLeftY(), 0, height-borderRadius.bottomLeftY(), true);
-            out.quadTo(0, height, 0, height - borderRadius.bottomLeftY());
-            out.lineTo(0, borderRadius.topLeftRadiusY());
-            //out.arcTo(borderRadius.topLeftRadiusX(), borderRadius.topLeftRadiusY(), borderRadius.topLeftRadiusX(), 0, true);
-            out.quadTo(0, 0, borderRadius.topLeftRadiusX(), 0);
+            out.moveTo(x + borderRadius.topLeftRadiusX(), y);
+            out.lineTo(x + width - borderRadius.topRightRadiusX(), y);
+
+            out.quadTo(x + width, y, x + width, y + borderRadius.topRightRadiusY());
+            out.lineTo(x + width, y + height - borderRadius.bottomRightY());
+
+            out.quadTo(x + width, y + height, x + width-borderRadius.bottomRightX(), y + height);
+            out.lineTo(x + borderRadius.bottomLeftX(), y + height);
+
+            out.quadTo(x, y + height, x, y + height - borderRadius.bottomLeftY());
+            out.lineTo(x, y + borderRadius.topLeftRadiusY());
+
+            out.quadTo(x, y, x + borderRadius.topLeftRadiusX(), y);
             out.closePath();
             
         } else {
             out.reset();
-            out.moveTo(0,0);
-            out.lineTo(width, 0);
-            out.lineTo(width, height);
-            out.lineTo(0, height);
+            out.moveTo(x,y);
+            out.lineTo(x + width, y);
+            out.lineTo(x + width, y + height);
+            out.lineTo(x, y + height);
             out.closePath();
         }
-        out.transform(Transform.makeTranslation((float)x, (float)y));
+        if (arrow != null) {
+            if (arrow.direction == CN.LEFT) {
+                int arrowHeightPixels = CN.convertToPixels((float)arrow.size);
+                int actualArrowPosition = (int)
+                        Math.min(y + height,
+                                Math.max(arrow.position, y + borderRadius.topLeftRadiusY()));
+                out.moveTo(x, actualArrowPosition);
+                out.lineTo(x - arrowHeightPixels, actualArrowPosition + arrowHeightPixels / 2f);
+                out.lineTo(x, actualArrowPosition + arrowHeightPixels);
+                out.closePath();
+            }
+            if (arrow.direction == CN.RIGHT) {
+                int arrowHeightPixels = CN.convertToPixels((float)arrow.size);
+                int actualArrowPosition = (int)
+                        Math.min(y + height,
+                                Math.max(arrow.position, y + borderRadius.topRightRadiusY()));
+                out.moveTo(x + width, actualArrowPosition);
+                out.lineTo(x + width + arrowHeightPixels, actualArrowPosition + arrowHeightPixels / 2f);
+                out.lineTo(x + width, actualArrowPosition + arrowHeightPixels);
+                out.closePath();
+            }
+            if (arrow.direction == CN.BOTTOM) {
+                int arrowHeightPixels = CN.convertToPixels((float)arrow.size);
+                int actualArrowPosition = (int)
+                        Math.min(x + width,
+                                Math.max(arrow.position, x + borderRadius.topLeftRadiusX()));
+                out.moveTo(actualArrowPosition, y + height);
+                out.lineTo(actualArrowPosition + arrowHeightPixels / 2f, y + height + arrowHeightPixels);
+                out.lineTo( actualArrowPosition + arrowHeightPixels, y + height);
+                out.closePath();
+            }
+            if (arrow.direction == CN.TOP) {
+                int arrowHeightPixels = CN.convertToPixels((float)arrow.size);
+                int actualArrowPosition = (int)
+                        Math.min(x + width,
+                                Math.max(arrow.position, x + borderRadius.topLeftRadiusX()));
+                out.moveTo(actualArrowPosition, y);
+                out.lineTo(actualArrowPosition + arrowHeightPixels / 2f, y - arrowHeightPixels);
+                out.lineTo(actualArrowPosition + arrowHeightPixels, y);
+                out.closePath();
+            }
+        }
+
+        out.transform(Transform.makeTranslation((float)tx, (float)ty));
         return out;
     }
     
@@ -1649,123 +1719,131 @@ public class CSSBorder extends Border {
             contentRect.setX(contentRect.getX() + c.getX());
             contentRect.setY(contentRect.getY() + c.getY());
             context = new Context(c, contentRect);
-            GeneralPath p = GeneralPath.createFromPool();
-            try {
-                createShape(p, contentRect.getX(), contentRect.getY(), contentRect.getWidth(), contentRect.getHeight());
-                
-                if (boxShadow != null) {
-                    boxShadow.paint(g, c, contentRect);
-                }
-                if (s.getBgTransparency() != 0) {
-                    g.setColor(s.getBgColor());
-                    int tp = s.getBgTransparency() & 0xff;
-                    int al = (int)Math.round(alpha * tp/255.0);
-                    g.setAlpha(al);
-                    g.fillShape(p);
-                    g.setColor(color);
-                    g.setAlpha(alpha);
-                    
-                }
+            String borderPathKey = "$$CSSBorderPath";
+            GeneralPath p = (GeneralPath) c.getClientProperty(borderPathKey);
+            if (p == null) {
+                p = new GeneralPath();
+                c.putClientProperty(borderPathKey, p);
+            }
 
-                if (hasBackgroundImages()) {
-                    int[] oldClip = g.getClip();
-                    g.setClip(p);
-                    g.clipRect(oldClip[0], oldClip[1], oldClip[2], oldClip[3]);
-                    for (BackgroundImage img : backgroundImages) {
-                        img.paint(g, c, contentRect);
-                    }
-                    g.setClip(oldClip);
+            createShape(
+                    p,
+                    contentRect.getX(),
+                    contentRect.getY(),
+                    contentRect.getWidth(),
+                    contentRect.getHeight(),
+                    createArrow(c)
+            );
+
+            if (boxShadow != null) {
+                boxShadow.paint(g, c, contentRect);
+            }
+            if (s.getBgTransparency() != 0) {
+                g.setColor(s.getBgColor());
+                int tp = s.getBgTransparency() & 0xff;
+                int al = (int)Math.round(alpha * tp/255.0);
+                g.setAlpha(al);
+                g.fillShape(p);
+                g.setColor(color);
+                g.setAlpha(alpha);
+
+            }
+
+            if (hasBackgroundImages()) {
+                int[] oldClip = g.getClip();
+                g.setClip(p);
+                g.clipRect(oldClip[0], oldClip[1], oldClip[2], oldClip[3]);
+                for (BackgroundImage img : backgroundImages) {
+                    img.paint(g, c, contentRect);
                 }
-                if (stroke != null) {
-                    if (allSidesHaveSameStroke() && stroke[TOP].isVisible()) {
-                        setColor(g,stroke[TOP].color);
-                        g.drawShape(p, stroke[TOP].getStroke(c, contentRect, true));
+                g.setClip(oldClip);
+            }
+            if (stroke != null) {
+                if (allSidesHaveSameStroke() && stroke[TOP].isVisible()) {
+                    setColor(g,stroke[TOP].color);
+                    g.drawShape(p, stroke[TOP].getStroke(c, contentRect, true));
+                } else {
+                    p.reset();
+                    double x = contentRect.getX();
+                    double y = contentRect.getY();
+                    double w = contentRect.getWidth();
+                    double h = contentRect.getHeight();
+                    if (hasBorderRadius()) {
+
+                        if (stroke[TOP].isVisible()) {
+                            p.moveTo(x, y + borderRadius.topLeftRadiusY());
+                            //p.arcTo(contentRect.getX() + borderRadius.topLeftRadiusX(), contentRect.getY() + borderRadius.topLeftRadiusY(), contentRect.getX() + borderRadius.topLeftRadiusX(), contentRect.getY());
+                            p.quadTo(x, y, x + borderRadius.topLeftRadiusX(), y);
+                            p.lineTo(x + w - borderRadius.topRightRadiusX(), y);
+                            //p.arcTo(contentRect.getX() + contentRect.getWidth() - borderRadius.topRightRadiusX(), contentRect.getY() + borderRadius.topRightRadiusY(), contentRect.getX() + contentRect.getWidth(), contentRect.getY() + borderRadius.topRightRadiusY());
+                            p.quadTo(x + w, y, x+w, y + borderRadius.topRightRadiusY());
+                            setColor(g, stroke[TOP].color);
+                            g.drawShape(p, stroke[TOP].getStroke(c, contentRect, true));
+                        }
+                        if (stroke[BOTTOM].isVisible()) {
+                            p.reset();
+                            p.moveTo(x, y + h - borderRadius.bottomLeftY());
+                            //p.arcTo(contentRect.getX() + borderRadius.bottomLeftX(), contentRect.getY() + contentRect.getHeight() - borderRadius.bottomLeftY(), contentRect.getX() + borderRadius.bottomLeftX(), contentRect.getY() + contentRect.getHeight());
+                            p.quadTo(x, y+h, x+borderRadius.bottomLeftX(), y+h);
+                            p.lineTo(x + w - borderRadius.bottomRightX(), y + h);
+                            //p.arcTo(contentRect.getX() + contentRect.getWidth() - borderRadius.bottomRightX(), contentRect.getY() + contentRect.getHeight() - borderRadius.bottomRightY(), contentRect.getX() + contentRect.getWidth(), contentRect.getY() + contentRect.getHeight() - borderRadius.bottomRightY());
+                            p.quadTo(x+w, y+h, x+w, y+h-borderRadius.bottomLeftY());
+                            setColor(g, stroke[BOTTOM].color);
+                            g.drawShape(p, stroke[BOTTOM].getStroke(c, contentRect, true));
+                        }
+                        if (stroke[LEFT].isVisible()) {
+                            p.reset();
+                            p.moveTo(x, y + borderRadius.topLeftRadiusY());
+                            p.lineTo(x, y + h - borderRadius.bottomLeftY());
+                            setColor(g, stroke[LEFT].color);
+                            g.drawShape(p, stroke[LEFT].getStroke(c, contentRect, false));
+                        }
+                        if (stroke[RIGHT].isVisible()) {
+                            p.reset();
+                            p.moveTo(x + w, y + borderRadius.topRightRadiusY());
+                            p.lineTo(x + w, y + h - borderRadius.bottomRightY());
+                            setColor(g, stroke[RIGHT].color);
+                            g.drawShape(p, stroke[RIGHT].getStroke(c, contentRect, false));
+                        }
+
+
                     } else {
-                        p.reset();
-                        double x = contentRect.getX();
-                        double y = contentRect.getY();
-                        double w = contentRect.getWidth();
-                        double h = contentRect.getHeight();
-                        if (hasBorderRadius()) {
-                            
-                            if (stroke[TOP].isVisible()) {
-                                p.moveTo(x, y + borderRadius.topLeftRadiusY());
-                                //p.arcTo(contentRect.getX() + borderRadius.topLeftRadiusX(), contentRect.getY() + borderRadius.topLeftRadiusY(), contentRect.getX() + borderRadius.topLeftRadiusX(), contentRect.getY());
-                                p.quadTo(x, y, x + borderRadius.topLeftRadiusX(), y);
-                                p.lineTo(x + w - borderRadius.topRightRadiusX(), y);
-                                //p.arcTo(contentRect.getX() + contentRect.getWidth() - borderRadius.topRightRadiusX(), contentRect.getY() + borderRadius.topRightRadiusY(), contentRect.getX() + contentRect.getWidth(), contentRect.getY() + borderRadius.topRightRadiusY());
-                                p.quadTo(x + w, y, x+w, y + borderRadius.topRightRadiusY());
-                                setColor(g, stroke[TOP].color);
-                                g.drawShape(p, stroke[TOP].getStroke(c, contentRect, true));
-                            }
-                            if (stroke[BOTTOM].isVisible()) {
-                                p.reset();
-                                p.moveTo(x, y + h - borderRadius.bottomLeftY());
-                                //p.arcTo(contentRect.getX() + borderRadius.bottomLeftX(), contentRect.getY() + contentRect.getHeight() - borderRadius.bottomLeftY(), contentRect.getX() + borderRadius.bottomLeftX(), contentRect.getY() + contentRect.getHeight());
-                                p.quadTo(x, y+h, x+borderRadius.bottomLeftX(), y+h);
-                                p.lineTo(x + w - borderRadius.bottomRightX(), y + h);
-                                //p.arcTo(contentRect.getX() + contentRect.getWidth() - borderRadius.bottomRightX(), contentRect.getY() + contentRect.getHeight() - borderRadius.bottomRightY(), contentRect.getX() + contentRect.getWidth(), contentRect.getY() + contentRect.getHeight() - borderRadius.bottomRightY());
-                                p.quadTo(x+w, y+h, x+w, y+h-borderRadius.bottomLeftY());
-                                setColor(g, stroke[BOTTOM].color);
-                                g.drawShape(p, stroke[BOTTOM].getStroke(c, contentRect, true));
-                            }
-                            if (stroke[LEFT].isVisible()) {
-                                p.reset();
-                                p.moveTo(x, y + borderRadius.topLeftRadiusY());
-                                p.lineTo(x, y + h - borderRadius.bottomLeftY());
-                                setColor(g, stroke[LEFT].color);
-                                g.drawShape(p, stroke[LEFT].getStroke(c, contentRect, false));
-                            }
-                            if (stroke[RIGHT].isVisible()) {
-                                p.reset();
-                                p.moveTo(x + w, y + borderRadius.topRightRadiusY());
-                                p.lineTo(x + w, y + h - borderRadius.bottomRightY());
-                                setColor(g, stroke[RIGHT].color);
-                                g.drawShape(p, stroke[RIGHT].getStroke(c, contentRect, false));
-                            }
-                            
-                            
-                        } else {
-                            
-                            if (stroke[TOP].isVisible()) {
-                                
-                                p.reset();
-                                p.moveTo(x, y);
-                                p.lineTo(x + w, y);
-                                
-                                setColor(g, stroke[TOP].color);
-                               
-                                Stroke st = stroke[TOP].getStroke(c, contentRect, true);
 
-                                g.drawShape(p, st);
-                            }
-                            if (stroke[BOTTOM].isVisible()) {
-                                p.reset();
-                                p.moveTo(x, y + h);
-                                p.lineTo(x + w,y + h);
-                                setColor(g, stroke[BOTTOM].color);
-                                g.drawShape(p, stroke[BOTTOM].getStroke(c, contentRect, true));
-                            }
-                            if (stroke[LEFT].isVisible()) {
-                                p.reset();
-                                p.moveTo(x, y);
-                                p.lineTo(x, y + h);
-                                setColor(g, stroke[LEFT].color);
-                                g.drawShape(p, stroke[LEFT].getStroke(c, contentRect, false));
-                            }
-                            if (stroke[RIGHT].isVisible()) {
-                                p.reset();
-                                p.moveTo(x + w, y);
-                                p.lineTo(x + w, y + h);
-                                setColor(g, stroke[RIGHT].color);
-                                g.drawShape(p, stroke[RIGHT].getStroke(c, contentRect, false));
-                            }
+                        if (stroke[TOP].isVisible()) {
+
+                            p.reset();
+                            p.moveTo(x, y);
+                            p.lineTo(x + w, y);
+
+                            setColor(g, stroke[TOP].color);
+
+                            Stroke st = stroke[TOP].getStroke(c, contentRect, true);
+
+                            g.drawShape(p, st);
+                        }
+                        if (stroke[BOTTOM].isVisible()) {
+                            p.reset();
+                            p.moveTo(x, y + h);
+                            p.lineTo(x + w,y + h);
+                            setColor(g, stroke[BOTTOM].color);
+                            g.drawShape(p, stroke[BOTTOM].getStroke(c, contentRect, true));
+                        }
+                        if (stroke[LEFT].isVisible()) {
+                            p.reset();
+                            p.moveTo(x, y);
+                            p.lineTo(x, y + h);
+                            setColor(g, stroke[LEFT].color);
+                            g.drawShape(p, stroke[LEFT].getStroke(c, contentRect, false));
+                        }
+                        if (stroke[RIGHT].isVisible()) {
+                            p.reset();
+                            p.moveTo(x + w, y);
+                            p.lineTo(x + w, y + h);
+                            setColor(g, stroke[RIGHT].color);
+                            g.drawShape(p, stroke[RIGHT].getStroke(c, contentRect, false));
                         }
                     }
                 }
-
-            } finally {
-                GeneralPath.recycle(p);
             }
         } finally {
             g.setAlpha(alpha);
@@ -2185,7 +2263,84 @@ public class CSSBorder extends Border {
         }
         return this;
     }
-    
-    
+
+    private Arrow createArrow(Component c) {
+        if (getTrackComponent() == null) {
+            return null;
+        }
+
+        return new Arrow(c);
+    }
+
+    private class Arrow {
+        int direction = -1;
+        float size = 1.5f;
+        float position = -1;
+        int trackComponentSide = -1;
+        float trackComponentHorizontalPosition = -1;
+        float trackComponentVerticalPosition = -1;
+
+        Arrow(Component c) {
+            if(getTrackComponent() != null) {
+                int cabsY = c.getAbsoluteY();
+                int trackY = getTrackComponent().getY();
+                int trackX = getTrackComponent().getX();
+                int cabsX = c.getAbsoluteX();
+                int arrowWH = CN.convertToPixels(size);
+                if(cabsY >= trackY + getTrackComponent().getHeight()) {
+                    // we are below the component
+                    direction = CN.TOP;
+                    position = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
+                } else {
+                    if(trackComponentSide == CN.BOTTOM || cabsY + c.getHeight() <= trackY) {
+                        // we are above the component
+                        direction = CN.BOTTOM;
+                        position = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
+                    }  else {
+                        if(cabsX >= trackX + getTrackComponent().getWidth()) {
+                            // we are to the right of the component
+                            direction = CN.LEFT;
+                            position = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;
+                        } else {
+                            if(cabsX + c.getWidth() <= trackX) {
+                                // we are to the left of the component
+                                direction = CN.RIGHT;
+                                position = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;
+                            }
+                        }
+                    }
+                }
+            } else if (trackComponentSide >= 0) {
+                switch (trackComponentSide) {
+                    case CN.TOP:
+                        direction = CN.TOP;
+                        position = 0;
+                        if (trackComponentHorizontalPosition >= 0) {
+                            position = (int)(c.getWidth() * trackComponentHorizontalPosition);
+                        }   break;
+                    case CN.BOTTOM:
+                        direction = CN.BOTTOM;
+                        position = 0;
+                        if (trackComponentHorizontalPosition >= 0) {
+                            position = (int)(c.getWidth() * trackComponentHorizontalPosition);
+                        }   break;
+                    case CN.LEFT:
+                        direction = CN.LEFT;
+                        position = 0;
+                        if (trackComponentVerticalPosition >= 0) {
+                            position = (int)(c.getHeight() * trackComponentVerticalPosition);
+                        }   break;
+                    case CN.RIGHT:
+                        direction = CN.RIGHT;
+                        position = 0;
+                        if (trackComponentVerticalPosition >= 0) {
+                            position = (int)(c.getHeight() * trackComponentVerticalPosition);
+                        }   break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
     
 }

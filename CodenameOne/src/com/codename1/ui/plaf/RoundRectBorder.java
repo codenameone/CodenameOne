@@ -26,8 +26,10 @@ package com.codename1.ui.plaf;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
@@ -49,6 +51,7 @@ import com.codename1.ui.geom.Rectangle;
  */
 public class RoundRectBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rrbcache";
+    private boolean useCache = true;
     private boolean dirty=true; 
     /**
      * The color of the edge of the border if applicable
@@ -265,6 +268,32 @@ public class RoundRectBorder extends Border {
      */
     public float getTrackComponentHorizontalPosition() {
         return trackComponentHorizontalPosition;
+    }
+    
+    /**
+     * Sets whether this RoundRectBorder instance should cache the border as a background image.
+     * 
+     * <p>This setting is on by default, but can be turned off, as some older, low-memory devices may run into
+     * memory trouble if it is using a lot of RoundRectBorders.  Turn the cache off for low-memory devices.</p>
+     * 
+     * <p><strong>NOTE:</strong> Using the cache is required for gaussian blur to work.  If cache is disabled,
+     * then gaussian blur settings will be ignored.</p>
+     * 
+     * @param useCache True to cache the border as a mutable image on the Component.
+     * @return Self for chaining.
+     * @since 8.0
+     */
+    public RoundRectBorder useCache(boolean useCache) {
+        this.useCache = useCache;
+        return this;
+    }
+    
+    /**
+     * Checks whether this RoundRectBorder instance caches the border as a background image.
+     * @return 
+     */
+    public boolean isUseCache() {
+        return this.useCache;
     }
     
     
@@ -533,9 +562,89 @@ public class RoundRectBorder extends Border {
         }
         return this;
     }
+
+
+    private Image createTargetComponentImage(final Component c, final int w, final int h, final boolean fast) {
+        return new com.codename1.ui.ComponentImage(new Component() {
+            @Override
+            public void paint(Graphics g) {
+                super.paint(g);
+                try {
+                    g.translate(getX(), getY());
+                    int shapeX = 0;
+                    int shapeY = 0;
+                    int shapeW = w;
+                    int shapeH = h;
+
+                    Graphics tg = g;
+                    tg.setAntiAliased(true);
+
+                    int shadowSpreadL = Display.getInstance().convertToPixels(shadowSpread);
+
+                    if (shadowOpacity > 0) {
+                        shapeW -= shadowSpreadL;
+                        shapeH -= shadowSpreadL;
+                        shapeX += Math.round(((float) shadowSpreadL) * shadowX);
+                        shapeY += Math.round(((float) shadowSpreadL) * shadowY);
+
+                        // draw a gradient of sort for the shadow
+                        for (int iter = shadowSpreadL - 1; iter >= 0; iter--) {
+                            tg.translate(iter, iter);
+                            int iterOpacity = Math.max(0, Math.min(255, (int) (shadowOpacity * (shadowSpreadL - iter) / (float) shadowSpreadL)));
+                            drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2));
+                            tg.translate(-iter, -iter);
+                        }
+                    }
+                    tg.translate(shapeX, shapeY);
+
+                    GeneralPath gp = createShape(shapeW, shapeH);
+                    Style s = c.getStyle();
+                    if (s.getBgImage() == null) {
+                        byte type = s.getBackgroundType();
+                        if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
+                            byte bgt = c.getStyle().getBgTransparency();
+                            if (bgt != 0) {
+                                tg.setAlpha(bgt & 0xff);
+                                tg.setColor(s.getBgColor());
+                                tg.fillShape(gp);
+                            }
+                            if (RoundRectBorder.this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                                tg.setAlpha(strokeOpacity);
+                                tg.setColor(strokeColor);
+                                tg.drawShape(gp, RoundRectBorder.this.stroke);
+                            }
+                            return;
+                        }
+                    }
+
+                    c.getStyle().setBorder(Border.createEmpty());
+                    tg.setClip(gp);
+                    s.getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
+                    if (RoundRectBorder.this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                        tg.setClip(0, 0, w, h);
+                        tg.setAlpha(strokeOpacity);
+                        tg.setColor(strokeColor);
+                        tg.drawShape(gp, RoundRectBorder.this.stroke);
+                    }
+                    c.getStyle().setBorder(RoundRectBorder.this);
+                    return;
+                } finally {
+                    g.translate(-getX(), -getY());
+                }
+            }
+        }, w, h);
+
+
+    }
+
+    
+    
     
     private Image createTargetImage(Component c, int w, int h, boolean fast) {
-        Image target = Image.createImage(w, h, 0);
+        if (!useCache) {
+            return createTargetComponentImage(c, w, h, fast);
+        }
+        Image target = ImageFactory.createImage(c, w, h, 0);
         
         int shapeX = 0;
         int shapeY = 0;
@@ -563,7 +672,7 @@ public class RoundRectBorder extends Border {
             
             if(Display.getInstance().isGaussianBlurSupported() && !fast) {
                 Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur/2);
-                target = Image.createImage(w, h, 0);
+                target = ImageFactory.createImage(c, w, h, 0);
                 tg = target.getGraphics();
                 tg.drawImage(blured, 0, 0);
                 tg.setAntiAliased(true);
@@ -716,21 +825,22 @@ public class RoundRectBorder extends Border {
             } else {
                 return;
             }
-
             Image target = createTargetImage(c, w, h, true);
             g.drawImage(target, x, y);
             c.putClientProperty(CACHE_KEY + instanceVal, target);
             dirty = false;
             // update the cache with a more refined version and repaint
-            Display.getInstance().callSeriallyOnIdle(new Runnable() {
-                public void run() {
-                    if(w == c.getWidth() && h == c.getHeight()) {
-                        Image target = createTargetImage(c, w, h, false);
-                        c.putClientProperty(CACHE_KEY + instanceVal, target);
-                        c.repaint();
+            if (!useCache) {
+                Display.getInstance().callSeriallyOnIdle(new Runnable() {
+                    public void run() {
+                        if (w == c.getWidth() && h == c.getHeight()) {
+                            Image target = createTargetImage(c, w, h, false);
+                            c.putClientProperty(CACHE_KEY + instanceVal, target);
+                            c.repaint();
+                        }
                     }
-                }
-            });
+                });
+            }
         } finally {
             g.setAntiAliased(antiAliased);
         }

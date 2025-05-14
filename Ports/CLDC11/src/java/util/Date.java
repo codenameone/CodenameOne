@@ -28,7 +28,7 @@ package java.util;
  * Although the Date class is intended to reflect coordinated universal time (UTC), it may not do so exactly, depending on the host environment of the Java Virtual Machine. Nearly all modern operating systems assume that 1 day = 24x60x60 = 86400 seconds in all cases. In UTC, however, about once every year or two there is an extra second, called a "leap second." The leap second is always added as the last second of the day, and always on December 31 or June 30. For example, the last minute of the year 1995 was 61 seconds long, thanks to an added leap second. Most computer clocks are not accurate enough to be able to reflect the leap-second distinction.
  * Version: CLDC 1.1 03/13/2002 (Based on JDK 1.3) See Also:TimeZone, Calendar
  */
-public class Date{
+public class Date implements Comparable<Date> {
     /**
      * Allocates a Date object and initializes it to represent the current time specified number of milliseconds since the standard base time known as "the epoch", namely January 1, 1970, 00:00:00 GMT.
      * See Also:System.currentTimeMillis()
@@ -80,6 +80,10 @@ public class Date{
      */
     public java.lang.String toString(){
         return null; //TODO codavaj!!
+    }
+
+    public int compareTo(Date arg0) {
+        return 0;
     }
 
 }

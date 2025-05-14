@@ -43,7 +43,7 @@ import java.io.IOException;
  * <script src="https://gist.github.com/codenameone/9dc822cf80cc8bf3a6cc.js"></script>
  * 
  * <p>The sample below demonstrates the usage of the background geofencing API:</p>
- * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+ * <script src="https://gist.github.com/shannah/a5592313da97e085822120af16518874.js"></script>
  * 
  */
 public abstract class LocationManager {
@@ -137,6 +137,11 @@ public abstract class LocationManager {
             }
         }
     }
+
+    protected final LocationListener getListener() {
+        return listener;
+    }
+
     /**
      * Returns the current location synchronously, this is useful if you just want
      * to know the location NOW and don't care about tracking location. Notice that
@@ -160,7 +165,7 @@ public abstract class LocationManager {
      */
     public Location getCurrentLocationSync(long timeout) {
         try {
-            if(getStatus() != AVAILABLE) {
+            if(listener == null) {
                 LL l = new LL();
                 l.timeout = timeout;
                 l.bind();

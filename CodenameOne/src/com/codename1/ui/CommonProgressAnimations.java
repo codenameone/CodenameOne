@@ -167,6 +167,7 @@ public class CommonProgressAnimations {
         @Override
         protected void paintBackground(Graphics g) {
             g.setColor(getStyle().getFgColor());
+            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());
             boolean anti = g.isAntiAliased();
             g.setAntiAliased(true);
             int d = Math.min(getWidth(), getHeight());
@@ -180,6 +181,7 @@ public class CommonProgressAnimations {
                 g.fillArc(x, y, w, h, 0, (720 - step));
             }
             g.setAntiAliased(anti);
+            g.setAlpha(alpha);
         }
 
         @Override
@@ -282,12 +284,14 @@ public class CommonProgressAnimations {
         protected void paintBackground(Graphics g) {
             strlen = loremIpsum.length();
             g.setColor(getStyle().getFgColor());
+
             int alpha = g.getAlpha();
             float pauseRatio = 1f;
             if (pauseCounter > 0) {
                 pauseRatio = pauseCounter / (float)pauseLength;
             }
             g.setAlpha((int)(getStyle().getOpacity()/255f * alpha * pauseRatio));
+            g.concatenateAlpha(getStyle().getFgAlpha());
             Font f = cmp == null ? getStyle().getFont() : cmp.getStyle().getFont();
             if (f == null) {
                 f = Font.getDefaultFont();

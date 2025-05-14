@@ -108,6 +108,7 @@ public class SwipeableContainer extends Container {
      * {@inheritDoc}
      */
     protected void deinitialize() {
+        waitForRelease = false;
         Form form = this.getComponentForm();
         if (form != null) {
             form.removePointerPressedListener(press);
@@ -189,15 +190,18 @@ public class SwipeableContainer extends Container {
         if (!open) {
             return;
         }
-        if (openedToRight) {
-            int topX = topWrapper.getX();
-            openCloseMotion = Motion.createSplineMotion(topX, 0, 300);
-        } else {
-            int topX = topWrapper.getX();
-            openCloseMotion = Motion.createSplineMotion(-topX, 0, 300);
+        Form f = getComponentForm();
+        if(f != null) {
+            if (openedToRight) {
+                int topX = topWrapper.getX();
+                openCloseMotion = Motion.createSplineMotion(topX, 0, 300);
+            } else {
+                int topX = topWrapper.getX();
+                openCloseMotion = Motion.createSplineMotion(-topX, 0, 300);
+            }
+            f.registerAnimated(this);
+            openCloseMotion.start();
         }
-        getComponentForm().registerAnimated(this);
-        openCloseMotion.start();
         open = false;
     }
 
@@ -427,7 +431,7 @@ public class SwipeableContainer extends Container {
                                     open = true;
                                     close();
                                 }
-                            } else {
+                            } else if (topX < 0) { //check explicitly if opened to the left
                                 if (Display.getInstance().getDragSpeed(false) > 0) {
                                     open = false;
                                     openedToLeft = false;

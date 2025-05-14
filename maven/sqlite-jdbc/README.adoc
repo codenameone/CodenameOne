@@ -1,0 +1,6 @@
+= sqlite-jdbc Shaded Jar
+
+This is a shaded jar that includes the sqlite-jdbc jar with the slf4j-api jar shaded into it at a different package,
+so as not to conflict with other libraries that might include slf4j.
+
+We needed to add this when we upgraded to version 3.46.1.0 of the sqlite-jdbc library, because it adds a dependency on slf4j-api.

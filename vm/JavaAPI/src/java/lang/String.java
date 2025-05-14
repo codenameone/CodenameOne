@@ -789,6 +789,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
 
     public native java.lang.String toUpperCase();
     
+    public java.lang.String toUpperCase(java.util.Locale locale) {
+        return toUpperCase();
+    }
+    
     /**
      * Removes white space from both ends of this string.
      * If this String object represents an empty character sequence, or the first and last characters of character sequence represented by this String object both have codes greater than 'u0020' (the space character), then a reference to this String object is returned.

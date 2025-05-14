@@ -85,7 +85,7 @@ public class Canvas  {
         //Log.p("Applyingn paint : "+paint);
         g.setColor(paint.getColor());
         int alpha = ColorUtil.alpha(paint.getColor());
-        g.setAlpha(alpha);
+        g.concatenateAlpha(alpha);
         if ( forText ){
             Font typeFace = paint.getTypeface();
             if ( typeFace != null ){

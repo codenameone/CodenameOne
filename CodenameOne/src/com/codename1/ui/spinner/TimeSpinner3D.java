@@ -46,6 +46,8 @@ import java.util.Date;
  * @author Steve Hannah
  */
 class TimeSpinner3D extends Container implements InternalPickerWidget {
+
+    static final int DEFAULT_MINUTE_STEP = 5;
     private Spinner3D hour;
     private Spinner3D minute;
     private Spinner3D amPM;
@@ -54,8 +56,8 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     private int maxHour = -1;
     
     private int startHour = 1;
-    private int endHour = 13;
-    private int minuteStep = 5;
+    private int endHour = 12;
+    private int minuteStep = DEFAULT_MINUTE_STEP;
 
     private boolean durationMode;
     private boolean showHours=true;
@@ -68,8 +70,13 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     /**
      * Default constructor
      */
-    public TimeSpinner3D() {
+    public TimeSpinner3D(int minuteStep) {
+        this.minuteStep = minuteStep;
         initSpinner();
+    }
+
+    public TimeSpinner3D() {
+        this(DEFAULT_MINUTE_STEP);
     }
     
     /**
@@ -93,7 +100,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
             hourStyle.setAlignment(Component.RIGHT);
             hourStyle.setPaddingRight(3f);
             //hour.refreshStyles();
-            minute = Spinner3D.create(0, 60, currentMinute, minuteStep);
+            minute = Spinner3D.create(0, 59, currentMinute, minuteStep);
             minute.setRowFormatter(new SpinnerNode.RowFormatter() {
 
                 @Override
@@ -339,14 +346,14 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     private void rebuildHours() {
         if(showMeridiem) {
             startHour = 1;
-            endHour = 13;
+            endHour = 12;
         } else {
             startHour = 0;
-            endHour = 24;
-            if (minHour >= 0 && minHour <= 24) {
+            endHour = 23;
+            if (minHour >= 0 && minHour <= 23) {
                 startHour = minHour;
             }
-            if (maxHour >= 0 && maxHour <= 24 && maxHour > startHour) {
+            if (maxHour >= 0 && maxHour <= 23 && maxHour > startHour) {
                 endHour = maxHour;
             }
         }

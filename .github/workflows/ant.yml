@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  build-linux-jdk8-fx:
+  build-linux-jdk8:
 
     runs-on: ubuntu-latest
 
@@ -16,49 +16,31 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 1.8
-        java-package: jdk+fx
+        java-package: jdk
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install xvfb
-    - name: Build with Ant
-      run: xvfb-run ant test-javase
+    - name: Build with Maven
+      run: |
+        cd maven
+        xvfb-run -a mvn install
+      
 
-    - name: Fetch JavaDoc Source Embed
+    - name: Fetch archetype projects
       uses: carlosperate/download-file-action@v1.0.3
       with:
-        file-url: https://github.com/codenameone/JavaDocSourceEmbed/releases/download/refs%2Fheads%2Fmaster/JavaDocSourceEmbed-1.0-SNAPSHOT.jar
-        file-name: JavaDocSourceEmbed.jar
-            
-    - name: Build Release
-      run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
-
-    - name: Build iOS Port
-      run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
-
-    - name: Build iOS VM API
-      run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
-
-    - name: Build iOS VM
-      run: ant -noinput -buildfile vm/ByteCodeTranslator/build.xml jar
-
-    - name: Build Android Port
-      run: ant -noinput -buildfile Ports/Android/build.xml jar
-
-    - name: Build JavaDoc
-      if: github.ref == 'refs/heads/master'
+        file-url: https://github.com/shannah/cn1-maven-archetypes/archive/refs/heads/master.zip
+        file-name: cn1-maven-archetypes.zip 
+    - name: Install archetype projects
       run: |
-        echo "Deleting old/temporary files"
-        rm -Rf CodenameOne/dist/javadoc
-        rm -Rf CodenameOne/build/tempJavaSources
-        echo "Creating JavaDoc Dir"
-        mkdir -p CodenameOne/build
-        mkdir -p CodenameOne/build/tempJavaSources
-        echo "Running JavaDocSourceEmbed"
-        java -jar JavaDocSourceEmbed.jar CodenameOne/src CodenameOne/build/tempJavaSources
-        echo "Analyzing packages"
-        find CodenameOne/build/tempJavaSources Ports/CLDC11/src -name "*.java" | grep -v /impl/ > tmp.packages
-        echo "Running JavaDoc"
-        cat tmp.packages | xargs javadoc --allow-script-in-comments -protected -d CodenameOne/dist/javadoc -windowtitle "Codename One API" || true
-        echo "Zipping JavaDoc bundle"
-        cd CodenameOne/dist/javadoc
-        zip -r ../../../javadoc.zip *
-        cd ../../..
+        unzip cn1-maven-archetypes.zip
+        cd cn1-maven-archetypes-master
+        xvfb-run -a mvn install archetype:update-local-catalog
+        xvfb-run -a mvn archetype:crawl
+    - name: Run Maven Unit Tests
+      run: |
+        pwd
+        xvfb-run -a bash tests/all.sh
+        cd maven/integration-tests
+        xvfb-run -a bash all.sh
+
+  

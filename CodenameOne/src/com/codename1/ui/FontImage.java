@@ -94,6 +94,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_123 = '\uEB8D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_12MP = '\uE954';
     /**
      * Material design icon font character code see
@@ -124,6 +129,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_18_UP_RATING = '\uF8FD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_18MP = '\uE95A';
     /**
      * Material design icon font character code see
@@ -140,6 +150,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_1K_PLUS = '\uE95D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_1X_MOBILEDATA = '\uEFCD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -184,12 +199,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_30FPS = '\uEFCE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_30FPS_SELECT = '\uEFCF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_360 = '\uE577';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_3D_ROTATION = '\uE84D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_3G_MOBILEDATA = '\uEFD0';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -205,6 +235,21 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_3MP = '\uE968';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_3P = '\uEFD1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_4G_MOBILEDATA = '\uEFD2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_4G_PLUS_MOBILEDATA = '\uEFD3';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -240,6 +285,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_5MP = '\uE96D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_60FPS = '\uEFD4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_60FPS_SELECT = '\uEFD5';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -309,6 +364,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ABC = '\uEB94';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_AC_UNIT = '\uEB3B';
     /**
      * Material design icon font character code see
@@ -325,6 +385,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ACCESS_TIME = '\uE192';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ACCESS_TIME_FILLED = '\uEFD6';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -419,6 +484,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ADD_CARD = '\uEB86';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ADD_CHART = '\uE97B';
     /**
      * Material design icon font character code see
@@ -435,6 +505,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ADD_COMMENT = '\uE266';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_HOME = '\uF8EB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_HOME_WORK = '\uF8ED';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -465,6 +545,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ADD_PHOTO_ALTERNATE = '\uE43E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ADD_REACTION = '\uE1D3';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -509,6 +594,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ADF_SCANNER = '\uEADA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ADJUST = '\uE39E';
     /**
      * Material design icon font character code see
@@ -519,7 +609,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ADOBE = '\uEA96';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ADS_CLICK = '\uE762';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_AGRICULTURE = '\uEA79';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_AIR = '\uEFD8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -560,6 +665,21 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_AIRLINE_SEAT_RECLINE_NORMAL = '\uE637';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_AIRLINE_STOPS = '\uE7D0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_AIRLINES = '\uE7CA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_AIRPLANE_TICKET = '\uEFD9';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -704,6 +824,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_AOD = '\uEFDA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_APARTMENT = '\uEA40';
     /**
      * Material design icon font character code see
@@ -729,12 +854,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_APP_SHORTCUT = '\uEAE4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_APPLE = '\uEA80';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_APPROVAL = '\uE982';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_APPS = '\uE5C3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_APPS_OUTAGE = '\uE7CC';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -749,6 +889,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_AREA_CHART = '\uE770';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ARROW_BACK = '\uE5C4';
     /**
      * Material design icon font character code see
@@ -759,7 +904,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ARROW_BACK_IOS_NEW = '\uE2EA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ARROW_CIRCLE_DOWN = '\uF181';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_CIRCLE_LEFT = '\uEAA7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_CIRCLE_RIGHT = '\uEAAA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -800,6 +960,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ARROW_LEFT = '\uE5DE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ARROW_OUTWARD = '\uF8CE';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -869,6 +1034,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ASSIST_WALKER = '\uF8D5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ASSISTANT = '\uE39F';
     /**
      * Material design icon font character code see
@@ -885,6 +1055,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ASSISTANT_PHOTO = '\uE3A0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ASSURED_WORKLOAD = '\uEB6F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -915,6 +1090,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ATTRACTIONS = '\uEA52';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ATTRIBUTION = '\uEFDB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_AUDIO_FILE = '\uEB82';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -959,7 +1144,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_AUTO_GRAPH = '\uE4FB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_AUTO_MODE = '\uEC20';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_AUTO_STORIES = '\uE666';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_AUTOFPS_SELECT = '\uEFDC';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -975,6 +1175,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_BABY_CHANGING_STATION = '\uF19B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BACK_HAND = '\uE764';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1009,6 +1214,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BALANCE = '\uEAF6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BALCONY = '\uE58F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BALLOT = '\uE172';
     /**
      * Material design icon font character code see
@@ -1024,7 +1239,47 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BATHROOM = '\uEFDD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BATHTUB = '\uEA41';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BATTERY_0_BAR = '\uEBDC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BATTERY_1_BAR = '\uEBD9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BATTERY_2_BAR = '\uEBE0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BATTERY_3_BAR = '\uEBDD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BATTERY_4_BAR = '\uEBE2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BATTERY_5_BAR = '\uEBD4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BATTERY_6_BAR = '\uEBD2';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1044,6 +1299,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BATTERY_SAVER = '\uEFDE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BATTERY_STD = '\uE1A5';
     /**
      * Material design icon font character code see
@@ -1059,7 +1319,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BED = '\uEFDF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BEDROOM_BABY = '\uEFE0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BEDROOM_CHILD = '\uEFE1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BEDROOM_PARENT = '\uEFE2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BEDTIME = '\uEF44';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BEDTIME_OFF = '\uEB76';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1084,12 +1369,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BLENDER = '\uEFE3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BLIND = '\uF8D6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BLINDS = '\uE286';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BLINDS_CLOSED = '\uEC1F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BLOCK = '\uE14B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_BLOCK_FLIPPED = '\uEF46';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BLOODTYPE = '\uEFE4';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1110,6 +1420,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_BLUETOOTH_DISABLED = '\uE1A9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BLUETOOTH_DRIVE = '\uEFE5';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1159,12 +1474,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BOOKMARK_ADD = '\uE598';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BOOKMARK_ADDED = '\uE599';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BOOKMARK_BORDER = '\uE867';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_BOOKMARK_OUTLINE = '\uE867';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BOOKMARK_REMOVE = '\uE59A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1234,6 +1564,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BOY = '\uEB67';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BRANDING_WATERMARK = '\uE06B';
     /**
      * Material design icon font character code see
@@ -1299,12 +1634,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BROADCAST_ON_HOME = '\uF8F8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BROADCAST_ON_PERSONAL = '\uF8F9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BROKEN_IMAGE = '\uE3AD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BROWSE_GALLERY = '\uEBD1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BROWSER_NOT_SUPPORTED = '\uEF47';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_BROWSER_UPDATED = '\uE7CF';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1339,6 +1694,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_BUNGALOW = '\uE591';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_BURST_MODE = '\uE43C';
     /**
      * Material design icon font character code see
@@ -1359,6 +1719,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CABIN = '\uE589';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CABLE = '\uEFE6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CACHED = '\uE86A';
     /**
      * Material design icon font character code see
@@ -1374,12 +1744,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CALENDAR_MONTH = '\uEBCC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CALENDAR_TODAY = '\uE935';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CALENDAR_VIEW_DAY = '\uE936';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CALENDAR_VIEW_MONTH = '\uEFE7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CALENDAR_VIEW_WEEK = '\uEFE8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1449,12 +1834,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CAMERA_INDOOR = '\uEFE9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CAMERA_OUTDOOR = '\uEFEA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CAMERA_REAR = '\uE3B2';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CAMERA_ROLL = '\uE3B3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CAMERASWITCH = '\uEFEB';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1475,6 +1875,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CANCEL_SCHEDULE_SEND = '\uEA39';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CANDLESTICK_CHART = '\uEAD4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CAR_CRASH = '\uEBF2';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1534,12 +1944,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CASTLE = '\uEAB1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CATCHING_POKEMON = '\uE508';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CATEGORY = '\uE574';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CELEBRATION = '\uEA65';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CELL_TOWER = '\uEBBA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1555,6 +1980,26 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CENTER_FOCUS_WEAK = '\uE3B5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CHAIR = '\uEFED';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CHAIR_ALT = '\uEFEE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CHALET = '\uE585';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CHANGE_CIRCLE = '\uE2E7';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1609,6 +2054,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CHECKLIST = '\uE6B1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CHECKLIST_RTL = '\uE6B3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CHECKROOM = '\uF19E';
     /**
      * Material design icon font character code see
@@ -1635,6 +2090,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CHROME_READER_MODE = '\uE86D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CHURCH = '\uEAAE';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1729,12 +2189,47 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CLOUD_SYNC = '\uEB5A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CLOUD_UPLOAD = '\uE2C3';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CLOUDY_SNOWING = '\uE810';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CO2 = '\uE7B0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CO_PRESENT = '\uEAF0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CODE = '\uE86F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CODE_OFF = '\uE4F3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_COFFEE = '\uEFEF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_COFFEE_MAKER = '\uEFF0';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1769,6 +2264,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_COMMENTS_DISABLED = '\uE7A2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_COMMIT = '\uEAF5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_COMMUTE = '\uE940';
     /**
      * Material design icon font character code see
@@ -1785,6 +2290,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_COMPASS_CALIBRATION = '\uE57C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_COMPOST = '\uE761';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1819,7 +2329,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CONNECTING_AIRPORTS = '\uE7C9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CONSTRUCTION = '\uEA3C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CONTACT_EMERGENCY = '\uF8D1';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1869,6 +2389,26 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CONTENT_PASTE_GO = '\uEA8E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CONTENT_PASTE_OFF = '\uE4F8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CONTENT_PASTE_SEARCH = '\uEA9B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CONTRAST = '\uEB37';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_CONTROL_CAMERA = '\uE074';
     /**
      * Material design icon font character code see
@@ -1884,6 +2424,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_COOKIE = '\uEAAC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_COPY_ALL = '\uE2EC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_COPYRIGHT = '\uE90C';
     /**
      * Material design icon font character code see
@@ -1895,6 +2445,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CORPORATE_FARE = '\uF1D0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_COTTAGE = '\uE587';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1915,6 +2470,26 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_CREDIT_CARD = '\uE870';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CREDIT_CARD_OFF = '\uE4F4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CREDIT_SCORE = '\uEFF1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CRIB = '\uE588';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CRISIS_ALERT = '\uEBE9';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1979,7 +2554,82 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_CRUELTY_FREE = '\uE799';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CSS = '\uEB93';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_BITCOIN = '\uEBC5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_EXCHANGE = '\uEB70';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_FRANC = '\uEAFA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_LIRA = '\uEAEF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_POUND = '\uEAF1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_RUBLE = '\uEAEC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_RUPEE = '\uEAF7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_YEN = '\uEAFB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURRENCY_YUAN = '\uEAF9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURTAINS = '\uEC1E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CURTAINS_CLOSED = '\uEC1D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_CYCLONE = '\uEBD5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DANGEROUS = '\uE99A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DARK_MODE = '\uE51C';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -1994,12 +2644,57 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DATA_ARRAY = '\uEAD1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DATA_EXPLORATION = '\uE76F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DATA_OBJECT = '\uEAD3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DATA_SAVER_OFF = '\uEFF2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DATA_SAVER_ON = '\uEFF3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DATA_THRESHOLDING = '\uEB9F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DATA_USAGE = '\uE1AF';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DATASET = '\uF8EE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DATASET_LINKED = '\uF8EF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DATE_RANGE = '\uE916';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DEBLUR = '\uEB77';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2039,6 +2734,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DENSITY_LARGE = '\uEBA9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DENSITY_MEDIUM = '\uEB9E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DENSITY_SMALL = '\uEBA8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DEPARTURE_BOARD = '\uE576';
     /**
      * Material design icon font character code see
@@ -2049,7 +2759,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DESELECT = '\uEBB6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DESIGN_SERVICES = '\uF10A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DESK = '\uF8F4';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2079,6 +2799,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DEVELOPER_BOARD_OFF = '\uE4FF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DEVELOPER_MODE = '\uE1B0';
     /**
      * Material design icon font character code see
@@ -2104,6 +2829,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DEVICES_FOLD = '\uEBDE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DEVICES_OTHER = '\uE337';
     /**
      * Material design icon font character code see
@@ -2115,6 +2845,21 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_DIALPAD = '\uE0BC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DIAMOND = '\uEAD5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DIFFERENCE = '\uEB7D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DINING = '\uEFF4';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2139,12 +2884,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DIRECTIONS_BOAT_FILLED = '\uEFF5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DIRECTIONS_BUS = '\uE530';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DIRECTIONS_BUS_FILLED = '\uEFF6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DIRECTIONS_CAR = '\uE531';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DIRECTIONS_CAR_FILLED = '\uEFF7';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2164,6 +2924,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DIRECTIONS_RAILWAY_FILLED = '\uEFF8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DIRECTIONS_RUN = '\uE566';
     /**
      * Material design icon font character code see
@@ -2174,12 +2939,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DIRECTIONS_SUBWAY_FILLED = '\uEFF9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DIRECTIONS_TRAIN = '\uE534';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_DIRECTIONS_TRANSIT = '\uE535';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DIRECTIONS_TRANSIT_FILLED = '\uEFFA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2199,7 +2974,42 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DISABLED_VISIBLE = '\uE76E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DISC_FULL = '\uE610';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DISCORD = '\uEA6C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DISCOUNT = '\uEBC9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DISPLAY_SETTINGS = '\uEB97';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DIVERSITY_1 = '\uF8D7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DIVERSITY_2 = '\uF8D8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DIVERSITY_3 = '\uF8D9';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2210,6 +3020,26 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_DNS = '\uE875';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DO_DISTURB = '\uF08C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DO_DISTURB_ALT = '\uF08D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DO_DISTURB_OFF = '\uF08E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DO_DISTURB_ON = '\uF08F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2234,6 +3064,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DO_NOT_DISTURB_ON_TOTAL_SILENCE = '\uEFFB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DO_NOT_STEP = '\uF19F';
     /**
      * Material design icon font character code see
@@ -2249,7 +3084,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DOCUMENT_SCANNER = '\uE5FA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DOMAIN = '\uE7EE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOMAIN_ADD = '\uEB62';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2289,7 +3134,52 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DOOR_BACK = '\uEFFC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOOR_FRONT = '\uEFFD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOOR_SLIDING = '\uEFFE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOORBELL = '\uEFFF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DOUBLE_ARROW = '\uEA50';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOWNHILL_SKIING = '\uE509';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOWNLOAD = '\uF090';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOWNLOAD_DONE = '\uF091';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOWNLOAD_FOR_OFFLINE = '\uF000';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DOWNLOADING = '\uF001';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2309,6 +3199,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_DRAW = '\uE746';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_DRIVE_ETA = '\uE613';
     /**
      * Material design icon font character code see
@@ -2320,6 +3215,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_DRIVE_FILE_MOVE_OUTLINE = '\uE9A1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_DRIVE_FILE_MOVE_RTL = '\uE76D';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2364,12 +3264,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_E_MOBILEDATA = '\uF002';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EARBUDS = '\uF003';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EARBUDS_BATTERY = '\uF004';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_EAST = '\uF1DF';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ECO = '\uEA35';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EDGESENSOR_HIGH = '\uF005';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EDGESENSOR_LOW = '\uF006';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2384,7 +3309,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_EDIT_CALENDAR = '\uE742';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_EDIT_LOCATION = '\uE568';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EDIT_LOCATION_ALT = '\uE1C5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EDIT_NOTE = '\uE745';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EDIT_NOTIFICATIONS = '\uE525';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2399,6 +3344,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_EGG = '\uEACC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EGG_ALT = '\uEAC8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_EJECT = '\uE8FB';
     /**
      * Material design icon font character code see
@@ -2409,12 +3364,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ELDERLY_WOMAN = '\uEB69';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ELECTRIC_BIKE = '\uEB1B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ELECTRIC_BOLT = '\uEC1C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ELECTRIC_CAR = '\uEB1C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ELECTRIC_METER = '\uEC1B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2445,6 +3415,21 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_EMAIL = '\uE0BE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EMERGENCY = '\uE1EB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EMERGENCY_RECORDING = '\uEBF4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EMERGENCY_SHARE = '\uEBF6';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2490,6 +3475,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_EMOJI_TRANSPORTATION = '\uEA1F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ENERGY_SAVINGS_LEAF = '\uEC1A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2569,6 +3559,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_EVENT_REPEAT = '\uEB7B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_EVENT_SEAT = '\uE903';
     /**
      * Material design icon font character code see
@@ -2580,6 +3575,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_EXPAND = '\uE94F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_EXPAND_CIRCLE_DOWN = '\uE7CD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2654,12 +3654,47 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_EXTENSION_OFF = '\uE4F5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FACE = '\uE87C';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FACE_2 = '\uF8DA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FACE_3 = '\uF8DB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FACE_4 = '\uF8DC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FACE_5 = '\uF8DD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FACE_6 = '\uF8DE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FACE_RETOUCHING_NATURAL = '\uEF4E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FACE_RETOUCHING_OFF = '\uF007';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2670,6 +3705,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_FACT_CHECK = '\uF0C5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FACTORY = '\uEBBC';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2709,6 +3749,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FAX = '\uEAD8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FEATURED_PLAY_LIST = '\uE06D';
     /**
      * Material design icon font character code see
@@ -2719,7 +3764,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FEED = '\uF009';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FEEDBACK = '\uE87F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FEMALE = '\uE590';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2770,6 +3825,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_FILE_DOWNLOAD_DONE = '\uE9AA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FILE_DOWNLOAD_OFF = '\uE4FE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FILE_OPEN = '\uEAF3';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2844,6 +3909,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FILTER_ALT_OFF = '\uEB32';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FILTER_B_AND_W = '\uE3DB';
     /**
      * Material design icon font character code see
@@ -2875,6 +3945,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_FILTER_LIST_ALT = '\uE94E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FILTER_LIST_OFF = '\uEB57';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2919,6 +3994,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FIRE_HYDRANT_ALT = '\uF8F1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FIRE_TRUCK = '\uF8F2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FIREPLACE = '\uEA43';
     /**
      * Material design icon font character code see
@@ -2934,12 +4019,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FITBIT = '\uE82B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FITNESS_CENTER = '\uEB43';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_FLAG = '\uE153';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FLAG_CIRCLE = '\uEAF8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -2969,7 +4064,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FLASHLIGHT_OFF = '\uF00A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FLASHLIGHT_ON = '\uF00B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FLATWARE = '\uF00C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FLIGHT = '\uE539';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FLIGHT_CLASS = '\uE7CB';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3009,7 +4124,52 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FLOOD = '\uEBE6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FLOURESCENT = '\uF00D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FLUTTER_DASH = '\uE00B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FMD_BAD = '\uF00E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FMD_GOOD = '\uF00F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FOGGY = '\uE818';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FOLDER = '\uE2C7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FOLDER_COPY = '\uEBBD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FOLDER_DELETE = '\uEB34';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FOLDER_OFF = '\uEB83';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3029,6 +4189,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FOLDER_ZIP = '\uEB2C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FOLLOW_THE_SIGNS = '\uF222';
     /**
      * Material design icon font character code see
@@ -3039,7 +4204,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FONT_DOWNLOAD_OFF = '\uE4F9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FOOD_BANK = '\uF1F2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FOREST = '\uEA99';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FORK_LEFT = '\uEBA0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FORK_RIGHT = '\uEBAC';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3124,6 +4309,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FORMAT_OVERLINE = '\uEB65';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FORMAT_PAINT = '\uE243';
     /**
      * Material design icon font character code see
@@ -3169,6 +4359,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FORT = '\uEAAD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FORUM = '\uE0BF';
     /**
      * Material design icon font character code see
@@ -3209,6 +4404,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_FREE_CANCELLATION = '\uE748';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_FRONT_HAND = '\uE769';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_FULLSCREEN = '\uE5D0';
     /**
      * Material design icon font character code see
@@ -3220,6 +4425,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_FUNCTIONS = '\uE24A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_G_MOBILEDATA = '\uF010';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3239,7 +4449,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_GARAGE = '\uF011';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GAS_METER = '\uEC19';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_GAVEL = '\uE90E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GENERATING_TOKENS = '\uE749';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3259,7 +4484,42 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_GIF_BOX = '\uE7A3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GIRL = '\uEB68';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GITE = '\uE58B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    // public static final char MATERIAL_GOAT = '\u10FFFD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_GOLF_COURSE = '\uEB45';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GPP_BAD = '\uF012';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GPP_GOOD = '\uF013';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GPP_MAYBE = '\uF014';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3309,6 +4569,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_GRID_3X3 = '\uF015';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GRID_4X4 = '\uF016';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GRID_GOLDENRATIO = '\uF017';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_GRID_OFF = '\uE3EB';
     /**
      * Material design icon font character code see
@@ -3334,6 +4609,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_GROUP_OFF = '\uE747';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GROUP_REMOVE = '\uE7AD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_GROUP_WORK = '\uE886';
     /**
      * Material design icon font character code see
@@ -3344,7 +4629,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_GROUPS_2 = '\uF8DF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_GROUPS_3 = '\uF8E0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_H_MOBILEDATA = '\uF018';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_H_PLUS_MOBILEDATA = '\uF019';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HAIL = '\uE9B1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HANDSHAKE = '\uEBCB';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3364,6 +4674,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HDR_AUTO = '\uF01A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HDR_AUTO_SELECT = '\uF01B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HDR_ENHANCED_SELECT = '\uEF51';
     /**
      * Material design icon font character code see
@@ -3374,7 +4694,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HDR_OFF_SELECT = '\uF01C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HDR_ON = '\uE3EE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HDR_ON_SELECT = '\uF01D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HDR_PLUS = '\uF01E';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3385,6 +4720,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_HDR_WEAK = '\uE3F2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HEADPHONES = '\uF01F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HEADPHONES_BATTERY = '\uF020';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3409,12 +4754,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HEALTH_AND_SAFETY = '\uE1D5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HEARING = '\uE023';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_HEARING_DISABLED = '\uF104';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HEART_BROKEN = '\uEAC2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HEAT_PUMP = '\uEC18';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3435,6 +4795,26 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_HELP_OUTLINE = '\uE8FD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HEVC = '\uF021';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HEXAGON = '\uEB39';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HIDE_IMAGE = '\uF022';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HIDE_SOURCE = '\uF023';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3464,6 +4844,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HIKING = '\uE50A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HISTORY = '\uE889';
     /**
      * Material design icon font character code see
@@ -3479,12 +4864,42 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HIVE = '\uEAA6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HLS = '\uEB8A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HLS_OFF = '\uEB8C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HOLIDAY_VILLAGE = '\uE58A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HOME = '\uE88A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_HOME_FILLED = '\uE9B2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HOME_MAX = '\uF024';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HOME_MINI = '\uF025';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3524,6 +4939,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HOTEL_CLASS = '\uE743';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HOURGLASS_BOTTOM = '\uEA5C';
     /**
      * Material design icon font character code see
@@ -3559,12 +4979,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HOUSEBOAT = '\uE584';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HOW_TO_REG = '\uE174';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_HOW_TO_VOTE = '\uE175';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_HTML = '\uEB7E';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3579,7 +5009,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_HUB = '\uE9F4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_HVAC = '\uF10E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ICE_SKATING = '\uE50B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3630,6 +5070,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_INBOX = '\uE156';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_INCOMPLETE_CIRCLE = '\uE79B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3689,6 +5134,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_INSERT_PAGE_BREAK = '\uEACA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_INSERT_PHOTO = '\uE251';
     /**
      * Material design icon font character code see
@@ -3699,12 +5149,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_INSTALL_DESKTOP = '\uEB71';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_INSTALL_MOBILE = '\uEB72';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_INTEGRATION_INSTRUCTIONS = '\uEF54';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_INTERESTS = '\uE7C8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_INTERPRETER_MODE = '\uE83B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_INVENTORY = '\uE179';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_INVENTORY_2 = '\uE1A1';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3729,12 +5204,67 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_IRON = '\uE583';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ISO = '\uE3F6';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_JAVASCRIPT = '\uEB7C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_JOIN_FULL = '\uEAEB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_JOIN_INNER = '\uEAF4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_JOIN_LEFT = '\uEAF2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_JOIN_RIGHT = '\uEAEA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KAYAKING = '\uE50C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEBAB_DINING = '\uE842';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEY = '\uE73C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEY_OFF = '\uEB84';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_KEYBOARD = '\uE312';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_ALT = '\uF028';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3769,12 +5299,57 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_KEYBOARD_COMMAND = '\uEAE0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_COMMAND_KEY = '\uEAE7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_KEYBOARD_CONTROL = '\uE5D3';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_KEYBOARD_CONTROL_KEY = '\uEAE6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_DOUBLE_ARROW_DOWN = '\uEAD0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_DOUBLE_ARROW_LEFT = '\uEAC3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_DOUBLE_ARROW_RIGHT = '\uEAC9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_DOUBLE_ARROW_UP = '\uEACF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_KEYBOARD_HIDE = '\uE31A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_OPTION = '\uEADF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_KEYBOARD_OPTION_KEY = '\uEAE8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3804,6 +5379,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_KITESURFING = '\uE50D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_LABEL = '\uE892';
     /**
      * Material design icon font character code see
@@ -3829,7 +5409,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_LAN = '\uEB2F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_LANDSCAPE = '\uE3F7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_LANDSLIDE = '\uEBD7';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3909,6 +5499,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_LENS_BLUR = '\uF029';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_LIBRARY_ADD = '\uE02E';
     /**
      * Material design icon font character code see
@@ -3929,12 +5524,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_LIGHT = '\uF02A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_LIGHT_MODE = '\uE518';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_LIGHTBULB = '\uE0F0';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_LIGHTBULB_CIRCLE = '\uEBFE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_LIGHTBULB_OUTLINE = '\uE90F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_LINE_AXIS = '\uEA9A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -3990,6 +5605,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_LIVE_TV = '\uE639';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_LIVING = '\uF02B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4219,7 +5839,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_LOCK_PERSON = '\uF8F3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_LOCK_RESET = '\uEADE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_LOGIN = '\uEA77';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_LOGO_DEV = '\uEAD6';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4284,6 +5919,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_LTE_MOBILEDATA = '\uF02C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_LTE_PLUS_MOBILEDATA = '\uF02D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_LUGGAGE = '\uF235';
     /**
      * Material design icon font character code see
@@ -4294,7 +5939,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_LYRICS = '\uEC0B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MACRO_OFF = '\uF8D2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MAIL = '\uE158';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MAIL_LOCK = '\uEC0A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4304,7 +5964,52 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MALE = '\uE58E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MAN = '\uE4EB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MAN_2 = '\uF8E1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MAN_3 = '\uF8E2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MAN_4 = '\uF8E3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MANAGE_ACCOUNTS = '\uF02E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MANAGE_HISTORY = '\uEBE7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MANAGE_SEARCH = '\uF02F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MAP = '\uE55B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MAPS_HOME_WORK = '\uF030';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4344,6 +6049,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MARK_UNREAD_CHAT_ALT = '\uEB9D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MARKUNREAD = '\uE159';
     /**
      * Material design icon font character code see
@@ -4364,12 +6074,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MEDIA_BLUETOOTH_OFF = '\uF031';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MEDIA_BLUETOOTH_ON = '\uF032';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MEDIATION = '\uEFA7';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MEDICAL_INFORMATION = '\uEBED';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MEDICAL_SERVICES = '\uF109';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MEDICATION = '\uF033';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MEDICATION_LIQUID = '\uEA87';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4395,6 +6130,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_MENU_OPEN = '\uE9BD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MERGE = '\uEB98';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4459,6 +6199,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MINOR_CRASH = '\uEBF1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MISCELLANEOUS_SERVICES = '\uF10C';
     /**
      * Material design icon font character code see
@@ -4489,12 +6234,47 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MOBILEDATA_OFF = '\uF034';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MODE = '\uF097';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MODE_COMMENT = '\uE253';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_MODE_EDIT = '\uE254';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MODE_EDIT_OUTLINE = '\uF035';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MODE_FAN_OFF = '\uEC17';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MODE_NIGHT = '\uF036';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MODE_OF_TRAVEL = '\uE7CE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MODE_STANDBY = '\uF037';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4519,7 +6299,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MONEY_OFF_CSRED = '\uF038';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MONITOR = '\uEF5B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MONITOR_HEART = '\uEAA2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MONITOR_WEIGHT = '\uF039';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4564,6 +6359,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MOSQUE = '\uEAB2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MOTION_PHOTOS_AUTO = '\uF03A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MOTION_PHOTOS_OFF = '\uE9C0';
     /**
      * Material design icon font character code see
@@ -4594,7 +6399,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_MOVE_DOWN = '\uEB61';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_MOVE_TO_INBOX = '\uE168';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MOVE_UP = '\uEB64';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4610,6 +6425,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_MOVIE_FILTER = '\uE43A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_MOVING = '\uE501';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4714,6 +6534,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NEARBY_ERROR = '\uF03B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NEARBY_OFF = '\uF03C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NEST_CAM_WIRED_STAND = '\uEC16';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_NETWORK_CELL = '\uE1B9';
     /**
      * Material design icon font character code see
@@ -4729,12 +6564,42 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NETWORK_PING = '\uEBCA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_NETWORK_WIFI = '\uE1BA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NETWORK_WIFI_1_BAR = '\uEBE4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NETWORK_WIFI_2_BAR = '\uEBD6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NETWORK_WIFI_3_BAR = '\uEBE1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NEW_LABEL = '\uE609';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_NEW_RELEASES = '\uE031';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NEWSPAPER = '\uEB81';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4764,12 +6629,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NIGHTLIGHT = '\uF03D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_NIGHTLIGHT_ROUND = '\uEF5E';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_NIGHTS_STAY = '\uEA46';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NO_ACCOUNTS = '\uF03E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NO_ADULT_CONTENT = '\uF8FE';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4784,12 +6664,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NO_CRASH = '\uEBF0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_NO_DRINKS = '\uF1A5';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_NO_ENCRYPTION = '\uE641';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NO_ENCRYPTION_GMAILERRORRED = '\uF03F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4844,6 +6734,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NOISE_AWARE = '\uEBEC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NOISE_CONTROL_OFF = '\uEBF3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NORDIC_WALKING = '\uE50E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_NORTH = '\uF1E0';
     /**
      * Material design icon font character code see
@@ -4889,7 +6794,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NOTE_ALT = '\uF040';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_NOTES = '\uE26C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_NOTIFICATION_ADD = '\uE399';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4939,6 +6854,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_NUMBERS = '\uEAC7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_OFFLINE_BOLT = '\uE932';
     /**
      * Material design icon font character code see
@@ -4950,6 +6870,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_OFFLINE_SHARE = '\uE9C5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_OIL_BARREL = '\uEC15';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ON_DEVICE_TRAINING = '\uEBFD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -4984,12 +6914,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_OPEN_IN_NEW_OFF = '\uE4F6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_OPEN_WITH = '\uE89F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_OTHER_HOUSES = '\uE58C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_OUTBOND = '\uF228';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_OUTBOUND = '\uE1CA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5019,6 +6964,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_OUTPUT = '\uEBBE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PADDING = '\uE9C8';
     /**
      * Material design icon font character code see
@@ -5034,12 +6984,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PAID = '\uF041';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PALETTE = '\uE40A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PAN_TOOL = '\uE925';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PAN_TOOL_ALT = '\uEBB9';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5099,6 +7059,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PARAGLIDING = '\uE50F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PARK = '\uEA63';
     /**
      * Material design icon font character code see
@@ -5109,7 +7074,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PASSWORD = '\uF042';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PATTERN = '\uF043';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PAUSE = '\uE034';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PAUSE_CIRCLE = '\uE1A2';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5139,6 +7119,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PAYPAL = '\uEA8D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PEDAL_BIKE = '\uEB29';
     /**
      * Material design icon font character code see
@@ -5154,6 +7139,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PENTAGON = '\uEB50';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PEOPLE = '\uE7FB';
     /**
      * Material design icon font character code see
@@ -5165,6 +7155,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PEOPLE_OUTLINE = '\uE7FC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PERCENT = '\uEB58';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5224,6 +7219,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PERSON_2 = '\uF8E4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PERSON_3 = '\uF8E5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PERSON_4 = '\uF8E6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PERSON_ADD = '\uE7FE';
     /**
      * Material design icon font character code see
@@ -5240,6 +7250,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PERSON_ADD_DISABLED = '\uE9CB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PERSON_OFF = '\uE510';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5274,6 +7289,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PERSONAL_INJURY = '\uE6DA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PERSONAL_VIDEO = '\uE63B';
     /**
      * Material design icon font character code see
@@ -5290,6 +7310,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PETS = '\uE91D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PHISHING = '\uEAD7';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5434,6 +7459,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PHP = '\uEB8F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PIANO = '\uE521';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PIANO_OFF = '\uE520';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PICTURE_AS_PDF = '\uE415';
     /**
      * Material design icon font character code see
@@ -5454,7 +7494,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PIE_CHART_OUTLINE = '\uF044';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PIE_CHART_OUTLINED = '\uE6C5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PIN = '\uF045';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5464,7 +7514,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PIN_END = '\uE767';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PIN_INVOKE = '\uE763';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PINCH = '\uEB38';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PIVOT_TABLE_CHART = '\uE9CE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PIX = '\uEAA3';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5480,6 +7550,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PLAY_ARROW = '\uE037';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PLAY_CIRCLE = '\uE1C4';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5509,6 +7584,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PLAY_LESSON = '\uF047';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PLAYLIST_ADD = '\uE03B';
     /**
      * Material design icon font character code see
@@ -5519,7 +7599,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PLAYLIST_ADD_CHECK_CIRCLE = '\uE7E6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PLAYLIST_ADD_CIRCLE = '\uE7E5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PLAYLIST_PLAY = '\uE05F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PLAYLIST_REMOVE = '\uEB80';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5530,6 +7625,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PLUS_ONE = '\uE800';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PODCASTS = '\uF048';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5545,6 +7645,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_POLL = '\uE801';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_POLYLINE = '\uEBBB';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5594,6 +7699,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PRECISION_MANUFACTURING = '\uF049';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PREGNANT_WOMAN = '\uE91E';
     /**
      * Material design icon font character code see
@@ -5605,6 +7715,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PREVIEW = '\uF1C5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PRICE_CHANGE = '\uF04A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PRICE_CHECK = '\uF04B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5629,7 +7749,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_PRIVATE_CONNECTIVITY = '\uE744';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PRODUCTION_QUANTITY_LIMITS = '\uE1D1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PROPANE = '\uEC14';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PROPANE_TANK = '\uEC13';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_PSYCHOLOGY = '\uEA4A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PSYCHOLOGY_ALT = '\uF8EA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5650,6 +7795,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_PUBLISHED_WITH_CHANGES = '\uF232';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_PUNCH_CLOCK = '\uEAA8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5679,7 +7829,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_QUERY_STATS = '\uE4FC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_QUESTION_ANSWER = '\uE8AF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_QUESTION_MARK = '\uEB8B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5710,6 +7870,26 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_QUICKREPLY = '\uEF6C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_QUIZ = '\uF04C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_QUORA = '\uEA98';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_R_MOBILEDATA = '\uF04D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_RADAR = '\uF04E';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5749,12 +7929,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_RAMP_LEFT = '\uEB9C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_RAMP_RIGHT = '\uEB96';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_RATE_REVIEW = '\uE560';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_RAW_OFF = '\uF04F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_RAW_ON = '\uF050';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_READ_MORE = '\uEF6D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_REAL_ESTATE_AGENT = '\uE73A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5784,6 +7989,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_RECTANGLE = '\uEB54';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_RECYCLING = '\uE760';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_REDDIT = '\uEAA0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_REDEEM = '\uE8B1';
     /**
      * Material design icon font character code see
@@ -5800,6 +8020,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_REFRESH = '\uE5D5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_REMEMBER_ME = '\uF051';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5839,12 +8064,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_REMOVE_ROAD = '\uEBFC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_REMOVE_SHOPPING_CART = '\uE928';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_REORDER = '\uE8FE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_REPARTITION = '\uF8E8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5909,6 +8144,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_REPORT_GMAILERRORRED = '\uF052';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_REPORT_OFF = '\uE170';
     /**
      * Material design icon font character code see
@@ -5930,6 +8170,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_RESET_TV = '\uE9D9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_RESTART_ALT = '\uF053';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5959,12 +8204,42 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_REVIEWS = '\uF054';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_RICE_BOWL = '\uF1F5';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_RING_VOLUME = '\uE0D1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ROCKET = '\uEBA5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ROCKET_LAUNCH = '\uEB9B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ROLLER_SHADES = '\uEC12';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ROLLER_SHADES_CLOSED = '\uEC11';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ROLLER_SKATING = '\uEBCD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -5994,6 +8269,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ROTATE_90_DEGREES_CW = '\uEAAB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ROTATE_LEFT = '\uE419';
     /**
      * Material design icon font character code see
@@ -6004,7 +8284,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_ROUNDABOUT_LEFT = '\uEB99';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ROUNDABOUT_RIGHT = '\uEBA3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_ROUNDED_CORNER = '\uE920';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ROUTE = '\uEACD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6020,6 +8315,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_RSS_FEED = '\uE0E5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_RSVP = '\uF055';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6044,7 +8344,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_RUNNING_WITH_ERRORS = '\uE51D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_RV_HOOKUP = '\uE642';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SAFETY_CHECK = '\uEBEF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SAFETY_DIVIDER = '\uE1CC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SAILING = '\uE502';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6059,6 +8379,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SATELLITE_ALT = '\uEB3A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SAVE = '\uE161';
     /**
      * Material design icon font character code see
@@ -6069,7 +8394,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SAVE_AS = '\uEB60';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SAVED_SEARCH = '\uEA11';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SAVINGS = '\uE2EB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SCALE = '\uEB5F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6094,6 +8434,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SCHEMA = '\uE4FD';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SCHOOL = '\uE80C';
     /**
      * Material design icon font character code see
@@ -6105,6 +8450,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SCORE = '\uE269';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SCOREBOARD = '\uEBD0';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6129,6 +8479,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SCREEN_ROTATION_ALT = '\uEBEE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SCREEN_SEARCH_DESKTOP = '\uEF70';
     /**
      * Material design icon font character code see
@@ -6139,12 +8494,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SCREENSHOT = '\uF056';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SCREENSHOT_MONITOR = '\uEC08';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SCUBA_DIVING = '\uEBCE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SD = '\uE9DD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SD_CARD = '\uE623';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SD_CARD_ALERT = '\uF057';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6169,6 +8544,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SECURITY_UPDATE = '\uF058';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SECURITY_UPDATE_GOOD = '\uF059';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SECURITY_UPDATE_WARNING = '\uF05A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SEGMENT = '\uE94B';
     /**
      * Material design icon font character code see
@@ -6184,12 +8574,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SELL = '\uF05B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SEND = '\uE163';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SEND_AND_ARCHIVE = '\uEA0C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SEND_TIME_EXTENSION = '\uEADB';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6204,7 +8604,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SENSOR_OCCUPIED = '\uEC10';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SENSOR_WINDOW = '\uF1B4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SENSORS = '\uE51E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SENSORS_OFF = '\uE51F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6245,6 +8660,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SETTINGS = '\uE8B8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SETTINGS_ACCESSIBILITY = '\uF05D';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6329,6 +8749,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SETTINGS_SUGGEST = '\uF05E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SETTINGS_SYSTEM_DAYDREAM = '\uE1C3';
     /**
      * Material design icon font character code see
@@ -6339,7 +8764,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SEVERE_COLD = '\uEBD3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SHAPE_LINE = '\uF8D3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SHARE = '\uE80D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SHARE_ARRIVAL_TIME = '\uE524';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SHARE_LOCATION = '\uF05F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6349,12 +8794,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SHIELD_MOON = '\uEAA9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SHOP = '\uE8C9';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SHOP_2 = '\uE19E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SHOP_TWO = '\uE8CA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SHOPIFY = '\uEA9D';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6374,12 +8834,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SHOPPING_CART_CHECKOUT = '\uEB88';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SHORT_TEXT = '\uE261';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SHORTCUT = '\uF060';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SHOW_CHART = '\uE6E1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SHOWER = '\uF061';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6404,6 +8879,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SIGN_LANGUAGE = '\uEBE5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SIGNAL_CELLULAR_0_BAR = '\uF0A8';
     /**
      * Material design icon font character code see
@@ -6419,12 +8899,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SIGNAL_CELLULAR_ALT_1_BAR = '\uEBDF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_CELLULAR_ALT_2_BAR = '\uEBE3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_CELLULAR_CONNECTED_NO_INTERNET_0_BAR = '\uF0AC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SIGNAL_CELLULAR_CONNECTED_NO_INTERNET_4_BAR = '\uE1CD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SIGNAL_CELLULAR_NO_SIM = '\uE1CE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_CELLULAR_NODATA = '\uF062';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6454,7 +8954,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SIGNAL_WIFI_BAD = '\uF063';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_WIFI_CONNECTED_NO_INTERNET_4 = '\uF064';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SIGNAL_WIFI_OFF = '\uE1DA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_WIFI_STATUSBAR_4_BAR = '\uF065';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_WIFI_STATUSBAR_CONNECTED_NO_INTERNET_4 = '\uF066';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNAL_WIFI_STATUSBAR_NULL = '\uF067';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIGNPOST = '\uEB91';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6469,7 +8999,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SIM_CARD_DOWNLOAD = '\uF068';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SINGLE_BED = '\uEA48';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SIP = '\uF069';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SKATEBOARDING = '\uE511';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6480,6 +9025,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SKIP_PREVIOUS = '\uE045';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SLEDDING = '\uE512';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6495,6 +9045,21 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SMART_BUTTON = '\uF1C1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SMART_DISPLAY = '\uF06A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SMART_SCREEN = '\uF06B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SMART_TOY = '\uF06C';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6524,6 +9089,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SNAPCHAT = '\uEA6E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SNIPPET_FOLDER = '\uF1C7';
     /**
      * Material design icon font character code see
@@ -6534,7 +9104,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SNOWBOARDING = '\uE513';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SNOWING = '\uE80F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SNOWMOBILE = '\uE503';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SNOWSHOEING = '\uE514';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SOAP = '\uF1B2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SOCIAL_DISTANCE = '\uE1CB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SOLAR_POWER = '\uEC0F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6549,12 +9149,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SOS = '\uEBF7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SOUP_KITCHEN = '\uE7D3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SOURCE = '\uF1C4';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SOUTH = '\uF1E3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SOUTH_AMERICA = '\uE7E4';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6575,6 +9190,26 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SPACE_BAR = '\uE256';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SPACE_DASHBOARD = '\uE66B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SPATIAL_AUDIO = '\uEBEB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SPATIAL_AUDIO_OFF = '\uEBE8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SPATIAL_TRACKING = '\uEBEA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6610,6 +9245,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SPELLCHECK = '\uE8CE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SPLITSCREEN = '\uF06D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SPOKE = '\uE9A7';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6654,6 +9299,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SPORTS_GYMNASTICS = '\uEBC4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SPORTS_HANDBALL = '\uEA33';
     /**
      * Material design icon font character code see
@@ -6665,6 +9315,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SPORTS_KABADDI = '\uEA34';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SPORTS_MARTIAL_ARTS = '\uEAE9';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6684,6 +9339,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SPORTS_SCORE = '\uF06E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SPORTS_SOCCER = '\uEA2F';
     /**
      * Material design icon font character code see
@@ -6699,7 +9359,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SQUARE = '\uEB36';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SQUARE_FOOT = '\uEA49';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SSID_CHART = '\uEB66';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6710,6 +9380,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_STACKED_LINE_CHART = '\uF22B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_STADIUM = '\uEB90';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6729,6 +9404,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_STAR_BORDER_PURPLE500 = '\uF099';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_STAR_HALF = '\uE839';
     /**
      * Material design icon font character code see
@@ -6739,12 +9419,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_STAR_PURPLE500 = '\uF09A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_STAR_RATE = '\uF0EC';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_STARS = '\uE8D0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_START = '\uE089';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6805,6 +9495,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_STOREFRONT = '\uEA12';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_STORM = '\uF070';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_STRAIGHT = '\uEB95';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6879,6 +9579,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SUMMARIZE = '\uF071';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SUNNY = '\uE81A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SUNNY_SNOWING = '\uE819';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SUPERSCRIPT = '\uF112';
     /**
      * Material design icon font character code see
@@ -6900,6 +9615,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_SUPPORT_AGENT = '\uF0E2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SURFING = '\uE515';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -6944,6 +9664,61 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SWIPE_DOWN = '\uEB53';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_DOWN_ALT = '\uEB30';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_LEFT = '\uEB59';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_LEFT_ALT = '\uEB33';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_RIGHT = '\uEB52';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_RIGHT_ALT = '\uEB56';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_UP = '\uEB2E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_UP_ALT = '\uEB35';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWIPE_VERTICAL = '\uEB51';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWITCH_ACCESS_SHORTCUT = '\uE7E1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SWITCH_ACCESS_SHORTCUT_ADD = '\uE7E2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SWITCH_ACCOUNT = '\uE9ED';
     /**
      * Material design icon font character code see
@@ -6969,6 +9744,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SYNAGOGUE = '\uEAB0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SYNC = '\uE627';
     /**
      * Material design icon font character code see
@@ -6984,7 +9764,27 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_SYNC_LOCK = '\uEAEE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_SYNC_PROBLEM = '\uE629';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SYSTEM_SECURITY_UPDATE = '\uF072';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SYSTEM_SECURITY_UPDATE_GOOD = '\uF073';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_SYSTEM_SECURITY_UPDATE_WARNING = '\uF074';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7014,7 +9814,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TABLE_BAR = '\uEAD2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TABLE_CHART = '\uE265';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TABLE_RESTAURANT = '\uEAC6';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7069,12 +9879,47 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TASK = '\uF075';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TASK_ALT = '\uE2E6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TAXI_ALERT = '\uEF74';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TELEGRAM = '\uEA6B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TEMPLE_BUDDHIST = '\uEAB3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TEMPLE_HINDU = '\uEAAF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TERMINAL = '\uEB8E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TERRAIN = '\uE564';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_DECREASE = '\uEADD';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7085,6 +9930,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_TEXT_FORMAT = '\uE165';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TEXT_INCREASE = '\uEAE2';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7144,6 +9994,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_THERMOSTAT = '\uF076';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_THERMOSTAT_AUTO = '\uF077';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_THUMB_DOWN = '\uE8DB';
     /**
      * Material design icon font character code see
@@ -7179,6 +10039,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_THUNDERSTORM = '\uEBDB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TIKTOK = '\uEA7E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TIME_TO_LEAVE = '\uE62C';
     /**
      * Material design icon font character code see
@@ -7204,12 +10074,32 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TIMER_10_SELECT = '\uF07A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TIMER_3 = '\uE424';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TIMER_3_SELECT = '\uF07B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TIMER_OFF = '\uE426';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TIPS_AND_UPDATES = '\uE79A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TIRE_REPAIR = '\uEBC8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7239,6 +10129,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TOKEN = '\uEA25';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TOLL = '\uE8E0';
     /**
      * Material design icon font character code see
@@ -7250,6 +10145,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_TOPIC = '\uF1C8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TORNADO = '\uE199';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7289,6 +10189,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TRANSCRIBE = '\uF8EC';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TRANSFER_WITHIN_A_STATION = '\uE572';
     /**
      * Material design icon font character code see
@@ -7299,12 +10204,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TRANSGENDER = '\uE58D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TRANSIT_ENTEREXIT = '\uE579';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_TRANSLATE = '\uE8E2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TRAVEL_EXPLORE = '\uE2DB';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7334,12 +10249,62 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TROUBLESHOOT = '\uE1D2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TRY = '\uF07C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TSUNAMI = '\uEBD8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_TTY = '\uF1AA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_TUNE = '\uE429';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TUNGSTEN = '\uF07D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TURN_LEFT = '\uEBA6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TURN_RIGHT = '\uEBAB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TURN_SHARP_LEFT = '\uEBA7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TURN_SHARP_RIGHT = '\uEBAA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TURN_SLIGHT_LEFT = '\uEBA4';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_TURN_SLIGHT_RIGHT = '\uEB9A';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7369,6 +10334,21 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_TYPE_SPECIMEN = '\uF8F0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_U_TURN_LEFT = '\uEBA1';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_U_TURN_RIGHT = '\uEBA2';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_UMBRELLA = '\uF1AD';
     /**
      * Material design icon font character code see
@@ -7389,7 +10369,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_UNFOLD_LESS_DOUBLE = '\uF8CF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_UNFOLD_MORE = '\uE5D7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_UNFOLD_MORE_DOUBLE = '\uF8D0';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7400,6 +10390,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_UNSUBSCRIBE = '\uE0EB';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_UPCOMING = '\uF07E';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7419,12 +10414,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_UPLOAD = '\uF09B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_UPLOAD_FILE = '\uE9FC';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_USB = '\uE1E0';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_USB_OFF = '\uE4FA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VACCINES = '\uE138';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VAPE_FREE = '\uEBC6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VAPING_ROOMS = '\uEBCF';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7459,6 +10479,16 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_VERTICAL_SHADES = '\uEC0E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VERTICAL_SHADES_CLOSED = '\uEC0D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_VERTICAL_SPLIT = '\uE949';
     /**
      * Material design icon font character code see
@@ -7474,7 +10504,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_VIDEO_CAMERA_BACK = '\uF07F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VIDEO_CAMERA_FRONT = '\uF080';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_VIDEO_COLLECTION = '\uE04A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VIDEO_FILE = '\uEB87';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7494,6 +10539,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_VIDEO_STABLE = '\uF081';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_VIDEOCAM = '\uE04B';
     /**
      * Material design icon font character code see
@@ -7505,6 +10555,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_VIDEOGAME_ASSET = '\uE338';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VIDEOGAME_ASSET_OFF = '\uE500';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7539,7 +10594,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_VIEW_COMFY_ALT = '\uEB73';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_VIEW_COMPACT = '\uE42B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VIEW_COMPACT_ALT = '\uEB74';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VIEW_COZY = '\uEB75';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7555,6 +10625,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_VIEW_IN_AR = '\uE9FE';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VIEW_KANBAN = '\uEB7F';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7584,12 +10659,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_VIEW_TIMELINE = '\uEB85';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_VIEW_WEEK = '\uE8F3';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_VIGNETTE = '\uE435';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VILLA = '\uE586';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7619,7 +10704,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_VOLCANO = '\uEBDA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_VOLUME_DOWN = '\uE04D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VOLUME_DOWN_ALT = '\uE79C';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7649,7 +10744,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_VPN_KEY_OFF = '\uEB7A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_VPN_LOCK = '\uE62F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_VRPANO = '\uF082';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WALLET = '\uF8FF';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7674,7 +10784,17 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WAREHOUSE = '\uEBB8';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WARNING = '\uE002';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WARNING_AMBER = '\uF083';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7694,7 +10814,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WATCH_OFF = '\uEAE3';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WATER = '\uF084';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WATER_DAMAGE = '\uF203';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WATER_DROP = '\uE798';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7705,6 +10840,11 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_WAVES = '\uE176';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WAVING_HAND = '\uE766';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7744,6 +10884,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WB_TWILIGHT = '\uE1C6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WC = '\uE63D';
     /**
      * Material design icon font character code see
@@ -7759,12 +10904,37 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WEB_ASSET_OFF = '\uE4F7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WEB_STORIES = '\uE595';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WEBHOOK = '\uEB92';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WECHAT = '\uEA81';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WEEKEND = '\uE16B';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_WEST = '\uF1E6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WHATSAPP = '\uEA9C';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7789,12 +10959,52 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WIDTH_FULL = '\uF8F5';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIDTH_NORMAL = '\uF8F6';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIDTH_WIDE = '\uF8F7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WIFI = '\uE63E';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WIFI_1_BAR = '\uE4CA';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIFI_2_BAR = '\uE4D9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WIFI_CALLING = '\uEF77';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIFI_CALLING_3 = '\uF085';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIFI_CHANNEL = '\uEB6A';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIFI_FIND = '\uEB31';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7809,6 +11019,11 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WIFI_PASSWORD = '\uEB6B';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WIFI_PROTECTED_SETUP = '\uF0FC';
     /**
      * Material design icon font character code see
@@ -7819,12 +11034,62 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WIFI_TETHERING_ERROR = '\uEAD9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIFI_TETHERING_ERROR_ROUNDED = '\uF086';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIFI_TETHERING_OFF = '\uF087';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WIND_POWER = '\uEC0C';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WINDOW = '\uF088';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WINE_BAR = '\uF1E8';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_WOMAN = '\uE13E';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WOMAN_2 = '\uF8E7';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WOO_COMMERCE = '\uEA6D';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WORDPRESS = '\uEA9F';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_WORK = '\uE8F9';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WORK_HISTORY = '\uEC09';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7835,6 +11100,16 @@ public class FontImage extends Image {
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_WORK_OUTLINE = '\uE943';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WORKSPACE_PREMIUM = '\uE7AF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_WORKSPACES = '\uE1A0';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7864,12 +11139,22 @@ public class FontImage extends Image {
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
+    public static final char MATERIAL_YARD = '\uF089';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
     public static final char MATERIAL_YOUTUBE_SEARCHED_FOR = '\uE8FA';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
      */
     public static final char MATERIAL_ZOOM_IN = '\uE8FF';
+    /**
+     * Material design icon font character code see
+     * https://www.material.io/resources/icons/ for full list
+     */
+    public static final char MATERIAL_ZOOM_IN_MAP = '\uEB2D';
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
@@ -7993,14 +11278,14 @@ public class FontImage extends Image {
             Style sel = b.getIconStyleComponent().getSelectedStyle();
             Style pre = b.getIconStyleComponent().getPressedStyle();
             Style dis = b.getIconStyleComponent().getDisabledStyle();
-            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
                 b.setRolloverIcon(FontImage.create("" + icon, sel));
             } else {
                 b.setRolloverIcon(null);
             }
-            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            if (pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icon, pre));
@@ -8008,7 +11293,7 @@ public class FontImage extends Image {
             } else {
                 b.setPressedIcon(null);
             }
-            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            if (dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
                 dis = new Style(dis);
                 dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
                 b.setDisabledIcon(FontImage.create("" + icon, dis));
@@ -8050,7 +11335,7 @@ public class FontImage extends Image {
             Style sel = b.getIconStyleComponent().getSelectedStyle();
             Style pre = b.getIconStyleComponent().getPressedStyle();
             Style dis = b.getIconStyleComponent().getDisabledStyle();
-            if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(1, icons.length-1)] != icons[0] || sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
                 sel = new Style(sel);
                 sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
                 b.setRolloverPressedIcon(FontImage.create("" + icons[Math.min(1, icons.length-1)], sel));
@@ -8058,7 +11343,7 @@ public class FontImage extends Image {
                 b.setRolloverPressedIcon(null);
             }
             
-            if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(2, icons.length-1)] != icons[0] || pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
                 pre = new Style(pre);
                 pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
                 b.setPressedIcon(FontImage.create("" + icons[Math.min(2, icons.length-1)], pre));
@@ -8066,7 +11351,7 @@ public class FontImage extends Image {
             } else {
                 b.setPressedIcon(null);
             }
-            if (icons[Math.min(4, icons.length-1)] != icons[0] || dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+            if (icons[Math.min(4, icons.length-1)] != icons[0] || dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
                 dis = new Style(dis);
                 dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
                 b.setDisabledIcon(FontImage.create("" + icons[Math.min(4, icons.length-1)], dis));
@@ -8155,17 +11440,17 @@ public class FontImage extends Image {
         Style sel = uim.getComponentSelectedStyle(uiid);
         Style pre = uim.getComponentCustomStyle(uiid, "press");
         Style dis = uim.getComponentCustomStyle(uiid, "dis");;
-        if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+        if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
             sel = new Style(sel);
             sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
             c.setRolloverIcon(FontImage.create("" + icon, sel));
         }
-        if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+        if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency()) || (pre.getFgAlpha() != s.getFgAlpha())) {
             pre = new Style(pre);
             pre.setFont(font.derive(rightSize(pre, size), Font.STYLE_PLAIN));
             c.setPressedIcon(FontImage.create("" + icon, pre));
         }
-        if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+        if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency()) || (dis.getFgAlpha() != s.getFgAlpha())) {
             dis = new Style(dis);
             dis.setFont(font.derive(rightSize(dis, size), Font.STYLE_PLAIN));
             c.setDisabledIcon(FontImage.create("" + icon, dis));
@@ -8391,6 +11676,7 @@ public class FontImage extends Image {
     private int backgroundColor;
     private byte backgroundOpacity;
     private int opacity=-1;
+    private int fgAlpha =255;
 
     private Motion rotationMotion;
     
@@ -8485,6 +11771,7 @@ public class FontImage extends Image {
         f.text = text;
         f.color = s.getFgColor();
         f.opacity = s.getOpacity();
+        f.fgAlpha = s.getFgAlpha();
         f.fnt = fnt;
         int w = Math.max(f.getHeight(), f.fnt.stringWidth(text)) + (f.padding * 2);
         f.width = w;
@@ -8582,20 +11869,20 @@ public class FontImage extends Image {
         Font oldFont = g.getFont();
 
         if (opacity > 0 && opacity < 255) {
-            g.setAlpha(opacity);
+            g.concatenateAlpha(opacity);
         }
         
         if (backgroundOpacity != 0) {
             g.setColor(backgroundColor);
             g.fillRect(x, y, width, height, (byte) backgroundOpacity);
         }
-
         g.setColor(color);
         g.setFont(fnt);
         int w = fnt.stringWidth(text);
         int h = Math.round(fnt.getPixelSize());
         if (h <= 0) h = fnt.getHeight();
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
+        if (fgAlpha< 255) g.concatenateAlpha(fgAlpha);
         if (rotated != 0) {
             int tX = g.getTranslateX();
             int tY = g.getTranslateY();
@@ -8629,6 +11916,7 @@ public class FontImage extends Image {
 
         Font oldFont = g.getFont();
         Font t = sizeFont(fnt, Math.min(h, w), padding);
+        int alpha = g.concatenateAlpha(fgAlpha);
         g.setColor(color);
         g.setFont(t);
         int ww = t.stringWidth(text);
@@ -8650,6 +11938,7 @@ public class FontImage extends Image {
         }
         g.setFont(oldFont);
         g.setColor(oldColor);
+        g.setColor(alpha);
     }
 
     /**
@@ -8754,6 +12043,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;
         f.opacity = opacity;
+        f.fgAlpha = fgAlpha;
         return f;
     }
 
@@ -8765,6 +12055,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = 90;
         f.opacity = maintainOpacity ? opacity : 255;
+        f.fgAlpha = fgAlpha;
         return f; 
     }
 
@@ -8776,6 +12067,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = 270;
         f.opacity = maintainOpacity ? opacity : 255;
+        f.fgAlpha = fgAlpha;
         return f; 
     }
 
@@ -8787,6 +12079,7 @@ public class FontImage extends Image {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = 180;
         f.opacity = maintainOpacity ? opacity : 255;
+        f.fgAlpha = fgAlpha;
         return f; 
     }
     
@@ -8816,7 +12109,7 @@ public class FontImage extends Image {
      */
     public Image toImage() {
         if (Image.isAlphaMutableImageSupported()) {
-            Image img = Image.createImage(width, height, 0);
+            Image img = ImageFactory.createImage(null, width, height, 0);
             Graphics g = img.getGraphics();
             g.drawImage(this, 0, 0);
             return img;
@@ -8846,6 +12139,15 @@ public class FontImage extends Image {
      */
     public void setBgTransparency(int t) {
         backgroundOpacity = (byte)t;
+    }
+
+    /**
+     * Sets the alpha for the text foreground color.
+     * @param alpha 0-255 alpha value.
+     * @since 8.0
+     */
+    public void setFgAlpha(int alpha) {
+        fgAlpha = alpha;
     }
     
     /**

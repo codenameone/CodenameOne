@@ -21,6 +21,7 @@
  * need additional information or have any questions.
  */
 #import "CodenameOne_GLAppDelegate.h"
+#import "CN1JailbreakDetector.h"
 #include "xmlvm.h"
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
@@ -115,6 +116,9 @@ static void installSignalHandlers() {
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+#ifdef CN1_DETECT_JAILBREAK
+    cn1DetectJailbreakBypassesAndExit();
+#endif
     //beforeDidFinishLaunchingWithOptionsMarkerEntry
     
     // Override point for customization after application launch.
@@ -137,6 +141,22 @@ static void installSignalHandlers() {
             value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
         }
         com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG o, key, value);
+    }
+    if (@available(iOS 8, *)) {
+        // App Links from associated domains
+        NSDictionary *activityDictionary = [launchOptions objectForKey:UIApplicationLaunchOptionsUserActivityDictionaryKey];
+        if (activityDictionary) {
+            NSUserActivity *userActivity = [activityDictionary valueForKey:@"UIApplicationLaunchOptionsUserActivityKey"];
+            if (userActivity != nil) {
+                if ([NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
+                    JAVA_OBJECT launchUrlStr = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [userActivity.webpageURL absoluteString]);
+                    JAVA_OBJECT appArgKey = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
+                    JAVA_OBJECT displayInstObj = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+
+                    com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG displayInstObj, appArgKey, launchUrlStr);
+                }
+            }
+        }
     }
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
@@ -419,8 +439,17 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)())completionHandler {
+    if (@available(iOS 10, *)) {
+        if( [response.notification.request.content.userInfo valueForKey:@"__ios_id__"] != NULL)
+        {
+            CN1Log(@"Received local notification while in background: %@", response.notification);
+            NSString* alertValue = [response.notification.request.content.userInfo valueForKey:@"__ios_id__"];
+            com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
+            completionHandler();
 
-
+            return;
+        }
+    }
 #ifdef INCLUDE_CN1_PUSH
     NSLog( @"Handle push from background or closed" );
     // if you set a member variable in didReceiveRemoteNotification, you  will know if this is from closed or background

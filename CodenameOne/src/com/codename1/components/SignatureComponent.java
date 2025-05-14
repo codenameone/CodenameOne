@@ -30,6 +30,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
@@ -204,6 +205,7 @@ public class SignatureComponent extends Container implements ActionSource {
                 super.paintBackground(g);
                 
                 g.setColor(signatureButtonBoxStyle.getFgColor());
+                int alpha = g.concatenateAlpha(signatureButtonBoxStyle.getFgAlpha());
                 Style s = getStyle();
                 g.drawRect(
                         getX()+s.getPaddingLeftNoRTL(), 
@@ -214,6 +216,7 @@ public class SignatureComponent extends Container implements ActionSource {
                 
                 g.setFont(xFont);
                 g.drawString("X", getX() + getStyle().getPaddingLeftNoRTL() + Display.getInstance().convertToPixels(3, true), getY() + getHeight() / 2);
+                g.setAlpha(alpha);
             }
         };
         lead.setText(localize("SignatureComponent.LeadText","Press to sign"));
@@ -470,6 +473,7 @@ public class SignatureComponent extends Container implements ActionSource {
            super.paint(g);
 
            g.setColor(signatureBoxStyle.getFgColor());
+           int alpha = g.concatenateAlpha(signatureBoxStyle.getFgAlpha());
            calcSignatureRect(signatureRect);
            g.drawRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
            g.drawString("X", signatureRect.getX() + Display.getInstance().convertToPixels(1, true), signatureRect.getY() + signatureRect.getHeight() / 2);
@@ -477,6 +481,8 @@ public class SignatureComponent extends Container implements ActionSource {
            g.clipRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
            paintSignature(g);
            g.popClip();
+           g.setAlpha(alpha);
+
        }
 
        /**
@@ -486,10 +492,12 @@ public class SignatureComponent extends Container implements ActionSource {
         */
        private void paintSignature(Graphics g) {
            g.setColor(signatureStyle.getFgColor());
+           int alpha = g.concatenateAlpha(signatureStyle.getFgAlpha());
            boolean oldAA = g.isAntiAliased();
            g.setAntiAliased(true);
            g.drawShape(path, stroke);
            g.setAntiAliased(oldAA);
+           g.setAlpha(alpha);
        }
 
        /**
@@ -571,7 +579,7 @@ public class SignatureComponent extends Container implements ActionSource {
            }
            calcSignatureRect(signatureRect);
 
-           Image img = Image.createImage(signatureRect.getWidth(), signatureRect.getHeight(), 0xffffff);
+           Image img = ImageFactory.createImage(this, signatureRect.getWidth(), signatureRect.getHeight(), 0xffffff);
            Graphics g = img.getGraphics();
            g.translate(-signatureRect.getX(), -signatureRect.getY());
            paintSignature(g);

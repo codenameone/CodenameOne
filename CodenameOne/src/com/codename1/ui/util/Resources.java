@@ -24,10 +24,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.io.Log;
-import com.codename1.ui.Display;
-import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Font;
-import com.codename1.ui.Image;
+import com.codename1.ui.*;
 import com.codename1.ui.animations.AnimationObject;
 import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.Dimension;
@@ -1252,17 +1249,35 @@ public class Resources {
     
     Font createTrueTypeFont(Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
         switch(sizeSetting) {
-            case 0:
+            case 0: // small
                 fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight();
                 break;
-            case 1:
+            case 1: // medium
                 fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM).getHeight();
                 break;
-            case 2:
+            case 2: // large
                 fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE).getHeight();
                 break;
-            case 3:
+            case 3: // millimetres
                 fontSize = Display.getInstance().convertToPixels((int)(fontSize * 10), true) / 10.0f;
+                break;
+
+            case 4: // pixels
+                break;
+            case 5: // rem
+                fontSize = Font.getDefaultFont().getHeight() * fontSize;
+                break;
+            case 6: // vw
+                fontSize = CN.getDisplayWidth() * fontSize / 100f;
+                break;
+            case 7: // vh
+                fontSize = CN.getDisplayHeight() * fontSize / 100f;
+                break;
+            case 8: // vmin
+                fontSize = Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()) * fontSize / 100f;
+                break;
+            case 9: // vmax
+                fontSize = Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()) * fontSize / 100f;
                 break;
         }
         if(!failOnMissingTruetype) {
@@ -1310,19 +1325,44 @@ public class Resources {
             
         }
         Map<String,MediaRule> mediaRules = new HashMap<String,MediaRule>();
+        int defaultFontSizeSetPriority = 0;
         for(int iter = 0 ; iter < size ; iter++) {
             String key = input.readUTF();
             if(key.startsWith("@")) {
                 theme.put(key, input.readUTF());
                 if (enableMediaQueries) {
                     if (key.endsWith("-font-scale")) {
-                        if (fontScaleRules ==null) {
-                            fontScaleRules = new LinkedHashMap<String,Float>();
+                        if (fontScaleRules == null) {
+                            fontScaleRules = new LinkedHashMap<String, Float>();
                         }
-                        fontScaleRules.put(key, Float.parseFloat((String)theme.get(key)));
+                        fontScaleRules.put(key, Float.parseFloat((String) theme.get(key)));
                     }
                 }
-                continue;
+                if (key.equals("@defaultFontSizeInt") && defaultFontSizeSetPriority < 1) {
+                    int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
+                    if (themeMedianFontSize > 0) {
+                        double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 / (CN.isDesktop() ? 96f : 160f);
+                        Font.setDefaultFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, (float) adjustedFontSize / CN.convertToPixels(1f)));
+                        defaultFontSizeSetPriority = 1;
+                    }
+                }
+                if (CN.isTablet() && key.equals("@defaultTabletFontSizeInt") && defaultFontSizeSetPriority < 2) {
+                    int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
+                    if (themeMedianFontSize > 0) {
+                        double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 /  (CN.isDesktop() ? 96f : 160f);
+                        Font.setDefaultFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, (float) adjustedFontSize / CN.convertToPixels(1f)));
+                        defaultFontSizeSetPriority = 2;
+                    }
+                }
+                if (CN.isDesktop() && key.equals("@defaultDesktopFontSizeInt") && defaultFontSizeSetPriority < 3) {
+                    int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
+                    if (themeMedianFontSize > 0) {
+                        double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 /  (CN.isDesktop() ? 96f : 160f);
+                        Font.setDefaultFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, (float) adjustedFontSize / CN.convertToPixels(1f)));
+                        defaultFontSizeSetPriority = 3;
+                    }
+                }
+               continue;
             }
             if (enableMediaQueries) {
                 String subkey = key;
@@ -1404,11 +1444,35 @@ public class Resources {
                 theme.put(key, "" + (input.readByte() & 0xff));
                 continue;
             } 
-            
+
+            if (key.endsWith("fgAlpha")) {
+                theme.put(key, (input.readInt() & 0xff));
+                continue;
+            }
             if(key.endsWith("opacity")) {
                 theme.put(key, "" + (input.readInt() & 0xff));
                 continue;
-            } 
+            }
+
+            if (key.endsWith("elevation")) {
+                theme.put(key, (input.readInt() & 0xff));
+                continue;
+            }
+
+            if (key.endsWith("iconGap")) {
+                theme.put(key, input.readFloat());
+                continue;
+            }
+
+            if (key.endsWith("iconGapUnit")) {
+                theme.put(key, input.readByte());
+                continue;
+            }
+
+            if (key.endsWith("surface")) {
+                theme.put(key, (input.readBoolean()));
+                continue;
+            }
 
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("adding") || key.endsWith("argin")) {
@@ -1643,9 +1707,17 @@ public class Resources {
                 }
                 if (Math.abs(scale-1f) > 0.01) {
                     for (String fontKey : fontKeys) {
-                        Font f = (Font)theme.get(fontKey);
-                        f = f.derive(f.getPixelSize() * scale, f.getStyle());
-                        theme.put(fontKey, f);
+                        Font f = (Font) theme.get(fontKey);
+                        if (f != null && f.isTTFNativeFont()) {
+                            try {
+                                f = f.derive(f.getPixelSize() * scale, f.getStyle());
+                                theme.put(fontKey, f);
+                            } catch (Exception ex) {
+                                Log.p("Failed to derive font " + f + " while loading font key " + fontKey + " from resource file. " + ex.getMessage());
+                                Log.e(ex);
+                            }
+                        }
+
                     }
                 }
             }

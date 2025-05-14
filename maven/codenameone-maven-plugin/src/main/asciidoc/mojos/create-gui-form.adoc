@@ -1,0 +1,36 @@
+== Create GUI Form
+
+
+The link:../../java/com/codename1/maven/CreateGuiFormMojo.java[create-gui-form] goal will generate a GUI form that can be edited in the GUI builder.
+
+**Basic Usage Example**
+
+[source,bash]
+----
+mvn cn1:create-gui-form -DclassName=com.example.MyForm
+----
+
+The above example will generate a GUIBuilder form with the provided class name.  It effectively generates two files:
+
+. `common/src/main/guibuilder/com/example/MyForm.gui`
+. `common/src/main/java/com/example/MyForm.java`
+
+NOTE: The paths above assume that this goal was run from the root multimodule maven project.  If it were run inside the "common" submodule, then the files would simply be generated in the "src/main/..." directory of that module.  (It would try to create yet another "common" submodule).  See link:../../../../../maven-archetypes/cn1app-archetype/README.adoc[the cn1app-archetype project structure] for more details about the project structure of Codename One application project.
+
+You can then open the guibuilder to edit this form using the `cn1:guibuilder` goal.
+
+[source,bash]
+----
+mvn cn1:guibuilder -DclassName=com.example.MyForm
+----
+
+== Parmeters
+
+className::
+(Required) The class name of the form that you wish to generate.  E.g `com.example.MyForm`.
+
+guiType::
+The type of GUI component to generate.  Supports "Form", "Dialog", and "Container".  Default value is "Form"
+
+autoLayout::
+Whether to use autolayout.  This is boolean (true/false), and the default value is `true`.

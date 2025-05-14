@@ -13,7 +13,7 @@ import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.Commandline;
 
 /**
- *
+ * Opens the designer.
  * @author shannah
  */
 @Mojo(name = "designer")
@@ -21,6 +21,9 @@ public class OpenDesignerMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        if (!isCN1ProjectDir()) {
+            return;
+        }
         updateCodenameOne(false, getDesignerJar());
         Java java = createJava();
         java.setFork(true);

@@ -477,6 +477,7 @@ public class UIFragment {
     public static UIFragment parseXML(String xml) {
         try {
             XMLParser p = new XMLParser();
+            p.setCaseSensitive(true);
             Element el = p.parse(new CharArrayReader(xml.toCharArray()));
             return new UIFragment(el);
         } catch (Exception ex) {
@@ -632,7 +633,7 @@ public class UIFragment {
      */
     public Component findById(String id) {
         getView();
-        return index.get(id);
+        return index.get(id.toLowerCase());
     }
     
     private static class UINotationParser { 

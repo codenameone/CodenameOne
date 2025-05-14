@@ -30,6 +30,7 @@ import android.graphics.Rect;
 import android.util.Log;
 import android.view.*;
 import android.view.inputmethod.EditorInfo;
+import android.os.Build;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -37,6 +38,8 @@ import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import java.lang.reflect.Method;
+
 
 /**
  *
@@ -55,6 +58,11 @@ public class CodenameOneView {
     private boolean fireKeyDown = false;
     //private volatile boolean created = false;
     private boolean drawing;
+
+    private final Rect safeArea = new Rect();
+
+    private static final int VERSION_CODE_P = 28;
+    private static final int VERSION_CODE_M = 23;
 
     public CodenameOneView(Activity activity, View androidView, AndroidImplementation implementation, boolean drawing) {
 
@@ -94,6 +102,12 @@ public class CodenameOneView {
         android.view.Display androidDisplay = ((WindowManager) activity.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         width = androidDisplay.getWidth();
         height = androidDisplay.getHeight();
+        View rootView = activity.getWindow().getDecorView();
+        rootView.post(new Runnable() {
+            public void run() {
+                updateSafeArea();
+            }
+        });
         initBitmaps(width, height);
     }
 
@@ -148,6 +162,65 @@ public class CodenameOneView {
         //flushGraphics();
     }
 
+    private void updateSafeArea() {
+        final Activity activity = CodenameOneView.this.implementation.getActivity();
+        final Rect rect = this.safeArea;
+        final View rootView = activity.getWindow().getDecorView();
+        if (Build.VERSION.SDK_INT >= VERSION_CODE_P) {
+            try {
+                Method getRootWindowInsetsMethod = View.class.getMethod("getRootWindowInsets");
+                Object insets = getRootWindowInsetsMethod.invoke(rootView);
+                if (insets != null) {
+                    Class<?> windowInsetsClass = Class.forName("android.view.WindowInsets");
+                    Method getDisplayCutoutMethod = windowInsetsClass.getMethod("getDisplayCutout");
+                    Object cutout = getDisplayCutoutMethod.invoke(insets);
+
+                    if (cutout != null) {
+                        Class<?> displayCutoutClass = Class.forName("android.view.DisplayCutout");
+                        Method getSafeInsetLeft = displayCutoutClass.getMethod("getSafeInsetLeft");
+                        Method getSafeInsetTop = displayCutoutClass.getMethod("getSafeInsetTop");
+                        Method getSafeInsetRight = displayCutoutClass.getMethod("getSafeInsetRight");
+                        Method getSafeInsetBottom = displayCutoutClass.getMethod("getSafeInsetBottom");
+
+                        rect.left = ((Integer) getSafeInsetLeft.invoke(cutout)).intValue();
+                        rect.top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();
+                        rect.right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();
+                        rect.bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();
+                    }
+                }
+            } catch (Exception e) {
+                rect.top = 0;
+                rect.left = 0;
+                rect.right = 0;
+                rect.bottom = 0;
+            }
+
+        } else if (Build.VERSION.SDK_INT >= VERSION_CODE_M) {
+            rootView.post(new Runnable() {
+                public void run() {
+                    WindowInsets insets = rootView.getRootWindowInsets();
+                    if (insets != null) {
+                        rect.top = insets.getSystemWindowInsetTop();
+                        rect.left = insets.getSystemWindowInsetLeft();;
+                        rect.right = insets.getSystemWindowInsetRight();
+                        rect.bottom = insets.getSystemWindowInsetBottom();
+                    } else {
+                        rect.top = 0;
+                        rect.left = 0;
+                        rect.right = 0;
+                        rect.bottom = 0;
+                    }
+                }
+            });
+        } else {
+            // For pre-Marshmallow (API < 23), assume full screen
+            rect.top = 0;
+            rect.left = 0;
+            rect.right = 0;
+            rect.bottom = 0;
+        }
+    }
+
     public void handleSizeChange(int w, int h) {
 
         if(!drawing) {
@@ -161,6 +234,9 @@ public class CodenameOneView {
         }
         this.width = w;
         this.height = h;
+
+        updateSafeArea();
+
         Log.d("Codename One", "sizechanged: " + width + " " + height + " " + this);
         if (this.implementation.getCurrentForm() == null) {
             /**
@@ -275,8 +351,18 @@ public class CodenameOneView {
             case KeyEvent.KEYCODE_ALT_LEFT:
             case KeyEvent.KEYCODE_ALT_RIGHT:
             case KeyEvent.KEYCODE_SYM:
+            return false;
             case KeyEvent.KEYCODE_ENTER:
-                return false;
+                if(Display.getInstance().getProperty("sendEnterKey", "false").equals("true")) {
+                	if (down) {
+                        Display.getInstance().keyPressed(keyCode);
+                    } else {
+                        Display.getInstance().keyReleased(keyCode);
+                    }
+               	    return false;
+                }
+                break;
+                
             default:
         }
 
@@ -482,6 +568,10 @@ public class CodenameOneView {
 
     public int getViewWidth() {
         return width;
+    }
+
+    public Rect getSafeArea() {
+        return safeArea;
     }
 
     public void setInputType(EditorInfo editorInfo) {

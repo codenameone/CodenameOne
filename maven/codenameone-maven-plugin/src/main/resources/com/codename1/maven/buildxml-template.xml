@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--build_version=5.3-->
+<!--
+This the Ant build script used by the CN1BuildMojo for sending to the build server.
+-->
+
+<project name="SampleProjectTemplate" default="default" basedir="." xmlns:j2seproject1="http://www.netbeans.org/ns/j2se-project/1">
+    <description>Builds, tests, and runs the project SampleProjectTemplate.</description>
+
+    <property file="${codenameone_settings.properties}"/>
+    <property name="automated" value="false" />
+    <taskdef name="codeNameOne" classname="com.codename1.build.client.CodeNameOneBuildTask" classpath="${CodeNameOneBuildClient.jar}"/>
+
+
+
+
+    <target name="ios-device" depends="">
+        <property name="ios.debug.targetType" value="iphone"/>
+        <echo message="Building iOS for target ${ios.debug.targetType}"/>
+        <codeNameOne
+                jarFile="${dist.jar}"
+                displayName="${codename1.displayName}"
+                packageName = "${codename1.packageName}"
+                mainClassName = "${codename1.mainName}"
+                version="${codename1.version}"
+                icon="${codename1.icon}"
+                vendor="${codename1.vendor}"
+                subtitle="${codename1.secondaryTitle}"
+
+                targetType="${ios.debug.targetType}"
+                certificate="${codename1.ios.debug.certificate}"
+                certPassword="${codename1.ios.debug.certificatePassword}"
+                provisioningProfile="${codename1.ios.debug.provision}"
+                appid="${codename1.ios.appid}"
+                automated="${automated}"
+        />
+    </target>
+
+
+    <target name="ios-device-release" depends="">
+        <property name="ios.release.targetType" value="iphone"/>
+        <codeNameOne
+                jarFile="${dist.jar}"
+                displayName="${codename1.displayName}"
+                packageName = "${codename1.packageName}"
+                mainClassName = "${codename1.mainName}"
+                version="${codename1.version}"
+                icon="${codename1.icon}"
+                vendor="${codename1.vendor}"
+                subtitle="${codename1.secondaryTitle}"
+                appStoreBuild="true"
+                production="true"
+                targetType="${ios.release.targetType}"
+                certificate="${codename1.ios.release.certificate}"
+                certPassword="${codename1.ios.release.certificatePassword}"
+                provisioningProfile="${codename1.ios.release.provision}"
+                appid="${codename1.ios.appid}"
+                automated="${automated}"
+        />
+    </target>
+
+
+
+    <target name="android-device" depends="">
+        <property name="android.targetType" value="android"/>
+        <codeNameOne
+                jarFile="${dist.jar}"
+                displayName="${codename1.displayName}"
+                packageName = "${codename1.packageName}"
+                mainClassName = "${codename1.mainName}"
+                version="${codename1.version}"
+                icon="${codename1.icon}"
+                vendor="${codename1.vendor}"
+                subtitle="${codename1.secondaryTitle}"
+
+                targetType="${android.targetType}"
+                keystoreAlias="${codename1.android.keystoreAlias}"
+                keystore="${codename1.android.keystore}"
+                certPassword="${codename1.android.keystorePassword}"
+                automated="${automated}"
+        />
+    </target>
+
+    <target name="javascript" depends="">
+        <property name="javascript.targetType" value="javascript"/>
+        <echo message="Building iOS for target ${javascript.targetType}"/>
+        <codeNameOne
+                jarFile="${dist.jar}"
+                displayName="${codename1.displayName}"
+                packageName = "${codename1.packageName}"
+                mainClassName = "${codename1.mainName}"
+                version="${codename1.version}"
+                icon="${codename1.icon}"
+                vendor="${codename1.vendor}"
+                subtitle="${codename1.secondaryTitle}"
+
+                targetType="${javascript.targetType}"
+                automated="${automated}"
+        />
+    </target>
+
+    <target name="war" depends="" description="Create .war file with Javascript build">
+        <antcall target="build-for-javascript">
+            <param name="automated" value="true"/>
+        </antcall>
+        <basename property="dist.base" file="${dist.jar}" suffix=".jar"/>
+        <property name="dist.war" value="dist/${dist.base}.war"/>
+        <mkdir dir="build/result" />
+        <unzip src="dist/result.zip" dest="build/result" />
+        <first id="first">
+            <fileset dir="build/result" includes="*.war"/>
+        </first>
+        <copy file="${toString:first}" tofile="${dist.war}" overwrite="true"/>
+        <delete dir="build/result"/>
+        <delete file="dist/result.zip"/>
+    </target>
+    <target name="check-webapp-runner">
+        <echo>Checking Webapp Runner...</echo>
+        <available file="${user.home}/.codenameone/webapp-runner.jar" property="webapprunner.present" value="true"/>
+        <echo message="Webapp Runner present? : ${webapprunner.present}"/>
+    </target>
+    <target name="init-webapp-runner" depends="check-webapp-runner" unless="webapprunner.present">
+        <mkdir dir="${user.home}/.codenameone"/>
+        <get src="https://github.com/codenameone/cn1-binaries/raw/master/javascript/webapp-runner.jar" dest="${user.home}/.codenameone/webapp-runner.jar"/>
+    </target>
+    <target name="check-war" depends="">
+        <echo>Checking War</echo>
+        <basename property="dist.base" file="${dist.jar}" suffix=".jar"/>
+        <property name="dist.war" value="dist/${dist.base}.war"/>
+        <available file="${dist.war}" property="war.present" value="true"/>
+        <echo message="War file present? ${war.present}"/>
+    </target>
+    <target name="init-war" depends="check-war" unless="war.present">
+        <antcall target="war"/>
+    </target>
+    <target name="run-war" depends="init-war,init-webapp-runner" description="Run as Web App on Localhost using embedded Tomcat">
+        <property name="port" value="0"/>
+        <java jar="${user.home}/.codenameone/webapp-runner.jar" fork="true" failonerror="true">
+            <arg value="${dist.war}"/>
+            <arg value="--port"/>
+            <arg value="${port}"/>
+            <arg value="--open-in-browser"/>
+            <arg value="--temp-directory"/>
+            <arg value="dist/webapp"/>
+        </java>
+    </target>
+
+
+    <target name="mac-os-x-desktop" depends="">
+        <property name="desktop_macosx.targetType" value="desktop_macosx"/>
+        <codeNameOne
+                jarFile="${dist.jar}"
+                displayName="${codename1.displayName}"
+                packageName = "${codename1.packageName}"
+                mainClassName = "${codename1.mainName}"
+                version="${codename1.version}"
+                icon="${codename1.icon}"
+                vendor="${codename1.vendor}"
+                subtitle="${codename1.secondaryTitle}"
+                certificate="${codename1.desktop.mac.certificate}"
+                certPassword="${codename1.desktop.mac.certificatePassword}"
+                targetType="${desktop_macosx.targetType}"
+                automated="${automated}"
+        />
+
+    </target>
+
+    <target name="windows-desktop" depends="">
+        <property name="desktop_windows.targetType" value="desktop_windows"/>
+        <codeNameOne
+                jarFile="${dist.jar}"
+                displayName="${codename1.displayName}"
+                packageName = "${codename1.packageName}"
+                mainClassName = "${codename1.mainName}"
+                version="${codename1.version}"
+                icon="${codename1.icon}"
+                vendor="${codename1.vendor}"
+                subtitle="${codename1.secondaryTitle}"
+
+                targetType="${desktop_windows.targetType}"
+                automated="${automated}"
+        />
+
+    </target>
+
+
+
+
+    <target name="windows-device" depends="">
+        <codeNameOne
+                jarFile="${dist.jar}"
+                displayName="${codename1.displayName}"
+                packageName = "${codename1.packageName}"
+                mainClassName = "${codename1.mainName}"
+                version="${codename1.version}"
+                icon="${codename1.icon}"
+                vendor="${codename1.vendor}"
+                subtitle="${codename1.secondaryTitle}"
+
+                certificate="${codename1.windows.certificate}"
+                certPassword="${codename1.windows.certificatePassword}"
+
+                targetType="windows"
+                automated="${automated}"
+        />
+    </target>
+
+
+</project>

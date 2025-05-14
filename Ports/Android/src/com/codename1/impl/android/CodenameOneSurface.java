@@ -49,4 +49,6 @@ public interface CodenameOneSurface {
     public void setLayoutParams(ViewGroup.LayoutParams lp);
     
     public boolean alwaysRepaintAll();
+
+    public Rect getSafeAreaInsets();
 }

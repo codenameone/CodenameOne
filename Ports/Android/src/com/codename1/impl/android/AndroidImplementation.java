@@ -24,6 +24,8 @@ package com.codename1.impl.android;
 
 import android.Manifest;
 import android.annotation.TargetApi;
+import com.codename1.impl.android.permissions.DevicePermission;
+import com.codename1.impl.android.permissions.PermissionsHelper;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -222,6 +224,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     };
 
+    public static final int FLAG_ONE_SHOT = 0x40000000;
+    public static final int FLAG_MUTABLE = 0x02000000;
+
+    public static final int FLAG_IMMUTABLE = 0x04000000;
+
     /**
      * make sure these important keys have a negative value when passed to
      * Codename One or they might be interpreted as characters.
@@ -254,6 +261,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public static void setActivity(CodenameOneActivity aActivity) {
         activity = aActivity;
+        if (activity != null) {
+            activityComponentName = activity.getComponentName();
+        }
+        
     }
     CodenameOneSurface myView = null;
     CodenameOneTextPaint defaultFont;
@@ -265,6 +276,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int displayWidth;
     private int displayHeight;
     static CodenameOneActivity activity;
+    static ComponentName activityComponentName;
+    
     private static Context context;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
@@ -769,7 +782,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return out.toArray(new PushActionCategory[out.size()]);
     }
-    
+
+    public static PendingIntent createPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            return PendingIntent.getActivity(ctx, value, intent, FLAG_IMMUTABLE);
+        } else {
+            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent createMutablePendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            return PendingIntent.getActivity(ctx, value, intent, FLAG_MUTABLE);
+        } else {
+            return PendingIntent.getActivity(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent getPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            return PendingIntent.getService(ctx, value, intent, FLAG_IMMUTABLE);
+        } else {
+            return PendingIntent.getService(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
+    public static PendingIntent getBroadcastPendingIntent(Context ctx, int value, Intent intent) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            // PendingIntent.FLAG_IMMUTABLE
+            return PendingIntent.getBroadcast(ctx, value, intent, 67108864);
+        } else {
+            return PendingIntent.getBroadcast(ctx, value, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        }
+    }
+
     /**
      * Adds actions to a push notification.  This is called by the Push broadcast receiver probably before 
      * Codename One is initialized
@@ -805,13 +851,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         for (PushAction action : category.getActions()) {
             Intent newIntent = (Intent)targetIntent.clone();
             newIntent.putExtra("pushActionId", action.getId());
-            PendingIntent contentIntent = PendingIntent.getActivity(context, requestCode++, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            PendingIntent contentIntent = createMutablePendingIntent(context, requestCode++, newIntent);
             try {
                 int iconId = 0;
                 try { iconId = Integer.parseInt(action.getIcon());} catch (Exception ex){}
-                //android.app.Notification.Action.Builder actionBuilder = new android.app.Notification.Action.Builder(iconId, action.getTitle(), contentIntent);
-
-                System.out.println("Adding action "+action.getId()+", "+action.getTitle()+", icon="+iconId);
                 if (ActionWrapper.BuilderWrapper.isSupported()) {
                     // We need to take this abstracted "wrapper" approach because the Action.Builder class, and RemoteInput class
                     // aren't available until API 22.
@@ -1247,6 +1290,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         return Display.DENSITY_MEDIUM;
+    }
+
+    public Rectangle getDisplaySafeArea(Rectangle rect) {
+        if (rect == null) {
+            rect = new Rectangle();
+        }
+        if (getProperty("android.useSafeAreaInsets", "false").equals("false")) {
+            return super.getDisplaySafeArea(rect);
+        }
+        if (this.myView != null) {
+            rect.setBounds(
+                    this.myView.getSafeAreaInsets().left,
+                    this.myView.getSafeAreaInsets().top,
+                    getDisplayWidth() - this.myView.getSafeAreaInsets().right - this.myView.getSafeAreaInsets().left,
+                    getDisplayHeight() - this.myView.getSafeAreaInsets().top - this.myView.getSafeAreaInsets().bottom
+            );
+            return rect;
+        }
+
+        return super.getDisplaySafeArea(rect);
     }
 
     /**
@@ -1985,7 +2048,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setAntiAliasedText(Object graphics, boolean a) {
-        ((AndroidGraphics) graphics).getFont().setAntiAlias(a);
+        android.graphics.Paint p  = ((AndroidGraphics) graphics).getFont();
+        if(p != null) {
+            p.setAntiAlias(a);
+        }
     }
 
     @Override
@@ -2677,6 +2743,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void run() {
             activity.invalidateOptionsMenu();
+            if (activity.getActionBar() == null) {
+                return;
+            }
             if (show) {
                 activity.getActionBar().show();
             } else {
@@ -2699,6 +2768,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
+            String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+            intent.removeExtra(Intent.EXTRA_TEXT);
             Uri u = intent.getData();
             String scheme = intent.getScheme();
             if (u == null && intent.getExtras() != null) {
@@ -2724,6 +2795,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (name != null) {
                                 String filePath = getAppHomePath()
                                         + getFileSystemSeparator() + name;
+                                if(filePath.startsWith("file:")) {
+                                    filePath = filePath.substring(5);
+                                }
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
@@ -2733,8 +2807,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 }
                                 tmp.close();
                                 attachment.close();
-                                setAppArg(filePath);
-                                return filePath;
+                                setAppArg(addFile(filePath));
+                                return addFile(filePath);
                             }
                         }
                     } catch (FileNotFoundException e) {
@@ -2766,15 +2840,52 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         return encodedPath;
                     }
                     */
-                    setAppArg(u.toString());
-                    return u.toString();
+                    if (sharedText != null) {
+                        setAppArg(sharedText);
+                        return sharedText;
+                    } else {
+                        setAppArg(u.toString());
+                        return u.toString();
+                    }
+
                 }
+            } else if (sharedText != null) {
+                setAppArg(sharedText);
+                return sharedText;
             }
         }
         return null;
     }
+    
+    // taken from https://stackoverflow.com/a/70380413/756809
+    private boolean isRunningOnAndroidStudioEmulator() {
+        return Build.FINGERPRINT.startsWith("google/sdk_gphone")
+                && Build.FINGERPRINT.endsWith(":user/release-keys")
+                && Build.MANUFACTURER == "Google" && Build.PRODUCT.startsWith("sdk_gphone") && Build.BRAND == "google"
+                && Build.MODEL.startsWith("sdk_gphone");
+    }
 
-
+    // taken from https://stackoverflow.com/a/57960169/756809
+    private boolean isEmulator() {
+        return isRunningOnAndroidStudioEmulator() ||
+                ((Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+                || Build.FINGERPRINT.startsWith("generic")
+                || Build.FINGERPRINT.startsWith("unknown")
+                || Build.HARDWARE.contains("goldfish")
+                || Build.HARDWARE.contains("ranchu")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.MODEL.contains("VirtualBox")
+                || Build.MANUFACTURER.contains("Genymotion")
+                || Build.PRODUCT.contains("sdk_google")
+                || Build.PRODUCT.contains("google_sdk")
+                || Build.PRODUCT.contains("sdk")
+                || Build.PRODUCT.contains("sdk_x86")
+                || Build.PRODUCT.contains("vbox86p")
+                || Build.PRODUCT.contains("emulator")
+                || Build.PRODUCT.contains("simulator"));
+    }
 
 
     /**
@@ -2794,11 +2905,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if ("OS".equals(key)) {
             return "Android";
         }
-        if ("androidId".equals(key)) {
-            return Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
-        }
 
-        if ("cellId".equals(key)) {
+        // It's possible that this is triggering a Google Play data collection verification error
+        /*if ("androidId".equals(key)) {
+            return Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+        }*/
+
+        /*if ("cellId".equals(key)) {
             try {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the cellId")){
                     return defaultValue;
@@ -2810,7 +2923,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } catch (Throwable t) {
                 return defaultValue;
             }
-        }
+        }*/
         if ("AppName".equals(key)) {
 
             final PackageManager pm = getContext().getPackageManager();
@@ -2855,7 +2968,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if("DeviceName".equals(key)) {
             return "" + android.os.Build.MODEL;
         }
-        try {
+        if("Emulator".equals(key)) {
+            return "" + isEmulator();
+        }
+        /*try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
                     return "";
@@ -2884,7 +3000,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch(Throwable t) {
             // will be caused by no permissions.
             return defaultValue;
-        }
+        }*/
 
         if (getActivity() != null) {
             android.content.Intent intent = getActivity().getIntent();
@@ -3047,9 +3163,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
                 if(url.startsWith("/") || url.startsWith("file:")) {
-                    if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
-                        return null;
+                    if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+                        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
+                            return null;
+                        }
                     }
+
                 }
                 intent = new Intent();
                 intent.setAction(Intent.ACTION_VIEW);
@@ -3201,7 +3320,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean isBuiltinSoundAvailable(String soundIdentifier) {
-        return true;
+        return false;
     }
 
     /**
@@ -3428,7 +3547,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return null;
         }
         if(!uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
-            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+            if(!PermissionsHelper.checkForPermission(isVideo ? DevicePermission.PERMISSION_READ_VIDEO : DevicePermission.PERMISSION_READ_AUDIO, "This is required to play media")){
                 return null;
             }
         }
@@ -4647,6 +4766,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             }
                         }
                         wv.getSettings().setDomStorageEnabled(true);
+                        wv.getSettings().setAllowFileAccess(true);
+                        wv.getSettings().setAllowContentAccess(true);
                         wv.requestFocus(View.FOCUS_DOWN);
                         wv.setFocusableInTouchMode(true);
                         if (android.os.Build.VERSION.SDK_INT >= 17) {
@@ -5128,6 +5249,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
+    /**
+     * Checks if this platform supports sharing cookies between Native components (e.g. BrowserComponent)
+     * and ConnectionRequests.  Currently only Android and iOS ports support this.
+     * @return
+     */
+    @Override
+    public boolean isNativeCookieSharingSupported() {
+        return true;
+    }
+
     @Override
     public void clearNativeCookies() {
         CookieManager mgr = getCookieManager();
@@ -5135,7 +5266,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     private static CookieManager cookieManager;
     private static CookieManager getCookieManager() {
-        if (android.os.Build.VERSION.SDK_INT >= 21) {
+        if (android.os.Build.VERSION.SDK_INT > 28) {
             return CookieManager.getInstance();
         }
         if (cookieManager == null) {
@@ -5225,6 +5356,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             web.addJavascriptInterface(jsCallback, AndroidBrowserComponentCallback.JS_VAR_NAME);
             web.addJavascriptInterface(new WebAppInterface(parent), "cn1application");
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
+            }
 
             web.setWebViewClient(new WebViewClient() {
                 
@@ -5820,13 +5954,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(timeout > -1) {
                 c.setConnectTimeout(timeout);
             }
-            if(read){
-                if(timeout > -1) {
-                    c.setReadTimeout(timeout);
-                }else{
-                    c.setReadTimeout(10000);
-                }
-            }
+
             if (android.os.Build.VERSION.SDK_INT > 13) {
                 c.setRequestProperty("Connection", "close");
             }
@@ -5896,12 +6024,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 conn.connect();
                 java.security.cert.Certificate[] certs = conn.getServerCertificates();
-                String[] out = new String[certs.length];
+                String[] out = new String[certs.length * 2];
                 int i=0;
                 for (java.security.cert.Certificate cert : certs) {
-                    MessageDigest md = MessageDigest.getInstance("SHA1");
-                    md.update(cert.getEncoded());
-                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA-256");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA-256:" + dumpHex(md.digest());
+                    }
+                    {
+                        MessageDigest md = MessageDigest.getInstance("SHA1");
+                        md.update(cert.getEncoded());
+                        out[i++] = "SHA1:" + dumpHex(md.digest());
+                    }
+
                 }
                 return out;
             } catch (Exception ex) {
@@ -6422,20 +6558,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String removeFilePrefix(String file) {
-        if (file.contains("/files//storage/emulated/")) {
-            // TODO: Find a better fix for issue https://github.com/codenameone/CodenameOne/issues/3204
-            // The gallery is returning files inside the directory /storage/emulated/0/DCIM/Camera/...
-            // The path is translated wrong because this path is not listed in any of the root
-            // paths of the file system.
-            // This issue is related to scoped storage. in API 29.
-            // https://stackoverflow.com/questions/56992682/android-9-api-29-storage-emulated-0-pictures-mypic-png-open-failed-eacces
-            // 
-            // This hack works around the problem (and seems to fix it for my test device) by simply
-            // looking for this pattern in the path, and stripping everything before
-            // the /storage/emulated/...
-            // Not good.  Needs to be revisited. - SJH Sept 25, 2020
-            return file.substring(file.indexOf("/files//storage/emulated/")+ 7);
-        }
         if (file.startsWith("file://")) {
             return file.substring(7);
         }
@@ -6562,8 +6684,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
-        if(!checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")){
+        String permissionMessage = "This is required to get the location";
+        if (
+                !checkForPermission( Manifest.permission.ACCESS_FINE_LOCATION, permissionMessage)
+        ) {
             return null;
+        }
+        if (
+                Build.VERSION.SDK_INT >= 29  
+                && "true".equals(Display.getInstance().getProperty("android.requiresBackgroundLocationPermissionForAPI29", "false"))
+        ) {
+            if (
+                    !checkForPermission(
+                            "android.permission.ACCESS_BACKGROUND_LOCATION", 
+                            permissionMessage
+                    )
+            ) {
+                com.codename1.io.Log.e(new RuntimeException("Background location permission denied"));
+            }
         }
 
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
@@ -6593,11 +6731,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         File newFile = new File(mediaStorageDir.getPath() + File.separator
                     + cn1File.getName());
-        if(newFile.exists()) {
-            // Create a media file name
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            newFile = new File(mediaStorageDir.getPath() + File.separator
-                    + "IMG_" + timeStamp + "_" + cn1File.getName());
+        if (newFile.exists()) {
+            if (Display.getInstance().getProperty("DeleteCachedFileAfterShare", "false").equals("true")) {
+                newFile.delete();
+            } else {
+                // Create a media file name
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+                newFile = new File(mediaStorageDir.getPath() + File.separator
+                        + "IMG_" + timeStamp + "_" + cn1File.getName());
+            }
         }
 
 
@@ -6790,7 +6932,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         "android.NotificationChannel.enableLights",
         "android.NotificationChannel.lightColor",
         "android.NotificationChannel.enableVibration",
-        "android.NotificationChannel.vibrationPattern"
+        "android.NotificationChannel.vibrationPattern",
+        "android.NotoficationChannel.soundUri"
     };
     
     /**
@@ -6826,7 +6969,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             InputStream i = null;
             try {
                 serviceProperties = new HashMap<String,String>();
-                i = a.openFileInput("CN1$AndroidServiceProperties");
+                try {
+                    i = a.openFileInput("CN1$AndroidServiceProperties");
+                } catch (FileNotFoundException notFoundEx){}
                 if(i == null) {
                     return serviceProperties;
                 }
@@ -6919,8 +7064,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @param nm The notification manager.
      * @param mNotifyBuilder The notify builder
      * @param context The context
+     * @since 7.0
      */
     public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context) {
+        setNotificationChannel(nm, mNotifyBuilder, context, (String)null);
+        
+    }
+    
+    /**
+     * Sets the notification channel on a notification builder.  Uses service properties to 
+     * set properties of channel.
+     * @param nm The notification manager.
+     * @param mNotifyBuilder The notify builder
+     * @param context The context
+     * @param soundName The name of the sound to use for notifications on this channel.  E.g. mysound.mp3.  This feature is not yet implemented, but
+     *  parameter is added now to scaffold compatibility with build daemon until implementation is complete.
+     * @since 8.0
+     */
+    public static void setNotificationChannel(NotificationManager nm, NotificationCompat.Builder mNotifyBuilder, Context context, String soundName) {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             try {
                 NotificationManager mNotificationManager = nm;
@@ -6974,6 +7135,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     //mChannel.setVibrationPattern(pattern);
                 }
                 
+                String soundUri = getServiceProperty("android.NotificationChannel.soundUri", null, context);
+                if (soundUri != null) {
+                    Uri uri= android.net.Uri.parse(soundUri);
+                    
+                    android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                            .build();
+                    method = clsNotificationChannel.getMethod("setSound", android.net.Uri.class, android.media.AudioAttributes.class);
+                    method.invoke(mChannel, new Object[]{uri, audioAttributes});
+                }
+                
                 method = NotificationManager.class.getMethod("createNotificationChannel", clsNotificationChannel);
                 method.invoke(mNotificationManager, new Object[]{mChannel});
                 //mNotificationManager.createNotificationChannel(mChannel);
@@ -7015,8 +7188,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Activity.NOTIFICATION_SERVICE);
 
         Intent notificationIntent = new Intent();
-        notificationIntent.setComponent(getActivity().getComponentName());
-        PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
+        notificationIntent.setComponent(activityComponentName);
+        PendingIntent contentIntent = createPendingIntent(getContext(), 0, notificationIntent);
 
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext())
@@ -7126,8 +7299,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }*/
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         if(image == null){
-            shareIntent.setType("text/plain");
-            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, text);
+            if (text.startsWith("file:") && mimeType != null && new com.codename1.io.File(text).exists()) {
+                shareIntent.setType(mimeType);
+                shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(text)));
+            } else {
+                shareIntent.setType("text/plain");
+                shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, text);
+            }
         }else{
             shareIntent.setType(mimeType);
             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(fixAttachmentPath(image)));
@@ -7837,10 +8015,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (requestCode == REQUEST_SELECT_FILE || requestCode == FILECHOOSER_RESULTCODE) {
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 if (requestCode == REQUEST_SELECT_FILE) {
-                    if (uploadMessage == null) {
-                        return;
+                    if (uploadMessage == null) return;
+                    Uri[] results = null;
+
+                    // Check that the response is a good one
+                    if (resultCode == Activity.RESULT_OK) {
+                        if (intent != null) {
+                            // If there is not data, then we may have taken a photo
+                            String dataString = intent.getDataString();
+                            ClipData clipData = intent.getClipData();
+
+                            if (clipData != null) {
+                                results = new Uri[clipData.getItemCount()];
+                                for (int i = 0; i < clipData.getItemCount(); i++) {
+                                    ClipData.Item item = clipData.getItemAt(i);
+                                    results[i] = item.getUri();
+                                }
+                            } else if (dataString != null) {
+                                results = new Uri[]{Uri.parse(dataString)};
+                            }
+                        }
                     }
-                    uploadMessage.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, intent));
+
+                    uploadMessage.onReceiveValue(results);
                     uploadMessage = null;
                 }
             }
@@ -7925,8 +8122,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
+                boolean fileExists = false;
+                if (filePath != null) {
+                    File file = new File(filePath);
+                    fileExists = file.exists() && file.canRead();
+                }
 
-                if (filePath == null && "content".equals(scheme)) {
+                if (!fileExists && "content".equals(scheme)) {
                     //if the file is not on the filesystem download it and save it
                     //locally
                     try {
@@ -7972,8 +8174,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
                 String filePath = cursor.getString(columnIndex);
                 cursor.close();
+                boolean fileExists = false;
+                if (filePath != null) {
+                    File file = new File(filePath);
+                    fileExists = file.exists() && file.canRead();
+                }
 
-                if (filePath == null && "content".equals(scheme)) {
+                if (!fileExists && "content".equals(scheme)) {
                     //if the file is not on the filesystem download it and save it
                     //locally
                     try {
@@ -8019,14 +8226,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+
+
     @Override
     public void capturePhoto(ActionListener response) {
         if (getActivity() == null) {
             throw new RuntimeException("Cannot capture photo in background mode");
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")){
-            return;
+        if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")){
+                return;
+            }
         }
+
         if (getRequestedPermissions().contains(Manifest.permission.CAMERA)) {
             // Normally we don't need to request the CAMERA permission since we use
             // the ACTION_IMAGE_CAPTURE intent, which handles permissions itself.
@@ -8076,9 +8288,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             throw new RuntimeException("Cannot capture video in background mode");
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")){
-            return;
+        if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")){
+                return;
+            }
         }
+
         if (getRequestedPermissions().contains(Manifest.permission.CAMERA)) {
             // Normally we don't need to request the CAMERA permission since we use
             // the ACTION_VIDEO_CAPTURE intent, which handles permissions itself.
@@ -8292,8 +8507,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             throw new RuntimeException("Cannot open galery in background mode");
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
-            return;
+        if (PermissionsHelper.requiresExternalStoragePermissionForMediaAccess()) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
+                return;
+            }
         }
         if(editInProgress()) {
             stopEditing(true);
@@ -8438,6 +8655,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return;
         }
+
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive push notifications")){
+                return;
+            }
+        }
+
         boolean has = hasAndroidMarket();
         if (!has) {
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
@@ -9859,8 +10083,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     }
 
+    @Override
+    public void drawShadow(Object graphics, Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
+        AndroidGraphics ag = (AndroidGraphics)graphics;
 
+        ag.drawShadow(image, x, y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
+    }
 
+    @Override
+    public boolean isDrawShadowSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDrawShadowFast() {
+        return false;
+    }
     // BEGIN TRANSFORMATION METHODS---------------------------------------------------------
 
 
@@ -10289,14 +10527,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
-
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")){
+                com.codename1.io.Log.e(new RuntimeException("Local notification was prevented the POST_NOTIFICATIONS permission was not granted by the user."));
+                return;
+            }
+        }
         final Intent notificationIntent = new Intent(getContext(), LocalNotificationPublisher.class);
         notificationIntent.setAction(getContext().getApplicationInfo().packageName + "." + notif.getId());
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
 
         Intent contentIntent = new Intent();
-        if (getActivity() != null) {
-            contentIntent.setComponent(getActivity().getComponentName());
+        if (activityComponentName != null) {
+            contentIntent.setComponent(activityComponentName);
+        } else {
+            try {
+                contentIntent.setComponent(getContext().getPackageManager().getLaunchIntentForPackage(getContext().getApplicationInfo().packageName).getComponent());
+            } catch (Exception ex) {
+                System.err.println("Failed to get the component name for local notification.  Local notification may not work.");
+                ex.printStackTrace();
+            }
         }
         contentIntent.putExtra("LocalNotificationID", notif.getId());
 
@@ -10308,20 +10558,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
             //an ugly workaround to the putExtra bug 
             intent.setData(Uri.parse("http://codenameone.com/a?" + getBackgroundFetchListener().getClass().getName()));
-            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pendingIntent = getPendingIntent(context, 0,
+                    intent);
             notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
 
         } else {
             contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID="+Uri.encode(notif.getId())));
         }
-        PendingIntent pendingContentIntent = PendingIntent.getActivity(getContext(), 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingContentIntent = createPendingIntent(getContext(), 0, contentIntent);
 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
 
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(getContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
 
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
@@ -10354,7 +10603,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent notificationIntent = new Intent(getContext(), LocalNotificationPublisher.class);
         notificationIntent.setAction(getContext().getApplicationInfo().packageName + "." + notificationId);
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(getContext(), 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = getBroadcastPendingIntent(getContext(), 0, notificationIntent);
         AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(pendingIntent);
     }

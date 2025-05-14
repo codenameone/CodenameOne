@@ -23,6 +23,7 @@
 
 package com.codename1.properties;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -122,4 +123,21 @@ public abstract class CollectionProperty<T, K> extends PropertyBase<T, K> implem
      */
     public abstract boolean contains(T element);
 
+    /**
+     * Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
+     * be converted to a Map
+     * @return a list
+     */
+    List<Object> asExplodedList(Collection<T> value) {
+        ArrayList<Object> aa = new ArrayList<Object>();
+        for(T t : value) {
+            if(t instanceof PropertyBusinessObject) {
+                aa.add(((PropertyBusinessObject)t).getPropertyIndex().toMapRepresentation());
+            } else {
+                aa.add(t);
+            }
+        }
+        internalGet();
+        return aa;
+    }
 }

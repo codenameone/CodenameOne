@@ -1,0 +1,849 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+    <component name="AutoImportSettings">
+        <option name="autoReloadType" value="SELECTIVE" />
+    </component>
+    <component name="ChangeListManager">
+        <list default="true" id="336d32c5-6f4b-4a8f-b637-9fea310958e7" name="Default Changelist" comment="">
+            <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+        </list>
+        <option name="SHOW_DIALOG" value="false" />
+        <option name="HIGHLIGHT_CONFLICTS" value="true" />
+        <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+        <option name="LAST_RESOLUTION" value="IGNORE" />
+    </component>
+    <component name="Git.Settings">
+        <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+    </component>
+    <component name="MarkdownSettingsMigration">
+        <option name="stateVersion" value="1" />
+    </component>
+    <component name="MavenImportPreferences">
+        <option name="importingSettings">
+            <MavenImportingSettings>
+                <option name="vmOptionsForImporter" value="-Xmx768m" />
+            </MavenImportingSettings>
+        </option>
+    </component>
+    <component name="MavenRunner">
+        <option name="delegateBuildToMaven" value="true" />
+        <option name="mavenProperties">
+            <map>
+                <entry key="codename1.platform" value="javase" />
+            </map>
+        </option>
+        <option name="skipTests" value="true" />
+    </component>
+    <component name="ProjectId" id="1occntywqhF2GI6rzQO8tgiLMHt" />
+    <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+    <component name="ProjectViewState">
+        <option name="hideEmptyMiddlePackages" value="true" />
+        <option name="showLibraryContents" value="true" />
+    </component>
+    <component name="PropertiesComponent">
+        <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+        <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+        <property name="project.structure.last.edited" value="Libraries" />
+        <property name="project.structure.proportion" value="0.0" />
+        <property name="project.structure.side.proportion" value="0.14306152" />
+        <property name="settings.editor.selected.configurable" value="reference.settings.project.maven.runner" />
+    </component>
+    <component name="RunManager" selected="Maven.Run in Simulator">
+        <configuration name="Android Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="android-device" />
+                                <entry key="codename1.platform" value="android" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Codename One Settings" type="MavenRunConfiguration" factoryName="Maven" folderName="Tools">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map />
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="cn1:settings" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Cross-platform (JavaSE) Desktop App" type="MavenRunConfiguration" factoryName="Maven" folderName="Local Builds">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.platform" value="javase" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map>
+                                <entry key="executable-jar" value="true" />
+                            </map>
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Generate Native Interfaces" type="MavenRunConfiguration" factoryName="Maven" folderName="Tools">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map />
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="cn1:generate-native-interfaces" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Gradle Android Project" type="MavenRunConfiguration" factoryName="Maven" folderName="Local Builds">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="android-source" />
+                                <entry key="codename1.platform" value="android" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Javascript Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="javascript" />
+                                <entry key="codename1.platform" value="javascript" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Mac Desktop Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="mac-os-x-desktop" />
+                                <entry key="codename1.platform" value="javase" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Run as Desktop App" type="MavenRunConfiguration" factoryName="Maven">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.platform" value="javase" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="verify" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map>
+                                <entry key="run-desktop" value="true" />
+                            </map>
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Run in Simulator" type="MavenRunConfiguration" factoryName="Maven">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.platform" value="javase" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="verify" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map>
+                                <entry key="idea-simulator" value="true" />
+                            </map>
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Update Codename One" type="MavenRunConfiguration" factoryName="Maven" folderName="Tools">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map />
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="cn1:update" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Windows Desktop Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="windows-desktop" />
+                                <entry key="codename1.platform" value="javase" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Windows Device Build (UWP)" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="windows-device" />
+                                <entry key="codename1.platform" value="win" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="Xcode iOS Project" type="MavenRunConfiguration" factoryName="Maven" folderName="Local Builds">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="ios-source" />
+                                <entry key="codename1.platform" value="ios" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration default="true" type="MavenRunConfiguration" factoryName="Maven">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings" />
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list />
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map>
+                                <entry key="simulator" value="true" />
+                            </map>
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="iOS Debug Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="ios-device" />
+                                <entry key="codename1.platform" value="ios" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <configuration name="iOS Release Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+            <MavenSettings>
+                <option name="myGeneralSettings" />
+                <option name="myRunnerSettings">
+                    <MavenRunnerSettings>
+                        <option name="delegateBuildToMaven" value="true" />
+                        <option name="environmentProperties">
+                            <map />
+                        </option>
+                        <option name="jreName" value="#USE_PROJECT_JDK" />
+                        <option name="mavenProperties">
+                            <map>
+                                <entry key="codename1.buildTarget" value="ios-device-release" />
+                                <entry key="codename1.platform" value="ios" />
+                            </map>
+                        </option>
+                        <option name="passParentEnv" value="true" />
+                        <option name="runMavenInBackground" value="true" />
+                        <option name="skipTests" value="true" />
+                        <option name="vmOptions" value="" />
+                    </MavenRunnerSettings>
+                </option>
+                <option name="myRunnerParameters">
+                    <MavenRunnerParameters>
+                        <option name="profiles">
+                            <set />
+                        </option>
+                        <option name="goals">
+                            <list>
+                                <option value="package" />
+                                <option value="-U" />
+                                <option value="-e" />
+                            </list>
+                        </option>
+                        <option name="pomFileName" />
+                        <option name="profilesMap">
+                            <map />
+                        </option>
+                        <option name="resolveToWorkspace" value="false" />
+                        <option name="workingDirPath" value="$PROJECT_DIR$" />
+                    </MavenRunnerParameters>
+                </option>
+            </MavenSettings>
+            <method v="2" />
+        </configuration>
+        <list>
+            <item itemvalue="Maven.Android Build" />
+            <item itemvalue="Maven.iOS Debug Build" />
+            <item itemvalue="Maven.iOS Release Build" />
+            <item itemvalue="Maven.Javascript Build" />
+            <item itemvalue="Maven.Mac Desktop Build" />
+            <item itemvalue="Maven.Windows Desktop Build" />
+            <item itemvalue="Maven.Windows Device Build (UWP)" />
+            <item itemvalue="Maven.Cross-platform (JavaSE) Desktop App" />
+            <item itemvalue="Maven.Xcode iOS Project" />
+            <item itemvalue="Maven.Gradle Android Project" />
+            <item itemvalue="Maven.Generate Native Interfaces" />
+            <item itemvalue="Maven.Codename One Settings" />
+            <item itemvalue="Maven.Update Codename One" />
+            <item itemvalue="Maven.Run in Simulator" />
+            <item itemvalue="Maven.Run as Desktop App" />
+        </list>
+    </component>
+    <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+    <component name="SvnConfiguration">
+        <configuration />
+    </component>
+    <component name="TaskManager">
+        <task active="true" id="Default" summary="Default task">
+            <changelist id="336d32c5-6f4b-4a8f-b637-9fea310958e7" name="Default Changelist" comment="" />
+            <created>1613589489573</created>
+            <option name="number" value="Default" />
+            <option name="presentableId" value="Default" />
+            <updated>1613589489573</updated>
+        </task>
+        <servers />
+    </component>
+    <component name="Vcs.Log.Tabs.Properties">
+        <option name="TAB_STATES">
+            <map>
+                <entry key="MAIN">
+                    <value>
+                        <State />
+                    </value>
+                </entry>
+            </map>
+        </option>
+    </component>
+    <component name="WindowStateProjectService">
+        <state x="604" y="148" width="801" height="672" key="#Project_Structure" timestamp="1613667632061">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state x="340" y="97" width="801" height="672" key="#Project_Structure/0.25.1440.817@0.25.1440.817" timestamp="1613589576153" />
+        <state x="604" y="148" key="#Project_Structure/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613667632061" />
+        <state x="297" y="88" width="1071" height="779" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1613675369173">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state x="167" y="63" width="1071" height="779" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.25.1440.817@0.25.1440.817" timestamp="1613591898592" />
+        <state x="297" y="88" key="#com.intellij.execution.impl.EditConfigurationsDialog/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613675369173" />
+        <state width="1857" height="258" key="GridCell.Tab.0.bottom" timestamp="1613673746962">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.0.bottom/0.25.1440.817@0.25.1440.817" timestamp="1613592228433" />
+        <state width="1857" height="258" key="GridCell.Tab.0.bottom/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673746962" />
+        <state width="1857" height="258" key="GridCell.Tab.0.center" timestamp="1613673746961">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.0.center/0.25.1440.817@0.25.1440.817" timestamp="1613592228433" />
+        <state width="1857" height="258" key="GridCell.Tab.0.center/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673746961" />
+        <state width="1857" height="258" key="GridCell.Tab.0.left" timestamp="1613673746960">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.0.left/0.25.1440.817@0.25.1440.817" timestamp="1613592228432" />
+        <state width="1857" height="258" key="GridCell.Tab.0.left/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673746960" />
+        <state width="1857" height="258" key="GridCell.Tab.0.right" timestamp="1613673746961">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.0.right/0.25.1440.817@0.25.1440.817" timestamp="1613592228433" />
+        <state width="1857" height="258" key="GridCell.Tab.0.right/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673746961" />
+        <state width="1857" height="258" key="GridCell.Tab.1.bottom" timestamp="1613673760461">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.1.bottom/0.25.1440.817@0.25.1440.817" timestamp="1613592228434" />
+        <state width="1857" height="258" key="GridCell.Tab.1.bottom/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673760461" />
+        <state width="1857" height="258" key="GridCell.Tab.1.center" timestamp="1613673760460">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.1.center/0.25.1440.817@0.25.1440.817" timestamp="1613592228434" />
+        <state width="1857" height="258" key="GridCell.Tab.1.center/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673760459" />
+        <state width="1857" height="258" key="GridCell.Tab.1.left" timestamp="1613673760459">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.1.left/0.25.1440.817@0.25.1440.817" timestamp="1613592228434" />
+        <state width="1857" height="258" key="GridCell.Tab.1.left/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673760459" />
+        <state width="1857" height="258" key="GridCell.Tab.1.right" timestamp="1613673760460">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state width="1400" height="258" key="GridCell.Tab.1.right/0.25.1440.817@0.25.1440.817" timestamp="1613592228434" />
+        <state width="1857" height="258" key="GridCell.Tab.1.right/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613673760460" />
+        <state x="377" y="99" key="SettingsEditor" timestamp="1613667715096">
+            <screen x="0" y="23" width="2560" height="1417" />
+        </state>
+        <state x="212" y="69" key="SettingsEditor/0.25.1440.817@0.25.1440.817" timestamp="1613589796525" />
+        <state x="377" y="99" key="SettingsEditor/2560.23.1680.1027/0.23.2560.1417@0.23.2560.1417" timestamp="1613667715096" />
+        <state x="395" y="264" key="com.intellij.ide.util.TipDialog" timestamp="1613592243503">
+            <screen x="0" y="25" width="1440" height="817" />
+        </state>
+        <state x="395" y="264" key="com.intellij.ide.util.TipDialog/0.25.1440.817@0.25.1440.817" timestamp="1613592243503" />
+        <state x="368" y="195" width="670" height="675" key="run.anything.popup" timestamp="1613589686494">
+            <screen x="0" y="25" width="1440" height="817" />
+        </state>
+        <state x="368" y="195" width="670" height="675" key="run.anything.popup/0.25.1440.817@0.25.1440.817" timestamp="1613589686494" />
+    </component>
+</project>

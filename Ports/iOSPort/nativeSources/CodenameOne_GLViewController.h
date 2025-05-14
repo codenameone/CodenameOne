@@ -35,7 +35,10 @@
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MessageUI/MFMessageComposeViewController.h>
 #import <CoreLocation/CoreLocation.h>
+//#define CN1_USE_STOREKIT
+#ifdef CN1_USE_STOREKIT
 #import "StoreKit/StoreKit.h"
+#endif
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
 //#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
@@ -58,6 +61,7 @@
 //#define GLUIIMAGE_AUTOSCALE_LARGE_TEXTURES
 //#define CN1_USE_JAVASCRIPTCORE
 //#define ENABLE_GALLERY_MULTISELECT
+//#define USE_PHOTOKIT_FOR_MULTIGALLERY
 //#define INCLUDE_CONTACTS_USAGE
 //#define INCLUDE_CALENDARS_USAGE
 //#define INCLUDE_CAMERA_USAGE
@@ -89,6 +93,11 @@
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 #import "QBImagePickerController.h"
+
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+#import "PhotosUI/PhotosUI.h"
+#endif
+
 #endif
 #endif
 
@@ -154,7 +163,11 @@
 
 //ADD_INCLUDE
 
-@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
+@interface CodenameOne_GLViewController : UIViewController<UIImagePickerControllerDelegate, MFMailComposeViewControllerDelegate, 
+#ifdef CN1_USE_STOREKIT
+SKProductsRequestDelegate, SKPaymentTransactionObserver, 
+#endif
+MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIPopoverControllerDelegate, UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
 #endif
@@ -171,6 +184,9 @@
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
         ,QBImagePickerControllerDelegate
+#ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
+        ,PHPickerViewControllerDelegate
+#endif
 #endif
 #endif
 > {

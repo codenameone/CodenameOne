@@ -6,8 +6,11 @@
 package com.codename1.maven;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -17,6 +20,11 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.shared.invoker.DefaultInvocationRequest;
+import org.apache.maven.shared.invoker.DefaultInvoker;
+import org.apache.maven.shared.invoker.InvocationRequest;
+import org.apache.maven.shared.invoker.Invoker;
+import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.Environment.Variable;
 import org.apache.tools.ant.types.Path;
@@ -26,11 +34,12 @@ import org.apache.tools.ant.types.Permissions.Permission;
 /**
  *
  * @author shannah
+ * @deprecated This was an early attempt at getting the simulator runnign using Maven.  Currently it is not used, as we are using the Maven exec plugin.
  */
 @Mojo( name="simulator", 
         requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, 
         requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME, 
-        defaultPhase = LifecyclePhase.COMPILE
+        defaultPhase = LifecyclePhase.PACKAGE
         
         
         )
@@ -47,6 +56,47 @@ private static final String GROUP_ID="com.codenameone";
     
     @Override
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
+        
+        // We only want to run this if we are in the cn1 project directory.  
+        File cn1ProjectDir = getCN1ProjectDir();
+        File projectDir = project.getBasedir();
+        File canonicalCn1Project;
+        if (cn1ProjectDir == null) return;
+        try {
+            canonicalCn1Project = cn1ProjectDir.getCanonicalFile();
+            File canonicalProjectDir = projectDir.getCanonicalFile();
+            if (!canonicalCn1Project.equals(canonicalProjectDir)) {
+                return;
+            }
+            
+        } catch (IOException ioe) {
+            throw new MojoExecutionException("Failure trying to compare project paths", ioe);
+        }
+        
+        File javaseProject = new File(canonicalCn1Project.getParentFile(), "javase");
+        if (!javaseProject.exists()) {
+            throw new MojoExecutionException("JavaSE sibling project is required in order to run the simulator goal.");
+        }
+        InvocationRequest request = new DefaultInvocationRequest();
+        //request.setPomFile( new File( "/path/to/pom.xml" ) );
+        request.setGoals( Collections.singletonList( "verify" ) );
+        request.setBaseDirectory(javaseProject);
+        Properties props = new Properties();
+        props.setProperty("codename1.platform", "javase");
+        
+        request.setProperties(props);
+        request.setProfiles(Collections.singletonList("simulator"));
+        
+        
+        Invoker invoker = new DefaultInvoker();
+        try {
+            invoker.execute( request );
+        } catch (MavenInvocationException ex) {
+            throw new MojoExecutionException(ex.getMessage(), ex);
+                    
+        }
+    }
+    public void executeImpl_old() throws MojoExecutionException, MojoFailureException {
         getLog().info("execArgs="+execArgs);
         getLog().info(""+System.getProperties());
         //String args = "-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address} -classpath %classpath ${packageClassName}";

@@ -81,7 +81,7 @@ The API is relatively limited in scope to keep the size low, we occasionally add
 
 ParparVM is used by Codename One internally, it's open source and we have no intention to change that. It is used in Codename One's Mac build servers (so Codename One proper doesn't require a Mac) and also used by the offline builder tool.
 
-Parpar has no dependency on Codename One that we know of but some might exist inadvertantly since Codename One is the only target we have. If such a dependency exists and you can think of an elegant way to remove it please feel free to submit a pull request.
+Parpar has no dependency on Codename One that we know of but some might exist inadvertently since Codename One is the only target we have. If such a dependency exists and you can think of an elegant way to remove it please feel free to submit a pull request.
 
 ## Support
 

@@ -4,7 +4,7 @@
        <parent>
            <artifactId>codenameone</artifactId>
            <groupId>com.codenameone</groupId>
-           <version>7.0-SNAPSHOT</version>
+           <version>7.0</version>
        </parent>
     <groupId>com.codenameone.tests</groupId>
     <artifactId>testnativeinterfaces</artifactId>
@@ -14,20 +14,17 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <cn1.version>${project.version}</cn1.version>
         <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
     </properties>
     <dependencies>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase</artifactId>
-            <version>${cn1.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>${cn1.version}</version>
         </dependency>
     </dependencies>
 
@@ -55,7 +52,6 @@
             <plugin>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-maven-plugin</artifactId>
-                <version>${cn1.version}</version>
                 <extensions>true</extensions>
                 <executions>
                     <execution>
@@ -94,14 +90,7 @@
             <name>bintray</name>
             <url>https://dl.bintray.com/codenameone/codenameone</url>
         </repository>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-guardsquare-proguard</id>
-            <name>bintray</name>
-            <url>https://dl.bintray.com/guardsquare/proguard</url>
-        </repository>
+
     </repositories>
     <pluginRepositories>
         <pluginRepository>
@@ -211,7 +200,6 @@
                 <dependency>
                     <groupId>com.codenameone</groupId>
                     <artifactId>codenameone-javase</artifactId>
-                    <version>${cn1.version}</version>
                     <scope>runtime</scope>
                 </dependency>
             </dependencies>

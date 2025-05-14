@@ -74,7 +74,7 @@ public class DateSpinner extends BaseSpinner {
                             value = "" + d;
                         } else {
                             Map<String, String> t = getUIManager().getBundle();
-                            String text = DateTimeRenderer.MONTHS[d - 1];
+                            String text = DateTimeRenderer.MONTHS[Math.max(0, Math.min(d - 1, DateTimeRenderer.MONTHS.length - 1))];
                             if (t != null) {
                                 Object o = t.get("Calendar." + text);
                                 if (o != null) {

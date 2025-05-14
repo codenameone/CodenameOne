@@ -290,7 +290,7 @@ public class CN1CSSCLI {
         }
         
         if (!destDir.exists()) {
-            destDir.mkdir();
+            destDir.mkdirs();
         }
         
         if (contains(srcDir, destDir) || contains(destDir, srcDir)) {
@@ -333,6 +333,7 @@ public class CN1CSSCLI {
                 
                 if (child.isDirectory()) {
                     destChild.mkdir();
+                    syncDirectories(child, destChild);
                 } else {
                     Files.copy(child.toPath(), destChild.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
@@ -422,6 +423,7 @@ public class CN1CSSCLI {
         //String relativePathToLibCSSDir = getRelativePath(libCSSDir, mergedFile);
         
         for (File f : inputFiles) {
+
             File canonicalFile = f.getCanonicalFile();
             String md5 = getMd5(canonicalFile.getAbsolutePath());
             File destDir = new File(incDir, md5);
@@ -630,6 +632,10 @@ public class CN1CSSCLI {
                 throw new IllegalArgumentException("Output path is required.  Use -o [filepath] or -output [filepath]");
             }
             watchmode = "true".equals(getArgByName(args, "watch"));
+            if (watchmode && !CN1Bootstrap.isBootstrapped() && !CN1Bootstrap.isCEFLoaded()) {
+                // In watch mode we require CEF to be loaded
+                throw new MissingNativeBrowserException();
+            }
             mergedFile = getArgByName(args, "m", "merge");
             
             mergeMode = inputPath.contains(",") || mergedFile != null;
@@ -695,6 +701,9 @@ public class CN1CSSCLI {
         }
         
         File[] inputFiles = getInputFiles(inputPath);
+        if (inputFiles.length == 0) {
+            throw new IllegalArgumentException("CSS Compiler requires at least one input file");
+        }
         if (mergeMode) {
             System.out.println("Updating merge file "+mergedFile);
             updateMergeFile(inputFiles, new File(mergedFile));
@@ -770,6 +779,7 @@ public class CN1CSSCLI {
             });
             
         }
+
         try {
             if (mergeMode) {
                 System.out.println("Compiling "+mergedFile+" to "+outputFile);

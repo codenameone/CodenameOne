@@ -5,7 +5,7 @@
  */
 package com.codename1.maven;
 
-import static com.codename1.maven.Cn1libMojo.CN1LIB_VERSION;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -40,6 +40,7 @@ import org.apache.tools.ant.types.FileSet;
  * As a safety feature, this goal will fail if the maven project has an existing src directory.  Before running 
  * this goal, you need to delete or move the src directory.
  * @author shannah
+ * @deprecated
  */
 @Mojo(name = "import-ant-project")
 public class ImportAntProjectMojo extends AbstractCN1Mojo {
@@ -351,7 +352,7 @@ public class ImportAntProjectMojo extends AbstractCN1Mojo {
             cn1Attributes = new Attributes();
             manifest.getEntries().put("cn1lib", cn1Attributes);
         }
-        cn1Attributes.putValue("Version", CN1LIB_VERSION);
+        cn1Attributes.putValue("Version", "1.0");
         
         File manifestFile = new File(metaInf, "MANIFEST.MF");
         try (FileOutputStream fos = new FileOutputStream(manifestFile)) {

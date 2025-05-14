@@ -136,16 +136,20 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         }
         
         if (isMac) {
-            String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator;
+            String cefRoot = System.getProperty("cef.dir",
+                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator;
+
             return cefRoot + "macos64";
         } else if (isWindows) {
             String bitSuffix = is64Bit ? "64" : "32";
-            String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator+"lib"+File.separator;
+            String cefRoot = System.getProperty("cef.dir",
+                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator+"lib"+File.separator;
             return cefRoot + "win"+bitSuffix;
         } else if (isUnix && is64Bit) {
             
             String bitSuffix = is64Bit ? "64" : "32";
-            String cefRoot = System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef"+File.separator+"lib"+File.separator;
+            String cefRoot = System.getProperty("cef.dir",
+                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator+"lib"+File.separator;
             return cefRoot + "linux"+bitSuffix;
         }else {
             throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
@@ -155,9 +159,15 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private static String[] createArgs() {
         List<String> args = new ArrayList<String>();
         if (isMac) {
-            args.add(String.format("--framework-dir-path=%s/Chromium Embedded Framework.framework", getLibPath()));
-            args.add(String.format("--main-bundle-path=%s/jcef Helper.app", getLibPath()));
-            args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
+
+            if (!"true".equals(System.getProperty("cn1.cef.bundled"))) {
+                // The cn1.cef.bundled flag is set in SEWrapper to indicate that CEF is bundled in the .app
+                // Otherwise it needs to get CEF from the central location specified 
+                args.add(String.format("--framework-dir-path=%s/Chromium Embedded Framework.framework", getLibPath()));
+                args.add(String.format("--main-bundle-path=%s/jcef Helper.app", getLibPath()));
+                args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
+            }
+            
             args.add("--disable-gpu");
         } else if (isWindows) {
             // no extra stuff here

@@ -4,12 +4,12 @@
     <parent>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone</artifactId>
-        <version>7.0-SNAPSHOT</version>
+        <version>8.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone-designer</artifactId>
-    <version>7.0-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     
     <dependencies>
@@ -21,18 +21,18 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase-svg</artifactId>
-            <version>${project.version}</version>
+
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-server -->
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
-            <version>9.3.27.v20190418</version>
+            <version>9.4.41.v20210516</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.swinglabs/swing-layout -->
         <dependency>
@@ -101,21 +101,23 @@
         <dependency>
             <groupId>javax.xml.bind</groupId>
             <artifactId>jaxb-api</artifactId>
-            <version>2.3.1</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-impl -->
         <dependency>
             <groupId>com.sun.xml.bind</groupId>
             <artifactId>jaxb-impl</artifactId>
-            <version>2.3.1</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.sun.xml.bind/jaxb-core -->
         <dependency>
             <groupId>com.sun.xml.bind</groupId>
             <artifactId>jaxb-core</artifactId>
-            <version>2.3.0.1</version>
         </dependency>
-        
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.3.1</version>
+            <scope>test</scope>
+        </dependency>
         
         
         
@@ -131,174 +133,20 @@
         <resources>
             <resource>
                 <directory>${src.dir}</directory>
+                <excludes>
+                    <exclude>**/*.java</exclude>
+                </excludes>
             </resource>
         </resources>
         <plugins>
-            
-        </plugins>
-    </build>
-   
-    
-    <profiles>
-        <profile>
-            <id>cn1-binaries</id>
-            <activation>
-                <file>
-                    <exists>${basedir}/../../../cn1-binaries</exists>
-                </file>
-            </activation>
-            <properties>
-                <cn1.binaries>${basedir}/../../../cn1-binaries</cn1.binaries>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android-support-v7-appcompat</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android-support-v7-appcompat.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android-support-v7-cardview</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android-support-v7-cardview.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android-support-v7-gridlayout</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android-support-v7-gridlayout.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>google-services</artifactId>
-                    <version>3.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/google-services-3.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-auth</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-auth-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-base</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-base-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-basement</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-basement-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-location</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-location-12.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>facebook</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/facebook.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>google-play-services</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/google-play-services.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>zooz_iap</artifactId>
-                    <version>${project.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/zooz_iap.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-v4</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-v4-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-compat-v4</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-compat-v4-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-media-compat</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-media-compat-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-core-utils</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-core-utils-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-annotations</artifactId>
-                    <version>26.1.0-alpha1</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-annotations-26.0.0-alpha1.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-core-ui</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-core-ui-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>support-fragment</artifactId>
-                    <version>26.1.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/support-fragment-26.1.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>play-services-tasks</artifactId>
-                    <version>12.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/play-services-tasks-12.0.0.jar</systemPath>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
+
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
+                    <version>3.3.0</version>
                     <executions>
                         <execution>
+                            <id>build-executable-jar</id>
                             <phase>package</phase>
                             <goals>
                                 <goal>single</goal>
@@ -324,11 +172,17 @@
 
                         <executions>
                           <execution>
+                              <id>add-designer-jar-with-dependencies</id>
                             <phase>package</phase>
                             <configuration>
                               <target>
+                                  <delete dir="${project.build.directory}/${project.build.finalName}-jar-with-dependencies"/>
+                                  <mkdir dir="${project.build.directory}/${project.build.finalName}-jar-with-dependencies"/>
                                   <move file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar"
-                                      tofile="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.zip"/>
+                                      tofile="${project.build.directory}/${project.build.finalName}-jar-with-dependencies/designer_1.jar"/>
+                                      <zip destfile="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar" basedir="${project.build.directory}/${project.build.finalName}-jar-with-dependencies"/>
+                                          
+                                          
 
                               </target>
                             </configuration>
@@ -352,8 +206,8 @@
                                   <configuration>
                                     <artifacts>
                                       <artifact>
-                                        <file>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.zip</file>
-                                        <type>zip</type>
+                                        <file>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar</file>
+                                        <type>jar</type>
                                         <classifier>jar-with-dependencies</classifier>
                                       </artifact>
                                       
@@ -364,7 +218,6 @@
                             </plugin>
                   </plugins>
             </build>
-        </profile>
-    </profiles>
+
     
 </project>

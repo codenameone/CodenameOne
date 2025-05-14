@@ -1,0 +1,118 @@
+bash("set -e");
+bash("MVNW=\"./mvnw\"");
+batch("set MVNW=mvnw.cmd");
+
+function mac_desktop() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=mac-os-x-desktop");
+}
+
+function windows_desktop() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=windows-desktop");
+}
+
+function windows_device() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=win", "-Dcodename1.buildTarget=windows-device");
+}
+
+function uwp() {
+    global MVNW;
+    windows_device();
+}
+
+function javascript() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=javascript", "-Dcodename1.buildTarget=javascript");
+}
+
+function android() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=android", "-Dcodename1.buildTarget=android-device");
+}
+
+function xcode() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=ios-source");
+}
+
+function ios_source() {
+    xcode();
+}
+
+function android_source() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=android", "-Dcodename1.buildTarget=android-source");
+}
+
+function ios() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=ios-device");
+}
+
+function ios_release() {
+    global MVNW;
+    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=ios-device-release");
+}
+
+
+
+function jar() {
+    global MVNW;
+    call(MVNW, "-Pexecutable-jar", "package", "-Dcodename1.platform=javase", "-DskipTests");
+}
+
+function help() {
+    println("build.sh [COMMAND]");
+    println("Local Build Commands:");
+    println("  The following commands will build the app locally (i.e. does NOT use the Codename One build server)");
+    println("");
+    println("  jar");
+    println("    Builds app as desktop app executable jar file to javase/target directory");
+    println("  android_source");
+    println("    Generates an android gradle project that can be opened in Android studio");
+    println("    *Requires android development tools installed.");
+    println("    *Requires ANDROID_HOME environment variable");
+    println("    *Requires either GRADLE_HOME environment variable, or for gradle to be in PATH");
+    println("  ios_source");
+        println("    Generates an Xcode Project that you can open and build using Apple's development tools");
+        println("    *Requires a Mac with Xcode installed");
+    println("");
+    println("Build Server Commands:");
+    println("  The following commands will build the app using the Codename One build server, and require");
+    println("  a Codename One account.  See https://www.codenameone.com");
+    println("");
+    println("  ios");
+    println("    Builds iOS app.");
+    println("  ios_release");
+    println("    Builds iOS app for submission to Apple appstore.");
+    println("  android");
+    println("    Builds android app.");
+    println("  mac_desktop");
+    println("    Builds Mac OS desktop app.");
+    println("    *Mac OS Desktop builds are a Pro user feature.");
+    println("  windows_desktop");
+    println("    Builds Windows desktop app.");
+    println("    *Windows Desktop builds are a Pro user feature.");
+    println("  windows_device");
+    println("    Builds UWP Windows app.");
+    println("  javascript");
+    println("    Builds as a web app.");
+    println("    *Javascript builds are an Enterprise user feature");
+
+
+}
+
+
+function settings() {
+    global MVNW;
+    call(MVNW, "cn:settings");
+}
+
+bash("CMD=\"$1\"");
+batch("SET CMD=%1");
+if (CMD == "") {
+    CMD = "jar";
+}
+call(CMD);

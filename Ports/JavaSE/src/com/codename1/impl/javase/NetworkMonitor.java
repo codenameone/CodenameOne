@@ -25,17 +25,13 @@ package com.codename1.impl.javase;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.IOAccessor;
 import java.awt.Component;
-import java.net.HttpURLConnection;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.net.URLConnection;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Vector;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.DefaultListModel;
-import javax.swing.JList;
+import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
@@ -44,11 +40,11 @@ import javax.swing.event.ListSelectionListener;
  *
  * @author Shai Almog
  */
-public class NetworkMonitor extends javax.swing.JFrame {
+public class NetworkMonitor extends javax.swing.JPanel {
 
     private Map<URLConnection, NetworkRequestObject> requests = new HashMap<URLConnection, NetworkRequestObject>();
     private Map<ConnectionRequest, NetworkRequestObject> queuedRequests = new HashMap<ConnectionRequest, NetworkRequestObject>();
-    
+    private JFrame frame;
     /** Creates new form NetworkMonitor */
     public NetworkMonitor() {
         initComponents();
@@ -78,6 +74,33 @@ public class NetworkMonitor extends javax.swing.JFrame {
                 
             }
         });
+    }
+
+    public JFrame showInNewWindow() {
+        if (frame == null) {
+            frame = new JFrame("Network Monitor");
+            frame.getContentPane().setLayout(new java.awt.BorderLayout());
+            frame.getContentPane().add(this, java.awt.BorderLayout.CENTER);
+            frame.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosing(WindowEvent e) {
+                    JavaSEPort.disableNetworkMonitor();
+                }
+            });
+
+            frame.pack();
+            frame.setLocationByPlatform(true);
+            frame.setVisible(true);
+
+        }
+        return frame;
+    }
+
+    public void dispose() {
+        if (frame != null) {
+            frame.dispose();
+            frame = null;
+        }
     }
 
     public synchronized void addRequest(URLConnection con, NetworkRequestObject r) {
@@ -171,9 +194,9 @@ public class NetworkMonitor extends javax.swing.JFrame {
 
         FormListener formListener = new FormListener();
 
-        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-        setTitle("Network Monitor");
-        addWindowListener(formListener);
+        //setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        //setTitle("Network Monitor");
+        //addWindowListener(formListener);
 
         jSplitPane1.setContinuousLayout(true);
         jSplitPane1.setOneTouchExpandable(true);
@@ -382,7 +405,7 @@ public class NetworkMonitor extends javax.swing.JFrame {
 
         jSplitPane1.setRightComponent(jTabbedPane1);
 
-        getContentPane().add(jSplitPane1, java.awt.BorderLayout.CENTER);
+        add(jSplitPane1, java.awt.BorderLayout.CENTER);
 
         jPanel4.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
 
@@ -390,9 +413,8 @@ public class NetworkMonitor extends javax.swing.JFrame {
         jButton1.addActionListener(formListener);
         jPanel4.add(jButton1);
 
-        getContentPane().add(jPanel4, java.awt.BorderLayout.SOUTH);
+        add(jPanel4, java.awt.BorderLayout.SOUTH);
 
-        pack();
     }
 
     // Code for dispatching events from components to event handlers.

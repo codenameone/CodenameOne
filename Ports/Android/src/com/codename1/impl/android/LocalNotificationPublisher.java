@@ -57,6 +57,9 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         
         Bundle extras=intent.getExtras();
+        if(extras == null) {
+            return;
+        }
         PendingIntent content = extras.getParcelable(NOTIFICATION_INTENT);
         Bundle b = extras.getParcelable(NOTIFICATION);
         LocalNotification notif = AndroidImplementation.createNotificationFromBundle(b);

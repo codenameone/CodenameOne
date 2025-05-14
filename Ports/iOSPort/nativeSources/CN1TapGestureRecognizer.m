@@ -108,7 +108,14 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     }
     UITouch* touch = [touches anyObject];
     if (touch != nil) {
-        pressedView = touch.view;
+        if (pressedView != touch.view) {
+            if (pressedView != nil) {
+                [pressedView release];
+                pressedView = nil;
+            }
+            pressedView = touch.view;
+            [pressedView retain];
+        }
     }
     NSArray *ts = [touches allObjects];
     [touchesArray addObjectsFromArray:ts];

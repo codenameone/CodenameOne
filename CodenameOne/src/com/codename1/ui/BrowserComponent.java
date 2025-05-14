@@ -2140,8 +2140,10 @@ public class BrowserComponent extends Container {
     public void setDebugMode(boolean mode) {
         if(mode) {
             putClientProperty("BrowserComponent.firebug", Boolean.TRUE);
+            putClientProperty("BrowserComponent.ios.debug", Boolean.TRUE);
         } else {
             putClientProperty("BrowserComponent.firebug", null);
+            putClientProperty("BrowserComponent.ios.debug", null);
         }
     }
 

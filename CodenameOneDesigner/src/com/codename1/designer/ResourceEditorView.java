@@ -266,7 +266,11 @@ public class ResourceEditorView extends FrameView {
         enableXMLTeamMode.setSelected(isXMLEnabled);
 
         initNativeTheme();
-        LocalServer.startServer(mainPanel);
+
+
+        if (LocalServer.isSupported()) {
+            LocalServer.startServer(mainPanel);
+        }
         if(ResourceEditorApp.IS_MAC) {
             fileMenu.remove(exitMenuItem);
             fileMenu.remove(jSeparator1);

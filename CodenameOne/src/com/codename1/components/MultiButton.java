@@ -29,6 +29,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
@@ -40,6 +41,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
+import java.util.StringTokenizer;
 
 /**
  * <p>A powerful button like component that allows multiple rows/and an icon to be added
@@ -808,7 +810,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     }
 
     /**
-     * Returns the line 1 text
+     * Sets the line 1 text
      * {@inheritDoc}
      */
     @Override
@@ -817,7 +819,73 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     }
 
     /**
-     * Sets the line 1 text
+     * Sets textLine1, textLine2, textLine3, and textLine4 in single method with single string
+     * using "\n" as a delimiter.
+     * @param text The text to set.
+     * @since 8.0
+     */
+    public void setTextLines(String text) {
+        //String currTextVal = btn.getText();
+        String newTextVal0 = text;
+        int line = 0;
+        StringTokenizer strtok = new StringTokenizer(newTextVal0, "\n");
+        while (strtok.hasMoreTokens()) {
+            line++;
+            String currTextVal;
+            switch (line) {
+                case 1: currTextVal = getTextLine1(); break;
+                case 2: currTextVal = getTextLine2(); break;
+                case 3: currTextVal = getTextLine3(); break;
+                case 4: currTextVal = getTextLine4(); break;
+                default: currTextVal = getText();
+            }
+            String newTextVal = strtok.nextToken().trim();
+            if (!com.codename1.compat.java.util.Objects.equals(currTextVal, newTextVal)) {
+                switch (line) {
+                    case 1: setTextLine1(newTextVal); break;
+                    case 2: setTextLine2(newTextVal); break;
+                    case 3: setTextLine3(newTextVal); break;
+                    case 4: setTextLine4(newTextVal); break;
+                    default: setText(newTextVal);
+
+                }
+            }
+        }
+        while (line < 4) {
+            line++;
+            String currTextVal;
+            switch (line) {
+                case 1: currTextVal = getTextLine1(); break;
+                case 2: currTextVal = getTextLine2(); break;
+                case 3: currTextVal = getTextLine3(); break;
+                case 4: currTextVal = getTextLine4(); break;
+                default: currTextVal = getText();
+            }
+            if (!com.codename1.compat.java.util.Objects.equals(currTextVal, "")) {
+                switch (line) {
+                    case 1: setTextLine1(""); break;
+                    case 2: setTextLine2(""); break;
+                    case 3: setTextLine3(""); break;
+                    case 4: setTextLine4(""); break;
+                    default: setText(""); break;
+
+                }
+
+            }
+        }
+    }
+
+    /**
+     * Gets all text in multibutton in a single string delimited by "\n" character.
+     * @since 8.0
+     * @return String with textLine1 to textLine4 delimited by "\n"
+     */
+    public String getTextLines() {
+        return getTextLine1() + "\n" + getTextLine2() + "\n" + getTextLine3() + "\n" + getTextLine4();
+    }
+
+    /**
+     * Returns the line 1 text
      * {@inheritDoc}
      */
     @Override
@@ -1254,6 +1322,24 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
 
     /**
      * {@inheritDoc }
+     * @since 8.0
+     */
+    @Override
+    public void setMaterialIcon(char c, float size) {
+        icon.setMaterialIcon(c, size);
+    }
+
+    /**
+     * {@inheritDoc }
+     * @since 8.0
+     */
+    @Override
+    public void setFontIcon(Font font, char c, float size) {
+        icon.setFontIcon(font, c, size);
+    }
+
+    /**
+     * {@inheritDoc }
      * @since 7.0
      */
     @Override
@@ -1336,5 +1422,59 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
     @Override
     public Image getIconFromState() {
         return icon.getIconFromState();
+    }
+
+    /**
+     * Sets the badge text to be used on this label.  Badges are rendered in the
+     * upper right corner of the label inside round border.  The style of the badge can be
+     * configured using {@link #setBadgeUIID(java.lang.String) }, but the default style uses
+     * the "Badge" UIID, which, by default, uses white text on a red round border background.
+     *
+     * @param badgeText The text to include in the badge.   null or empty strings will result in the
+     * badge not being rendered.
+     * @since 8.0
+     * @see #getBadgeText()
+     * @see #getBadgeStyleComponent()
+     * @see #setBadgeUIID(java.lang.String)
+     */
+    public void setBadgeText(String badgeText) {
+        icon.setBadgeText(badgeText);
+    }
+
+    /**
+     * Gets the text to be used in a badge on this label.
+     * @return the badge text to be used on this label.  May return if no text is set.
+     * @since 8.0
+     * @see #setBadgeText(java.lang.String)
+     * @see #setBadgeUIID(java.lang.String)
+     * @see #getBadgeStyleComponent()
+     */
+    public String getBadgeText() {
+        return icon.getBadgeText();
+    }
+
+    /**
+     * Sets the style that should be used for rendering badges.  By default it will use
+     * the "Badge" UIID, which rendered 1.5mm white text on a red round border.
+     *
+     * @param badgeUIID The UIID to use for the badge.
+     * @since 8.0
+     * @see #setBadgeText(java.lang.String)
+     * @see #getBadgeStyleComponent()
+     */
+    public void setBadgeUIID(String badgeUIID) {
+        icon.setBadgeUIID(badgeUIID);
+    }
+
+    /**
+     * Gets a component that can be used for the style of the badge.
+     * @return The component whose style can be used to style the badge.  May return null if none set.
+     * @since 8.0
+     * @see #setBadgeText(java.lang.String)
+     * @see #setBadgeUIID(java.lang.String)
+     * @see #getBadgeText()
+     */
+    public Component getBadgeStyleComponent() {
+        return icon.getBadgeStyleComponent();
     }
 }

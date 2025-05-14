@@ -72,6 +72,11 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
         });
     }
 
+    @Override
+    public Rect getSafeAreaInsets() {
+        return cn1View.getSafeArea();
+    }
+
     public boolean isOpaque() {
         return true;
     }
