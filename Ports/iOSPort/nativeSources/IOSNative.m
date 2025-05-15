@@ -6180,31 +6180,34 @@ JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_i
 
 #ifdef NEW_CODENAME_ONE_VM
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+
     enteringNativeAllocations();
+
     const char* result = (const char*)sqlite3_column_text((sqlite3_stmt*)statement, col);
     if(result == 0) {
         return JAVA_NULL;
     }
+
+    NSString* ns = [NSString stringWithUTF8String:result];
+    if (!ns) {
+        return JAVA_NULL;
+    }
+    
+    [ns retain];
+
     JAVA_OBJECT str = __NEW_INSTANCE_java_lang_String(threadStateData);
     struct obj__java_lang_String* ss = (struct obj__java_lang_String*)str;
-    NSString* ns = [NSString stringWithUTF8String:result];
-    [ns retain];
     ss->java_lang_String_nsString = (JAVA_LONG)ns;
-    
-    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, [ns length]);
+
+    NSUInteger len = [ns length];
+    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
     ss->java_lang_String_value = destArr;
-    ss->java_lang_String_count = [ns length];
-    
-    __block JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
-    __block int length = 0;
-    [ns enumerateSubstringsInRange:NSMakeRange(0, [ns length])
-                           options:NSStringEnumerationByComposedCharacterSequences
-                        usingBlock:^(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
-                            dest[length] = (JAVA_CHAR)[ns characterAtIndex:length];
-                            length++;
-                        }];
+    ss->java_lang_String_count = len;
+
+    JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+    [ns getCharacters:(unichar*)dest range:NSMakeRange(0, len)];
+
     finishedNativeAllocations();
-    
     return str;
 }
 #else // NEW_CODENAME_ONE_VM
