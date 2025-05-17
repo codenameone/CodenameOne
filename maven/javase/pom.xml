@@ -50,13 +50,9 @@
     </scm>
     <profiles>
         <profile>
-            <id>local-dev</id>
+            <id>local-dev-javase</id>
             <activation>
-                <file>
-                    <exists>
-                        ${cn1.binaries}
-                    </exists>
-                </file>
+                <activeByDefault>true</activeByDefault>
             </activation>
             <dependencies>
                 <dependency>

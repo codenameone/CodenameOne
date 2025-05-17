@@ -26,9 +26,7 @@
         <profile>
             <id>local-dev</id>
             <activation>
-                <file>
-                    <exists>${user.home}/.codenameone/CodeNameOneBuildClient.jar</exists>
-                </file>
+                <activeByDefault>true</activeByDefault>
             </activation>
             <dependencies>
                 <dependency>

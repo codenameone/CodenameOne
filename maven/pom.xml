@@ -5,13 +5,10 @@
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
     <version>8.0-SNAPSHOT</version>
-
     <packaging>pom</packaging>
-
     <name>CodenameOne</name>
     <description>Codename One aggregate project</description>
     <url>https://www.codenameone.com</url>
-
     <licenses>
         <license>
             <name>GPL v2 With Classpath Exception</name>
@@ -41,14 +38,10 @@
             <timezone>-8</timezone>
         </developer>
     </developers>
-
     <scm>
         <url>https://github.com/codenameone/CodenameOne</url>
         <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
     </scm>
-
-
-
     <properties>
         <cn1.version>${project.version}</cn1.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -57,7 +50,6 @@
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
-
         <jaxb.version>2.3.1</jaxb.version>
     </properties>
     <modules>
@@ -74,8 +66,6 @@
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
     </modules>
-
-
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -239,14 +229,10 @@
                 <artifactId>ant</artifactId>
                 <version>1.10.11</version>
             </dependency>
-
-
-
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase</artifactId>
                 <version>${project.version}</version>
-
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
@@ -280,7 +266,6 @@
                 <artifactId>commons-text</artifactId>
                 <version>1.10.0</version>
             </dependency>
-
             <dependency>
                 <groupId>com.guardsquare</groupId>
                 <artifactId>proguard-base</artifactId>
@@ -303,14 +288,9 @@
                 <artifactId>jaxb-core</artifactId>
                 <version>2.3.0.1</version>
             </dependency>
-
-
         </dependencies>
     </dependencyManagement>
-
-
     <build>
-
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -422,9 +402,7 @@
                     </configuration>
                 </plugin>
             </plugins>
-
     </build>
-
     <profiles>
         <profile>
             <id>sign-artifacts</id>
@@ -574,6 +552,4 @@
             </modules>
         </profile>
     </profiles>
-    
-
 </project>
