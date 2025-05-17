@@ -7,16 +7,51 @@
         <version>8.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.codenameone</groupId>
+
     <artifactId>codenameone-javase</artifactId>
     <version>8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
+    <description>JavaSE port for Codename One</description>
+
+    <licenses>
+        <license>
+            <name>GPL v2 With Classpath Exception</name>
+            <url>https://openjdk.java.net/legal/gplv2+ce.html</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>shai</id>
+            <name>Shai Almog</name>
+            <email>shai.almog@codenameone.com</email>
+            <timezone>+4</timezone>
+        </developer>
+        <developer>
+            <id>chen</id>
+            <name>Chen Fishbein</name>
+            <email>chen.fishbein@codenameone.com</email>
+            <timezone>+4</timezone>
+        </developer>
+        <developer>
+            <id>shannah</id>
+            <name>Steve Hannah</name>
+            <email>steve.hannah@codenameone.com</email>
+            <timezone>-8</timezone>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/codenameone/CodenameOne</url>
+        <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
+    </scm>
 
     <dependencies>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
@@ -71,8 +106,6 @@
         <plugins>
             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
-
-
                 <executions>
                     <execution>
                         <id>build-skins</id>
@@ -121,7 +154,4 @@
             </plugin>
         </plugins>
     </build>
-
-
-
 </project>
