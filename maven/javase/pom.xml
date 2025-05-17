@@ -48,6 +48,36 @@
         <url>https://github.com/codenameone/CodenameOne</url>
         <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
     </scm>
+    <profiles>
+        <profile>
+            <id>local-dev</id>
+            <activation>
+                <file>
+                    <exists>
+                        ${cn1.binaries}
+                    </exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>jfxrt</artifactId>
+                    <version>8</version>
+                    <scope>system</scope>
+                    <systemPath>${cn1.binaries}/jfxrt.jar</systemPath>
+                    <optional>true</optional>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>jcef</artifactId>
+                    <version>6.0.0</version>
+                    <scope>system</scope>
+                    <systemPath>${cn1.binaries}/javase/jcef.jar</systemPath>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
     <dependencies>
         <dependency>
@@ -69,23 +99,6 @@
             <version>2.1.1e</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>jfxrt</artifactId>
-            <version>8</version>
-            <scope>system</scope>
-            <systemPath>${cn1.binaries}/jfxrt.jar</systemPath>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>jcef</artifactId>
-            <version>6.0.0</version>
-            <scope>system</scope>
-            <systemPath>${cn1.binaries}/javase/jcef.jar</systemPath>
-            <optional>true</optional>
-        </dependency>
-
     </dependencies>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
