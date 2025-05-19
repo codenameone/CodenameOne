@@ -406,7 +406,7 @@
                 </executions>
                 <configuration>
                     <flattenMode>resolveCiFriendliesOnly</flattenMode>
-                    <updatePomFile>true</updatePomFile>
+                    <flattenDependencyMode>all</flattenDependencyMode>
                 </configuration>
             </plugin>
             <plugin>
