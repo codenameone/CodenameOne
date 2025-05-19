@@ -20,6 +20,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
+        <cn1.user.home>${user.home}</cn1.user.home>
     </properties>
 
     <profiles>
@@ -34,7 +35,7 @@
                     <artifactId>codenameone-buildclient</artifactId>
                     <version>8.0</version>
                     <scope>system</scope>
-                    <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+                    <systemPath>${cn1.user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
                     <optional>true</optional>
                 </dependency>
             </dependencies>
