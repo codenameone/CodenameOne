@@ -20,12 +20,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
-        <cn1.user.home>${user.home}</cn1.user.home>
     </properties>
 
     <profiles>
         <profile>
-            <id>local-dev</id>
+            <id>local-dev-plugin</id>
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
@@ -35,7 +34,7 @@
                     <artifactId>codenameone-buildclient</artifactId>
                     <version>8.0</version>
                     <scope>system</scope>
-                    <systemPath>${cn1.user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+                    <systemPath>${cn1.build.client.path}</systemPath>
                     <optional>true</optional>
                 </dependency>
             </dependencies>

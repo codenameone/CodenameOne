@@ -51,6 +51,7 @@
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
         <jaxb.version>2.3.1</jaxb.version>
+        <cn1.build.client.path>${user.home}/.codenameone/CodeNameOneBuildClient.jar</cn1.build.client.path>
     </properties>
     <modules>
         <!--<module>codenameone-maven-goals</module>-->
