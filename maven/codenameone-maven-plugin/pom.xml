@@ -30,16 +30,6 @@
                     <exists>${cn1.build.client.path}</exists>
                 </file>
             </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>com.codenameone</groupId>
-                    <artifactId>codenameone-buildclient</artifactId>
-                    <version>8.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.build.client.path}</systemPath>
-                    <optional>true</optional>
-                </dependency>
-            </dependencies>
         </profile>
     </profiles>
 
