@@ -22,6 +22,17 @@
         <maven.compiler.target>1.7</maven.compiler.target>
     </properties>
 
+    <profiles>
+        <profile>
+            <id>local-dev-plugin</id>
+            <activation>
+                <file>
+                    <exists>${cn1.build.client.path}</exists>
+                </file>
+            </activation>
+        </profile>
+    </profiles>
+
     <dependencies>
         <dependency>
             <groupId>org.jdom</groupId>
@@ -73,13 +84,6 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-javase</artifactId>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-buildclient</artifactId>
-            <version>8.0</version>
-            <scope>system</scope>
-            <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->
