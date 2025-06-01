@@ -60,7 +60,7 @@ import com.codename1.ui.util.EventDispatcher;
  * <script src="https://gist.github.com/codenameone/ba27124a0a25e685b123.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-tabs.png" alt="Simple usage of Tabs" />
  * 
- * The <code>Tabs</code> allows swiping on the X-axis (by default) but also on the Y-axis (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):
+ * <p>The <code>Tabs</code> allows swiping on the X-axis (by default) but also on the Y-axis (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):</p>
  * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
  * 
  * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the 
