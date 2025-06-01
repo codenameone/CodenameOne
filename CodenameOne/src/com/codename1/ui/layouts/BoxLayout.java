@@ -371,7 +371,7 @@ public class BoxLayout extends Layout{
         }
     }
     
-    private Dimension dim = new Dimension(0, 0);
+//    private Dimension dim = new Dimension(0, 0); //moved into getPreferredSize, otherwise the same dim instance can be used both as preferredSize and scrollSize which creates side effects when preferredSize is forced to (0,0) in setHidden(true)
 
     /**
      * {@inheritDoc}
@@ -396,6 +396,7 @@ public class BoxLayout extends Layout{
             }
         }
         Style s = parent.getStyle();
+        Dimension dim = new Dimension(0, 0);
         dim.setWidth(width + s.getHorizontalPadding());
         dim.setHeight(height + s.getVerticalPadding());
         return dim;
