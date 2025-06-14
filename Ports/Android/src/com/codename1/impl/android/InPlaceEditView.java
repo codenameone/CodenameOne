@@ -59,6 +59,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -1401,23 +1402,26 @@ public class InPlaceEditView extends FrameLayout{
 
     private static void applyImeInsetPaddingReflection(View rootView) {
         try {
-            rootView.setOnApplyWindowInsetsListener((v, insets) -> {
-                try {
-                    Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
-                    Class<?> insetsClass = Class.forName("android.view.WindowInsets");
-                    int imeType = (int) typeClass.getMethod("ime").invoke(null);
+            rootView.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+                @Override
+                public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                    try {
+                        Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
+                        Class<?> insetsClass = Class.forName("android.view.WindowInsets");
+                        int imeType = (int) typeClass.getMethod("ime").invoke(null);
 
-                    Object imeInsets = insetsClass.getMethod("getInsets", int.class).invoke(insets, imeType);
-                    Class<?> insetsRectClass = imeInsets.getClass();
+                        Object imeInsets = insetsClass.getMethod("getInsets", int.class).invoke(insets, imeType);
+                        Class<?> insetsRectClass = imeInsets.getClass();
 
-                    int bottom = (int) insetsRectClass.getField("bottom").get(imeInsets);
-                    boolean isVisible = (boolean) insetsClass.getMethod("isVisible", int.class).invoke(insets, imeType);
+                        int bottom = (int) insetsRectClass.getField("bottom").get(imeInsets);
+                        boolean isVisible = (boolean) insetsClass.getMethod("isVisible", int.class).invoke(insets, imeType);
 
-                    v.setPadding(0, 0, 0, isVisible ? bottom : 0);
-                } catch (Throwable e) {
-                    e.printStackTrace();
+                        v.setPadding(0, 0, 0, isVisible ? bottom : 0);
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                    }
+                    return insets;
                 }
-                return insets;
             });
 
             rootView.requestApplyInsets();
@@ -1426,7 +1430,6 @@ public class InPlaceEditView extends FrameLayout{
             e.printStackTrace();
         }
     }
-
 
     public static boolean isInputResize(){
         return resizeMode;
