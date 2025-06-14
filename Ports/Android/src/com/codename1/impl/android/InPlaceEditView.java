@@ -1408,13 +1408,13 @@ public class InPlaceEditView extends FrameLayout{
                     try {
                         Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
                         Class<?> insetsClass = Class.forName("android.view.WindowInsets");
-                        int imeType = (int) typeClass.getMethod("ime").invoke(null);
+                        int imeType = ((Integer) typeClass.getMethod("ime").invoke(null)).intValue();
 
                         Object imeInsets = insetsClass.getMethod("getInsets", int.class).invoke(insets, imeType);
                         Class<?> insetsRectClass = imeInsets.getClass();
 
-                        int bottom = (int) insetsRectClass.getField("bottom").get(imeInsets);
-                        boolean isVisible = (boolean) insetsClass.getMethod("isVisible", int.class).invoke(insets, imeType);
+                        int bottom = ((Integer) insetsRectClass.getField("bottom").get(imeInsets)).intValue();
+                        boolean isVisible = ((Boolean) insetsClass.getMethod("isVisible", int.class).invoke(insets, imeType)).booleanValue();
 
                         v.setPadding(0, 0, 0, isVisible ? bottom : 0);
                     } catch (Throwable e) {
