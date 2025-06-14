@@ -11,7 +11,7 @@
     <artifactId>codenameone-designer</artifactId>
     <version>8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    
+    <name>codenameone-designer</name>
     <dependencies>
         <dependency>
             <groupId>org.apache.ant</groupId>
