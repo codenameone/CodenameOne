@@ -58,6 +58,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
+import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -1376,14 +1377,56 @@ public class InPlaceEditView extends FrameLayout{
 
 
 
-    private static void setEditMode(final boolean resize){
+    private static void setEditMode(final boolean resize) {
         resizeMode = resize;
+
+        final Activity activity = sInstance.impl.getActivity();
+        final Window window = activity.getWindow();
+
         if (resize) {
-            sInstance.impl.getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            if (Build.VERSION.SDK_INT >= 34) {
+                // On Android 14+, adjustResize doesn't work with immersive layouts
+                window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
+                View rootView = window.getDecorView().findViewById(android.R.id.content);
+                applyImeInsetPaddingReflection(rootView);
+            } else {
+                // Old behavior works fine
+                window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            }
         } else {
-            sInstance.impl.getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         }
     }
+
+
+    private static void applyImeInsetPaddingReflection(View rootView) {
+        try {
+            rootView.setOnApplyWindowInsetsListener((v, insets) -> {
+                try {
+                    Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
+                    Class<?> insetsClass = Class.forName("android.view.WindowInsets");
+                    int imeType = (int) typeClass.getMethod("ime").invoke(null);
+
+                    Object imeInsets = insetsClass.getMethod("getInsets", int.class).invoke(insets, imeType);
+                    Class<?> insetsRectClass = imeInsets.getClass();
+
+                    int bottom = (int) insetsRectClass.getField("bottom").get(imeInsets);
+                    boolean isVisible = (boolean) insetsClass.getMethod("isVisible", int.class).invoke(insets, imeType);
+
+                    v.setPadding(0, 0, 0, isVisible ? bottom : 0);
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+                return insets;
+            });
+
+            rootView.requestApplyInsets();
+
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+
 
     public static boolean isInputResize(){
         return resizeMode;
