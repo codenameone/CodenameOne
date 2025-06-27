@@ -1376,19 +1376,23 @@ public class InPlaceEditView extends FrameLayout{
         }
     }
 
-
-
     private static void setEditMode(final boolean resize) {
         resizeMode = resize;
 
         final Activity activity = sInstance.impl.getActivity();
-        final Window window = activity.getWindow();
+        final Window window     = activity.getWindow();
+        final View decorView    = window.getDecorView();
+        final int flags         = decorView.getSystemUiVisibility();
+
+        boolean isImmersive = (flags & View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN) != 0
+                           || (flags & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0
+                           || (flags & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) != 0;
 
         if (resize) {
-            if (Build.VERSION.SDK_INT >= 34) {
+            if (Build.VERSION.SDK_INT >= 34 && isImmersive) {
                 // On Android 14+, adjustResize doesn't work with immersive layouts
-                window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
-                View rootView = window.getDecorView().findViewById(android.R.id.content);
+                //window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
+                View rootView = decorView.findViewById(android.R.id.content);
                 applyImeInsetPaddingReflection(rootView);
             } else {
                 // Old behavior works fine
@@ -1399,22 +1403,21 @@ public class InPlaceEditView extends FrameLayout{
         }
     }
 
-
     private static void applyImeInsetPaddingReflection(View rootView) {
         try {
             rootView.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
                 @Override
                 public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
                     try {
-                        Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
-                        Class<?> insetsClass = Class.forName("android.view.WindowInsets");
-                        int imeType = ((Integer) typeClass.getMethod("ime").invoke(null)).intValue();
+                        Class<?> typeClass      = Class.forName("android.view.WindowInsets$Type");
+                        Class<?> insetsClass    = Class.forName("android.view.WindowInsets");
+                        int imeType             = ((Integer) typeClass.getMethod("ime").invoke(null)).intValue();
 
-                        Object imeInsets = insetsClass.getMethod("getInsets", int.class).invoke(insets, imeType);
-                        Class<?> insetsRectClass = imeInsets.getClass();
+                        Object imeInsets        = insetsClass.getMethod("getInsets", int.class).invoke(insets, imeType);
+                        Class<?> insetsRectClass= imeInsets.getClass();
 
-                        int bottom = ((Integer) insetsRectClass.getField("bottom").get(imeInsets)).intValue();
-                        boolean isVisible = ((Boolean) insetsClass.getMethod("isVisible", int.class).invoke(insets, imeType)).booleanValue();
+                        int bottom              = ((Integer) insetsRectClass.getField("bottom").get(imeInsets)).intValue();
+                        boolean isVisible       = ((Boolean) insetsClass.getMethod("isVisible", int.class).invoke(insets, imeType)).booleanValue();
 
                         v.setPadding(0, 0, 0, isVisible ? bottom : 0);
                     } catch (Throwable e) {
@@ -1423,9 +1426,7 @@ public class InPlaceEditView extends FrameLayout{
                     return insets;
                 }
             });
-
             rootView.requestApplyInsets();
-
         } catch (Throwable e) {
             e.printStackTrace();
         }
