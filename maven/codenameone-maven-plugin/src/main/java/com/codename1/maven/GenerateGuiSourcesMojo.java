@@ -5,12 +5,12 @@
  */
 package com.codename1.maven;
 
-import com.codename1.build.client.GenerateGuiSources;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.LinkedList;
 import java.util.function.Function;
 
@@ -52,12 +52,20 @@ public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {
         }
         System.setProperty("generate-gui-sources-done", "true");
         System.setProperty("javax.xml.bind.context.factory", "com.sun.xml.bind.v2.ContextFactory");
-                
-        GenerateGuiSources g = new GenerateGuiSources();
-        g.setSrcDir(new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "java"));
-        g.setGuiDir(new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "guibuilder"));
-        g.execute();
-
+        String buildClientJarPath = path(System.getProperty("user.home"), ".codenameone", "CodeNameOneBuildClient.jar");
+        File jarFile = new File(buildClientJarPath);
+        if (!jarFile.exists()) {
+            throw new MojoExecutionException(buildClientJarPath + " not found at " + jarFile.getAbsolutePath());
+        }
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{jarFile.toURI().toURL()}, this.getClass().getClassLoader())) {
+            Class<?> clazz = classLoader.loadClass("com.codename1.build.client.GenerateGuiSources");
+            Object g = clazz.getDeclaredConstructor().newInstance();
+            clazz.getMethod("setSrcDir", File.class).invoke(g, new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "java"));
+            clazz.getMethod("setGuiDir", File.class).invoke(g, new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "guibuilder"));
+            clazz.getMethod("execute").invoke(g);
+        } catch (Exception e) {
+            throw new MojoExecutionException("Failed to load and execute GenerateGuiSources", e);
+        }
 
         // Generate the RAD templates while we're at it
 

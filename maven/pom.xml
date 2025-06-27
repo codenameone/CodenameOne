@@ -5,13 +5,10 @@
     <groupId>com.codenameone</groupId>
     <artifactId>codenameone</artifactId>
     <version>8.0-SNAPSHOT</version>
-
     <packaging>pom</packaging>
-
     <name>CodenameOne</name>
     <description>Codename One aggregate project</description>
     <url>https://www.codenameone.com</url>
-
     <licenses>
         <license>
             <name>GPL v2 With Classpath Exception</name>
@@ -41,26 +38,20 @@
             <timezone>-8</timezone>
         </developer>
     </developers>
-
     <scm>
         <url>https://github.com/codenameone/CodenameOne</url>
         <connection>scm:git:git@github.com:codenameone/CodenameOne.git</connection>
     </scm>
-
-
-
     <properties>
         <cn1.version>${project.version}</cn1.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <sonatypeOssDistMgmtSnapshotsUrl>https://oss.sonatype.org/content/repositories/snapshots/</sonatypeOssDistMgmtSnapshotsUrl>
-
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
-
         <jaxb.version>2.3.1</jaxb.version>
+        <cn1.build.client.path>${user.home}/.codenameone/CodeNameOneBuildClient.jar</cn1.build.client.path>
     </properties>
     <modules>
         <!--<module>codenameone-maven-goals</module>-->
@@ -76,8 +67,6 @@
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
     </modules>
-
-
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -241,14 +230,10 @@
                 <artifactId>ant</artifactId>
                 <version>1.10.11</version>
             </dependency>
-
-
-
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase</artifactId>
                 <version>${project.version}</version>
-
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
@@ -282,7 +267,6 @@
                 <artifactId>commons-text</artifactId>
                 <version>1.10.0</version>
             </dependency>
-
             <dependency>
                 <groupId>com.guardsquare</groupId>
                 <artifactId>proguard-base</artifactId>
@@ -305,14 +289,9 @@
                 <artifactId>jaxb-core</artifactId>
                 <version>2.3.0.1</version>
             </dependency>
-
-
         </dependencies>
     </dependencyManagement>
-
-
     <build>
-
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -392,43 +371,40 @@
             </plugins>
         </pluginManagement>
 
-            <plugins>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-source-plugin</artifactId>
-                    <executions>
-                        <execution>
-                            <id>attach-sources</id>
-                            <goals>
-                                <goal>jar</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>3.2.0</version>
-                    <configuration>
-                        <additionalOptions>--allow-script-in-comments</additionalOptions>
-                    </configuration>
-                </plugin>
-            </plugins>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <additionalOptions>--allow-script-in-comments</additionalOptions>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.7.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
+                </configuration>
+            </plugin>
 
+        </plugins>
     </build>
-    <distributionManagement>
-        <repository>
-            <id>nexus-staging</id>
-            <name>Nexus Release Repository</name>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-    </distributionManagement>
-
-    <repositories>
-
-
-    </repositories>
-
     <profiles>
         <profile>
             <id>sign-artifacts</id>
@@ -566,48 +542,6 @@
                 </plugins>
             </build>
         </profile>
-
-        <profile>
-            <id>sonatype-release</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>1.6.7</version>
-                        <extensions>true</extensions>
-
-                        <configuration>
-                            <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.5</version>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <!-- Prevent gpg from using pinentry programs -->
-                            <gpgArguments>
-                                <arg>--pinentry-mode</arg>
-                                <arg>loopback</arg>
-                            </gpgArguments>
-                        </configuration>
-                    </plugin>
-                </plugins>
-
-            </build>
-        </profile>
         <profile>
             <id>unittests</id>
             <activation>
@@ -620,6 +554,4 @@
             </modules>
         </profile>
     </profiles>
-    
-
 </project>

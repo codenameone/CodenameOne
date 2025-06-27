@@ -1098,13 +1098,18 @@ public class AndroidGradleBuilder extends Executor {
         String googlePlayObfuscation = "";
         String googleAdUnitId = request.getArg("android.googleAdUnitId", request.getArg("google.adUnitId", null));
         String googlePlayAdViewCode = "";
+        String userXapplication = request.getArg("android.xapplication", "");
         if (playServicesAds) {
             minSDK = maxInt("21", minSDK);
         }
         if (googleAdUnitId != null && googleAdUnitId.length() > 0) {
             minSDK = maxInt("9", minSDK);
-            googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
-            googlePlayAdsActivity = "<activity android:name=\"com.google.android.gms.ads.AdActivity\" android:configChanges=\"keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize\" android:exported=\"false\"/>";
+            if (!userXapplication.contains("com.google.android.gms.version")) {
+                googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
+            }
+            if (!userXapplication.contains("com.google.android.gms.ads.AdActivity")) {
+                googlePlayAdsActivity = "<activity android:name=\"com.google.android.gms.ads.AdActivity\" android:configChanges=\"keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize\"/>";
+            }
             accessNetworkStatePermission = true;
 
             String testDevice = request.getArg("android.googleAdUnitTestDevice", "C6783E2486F0931D9D09FABC65094FDF");
@@ -1443,7 +1448,9 @@ public class AndroidGradleBuilder extends Executor {
 
         if (googleAdUnitId == null && playServicesAds) {
             minSDK = maxInt("9", minSDK);
-            googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
+            if (!userXapplication.contains("com.google.android.gms.version")) {
+                googlePlayAdsMetaData = "<meta-data android:name=\"com.google.android.gms.version\" android:value=\"@integer/google_play_services_version\"/>";
+            }
         }
         if (playServicesLocation) {
             debug("Play Services Location Enabled");
