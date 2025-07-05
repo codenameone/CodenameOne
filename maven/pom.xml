@@ -52,6 +52,8 @@
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
         <jaxb.version>2.3.1</jaxb.version>
         <cn1.build.client.path>${user.home}/.codenameone/CodeNameOneBuildClient.jar</cn1.build.client.path>
+        <junit.jupiter.version>5.9.3</junit.jupiter.version>
+        <junit.version>4.13.2</junit.version>
     </properties>
     <modules>
         <!--<module>codenameone-maven-goals</module>-->
@@ -69,6 +71,13 @@
     </modules>
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.jupiter.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-model</artifactId>
@@ -194,12 +203,6 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>junit</groupId>
-                <artifactId>junit</artifactId>
-                <version>4.13.1</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-plugin-api</artifactId>
                 <version>3.3.3</version>
@@ -288,6 +291,12 @@
                 <groupId>com.sun.xml.bind</groupId>
                 <artifactId>jaxb-core</artifactId>
                 <version>2.3.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <scope>test</scope>
+                <version>${junit.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
