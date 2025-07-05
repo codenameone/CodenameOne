@@ -53,6 +53,7 @@
         <jaxb.version>2.3.1</jaxb.version>
         <cn1.build.client.path>${user.home}/.codenameone/CodeNameOneBuildClient.jar</cn1.build.client.path>
         <junit.jupiter.version>5.9.3</junit.jupiter.version>
+        <junit.version>4.13.2</junit.version>
     </properties>
     <modules>
         <!--<module>codenameone-maven-goals</module>-->
@@ -290,6 +291,12 @@
                 <groupId>com.sun.xml.bind</groupId>
                 <artifactId>jaxb-core</artifactId>
                 <version>2.3.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <scope>test</scope>
+                <version>${junit.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
