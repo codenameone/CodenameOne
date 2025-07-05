@@ -16,6 +16,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <src.dir>../../CodenameOne/src</src.dir>
+        <jupiter.version>5.12.2</jupiter.version>
     </properties>
     <build>
         <testSourceDirectory>${basedir}/src/test/java</testSourceDirectory>
@@ -65,19 +66,19 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>RELEASE</version>
+            <version>${jupiter.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.4.2</version>
+            <version>${jupiter.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-params</artifactId>
-            <version>5.4.2</version>
+            <version>${jupiter.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
