@@ -9025,15 +9025,76 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return;
         }
-        if(getCurrentForm() == null){
+        if (getCurrentForm() == null) {
             flushGraphics();
         }
-        if(editInProgress()) {
+        if (editInProgress()) {
             stopEditing(true);
         }
+        resetInsetsForNewForm();// Clean paddings y listeners before Form
         super.setCurrentForm(f);
-        if (isNativeTitle() &&  !(f instanceof Dialog)) {
+        if (isNativeTitle() && !(f instanceof Dialog)) {
             getActivity().runOnUiThread(new SetCurrentFormImpl(getActivity(), f));
+        }
+    }
+    
+    private void resetInsetsForNewForm() {
+        final String methodName = "resetInsetsForNewForm";
+        if (Build.VERSION.SDK_INT >= 34) {
+            final Activity activity = getActivity();
+            if (activity == null) {
+                Log.e(methodName, "Activity is null");
+                return;
+            }
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Window window = activity.getWindow();
+                        if (window == null) {
+                            Log.e(methodName, "Window is null");
+                            return;
+                        }
+                        View decorView = window.getDecorView();
+                        ViewGroup content = window.findViewById(android.R.id.content);
+                        if (content == null || content.getChildCount() == 0) {
+                            Log.e(methodName, "Content view is empty");
+                            return;
+                        }
+                        View rootView = content.getChildAt(0);
+                        if (rootView == null || rootView.getWindowToken() == null || !rootView.isAttachedToWindow()) {
+                            Log.e(methodName, "RootView is not ready (null or not attached)");
+                            return;
+                        }
+                        // Restore config by Default
+                        window.setDecorFitsSystemWindows(true);
+                        // Force Refresh
+                        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
+                        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+                        // Clean listeners and insets
+                        decorView.setOnApplyWindowInsetsListener(null);
+                        decorView.setPadding(0, 0, 0, 0);
+                        decorView.setFitsSystemWindows(true);
+                        decorView.requestApplyInsets();
+
+                        rootView.setOnApplyWindowInsetsListener(null);
+                        rootView.setPadding(0, 0, 0, 0);
+                        rootView.setFitsSystemWindows(true);
+                        rootView.requestApplyInsets();
+
+                        content.requestLayout();
+                        content.invalidate();
+
+                        decorView.requestLayout();
+                        decorView.invalidate();
+
+                        Log.i(methodName, "Insets cleaned successfull");
+
+                    } catch (Exception e) {
+                        Log.e(methodName, "Error appliying insets: " + e.toString(), e);
+                    }
+                }
+            });
         }
     }
 
