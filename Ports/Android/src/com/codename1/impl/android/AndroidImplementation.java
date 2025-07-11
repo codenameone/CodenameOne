@@ -9033,7 +9033,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         resetInsetsForNewForm();// Clean paddings y listeners before Form
         super.setCurrentForm(f);
-        if (isNativeTitle() && !(f instanceof Dialog)) {
+        if (isNativeTitle() &&  !(f instanceof Dialog)) {
             getActivity().runOnUiThread(new SetCurrentFormImpl(getActivity(), f));
         }
     }
