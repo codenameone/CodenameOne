@@ -9025,10 +9025,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return;
         }
-        if (getCurrentForm() == null) {
+        if(getCurrentForm() == null){
             flushGraphics();
         }
-        if (editInProgress()) {
+        if(editInProgress()) {
             stopEditing(true);
         }
         resetInsetsForNewForm();// Clean paddings y listeners before Form
