@@ -1377,7 +1377,7 @@ public class InPlaceEditView extends FrameLayout{
     }
 
     private static void setEditMode(final boolean resize) {
-        resizeMode = true;
+        resizeMode = resize;
         final Activity activity = sInstance.impl.getActivity();
         final Window window     = activity.getWindow();
         View rootView           = window.getDecorView().findViewById(android.R.id.content);
