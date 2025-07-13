@@ -1398,51 +1398,7 @@ public class InPlaceEditView extends FrameLayout{
     }
 
     private static boolean isImmersive(Window window) {
-        View decor = window.getDecorView();
-
-        // ---------- Modern branch : API 30+ ----------
-        if (Build.VERSION.SDK_INT >= 30) {
-            try {
-                // WindowInsets insets = decor.getRootWindowInsets();
-                Object insets = View.class
-                        .getMethod("getRootWindowInsets")
-                        .invoke(decor);
-                if (insets == null) return false;
-
-                // int mask = WindowInsets.Type.systemBars();
-                Class<?> typeCls =
-                        Class.forName("android.view.WindowInsets$Type");
-                int systemBars = (Integer) typeCls
-                        .getMethod("systemBars")
-                        .invoke(null);
-
-                // boolean barsVisible = insets.isVisible(mask);
-                boolean barsVisible = (Boolean) insets.getClass()
-                        .getMethod("isVisible", int.class)
-                        .invoke(insets, systemBars);
-
-                /* --------------------------------------------------
-                 * Edge-to-edge is guaranteed on API 35+ anyway, and
-                 * `getDecorFitsSystemWindows()` no longer exists on
-                 * API 36.  We treat everything >=30 as edge-to-edge
-                 * (decorFits = false) and only look at bar visibility
-                 * to decide if we’re *immersive*.
-                 * -------------------------------------------------- */
-                return !barsVisible;    // immersive ⇢ bars are hidden
-            } catch (Throwable ignore) {
-                System.out.println("Error: " + ignore);
-            }
-        }
-
-        // ---------- Legacy branch : API 19-29 ----------
-        int f = decor.getSystemUiVisibility();
-        boolean immersiveBits =
-                (f & View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY) != 0 ||
-                        (f & View.SYSTEM_UI_FLAG_IMMERSIVE)        != 0;
-        boolean barsHidden =
-                (f & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) != 0 &&
-                        (f & View.SYSTEM_UI_FLAG_FULLSCREEN)      != 0;
-        return immersiveBits && barsHidden;
+        return AndroidImplementation.isImmersive(window);
     }
 
     private static void applyImeInsetPaddingReflection(View rootView) {
