@@ -2709,7 +2709,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void revalidate() {
         if (myView != null) {
             myView.getAndroidView().setVisibility(View.VISIBLE);
-            getCurrentForm().revalidate();
+            Form form = getCurrentForm();
+            if (form != null) {
+                form.revalidate();
+            }
             flushGraphics();
         }
 
