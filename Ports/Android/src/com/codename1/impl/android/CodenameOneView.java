@@ -187,18 +187,54 @@ public class CodenameOneView {
                         int top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();
                         int right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();
                         int bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();
+                        boolean imeVisible = false;
+                        try {
+                            Method isVisibleMethod = insets.getClass().getMethod("isVisible", int.class);
+                            Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
+                            int imeType = ((Integer) typeClass.getMethod("ime").invoke(null)).intValue();
+                            imeVisible = (Boolean) isVisibleMethod.invoke(insets, imeType);
+                        } catch (Throwable t) {
+                            // Fallback or log
+                        }
+
+                        Rect systemBarInsets = AndroidImplementation.getSystemBarInsets(rootView);
+                        top = Math.max(systemBarInsets.top, top);
+                        if (imeVisible) {
+                            // Avoid double-counting the bottom gesture bar
+                            bottom = Math.max(bottom, 0);
+                        } else {
+                            bottom = Math.max(systemBarInsets.bottom, bottom);
+                        }
+                        left = Math.max(systemBarInsets.left, left);
+                        right = Math.max(systemBarInsets.right, right);
+
                         if (!AndroidImplementation.isImmersive()) {
-                            Rect systemBarInsets = AndroidImplementation.getSystemBarInsets(rootView);
                             top -= systemBarInsets.top;
-                            bottom -= systemBarInsets.bottom;
+                            if (!imeVisible) {
+                                bottom -= systemBarInsets.bottom;
+                            }
+                            left -= systemBarInsets.left;
+                            right -= systemBarInsets.right;
                         }
 
                         // Only apply if at least one is non-zero
                         if (left != 0 || top != 0 || right != 0 || bottom != 0) {
+                            boolean isChanged = rect.left != left
+                                    || rect.right != right
+                                    || rect.top != top
+                                    || rect.bottom != bottom;
                             rect.left = left;
                             rect.top = top;
                             rect.right = right;
                             rect.bottom = bottom;
+
+                            if (isChanged) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        AndroidImplementation.getInstance().revalidate();
+                                    }
+                                });
+                            }
                         }
                     }
                 }
