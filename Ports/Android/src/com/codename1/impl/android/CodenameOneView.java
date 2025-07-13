@@ -164,6 +164,7 @@ public class CodenameOneView {
 
     private void updateSafeArea() {
         final Activity activity = CodenameOneView.this.implementation.getActivity();
+
         final Rect rect = this.safeArea;
         final View rootView = activity.getWindow().getDecorView();
         if (Build.VERSION.SDK_INT >= VERSION_CODE_P) {
@@ -182,10 +183,23 @@ public class CodenameOneView {
                         Method getSafeInsetRight = displayCutoutClass.getMethod("getSafeInsetRight");
                         Method getSafeInsetBottom = displayCutoutClass.getMethod("getSafeInsetBottom");
 
-                        rect.left = ((Integer) getSafeInsetLeft.invoke(cutout)).intValue();
-                        rect.top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();
-                        rect.right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();
-                        rect.bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();
+                        int left = ((Integer) getSafeInsetLeft.invoke(cutout)).intValue();
+                        int top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();
+                        int right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();
+                        int bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();
+                        if (!AndroidImplementation.isImmersive()) {
+                            Rect systemBarInsets = AndroidImplementation.getSystemBarInsets(rootView);
+                            top -= systemBarInsets.top;
+                            bottom -= systemBarInsets.bottom;
+                        }
+
+                        // Only apply if at least one is non-zero
+                        if (left != 0 || top != 0 || right != 0 || bottom != 0) {
+                            rect.left = left;
+                            rect.top = top;
+                            rect.right = right;
+                            rect.bottom = bottom;
+                        }
                     }
                 }
             } catch (Exception e) {

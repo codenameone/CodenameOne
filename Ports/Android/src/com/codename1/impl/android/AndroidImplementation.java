@@ -1292,11 +1292,56 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Display.DENSITY_MEDIUM;
     }
 
+    public static boolean isImmersive() {
+        if (getActivity() == null) {
+            return false;
+        }
+        return isImmersive(getActivity().getWindow());
+    }
+    public static boolean isImmersive(Window window) {
+        if (Build.VERSION.SDK_INT >= 35) {
+            // Android 15+ is always immersive (overlay mode by default)
+            return true;
+        }
+        // On Android 34 and below, we can't detect decorFitsSystemWindows
+        // reliably at runtime. So the app must make the decision explicitly.
+        return false;
+    }
+    public static Rect getSystemBarInsets(final View rootView) {
+        final Rect result = new Rect(0, 0, 0, 0);
+        try {
+            Object insets = View.class
+                    .getMethod("getRootWindowInsets")
+                    .invoke(rootView);
+            if (insets == null) return result;
+            // Get android.view.WindowInsets$Type.systemBars()
+            Class typeClass = Class.forName("android.view.WindowInsets$Type");
+            int systemBarsMask = ((Integer) typeClass
+                    .getMethod("systemBars")
+                    .invoke(null)).intValue();
+            // Call insets.getInsets(int)
+            Object insetsObject = insets.getClass()
+                    .getMethod("getInsets", new Class[]{int.class})
+                    .invoke(insets, new Object[]{systemBarsMask});
+            if (insetsObject == null) return result;
+            Class insetsClass = insetsObject.getClass();
+            int left = ((Integer) insetsClass.getField("left").get(insetsObject)).intValue();
+            int top = ((Integer) insetsClass.getField("top").get(insetsObject)).intValue();
+            int right = ((Integer) insetsClass.getField("right").get(insetsObject)).intValue();
+            int bottom = ((Integer) insetsClass.getField("bottom").get(insetsObject)).intValue();
+            result.set(left, top, right, bottom);
+        } catch (Throwable t) {
+            t.printStackTrace();  // Optional: log this or suppress if expected
+        }
+        return result;
+    }
+
+
     public Rectangle getDisplaySafeArea(Rectangle rect) {
         if (rect == null) {
             rect = new Rectangle();
         }
-        if (getProperty("android.useSafeAreaInsets", "false").equals("false")) {
+        if (getProperty("android.useSafeAreaInsets", "true").equals("false")) {
             return super.getDisplaySafeArea(rect);
         }
         if (this.myView != null) {
