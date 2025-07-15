@@ -164,9 +164,9 @@ public class CodenameOneView {
 
     private void updateSafeArea() {
         final Activity activity = CodenameOneView.this.implementation.getActivity();
-
         final Rect rect = this.safeArea;
         final View rootView = activity.getWindow().getDecorView();
+
         if (Build.VERSION.SDK_INT >= VERSION_CODE_P) {
             try {
                 Method getRootWindowInsetsMethod = View.class.getMethod("getRootWindowInsets");
@@ -176,6 +176,8 @@ public class CodenameOneView {
                     Method getDisplayCutoutMethod = windowInsetsClass.getMethod("getDisplayCutout");
                     Object cutout = getDisplayCutoutMethod.invoke(insets);
 
+                    int left = 0, top = 0, right = 0, bottom = 0;
+
                     if (cutout != null) {
                         Class<?> displayCutoutClass = Class.forName("android.view.DisplayCutout");
                         Method getSafeInsetLeft = displayCutoutClass.getMethod("getSafeInsetLeft");
@@ -183,91 +185,82 @@ public class CodenameOneView {
                         Method getSafeInsetRight = displayCutoutClass.getMethod("getSafeInsetRight");
                         Method getSafeInsetBottom = displayCutoutClass.getMethod("getSafeInsetBottom");
 
-                        int left = ((Integer) getSafeInsetLeft.invoke(cutout)).intValue();
-                        int top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();
-                        int right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();
-                        int bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();
-                        boolean imeVisible = false;
-                        try {
-                            Method isVisibleMethod = insets.getClass().getMethod("isVisible", int.class);
-                            Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
-                            int imeType = ((Integer) typeClass.getMethod("ime").invoke(null)).intValue();
-                            imeVisible = (Boolean) isVisibleMethod.invoke(insets, imeType);
-                        } catch (Throwable t) {
-                            // Fallback or log
-                        }
+                        left = ((Integer) getSafeInsetLeft.invoke(cutout)).intValue();
+                        top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();
+                        right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();
+                        bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();
+                    }
 
-                        Rect systemBarInsets = AndroidImplementation.getSystemBarInsets(rootView);
-                        top = Math.max(systemBarInsets.top, top);
-                        if (imeVisible) {
-                            // Avoid double-counting the bottom gesture bar
-                            bottom = Math.max(bottom, 0);
-                        } else {
-                            bottom = Math.max(systemBarInsets.bottom, bottom);
-                        }
-                        left = Math.max(systemBarInsets.left, left);
-                        right = Math.max(systemBarInsets.right, right);
+                    boolean imeVisible = false;
+                    try {
+                        Method isVisibleMethod = insets.getClass().getMethod("isVisible", int.class);
+                        Class<?> typeClass = Class.forName("android.view.WindowInsets$Type");
+                        int imeType = ((Integer) typeClass.getMethod("ime").invoke(null)).intValue();
+                        imeVisible = (Boolean) isVisibleMethod.invoke(insets, imeType);
+                    } catch (Throwable t) {
+                        // IME visibility check not available or failed
+                    }
 
-                        if (!AndroidImplementation.isImmersive()) {
-                            top -= systemBarInsets.top;
-                            if (!imeVisible) {
-                                bottom -= systemBarInsets.bottom;
+                    boolean immersive = AndroidImplementation.isImmersive(activity.getWindow());
+                    Rect systemBarInsets = AndroidImplementation.getSystemBarInsets(rootView);
+
+                    if (cutout == null) {
+                        top = systemBarInsets.top;
+                        bottom = imeVisible ? 0 : systemBarInsets.bottom;
+                        left = systemBarInsets.left;
+                        right = systemBarInsets.right;
+                    } else {
+                        top = Math.max(top, systemBarInsets.top);
+                        if (!imeVisible) {
+                            bottom = Math.max(bottom, systemBarInsets.bottom);
+                        }
+                        left = Math.max(left, systemBarInsets.left);
+                        right = Math.max(right, systemBarInsets.right);
+                    }
+
+                    if (!immersive) {
+                        top = Math.max(0, top - systemBarInsets.top);
+                        if (!imeVisible) {
+                            bottom = Math.max(0, bottom - systemBarInsets.bottom);
+                        }
+                        left = Math.max(0, left - systemBarInsets.left);
+                        right = Math.max(0, right - systemBarInsets.right);
+                    }
+
+                    boolean isChanged = rect.left != left || rect.top != top || rect.right != right || rect.bottom != bottom;
+
+                    rect.left = left;
+                    rect.top = top;
+                    rect.right = right;
+                    rect.bottom = bottom;
+
+                    if (isChanged) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                AndroidImplementation.getInstance().revalidate();
                             }
-                            left -= systemBarInsets.left;
-                            right -= systemBarInsets.right;
-                        }
-
-                        // Only apply if at least one is non-zero
-                        if (left != 0 || top != 0 || right != 0 || bottom != 0) {
-                            boolean isChanged = rect.left != left
-                                    || rect.right != right
-                                    || rect.top != top
-                                    || rect.bottom != bottom;
-                            rect.left = left;
-                            rect.top = top;
-                            rect.right = right;
-                            rect.bottom = bottom;
-
-                            if (isChanged) {
-                                Display.getInstance().callSerially(new Runnable() {
-                                    public void run() {
-                                        AndroidImplementation.getInstance().revalidate();
-                                    }
-                                });
-                            }
-                        }
+                        });
                     }
                 }
             } catch (Exception e) {
-                rect.top = 0;
-                rect.left = 0;
-                rect.right = 0;
-                rect.bottom = 0;
+                rect.set(0, 0, 0, 0);
             }
-
         } else if (Build.VERSION.SDK_INT >= VERSION_CODE_M) {
             rootView.post(new Runnable() {
                 public void run() {
                     WindowInsets insets = rootView.getRootWindowInsets();
                     if (insets != null) {
                         rect.top = insets.getSystemWindowInsetTop();
-                        rect.left = insets.getSystemWindowInsetLeft();;
+                        rect.left = insets.getSystemWindowInsetLeft();
                         rect.right = insets.getSystemWindowInsetRight();
                         rect.bottom = insets.getSystemWindowInsetBottom();
                     } else {
-                        rect.top = 0;
-                        rect.left = 0;
-                        rect.right = 0;
-                        rect.bottom = 0;
+                        rect.set(0, 0, 0, 0);
                     }
                 }
             });
         } else {
-            // For pre-Marshmallow (API < 23), assume full screen
-            rect.top = 0;
-            rect.left = 0;
-            rect.right = 0;
-            rect.bottom = 0;
+            rect.set(0, 0, 0, 0);
         }
     }
 
