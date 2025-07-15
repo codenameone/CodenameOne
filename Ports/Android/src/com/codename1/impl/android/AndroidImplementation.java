@@ -1299,13 +1299,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return isImmersive(getActivity().getWindow());
     }
     public static boolean isImmersive(Window window) {
-        if (Build.VERSION.SDK_INT >= 35) {
-            // Android 15+ is always immersive (overlay mode by default)
-            return true;
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                // Android 11+ supports decorFitsSystemWindows
+                Method m = Window.class.getMethod("getDecorFitsSystemWindows");
+                Boolean result = (Boolean) m.invoke(window);
+                return result != null && !result;  // Immersive = decorFitsSystemWindows == false
+            } catch (Throwable t) {
+                // Fallback: allow developer override
+                return "true".equals(Display.getInstance().getProperty("android.forceImmersive", "false"));
+            }
         }
-        // On Android 34 and below, we can't detect decorFitsSystemWindows
-        // reliably at runtime. So the app must make the decision explicitly.
-        return false;
+        // For Android < 11, use only developer override
+        return "true".equals(Display.getInstance().getProperty("android.forceImmersive", "false"));
     }
     public static Rect getSystemBarInsets(final View rootView) {
         final Rect result = new Rect(0, 0, 0, 0);
