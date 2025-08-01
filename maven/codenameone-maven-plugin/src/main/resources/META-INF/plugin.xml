@@ -1,0 +1,8 @@
+<idea-plugin>
+    <id>com.codename1.maven.codenameone</id>
+    <name>Codename One Maven Plugin</name>
+    <description>Codename One plugin for IntelliJ IDEA</description>
+    <version>1.0.0</version>
+    <vendor>Codename One</vendor>
+    <icon>com/codename1/maven/codenameone-icon.png</icon>
+</idea-plugin>
