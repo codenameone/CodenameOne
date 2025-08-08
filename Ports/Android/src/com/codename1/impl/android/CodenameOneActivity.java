@@ -116,7 +116,7 @@ public class CodenameOneActivity extends Activity {
 
     private void verifySignature(String expectedSignature) {
         android.content.pm.PackageInfo packageInfo =
-                context.getPackageManager().getPackageInfo(context.getPackageName(),
+                getPackageManager().getPackageInfo(getPackageName(),
                         PackageManager.GET_SIGNATURES);
         for (android.content.pm.Signature signature : packageInfo.signatures) {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA");
