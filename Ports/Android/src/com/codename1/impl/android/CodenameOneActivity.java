@@ -115,16 +115,20 @@ public class CodenameOneActivity extends Activity {
     }
 
     private void verifySignature(String expectedSignature) {
-        android.content.pm.PackageInfo packageInfo =
-                getPackageManager().getPackageInfo(getPackageName(),
-                        PackageManager.GET_SIGNATURES);
-        for (android.content.pm.Signature signature : packageInfo.signatures) {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA");
-            md.update(signature.toByteArray());
-            String currentSignature = android.util.Base64.encodeToString(md.digest(), android.util.Base64.DEFAULT);
-            if (!currentSignature.equals(expectedSignature)) {
-                throw new SecurityException("App integrity check failed!");
+        try {
+            android.content.pm.PackageInfo packageInfo =
+                    getPackageManager().getPackageInfo(getPackageName(),
+                            PackageManager.GET_SIGNATURES);
+            for (android.content.pm.Signature signature : packageInfo.signatures) {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA");
+                md.update(signature.toByteArray());
+                String currentSignature = android.util.Base64.encodeToString(md.digest(), android.util.Base64.DEFAULT);
+                if (!currentSignature.equals(expectedSignature)) {
+                    throw new RuntimeException("App integrity check failed!");
+                }
             }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
