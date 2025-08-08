@@ -45,6 +45,8 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Vector;
 
 public class CodenameOneActivity extends Activity {
@@ -110,7 +112,33 @@ public class CodenameOneActivity extends Activity {
             billingSupport.consumeAndAcknowlegePurchases();
         }
         background = false;
+
+        /*VERIFY-CODE-START
+        verifySignature("EXPECTED_SIGNATURE_VALUE");
+        VERIFY-CODE-END*/
     }
+
+    /*VERIFY-CODE-START
+    private void verifySignature(String expectedSignature) {
+        try {
+            String[] split = expectedSignature.split(",");
+            List<String> splitString = Arrays.asList(split);
+            android.content.pm.PackageInfo packageInfo =
+                    getPackageManager().getPackageInfo(getPackageName(),
+                            PackageManager.GET_SIGNATURES);
+            for (android.content.pm.Signature signature : packageInfo.signatures) {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA");
+                md.update(signature.toByteArray());
+                String currentSignature = android.util.Base64.encodeToString(md.digest(), android.util.Base64.DEFAULT);
+                if (!splitString.contains(currentSignature)) {
+                    throw new RuntimeException("App integrity check failed for: " + currentSignature);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+    VERIFY-CODE-END*/
 
     /**
      * Overriden by subclasses to return true if billing is supported on this
