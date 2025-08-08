@@ -45,6 +45,8 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Vector;
 
 public class CodenameOneActivity extends Activity {
@@ -116,6 +118,8 @@ public class CodenameOneActivity extends Activity {
 
     private void verifySignature(String expectedSignature) {
         try {
+            String[] split = expectedSignature.split(",");
+            List<String> splitString = Arrays.asList(split);
             android.content.pm.PackageInfo packageInfo =
                     getPackageManager().getPackageInfo(getPackageName(),
                             PackageManager.GET_SIGNATURES);
@@ -123,8 +127,8 @@ public class CodenameOneActivity extends Activity {
                 java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA");
                 md.update(signature.toByteArray());
                 String currentSignature = android.util.Base64.encodeToString(md.digest(), android.util.Base64.DEFAULT);
-                if (!currentSignature.equals(expectedSignature)) {
-                    throw new RuntimeException("App integrity check failed!");
+                if (!splitString.contains(currentSignature)) {
+                    throw new RuntimeException("App integrity check failed for: " + currentSignature);
                 }
             }
         } catch (Exception e) {
