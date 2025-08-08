@@ -113,9 +113,12 @@ public class CodenameOneActivity extends Activity {
         }
         background = false;
 
+        /*VERIFY-CODE-START
         verifySignature("EXPECTED_SIGNATURE_VALUE");
+        VERIFY-CODE-END*/
     }
 
+    /*VERIFY-CODE-START
     private void verifySignature(String expectedSignature) {
         try {
             String[] split = expectedSignature.split(",");
@@ -135,6 +138,7 @@ public class CodenameOneActivity extends Activity {
             throw new RuntimeException(e);
         }
     }
+    VERIFY-CODE-END*/
 
     /**
      * Overriden by subclasses to return true if billing is supported on this
