@@ -481,8 +481,9 @@ public class Component implements Animation, StyleListener, Editable {
     EventDispatcher longPressListeners;
     private EventDispatcher stateChangeListeners;
     boolean isUnselectedStyle;
-    
+
     private String tooltip;
+    private String accessibilityText;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
@@ -2138,6 +2139,10 @@ public class Component implements Animation, StyleListener, Editable {
      */
     void focusGainedInternal() {
         startComponentLableTicker();
+        String text = getAccessibilityText();
+        if (text != null && text.length() > 0) {
+            announceForAccessibility(text);
+        }
     }
 
 
@@ -2156,7 +2161,7 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     /**
-     * Callback allowing a developer to track wheh the component gains focus
+     * Callback allowing a developer to track when the component gains focus
      */
     protected void focusGained() {
     }
@@ -8156,6 +8161,55 @@ public class Component implements Animation, StyleListener, Editable {
 
         public void paint(Graphics g) {
         }
+    }
+
+    /**
+     * Manually announces text to native accessibility services, associating the announcement
+     * with this component when possible. Screen readers normally announce a component
+     * automatically when it gains focus; this helper is for additional announcements that
+     * should occur outside of focus changes.
+     *
+     * @param text the message to announce
+     */
+    public void announceForAccessibility(String text) {
+        Display.getInstance().announceForAccessibility(this, text);
+    }
+
+    /**
+     * Sets the text that describes this component to assistive technologies.
+     * When the component gains focus, this text will be announced
+     * automatically.
+     *
+     * @param text accessibility description
+     */
+    public void setAccessibilityText(String text) {
+        this.accessibilityText = text;
+    }
+
+    /**
+     * Returns the text that describes this component to assistive technologies.
+     * If no text was set explicitly, this method attempts to derive a
+     * description from the component's label or content.
+     *
+     * @return accessibility description or {@code null} if none
+     */
+    public String getAccessibilityText() {
+        if (accessibilityText != null) {
+            return accessibilityText;
+        }
+        if (componentLabel != null) {
+            String t = componentLabel.getText();
+            if (t != null && t.length() > 0) {
+                return t;
+            }
+        }
+        if (this instanceof TextHolder) {
+            String t = ((TextHolder) this).getText();
+            if (t != null && t.length() > 0) {
+                return t;
+            }
+        }
+        return null;
     }
 
     /**

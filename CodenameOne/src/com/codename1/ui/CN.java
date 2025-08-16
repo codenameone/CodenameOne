@@ -327,6 +327,27 @@ public class CN extends  CN1Constants {
         Display.impl.vibrate(duration);
     }
 
+    /**
+     * Manually announces text to native accessibility services, optionally associating the
+     * announcement with a specific component. Normally, components are announced automatically
+     * when they receive focus; this method is for cases where an announcement is needed outside
+     * the normal focus lifecycle.
+     *
+     * @param cmp the component related to this announcement or {@code null} for the root view
+     * @param text the message to announce
+     */
+    public static void announceForAccessibility(Component cmp, String text) {
+        Display.impl.announceForAccessibility(cmp, text);
+    }
+
+    /**
+     * Convenience overload to announce text without specifying a component.
+     *
+     * @param text the message to announce
+     */
+    public static void announceForAccessibility(String text) {
+        Display.impl.announceForAccessibility(null, text);
+    }
 
     /**
      * Returns true if we are currently in the event dispatch thread.

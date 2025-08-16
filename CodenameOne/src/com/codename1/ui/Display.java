@@ -683,6 +683,28 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Manually announces text to native accessibility services, optionally associating the
+     * announcement with a specific component. Most assistive technologies will announce a
+     * component automatically when it gains focus; this method is intended for situations
+     * where an announcement should occur independently of focus changes.
+     *
+     * @param cmp the component related to this announcement or {@code null} for the root view
+     * @param text the message to announce
+     */
+    public void announceForAccessibility(Component cmp, String text) {
+        impl.announceForAccessibility(cmp, text);
+    }
+
+    /**
+     * Convenience overload to announce text without specifying a component.
+     *
+     * @param text the message to announce
+     */
+    public void announceForAccessibility(String text) {
+        announceForAccessibility(null, text);
+    }
+
+    /**
      * Invoking the show() method of a form/dialog while the user is editing
      * text in the native text box can have several behaviors: SHOW_DURING_EDIT_IGNORE,
      * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,

@@ -42,6 +42,7 @@ import com.codename1.io.Util;
 import com.codename1.io.tar.TarEntry;
 import com.codename1.io.tar.TarInputStream;
 import com.codename1.l10n.L10NManager;
+import com.codename1.ui.Component;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
@@ -8548,5 +8549,19 @@ public abstract class CodenameOneImplementation {
      */
     public Boolean isDarkMode() {
         return null;
+    }
+
+    /**
+     * Manually announces text to native accessibility services, associating the announcement with
+     * a specific component when possible. Components are typically announced automatically when
+     * focused; this hook allows platforms to expose announcements triggered outside the normal
+     * focus lifecycle. The default implementation is a no-op.
+     *
+     * @param cmp the component related to this announcement or {@code null} for the root context
+     * @param text the message to announce
+     */
+    public void announceForAccessibility(Component cmp, String text) {
+        // No-op by default. Platforms that support accessibility announcements
+        // should override this method.
     }
 }
