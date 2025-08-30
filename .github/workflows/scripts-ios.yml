@@ -23,4 +23,6 @@ jobs:
       - name: Build iOS port
         run: |
           source tools/env.sh
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
           ./scripts/build-ios-port.sh -q -DskipTests

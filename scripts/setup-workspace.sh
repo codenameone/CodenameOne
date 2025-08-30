@@ -71,6 +71,13 @@ EOF
 
 source "$TOOLS_DIR/env.sh"
 
+echo "JAVA_HOME is set to $JAVA_HOME"
+"$JAVA_HOME/bin/java" -version
+echo "JAVA_HOME_17 is set to $JAVA_HOME_17"
+"$JAVA_HOME_17/bin/java" -version
+echo "MAVEN_HOME is $MAVEN_HOME"
+mvn -version
+
 mvn -f maven/pom.xml install "$@"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"

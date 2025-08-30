@@ -1,6 +1,6 @@
 # Building Codename One
 
-This document provides reproducible instructions for building Codename One and its Android and iOS ports with Maven. It is written so that both developers and automated tools can follow it step by step.
+This document provides reproducible instructions for building Codename One and its Android and iOS ports with Maven.
 
 ## Prerequisites
 

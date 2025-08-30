@@ -32,6 +32,15 @@ fi
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
+echo "JAVA_HOME is set to $JAVA_HOME"
+if [ -x "$JAVA_HOME/bin/java" ]; then
+  "$JAVA_HOME/bin/java" -version
+else
+  echo "java executable not found under $JAVA_HOME" >&2
+fi
+echo "PATH is $PATH"
+mvn -version
+
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 if [ ! -f "$BUILD_CLIENT" ]; then
   if ! mvn -f maven/pom.xml cn1:install-codenameone "$@"; then

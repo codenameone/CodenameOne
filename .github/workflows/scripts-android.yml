@@ -23,4 +23,8 @@ jobs:
       - name: Build Android port
         run: |
           source tools/env.sh
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          echo "JAVA_HOME_17=$JAVA_HOME_17"
+          "$JAVA_HOME_17/bin/java" -version
           ./scripts/build-android-port.sh -q -DskipTests
