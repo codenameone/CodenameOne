@@ -1,0 +1,28 @@
+---
+name: Test iOS build scripts
+
+'on':
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'BUILDING.md'
+  push:
+    branches:
+      - master
+    paths:
+      - 'scripts/**'
+      - 'BUILDING.md'
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build iOS port
+        run: |
+          source tools/env.sh
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          ./scripts/build-ios-port.sh -q -DskipTests
