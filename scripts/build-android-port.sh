@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Codename One Android port using JDK 8 for Maven and JDK 17 for compilation
+# Build Codename One Android port using JDK 11 for Maven and JDK 17 for compilation
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -11,12 +11,22 @@ else
   source "$ROOT/tools/env.sh"
 fi
 
-if ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '1\.8'; then
-  echo "JAVA_HOME must point to JDK 8" >&2
+if ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '11\.0'; then
+  echo "JAVA_HOME is not JDK 11; running setup-workspace.sh" >&2
+  ./scripts/setup-workspace.sh -q -DskipTests
+  source "$ROOT/tools/env.sh"
+fi
+if ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '11\.0'; then
+  echo "Failed to provision JDK 11" >&2
   exit 1
 fi
 if ! "$JAVA_HOME_17/bin/java" -version 2>&1 | grep -q '17\.0'; then
-  echo "JAVA_HOME_17 must point to JDK 17" >&2
+  echo "JAVA_HOME_17 is not JDK 17; running setup-workspace.sh" >&2
+  ./scripts/setup-workspace.sh -q -DskipTests
+  source "$ROOT/tools/env.sh"
+fi
+if ! "$JAVA_HOME_17/bin/java" -version 2>&1 | grep -q '17\.0'; then
+  echo "Failed to provision JDK 17" >&2
   exit 1
 fi
 
