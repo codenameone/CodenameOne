@@ -40,4 +40,4 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl android -am clean install "$@"
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl android -am -Dmaven.javadoc.skip=true clean install "$@"

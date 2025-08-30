@@ -1,6 +1,6 @@
 # Building Codename One
 
-This guide explains how to build Codename One and its Android and iOS ports locally with Maven.
+This guide provides reproducible steps to build Codename One locally with Maven, including its Android and iOS ports.
 
 ## Prerequisites
 
@@ -9,7 +9,8 @@ This guide explains how to build Codename One and its Android and iOS ports loca
 - **Apache Maven 3.6+**
 - macOS with Xcode (required only for the iOS port)
 
-The helper scripts in the `scripts/` directory download these dependencies when they are not already installed.
+The helper scripts in the `scripts/` directory download these dependencies when they are not already installed. On Apple Silicon
+macOS machines, the scripts download the Intel JDK 8 and run it via Rosetta because an ARM build of JDK 8 is unavailable.
 
 ### Installing JDKs on Linux
 
@@ -44,7 +45,8 @@ The script runs `mvn install` in `maven/`, installs `cn1-maven-archetypes`, and 
 
 ## Building the Android port
 
-The Android port uses JDK 17 for compilation while Maven runs with JDK 8. Run the build script:
+The Android port uses JDK 17 for compilation while Maven runs with JDK 8. Javadoc generation is skipped to avoid known Maven
+report issues. Run the build script:
 
 ```bash
 ./scripts/build-android-port.sh -DskipTests

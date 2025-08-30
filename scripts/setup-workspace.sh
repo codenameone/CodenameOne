@@ -21,10 +21,17 @@ case "$arch_name" in
   x86_64|amd64) arch="x64" ;;
   arm64|aarch64) arch="aarch64" ;;
   *) echo "Unsupported architecture: $arch_name" >&2; exit 1 ;;
-  esac
+esac
 
-JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u462-b08/OpenJDK8U-jdk_${arch}_${os}_hotspot_8u462b08.tar.gz"
-JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
+# JDK 8 is not available for Apple Silicon. Use the Intel build when running on macOS ARM.
+jdk8_arch="$arch"
+jdk17_arch="$arch"
+if [ "$os" = "mac" ] && [ "$arch" = "aarch64" ]; then
+  jdk8_arch="x64"
+fi
+
+JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u462-b08/OpenJDK8U-jdk_${jdk8_arch}_${os}_hotspot_8u462b08.tar.gz"
+JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${jdk17_arch}_${os}_hotspot_17.0.16_8.tar.gz"
 MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"
 
 install_jdk() {
