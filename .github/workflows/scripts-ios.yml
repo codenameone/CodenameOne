@@ -1,0 +1,20 @@
+---
+name: Test iOS build scripts
+
+'on':
+  push:
+    paths:
+      - 'scripts/**'
+  pull_request:
+    paths:
+      - 'scripts/**'
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build iOS port
+        run: |
+          ./scripts/setup-workspace.sh -q -DskipTests
+          ./scripts/build-ios-port.sh -q -DskipTests

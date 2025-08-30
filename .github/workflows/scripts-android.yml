@@ -1,0 +1,20 @@
+---
+name: Test Android build scripts
+
+'on':
+  push:
+    paths:
+      - 'scripts/**'
+  pull_request:
+    paths:
+      - 'scripts/**'
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Android port
+        run: |
+          ./scripts/setup-workspace.sh -q -DskipTests
+          ./scripts/build-android-port.sh -q -DskipTests
