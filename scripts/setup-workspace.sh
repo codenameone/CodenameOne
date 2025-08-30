@@ -1,103 +1,86 @@
-#!/bin/bash
-# Prepare Codename One workspace by installing Maven, provisioning JDK 11 and JDK 17,
-# building core modules, and installing Maven archetypes
-set -e
-DIR="$(cd "$(dirname "$0")" && pwd)/.."
-cd "$DIR"
+#!/usr/bin/env bash
+# Prepare Codename One workspace by installing Maven, provisioning JDK 8 and JDK 17,
+# building core modules, and installing Maven archetypes.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TOOLS="$ROOT/tools"
+mkdir -p "$TOOLS"
 
-TOOLS_DIR="$DIR/tools"
-mkdir -p "$TOOLS_DIR"
-
-ensure_jdk() {
-  local envvar="$1" version="$2" url="$3"
-  local current="${!envvar}"
-  if [ -z "$current" ] || ! "$current/bin/java" -version 2>&1 | head -n1 | grep -q "$version"; then
-    local existing=$(ls -d "$TOOLS_DIR"/jdk-$version* 2>/dev/null | head -n1)
-    if [ -z "$existing" ]; then
-      echo "Downloading JDK $version (this may take a while)..."
-      local archive="$TOOLS_DIR/jdk$version.tar.gz"
-      curl -L -o "$archive" "$url"
-      tar -xzf "$archive" -C "$TOOLS_DIR"
-      rm "$archive"
-      existing=$(ls -d "$TOOLS_DIR"/jdk-$version* | head -n1)
-    fi
-    export "$envvar"="$existing"
-  fi
-}
-
-ensure_maven() {
-  local version="3.9.6"
-  MAVEN_HOME="$TOOLS_DIR/apache-maven-$version"
-  if [ ! -d "$MAVEN_HOME" ]; then
-    local archive="$TOOLS_DIR/apache-maven-$version-bin.tar.gz"
-    echo "Downloading Maven $version..."
-    curl -L -o "$archive" "https://archive.apache.org/dist/maven/maven-3/$version/binaries/apache-maven-$version-bin.tar.gz"
-    tar -xzf "$archive" -C "$TOOLS_DIR"
-    rm "$archive"
-  fi
-  export MAVEN_HOME
-  export PATH="$MAVEN_HOME/bin:$PATH"
-}
-
-detect_platform() {
-  case "$(uname -s)" in
-    Linux) platform="linux" ;;
-    Darwin) platform="mac" ;;
-    *) echo "Unsupported OS: $(uname -s)" >&2; exit 1 ;;
+os_name=$(uname -s)
+arch_name=$(uname -m)
+case "$os_name" in
+  Linux) os="linux" ;;
+  Darwin) os="mac" ;;
+  *) echo "Unsupported OS: $os_name" >&2; exit 1 ;;
+  esac
+case "$arch_name" in
+  x86_64|amd64) arch="x64" ;;
+  arm64|aarch64) arch="aarch64" ;;
+  *) echo "Unsupported architecture: $arch_name" >&2; exit 1 ;;
   esac
 
-  case "$(uname -m)" in
-    x86_64|amd64) arch="x64" ;;
-    arm64|aarch64) arch="aarch64" ;;
-    *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
-  esac
+JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u442-b06/OpenJDK8U-jdk_${arch}_${os}_hotspot_8u442b06.tar.gz"
+JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
+MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"
+
+install_jdk() {
+  local url="$1" dest_var="$2"
+  local tmp="$TOOLS/jdk.tgz"
+  curl -fL "$url" -o "$tmp"
+  local top=$(tar -tzf "$tmp" | head -1 | cut -d/ -f1)
+  tar -xzf "$tmp" -C "$TOOLS"
+  rm "$tmp"
+  local home="$TOOLS/$top"
+  if [ -d "$home/Contents/Home" ]; then
+    home="$home/Contents/Home"
+  fi
+  eval "$dest_var=\"$home\""
 }
 
-detect_platform
+if ! [ -x "${JAVA_HOME:-}/bin/java" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '1\.8'; then
+  echo "Downloading JDK 8 (this may take a while)..."
+  install_jdk "$JDK8_URL" JAVA_HOME
+fi
 
-JDK11_URL="https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.28%2B6/OpenJDK11U-jdk_${arch}_${platform}_hotspot_11.0.28_6.tar.gz"
-JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${platform}_hotspot_17.0.16_8.tar.gz"
+if ! [ -x "${JAVA_HOME_17:-}/bin/java" ] || ! "$JAVA_HOME_17/bin/java" -version 2>&1 | grep -q '17\.0'; then
+  echo "Downloading JDK 17 (this may take a while)..."
+  install_jdk "$JDK17_URL" JAVA_HOME_17
+fi
 
-ensure_jdk JAVA_HOME 11 "$JDK11_URL"
-ensure_jdk JAVA_HOME_17 17 "$JDK17_URL"
-ensure_maven
+if ! [ -x "${MAVEN_HOME:-}/bin/mvn" ]; then
+  echo "Downloading Maven..."
+  tmp="$TOOLS/maven.tgz"
+  curl -fL "$MAVEN_URL" -o "$tmp"
+  tar -xzf "$tmp" -C "$TOOLS"
+  rm "$tmp"
+  MAVEN_HOME="$TOOLS/apache-maven-3.9.6"
+fi
 
-cat > "$TOOLS_DIR/env.sh" <<EOF
+cat > "$TOOLS/env.sh" <<ENV
 export JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME_17="$JAVA_HOME_17"
 export MAVEN_HOME="$MAVEN_HOME"
-export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:\$PATH"
-EOF
+export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
+ENV
 
-source "$TOOLS_DIR/env.sh"
+source "$TOOLS/env.sh"
 
-echo "JAVA_HOME is set to $JAVA_HOME"
 "$JAVA_HOME/bin/java" -version
-echo "JAVA_HOME_17 is set to $JAVA_HOME_17"
 "$JAVA_HOME_17/bin/java" -version
-echo "MAVEN_HOME is $MAVEN_HOME"
-mvn -version
+"$MAVEN_HOME/bin/mvn" -version
 
-mvn -f maven/pom.xml install "$@"
+PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
+("$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml install "$@")
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 if [ ! -f "$BUILD_CLIENT" ]; then
-  echo "Installing Codename One build client..."
-  if ! mvn -f maven/pom.xml cn1:install-codenameone "$@"; then
-    echo "Falling back to manual copy of build client jar." >&2
-    if [ -f maven/CodeNameOneBuildClient.jar ]; then
-      mkdir -p "$(dirname "$BUILD_CLIENT")"
-      cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT"
-    else
-      echo "maven/CodeNameOneBuildClient.jar not found." >&2
-    fi
+  if ! "$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml cn1:install-codenameone "$@"; then
+    mkdir -p "$(dirname "$BUILD_CLIENT")"
+    cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT" || true
   fi
 fi
 
 if [ ! -d cn1-maven-archetypes ]; then
   git clone https://github.com/shannah/cn1-maven-archetypes
 fi
-(
-  cd cn1-maven-archetypes
-  mvn install "$@"
-)
+(cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -q -DskipTests install)
