@@ -116,6 +116,8 @@ import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
 import android.view.*;
 import android.view.View.MeasureSpec;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityManager;
 import android.webkit.*;
 import android.widget.*;
 import com.codename1.background.BackgroundFetch;
@@ -10802,5 +10804,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             com.codename1.io.Log.e(t);
         }
         return false;
+    }
+
+    @Override
+    public void announceForAccessibility(final Component cmp, final String text) {
+        final Activity act = getActivity();
+        if (act == null) {
+            return;
+        }
+        act.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                View view = null;
+                if (cmp instanceof PeerComponent) {
+                    Object peer = ((PeerComponent) cmp).getNativePeer();
+                    if (peer instanceof View) {
+                        view = (View) peer;
+                    }
+                }
+                if (view == null) {
+                    view = act.getWindow().getDecorView();
+                }
+                if (view == null) {
+                    return;
+                }
+                if (Build.VERSION.SDK_INT >= 16) {
+                    view.announceForAccessibility(text);
+                } else {
+                    AccessibilityManager manager = (AccessibilityManager) act.getSystemService(Context.ACCESSIBILITY_SERVICE);
+                    if (manager != null && manager.isEnabled()) {
+                        AccessibilityEvent event = AccessibilityEvent.obtain(AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED);
+                        event.getText().add(text);
+                        event.setSource(view);
+                        manager.sendAccessibilityEvent(event);
+                    }
+                }
+            }
+        });
     }
 }
