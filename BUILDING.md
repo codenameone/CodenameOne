@@ -1,12 +1,13 @@
 # Building Codename One
 
-This guide describes how to build Codename One and its Android and iOS ports locally using Maven. It includes reproducible steps for setting up the workspace and compiling each port.
+This document provides reproducible instructions for building Codename One and its Android and iOS ports with Maven. It is written so that both developers and automated tools can follow it step by step.
 
 ## Prerequisites
 
-- **JDK 11** for building the main project and the iOS port.
+- **JDK 11** (Codename One also builds with JDK 8, but these instructions use JDK 11).
 - **JDK 17** for building the Android port.
 - **Apache Maven 3.6+**.
+- macOS with Xcode (only for building the iOS port).
 
 The `setup-workspace.sh` script downloads these dependencies automatically when they are not already installed.
 
@@ -38,13 +39,14 @@ Clone the repository and run the setup script to install Maven, download JDK 11
 git clone https://github.com/codenameone/CodenameOne
 cd CodenameOne
 ./scripts/setup-workspace.sh -DskipTests
+source tools/env.sh
 ```
 
-The script runs `mvn install` in `maven/`, installs `cn1-maven-archetypes`, and ensures `~/.codenameone/CodeNameOneBuildClient.jar` is installed by invoking the `cn1:install-codenameone` Maven goal. If that goal fails, the script copies the jar from `maven/CodeNameOneBuildClient.jar`.
+The script runs `mvn install` in `maven/`, installs `cn1-maven-archetypes`, and ensures `~/.codenameone/CodeNameOneBuildClient.jar` is installed by invoking the `cn1:install-codenameone` Maven goal. If that goal fails, the script copies the jar from `maven/CodeNameOneBuildClient.jar`. After the script finishes, `tools/env.sh` contains environment variables for the provisioned JDKs and Maven.
 
 ## Building the Android port
 
-Run the Android build script. It requires `JAVA_HOME` pointing to JDK 11 and `JAVA_HOME_17` pointing to JDK 17. If these variables are unset, the script will look for the JDKs under `tools/` as provisioned by `setup-workspace.sh`:
+Run the Android build script. It sources the environment from `tools/env.sh`, ensuring `JAVA_HOME` points to JDK 11 and `JAVA_HOME_17` points to JDK 17. If the JDKs are missing, the script will run `setup-workspace.sh` to download them:
 
 ```bash
 ./scripts/build-android-port.sh -DskipTests
@@ -54,7 +56,7 @@ The resulting artifacts are placed in `maven/android/target`.
 
 ## Building the iOS port
 
-The iOS port can only be built on macOS with Xcode installed. The build script expects `JAVA_HOME` to point to JDK 11 and will search `tools/` if it is not set:
+The iOS port can only be built on macOS with Xcode installed. The build script sources `tools/env.sh` and ensures `JAVA_HOME` points to JDK 11, running `setup-workspace.sh` if necessary:
 
 ```bash
 ./scripts/build-ios-port.sh -DskipTests
@@ -66,7 +68,7 @@ The build output is in `maven/ios/target`.
 
 The `scripts` directory contains helper scripts:
 
-- `setup-workspace.sh` – installs Maven, downloads JDK 11 and JDK 17, builds the core modules, installs Maven archetypes, and provisions the Codename One build client.
+- `setup-workspace.sh` – installs Maven, downloads JDK 11 and JDK 17, builds the core modules, installs Maven archetypes, provisions the Codename One build client, and writes `tools/env.sh`.
 - `build-android-port.sh` – builds the Android port using JDK 11 for Maven and JDK 17 for compilation.
 - `build-ios-port.sh` – builds the iOS port on macOS with JDK 11.
 

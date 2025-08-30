@@ -26,16 +26,17 @@ ensure_jdk() {
 }
 
 ensure_maven() {
-  if ! command -v mvn >/dev/null; then
-    local version="3.9.6"
+  local version="3.9.6"
+  MAVEN_HOME="$TOOLS_DIR/apache-maven-$version"
+  if [ ! -d "$MAVEN_HOME" ]; then
     local archive="$TOOLS_DIR/apache-maven-$version-bin.tar.gz"
     echo "Downloading Maven $version..."
     curl -L -o "$archive" "https://archive.apache.org/dist/maven/maven-3/$version/binaries/apache-maven-$version-bin.tar.gz"
     tar -xzf "$archive" -C "$TOOLS_DIR"
     rm "$archive"
-    MAVEN_HOME="$TOOLS_DIR/apache-maven-$version"
-    export PATH="$MAVEN_HOME/bin:$PATH"
   fi
+  export MAVEN_HOME
+  export PATH="$MAVEN_HOME/bin:$PATH"
 }
 
 detect_platform() {
@@ -54,17 +55,21 @@ detect_platform() {
 
 detect_platform
 
-JDK11_URL="https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.28%2B6/"\
-"OpenJDK11U-jdk_${arch}_${platform}_hotspot_11.0.28_6.tar.gz"
-JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/"\
-"OpenJDK17U-jdk_${arch}_${platform}_hotspot_17.0.16_8.tar.gz"
+JDK11_URL="https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.28%2B6/OpenJDK11U-jdk_${arch}_${platform}_hotspot_11.0.28_6.tar.gz"
+JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${platform}_hotspot_17.0.16_8.tar.gz"
 
 ensure_jdk JAVA_HOME 11 "$JDK11_URL"
 ensure_jdk JAVA_HOME_17 17 "$JDK17_URL"
-
 ensure_maven
 
-export PATH="$JAVA_HOME/bin:$PATH"
+cat > "$TOOLS_DIR/env.sh" <<EOF
+export JAVA_HOME="$JAVA_HOME"
+export JAVA_HOME_17="$JAVA_HOME_17"
+export MAVEN_HOME="$MAVEN_HOME"
+export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:\$PATH"
+EOF
+
+source "$TOOLS_DIR/env.sh"
 
 mvn -f maven/pom.xml install "$@"
 

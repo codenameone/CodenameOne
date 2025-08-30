@@ -5,25 +5,33 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)/.."
 cd "$DIR"
 
-# Locate JDK 11
-if [ -z "$JAVA_HOME" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | head -n1 | grep -q "11"; then
-  JAVA_HOME=$(ls -d "$DIR"/tools/jdk-11* 2>/dev/null | head -n1)
+if [ -f "$DIR/tools/env.sh" ]; then
+  source "$DIR/tools/env.sh"
 fi
+
 if [ -z "$JAVA_HOME" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | head -n1 | grep -q "11"; then
-  echo "JAVA_HOME must point to JDK 11." >&2
+  echo "Provisioning workspace..."
+  ./scripts/setup-workspace.sh -q -DskipTests
+  source "$DIR/tools/env.sh"
+fi
+
+if [ -z "$JAVA_HOME" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | head -n1 | grep -q "11"; then
+  echo "Failed to set up JDK 11." >&2
   exit 1
 fi
 
-# Locate JDK 17
 if [ -z "$JAVA_HOME_17" ] || ! "$JAVA_HOME_17/bin/java" -version 2>&1 | head -n1 | grep -q "17"; then
-  JAVA_HOME_17=$(ls -d "$DIR"/tools/jdk-17* 2>/dev/null | head -n1)
+  echo "Provisioning JDK 17..."
+  ./scripts/setup-workspace.sh -q -DskipTests
+  source "$DIR/tools/env.sh"
 fi
+
 if [ -z "$JAVA_HOME_17" ] || ! "$JAVA_HOME_17/bin/java" -version 2>&1 | head -n1 | grep -q "17"; then
-  echo "JAVA_HOME_17 must point to JDK 17." >&2
+  echo "Failed to set up JDK 17." >&2
   exit 1
 fi
 
-export PATH="$JAVA_HOME/bin:$PATH"
+export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 if [ ! -f "$BUILD_CLIENT" ]; then
