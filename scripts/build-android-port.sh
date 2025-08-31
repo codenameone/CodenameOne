@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Codename One Android port using JDK 8 for Maven and JDK 17 for compilation
+# Build Codename One Android port using JDK 11 for Maven and JDK 17 for compilation
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -11,12 +11,12 @@ else
   source "$ROOT/tools/env.sh"
 fi
 
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '1\.8'; then
+if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
   ./scripts/setup-workspace.sh -q -DskipTests
   source "$ROOT/tools/env.sh"
 fi
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '1\.8'; then
-  echo "Failed to provision JDK 8" >&2
+if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
+  echo "Failed to provision JDK 11" >&2
   exit 1
 fi
 if ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
@@ -40,4 +40,4 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl android -am -Dmaven.javadoc.skip=true clean install "$@"
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl android -am -Dmaven.javadoc.skip=true -Djava.awt.headless=true clean install "$@"

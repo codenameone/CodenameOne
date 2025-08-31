@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###
-# Prepare Codename One workspace by installing Maven, provisioning JDK 8 and JDK 17,
+# Prepare Codename One workspace by installing Maven, provisioning JDK 11 and JDK 17,
 # building core modules, and installing Maven archetypes.
 ###
 set -euo pipefail
@@ -31,15 +31,9 @@ case "$arch_name" in
   *) echo "Unsupported architecture: $arch_name" >&2; exit 1 ;;
 esac
 
-# JDK 8 is not available for Apple Silicon. Use the Intel build when running on macOS ARM.
-jdk8_arch="$arch"
-jdk17_arch="$arch"
-if [ "$os" = "mac" ] && [ "$arch" = "aarch64" ]; then
-  jdk8_arch="x64"
-fi
-
-JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u462-b08/OpenJDK8U-jdk_${jdk8_arch}_${os}_hotspot_8u462b08.tar.gz"
-JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${jdk17_arch}_${os}_hotspot_17.0.16_8.tar.gz"
+# Determine platform-specific JDK download URLs
+JDK11_URL="https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.28%2B6/OpenJDK11U-jdk_${arch}_${os}_hotspot_11.0.28_6.tar.gz"
+JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
 MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"
 
 install_jdk() {
@@ -58,12 +52,12 @@ install_jdk() {
   eval "$dest_var=\"$home\""
 }
 
-log "Ensuring JDK 8 is available"
-if [ ! -x "${JAVA_HOME:-}/bin/java" ] || ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '1\.8'; then
-  log "Provisioning JDK 8 (this may take a while)..."
-  install_jdk "$JDK8_URL" JAVA_HOME
+log "Ensuring JDK 11 is available"
+if [ ! -x "${JAVA_HOME:-}/bin/java" ] || ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
+  log "Provisioning JDK 11 (this may take a while)..."
+  install_jdk "$JDK11_URL" JAVA_HOME
 else
-  log "Using existing JDK 8 at $JAVA_HOME"
+  log "Using existing JDK 11 at $JAVA_HOME"
 fi
 
 log "Ensuring JDK 17 is available"
@@ -96,14 +90,14 @@ ENV
 
 source "$TOOLS/env.sh"
 
-log "JDK 8 version:"; "$JAVA_HOME/bin/java" -version
+log "JDK 11 version:"; "$JAVA_HOME/bin/java" -version
 log "JDK 17 version:"; "$JAVA_HOME_17/bin/java" -version
 log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
 PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests install "$@"
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -DskipTests -Djava.awt.headless=true install "$@"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"
@@ -119,4 +113,4 @@ log "Installing cn1-maven-archetypes"
 if [ ! -d cn1-maven-archetypes ]; then
   git clone https://github.com/shannah/cn1-maven-archetypes
 fi
-(cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -DskipTests -Dinvoker.skip=true install)
+(cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -q -DskipTests -DskipITs=true -Dinvoker.skip=true install)

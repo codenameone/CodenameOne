@@ -17,12 +17,12 @@ else
   ./scripts/setup-workspace.sh -q -DskipTests
   source "$ROOT/tools/env.sh"
 fi
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '1\.8'; then
+if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
   ./scripts/setup-workspace.sh -q -DskipTests
   source "$ROOT/tools/env.sh"
 fi
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '1\.8'; then
-  echo "Failed to provision JDK 8" >&2
+if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
+  echo "Failed to provision JDK 11" >&2
   exit 1
 fi
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
@@ -36,4 +36,4 @@ if [ ! -f "$BUILD_CLIENT" ]; then
   fi
 fi
 
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am clean install "$@"
+"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl ios -am -Djava.awt.headless=true clean install "$@"
