@@ -31,8 +31,8 @@ import java.io.IOException;
 
 /**
  * Generic "Like" button that enables us to submit a like to facebook, to get the post id
- * required for the like functionality you will need to use a tool such as: 
- * https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Fposts
+ * required for the like functionality you will need to use a tool such as:
+ * <a href="https://developers.facebook.com/tools/explorer/?method=GET&amp;path=me%2Fposts">https://developers.facebook.com/tools/explorer/?method=GET&amp;path=me%2Fposts</a>
  * You can ask it to list your posts and then seek the correct id within the returned JSON
  * 
  * @author Chen Fishbein

@@ -33,7 +33,7 @@ import java.util.Date;
  * exposed.
  * 
  * @author Eric Coolman
- * @see http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html
+ * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html</a>
  */
 public class DateFormat extends Format {
 	/**

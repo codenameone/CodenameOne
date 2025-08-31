@@ -133,7 +133,7 @@ public class XMLParser {
 
     /**
      * Adds the given symbol and code to the user defined char entities table
-     * http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references
+     * <a href="http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references">http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references</a>
      * 
      * @param symbol The symbol to add
      * @param code The symbol's code
@@ -165,10 +165,10 @@ public class XMLParser {
     }
 
     /**
-     * Trims unneeded & and ; from the symbol if exist
+     * Trims unneeded &amp; and ; from the symbol if exist
      *
      * @param symbol The char entity symbol
-     * @return A trimmed char entity without & and ;
+     * @return A trimmed char entity without &amp; and ;
      */
     private static String trimCharEntity(String symbol) {
 		int start = 0;
@@ -222,7 +222,7 @@ public class XMLParser {
      * This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
      *
      * @param charEntity The char entity to convert
-     * @return A string containing a single char, or the original char entity string (with & and ;) if the char entity couldn't be resolved
+     * @return A string containing a single char, or the original char entity string (with &amp; and ;) if the char entity couldn't be resolved
      */
     protected String convertCharEntity(String charEntity) {
         try {

@@ -42,7 +42,7 @@ public class HTMLParser extends XMLParser {
 
     /**
      * The list of empty tags (tags that naturally don't have any children).
-     * This is used to enable empty tags to be closed also in a non-strict way (i.e. &lt;br&gt; instead of &lt;br&gt/;)
+     * This is used to enable empty tags to be closed also in a non-strict way (i.e. &lt;br&gt; instead of &lt;br/&gt;)
      * some of these tags are not a part of the XHTML-MP 1.0 standard, but including them here allows a more smooth parsing if the document is not strictly XHTML-MP 1.0
      */
     private static String[] EMPTY_TAGS = {"br","link","meta","base","area","basefont","col","frame","hr","img","input","isindex","param"};
@@ -113,7 +113,7 @@ public class HTMLParser extends XMLParser {
      * Overrides XMLParser.convertCharEntity to add in HTML char entities
      *
      * @param charEntity The char entity to convert
-     * @return A string containing a single char, or the original char entity string (with & and ;) if the char entity couldn't be resolved
+     * @return A string containing a single char, or the original char entity string (with &amp; and ;) if the char entity couldn't be resolved
      */
     protected String convertCharEntity(String charEntity) {
         try {

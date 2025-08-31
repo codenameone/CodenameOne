@@ -35,7 +35,7 @@ import net.sourceforge.retroweaver.harmony.runtime.java.util.StringTokenizer;
  * <pre>
  * 1) For socket related URIs, the toString() methods use semicolon (;) as the
  *    query marker instead of the normal question mark (?), and the parameters are separated
- *    with a semicolon instead of the normal ampersand (&).  With this, the URIs are compatible
+ *    with a semicolon instead of the normal ampersand (&amp;).  With this, the URIs are compatible
  *    with those used by J2ME socket connectors.  (The Java 6 API treats socket URIs as URNs).
  * 2) This implementation does not yet "rigorously parse IPv4" addresses like the Java 6 version does,
  *    the host address is simply stored as provided by the caller.  This will be enhanced using the
@@ -49,12 +49,12 @@ import net.sourceforge.retroweaver.harmony.runtime.java.util.StringTokenizer;
  * 
  * @author Eric Coolman
  * 
- * @see http://docs.oracle.com/javase/6/docs/api/java/net/URI.html
- * @see http://en.wikipedia.org/wiki/Uniform_resource_identifier
- * @see http://en.wikipedia.org/wiki/Uniform_resource_name
- * @see http://www.ietf.org/rfc/rfc2396.txt
- * @see http://www.ietf.org/rfc/rfc2732.txt
- * @see http://tools.ietf.org/html/rfc2141
+ * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html</a>
+ * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_identifier">http://en.wikipedia.org/wiki/Uniform_resource_identifier</a>
+ * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_name">http://en.wikipedia.org/wiki/Uniform_resource_name</a>
+ * @see <a href="http://www.ietf.org/rfc/rfc2396.txt">http://www.ietf.org/rfc/rfc2396.txt</a>
+ * @see <a href="http://www.ietf.org/rfc/rfc2732.txt">http://www.ietf.org/rfc/rfc2732.txt</a>
+ * @see <a href="http://tools.ietf.org/html/rfc2141">http://tools.ietf.org/html/rfc2141</a>
  */
 public class URI {
 	/**
@@ -114,8 +114,8 @@ public class URI {
 	 */
 	static final char FRAGMENT_SEPARATOR = '#';
 	/**
-	 * The character that should be used for separating query for this URI (; or
-	 * &).
+         * The character that should be used for separating query for this URI (; or
+         * &amp;).
 	 */
 	private char querySeparator;
 	/**
@@ -262,7 +262,7 @@ public class URI {
 	 * Utility method - set the scheme, ensuring valid format, and determining
 	 * the query separator to use.
 	 * 
-	 * @see http://en.wikipedia.org/wiki/Uniform_resource_name
+         * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_name">http://en.wikipedia.org/wiki/Uniform_resource_name</a>
 	 */
 	protected void setScheme(String scheme) throws URISyntaxException {
 		if ((this.scheme = scheme) == null) {
@@ -568,7 +568,7 @@ public class URI {
 
 	/**
 	 * Internal utility method to determine if the given scheme should use
-	 * semicolons (;) for query separator instead of ampersand (&)
+         * semicolons (;) for query separator instead of ampersand (&amp;)
 	 */
 	boolean isSocketScheme(String scheme) {
 		for (String p : URIHelper.SOCKET_SCHEMES) {
@@ -583,7 +583,7 @@ public class URI {
 	 * Verifies the scheme contains only valid characters as per the URN
 	 * specification (see NID).
 	 * 
-	 * @see http://tools.ietf.org/html/rfc2141
+         * @see <a href="http://tools.ietf.org/html/rfc2141">http://tools.ietf.org/html/rfc2141</a>
 	 */
 	boolean isValidScheme(String scheme) {
 		for (int i = 0; i < scheme.length(); i++) {
@@ -780,9 +780,7 @@ public class URI {
 	 * 
 	 * @param uri
 	 * @return
-	 * @see http
-	 *      ://docs.oracle.com/javase/6/docs/api/java/net/URI.html#relativize
-	 *      %28java.net.URI%29
+         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#relativize%28java.net.URI%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#relativize%28java.net.URI%29</a>
 	 */
 	public URI relativize(URI uri) {
 		if (isOpaque() || uri.isOpaque()) {
@@ -816,9 +814,7 @@ public class URI {
 	 * 
 	 * @param uri a URI to resolve against this URI.
 	 * @return a new URI created by merging given URI with this URI.
-	 * @see http
-	 *      ://docs.oracle.com/javase/6/docs/api/java/net/URI.html#resolve%28
-	 *      java.net.URI%29
+         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#resolve%28java.net.URI%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#resolve%28java.net.URI%29</a>
 	 */
 	public URI resolve(URI uri) {
 		if (isOpaque() || uri.isAbsolute()) {
@@ -862,9 +858,7 @@ public class URI {
 	 * Normalize a URI by removing any "./" segments, and "path/../" segments.
 	 * 
 	 * @return a new URI instance with redundant segments removed.
-	 * @see http
-	 *      ://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%
-	 *      28%29
+         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html#normalize%28%29</a>
 	 */
 	public URI normalize() {
 		String thisPath = getPath();
