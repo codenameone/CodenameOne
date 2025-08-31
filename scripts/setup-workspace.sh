@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###
-# Prepare Codename One workspace by installing Maven, provisioning JDK 8 and JDK 17,
+# Prepare Codename One workspace by installing Maven, provisioning JDK 11 and JDK 17,
 # building core modules, and installing Maven archetypes.
 ###
 set -euo pipefail
@@ -10,8 +10,12 @@ log() {
 }
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TOOLS="$ROOT/tools"
-mkdir -p "$TOOLS"
+ENV_DIR="$ROOT/tools"
+mkdir -p "$ENV_DIR"
+
+# Place downloaded tools outside the repository so it isn't filled with binaries
+DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
+mkdir -p "$DOWNLOAD_DIR"
 
 JAVA_HOME="${JAVA_HOME:-}"
 JAVA_HOME_17="${JAVA_HOME_17:-}"
@@ -32,36 +36,36 @@ case "$arch_name" in
 esac
 
 # Determine platform-specific JDK download URLs
-arch_jdk8="$arch"
+arch_jdk11="$arch"
 if [ "$os" = "mac" ] && [ "$arch" = "aarch64" ]; then
-  arch_jdk8="x64"
+  arch_jdk11="x64"
 fi
-JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u462-b08/OpenJDK8U-jdk_${arch_jdk8}_${os}_hotspot_8u462b08.tar.gz"
+JDK11_URL="https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.28%2B6/OpenJDK11U-jdk_${arch_jdk11}_${os}_hotspot_11.0.28_6.tar.gz"
 JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
 MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"
 
 install_jdk() {
   local url="$1" dest_var="$2"
-  local tmp="$TOOLS/jdk.tgz"
+  local tmp="$DOWNLOAD_DIR/jdk.tgz"
   log "Downloading JDK from $url"
   curl -fL "$url" -o "$tmp"
   local top
   top=$(tar -tzf "$tmp" 2>/dev/null | head -1 | cut -d/ -f1 || true)
-  tar -xzf "$tmp" -C "$TOOLS"
+  tar -xzf "$tmp" -C "$DOWNLOAD_DIR"
   rm "$tmp"
-  local home="$TOOLS/$top"
+  local home="$DOWNLOAD_DIR/$top"
   if [ -d "$home/Contents/Home" ]; then
     home="$home/Contents/Home"
   fi
   eval "$dest_var=\"$home\""
 }
 
-log "Ensuring JDK 8 is available"
-if [ ! -x "${JAVA_HOME:-}/bin/java" ] || ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '1\.8\.0'; then
-  log "Provisioning JDK 8 (this may take a while)..."
-  install_jdk "$JDK8_URL" JAVA_HOME
+log "Ensuring JDK 11 is available"
+if [ ! -x "${JAVA_HOME:-}/bin/java" ] || ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
+  log "Provisioning JDK 11 (this may take a while)..."
+  install_jdk "$JDK11_URL" JAVA_HOME
 else
-  log "Using existing JDK 8 at $JAVA_HOME"
+  log "Using existing JDK 11 at $JAVA_HOME"
 fi
 
 log "Ensuring JDK 17 is available"
@@ -74,27 +78,27 @@ fi
 
 log "Ensuring Maven is available"
 if ! [ -x "${MAVEN_HOME:-}/bin/mvn" ]; then
-  tmp="$TOOLS/maven.tgz"
+  tmp="$DOWNLOAD_DIR/maven.tgz"
   log "Downloading Maven from $MAVEN_URL"
   curl -fL "$MAVEN_URL" -o "$tmp"
-  tar -xzf "$tmp" -C "$TOOLS"
+  tar -xzf "$tmp" -C "$DOWNLOAD_DIR"
   rm "$tmp"
-  MAVEN_HOME="$TOOLS/apache-maven-3.9.6"
+  MAVEN_HOME="$DOWNLOAD_DIR/apache-maven-3.9.6"
 else
   log "Using existing Maven at $MAVEN_HOME"
 fi
 
-log "Writing environment to $TOOLS/env.sh"
-cat > "$TOOLS/env.sh" <<ENV
+log "Writing environment to $ENV_DIR/env.sh"
+cat > "$ENV_DIR/env.sh" <<ENV
 export JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME_17="$JAVA_HOME_17"
 export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
 ENV
 
-source "$TOOLS/env.sh"
+source "$ENV_DIR/env.sh"
 
-log "JDK 8 version:"; "$JAVA_HOME/bin/java" -version
+log "JDK 11 version:"; "$JAVA_HOME/bin/java" -version
 log "JDK 17 version:"; "$JAVA_HOME_17/bin/java" -version
 log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
