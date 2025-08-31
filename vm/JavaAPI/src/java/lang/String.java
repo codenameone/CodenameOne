@@ -528,7 +528,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     public int lastIndexOf(String subString, int start) {
         int count = length();
         int subCount = subString.length();
-        if (subCount  &lt;= count && start >= 0) {
+        if (subCount <= count && start >= 0) {
             if (subCount > 0) {
                 if (start > count - subCount) {
                     start = count - subCount;
@@ -593,7 +593,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (thisStart < 0 || count - thisStart < length) {
             return false;
         }
-        if (length  &lt;= 0) {
+        if (length <= 0) {
             return true;
         }
         int o1 = offset + thisStart, o2 = string.offset + start;
@@ -646,7 +646,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     private char foldCase(char ch) {
         if (ch < 128) {
-            if ('A'  &lt;= ch && ch  &lt;= 'Z') {
+            if ('A' <= ch && ch <= 'Z') {
                 return (char) (ch + ('a' - 'A'));
             }
             return ch;
@@ -717,7 +717,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (start == 0) {
             return this;
         }
-        if (start >= 0 && start  &lt;= count) {
+        if (start >= 0 && start <= count) {
             //return new String(offset + start, count - start, value);
             return new String(value, offset + start, count - start);
         }
@@ -735,7 +735,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
         // NOTE last character not copied!
         // Fast range check.
-        if (start >= 0 && start  &lt;= end && end  &lt;= count) {
+        if (start >= 0 && start <= end && end <= count) {
             //return new String(offset + start, end - start, value);
             return new String(value, offset + start, end - start);
         }
@@ -803,10 +803,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     public java.lang.String trim(){
         int start = offset, last = offset + count - 1;
         int end = last;
-        while ((start  &lt;= end) &amp;&amp; (value[start]  &lt;= ' ')) {
+        while ((start <= end) && (value[start] <= ' ')) {
             start++;
         }
-        while ((end >= start) &amp;&amp; (value[end]  &lt;= ' ')) {
+        while ((end >= start) && (value[end] <= ' ')) {
             end--;
         }
         if (start == offset && end == last) {
