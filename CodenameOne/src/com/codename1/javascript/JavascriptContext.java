@@ -572,7 +572,7 @@ public class JavascriptContext  {
     /**
      * Calls the appropriate callback method given a URL that was received 
      * from the NavigationCallback.  It is set up to accept URLs of the 
-     * form cn1command:object.method?type1=value1&type2=value2&...&typen=valuen
+     * form cn1command:object.method?type1=value1&amp;type2=value2&amp;...&amp;typen=valuen
      * 
      * <p>This method parses the URL and converts all arguments (including the 
      * object and method) into their associated Java representations, then 

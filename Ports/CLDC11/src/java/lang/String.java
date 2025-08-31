@@ -257,8 +257,8 @@ public final class String implements CharSequence, Comparable<String> {
      * Returns the index within this string of the first occurrence of the specified character, starting the search at the specified index.
      * If a character with value ch occurs in the character sequence represented by this String object at an index no smaller than fromIndex, then the index of the first such occurrence is returned--that is, the smallest value k such that:
      * (this.charAt(
-     * ) == ch) && (
-     * >= fromIndex) is true. If no such character occurs in this string at or after position fromIndex, then -1 is returned.
+     * ) == ch) &amp;&amp; (
+     * &gt;= fromIndex) is true. If no such character occurs in this string at or after position fromIndex, then -1 is returned.
      * There is no restriction on the value of fromIndex. If it is negative, it has the same effect as if it were zero: this entire string may be searched. If it is greater than the length of this string, it has the same effect as if it were equal to the length of this string: -1 is returned.
      */
     public int indexOf(int ch, int fromIndex){
@@ -277,8 +277,8 @@ public final class String implements CharSequence, Comparable<String> {
     /**
      * Returns the index within this string of the first occurrence of the specified substring, starting at the specified index. The integer returned is the smallest value
      * such that: this.startsWith(str,
-     * ) && (
-     * >= fromIndex) is true.
+     * ) &amp;&amp; (
+     * &gt;= fromIndex) is true.
      * There is no restriction on the value of fromIndex. If it is negative, it has the same effect as if it were zero: this entire string may be searched. If it is greater than the length of this string, it has the same effect as if it were equal to the length of this string: -1 is returned.
      */
     public int indexOf(java.lang.String str, int fromIndex){
@@ -307,7 +307,7 @@ public final class String implements CharSequence, Comparable<String> {
 
     /**
      * Returns the index within this string of the last occurrence of the specified character, searching backward starting at the specified index. That is, the index returned is the largest value
-     * such that: (this.charAt(k) == ch) && (k <= fromIndex) is true.
+     * such that: (this.charAt(k) == ch) &amp;&amp; (k &lt;= fromIndex) is true.
      */
     public int lastIndexOf(int ch, int fromIndex){
         return 0; //TODO codavaj!!

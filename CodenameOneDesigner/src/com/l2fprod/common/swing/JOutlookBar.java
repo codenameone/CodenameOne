@@ -91,7 +91,7 @@ public class JOutlookBar extends JTabbedPane {
   }
 
   /**
-   * Notification from the <code>UIManager</code> that the L&F has
+   * Notification from the <code>UIManager</code> that the L&amp;F has
    * changed. Replaces the current UI object with the latest version
    * from the <code>UIManager</code>.
    * 
@@ -102,9 +102,9 @@ public class JOutlookBar extends JTabbedPane {
   }
 
   /**
-   * Sets the L&F object that renders this component.
+   * Sets the L&amp;F object that renders this component.
    * 
-   * @param ui the <code>OutlookBarUI</code> L&F object
+   * @param ui the <code>OutlookBarUI</code> L&amp;F object
    * @see javax.swing.UIDefaults#getUI
    * 
    * @beaninfo bound: true hidden: true description: The UI object
@@ -115,7 +115,7 @@ public class JOutlookBar extends JTabbedPane {
   }
 
   /**
-   * Returns the name of the L&F class that renders this component.
+   * Returns the name of the L&amp;F class that renders this component.
    * 
    * @return the string {@link #UI_CLASS_ID}
    * @see javax.swing.JComponent#getUIClassID

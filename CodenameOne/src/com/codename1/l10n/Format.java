@@ -25,7 +25,7 @@ package com.codename1.l10n;
 /**
  * An abstract class for parsing and formatting localisation sensitive information, compatible with JDK 6.
  * 
- * @see http://docs.oracle.com/javase/6/docs/api/java/text/Format.html
+ * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/Format.html">http://docs.oracle.com/javase/6/docs/api/java/text/Format.html</a>
  * @author Eric Coolman
  */
 public abstract class Format implements Cloneable {

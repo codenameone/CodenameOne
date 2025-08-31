@@ -50,7 +50,7 @@ public final class Math{
 
     /**
      * Returns the absolute value of a float value. If the argument is not negative, the argument is returned. If the argument is negative, the negation of the argument is returned. Special cases: If the argument is positive zero or negative zero, the result is positive zero. If the argument is infinite, the result is positive infinity. If the argument is NaN, the result is NaN. In other words, the result is equal to the value of the expression:
-     * Float.intBitsToFloat(0x7fffffff & Float.floatToIntBits(a))
+     * Float.intBitsToFloat(0x7fffffff &amp; Float.floatToIntBits(a))
      */
     public static float abs(float a){
         return 0.0f; //TODO codavaj!!

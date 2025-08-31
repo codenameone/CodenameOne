@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Pader-Sync Ltd. & Co. KG.  All Rights Reserved.
+ * Copyright 2009 Pader-Sync Ltd. &amp; Co. KG.  All Rights Reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it

@@ -45,7 +45,7 @@ package com.codename1.ui.layouts.mig;
  *
  * boolean isHor = (adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.RIGHT);
  *
- * if (adjacentComp.getComponentType(false) == ComponentWrapper.TYPE_LABEL && comp.getComponentType(false) == ComponentWrapper.TYPE_TEXT_FIELD)
+ * if (adjacentComp.getComponentType(false) == ComponentWrapper.TYPE_LABEL &amp;&amp; comp.getComponentType(false) == ComponentWrapper.TYPE_TEXT_FIELD)
  *    return isHor ? UNRELATED_Y : UNRELATED_Y;
  *
  * return (adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.RIGHT) ? RELATED_X : RELATED_Y;

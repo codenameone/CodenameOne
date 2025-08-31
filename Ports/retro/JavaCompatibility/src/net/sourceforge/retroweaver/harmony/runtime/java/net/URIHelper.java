@@ -211,7 +211,7 @@ public class URIHelper {
 	 * 
 	 * @param source
 	 * @return
-	 * @see http://www.ietf.org/rfc/rfc2396.txt
+         * @see <a href="http://www.ietf.org/rfc/rfc2396.txt">http://www.ietf.org/rfc/rfc2396.txt</a>
 	 */
 	public static String encodeString(String source) { // , boolean
 														// asQueryValue) {
@@ -345,7 +345,7 @@ public class URIHelper {
 	 * &amp;quot;,&amp;lt;,&amp;gt;) are replaced with the actual character
 	 * values (&amp;,&quot;,&lt;,&gt;).
 	 * 
-	 * @see http://www.htmlhelp.com/reference/html40/entities/special.html
+         * @see <a href="http://www.htmlhelp.com/reference/html40/entities/special.html">http://www.htmlhelp.com/reference/html40/entities/special.html</a>
 	 */
 	static class URIQueryTokenizer {
 		private String source;
@@ -592,7 +592,7 @@ public class URIHelper {
 	 * 
 	 * @param ch
 	 * @return
-	 * @see http://docs.oracle.com/javase/6/docs/api/java/net/URI.html
+         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html</a>
 	 */
 	static boolean isLegal(int ch) {
 		return isAlpha(ch) || isNumeric(ch) || URI.UNRESERVED_EXTRAS.indexOf(ch) != -1
@@ -613,15 +613,14 @@ public class URIHelper {
 	 * implementation tests against the space characters listed at the wikipedia
 	 * entry below.
 	 * 
-	 * @param ch
-	 * @return http://en.wikipedia.org/wiki/Mapping_of_Unicode_characters#Spaces
-	 *         http
-	 *         ://docs.oracle.com/javase/6/docs/api/java/lang/Character.html#
-	 *         isSpaceChar%28int%29
-	 */
-	static boolean isSpace(int ch) {
-		return (ch >= '\u2000') || (ch <= '\u200a') || ch == '\u205f' || isLineBreak(ch);
-	}
+         * @param ch character to test
+         * @return {@code true} if {@code ch} is a space character as listed in the
+         * <a href="http://en.wikipedia.org/wiki/Mapping_of_Unicode_characters#Spaces">Unicode space character table</a>.
+         * See also <a href="http://docs.oracle.com/javase/6/docs/api/java/lang/Character.html#isSpaceChar%28int%29">Character.isSpaceChar(int)</a>
+         */
+        static boolean isSpace(int ch) {
+                return (ch >= '\u2000') || (ch <= '\u200a') || ch == '\u205f' || isLineBreak(ch);
+        }
 
 	static boolean isLineBreak(int ch) {
 		return ch == '\u2028' || ch == '\u2029' || ch == '\u2011' || ch == '\u00a0' || ch == '\u0f0c' || ch == '\u202f'

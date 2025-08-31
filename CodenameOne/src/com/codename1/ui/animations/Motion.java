@@ -227,7 +227,7 @@ public class Motion {
     
     /**
      * Creates a linear motion starting from source value all the way to destination value for a color value.
-     * Unlike a regular linear motion a color linear motion is shifted based on channels where red, green & blue 
+     * Unlike a regular linear motion a color linear motion is shifted based on channels where red, green &amp; blue
      * get shifted separately.
      * 
      * @param sourceValue the color from which we are starting 

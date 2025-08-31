@@ -139,7 +139,7 @@ public class ByteArrayOutputStream extends OutputStream {
      * Returns the contents of this ByteArrayOutputStream as a string. Each byte
      * {@code b} in this stream is converted to a character {@code c} using the
      * following function:
-     * {@code c == (char)(((hibyte & 0xff) << 8) | (b & 0xff))}. This method is
+     * {@code c == (char)(((hibyte &amp; 0xff) << 8) | (b &amp; 0xff))}. This method is
      * deprecated and either {@link #toString()} or {@link #toString(String)}
      * should be used.
      *

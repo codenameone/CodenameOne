@@ -32,7 +32,7 @@ import java.util.Vector;
  * A class for parsing and formatting dates with a given pattern, compatible
  * with the Java 6 API.
  * 
- * @see http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html
+ * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html</a>
  * @author Eric Coolman
  * @deprecated this class has many issues in iOS and other platforms, please use the L10NManager
  */
@@ -543,8 +543,7 @@ public class SimpleDateFormat extends DateFormat {
 	 *            error reporting.
 	 * @return full year.
 	 * @throws ParseException if the source could not be parsed.
-	 * @see http 
-	 *      ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html</a>
 	 */
 	int parseHour(String source, char patternChar, int offset) throws ParseException {
 		int min = (patternChar == HOUR_1_LETTER || patternChar == HOUR12_1_LETTER) ? 1 : 0;
@@ -677,8 +676,7 @@ public class SimpleDateFormat extends DateFormat {
 	 *            error reporting.
 	 * @return full year.
 	 * @throws ParseException if the source could not be parsed.
-	 * @see http 
-	 *      ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+         * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html</a>
 	 */
 	int parseYear(String source, String token, int ofs) throws ParseException {
 		int year = parseNumber(source, ofs, "year", -1, -1);

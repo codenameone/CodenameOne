@@ -1461,7 +1461,7 @@ public class RE {
      * resulting String returned by subst would be "-foo-garply-wacky-".
      * <p>
      * It is also possible to reference the contents of a parenthesized expression
-     * with $0, $1, ... $9. A regular expression of "http://[\\.\\w\\-\\?/~_@&=%]+",
+     * with $0, $1, ... $9. A regular expression of "http://[\\.\\w\\-\\?/~_@&amp;=%]+",
      * a String to substituteIn of "visit us: http://www.apache.org!" and the
      * substitution String "&lt;a href=\"$0\"&gt;$0&lt;/a&gt;", the resulting String
      * returned by subst would be
