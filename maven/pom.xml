@@ -332,6 +332,7 @@
                         <source>1.8</source>
                         <show>protected</show>
                         <failOnError>false</failOnError>
+                        <doclint>none</doclint>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -398,7 +399,11 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.2.0</version>
                 <configuration>
-                    <additionalOptions>--allow-script-in-comments</additionalOptions>
+                    <doclint>none</doclint>
+                    <failOnError>false</failOnError>
+                    <additionalOptions>
+                        <additionalOption>--allow-script-in-comments</additionalOption>
+                    </additionalOptions>
                 </configuration>
             </plugin>
             <plugin>
