@@ -726,7 +726,7 @@ public final class BidiFormatter {
 
         /**
          * Returns the Character.DIRECTIONALITY_... value of the next codepoint and advances
-         * charIndex. If isHtml, and the codepoint is '<' or '&', advances through the tag/entity,
+         * charIndex. If isHtml, and the codepoint is '<' or '&amp;', advances through the tag/entity,
          * and returns Character.DIRECTIONALITY_WHITESPACE. For an entity, it would be best to
          * figure out the actual character, and return its dirtype, but treating it as whitespace is
          * good enough for our purposes.

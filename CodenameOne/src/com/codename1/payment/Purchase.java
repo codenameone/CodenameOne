@@ -46,7 +46,7 @@ import java.util.Map;
  * <p>In-app-purchase API's rely on managed server based products, other payment systems
  * use the manual approach. An application dealing with virtual goods must support both 
  * since not all devices feature in-app-purchase API's. An application dealing with physical
- * goods & services must use the latter according to the TOS of current in-app-purchase
+ * goods &amp; services must use the latter according to the TOS of current in-app-purchase
  * solutions.
  *
  * @author Shai Almog

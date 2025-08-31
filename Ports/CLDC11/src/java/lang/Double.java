@@ -161,7 +161,7 @@ public final class Double extends Number implements Comparable<Double> {
      * If the argument is 0xfff0000000000000L, the result is negative infinity.
      * If the argument is any value in the range 0x7ff0000000000001L through 0x7fffffffffffffffL or in the range 0xfff0000000000001L through 0xffffffffffffffffL, the result is NaN. All IEEE 754 NaN values of type double are, in effect, lumped together by the Java programming language into a single value called NaN.
      * In all other cases, let s, e, and m be three values that can be computed from the argument:
-     * int s = ((bits >> 63) == 0) ? 1 : -1; int e = (int)((bits >> 52) & 0x7ffL); long m = (e == 0) ? (bits & 0xfffffffffffffL) << 1 : (bits & 0xfffffffffffffL) | 0x10000000000000L; Then the floating-point result equals the value of the mathematical expression
+     * int s = ((bits >> 63) == 0) ? 1 : -1; int e = (int)((bits >> 52) &amp; 0x7ffL); long m = (e == 0) ? (bits &amp; 0xfffffffffffffL) << 1 : (bits &amp; 0xfffffffffffffL) | 0x10000000000000L; Then the floating-point result equals the value of the mathematical expression
      * 2e-1075.
      */
     public static double longBitsToDouble(long bits){

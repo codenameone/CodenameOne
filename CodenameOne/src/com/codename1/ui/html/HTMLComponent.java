@@ -464,7 +464,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
 
     /**
      * Adds the given symbol and code to the user defined char entities table.
-     * Symbols do not need to include leading & and trailing ; - these will be trimmed if given as the symbol
+     * Symbols do not need to include leading &amp; and trailing ; - these will be trimmed if given as the symbol
      *
      * @param symbol The symbol to add
      * @param code The symbol's code

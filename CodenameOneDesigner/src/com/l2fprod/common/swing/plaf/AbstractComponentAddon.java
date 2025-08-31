@@ -191,14 +191,14 @@ public abstract class AbstractComponentAddon implements ComponentAddon {
   }
 
   /**
-   * @return true if the current look and feel is one of JGoodies Plastic l&fs
+   * @return true if the current look and feel is one of JGoodies Plastic l&amp;fs
    */
   protected boolean isPlastic() {
     return UIManager.getLookAndFeel().getClass().getName().indexOf("Plastic") != -1;
   }
 
   /**
-   * @return true if the current look and feel is Synth l&f
+   * @return true if the current look and feel is Synth l&amp;f
    */
   protected boolean isSynth() {
     return UIManager.getLookAndFeel().getClass().getName().indexOf("ynth") != -1;    

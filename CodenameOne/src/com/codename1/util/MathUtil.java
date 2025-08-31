@@ -17,19 +17,19 @@ package com.codename1.util;
  *
  * @author kmashint
  *
- * @see http://www.netlib.org/fdlibm/readme
+ * @see <a href="http://www.netlib.org/fdlibm/readme">http://www.netlib.org/fdlibm/readme</a>
  *    For the Freely Distributable C-library conforming to IEEE-754 floating point math.
- * @see http://web.mit.edu/source/third/gcc/libjava/java/lang/
+ * @see <a href="http://web.mit.edu/source/third/gcc/libjava/java/lang/">http://web.mit.edu/source/third/gcc/libjava/java/lang/</a>
  *    For the GNU C variant of the same IEEE-754 routines.
- * @see http://www.dclausen.net/projects/microfloat/
+ * @see <a href="http://www.dclausen.net/projects/microfloat/">http://www.dclausen.net/projects/microfloat/</a>
  *    Another take on the IEEE-754 routines.
- * @see http://real-java.sourceforge.net/Real.html
+ * @see <a href="http://real-java.sourceforge.net/Real.html">http://real-java.sourceforge.net/Real.html</a>
  *    Yet another take on the IEEE-754 routines.
- * @see http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html
+ * @see <a href="http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html">http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html</a>
  *    For other approximations.
- * @see http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/
+ * @see <a href="http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/">http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/</a>
  *    For fast but rough approximations.
- * @see http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/
+ * @see <a href="http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/">http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/</a>
  *    For more fast but rough approximations.
  */
 public abstract class MathUtil {

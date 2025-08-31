@@ -80,8 +80,8 @@ public class HTMLUtils {
      * Converts an XML char entity to the matching character or string.
      * This is a convenience method that uses convertCharEntity with false for lookupHTMLentities and a null userDefinedCharEntities
      *
-     * @param charEntity The char entity to convert (Not including the & and ;)
-     * @return A string containing a single char, or the original char entity string (with & and ;) if the char entity couldn't be resolved
+     * @param charEntity The char entity to convert (Not including the &amp; and ;)
+     * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
      */
     public static String convertXMLCharEntity(String charEntity) {
         return convertCharEntity(charEntity, false, null);
@@ -91,8 +91,8 @@ public class HTMLUtils {
      * Converts an HTML char entity to the matching character or string.
      * This is a convenience method that uses convertCharEntity with true for lookupHTMLentities and a null userDefinedCharEntities
      *
-     * @param charEntity The char entity to convert (Not including the & and ;)
-     * @return A string containing a single char, or the original char entity string (with & and ;) if the char entity couldn't be resolved
+     * @param charEntity The char entity to convert (Not including the &amp; and ;)
+     * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
      */
     public static String convertHTMLCharEntity(String charEntity) {
         return convertCharEntity(charEntity, true, null);
@@ -103,10 +103,10 @@ public class HTMLUtils {
      * Converts a char entity to the matching character or string.
      * This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
      *
-     * @param charEntity The char entity to convert (Not including the & and ;)
+     * @param charEntity The char entity to convert (Not including the &amp; and ;)
       * @param lookupHTMLentities true to include the basic HTML named char entities (unicode 160-255), false otherwise
       * @param userDefinedCharEntities A hashtable containing (String,int) dentoing the char entity name and its unicode
-     * @return A string containing a single char, or the original char entity string (with & and ;) if the char entity couldn't be resolved
+     * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
       */
     public static String convertCharEntity(String charEntity,boolean lookupHTMLentities,Hashtable userDefinedCharEntities) {
         int charCode=-1;
