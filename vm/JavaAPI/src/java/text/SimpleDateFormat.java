@@ -315,7 +315,7 @@ public class SimpleDateFormat extends DateFormat {
 					if (names == null) {
 						toAppendTo.append(calendar.getTimeZone().getID());
 					} else {
-						toAppendTo.append(names[DateFormatSymbols.ZONE_SHORTNAME]);
+						toAppendTo.append(names[2 /*DateFormatSymbols.ZONE_SHORTNAME */]);
 					}
 					break;
 				case TIMEZONE822_LETTER :
@@ -398,7 +398,7 @@ public class SimpleDateFormat extends DateFormat {
 
 	private String[] getTimeZoneDisplayNames(String id) {
 		for (String zoneStrings[] : getDateFormatSymbols().getZoneStrings()) {
-			if (zoneStrings[DateFormatSymbols.ZONE_ID].equalsIgnoreCase(id)) {
+			if (zoneStrings[0 /*DateFormatSymbols.ZONE_ID*/].equalsIgnoreCase(id)) {
 				return zoneStrings;
 			}
 		}
@@ -926,7 +926,7 @@ public class SimpleDateFormat extends DateFormat {
 		for (String timezone[] : getDateFormatSymbols().getZoneStrings()) {
 			for (String z : timezone) {
 				if (z.equalsIgnoreCase(source)) {
-					TimeZone tz = TimeZone.getTimeZone(timezone[DateFormatSymbols.ZONE_ID]);
+					TimeZone tz = TimeZone.getTimeZone(timezone[0 /*DateFormatSymbols.ZONE_ID*/]);
 					return -(tz.getRawOffset() / MILLIS_TO_MINUTES);
 				}
 			}

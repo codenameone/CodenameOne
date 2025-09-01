@@ -192,13 +192,19 @@ public class ByteArrayOutputStream extends OutputStream {
      */
     @Override
     public synchronized void write(byte[] buffer, int offset, int len) {
-        Arrays.checkOffsetAndCount(buffer.length, offset, len);
+        checkOffsetAndCount(buffer.length, offset, len);
         if (len == 0) {
             return;
         }
         expand(len);
         System.arraycopy(buffer, offset, buf, this.count, len);
         this.count += len;
+    }
+
+    static void checkOffsetAndCount(int arrayLength, int offset, int count) {
+        if ((offset | count) < 0 || offset > arrayLength || arrayLength - offset < count) {
+            throw new ArrayIndexOutOfBoundsException(offset);
+        }
     }
 
     /**
