@@ -1,0 +1,30 @@
+---
+name: Test Android build scripts
+
+'on':
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'BUILDING.md'
+  push:
+    branches:
+      - master
+    paths:
+      - 'scripts/**'
+      - 'BUILDING.md'
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build Android port
+        run: |
+          source tools/env.sh
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          echo "JAVA_HOME_17=$JAVA_HOME_17"
+          "$JAVA_HOME_17/bin/java" -version
+          ./scripts/build-android-port.sh -q -DskipTests

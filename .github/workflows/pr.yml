@@ -1,12 +1,18 @@
 name: PR CI
 
-on:   
+on:
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - 'scripts/**'
+      - '**/*.md'
   push:
     branches:
       - master
+    paths-ignore:
+      - 'scripts/**'
+      - '**/*.md'
 
 jobs:
   build-linux-jdk8-fx:
