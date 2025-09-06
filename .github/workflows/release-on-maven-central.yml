@@ -25,6 +25,9 @@ jobs:
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "github-actions@codenameone.com"
 
+      - name: Check Maven Version
+        run: mvn -v
+
       - name: Deploy with Maven
         run: |
           cat $HOME/.m2/settings.xml
