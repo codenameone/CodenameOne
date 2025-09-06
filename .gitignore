@@ -70,3 +70,4 @@ pom.xml.versionsBackup
 pom.xml.releaseBackup
 pom.xml.tag
 !maven/**/*.zip
+**/.flattened-pom.xml
