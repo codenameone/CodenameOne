@@ -34,12 +34,12 @@ jobs:
           cd maven
           bash update-version.sh "$GITHUB_REF_NAME"
           export GPG_TTY=$(tty)
-          xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE
+          xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE -Plocal-dev-javase
           cd ..
           git clone https://github.com/shannah/cn1-maven-archetypes
           cd cn1-maven-archetypes
           bash update-version.sh "$GITHUB_REF_NAME"
-          xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE
+          xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE -Plocal-dev-javase
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

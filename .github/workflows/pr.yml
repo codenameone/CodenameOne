@@ -30,7 +30,7 @@ jobs:
     - name: Run Unit Tests
       run: |
         cd maven
-        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true
+        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase
         cd ..
     - name: Install dependencies
       run: |
