@@ -53,7 +53,10 @@
         <profile>
             <id>local-dev-javase</id>
             <activation>
-                <activeByDefault>true</activeByDefault>
+                <property>
+                    <name>codename1.platform</name>
+                    <value>javase</value>
+                </property>
             </activation>
             <dependencies>
                 <dependency>

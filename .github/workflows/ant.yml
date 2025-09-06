@@ -22,7 +22,7 @@ jobs:
     - name: Build with Maven
       run: |
         cd maven
-        xvfb-run -a mvn install
+        xvfb-run -a mvn install -Plocal-dev-javase
       
 
     - name: Fetch archetype projects
@@ -34,8 +34,8 @@ jobs:
       run: |
         unzip cn1-maven-archetypes.zip
         cd cn1-maven-archetypes-master
-        xvfb-run -a mvn install archetype:update-local-catalog
-        xvfb-run -a mvn archetype:crawl
+        xvfb-run -a mvn install archetype:update-local-catalog -Plocal-dev-javase
+        xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
     - name: Run Maven Unit Tests
       run: |
         pwd

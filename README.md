@@ -185,8 +185,10 @@ The setup is covered in depth in [this article and video](https://www.codenameon
 ~~~~
 git clone https://github.com/codenameone/CodenameOne
 cd CodenameOne/maven
-mvn install
+mvn install -Plocal-dev-javase
 ~~~~
+
+NOTE: The `-Plocal-dev-javase` profile is necessary for building the javase port.  Without it, you'll get build errors.
 
 This will build and install Codename One in your local Maven repository. This process can take a while since it automatically downloads dependencies with a size of ~1GB.  
 
@@ -196,7 +198,7 @@ To build the archetype projects from source, you should check out the [cn1-maven
 ~~~~
 git clone https://github.com/shannah/cn1-maven-archetypes
 cd cn1-maven-archetypes
-mvn install
+mvn install -Plocal-dev-javase
 ~~~~  
 
 
@@ -204,7 +206,7 @@ Now that Codename One is installed in your local Maven repository, you can use t
 A new testing project can be quickly generated with the [Codename One initializr](https://start.codenameone.com).
 
 After downloading and extracting the project, open its pom.xml file and and look for the `<cn1.version>` and `<cn1.plugin.version>` properties.
-Then change these to point to the version that got installed into your *local* maven repository by `mvn install`. The locally built version will usually be a SNAPSHOT version (e.g. 7.0.21-SNAPSHOT).
+Then change these to point to the version that got installed into your *local* maven repository by `mvn install -Plocal-dev-javase`. The locally built version will usually be a SNAPSHOT version (e.g. 7.0.21-SNAPSHOT).
 
 
 ### Quick Start with Ant
