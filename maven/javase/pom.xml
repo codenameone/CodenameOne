@@ -53,9 +53,7 @@
         <profile>
             <id>local-dev-javase</id>
             <activation>
-                <file>
-                    <exists>${cn1.build.client.path}</exists>
-                </file>
+                <activeByDefault>true</activeByDefault>
             </activation>
             <dependencies>
                 <dependency>
