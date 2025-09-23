@@ -113,7 +113,7 @@ public class GoogleImpl extends GoogleConnect implements
                         String displayName = acct.getDisplayName();
                         String acctId = acct.getId();
                         String email = acct.getEmail();
-                        String requestIdToken = acct.getIdToken();
+                        final String requestIdToken = acct.getIdToken();
                         Set<Scope> grantedScopes = acct.getGrantedScopes();
                         String code = acct.getServerAuthCode();
                         String scopeStr = scope;
