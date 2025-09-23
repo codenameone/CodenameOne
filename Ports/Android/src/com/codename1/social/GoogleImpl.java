@@ -133,7 +133,14 @@ public class GoogleImpl extends GoogleConnect implements
                                 protected void readResponse(InputStream input) throws IOException {
                                     Map<String, Object> json = new JSONParser().parseJSON(new InputStreamReader(input, "UTF-8"));
                                     if (json.containsKey("access_token")) {
-                                        setAccessToken(new AccessToken((String) json.get("access_token"), (String)null));
+                                        String accessToken = (String) json.get("access_token");
+                                        String expiresIn = json.containsKey("expires_in") ? String.valueOf(json.get("expires_in")) : null;
+                                        String refreshToken = json.containsKey("refresh_token") ? (String) json.get("refresh_token") : null;
+                                        String idToken = json.containsKey("id_token") ? (String) json.get("id_token") : requestIdToken;
+
+                                        // Use the constructor that includes all token fields
+                                        setAccessToken(new AccessToken(accessToken, expiresIn, refreshToken, idToken));
+
                                         Display.getInstance().callSerially(new Runnable() {
 
                                             @Override
@@ -142,7 +149,9 @@ public class GoogleImpl extends GoogleConnect implements
                                             }
                                         });
                                     } else {
-                                        setAccessToken(new AccessToken());
+                                        // Even if we don't get an access token from the server, we can still set the ID token
+                                        // that we received from the initial Google Sign-In
+                                        setAccessToken(new AccessToken(null, null, null, requestIdToken));
                                         Log.p("Failed to retrieve the access token from the google auth server.  Login succeeded, but access token is null, so you won't be able to use it to retrieve additional information.");
                                         Log.p("Response was " + json);
                                         Display.getInstance().callSerially(new Runnable() {
@@ -168,7 +177,8 @@ public class GoogleImpl extends GoogleConnect implements
                             req.setReadResponseForErrors(true);
                             NetworkManager.getInstance().addToQueue(req);
                         } else {
-                            setAccessToken(new AccessToken());
+                            // Even without clientId and clientSecret, we should still preserve the ID token from the initial sign-in
+                            setAccessToken(new AccessToken(null, null, null, requestIdToken));
                             Log.p("The access token was set to null because one of clientId, clientSecret, requestIdToken, or auth were null");
                             Log.p("The login succeeded, but you won't be able to make any requests to Google's REST apis using the login token.");
                             Log.p("In order to obtain a token that can be used with Google's REST APIs, you need to set the clientId, and clientSecret of" +
