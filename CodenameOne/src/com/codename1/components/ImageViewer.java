@@ -813,17 +813,12 @@ public class ImageViewer extends Component {
             }
 
             g.drawImage(image,
-                    (imageDrawWidth <= getInnerWidth()) ? getX() + imageX : Math.max(
-                            Math.min( //
-                                    getX(),
-                                    getX() + imageX
-                            ),
-                            getX() - imageDrawWidth + getInnerWidth()),
-                    (imageDrawHeight <= getInnerHeight()) ? getY() + imageY : Math.max(
-                            Math.min(
-                                    getY(), getY() + imageY
-                            ), getY() - imageDrawHeight + getInnerHeight()
-                    ),
+                    (imageDrawWidth <= getInnerWidth()) ? getX() + imageX : getX() + Math.max(
+                            Math.min(0, imageX),
+                            -imageDrawWidth + getInnerWidth()),
+                    (imageDrawHeight <= getInnerHeight()) ? getY() + imageY : getY() + Math.max(
+                            Math.min(0, imageY),
+                            -imageDrawHeight + getInnerHeight()),
                     imageDrawWidth, imageDrawHeight);
 
 
