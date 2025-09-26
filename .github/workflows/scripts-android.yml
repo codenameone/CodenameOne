@@ -9,9 +9,8 @@ name: Test Android build scripts
   push:
     branches:
       - master
-    paths:
-      - 'scripts/**'
-      - 'BUILDING.md'
+    paths-ignore:
+      - '**/*.md'
 
 jobs:
   build-android:

@@ -9,13 +9,11 @@ log() {
   echo "[setup-workspace] $1"
 }
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ENV_DIR="$ROOT/tools"
-mkdir -p "$ENV_DIR"
-
 # Place downloaded tools outside the repository so it isn't filled with binaries
 DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
 mkdir -p "$DOWNLOAD_DIR"
+ENV_DIR="$DOWNLOAD_DIR/tools"
+mkdir -p "$ENV_DIR"
 
 JAVA_HOME="${JAVA_HOME:-}"
 JAVA_HOME_17="${JAVA_HOME_17:-}"

@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 # Build Codename One Android port using JDK 11 for Maven and JDK 17 for compilation
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
+ENV_DIR="$DOWNLOAD_DIR/tools"
 
-if [ -f "$ROOT/tools/env.sh" ]; then
-  source "$ROOT/tools/env.sh"
+if [ -f "$ENV_DIR/env.sh" ]; then
+  source "$ENV_DIR/env.sh"
 else
   ./scripts/setup-workspace.sh -q -DskipTests
-  source "$ROOT/tools/env.sh"
+  source "$ENV_DIR/env.sh"
 fi
 
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
-  ./scripts/setup-workspace.sh -q -DskipTests
-  source "$ROOT/tools/env.sh"
-fi
 if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
   echo "Failed to provision JDK 11" >&2
   exit 1
