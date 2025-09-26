@@ -20,8 +20,4 @@ jobs:
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build iOS port
-        run: |
-          source tools/env.sh
-          echo "JAVA_HOME=$JAVA_HOME"
-          java -version
-          ./scripts/build-ios-port.sh -q -DskipTests
+        run: ./scripts/build-ios-port.sh -q -DskipTests
