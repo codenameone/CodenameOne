@@ -550,6 +550,80 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utv.text = [NSString stringWithUTF8String:str];
             utv.delegate = [[CodenameOne_GLViewController instance] eaglView];
             
+            // Apply constraints for multiline text view
+            // INITIAL_CAPS_WORD
+            if((constraint & 0x100000) == 0x100000) {
+                utv.autocapitalizationType = UITextAutocapitalizationTypeWords;
+            } else {
+                // INITIAL_CAPS_SENTENCE
+                if((constraint & 0x200000) == 0x200000) {
+                    utv.autocapitalizationType = UITextAutocapitalizationTypeSentences;
+                } else {
+                    // UPPERCASE
+                    if((constraint & 0x800000) == 0x800000) {
+                        utv.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+                    } else {
+                        utv.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                    }
+                }
+            }
+            
+            // NON_PREDICTIVE
+            if((constraint & 0x80000) == 0x80000) {
+                utv.autocorrectionType = UITextAutocorrectionTypeNo;
+            }
+            
+            // PASSWORD (Note: multiline password fields are uncommon, but supported)
+            if((constraint & 0x10000) == 0x10000) {
+                utv.secureTextEntry = YES;
+                if (@available(iOS 11, *)) {
+                    utv.textContentType = UITextContentTypePassword;
+                }
+            }
+            
+            if ((constraint & 0x400000) == 0x400000) {
+                if (@available(iOS 11, *)) {
+                    utv.textContentType = UITextContentTypeUsername;
+                }
+            }
+            
+            // EMAILADDR and other keyboard types (these apply even to multiline)
+            int cccc = constraint & 0xff;
+            if(cccc == 1) {
+                utv.keyboardType = UIKeyboardTypeEmailAddress;
+                utv.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                if (@available(iOS 10, *)) {
+                    utv.textContentType = UITextContentTypeEmailAddress;
+                }
+            } else {
+                // NUMERIC
+                if(cccc == 2) {
+                    utv.keyboardType = UIKeyboardTypeNumberPad;
+                } else {
+                    // PHONENUMBER
+                    if(cccc == 3) {
+                        utv.keyboardType = UIKeyboardTypePhonePad;
+                        if (@available(iOS 10, *)) {
+                            utv.textContentType = UITextContentTypeTelephoneNumber;
+                        }
+                    } else {
+                        // URL
+                        if(cccc == 4) {
+                            utv.keyboardType = UIKeyboardTypeURL;
+                            utv.autocapitalizationType = UITextAutocapitalizationTypeNone;
+                            if (@available(iOS 10, *)) {
+                                utv.textContentType = UITextContentTypeURL;
+                            }
+                        } else {
+                            // DECIMAL
+                            if(cccc == 5) {
+                                utv.keyboardType = UIKeyboardTypeDecimalPad;
+                            }
+                        }
+                    }
+                }
+            }
+            
             if(showToolbar) {
                 //add navigation toolbar to the top of the keyboard
 #ifndef CN1_USE_ARC
