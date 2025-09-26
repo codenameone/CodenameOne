@@ -2,10 +2,13 @@
 # Build Codename One Android port using JDK 11 for Maven and JDK 17 for compilation
 set -euo pipefail
 
-# Normalize TMPDIR so it has no trailing slash
+# Normalize TMPDIR and compose paths without duplicate slashes
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
-DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
+
+# Place downloaded tools outside the repository so it isn't filled with binaries
+# Strip any trailing slash again at the join to be extra safe.
+DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 
 if [ -f "$ENV_DIR/env.sh" ]; then
