@@ -21,7 +21,7 @@ mkdir -p "$DOWNLOAD_DIR"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$ENV_DIR"
 mkdir -p ../cn1-binaries
-CN1_BINARIES="$(cd ./cn1-binaries && pwd -P)"
+CN1_BINARIES="$(cd ../cn1-binaries && pwd -P)"
 rm -Rf ../cn1-binaries
 
 mkdir -p ~/.codenameone
