@@ -36,7 +36,7 @@ jobs:
     - name: Run Unit Tests
       run: |
         cd maven
-        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true
+        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase
         cd ..
     - name: Install dependencies
       run: |
@@ -59,8 +59,8 @@ jobs:
         mkdir -p build/tempJavaSources
         mkdir -p dist
         mkdir -p dist/javadoc
-        wget https://github.com/codenameone/JavaDocSourceEmbed/releases/download/refs%2Fheads%2Fmaster/JavaDocSourceEmbed-1.0-SNAPSHOT.jar
-        java -jar JavaDocSourceEmbed-1.0-SNAPSHOT.jar src build/tempJavaSources
+        # Skip JavaDocSourceEmbed due to gist access issues in CI
+        cp -r src/* build/tempJavaSources/
         find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d dist/javadoc -windowtitle "Codename One API" || true
         cd dist/javadoc
         zip -r ../../javadocs.zip *

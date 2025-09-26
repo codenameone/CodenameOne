@@ -8013,10 +8013,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 null,
                 null
         );
-        cursor.moveToFirst();
-        int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-        String filePath = cursor.getString(columnIndex);
-        cursor.close();
+        // Some gallery providers may return an empty cursor on modern Android builds.
+        String filePath = null;
+        if (cursor != null) {
+            try {
+                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+                if (columnIndex >= 0 && cursor.moveToFirst()) {
+                    filePath = cursor.getString(columnIndex);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
 
         if (filePath == null || "content".equals(scheme)) {
             //if the file is not on the filesystem download it and save it
@@ -8162,16 +8170,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String[] filePathColumn = {MediaStore.Images.Media.DATA};
                 Cursor cursor = getContext().getContentResolver().query(selectedImage, filePathColumn, null, null, null);
 
-                // this happens on Android devices, not exactly sure what the use case is
-                if(cursor == null) {
-                    callback.fireActionEvent(null);
-                    return;
+                // Some gallery providers may return an empty cursor on modern Android builds.
+                String filePath = null;
+                if (cursor != null) {
+                    try {
+                        int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+                        if (columnIndex >= 0 && cursor.moveToFirst()) {
+                            filePath = cursor.getString(columnIndex);
+                        }
+                    } finally {
+                        cursor.close();
+                    }
                 }
-
-                cursor.moveToFirst();
-                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-                String filePath = cursor.getString(columnIndex);
-                cursor.close();
                 boolean fileExists = false;
                 if (filePath != null) {
                     File file = new File(filePath);
@@ -8202,6 +8212,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
+                }
+
+                if (filePath == null) {
+                    callback.fireActionEvent(null);
+                    return;
                 }
 
                 callback.fireActionEvent(new ActionEvent(new String[]{filePath}));
@@ -8214,16 +8229,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 String[] filePathColumn = {MediaStore.Images.Media.DATA};
                 Cursor cursor = getContext().getContentResolver().query(selectedImage, filePathColumn, null, null, null);
 
-                // this happens on Android devices, not exactly sure what the use case is
-                if(cursor == null) {
-                    callback.fireActionEvent(null);
-                    return;
+                // Some gallery providers may return an empty cursor on modern Android builds.
+                String filePath = null;
+                if (cursor != null) {
+                    try {
+                        int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+                        if (columnIndex >= 0 && cursor.moveToFirst()) {
+                            filePath = cursor.getString(columnIndex);
+                        }
+                    } finally {
+                        cursor.close();
+                    }
                 }
-
-                cursor.moveToFirst();
-                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-                String filePath = cursor.getString(columnIndex);
-                cursor.close();
                 boolean fileExists = false;
                 if (filePath != null) {
                     File file = new File(filePath);
@@ -8254,6 +8271,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
+                }
+
+                if (filePath == null) {
+                    callback.fireActionEvent(null);
+                    return;
                 }
 
                 callback.fireActionEvent(new ActionEvent(filePath));
