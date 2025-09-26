@@ -19,8 +19,7 @@ DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 mkdir -p "$DOWNLOAD_DIR"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$ENV_DIR"
-CN1_BINARIES="$ENV_DIR/cn1-binaries"
-mkdir -p "$CN1_BINARIES/javase"
+CN1_BINARIES="../cn1-binaries"
 
 # Reuse previously saved environment if present (so we can skip downloads)
 if [ -f "$ENV_DIR/env.sh" ]; then
@@ -157,12 +156,12 @@ rm -Rf "$CN1_BINARIES"
 git clone https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
 
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -Dcn1.binaries="$CN1_BINARIES" -f maven/pom.xml -DskipTests -Djava.awt.headless=true install "$@"
+"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true install "$@"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"
 if [ ! -f "$BUILD_CLIENT" ]; then
-  if ! "$MAVEN_HOME/bin/mvn" -Dcn1.binaries="$CN1_BINARIES" -f maven/pom.xml cn1:install-codenameone "$@"; then
+  if ! "$MAVEN_HOME/bin/mvn" -f maven/pom.xml cn1:install-codenameone "$@"; then
     log "Falling back to copying CodeNameOneBuildClient.jar"
     mkdir -p "$(dirname "$BUILD_CLIENT")"
     cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT" || true
@@ -188,6 +187,6 @@ fi
 set -e
 
 if [ "${skip_archetypes:-0}" -eq 0 ]; then
-  (cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -Dcn1.binaries="$CN1_BINARIES" -DskipTests -DskipITs=true -Dinvoker.skip=true install) || \
+  (cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -DskipTests -DskipITs=true -Dinvoker.skip=true install) || \
     log "Archetype mvn install failed; continuing."
 fi
