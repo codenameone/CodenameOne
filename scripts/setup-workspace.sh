@@ -2,6 +2,7 @@
 ###
 # Prepare Codename One workspace by installing Maven, provisioning JDK 8, 11 and 17,
 # building core modules, and installing Maven archetypes.
+# IMPORTANT: Run this script from the project root!
 ###
 set -euo pipefail
 [ "${DEBUG:-0}" = "1" ] && set -x
@@ -19,7 +20,12 @@ DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 mkdir -p "$DOWNLOAD_DIR"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$ENV_DIR"
-CN1_BINARIES="../cn1-binaries"
+mkdir -p ../cn1-binaries
+CN1_BINARIES="$(cd ./cn1-binaries && pwd -P)"
+rm -Rf ../cn1-binaries
+
+mkdir -p ~/.codenameone
+cp maven/CodeNameOneBuildClient.jar ~/.codenameone
 
 # Reuse previously saved environment if present (so we can skip downloads)
 if [ -f "$ENV_DIR/env.sh" ]; then
