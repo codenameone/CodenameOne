@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Build Codename One Android port using JDK 11 for Maven and JDK 17 for compilation
 set -euo pipefail
+
+# Normalize TMPDIR so it has no trailing slash
+TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 
@@ -11,7 +14,7 @@ else
   source "$ENV_DIR/env.sh"
 fi
 
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
+if ! "${JAVA_HOME_11:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
   echo "Failed to provision JDK 11" >&2
   exit 1
 fi

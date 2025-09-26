@@ -9,22 +9,19 @@ if ! command -v xcodebuild >/dev/null; then
   echo "Xcode command-line tools not found." >&2
   exit 1
 fi
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
-if [ -f "$ROOT/tools/env.sh" ]; then
-  source "$ROOT/tools/env.sh"
+
+# Normalize TMPDIR so it has no trailing slash
+TMPDIR="${TMPDIR%/}"
+DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
+ENV_DIR="$DOWNLOAD_DIR/tools"
+
+if [ -f "$ENV_DIR/env.sh" ]; then
+  source "$ENV_DIR/env.sh"
 else
   ./scripts/setup-workspace.sh -q -DskipTests
-  source "$ROOT/tools/env.sh"
+  source "$ENV_DIR/env.sh"
 fi
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
-  ./scripts/setup-workspace.sh -q -DskipTests
-  source "$ROOT/tools/env.sh"
-fi
-if ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
-  echo "Failed to provision JDK 11" >&2
-  exit 1
-fi
+
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 "$JAVA_HOME/bin/java" -version
 "$MAVEN_HOME/bin/mvn" -version
