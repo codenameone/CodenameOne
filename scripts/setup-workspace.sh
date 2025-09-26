@@ -10,9 +10,10 @@ log() {
 }
 
 # Normalize TMPDIR so it has no trailing slash
-# Place downloaded tools outside the repository so it isn't filled with binaries
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
+
+# Place downloaded tools outside the repository so it isn't filled with binaries
 DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 mkdir -p "$DOWNLOAD_DIR"
 ENV_DIR="$DOWNLOAD_DIR/tools"
@@ -25,6 +26,7 @@ if [ -f "$ENV_DIR/env.sh" ]; then
 fi
 
 JAVA_HOME="${JAVA_HOME:-}"
+JAVA_HOME_11="${JAVA_HOME_11:-}"
 JAVA_HOME_17="${JAVA_HOME_17:-}"
 MAVEN_HOME="${MAVEN_HOME:-}"
 
@@ -109,14 +111,13 @@ fi
 
 log "Ensuring Maven is available"
 if ! [ -x "${MAVEN_HOME:-}/bin/mvn" ]; then
-  local mvn_archive="$DOWNLOAD_DIR/$(basename "$MAVEN_URL")"
+  mvn_archive="$DOWNLOAD_DIR/$(basename "$MAVEN_URL")"
   if [ -f "$mvn_archive" ]; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
   else
     log "Downloading Maven from $MAVEN_URL"
     curl -fL "$MAVEN_URL" -o "$mvn_archive"
   fi
-  local mvn_top
   mvn_top=$(tar -tzf "$mvn_archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
   if [ -n "$mvn_top" ] && [ -d "$DOWNLOAD_DIR/$mvn_top" ]; then
     log "Maven already extracted at $DOWNLOAD_DIR/$mvn_top"
