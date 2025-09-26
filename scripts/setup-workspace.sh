@@ -156,7 +156,7 @@ rm -Rf "$CN1_BINARIES"
 git clone https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
 
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true install -Dcn1.binaries="$CN1_BINARIES" "$@"
+"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" install "$@"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"
