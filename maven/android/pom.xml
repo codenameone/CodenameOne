@@ -130,6 +130,13 @@
                 </dependency>
                 <dependency>
                     <groupId>com.codenameone.cn1binaries</groupId>
+                    <artifactId>android-billing</artifactId>
+                    <version>4.0.0</version>
+                    <scope>system</scope>
+                    <systemPath>${cn1.binaries}/android/android-billing-4.0.0.jar</systemPath>
+                </dependency>
+                <dependency>
+                    <groupId>com.codenameone.cn1binaries</groupId>
                     <artifactId>play-services-auth</artifactId>
                     <version>12.0.0</version>
                     <scope>system</scope>
