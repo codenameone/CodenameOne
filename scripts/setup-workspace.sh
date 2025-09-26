@@ -25,6 +25,8 @@ mkdir -p ../cn1-binaries
 CN1_BINARIES="$(cd ../cn1-binaries && pwd -P)"
 rm -Rf ../cn1-binaries
 
+log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
+
 mkdir -p ~/.codenameone
 cp maven/CodeNameOneBuildClient.jar ~/.codenameone
 
@@ -147,6 +149,8 @@ export JAVA_HOME_17="$JAVA_HOME_17"
 export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
 ENV
+
+cat "$ENV_DIR/env.sh"
 
 # shellcheck disable=SC1090
 source "$ENV_DIR/env.sh"

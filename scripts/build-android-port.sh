@@ -9,7 +9,11 @@ TMPDIR="${TMPDIR%/}"
 # Place downloaded tools outside the repository so it isn't filled with binaries
 # Strip any trailing slash again at the join to be extra safe.
 DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
+log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
+
 ENV_DIR="$DOWNLOAD_DIR/tools"
+
+cat "$ENV_DIR/env.sh"
 
 if [ -f "$ENV_DIR/env.sh" ]; then
   source "$ENV_DIR/env.sh"
