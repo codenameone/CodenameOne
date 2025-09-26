@@ -150,7 +150,7 @@ export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
 ENV
 
-cat "$ENV_DIR/env.sh"
+cat "$ENV_DIR/env.sh"  | tee /dev/stderr
 
 # shellcheck disable=SC1090
 source "$ENV_DIR/env.sh"

@@ -2,6 +2,10 @@
 # Build Codename One Android port using JDK 11 for Maven and JDK 17 for compilation
 set -euo pipefail
 
+log() {
+  echo "[build-android-port] $1"
+}
+
 # Normalize TMPDIR and compose paths without duplicate slashes
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
@@ -13,7 +17,7 @@ log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 
 ENV_DIR="$DOWNLOAD_DIR/tools"
 
-cat "$ENV_DIR/env.sh"
+cat "$ENV_DIR/env.sh"  | tee /dev/stderr
 
 if [ -f "$ENV_DIR/env.sh" ]; then
   source "$ENV_DIR/env.sh"
