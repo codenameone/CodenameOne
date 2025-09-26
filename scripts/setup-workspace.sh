@@ -152,12 +152,12 @@ log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
 PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
-if [ ! -d "$BINARIES_DIR/.git" ]; then
+if [ ! -d "$CN1_BINARIES/.git" ]; then
   log "Cloning cn1-binaries"
-  git clone git@github.com:codenameone/cn1-binaries.git "$BINARIES_DIR"
+  git clone git@github.com:codenameone/cn1-binaries.git "$CN1_BINARIES"
 else
   log "Updating cn1-binaries"
-  git -C "$BINARIES_DIR" pull --rebase
+  git -C "$CN1_BINARIES" pull --rebase
 fi
 
 log "Building Codename One core modules"
