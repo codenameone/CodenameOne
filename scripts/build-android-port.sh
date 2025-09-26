@@ -3,8 +3,9 @@
 set -euo pipefail
 
 # Normalize TMPDIR so it has no trailing slash
+TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
-DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
+DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 
 if [ -f "$ENV_DIR/env.sh" ]; then
@@ -17,10 +18,6 @@ fi
 if ! "${JAVA_HOME_11:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
   echo "Failed to provision JDK 11" >&2
   exit 1
-fi
-if ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
-  ./scripts/setup-workspace.sh -q -DskipTests
-  source "$ROOT/tools/env.sh"
 fi
 if ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
   echo "Failed to provision JDK 17" >&2

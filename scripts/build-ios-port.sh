@@ -11,8 +11,9 @@ if ! command -v xcodebuild >/dev/null; then
 fi
 
 # Normalize TMPDIR so it has no trailing slash
+TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
-DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
+DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 
 if [ -f "$ENV_DIR/env.sh" ]; then

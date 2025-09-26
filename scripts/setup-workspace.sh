@@ -10,10 +10,10 @@ log() {
 }
 
 # Normalize TMPDIR so it has no trailing slash
-TMPDIR="${TMPDIR%/}"
-
 # Place downloaded tools outside the repository so it isn't filled with binaries
-DOWNLOAD_DIR="${TMPDIR:-/tmp}/codenameone-tools"
+TMPDIR="${TMPDIR:-/tmp}"
+TMPDIR="${TMPDIR%/}"
+DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 mkdir -p "$DOWNLOAD_DIR"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$ENV_DIR"
