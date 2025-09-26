@@ -154,7 +154,7 @@ PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
 log "Cloning cn1-binaries"
 rm -Rf "$CN1_BINARIES"
-git clone git@github.com:codenameone/cn1-binaries.git "$CN1_BINARIES"
+git clone https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
 
 log "Building Codename One core modules"
 "$MAVEN_HOME/bin/mvn" -Dcn1.binaries="$CN1_BINARIES" -f maven/pom.xml -DskipTests -Djava.awt.headless=true install "$@"
