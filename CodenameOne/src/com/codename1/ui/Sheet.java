@@ -381,6 +381,17 @@ public class Sheet extends Container {
             originalPadding[1] = s.getPaddingRightNoRTL(); // right  
             originalPadding[2] = s.getPaddingBottom();     // bottom
             originalPadding[3] = s.getPaddingLeftNoRTL();  // left
+        } else {
+            // Check if style was reset (current padding much smaller than stored original)
+            // This can happen if the component was removed and re-added with a new style
+            int currentBottom = s.getPaddingBottom();
+            if (currentBottom < originalPadding[2] / 2 && currentBottom >= 0) {
+                // Style appears to have been reset, update our cache
+                originalPadding[0] = s.getPaddingTop();        
+                originalPadding[1] = s.getPaddingRightNoRTL();
+                originalPadding[2] = s.getPaddingBottom();     
+                originalPadding[3] = s.getPaddingLeftNoRTL();  
+            }
         }
         
         Style statusBarStyle =  uim.getComponentStyle("StatusBar");
@@ -398,8 +409,6 @@ public class Sheet extends Container {
             // For Center and South position we use margin to 
             // prevent overlap with top notch.  This looks better as overlap is only
             // an edge case that occurs when the sheet is the full screen height.
-            // Use cached margins to prevent accumulation
-            s.cacheMargins(false);
             $(this).setMargin(topPadding, 0 , 0, 0);
             $(this).setPadding(originalPadding[0], originalPadding[1], bottomPadding, originalPadding[3]);
         } else {
