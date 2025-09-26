@@ -11,14 +11,15 @@ log() {
   echo "[setup-workspace] $1"
 }
 
-# Normalize TMPDIR so it has no trailing slash
+# Normalize TMPDIR and compose paths without duplicate slashes
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
 
 # Place downloaded tools outside the repository so it isn't filled with binaries
-DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
-mkdir -p "$DOWNLOAD_DIR"
+# Strip any trailing slash again at the join to be extra safe.
+DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
+mkdir -p "$DOWNLOAD_DIR"
 mkdir -p "$ENV_DIR"
 mkdir -p ../cn1-binaries
 CN1_BINARIES="$(cd ../cn1-binaries && pwd -P)"
