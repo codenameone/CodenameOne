@@ -19,6 +19,7 @@ DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 mkdir -p "$DOWNLOAD_DIR"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$ENV_DIR"
+CN1_BINARIES="../cn1-binaries"
 
 # Reuse previously saved environment if present (so we can skip downloads)
 if [ -f "$ENV_DIR/env.sh" ]; then
@@ -150,8 +151,9 @@ log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
 PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
-log "Downloading cn1-binaries"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true download-cn1-binaries
+log "Cloning cn1-binaries"
+rm -Rf "$CN1_BINARIES"
+git clone https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
 
 log "Building Codename One core modules"
 "$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true install "$@"
