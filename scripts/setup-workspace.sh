@@ -162,7 +162,7 @@ rm -Rf "$CN1_BINARIES"
 git clone https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
 
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase install "$@"
+"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android install "$@"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"
