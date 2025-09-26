@@ -503,7 +503,26 @@ public class ImageViewer extends Component {
             imageDrawHeight = prefH;
             imageX = prefX;
             imageY = prefY;
-            cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
+            
+            // Apply the same constraints used in paint() method to ensure cropBox matches what's actually visible
+            int constrainedImageX = imageX;
+            int constrainedImageY = imageY;
+            
+            if (imageDrawWidth > getInnerWidth()) {
+                constrainedImageX = Math.max(
+                    Math.min(0, imageX),
+                    -imageDrawWidth + getInnerWidth()
+                );
+            }
+            
+            if (imageDrawHeight > getInnerHeight()) {
+                constrainedImageY = Math.max(
+                    Math.min(0, imageY),
+                    -imageDrawHeight + getInnerHeight()
+                );
+            }
+            
+            cropBox.set(-constrainedImageY/(double)imageDrawHeight, (constrainedImageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (constrainedImageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -constrainedImageX/(double)imageDrawWidth);
             return;
         }
         int iW = image.getWidth();
@@ -529,7 +548,26 @@ public class ImageViewer extends Component {
 
             imageY += (getInnerHeight() - imageDrawHeight)/2;
         }
-        cropBox.set(-imageY/(double)imageDrawHeight, (imageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (imageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -imageX/(double)imageDrawWidth);
+        
+        // Apply the same constraints used in paint() method to ensure cropBox matches what's actually visible
+        int constrainedImageX = imageX;
+        int constrainedImageY = imageY;
+        
+        if (imageDrawWidth > getInnerWidth()) {
+            constrainedImageX = Math.max(
+                Math.min(0, imageX),
+                -imageDrawWidth + getInnerWidth()
+            );
+        }
+        
+        if (imageDrawHeight > getInnerHeight()) {
+            constrainedImageY = Math.max(
+                Math.min(0, imageY),
+                -imageDrawHeight + getInnerHeight()
+            );
+        }
+        
+        cropBox.set(-constrainedImageY/(double)imageDrawHeight, (constrainedImageX + imageDrawWidth - getWidth())/(double)imageDrawWidth, (constrainedImageY + imageDrawHeight - getHeight())/(double)imageDrawHeight, -constrainedImageX/(double)imageDrawWidth);
     }
     
     /**

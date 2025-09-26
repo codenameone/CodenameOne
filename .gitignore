@@ -70,5 +70,4 @@ pom.xml.versionsBackup
 pom.xml.releaseBackup
 pom.xml.tag
 !maven/**/*.zip
-/tools/
-tools.sh
+**/.flattened-pom.xml
