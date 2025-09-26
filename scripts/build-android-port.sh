@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Codename One Android port using JDK 11 for Maven and JDK 17 for compilation
+# Build Codename One Android port using JDK 8 for Maven and JDK 17 for compilation
 set -euo pipefail
 
 log() {
@@ -17,8 +17,6 @@ log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 
 ENV_DIR="$DOWNLOAD_DIR/tools"
 
-cat "$ENV_DIR/env.sh"  | tee /dev/stderr
-
 if [ -f "$ENV_DIR/env.sh" ]; then
   source "$ENV_DIR/env.sh"
 else
@@ -26,10 +24,6 @@ else
   source "$ENV_DIR/env.sh"
 fi
 
-if ! "${JAVA_HOME_11:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
-  echo "Failed to provision JDK 11" >&2
-  exit 1
-fi
 if ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
   echo "Failed to provision JDK 17" >&2
   exit 1

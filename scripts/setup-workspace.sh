@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###
-# Prepare Codename One workspace by installing Maven, provisioning JDK 8, 11 and 17,
+# Prepare Codename One workspace by installing Maven, provisioning JDK 8 and 17,
 # building core modules, and installing Maven archetypes.
 # IMPORTANT: Run this script from the project root!
 ###
@@ -37,7 +37,6 @@ if [ -f "$ENV_DIR/env.sh" ]; then
 fi
 
 JAVA_HOME="${JAVA_HOME:-}"
-JAVA_HOME_11="${JAVA_HOME_11:-}"
 JAVA_HOME_17="${JAVA_HOME_17:-}"
 MAVEN_HOME="${MAVEN_HOME:-}"
 
@@ -62,7 +61,6 @@ if [ "$os" = "mac" ] && [ "$arch" = "aarch64" ]; then
 fi
 
 JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u462-b08/OpenJDK8U-jdk_${arch_jdk8}_${os}_hotspot_8u462b08.tar.gz"
-JDK11_URL="https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.28%2B6/OpenJDK11U-jdk_${arch}_${os}_hotspot_11.0.28_6.tar.gz"
 JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
 MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"
 
@@ -104,14 +102,6 @@ else
   log "Using existing JDK 8 at $JAVA_HOME"
 fi
 
-log "Ensuring JDK 11 is available"
-if [ ! -x "${JAVA_HOME_11:-}/bin/java" ] || ! "${JAVA_HOME_11:-}/bin/java" -version 2>&1 | grep -q '11\.0'; then
-  log "Provisioning JDK 11..."
-  install_jdk "$JDK11_URL" JAVA_HOME_11
-else
-  log "Using existing JDK 11 at $JAVA_HOME_11"
-fi
-
 log "Ensuring JDK 17 is available"
 if [ ! -x "${JAVA_HOME_17:-}/bin/java" ] || ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
   log "Provisioning JDK 17..."
@@ -144,19 +134,15 @@ fi
 log "Writing environment to $ENV_DIR/env.sh"
 cat > "$ENV_DIR/env.sh" <<ENV
 export JAVA_HOME="$JAVA_HOME"
-export JAVA_HOME_11="$JAVA_HOME_11"
 export JAVA_HOME_17="$JAVA_HOME_17"
 export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
 ENV
 
-cat "$ENV_DIR/env.sh"  | tee /dev/stderr
-
 # shellcheck disable=SC1090
 source "$ENV_DIR/env.sh"
 
 log "JDK 8 version:"; "$JAVA_HOME/bin/java" -version
-log "JDK 11 version:"; "$JAVA_HOME_11/bin/java" -version
 log "JDK 17 version:"; "$JAVA_HOME_17/bin/java" -version
 log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
