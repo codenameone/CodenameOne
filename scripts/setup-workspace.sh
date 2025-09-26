@@ -4,6 +4,7 @@
 # building core modules, and installing Maven archetypes.
 ###
 set -euo pipefail
+[ "${DEBUG:-0}" = "1" ] && set -x
 
 log() {
   echo "[setup-workspace] $1"
@@ -18,6 +19,8 @@ DOWNLOAD_DIR="$TMPDIR/codenameone-tools"
 mkdir -p "$DOWNLOAD_DIR"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$ENV_DIR"
+CN1_BINARIES="$ENV_DIR/cn1-binaries"
+mkdir -p "$CN1_BINARIES/javase"
 
 # Reuse previously saved environment if present (so we can skip downloads)
 if [ -f "$ENV_DIR/env.sh" ]; then
@@ -149,13 +152,21 @@ log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
 PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
+if [ ! -d "$BINARIES_DIR/.git" ]; then
+  log "Cloning cn1-binaries"
+  git clone git@github.com:codenameone/cn1-binaries.git "$BINARIES_DIR"
+else
+  log "Updating cn1-binaries"
+  git -C "$BINARIES_DIR" pull --rebase
+fi
+
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -DskipTests -Djava.awt.headless=true install "$@"
+"$MAVEN_HOME/bin/mvn" -Dcn1.binaries="$CN1_BINARIES" -f maven/pom.xml -DskipTests -Djava.awt.headless=true install "$@"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"
 if [ ! -f "$BUILD_CLIENT" ]; then
-  if ! "$MAVEN_HOME/bin/mvn" -f maven/pom.xml cn1:install-codenameone "$@"; then
+  if ! "$MAVEN_HOME/bin/mvn" -Dcn1.binaries="$CN1_BINARIES" -f maven/pom.xml cn1:install-codenameone "$@"; then
     log "Falling back to copying CodeNameOneBuildClient.jar"
     mkdir -p "$(dirname "$BUILD_CLIENT")"
     cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT" || true
@@ -163,7 +174,24 @@ if [ ! -f "$BUILD_CLIENT" ]; then
 fi
 
 log "Installing cn1-maven-archetypes"
-if [ ! -d cn1-maven-archetypes ]; then
-  git clone https://github.com/shannah/cn1-maven-archetypes
+set +e  # don't let a transient git failure abort the whole build
+if [ -d cn1-maven-archetypes/.git ]; then
+  log "Updating existing cn1-maven-archetypes checkout"
+  if ! git -C cn1-maven-archetypes fetch --all --tags; then
+    log "git fetch failed (exit 128?). Leaving existing copy as-is."
+  else
+    git -C cn1-maven-archetypes reset --hard origin/master || \
+      log "git reset failed; keeping local state."
+  fi
+else
+  if ! git clone https://github.com/shannah/cn1-maven-archetypes cn1-maven-archetypes; then
+    log "git clone failed (likely exit 128). Skipping archetype install."
+    skip_archetypes=1
+  fi
 fi
-(cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -q -DskipTests -DskipITs=true -Dinvoker.skip=true install)
+set -e
+
+if [ "${skip_archetypes:-0}" -eq 0 ]; then
+  (cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -Dcn1.binaries="$CN1_BINARIES" -DskipTests -DskipITs=true -Dinvoker.skip=true install) || \
+    log "Archetype mvn install failed; continuing."
+fi
