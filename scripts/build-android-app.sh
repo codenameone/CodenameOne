@@ -146,6 +146,27 @@ public class ${MAIN_NAME} {
 }
 HELLOEOF
 
+SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
+log "Disabling Codename One CSS compilation for headless build environment"
+if [ -f "$SETTINGS_FILE" ]; then
+  if grep -q '^codename1.cssTheme=' "$SETTINGS_FILE"; then
+    python3 - "$SETTINGS_FILE" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+text = re.sub(r'^codename1\.cssTheme=.*$', 'codename1.cssTheme=false', text, flags=re.MULTILINE)
+path.write_text(text if text.endswith('\n') else text + '\n')
+PY
+  else
+    printf '\ncodename1.cssTheme=false\n' >> "$SETTINGS_FILE"
+  fi
+else
+  printf 'codename1.cssTheme=false\n' > "$SETTINGS_FILE"
+fi
+
 log "Building Android gradle project using Codename One port"
 "$MAVEN_HOME/bin/mvn" -q -f "$APP_DIR/pom.xml" package -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false "$@"
 
