@@ -15,28 +15,37 @@ TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 
-if [ -f "$ENV_DIR/env.sh" ]; then
-  # shellcheck disable=SC1090
-  source "$ENV_DIR/env.sh"
-else
-  log "Workspace tools not provisioned; running setup-workspace.sh"
-  ./scripts/setup-workspace.sh -q -DskipTests
-  # shellcheck disable=SC1090
-  source "$ENV_DIR/env.sh"
-fi
+ensure_workspace() {
+  local attempt
+  for attempt in 1 2; do
+    if [ -f "$ENV_DIR/env.sh" ]; then
+      # shellcheck disable=SC1090
+      source "$ENV_DIR/env.sh"
+    fi
 
-if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
-  log "JAVA_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ] && \
+       [ -n "${JAVA_HOME_17:-}" ] && [ -x "$JAVA_HOME_17/bin/java" ] && \
+       [ -n "${MAVEN_HOME:-}" ] && [ -x "$MAVEN_HOME/bin/mvn" ]; then
+      return 0
+    fi
+
+    if [ "$attempt" -eq 1 ]; then
+      log "Workspace tools not provisioned; running setup-workspace.sh"
+      ./scripts/setup-workspace.sh -q -DskipTests
+    fi
+  done
+
+  if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+    log "JAVA_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+  elif [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ]; then
+    log "JAVA_HOME_17 is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+  else
+    log "Maven is not available. Please run scripts/setup-workspace.sh first." >&2
+  fi
   exit 1
-fi
-if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ]; then
-  log "JAVA_HOME_17 is not set correctly. Please run scripts/setup-workspace.sh first." >&2
-  exit 1
-fi
-if [ -z "${MAVEN_HOME:-}" ] || [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
-  log "Maven is not available. Please run scripts/setup-workspace.sh first." >&2
-  exit 1
-fi
+}
+
+ensure_workspace
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
