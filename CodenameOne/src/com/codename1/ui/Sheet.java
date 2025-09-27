@@ -156,6 +156,11 @@ public class Sheet extends Container {
      */
     private String tabletPosition = position;
     
+    /**
+     * Original padding values to prevent accumulation when showing the sheet multiple times.
+     * These are set the first time the sheet is shown and used as the base for safe area calculations.
+     */
+    private int[] originalPadding = null;
     
     private ActionListener formPointerListener = new ActionListener() {
         @Override
@@ -369,6 +374,26 @@ public class Sheet extends Container {
         // Deal with iPhoneX notch.
         UIManager uim = UIManager.getInstance();
         
+        // Store original padding values on first show to prevent accumulation
+        if (originalPadding == null) {
+            originalPadding = new int[4];
+            originalPadding[0] = s.getPaddingTop();        // top
+            originalPadding[1] = s.getPaddingRightNoRTL(); // right  
+            originalPadding[2] = s.getPaddingBottom();     // bottom
+            originalPadding[3] = s.getPaddingLeftNoRTL();  // left
+        } else {
+            // Check if style was reset (current padding much smaller than stored original)
+            // This can happen if the component was removed and re-added with a new style
+            int currentBottom = s.getPaddingBottom();
+            if (currentBottom < originalPadding[2] / 2 && currentBottom >= 0) {
+                // Style appears to have been reset, update our cache
+                originalPadding[0] = s.getPaddingTop();        
+                originalPadding[1] = s.getPaddingRightNoRTL();
+                originalPadding[2] = s.getPaddingBottom();     
+                originalPadding[3] = s.getPaddingLeftNoRTL();  
+            }
+        }
+        
         Style statusBarStyle =  uim.getComponentStyle("StatusBar");
         Style titleAreaStyle = uim.getComponentStyle("TitleArea");
         
@@ -376,7 +401,8 @@ public class Sheet extends Container {
         int positionInt = getPositionInt();
         Rectangle displaySafeArea = new Rectangle();
         Display.getInstance().getDisplaySafeArea(displaySafeArea);
-        int bottomPadding = s.getPaddingBottom();
+        // Use original bottom padding to prevent accumulation
+        int bottomPadding = originalPadding[2];
         int safeAreaBottomPadding = CN.getDisplayHeight() - (displaySafeArea.getY() + displaySafeArea.getHeight());
         bottomPadding = bottomPadding + safeAreaBottomPadding;
         if (positionInt == S || positionInt == C) {
@@ -384,14 +410,13 @@ public class Sheet extends Container {
             // prevent overlap with top notch.  This looks better as overlap is only
             // an edge case that occurs when the sheet is the full screen height.
             $(this).setMargin(topPadding, 0 , 0, 0);
-            $(this).setPadding(s.getPaddingTop(), s.getPaddingRightNoRTL(), bottomPadding, s.getPaddingLeftNoRTL());
+            $(this).setPadding(originalPadding[0], originalPadding[1], bottomPadding, originalPadding[3]);
         } else {
             // For other cases we use padding to prevent overlap with top notch.  This looks
             // better as it appears that the sheet bleeds all the way to the top edge of the screen,
             // but the content is not obscured by the notch.
 
-
-            $(this).setPadding(topPadding, s.getPaddingRightNoRTL(), bottomPadding, s.getPaddingLeftNoRTL());
+            $(this).setPadding(topPadding, originalPadding[1], bottomPadding, originalPadding[3]);
         }
        
         // END Deal with iPhoneX notch
