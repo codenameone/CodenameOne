@@ -304,6 +304,7 @@ public class FloatingActionButton extends Button {
         if(f != null && (f.getContentPane() == cnt || f == cnt)) {
             // special case for content pane installs the button directly on the content pane
             Container layers = f.getLayeredPane(getClass(), true);
+            layers.setSafeArea(true);
             layers.setLayout(flow);
             layers.add(this);
             return null;
