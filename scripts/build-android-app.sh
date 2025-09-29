@@ -2,7 +2,7 @@
 # Build a sample "Hello Codename One" Android application using the locally-built Codename One Android port
 set -euo pipefail
 
-log() {
+ba_log() {
   echo "[build-android-app] $1"
 }
 
@@ -16,37 +16,32 @@ DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 EXTRA_MVN_ARGS=("$@")
 
-ensure_workspace() {
-  local attempt
-  for attempt in 1 2; do
-    if [ -f "$ENV_DIR/env.sh" ]; then
-      # shellcheck disable=SC1090
-      source "$ENV_DIR/env.sh"
-    fi
-
-    if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ] && \
-       [ -n "${JAVA_HOME_17:-}" ] && [ -x "$JAVA_HOME_17/bin/java" ] && \
-       [ -n "${MAVEN_HOME:-}" ] && [ -x "$MAVEN_HOME/bin/mvn" ]; then
-      return 0
-    fi
-
-    if [ "$attempt" -eq 1 ]; then
-      log "Workspace tools not provisioned; running setup-workspace.sh"
-      ./scripts/setup-workspace.sh -q -DskipTests
-    fi
-  done
-
-  if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
-    log "JAVA_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
-  elif [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ]; then
-    log "JAVA_HOME_17 is not set correctly. Please run scripts/setup-workspace.sh first." >&2
-  else
-    log "Maven is not available. Please run scripts/setup-workspace.sh first." >&2
-  fi
+ENV_FILE="$ENV_DIR/env.sh"
+ba_log "Loading workspace environment from $ENV_FILE"
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+else
+  ba_log "Workspace tools not found. Run scripts/setup-workspace.sh before this script." >&2
   exit 1
-}
+fi
 
-ensure_workspace
+if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+  ba_log "JAVA_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+  exit 1
+fi
+if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ]; then
+  ba_log "JAVA_HOME_17 is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+  exit 1
+fi
+if [ -z "${MAVEN_HOME:-}" ] || [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
+  ba_log "Maven is not available. Please run scripts/setup-workspace.sh first." >&2
+  exit 1
+fi
+
+ba_log "Using JAVA_HOME at $JAVA_HOME"
+ba_log "Using JAVA_HOME_17 at $JAVA_HOME_17"
+ba_log "Using Maven installation at $MAVEN_HOME"
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
@@ -59,15 +54,15 @@ if [ -z "$ANDROID_SDK_ROOT" ]; then
   fi
 fi
 if [ -z "$ANDROID_SDK_ROOT" ] || [ ! -d "$ANDROID_SDK_ROOT" ]; then
-  log "Android SDK not found. Set ANDROID_SDK_ROOT or ANDROID_HOME to a valid installation." >&2
+  ba_log "Android SDK not found. Set ANDROID_SDK_ROOT or ANDROID_HOME to a valid installation." >&2
   exit 1
 fi
 export ANDROID_SDK_ROOT
 export ANDROID_HOME="$ANDROID_SDK_ROOT"
-log "Using Android SDK at $ANDROID_SDK_ROOT"
+ba_log "Using Android SDK at $ANDROID_SDK_ROOT"
 
 CN1_VERSION=$(awk -F'[<>]' '/<version>/{print $3; exit}' maven/pom.xml)
-log "Detected Codename One version $CN1_VERSION"
+ba_log "Detected Codename One version $CN1_VERSION"
 
 WORK_DIR="$TMPDIR/cn1-hello-android"
 rm -rf "$WORK_DIR"
@@ -78,10 +73,10 @@ ARTIFACT_ID="hello-codenameone"
 MAIN_NAME="HelloCodenameOne"
 
 LOCAL_MAVEN_REPO="${LOCAL_MAVEN_REPO:-$HOME/.m2/repository}"
-log "Using local Maven repository at $LOCAL_MAVEN_REPO"
+ba_log "Using local Maven repository at $LOCAL_MAVEN_REPO"
 MAVEN_CMD=("$MAVEN_HOME/bin/mvn" -Dmaven.repo.local="$LOCAL_MAVEN_REPO")
 
-log "Generating Codename One application skeleton"
+ba_log "Generating Codename One application skeleton"
 xvfb-run -a "${MAVEN_CMD[@]}" -q --offline archetype:generate \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
@@ -98,7 +93,7 @@ xvfb-run -a "${MAVEN_CMD[@]}" -q --offline archetype:generate \
 
 APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 if [ ! -d "$APP_DIR" ]; then
-  log "Failed to create Codename One application project" >&2
+  ba_log "Failed to create Codename One application project" >&2
   exit 1
 fi
 
@@ -108,13 +103,13 @@ fi
 
 MAIN_FILE=$(find "$APP_DIR" -path "*/common/src/main/java/*Application.java" | head -n 1 || true)
 if [ -z "$MAIN_FILE" ]; then
-  log "Could not locate the generated application source file" >&2
+  ba_log "Could not locate the generated application source file" >&2
   exit 1
 fi
 
 PACKAGE_NAME=$(sed -n 's/^package \(.*\);/\1/p' "$MAIN_FILE" | head -n 1)
 if [ -z "$PACKAGE_NAME" ]; then
-  log "Unable to determine package name from $MAIN_FILE" >&2
+  ba_log "Unable to determine package name from $MAIN_FILE" >&2
   exit 1
 fi
 
@@ -154,7 +149,7 @@ public class ${MAIN_NAME} {
 HELLOEOF
 
 SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
-log "Ensuring Codename One CSS compilation is enabled"
+ba_log "Ensuring Codename One CSS compilation is enabled"
 if [ -f "$SETTINGS_FILE" ]; then
   if grep -q '^codename1.cssTheme=' "$SETTINGS_FILE"; then
     python3 - "$SETTINGS_FILE" <<'PY'
@@ -194,19 +189,19 @@ Label {
 CSSEOF
 fi
 
-log "Compiling Codename One CSS theme"
+ba_log "Compiling Codename One CSS theme"
 xvfb-run -a "${MAVEN_CMD[@]}" -q --offline -f "$APP_DIR/pom.xml" codenameone:css "${EXTRA_MVN_ARGS[@]}"
 
-log "Building Android gradle project using Codename One port"
+ba_log "Building Android gradle project using Codename One port"
 xvfb-run -a "${MAVEN_CMD[@]}" -q --offline -f "$APP_DIR/pom.xml" package -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false "${EXTRA_MVN_ARGS[@]}"
 
 GRADLE_PROJECT_DIR=$(find "$APP_DIR/target" -maxdepth 1 -type d -name "*-android-source" | head -n 1 || true)
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
-  log "Failed to locate generated Android project" >&2
+  ba_log "Failed to locate generated Android project" >&2
   exit 1
 fi
 
-log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
+ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME="$JAVA_HOME_17"
@@ -223,8 +218,8 @@ export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
 APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" | head -n 1 || true)
 if [ -z "$APK_PATH" ]; then
-  log "Gradle build completed but no APK was found" >&2
+  ba_log "Gradle build completed but no APK was found" >&2
   exit 1
 fi
 
-log "Successfully built Android APK at $APK_PATH"
+ba_log "Successfully built Android APK at $APK_PATH"
