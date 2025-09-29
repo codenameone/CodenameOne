@@ -82,7 +82,7 @@ log "Using local Maven repository at $LOCAL_MAVEN_REPO"
 MAVEN_CMD=("$MAVEN_HOME/bin/mvn" -Dmaven.repo.local="$LOCAL_MAVEN_REPO")
 
 log "Generating Codename One application skeleton"
-"${MAVEN_CMD[@]}" -q --offline archetype:generate \
+xvfb-run -a "${MAVEN_CMD[@]}" -q --offline archetype:generate \
   -DarchetypeArtifactId=cn1app-archetype \
   -DarchetypeGroupId=com.codenameone \
   -DarchetypeVersion="$CN1_VERSION" \
