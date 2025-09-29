@@ -59,11 +59,11 @@ check_java_home() {
 validate_workspace() {
   local missing=0
 
-  if ! check_java_home "JAVA_HOME" "${JAVA_HOME:-}" '1\\.8'; then
+  if ! check_java_home "JAVA_HOME" "${JAVA_HOME:-}" '1\.8'; then
     missing=1
   fi
 
-  if ! check_java_home "JAVA_HOME_17" "${JAVA_HOME_17:-}" '17\\.'; then
+  if ! check_java_home "JAVA_HOME_17" "${JAVA_HOME_17:-}" '17\.'; then
     missing=1
   fi
 
