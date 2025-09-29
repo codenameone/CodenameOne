@@ -106,7 +106,20 @@ MAIN_NAME="HelloCodenameOne"
 
 LOCAL_MAVEN_REPO="${LOCAL_MAVEN_REPO:-$HOME/.m2/repository}"
 ba_log "Using local Maven repository at $LOCAL_MAVEN_REPO"
+mkdir -p "$LOCAL_MAVEN_REPO"
 MAVEN_CMD=("$MAVEN_HOME/bin/mvn" -Dmaven.repo.local="$LOCAL_MAVEN_REPO")
+
+ARCHETYPE_PLUGIN_VERSION="3.2.1"
+ARCHETYPE_PLUGIN_JAR="$LOCAL_MAVEN_REPO/org/apache/maven/plugins/maven-archetype-plugin/$ARCHETYPE_PLUGIN_VERSION/maven-archetype-plugin-$ARCHETYPE_PLUGIN_VERSION.jar"
+
+if [ ! -f "$ARCHETYPE_PLUGIN_JAR" ]; then
+  ba_log "Preloading Maven archetype plugin version $ARCHETYPE_PLUGIN_VERSION into $LOCAL_MAVEN_REPO"
+  if ! xvfb-run -a "${MAVEN_CMD[@]}" -B org.apache.maven.plugins:maven-archetype-plugin:"$ARCHETYPE_PLUGIN_VERSION":help -Ddetail -Dgoal=generate; then
+    ba_log "Failed to cache maven-archetype-plugin $ARCHETYPE_PLUGIN_VERSION; archetype generation may download dependencies" >&2
+  fi
+else
+  ba_log "Maven archetype plugin $ARCHETYPE_PLUGIN_VERSION already cached"
+fi
 
 ba_log "Generating Codename One application skeleton"
 xvfb-run -a "${MAVEN_CMD[@]}" -q --offline archetype:generate \
