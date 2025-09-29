@@ -18,36 +18,95 @@ log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 ENV_FILE="$ENV_DIR/env.sh"
 
-log "Loading workspace environment from $ENV_FILE"
-if [ -f "$ENV_FILE" ]; then
+load_environment() {
+  if [ ! -f "$ENV_FILE" ]; then
+    return 1
+  fi
+
   log "Workspace environment file metadata"
   ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
   log "Workspace environment file contents"
   sed 's/^/[build-android-port] ENV: /' "$ENV_FILE"
   # shellcheck disable=SC1090
   source "$ENV_FILE"
-else
-  log "Workspace tools not found. Running setup-workspace.sh"
-  ./scripts/setup-workspace.sh -q -DskipTests
-  if [ -f "$ENV_FILE" ]; then
-    log "Workspace environment file metadata after setup"
-    ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
-    log "Workspace environment file contents after setup"
-    sed 's/^/[build-android-port] ENV: /' "$ENV_FILE"
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
+}
+
+check_java_home() {
+  local name="$1" home="$2" version_pattern="$3"
+
+  if [ -z "$home" ]; then
+    log "$name is not set"
+    return 1
+  fi
+
+  if [ ! -x "$home/bin/java" ]; then
+    log "$name does not contain a java binary: $home/bin/java"
+    return 1
+  fi
+
+  local version_output
+  version_output="$("$home/bin/java" -version 2>&1 || true)"
+  if ! grep -q "$version_pattern" <<<"$version_output"; then
+    log "$name java -version output did not match $version_pattern"
+    log "$version_output"
+    return 1
+  fi
+
+  log "$name detected at $home (${version_output%%$'\n'*})"
+  return 0
+}
+
+validate_workspace() {
+  local missing=0
+
+  if ! check_java_home "JAVA_HOME" "${JAVA_HOME:-}" '1\\.8'; then
+    missing=1
+  fi
+
+  if ! check_java_home "JAVA_HOME_17" "${JAVA_HOME_17:-}" '17\\.'; then
+    missing=1
+  fi
+
+  if [ -z "${MAVEN_HOME:-}" ]; then
+    log "MAVEN_HOME is not set"
+    missing=1
+  elif [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
+    log "Maven binary missing at $MAVEN_HOME/bin/mvn"
+    missing=1
   else
+    log "Maven detected at $MAVEN_HOME"
+  fi
+
+  return $missing
+}
+
+log "Loading workspace environment from $ENV_FILE"
+if ! load_environment; then
+  log "Workspace tools not found. Running setup-workspace.sh"
+  ./scripts/setup-workspace.sh -q -DskipTests "$@"
+  if ! load_environment; then
     log "Failed to create workspace environment at $ENV_FILE" >&2
     exit 1
   fi
 fi
 
-log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA_HOME_17=${JAVA_HOME_17:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
-
-if [ -z "${JAVA_HOME_17:-}" ] || ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\\.0'; then
-  echo "Failed to provision JDK 17" >&2
-  exit 1
+if validate_workspace; then
+  log "Workspace environment validated"
+else
+  log "Workspace validation failed. Re-provisioning tools via setup-workspace.sh"
+  ./scripts/setup-workspace.sh -q -DskipTests "$@"
+  if ! load_environment; then
+    log "Failed to create workspace environment at $ENV_FILE" >&2
+    exit 1
+  fi
+  if ! validate_workspace; then
+    echo "Failed to provision required JDK or Maven binaries" >&2
+    exit 1
+  fi
+  log "Workspace environment validated"
 fi
+
+log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA_HOME_17=${JAVA_HOME_17:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 "$JAVA_HOME/bin/java" -version
