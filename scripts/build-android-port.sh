@@ -113,11 +113,15 @@ export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 "$JAVA_HOME_17/bin/java" -version
 "$MAVEN_HOME/bin/mvn" -version
 
+run_maven() {
+  xvfb-run -a "$MAVEN_HOME/bin/mvn" "$@"
+}
+
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 if [ ! -f "$BUILD_CLIENT" ]; then
-  if ! "$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml cn1:install-codenameone "$@"; then
+  if ! run_maven -q -f maven/pom.xml cn1:install-codenameone "$@"; then
     [ -f maven/CodeNameOneBuildClient.jar ] && cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT" || true
   fi
 fi
 
-"$MAVEN_HOME/bin/mvn" -q -f maven/pom.xml -pl android -am -Dmaven.javadoc.skip=true -Djava.awt.headless=true clean install "$@"
+run_maven -q -f maven/pom.xml -pl android -am -Dmaven.javadoc.skip=true -Djava.awt.headless=true clean install "$@"
