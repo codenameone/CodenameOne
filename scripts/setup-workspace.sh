@@ -81,27 +81,31 @@ install_jdk() {
     curl -fL "$url" -o "$archive"
   fi
 
-  # Find top directory name inside the tarball
   local top
   top=$(tar -tzf "$archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
+  if [ -z "$top" ]; then
+    log "Unable to determine extracted directory from $(basename "$archive")" >&2
+    exit 1
+  fi
 
-  # Extract only if target directory doesn't already exist
-  if [ -n "$top" ] && [ -d "$DOWNLOAD_DIR/$top" ]; then
-    log "JDK already extracted at $DOWNLOAD_DIR/$top"
+  local extracted="$DOWNLOAD_DIR/$top"
+  if [ -d "$extracted" ]; then
+    log "JDK already extracted at $extracted"
   else
     log "Extracting JDK to $DOWNLOAD_DIR"
     tar -xzf "$archive" -C "$DOWNLOAD_DIR"
   fi
 
-  local home="$DOWNLOAD_DIR/$top"
+  local home="$extracted"
   if [ -d "$home/Contents/Home" ]; then
     home="$home/Contents/Home"
   fi
-  eval "$dest_var=\"$home\""
+
+  printf -v "$dest_var" '%s' "$home"
 }
 
 log "Ensuring JDK 8 is available"
-if [ ! -x "${JAVA_HOME:-}/bin/java" ] || ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '8\.0'; then
+if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '8\.0'; then
   log "Provisioning JDK 8..."
   install_jdk "$JDK8_URL" JAVA_HOME
 else
@@ -109,7 +113,7 @@ else
 fi
 
 log "Ensuring JDK 17 is available"
-if [ ! -x "${JAVA_HOME_17:-}/bin/java" ] || ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
+if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ] || ! "$JAVA_HOME_17/bin/java" -version 2>&1 | grep -q '17\.0'; then
   log "Provisioning JDK 17..."
   install_jdk "$JDK17_URL" JAVA_HOME_17
 else
@@ -117,7 +121,7 @@ else
 fi
 
 log "Ensuring Maven is available"
-if ! [ -x "${MAVEN_HOME:-}/bin/mvn" ]; then
+if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
   mvn_archive="$DOWNLOAD_DIR/$(basename "$MAVEN_URL")"
   if [ -f "$mvn_archive" ]; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
@@ -126,6 +130,10 @@ if ! [ -x "${MAVEN_HOME:-}/bin/mvn" ]; then
     curl -fL "$MAVEN_URL" -o "$mvn_archive"
   fi
   mvn_top=$(tar -tzf "$mvn_archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
+  if [ -z "$mvn_top" ]; then
+    log "Unable to determine extracted directory from $(basename "$mvn_archive")" >&2
+    exit 1
+  fi
   if [ -n "$mvn_top" ] && [ -d "$DOWNLOAD_DIR/$mvn_top" ]; then
     log "Maven already extracted at $DOWNLOAD_DIR/$mvn_top"
   else
