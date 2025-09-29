@@ -25,15 +25,21 @@ mkdir -p ../cn1-binaries
 CN1_BINARIES="$(cd ../cn1-binaries && pwd -P)"
 rm -Rf ../cn1-binaries
 
+ENV_FILE="$ENV_DIR/env.sh"
+
 log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 
 mkdir -p ~/.codenameone
 cp maven/CodeNameOneBuildClient.jar ~/.codenameone
 
 # Reuse previously saved environment if present (so we can skip downloads)
-if [ -f "$ENV_DIR/env.sh" ]; then
+if [ -f "$ENV_FILE" ]; then
+  log "Found existing workspace environment at $ENV_FILE"
+  ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
+  log "Existing workspace environment file contents"
+  sed 's/^/[setup-workspace] ENV: /' "$ENV_FILE"
   # shellcheck disable=SC1090
-  source "$ENV_DIR/env.sh"
+  source "$ENV_FILE"
 fi
 
 JAVA_HOME="${JAVA_HOME:-}"
@@ -131,16 +137,25 @@ else
   log "Using existing Maven at $MAVEN_HOME"
 fi
 
-log "Writing environment to $ENV_DIR/env.sh"
-cat > "$ENV_DIR/env.sh" <<ENV
+log "Writing environment to $ENV_FILE"
+cat > "$ENV_FILE" <<ENV
 export JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME_17="$JAVA_HOME_17"
 export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
 ENV
 
+log "Workspace environment file metadata"
+if [ -f "$ENV_FILE" ]; then
+  ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
+  log "Workspace environment file contents"
+  sed 's/^/[setup-workspace] ENV: /' "$ENV_FILE"
+else
+  log "Environment file was not created at $ENV_FILE" >&2
+fi
+
 # shellcheck disable=SC1090
-source "$ENV_DIR/env.sh"
+source "$ENV_FILE"
 
 log "JDK 8 version:"; "$JAVA_HOME/bin/java" -version
 log "JDK 17 version:"; "$JAVA_HOME_17/bin/java" -version

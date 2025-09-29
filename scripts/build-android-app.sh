@@ -21,6 +21,8 @@ ba_log "Loading workspace environment from $ENV_FILE"
 if [ -f "$ENV_FILE" ]; then
   ba_log "Workspace environment file metadata"
   ls -l "$ENV_FILE" | while IFS= read -r line; do ba_log "$line"; done
+  ba_log "Workspace environment file contents"
+  sed 's/^/[build-android-app] ENV: /' "$ENV_FILE"
   # shellcheck disable=SC1090
   source "$ENV_FILE"
   ba_log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA_HOME_17=${JAVA_HOME_17:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"

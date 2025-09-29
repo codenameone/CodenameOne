@@ -16,15 +16,35 @@ DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 
 ENV_DIR="$DOWNLOAD_DIR/tools"
+ENV_FILE="$ENV_DIR/env.sh"
 
-if [ -f "$ENV_DIR/env.sh" ]; then
-  source "$ENV_DIR/env.sh"
+log "Loading workspace environment from $ENV_FILE"
+if [ -f "$ENV_FILE" ]; then
+  log "Workspace environment file metadata"
+  ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
+  log "Workspace environment file contents"
+  sed 's/^/[build-android-port] ENV: /' "$ENV_FILE"
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
 else
+  log "Workspace tools not found. Running setup-workspace.sh"
   ./scripts/setup-workspace.sh -q -DskipTests
-  source "$ENV_DIR/env.sh"
+  if [ -f "$ENV_FILE" ]; then
+    log "Workspace environment file metadata after setup"
+    ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
+    log "Workspace environment file contents after setup"
+    sed 's/^/[build-android-port] ENV: /' "$ENV_FILE"
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+  else
+    log "Failed to create workspace environment at $ENV_FILE" >&2
+    exit 1
+  fi
 fi
 
-if ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
+log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA_HOME_17=${JAVA_HOME_17:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
+
+if [ -z "${JAVA_HOME_17:-}" ] || ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\\.0'; then
   echo "Failed to provision JDK 17" >&2
   exit 1
 fi
