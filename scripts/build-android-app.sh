@@ -19,22 +19,52 @@ EXTRA_MVN_ARGS=("$@")
 ENV_FILE="$ENV_DIR/env.sh"
 ba_log "Loading workspace environment from $ENV_FILE"
 if [ -f "$ENV_FILE" ]; then
+  ba_log "Workspace environment file metadata"
+  ls -l "$ENV_FILE" | while IFS= read -r line; do ba_log "$line"; done
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+  ba_log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA_HOME_17=${JAVA_HOME_17:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
 else
   ba_log "Workspace tools not found. Run scripts/setup-workspace.sh before this script." >&2
   exit 1
 fi
 
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+  ba_log "JAVA_HOME validation failed. Current value: ${JAVA_HOME:-<unset>}" >&2
+  if [ -n "${JAVA_HOME:-}" ]; then
+    ba_log "Contents of JAVA_HOME directory"
+    if [ -d "$JAVA_HOME" ]; then
+      ls -l "$JAVA_HOME" | while IFS= read -r line; do ba_log "$line"; done
+    else
+      ba_log "JAVA_HOME directory does not exist"
+    fi
+  fi
   ba_log "JAVA_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
   exit 1
 fi
 if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ]; then
+  ba_log "JAVA_HOME_17 validation failed. Current value: ${JAVA_HOME_17:-<unset>}" >&2
+  if [ -n "${JAVA_HOME_17:-}" ]; then
+    ba_log "Contents of JAVA_HOME_17 directory"
+    if [ -d "$JAVA_HOME_17" ]; then
+      ls -l "$JAVA_HOME_17" | while IFS= read -r line; do ba_log "$line"; done
+    else
+      ba_log "JAVA_HOME_17 directory does not exist"
+    fi
+  fi
   ba_log "JAVA_HOME_17 is not set correctly. Please run scripts/setup-workspace.sh first." >&2
   exit 1
 fi
 if [ -z "${MAVEN_HOME:-}" ] || [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
+  ba_log "MAVEN_HOME validation failed. Current value: ${MAVEN_HOME:-<unset>}" >&2
+  if [ -n "${MAVEN_HOME:-}" ]; then
+    ba_log "Contents of MAVEN_HOME directory"
+    if [ -d "$MAVEN_HOME" ]; then
+      ls -l "$MAVEN_HOME" | while IFS= read -r line; do ba_log "$line"; done
+    else
+      ba_log "MAVEN_HOME directory does not exist"
+    fi
+  fi
   ba_log "Maven is not available. Please run scripts/setup-workspace.sh first." >&2
   exit 1
 fi
