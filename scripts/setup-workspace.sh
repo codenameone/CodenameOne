@@ -145,6 +145,14 @@ else
   log "Using existing Maven at $MAVEN_HOME"
 fi
 
+ARCHETYPE_PLUGIN_COORD="org.apache.maven.plugins:maven-archetype-plugin:3.2.1"
+log "Preloading Maven archetype plugin ($ARCHETYPE_PLUGIN_COORD) for offline project generation"
+if "$MAVEN_HOME/bin/mvn" -B -N "$ARCHETYPE_PLUGIN_COORD:help" -Ddetail -Dgoal=generate >/dev/null 2>&1; then
+  log "Maven archetype plugin cached locally"
+else
+  log "Failed to preload $ARCHETYPE_PLUGIN_COORD; archetype generation may download dependencies" >&2
+fi
+
 log "Writing environment to $ENV_FILE"
 cat > "$ENV_FILE" <<ENV
 export JAVA_HOME="$JAVA_HOME"

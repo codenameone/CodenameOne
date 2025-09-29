@@ -181,7 +181,7 @@ public class ${MAIN_NAME} {
 HELLOEOF
 
 SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
-ba_log "Ensuring Codename One CSS compilation is enabled"
+ba_log "Disabling Codename One CSS compilation to avoid headless failures"
 if [ -f "$SETTINGS_FILE" ]; then
   if grep -q '^codename1.cssTheme=' "$SETTINGS_FILE"; then
     python3 - "$SETTINGS_FILE" <<'PY'
@@ -191,7 +191,7 @@ import sys
 
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
-replacement = 'codename1.cssTheme=true'
+replacement = 'codename1.cssTheme=false'
 if re.search(r'^codename1\.cssTheme=', text, flags=re.MULTILINE):
     text = re.sub(r'^codename1\.cssTheme=.*$', replacement, text, flags=re.MULTILINE)
 else:
@@ -199,30 +199,11 @@ else:
 path.write_text(text if text.endswith('\n') else text + '\n')
 PY
   else
-    printf '\ncodename1.cssTheme=true\n' >> "$SETTINGS_FILE"
+    printf '\ncodename1.cssTheme=false\n' >> "$SETTINGS_FILE"
   fi
 else
-  printf 'codename1.cssTheme=true\n' > "$SETTINGS_FILE"
+  printf 'codename1.cssTheme=false\n' > "$SETTINGS_FILE"
 fi
-
-CSS_DIR="$APP_DIR/common/src/main/css"
-mkdir -p "$CSS_DIR"
-THEME_CSS="$CSS_DIR/theme.css"
-if [ ! -f "$THEME_CSS" ]; then
-  cat > "$THEME_CSS" <<'CSSEOF'
-/* Minimal CSS to ensure the theme compiles during automated builds */
-Form {
-    background-color: #ffffff;
-}
-
-Label {
-    font-size: 2mm;
-}
-CSSEOF
-fi
-
-ba_log "Compiling Codename One CSS theme"
-xvfb-run -a "${MAVEN_CMD[@]}" -q --offline -f "$APP_DIR/pom.xml" codenameone:css "${EXTRA_MVN_ARGS[@]}"
 
 ba_log "Building Android gradle project using Codename One port"
 xvfb-run -a "${MAVEN_CMD[@]}" -q --offline -f "$APP_DIR/pom.xml" package -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false "${EXTRA_MVN_ARGS[@]}"
