@@ -16,11 +16,6 @@ DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 EXTRA_MVN_ARGS=("$@")
 
-# Version of the Codename One Maven plugin guaranteed to be published on Maven Central.
-# This is used solely to bootstrap project generation; generated projects are rewritten
-# to target the locally built snapshot version afterwards.
-BOOTSTRAP_CN1_VERSION="7.0.204"
-
 ENV_FILE="$ENV_DIR/env.sh"
 ba_log "Loading workspace environment from $ENV_FILE"
 if [ -f "$ENV_FILE" ]; then
@@ -131,7 +126,7 @@ ba_log "Generating Codename One application skeleton via codenameone-maven-plugi
 (
   cd "$WORK_DIR"
   xvfb-run -a "${MAVEN_CMD[@]}" -q --offline \
-    com.codenameone:codenameone-maven-plugin:"$BOOTSTRAP_CN1_VERSION":generate-app-project \
+    com.codenameone:codenameone-maven-plugin:"$CN1_VERSION":generate-app-project \
     -DgroupId="$GROUP_ID" \
     -DartifactId="$ARTIFACT_ID" \
     -Dversion=1.0-SNAPSHOT \
@@ -143,24 +138,6 @@ APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 if [ ! -d "$APP_DIR" ]; then
   ba_log "Failed to create Codename One application project" >&2
   exit 1
-fi
-
-if [ "$CN1_VERSION" != "$BOOTSTRAP_CN1_VERSION" ]; then
-  ba_log "Replacing generated project Codename One version $BOOTSTRAP_CN1_VERSION with local version $CN1_VERSION"
-  mapfile -t version_files < <(grep -rl "$BOOTSTRAP_CN1_VERSION" "$APP_DIR" || true)
-  for vf in "${version_files[@]}"; do
-    python3 - "$vf" "$BOOTSTRAP_CN1_VERSION" "$CN1_VERSION" <<'PY'
-import pathlib
-import sys
-
-path = pathlib.Path(sys.argv[1])
-old = sys.argv[2]
-new = sys.argv[3]
-text = path.read_text()
-if old in text:
-    path.write_text(text.replace(old, new))
-PY
-  done
 fi
 
 if [ -f "$APP_DIR/build.sh" ]; then
