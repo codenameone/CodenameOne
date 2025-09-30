@@ -104,37 +104,29 @@ GROUP_ID="com.codenameone.examples"
 ARTIFACT_ID="hello-codenameone"
 MAIN_NAME="HelloCodenameOne"
 
+SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
+if [ ! -d "$SOURCE_PROJECT" ]; then
+  ba_log "Source project template not found at $SOURCE_PROJECT" >&2
+  exit 1
+fi
+ba_log "Using source project template at $SOURCE_PROJECT"
+
 LOCAL_MAVEN_REPO="${LOCAL_MAVEN_REPO:-$HOME/.m2/repository}"
 ba_log "Using local Maven repository at $LOCAL_MAVEN_REPO"
 mkdir -p "$LOCAL_MAVEN_REPO"
 MAVEN_CMD=("$MAVEN_HOME/bin/mvn" -Dmaven.repo.local="$LOCAL_MAVEN_REPO")
 
-ARCHETYPE_PLUGIN_VERSION="3.2.1"
-ARCHETYPE_PLUGIN_JAR="$LOCAL_MAVEN_REPO/org/apache/maven/plugins/maven-archetype-plugin/$ARCHETYPE_PLUGIN_VERSION/maven-archetype-plugin-$ARCHETYPE_PLUGIN_VERSION.jar"
-
-if [ ! -f "$ARCHETYPE_PLUGIN_JAR" ]; then
-  ba_log "Preloading Maven archetype plugin version $ARCHETYPE_PLUGIN_VERSION into $LOCAL_MAVEN_REPO"
-  if ! xvfb-run -a "${MAVEN_CMD[@]}" -B org.apache.maven.plugins:maven-archetype-plugin:"$ARCHETYPE_PLUGIN_VERSION":help -Ddetail -Dgoal=generate; then
-    ba_log "Failed to cache maven-archetype-plugin $ARCHETYPE_PLUGIN_VERSION; archetype generation may download dependencies" >&2
-  fi
-else
-  ba_log "Maven archetype plugin $ARCHETYPE_PLUGIN_VERSION already cached"
-fi
-
-ba_log "Generating Codename One application skeleton"
-xvfb-run -a "${MAVEN_CMD[@]}" -q --offline archetype:generate \
-  -DarchetypeArtifactId=cn1app-archetype \
-  -DarchetypeGroupId=com.codenameone \
-  -DarchetypeVersion="$CN1_VERSION" \
-  -DarchetypeCatalog=local \
-  -DgroupId="$GROUP_ID" \
-  -DartifactId="$ARTIFACT_ID" \
-  -Dversion=1.0-SNAPSHOT \
-  -DmainName="$MAIN_NAME" \
-  -DinteractiveMode=false \
-  -Dpackage="$GROUP_ID.$MAIN_NAME" \
-  -DoutputDirectory="$WORK_DIR" \
-  "${EXTRA_MVN_ARGS[@]}"
+ba_log "Generating Codename One application skeleton via codenameone-maven-plugin"
+(
+  cd "$WORK_DIR"
+  xvfb-run -a "${MAVEN_CMD[@]}" -q --offline \
+    com.codenameone:codenameone-maven-plugin:"$CN1_VERSION":generate-app-project \
+    -DgroupId="$GROUP_ID" \
+    -DartifactId="$ARTIFACT_ID" \
+    -Dversion=1.0-SNAPSHOT \
+    -DsourceProject="$SOURCE_PROJECT" \
+    "${EXTRA_MVN_ARGS[@]}"
+)
 
 APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 if [ ! -d "$APP_DIR" ]; then
@@ -156,6 +148,13 @@ PACKAGE_NAME=$(sed -n 's/^package \(.*\);/\1/p' "$MAIN_FILE" | head -n 1)
 if [ -z "$PACKAGE_NAME" ]; then
   ba_log "Unable to determine package name from $MAIN_FILE" >&2
   exit 1
+fi
+
+TARGET_MAIN_FILE_DIR="$(dirname "$MAIN_FILE")"
+TARGET_MAIN_FILE="$TARGET_MAIN_FILE_DIR/${MAIN_NAME}.java"
+if [ "$MAIN_FILE" != "$TARGET_MAIN_FILE" ]; then
+  mv "$MAIN_FILE" "$TARGET_MAIN_FILE"
+  MAIN_FILE="$TARGET_MAIN_FILE"
 fi
 
 cat > "$MAIN_FILE" <<HELLOEOF
@@ -194,6 +193,31 @@ public class ${MAIN_NAME} {
 HELLOEOF
 
 SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
+ba_log "Setting codename1.mainName to $MAIN_NAME"
+if [ -f "$SETTINGS_FILE" ]; then
+  if grep -q '^codename1.mainName=' "$SETTINGS_FILE"; then
+    python3 - "$SETTINGS_FILE" "$MAIN_NAME" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+main_name = sys.argv[2]
+text = path.read_text()
+replacement = f'codename1.mainName={main_name}'
+if re.search(r'^codename1\.mainName=', text, flags=re.MULTILINE):
+    text = re.sub(r'^codename1\.mainName=.*$', replacement, text, flags=re.MULTILINE)
+else:
+    text = text + ('\n' if not text.endswith('\n') else '') + replacement + '\n'
+path.write_text(text if text.endswith('\n') else text + '\n')
+PY
+  else
+    printf '\ncodename1.mainName=%s\n' "$MAIN_NAME" >> "$SETTINGS_FILE"
+  fi
+else
+  printf 'codename1.mainName=%s\n' "$MAIN_NAME" > "$SETTINGS_FILE"
+fi
+
 ba_log "Disabling Codename One CSS compilation to avoid headless failures"
 if [ -f "$SETTINGS_FILE" ]; then
   if grep -q '^codename1.cssTheme=' "$SETTINGS_FILE"; then
