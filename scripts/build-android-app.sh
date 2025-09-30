@@ -144,7 +144,69 @@ if [ -f "$APP_DIR/build.sh" ]; then
   chmod +x "$APP_DIR/build.sh"
 fi
 
-MAIN_FILE=$(find "$APP_DIR" -path "*/common/src/main/java/*Application.java" | head -n 1 || true)
+SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
+if [ ! -f "$SETTINGS_FILE" ]; then
+  ba_log "codenameone_settings.properties not found at $SETTINGS_FILE" >&2
+  exit 1
+fi
+
+CN1_SETTINGS_TMP=$(mktemp)
+trap 'rm -f "$CN1_SETTINGS_TMP"' EXIT
+
+SETTINGS_FILE="$SETTINGS_FILE" python3 <<'PY' >"$CN1_SETTINGS_TMP"
+import os
+import pathlib
+import shlex
+
+path = pathlib.Path(os.environ['SETTINGS_FILE'])
+package = ""
+main_name = ""
+if path.exists():
+    for line in path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        if stripped.startswith('codename1.packageName=') and not package:
+            package = stripped.split('=', 1)[1].strip()
+        elif stripped.startswith('codename1.mainName=') and not main_name:
+            main_name = stripped.split('=', 1)[1].strip()
+
+print(f"CN1_PACKAGE_NAME={shlex.quote(package)}")
+print(f"CN1_CURRENT_MAIN_NAME={shlex.quote(main_name)}")
+PY
+
+# shellcheck disable=SC1090
+source "$CN1_SETTINGS_TMP"
+rm -f "$CN1_SETTINGS_TMP"
+trap - EXIT
+
+PACKAGE_NAME="${CN1_PACKAGE_NAME:-}"
+CURRENT_MAIN_NAME="${CN1_CURRENT_MAIN_NAME:-}"
+
+if [ -z "$PACKAGE_NAME" ]; then
+  PACKAGE_NAME="$GROUP_ID"
+  ba_log "Package name not found in settings. Falling back to groupId $PACKAGE_NAME"
+fi
+
+if [ -z "$CURRENT_MAIN_NAME" ]; then
+  CURRENT_MAIN_NAME="$MAIN_NAME"
+  ba_log "Main class name not found in settings. Falling back to target $CURRENT_MAIN_NAME"
+fi
+
+PACKAGE_PATH="${PACKAGE_NAME//.//}"
+if [ -n "$PACKAGE_PATH" ]; then
+  EXPECTED_MAIN_PATH="$APP_DIR/common/src/main/java/$PACKAGE_PATH/$CURRENT_MAIN_NAME.java"
+else
+  EXPECTED_MAIN_PATH="$APP_DIR/common/src/main/java/$CURRENT_MAIN_NAME.java"
+fi
+
+if [ -f "$EXPECTED_MAIN_PATH" ]; then
+  MAIN_FILE="$EXPECTED_MAIN_PATH"
+else
+  ba_log "Expected main source $EXPECTED_MAIN_PATH not found. Scanning project tree for $CURRENT_MAIN_NAME.java"
+  MAIN_FILE=$(find "$APP_DIR/common/src/main/java" -name "$CURRENT_MAIN_NAME.java" | head -n 1 || true)
+fi
+
 if [ -z "$MAIN_FILE" ]; then
   ba_log "Could not locate the generated application source file" >&2
   exit 1
@@ -198,11 +260,9 @@ public class ${MAIN_NAME} {
 }
 HELLOEOF
 
-SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
 ba_log "Setting codename1.mainName to $MAIN_NAME"
-if [ -f "$SETTINGS_FILE" ]; then
-  if grep -q '^codename1.mainName=' "$SETTINGS_FILE"; then
-    python3 - "$SETTINGS_FILE" "$MAIN_NAME" <<'PY'
+if grep -q '^codename1.mainName=' "$SETTINGS_FILE"; then
+  python3 - "$SETTINGS_FILE" "$MAIN_NAME" <<'PY'
 import pathlib
 import re
 import sys
@@ -217,17 +277,13 @@ else:
     text = text + ('\n' if not text.endswith('\n') else '') + replacement + '\n'
 path.write_text(text if text.endswith('\n') else text + '\n')
 PY
-  else
-    printf '\ncodename1.mainName=%s\n' "$MAIN_NAME" >> "$SETTINGS_FILE"
-  fi
 else
-  printf 'codename1.mainName=%s\n' "$MAIN_NAME" > "$SETTINGS_FILE"
+  printf '\ncodename1.mainName=%s\n' "$MAIN_NAME" >> "$SETTINGS_FILE"
 fi
 
 ba_log "Disabling Codename One CSS compilation to avoid headless failures"
-if [ -f "$SETTINGS_FILE" ]; then
-  if grep -q '^codename1.cssTheme=' "$SETTINGS_FILE"; then
-    python3 - "$SETTINGS_FILE" <<'PY'
+if grep -q '^codename1.cssTheme=' "$SETTINGS_FILE"; then
+  python3 - "$SETTINGS_FILE" <<'PY'
 import pathlib
 import re
 import sys
@@ -241,11 +297,8 @@ else:
     text = text + ('\n' if not text.endswith('\n') else '') + replacement + '\n'
 path.write_text(text if text.endswith('\n') else text + '\n')
 PY
-  else
-    printf '\ncodename1.cssTheme=false\n' >> "$SETTINGS_FILE"
-  fi
 else
-  printf 'codename1.cssTheme=false\n' > "$SETTINGS_FILE"
+  printf '\ncodename1.cssTheme=false\n' >> "$SETTINGS_FILE"
 fi
 
 ba_log "Building Android gradle project using Codename One port"
