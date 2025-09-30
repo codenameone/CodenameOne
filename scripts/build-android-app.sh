@@ -131,6 +131,7 @@ ba_log "Generating Codename One application skeleton via codenameone-maven-plugi
     -DartifactId="$ARTIFACT_ID" \
     -Dversion=1.0-SNAPSHOT \
     -DsourceProject="$SOURCE_PROJECT" \
+    -Dcn1Version="$CN1_VERSION" \
     "${EXTRA_MVN_ARGS[@]}"
 )
 
@@ -280,6 +281,113 @@ PY
 else
   printf '\ncodename1.mainName=%s\n' "$MAIN_NAME" >> "$SETTINGS_FILE"
 fi
+
+ba_log "Normalizing Codename One Maven coordinates to $CN1_VERSION"
+while IFS= read -r -d '' pom_file; do
+  ba_log "Updating Codename One artifacts in $pom_file"
+  python3 - "$pom_file" "$CN1_VERSION" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+pom_path, cn1_version = sys.argv[1:3]
+tree = ET.parse(pom_path)
+root = tree.getroot()
+
+def local_name(tag):
+    return tag.split('}', 1)[-1] if '}' in tag else tag
+
+ns_uri = ''
+if root.tag.startswith('{') and '}' in root.tag:
+    ns_uri = root.tag[1:root.tag.index('}')]
+
+def qname(name):
+    return f'{{{ns_uri}}}{name}' if ns_uri else name
+
+def find_child(parent, name):
+    for child in list(parent):
+        if local_name(child.tag) == name:
+            return child
+    return None
+
+changed = False
+
+properties = root.find(qname('properties'))
+if properties is None:
+    properties = ET.Element(qname('properties'))
+    # Insert properties after version if possible, otherwise append to root
+    inserted = False
+    for idx, child in enumerate(list(root)):
+        lname = local_name(child.tag)
+        if lname in {'modelVersion', 'groupId', 'artifactId', 'version'}:
+            continue
+        root.insert(idx, properties)
+        inserted = True
+        break
+    if not inserted:
+        root.append(properties)
+    changed = True
+
+def ensure_property(name, value):
+    global changed
+    prop = find_child(properties, name)
+    if prop is None:
+        prop = ET.SubElement(properties, qname(name))
+        changed = True
+    if (prop.text or '').strip() != value:
+        prop.text = value
+        changed = True
+
+ensure_property('codenameone.version', cn1_version)
+
+def ensure_version(element):
+    global changed
+    version = element.find(qname('version'))
+    if version is None:
+        version = ET.SubElement(element, qname('version'))
+        version.text = cn1_version
+        changed = True
+        return
+    text = (version.text or '').strip()
+    if text.startswith('${'):
+        return
+    if text != cn1_version:
+        version.text = cn1_version
+        changed = True
+
+def update_artifacts(parent):
+    if parent is None:
+        return
+    plugins = parent.find(qname('plugins'))
+    if plugins is None:
+        return
+    for plugin in plugins.findall(qname('plugin')):
+        group = plugin.find(qname('groupId'))
+        if group is not None and (group.text or '').strip() == 'com.codenameone':
+            ensure_version(plugin)
+
+build = root.find(qname('build'))
+if build is not None:
+    update_artifacts(build)
+    plugin_mgmt = build.find(qname('pluginManagement'))
+    if plugin_mgmt is not None:
+        update_artifacts(plugin_mgmt)
+
+for dependency in root.findall('.//' + qname('dependency')):
+    group = dependency.find(qname('groupId'))
+    if group is not None and (group.text or '').strip() == 'com.codenameone':
+        ensure_version(dependency)
+
+if ns_uri:
+    ET.register_namespace('', ns_uri)
+
+if changed:
+    try:
+        ET.indent(tree, space='  ')
+    except AttributeError:
+        pass
+    tree.write(pom_path, encoding='UTF-8', xml_declaration=True)
+PY
+done < <(find "$APP_DIR" -name pom.xml -print0)
 
 ba_log "Disabling Codename One CSS compilation to avoid headless failures"
 if grep -q '^codename1.cssTheme=' "$SETTINGS_FILE"; then
