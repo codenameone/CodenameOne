@@ -53,6 +53,9 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     @Parameter(property="archetypeCatalog", defaultValue = "local")
     private String archetypeCatalog;
 
+    @Parameter(property = "bootstrapArchetypeVersion", defaultValue = "7.0.204")
+    private String bootstrapArchetypeVersion;
+
 
     private Properties loadSourceProjectProperties() throws IOException {
         Properties props = new Properties();
@@ -76,6 +79,14 @@ public class GenerateAppProjectMojo extends AbstractMojo {
             MavenXpp3Reader reader = new MavenXpp3Reader();
             Model model = reader.read(getClass().getResourceAsStream("/META-INF/maven/com.codenameone/codenameone-maven-plugin/pom.xml"));
             archetypeVersion = model.getVersion();
+            if (archetypeVersion != null && archetypeVersion.endsWith("-SNAPSHOT")) {
+                String bootstrapVersion = bootstrapArchetypeVersion != null ? bootstrapArchetypeVersion.trim() : "";
+                if (bootstrapVersion.isEmpty()) {
+                    bootstrapVersion = "LATEST";
+                }
+                getLog().info("Detected snapshot plugin version " + archetypeVersion + ". Bootstrapping cn1app-archetype using " + bootstrapVersion + ".");
+                archetypeVersion = bootstrapVersion;
+            }
         } catch (Exception ex) {
             getLog().warn("Attempted to read archetype version from embedded pom.xml file but failed", ex);
         }
@@ -83,6 +94,9 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         //request.setPomFile( new File( "/path/to/pom.xml" ) );
 
         request.setGoals( Collections.singletonList( "archetype:generate" ) );
+
+        request.setBatchMode(true);
+        request.setInteractive(false);
 
         String[] propsArr = {
                 "interactiveMode=false",
@@ -120,6 +134,19 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         request.setProperties(props);
 
         Invoker invoker = new DefaultInvoker();
+        invoker.setInputStream(new ByteArrayInputStream(new byte[0]));
+        invoker.setOutputHandler(line -> {
+            if (line == null || line.contains("Progress (")) {
+                return;
+            }
+            getLog().info(line);
+        });
+        invoker.setErrorHandler(line -> {
+            if (line == null || line.contains("Progress (")) {
+                return;
+            }
+            getLog().error(line);
+        });
         try {
             InvocationResult result = invoker.execute( request );
             if (result.getExitCode() != 0) {
