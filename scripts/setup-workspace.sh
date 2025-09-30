@@ -104,6 +104,9 @@ install_jdk() {
   printf -v "$dest_var" '%s' "$home"
 }
 
+CN1_VERSION=$(awk -F'[<>]' '/<version>/{print $3; exit}' maven/pom.xml)
+log "Detected Codename One snapshot version ${CN1_VERSION}"
+
 log "Ensuring JDK 8 is available"
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '8\.0'; then
   log "Provisioning JDK 8..."
@@ -215,6 +218,15 @@ fi
 set -e
 
 if [ "${skip_archetypes:-0}" -eq 0 ]; then
-  (cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -DskipTests -DskipITs=true -Dinvoker.skip=true install) || \
-    log "Archetype mvn install failed; continuing."
+  (
+    cd cn1-maven-archetypes
+    current_version=$("$MAVEN_HOME/bin/mvn" -q -DforceStdout help:evaluate -Dexpression=project.version | tr -d '\r' | tail -n 1)
+    if [ -z "$current_version" ]; then
+      log "Unable to determine cn1-maven-archetypes version; proceeding with defaults"
+    elif [ "$current_version" != "$CN1_VERSION" ]; then
+      log "Updating cn1-maven-archetypes version from $current_version to $CN1_VERSION to match local snapshot"
+      "$MAVEN_HOME/bin/mvn" -q -B versions:set -DnewVersion="$CN1_VERSION" -DgenerateBackupPoms=false
+    fi
+    "$MAVEN_HOME/bin/mvn" -DskipTests -DskipITs=true -Dinvoker.skip=true install
+  ) || log "Archetype mvn install failed; continuing."
 fi
