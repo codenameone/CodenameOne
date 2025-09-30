@@ -125,7 +125,7 @@ MAVEN_CMD=(
 ba_log "Generating Codename One application skeleton via codenameone-maven-plugin"
 (
   cd "$WORK_DIR"
-  xvfb-run -a "${MAVEN_CMD[@]}" -q --offline \
+  xvfb-run -a "${MAVEN_CMD[@]}" -q \
     com.codenameone:codenameone-maven-plugin:"$CN1_VERSION":generate-app-project \
     -DgroupId="$GROUP_ID" \
     -DartifactId="$ARTIFACT_ID" \
@@ -410,7 +410,7 @@ else
 fi
 
 ba_log "Building Android gradle project using Codename One port"
-xvfb-run -a "${MAVEN_CMD[@]}" -q --offline -f "$APP_DIR/pom.xml" package -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false "${EXTRA_MVN_ARGS[@]}"
+xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false "${EXTRA_MVN_ARGS[@]}"
 
 GRADLE_PROJECT_DIR=$(find "$APP_DIR/target" -maxdepth 1 -type d -name "*-android-source" | head -n 1 || true)
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
