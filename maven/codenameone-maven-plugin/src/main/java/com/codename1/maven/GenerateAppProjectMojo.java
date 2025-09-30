@@ -96,7 +96,6 @@ public class GenerateAppProjectMojo extends AbstractMojo {
         request.setGoals( Collections.singletonList( "archetype:generate" ) );
 
         request.setBatchMode(true);
-        request.setInteractive(false);
 
         String[] propsArr = {
                 "interactiveMode=false",
