@@ -50,6 +50,9 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     @Parameter(property="version", defaultValue = "1.0-SNAPSHOT")
     private String version;
 
+    @Parameter(property="archetypeCatalog", defaultValue = "local")
+    private String archetypeCatalog;
+
 
     private Properties loadSourceProjectProperties() throws IOException {
         Properties props = new Properties();
@@ -99,6 +102,13 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 props.setProperty(prop.substring(0, eqpos), prop.substring(eqpos+1));
             } else if (eqpos < 0) {
                 props.setProperty(prop, "true");
+            }
+        }
+
+        if (archetypeCatalog != null) {
+            String catalog = archetypeCatalog.trim();
+            if (!catalog.isEmpty()) {
+                props.setProperty("archetypeCatalog", catalog);
             }
         }
 
