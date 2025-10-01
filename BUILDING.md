@@ -24,7 +24,7 @@ export JAVA_HOME=$PWD/jdk-8.0.28+6
 # JDK 17 (Linux x64; adjust `_x64_linux_` for your platform)
 curl -L -o temurin17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_x64_linux_hotspot_17.0.16_8.tar.gz
 tar xf temurin17.tar.gz
-export JAVA_HOME_17=$PWD/jdk-17.0.16+8
+export JAVA17_HOME=$PWD/jdk-17.0.16+8
 
 export PATH="$JAVA_HOME/bin:$PATH"
 ```
@@ -54,7 +54,7 @@ Note that it's important that `$CN1_BINARIES` points at the locally cloned [cn1-
 
 ## Building the Android port
 
-The Android port uses JDK 8 as well. However, it needs a `JAVA_HOME_17` environment variable that points at JDK 17.
+The Android port uses JDK 8 as well. However, it needs a `JAVA17_HOME` environment variable that points at JDK 17.
 
 ```bash
 ./scripts/build-android-port.sh -DskipTests

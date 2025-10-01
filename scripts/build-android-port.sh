@@ -63,7 +63,7 @@ validate_workspace() {
     missing=1
   fi
 
-  if ! check_java_home "JAVA_HOME_17" "${JAVA_HOME_17:-}" '17\.'; then
+  if ! check_java_home "JAVA17_HOME" "${JAVA17_HOME:-}" '17\.'; then
     missing=1
   fi
 
@@ -106,11 +106,11 @@ else
   log "Workspace environment validated"
 fi
 
-log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA_HOME_17=${JAVA_HOME_17:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
+log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA17_HOME=${JAVA17_HOME:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 "$JAVA_HOME/bin/java" -version
-"$JAVA_HOME_17/bin/java" -version
+"$JAVA17_HOME/bin/java" -version
 "$MAVEN_HOME/bin/mvn" -version
 
 run_maven() {

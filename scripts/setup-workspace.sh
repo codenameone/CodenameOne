@@ -43,7 +43,7 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 JAVA_HOME="${JAVA_HOME:-}"
-JAVA_HOME_17="${JAVA_HOME_17:-}"
+JAVA17_HOME="${JAVA17_HOME:-}"
 MAVEN_HOME="${MAVEN_HOME:-}"
 
 log "Detecting host platform"
@@ -116,11 +116,11 @@ else
 fi
 
 log "Ensuring JDK 17 is available"
-if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ] || ! "$JAVA_HOME_17/bin/java" -version 2>&1 | grep -q '17\.0'; then
+if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ] || ! "$JAVA17_HOME/bin/java" -version 2>&1 | grep -q '17\.0'; then
   log "Provisioning JDK 17..."
-  install_jdk "$JDK17_URL" JAVA_HOME_17
+  install_jdk "$JDK17_URL" JAVA17_HOME
 else
-  log "Using existing JDK 17 at $JAVA_HOME_17"
+  log "Using existing JDK 17 at $JAVA17_HOME"
 fi
 
 log "Ensuring Maven is available"
@@ -159,7 +159,7 @@ fi
 log "Writing environment to $ENV_FILE"
 cat > "$ENV_FILE" <<ENV
 export JAVA_HOME="$JAVA_HOME"
-export JAVA_HOME_17="$JAVA_HOME_17"
+export JAVA17_HOME="$JAVA17_HOME"
 export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
 ENV
@@ -177,7 +177,7 @@ fi
 source "$ENV_FILE"
 
 log "JDK 8 version:"; "$JAVA_HOME/bin/java" -version
-log "JDK 17 version:"; "$JAVA_HOME_17/bin/java" -version
+log "JDK 17 version:"; "$JAVA17_HOME/bin/java" -version
 log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
 PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"

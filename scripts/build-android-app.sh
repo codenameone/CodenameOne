@@ -25,7 +25,7 @@ if [ -f "$ENV_FILE" ]; then
   sed 's/^/[build-android-app] ENV: /' "$ENV_FILE"
   # shellcheck disable=SC1090
   source "$ENV_FILE"
-  ba_log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA_HOME_17=${JAVA_HOME_17:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
+  ba_log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA17_HOME=${JAVA17_HOME:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
 else
   ba_log "Workspace tools not found. Run scripts/setup-workspace.sh before this script." >&2
   exit 1
@@ -44,17 +44,17 @@ if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
   ba_log "JAVA_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
   exit 1
 fi
-if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/java" ]; then
-  ba_log "JAVA_HOME_17 validation failed. Current value: ${JAVA_HOME_17:-<unset>}" >&2
-  if [ -n "${JAVA_HOME_17:-}" ]; then
-    ba_log "Contents of JAVA_HOME_17 directory"
-    if [ -d "$JAVA_HOME_17" ]; then
-      ls -l "$JAVA_HOME_17" | while IFS= read -r line; do ba_log "$line"; done
+if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
+  ba_log "JAVA17_HOME validation failed. Current value: ${JAVA17_HOME:-<unset>}" >&2
+  if [ -n "${JAVA17_HOME:-}" ]; then
+    ba_log "Contents of JAVA17_HOME directory"
+    if [ -d "$JAVA17_HOME" ]; then
+      ls -l "$JAVA17_HOME" | while IFS= read -r line; do ba_log "$line"; done
     else
-      ba_log "JAVA_HOME_17 directory does not exist"
+      ba_log "JAVA17_HOME directory does not exist"
     fi
   fi
-  ba_log "JAVA_HOME_17 is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+  ba_log "JAVA17_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
   exit 1
 fi
 if [ -z "${MAVEN_HOME:-}" ] || [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
@@ -72,7 +72,7 @@ if [ -z "${MAVEN_HOME:-}" ] || [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
 fi
 
 ba_log "Using JAVA_HOME at $JAVA_HOME"
-ba_log "Using JAVA_HOME_17 at $JAVA_HOME_17"
+ba_log "Using JAVA17_HOME at $JAVA17_HOME"
 ba_log "Using Maven installation at $MAVEN_HOME"
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
@@ -421,7 +421,7 @@ fi
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
-export JAVA_HOME="$JAVA_HOME_17"
+export JAVA_HOME="$JAVA17_HOME"
 (
   cd "$GRADLE_PROJECT_DIR"
   if command -v sdkmanager >/dev/null 2>&1; then
