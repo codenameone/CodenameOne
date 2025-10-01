@@ -417,7 +417,7 @@ GRADLE_PROJECT_DIR=$(find "$APP_DIR/target" -maxdepth 2 -type d -name "*-android
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
   ba_log "Failed to locate generated Android project" >&2
   ba_log "Contents of $APP_DIR/target:" >&2
-  ls -R "$APP_DIR/target" >&2 || ba_log "Unable to list $APP_DIR/target" >&2
+  ls -R "$APP_DIR" >&2 || ba_log "Unable to list $APP_DIR" >&2
   exit 1
 fi
 
