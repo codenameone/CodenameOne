@@ -17,99 +17,58 @@ ENV_DIR="$DOWNLOAD_DIR/tools"
 EXTRA_MVN_ARGS=("$@")
 
 ENV_FILE="$ENV_DIR/env.sh"
-
-log_env_file() {
+ba_log "Loading workspace environment from $ENV_FILE"
+if [ -f "$ENV_FILE" ]; then
   ba_log "Workspace environment file metadata"
   ls -l "$ENV_FILE" | while IFS= read -r line; do ba_log "$line"; done
   ba_log "Workspace environment file contents"
   sed 's/^/[build-android-app] ENV: /' "$ENV_FILE"
-}
-
-log_directory_listing() {
-  local path="$1"
-  if [ -d "$path" ]; then
-    ls -l "$path" | while IFS= read -r line; do ba_log "$line"; done
-  else
-    ba_log "Directory $path does not exist"
-  fi
-}
-
-load_workspace_env() {
-  if [ ! -f "$ENV_FILE" ]; then
-    return 1
-  fi
-  log_env_file
   # shellcheck disable=SC1090
   source "$ENV_FILE"
   ba_log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA17_HOME=${JAVA17_HOME:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
-  return 0
-}
-
-validate_java_home() {
-  local name="$1" home="$2" pattern="$3"
-  if [ -z "$home" ]; then
-    ba_log "$name validation failed. Current value: <unset>" >&2
-    return 1
-  fi
-  if [ ! -x "$home/bin/java" ]; then
-    ba_log "$name validation failed. java binary not found under $home" >&2
-    log_directory_listing "$home"
-    return 1
-  fi
-  local version_output
-  version_output="$($home/bin/java -version 2>&1 || true)"
-  if ! grep -q "$pattern" <<<"$version_output"; then
-    ba_log "$name java -version output did not match $pattern (value: $home)" >&2
-    while IFS= read -r line; do ba_log "$line"; done <<<"$version_output"
-    return 1
-  fi
-  return 0
-}
-
-validate_maven_home() {
-  local home="$1"
-  if [ -z "$home" ]; then
-    ba_log "MAVEN_HOME validation failed. Current value: <unset>" >&2
-    return 1
-  fi
-  if [ ! -x "$home/bin/mvn" ]; then
-    ba_log "MAVEN_HOME validation failed. Current value: $home (mvn binary not found)" >&2
-    log_directory_listing "$home"
-    return 1
-  fi
-  return 0
-}
-
-validate_workspace_env() {
-  local failed=0
-  validate_java_home "JAVA_HOME" "${JAVA_HOME:-}" '1\\.8' || failed=1
-  validate_java_home "JAVA17_HOME" "${JAVA17_HOME:-}" '17\\.' || failed=1
-  validate_maven_home "${MAVEN_HOME:-}" || failed=1
-  return $failed
-}
-
-provision_workspace() {
-  ba_log "Provisioning workspace tools via scripts/setup-workspace.sh"
-  "$REPO_ROOT/scripts/setup-workspace.sh" -q -DskipTests
-  if ! load_workspace_env; then
-    ba_log "Unable to load workspace environment from $ENV_FILE after provisioning." >&2
-    exit 1
-  fi
-}
-
-ba_log "Loading workspace environment from $ENV_FILE"
-if ! load_workspace_env; then
-  ba_log "Workspace tools not found. Running scripts/setup-workspace.sh." >&2
-  provision_workspace
+else
+  ba_log "Workspace tools not found. Run scripts/setup-workspace.sh before this script." >&2
+  exit 1
 fi
 
-if ! validate_workspace_env; then
-  ba_log "Workspace validation failed. Re-provisioning tools." >&2
-  provision_workspace
-  if ! validate_workspace_env; then
-    ba_log "Workspace validation failed after provisioning. Please inspect $ENV_FILE." >&2
-    exit 1
+if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+  ba_log "JAVA_HOME validation failed. Current value: ${JAVA_HOME:-<unset>}" >&2
+  if [ -n "${JAVA_HOME:-}" ]; then
+    ba_log "Contents of JAVA_HOME directory"
+    if [ -d "$JAVA_HOME" ]; then
+      ls -l "$JAVA_HOME" | while IFS= read -r line; do ba_log "$line"; done
+    else
+      ba_log "JAVA_HOME directory does not exist"
+    fi
   fi
+  ba_log "JAVA_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+  exit 1
+fi
+if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
+  ba_log "JAVA17_HOME validation failed. Current value: ${JAVA17_HOME:-<unset>}" >&2
+  if [ -n "${JAVA17_HOME:-}" ]; then
+    ba_log "Contents of JAVA17_HOME directory"
+    if [ -d "$JAVA17_HOME" ]; then
+      ls -l "$JAVA17_HOME" | while IFS= read -r line; do ba_log "$line"; done
+    else
+      ba_log "JAVA17_HOME directory does not exist"
+    fi
+  fi
+  ba_log "JAVA17_HOME is not set correctly. Please run scripts/setup-workspace.sh first." >&2
+  exit 1
+fi
+if [ -z "${MAVEN_HOME:-}" ] || [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
+  ba_log "MAVEN_HOME validation failed. Current value: ${MAVEN_HOME:-<unset>}" >&2
+  if [ -n "${MAVEN_HOME:-}" ]; then
+    ba_log "Contents of MAVEN_HOME directory"
+    if [ -d "$MAVEN_HOME" ]; then
+      ls -l "$MAVEN_HOME" | while IFS= read -r line; do ba_log "$line"; done
+    else
+      ba_log "MAVEN_HOME directory does not exist"
+    fi
+  fi
+  ba_log "Maven is not available. Please run scripts/setup-workspace.sh first." >&2
+  exit 1
 fi
 
 ba_log "Using JAVA_HOME at $JAVA_HOME"
