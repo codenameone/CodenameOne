@@ -1,0 +1,32 @@
+package @PACKAGE@;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
+
+public class @MAIN_NAME@ {
+    private Form current;
+
+    public void init(Object context) {
+        // No special initialization required for this sample
+    }
+
+    public void start() {
+        if (current != null) {
+            current.show();
+            return;
+        }
+        Form helloForm = new Form("Hello Codename One", new BorderLayout());
+        helloForm.add(BorderLayout.CENTER, new Label("Hello Codename One"));
+        helloForm.show();
+    }
+
+    public void stop() {
+        current = Display.getInstance().getCurrent();
+    }
+
+    public void destroy() {
+        // Nothing to clean up for this sample
+    }
+}
