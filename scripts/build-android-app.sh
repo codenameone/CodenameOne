@@ -173,6 +173,35 @@ xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" \
   -DgenerateBackupPoms=false \
   -DprocessAllModules=true || true
 
+# Validate changes
+# 1) Show the resolved com.codenameone artifacts and EXACT files used
+ba_log "Resolved Codename One dependencies (with file paths)"
+xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" \
+  -U \
+  org.apache.maven.plugins:maven-dependency-plugin:3.6.1:list \
+  -DincludeGroupIds=com.codenameone \
+  -DoutputAbsoluteArtifactFilename=true
+
+# 2) Full tree (helps spot leftover fixed versions / parents / pluginManagement)
+ba_log "Dependency tree (grep com.codenameone)"
+xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" \
+  -U \
+  org.apache.maven.plugins:maven-dependency-plugin:3.6.1:tree \
+  -Dincludes=com.codenameone:* | sed 's/^/[build-android-app] TREE: /'
+
+# 3) Confirm what version is actually in the POM after your versions:* steps
+ba_log "Grepping for codenameone version/property in POM"
+grep -nE 'codenameone\.version|com\.codenameone' "$APP_DIR/pom.xml" \
+  | sed 's/^/[build-android-app] POM: /'
+
+# 4) Print the exact artifact on disk we expect to be used (adjust artifactIds as needed)
+for AID in "codenameone-core" "codenameone-maven-plugin" "codenameone-android"; do
+  FOUND=$(find "$LOCAL_MAVEN_REPO/com/codenameone/$AID/$CN1_VERSION" -maxdepth 1 -type f)
+  ba_log "Local repo contents for $AID:$CN1_VERSION"
+  printf '%s\n' "$FOUND" | sed 's/^/[build-android-app] M2: /'
+done
+
+
 # Force dependencies on com.codenameone:* to the detected version
 xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" \
   versions:use-dep-version \
