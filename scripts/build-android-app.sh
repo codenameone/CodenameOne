@@ -28,7 +28,7 @@ else
   exit 1
 fi
 
-# --- Tool validations (unchanged) ---
+# --- Tool validations ---
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
   ba_log "JAVA_HOME validation failed. Current value: ${JAVA_HOME:-<unset>}" >&2
   if [ -n "${JAVA_HOME:-}" ]; then
@@ -100,7 +100,7 @@ MAVEN_CMD=(
   -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
 )
 
-# --- Generate app skeleton (unchanged) ---
+# --- Generate app skeleton ---
 ba_log "Generating Codename One application skeleton via codenameone-maven-plugin"
 (
   cd "$WORK_DIR"
@@ -121,7 +121,7 @@ APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
 [ -f "$SETTINGS_FILE" ] || { ba_log "codenameone_settings.properties not found at $SETTINGS_FILE" >&2; exit 1; }
 
-# --- Read settings WITHOUT Python ---
+# --- Read settings ---
 read_prop() { grep -E "^$1=" "$SETTINGS_FILE" | head -n1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//'; }
 
 PACKAGE_NAME="$(read_prop 'codename1.packageName' || true)"
@@ -152,7 +152,7 @@ sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
     -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
     "$TEMPLATE" > "$MAIN_FILE"
 
-# --- Ensure codename1.mainName is set WITHOUT Python ---
+# --- Ensure codename1.mainName is set ---
 ba_log "Setting codename1.mainName to $MAIN_NAME"
 if grep -q '^codename1.mainName=' "$SETTINGS_FILE"; then
   # GNU sed in CI: in-place edit without backup
@@ -163,7 +163,7 @@ fi
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
 
-# --- Normalize Codename One versions WITHOUT Python (use Maven Versions Plugin) ---
+# --- Normalize Codename One versions (use Maven Versions Plugin) ---
 ba_log "Normalizing Codename One Maven coordinates to $CN1_VERSION"
 # Set property codenameone.version where present
 xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" \
@@ -190,7 +190,7 @@ xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" \
   -DgenerateBackupPoms=false \
   -DprocessAllModules=true || true
 
-# --- Build Android gradle project (unchanged) ---
+# --- Build Android gradle project ---
 ba_log "Building Android gradle project using Codename One port"
 xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package \
   -DskipTests \

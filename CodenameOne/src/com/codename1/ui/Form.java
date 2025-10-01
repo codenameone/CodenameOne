@@ -179,7 +179,10 @@ public class Form extends Container {
     public Form() {
         this(new FlowLayout());
     }
-    
+
+    public void testCIWorks() {
+    }
+
     /**
      * Constructor that accepts a layout
      * 
