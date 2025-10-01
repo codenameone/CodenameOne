@@ -413,8 +413,11 @@ ba_log "Building Android gradle project using Codename One port"
 xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package -DskipTests -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false "${EXTRA_MVN_ARGS[@]}"
 
 GRADLE_PROJECT_DIR=$(find "$APP_DIR/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
+
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
   ba_log "Failed to locate generated Android project" >&2
+  ba_log "Contents of $APP_DIR/target:" >&2
+  ls -R "$APP_DIR/target" >&2 || ba_log "Unable to list $APP_DIR/target" >&2
   exit 1
 fi
 
