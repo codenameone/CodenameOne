@@ -126,12 +126,12 @@ ba_log "Generating Codename One application skeleton via codenameone-maven-plugi
 (
   cd "$WORK_DIR"
   xvfb-run -a "${MAVEN_CMD[@]}" -q \
-    com.codenameone:codenameone-maven-plugin:"$CN1_VERSION":generate-app-project \
+    com.codenameone:codenameone-maven-plugin:7.0.204:generate-app-project \
     -DgroupId="$GROUP_ID" \
     -DartifactId="$ARTIFACT_ID" \
     -Dversion=1.0-SNAPSHOT \
     -DsourceProject="$SOURCE_PROJECT" \
-    -Dcn1Version="$CN1_VERSION" \
+    -Dcn1Version="7.0.204" \
     "${EXTRA_MVN_ARGS[@]}"
 )
 
