@@ -13,7 +13,7 @@ on:
 jobs:
   build-ios:
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
-    timeout-minutes: 20         # hard-stop the job after 20 minutes
+    timeout-minutes: 25         # hard-stop the job after 25 minutes
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci
       cancel-in-progress: false # queue new ones instead of canceling in-flight
@@ -24,7 +24,7 @@ jobs:
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
         # per-step timeout
-        timeout-minutes: 6
+        timeout-minutes: 15
 
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
