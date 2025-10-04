@@ -116,11 +116,11 @@ ba_log "Generating Codename One application skeleton via codenameone-maven-plugi
 
 APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 
-# --- Normalize Codename One versions (safe for Maven parent resolution) ---
+# --- Robust CN1 version normalization & plugin version injection ---
 
 ROOT_POM="$APP_DIR/pom.xml"
 
-# 0) Ensure property exists (you can keep this for deps/plugins)
+# 0) Ensure property exists for deps/plugins (not used for parent)
 ensure_property() {
   local pom="$1" name="$2" value="$3"
   if ! grep -q "<properties>" "$pom"; then
@@ -140,26 +140,60 @@ ensure_property() {
 }
 ensure_property "$ROOT_POM" "codenameone.version" "$CN1_VERSION"
 
-# 1) Parent: set literal version (Maven DOES NOT allow a property here)
+# 1) Parent must be literal version (Maven cannot resolve a property here)
 while IFS= read -r -d '' P; do
   perl -0777 -pe 's!(<parent>\s*<groupId>com\.codenameone</groupId>\s*<artifactId>codenameone-maven-parent</artifactId>\s*<version>)[^<]+(</version>)!$1'"$CN1_VERSION"'$2!s' -i "$P"
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 2) com.codenameone deps/plugins -> use the property (optional but tidy)
+# 2) CN1 deps/plugins -> property
 while IFS= read -r -d '' P; do
   perl -0777 -pe 's!(<dependency>\s*<groupId>com\.codenameone[^<]*</groupId>\s*<artifactId>[^<]+</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!sg' -i "$P"
   perl -0777 -pe 's!(<plugin>\s*<groupId>com\.codenameone[^<]*</groupId>\s*<artifactId>[^<]+</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!sg' -i "$P"
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 3) Build with the property set (covers any missed spots)
+# 3) Inject versions for plugins that have none (both build/plugins and pluginManagement)
+#    Map of common Maven plugin versions (adjust if you need different pins)
+declare -A PLUG_VERSIONS=(
+  [org.apache.maven.plugins:maven-compiler-plugin]=3.11.0
+  [org.apache.maven.plugins:maven-surefire-plugin]=3.2.5
+  [org.apache.maven.plugins:maven-failsafe-plugin]=3.2.5
+  [org.apache.maven.plugins:maven-jar-plugin]=3.3.0
+  [org.apache.maven.plugins:maven-resources-plugin]=3.3.1
+  [org.apache.maven.plugins:maven-install-plugin]=3.1.2
+  [org.apache.maven.plugins:maven-deploy-plugin]=3.1.2
+  [org.apache.maven.plugins:maven-clean-plugin]=3.3.2
+  [org.apache.maven.plugins:maven-site-plugin]=4.0.0-M15
+  [org.apache.maven.plugins:maven-assembly-plugin]=3.6.0
+  # If the generated app declares Codename One plugin without version (shouldn’t after step 2), this covers it:
+  [com.codenameone:codenameone-maven-plugin]="${CN1_VERSION}"
+)
+
+inject_plugin_versions_file() {
+  local pom="$1"
+  # For each known plugin, if present without <version>, insert one
+  for ga in "${!PLUG_VERSIONS[@]}"; do
+    local g="${ga%%:*}"; local a="${ga##*:}"; local v="${PLUG_VERSIONS[$ga]}"
+    # build/plugins
+    perl -0777 -pe 's!(<plugin>\s*<groupId>'"$g"'</groupId>\s*<artifactId>'"$a"'</artifactId>\s*)(?!.*?<version>.*?</version>)(?=.*?</plugin>)!\1<version>'"$v"'</version>\n!sg' -i "$pom"
+    # pluginManagement/plugins
+    perl -0777 -pe 's!(<plugin>\s*<groupId>'"$g"'</groupId>\s*<artifactId>'"$a"'</artifactId>\s*)(?!.*?<version>.*?</version>)(?=.*?</plugin>)!\1<version>'"$v"'</version>\n!sg' -i "$pom"
+  done
+}
+
+while IFS= read -r -d '' P; do
+  inject_plugin_versions_file "$P"
+done < <(find "$APP_DIR" -type f -name pom.xml -print0)
+
+# 4) Build with the property set (covers any lingering references)
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 
-# Show parent block without failing the build
-grep -n -A3 -B3 '<parent>' "$APP_DIR/pom.xml" || true
+# 5) Non-fatal debug (won’t fail the build)
+grep -n -A3 -B3 '<parent>' "$ROOT_POM" || true
+grep -n 'artifactId>maven-compiler-plugin' -n -A2 -B2 "$ROOT_POM" || true
 
-# Optional: dump effective POM to inspect pluginManagement
-"${MAVEN_HOME}/bin/mvn" -q -f "$APP_DIR/pom.xml" help:effective-pom -Doutput="$APP_DIR/effective-pom.xml" || true
-tail -n +1 "$APP_DIR/effective-pom.xml" | sed -n '1,200p' >/dev/null || true
+nl -ba "$ROOT_POM" | sed -n '1,140p' || true
+
+
 
 [ -d "$APP_DIR" ] || { ba_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
