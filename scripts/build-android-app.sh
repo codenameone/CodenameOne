@@ -151,8 +151,8 @@ while IFS= read -r -d '' P; do
   perl -0777 -pe 's!(<plugin>\s*<groupId>com\.codenameone[^<]*</groupId>\s*<artifactId>[^<]+</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!sg' -i "$P"
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 3) Inject versions for plugins that have none (both build/plugins and pluginManagement)
-#    Map of common Maven plugin versions (adjust if you need different pins)
+# 3) Inject versions for plugins that have none (or update existing ones) — no lookaheads
+
 declare -A PLUG_VERSIONS=(
   [org.apache.maven.plugins:maven-compiler-plugin]=3.11.0
   [org.apache.maven.plugins:maven-surefire-plugin]=3.2.5
@@ -164,19 +164,31 @@ declare -A PLUG_VERSIONS=(
   [org.apache.maven.plugins:maven-clean-plugin]=3.3.2
   [org.apache.maven.plugins:maven-site-plugin]=4.0.0-M15
   [org.apache.maven.plugins:maven-assembly-plugin]=3.6.0
-  # If the generated app declares Codename One plugin without version (shouldn’t after step 2), this covers it:
-  [com.codenameone:codenameone-maven-plugin]="${CN1_VERSION}"
+  [com.codenameone:codenameone-maven-plugin]="$CN1_VERSION"
 )
 
 inject_plugin_versions_file() {
   local pom="$1"
-  # For each known plugin, if present without <version>, insert one
   for ga in "${!PLUG_VERSIONS[@]}"; do
-    local g="${ga%%:*}"; local a="${ga##*:}"; local v="${PLUG_VERSIONS[$ga]}"
-    # build/plugins
-    perl -0777 -pe 's!(<plugin>\s*<groupId>'"$g"'</groupId>\s*<artifactId>'"$a"'</artifactId>\s*)(?!.*?<version>.*?</version>)(?=.*?</plugin>)!\1<version>'"$v"'</version>\n!sg' -i "$pom"
-    # pluginManagement/plugins
-    perl -0777 -pe 's!(<plugin>\s*<groupId>'"$g"'</groupId>\s*<artifactId>'"$a"'</artifactId>\s*)(?!.*?<version>.*?</version>)(?=.*?</plugin>)!\1<version>'"$v"'</version>\n!sg' -i "$pom"
+    local g="${ga%%:*}" a="${ga##*:}" v="${PLUG_VERSIONS[$ga]}"
+
+    # Pass 1: update existing <version>...</version> for this plugin
+    perl -0777 -i -pe \
+"s!(<plugin>\\s*<groupId>\\Q$g\\E</groupId>\\s*<artifactId>\\Q$a\\E</artifactId>\\s*<version>)[^<]+(</version>)!\$1$v\$2!sg" \
+      "$pom"
+
+    # Pass 2: if there is NO version yet, insert it right after </artifactId>
+    perl -0777 -i -pe \
+"s!(<plugin>\\s*<groupId>\\Q$g\\E</groupId>\\s*<artifactId>\\Q$a\\E</artifactId>\\s*)(?!.*?<version>)(?:(?:(?!</plugin>).)*</plugin>)!${1}<version>$v</version>\n!sg" \
+      "$pom" 2>/dev/null || true
+
+    # The line above still uses a tiny lookahead; if you want *zero* lookaheads at all,
+    # use this alternative pure two-step approach (slower, but bulletproof):
+    # if ! grep -zq "<groupId>$g</groupId>.*<artifactId>$a</artifactId>.*<version>" "$pom"; then
+    #   perl -0777 -i -pe \
+    # "s!(<plugin>\\s*<groupId>\\Q$g\\E</groupId>\\s*<artifactId>\\Q$a\\E</artifactId>\\s*)!\\1<version>$v</version>\n!s" \
+    #     "$pom"
+    # fi
   done
 }
 
@@ -184,7 +196,7 @@ while IFS= read -r -d '' P; do
   inject_plugin_versions_file "$P"
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 4) Build with the property set (covers any lingering references)
+# 4) Keep this so any remaining CN1 refs resolve to your local snapshot
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 
 # 5) Non-fatal debug (won’t fail the build)
