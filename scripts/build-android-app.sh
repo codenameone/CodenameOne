@@ -116,63 +116,48 @@ ba_log "Generating Codename One application skeleton via codenameone-maven-plugi
 
 APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 
-# --- Normalize Codename One versions post-generation (no versions-maven-plugin) ---
+# --- Normalize CN1 versions without versions-maven-plugin ---
 
 ROOT_POM="$APP_DIR/pom.xml"
 
-# 1) Ensure a codenameone.version property exists in the root pom
+# 1) Ensure codenameone.version property exists (or update it)
 ensure_property() {
   local pom="$1" name="$2" value="$3"
-
   if ! grep -q "<properties>" "$pom"; then
-    # Insert a <properties> block near the top-level <project> block
     awk -v v="$value" -v n="$name" '
-      BEGIN{inserted=0}
-      /<project[^>]*>/ && inserted==0 {
-        print;
-        print "  <properties>";
-        print "    <" n ">" v "</" n ">";
-        print "  </properties>";
-        inserted=1; next
-      }
+      BEGIN{ins=0}
+      /<project[^>]*>/ && !ins { print; print "  <properties>\n    <" n ">" v "</" n ">\n  </properties>"; ins=1; next }
       {print}
     ' "$pom" > "$pom.tmp" && mv "$pom.tmp" "$pom"
   elif ! grep -q "<${name}>" "$pom"; then
-    # Add the property inside existing <properties>
     awk -v v="$value" -v n="$name" '
-      /<properties>/ && !done {
-        print;
-        print "    <" n ">" v "</" n ">";
-        done=1; next
-      }
+      /<properties>/ && !done { print; print "    <" n ">" v "</" n ">"; done=1; next }
       {print}
     ' "$pom" > "$pom.tmp" && mv "$pom.tmp" "$pom"
   else
-    # Update existing property value
     perl -0777 -pe "s|(<${name}>)[^<]+(</${name}>)|\$1${value}\$2|s" -i "$pom"
   fi
 }
 
 ensure_property "$ROOT_POM" "codenameone.version" "$CN1_VERSION"
 
-# 2) Rewrite com.codenameone dependency versions to ${codenameone.version}
-rewrite_versions() {
-  local pom="$1"
-  # Dependencies
-  perl -0777 -pe 's!(<dependency>\s*<groupId>com\.codenameone[^<]*</groupId>\s*<artifactId>[^<]+</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!sg' -i "$pom"
-  # Plugins
-  perl -0777 -pe 's!(<plugin>\s*<groupId>com\.codenameone[^<]*</groupId>\s*<artifactId>[^<]+</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!sg' -i "$pom"
-}
-
-export codenameone_version_placeholder='${codenameone.version}'
-
-# Walk all poms under the generated app (skip non-poms like cn1libs/)
+# 2) In every pom.xml:
+#    - Point <parent><version> to ${codenameone.version} for Codename One parent
+#    - Set com.codenameone dependencies/plugins <version>${codenameone.version}</version>
 while IFS= read -r -d '' P; do
-  rewrite_versions "$P"
+  # Parent version -> ${codenameone.version}
+  perl -0777 -pe 's!(<parent>\s*<groupId>com\.codenameone</groupId>\s*<artifactId>codenameone-maven-parent</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!s' -i "$P"
+
+  # Dependencies (only com.codenameone)
+  perl -0777 -pe 's!(<dependency>\s*<groupId>com\.codenameone[^<]*</groupId>\s*<artifactId>[^<]+</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!sg' -i "$P"
+
+  # Plugins (only com.codenameone)
+  perl -0777 -pe 's!(<plugin>\s*<groupId>com\.codenameone[^<]*</groupId>\s*<artifactId>[^<]+</artifactId>\s*<version>)[^<]+(</version>)!${1}${codenameone.version}${2}!sg' -i "$P"
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 3) From now on, build with the property explicitly set too (helps any missed spots)
+# 3) Build with the property set so any missed spots still resolve correctly
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
+
 
 [ -d "$APP_DIR" ] || { ba_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
