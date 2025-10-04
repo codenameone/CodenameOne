@@ -158,6 +158,9 @@ done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 # 3) Build with the property set so any missed spots still resolve correctly
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 
+grep -nA2 -B2 '<parent>' "$APP_DIR/pom.xml"
+grep -nA3 -B3 '<pluginManagement>' "$APP_DIR/pom.xml"
+
 
 [ -d "$APP_DIR" ] || { ba_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
