@@ -116,123 +116,84 @@ ba_log "Generating Codename One application skeleton via codenameone-maven-plugi
 
 APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 
-# --- Safe CN1 normalization using xmlstarlet (no regex on XML) ---
-
+# --- Namespace-aware CN1 normalization (xmlstarlet) ---
 ROOT_POM="$APP_DIR/pom.xml"
+NS="mvn=http://maven.apache.org/POM/4.0.0"
 
-# 0) Ensure xmlstarlet is available
 if ! command -v xmlstarlet >/dev/null 2>&1; then
   sudo apt-get update -y && sudo apt-get install -y xmlstarlet
 fi
 
-# 1) Ensure codenameone.version property exists/updated (root pom)
-#    If <properties> missing, create; if present, upsert codenameone.version
-if ! xmlstarlet sel -t -v "count(/project/properties)" "$ROOT_POM" | grep -qxE '[1-9]'; then
-  # create <properties> right after <modelVersion>
-  xmlstarlet ed -L \
-    -s "/project" -t elem -n properties -v "" \
-    "$ROOT_POM"
+# Helper to run xmlstarlet with Maven namespace
+x() { xmlstarlet ed -L -N "$NS" "$@"; }
+q() { xmlstarlet sel -N "$NS" "$@"; }
+
+# 1) Ensure <properties><codenameone.version> exists/updated (root pom)
+if [ "$(q -t -v 'count(/mvn:project/mvn:properties)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
+  x -s "/mvn:project" -t elem -n properties -v "" "$ROOT_POM"
 fi
-if xmlstarlet sel -t -v "count(/project/properties/codenameone.version)" "$ROOT_POM" | grep -qxE '[1-9]'; then
-  xmlstarlet ed -L \
-    -u "/project/properties/codenameone.version" -v "$CN1_VERSION" \
-    "$ROOT_POM"
+if [ "$(q -t -v 'count(/mvn:project/mvn:properties/mvn:codenameone.version)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
+  x -s "/mvn:project/mvn:properties" -t elem -n codenameone.version -v "$CN1_VERSION" "$ROOT_POM"
 else
-  xmlstarlet ed -L \
-    -s "/project/properties" -t elem -n codenameone.version -v "$CN1_VERSION" \
-    "$ROOT_POM"
+  x -u "/mvn:project/mvn:properties/mvn:codenameone.version" -v "$CN1_VERSION" "$ROOT_POM"
 fi
 
-# 2) Parent must use a literal version (no properties allowed)
-#    Update any pom’s parent if it is CN1 parent
+# 2) Parent must be a LITERAL version (no property allowed)
 while IFS= read -r -d '' P; do
-  xmlstarlet ed -L \
-    -u "/project[parent/groupId='com.codenameone' and parent/artifactId='codenameone-maven-parent']/parent/version" \
-    -v "$CN1_VERSION" \
-    "$P" || true
+  x -u "/mvn:project[mvn:parent/mvn:groupId='com.codenameone' and mvn:parent/mvn:artifactId='codenameone-maven-parent']/mvn:parent/mvn:version" -v "$CN1_VERSION" "$P" || true
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 3) For com.codenameone deps/plugins, use the property ${codenameone.version}
-#    (Plugins still need a version element present)
+# 3) Point com.codenameone deps/plugins to ${codenameone.version}
 while IFS= read -r -d '' P; do
   # Dependencies
-  xmlstarlet ed -L \
-    -u "/project//dependencies/dependency[groupId[starts-with(.,'com.codenameone')]]/version" \
-    -v '${codenameone.version}' \
-    "$P" 2>/dev/null || true
-
-  # Plugins: set version value to property where version element exists
-  xmlstarlet ed -L \
-    -u "/project//build//plugins/plugin[groupId[starts-with(.,'com.codenameone')]]/version" \
-    -v '${codenameone.version}' \
-    "$P" 2>/dev/null || true
-  xmlstarlet ed -L \
-    -u "/project//build//pluginManagement//plugins/plugin[groupId[starts-with(.,'com.codenameone')]]/version" \
-    -v '${codenameone.version}' \
-    "$P" 2>/dev/null || true
+  x -u "/mvn:project//mvn:dependencies/mvn:dependency[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
+  # Plugins (regular)
+  x -u "/mvn:project//mvn:build/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
+  # Plugins (pluginManagement)
+  x -u "/mvn:project//mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 4) Ensure a version exists for common plugins that often omit it.
-#    Prefer property if present; else pin a stable version.
-declare -A PLUGIN_FALLBACK=(
-  [org.apache.maven.plugins:maven-compiler-plugin]='${maven-compiler-plugin.version:-3.11.0}'
-  [org.apache.maven.plugins:maven-resources-plugin]='3.3.1'
-  [org.apache.maven.plugins:maven-surefire-plugin]='3.2.5'
-  [org.apache.maven.plugins:maven-failsafe-plugin]='3.2.5'
-  [org.apache.maven.plugins:maven-jar-plugin]='3.3.0'
-  [org.apache.maven.plugins:maven-clean-plugin]='3.3.2'
-  [org.apache.maven.plugins:maven-deploy-plugin]='3.1.2'
-  [org.apache.maven.plugins:maven-install-plugin]='3.1.2'
-  [org.apache.maven.plugins:maven-assembly-plugin]='3.6.0'
-  [org.apache.maven.plugins:maven-site-plugin]='4.0.0-M15'
+# 4) Ensure common Maven plugins have a version (Maven requires it even if parent not yet resolved)
+declare -A PIN=(
+  [org.apache.maven.plugins:maven-compiler-plugin]=3.11.0
+  [org.apache.maven.plugins:maven-resources-plugin]=3.3.1
+  [org.apache.maven.plugins:maven-surefire-plugin]=3.2.5
+  [org.apache.maven.plugins:maven-failsafe-plugin]=3.2.5
+  [org.apache.maven.plugins:maven-jar-plugin]=3.3.0
+  [org.apache.maven.plugins:maven-clean-plugin]=3.3.2
+  [org.apache.maven.plugins:maven-deploy-plugin]=3.1.2
+  [org.apache.maven.plugins:maven-install-plugin]=3.1.2
+  [org.apache.maven.plugins:maven-assembly-plugin]=3.6.0
+  [org.apache.maven.plugins:maven-site-plugin]=4.0.0-M15
   [com.codenameone:codenameone-maven-plugin]='${codenameone.version}'
 )
 
-# Helper to resolve bash-like ${prop:-fallback} to either ${prop} or literal
-resolve_value() {
-  local spec="$1"
-  if [[ "$spec" == '${'maven-compiler-plugin.version':-'* ]]; then
-    # if property exists in the POM, use ${maven-compiler-plugin.version}, otherwise fallback literal
-    if xmlstarlet sel -t -v "count(/project/properties/maven-compiler-plugin.version)" "$ROOT_POM" | grep -qxE '[1-9]'; then
-      echo '${maven-compiler-plugin.version}'
-    else
-      echo "${spec#*\:-}" | tr -d '}'
-    fi
-  else
-    echo "$spec"
+add_version_if_missing() {
+  local pom="$1" g="$2" a="$3" v="$4"
+  # build/plugins
+  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
+     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
+    x -s "/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
+  fi
+  # pluginManagement/plugins
+  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
+     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
+    x -s "/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
   fi
 }
 
 while IFS= read -r -d '' P; do
-  for ga in "${!PLUGIN_FALLBACK[@]}"; do
-    g="${ga%%:*}"; a="${ga##*:}"
-    val="$(resolve_value "${PLUGIN_FALLBACK[$ga]}")"
-
-    # build/plugins: add <version> if missing
-    if [ "$(xmlstarlet sel -t -v "count(/project/build/plugins/plugin[groupId='$g' and artifactId='$a']/version)" "$P" 2>/dev/null || echo 0)" = "0" ] && \
-       [ "$(xmlstarlet sel -t -v "count(/project/build/plugins/plugin[groupId='$g' and artifactId='$a'])" "$P" 2>/dev/null || echo 0)" != "0" ]; then
-      xmlstarlet ed -L \
-        -s "/project/build/plugins/plugin[groupId='$g' and artifactId='$a']" -t elem -n version -v "$val" \
-        "$P" || true
-    fi
-
-    # pluginManagement/plugins: add <version> if missing
-    if [ "$(xmlstarlet sel -t -v "count(/project/build/pluginManagement/plugins/plugin[groupId='$g' and artifactId='$a']/version)" "$P" 2>/dev/null || echo 0)" = "0" ] && \
-       [ "$(xmlstarlet sel -t -v "count(/project/build/pluginManagement/plugins/plugin[groupId='$g' and artifactId='$a'])" "$P" 2>/dev/null || echo 0)" != "0" ]; then
-      xmlstarlet ed -L \
-        -s "/project/build/pluginManagement/plugins/plugin[groupId='$g' and artifactId='$a']" -t elem -n version -v "$val" \
-        "$P" || true
-    fi
+  for ga in "${!PIN[@]}"; do
+    add_version_if_missing "$P" "${ga%%:*}" "${ga##*:}" "${PIN[$ga]}"
   done
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 5) Make sure CN1 resolves everywhere even if some modules didn’t get rewritten
+# 5) Build with the property set so any lingering refs resolve to the local snapshot
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 
-# Optional: quick, non-fatal dump around the two sections that used to fail
-xmlstarlet sel -t -c "/project/build/plugins" -n "$ROOT_POM" || true
-xmlstarlet sel -t -c "/project/build/pluginManagement/plugins" -n "$ROOT_POM" || true
-nl -ba "$ROOT_POM" | sed -n '1,140p' || true
+# (Optional) quick non-fatal checks
+xmlstarlet sel -N "$NS" -t -v "/mvn:project/mvn:properties/mvn:codenameone.version" -n "$ROOT_POM" || true
+xmlstarlet sel -N "$NS" -t -c "/mvn:project/mvn:build/mvn:plugins" -n "$ROOT_POM" | head -n 60 || true
 
 
 
