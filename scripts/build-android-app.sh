@@ -232,6 +232,7 @@ EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 # Optional: quick, non-fatal dump around the two sections that used to fail
 xmlstarlet sel -t -c "/project/build/plugins" -n "$ROOT_POM" || true
 xmlstarlet sel -t -c "/project/build/pluginManagement/plugins" -n "$ROOT_POM" || true
+nl -ba "$ROOT_POM" | sed -n '1,140p' || true
 
 
 
