@@ -179,7 +179,7 @@ public class Form extends Container {
     public Form() {
         this(new FlowLayout());
     }
-    
+
     /**
      * Constructor that accepts a layout
      * 

@@ -25,19 +25,25 @@ mkdir -p ../cn1-binaries
 CN1_BINARIES="$(cd ../cn1-binaries && pwd -P)"
 rm -Rf ../cn1-binaries
 
+ENV_FILE="$ENV_DIR/env.sh"
+
 log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 
 mkdir -p ~/.codenameone
 cp maven/CodeNameOneBuildClient.jar ~/.codenameone
 
 # Reuse previously saved environment if present (so we can skip downloads)
-if [ -f "$ENV_DIR/env.sh" ]; then
+if [ -f "$ENV_FILE" ]; then
+  log "Found existing workspace environment at $ENV_FILE"
+  ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
+  log "Existing workspace environment file contents"
+  sed 's/^/[setup-workspace] ENV: /' "$ENV_FILE"
   # shellcheck disable=SC1090
-  source "$ENV_DIR/env.sh"
+  source "$ENV_FILE"
 fi
 
 JAVA_HOME="${JAVA_HOME:-}"
-JAVA_HOME_17="${JAVA_HOME_17:-}"
+JAVA17_HOME="${JAVA17_HOME:-}"
 MAVEN_HOME="${MAVEN_HOME:-}"
 
 log "Detecting host platform"
@@ -75,27 +81,34 @@ install_jdk() {
     curl -fL "$url" -o "$archive"
   fi
 
-  # Find top directory name inside the tarball
   local top
   top=$(tar -tzf "$archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
+  if [ -z "$top" ]; then
+    log "Unable to determine extracted directory from $(basename "$archive")" >&2
+    exit 1
+  fi
 
-  # Extract only if target directory doesn't already exist
-  if [ -n "$top" ] && [ -d "$DOWNLOAD_DIR/$top" ]; then
-    log "JDK already extracted at $DOWNLOAD_DIR/$top"
+  local extracted="$DOWNLOAD_DIR/$top"
+  if [ -d "$extracted" ]; then
+    log "JDK already extracted at $extracted"
   else
     log "Extracting JDK to $DOWNLOAD_DIR"
     tar -xzf "$archive" -C "$DOWNLOAD_DIR"
   fi
 
-  local home="$DOWNLOAD_DIR/$top"
+  local home="$extracted"
   if [ -d "$home/Contents/Home" ]; then
     home="$home/Contents/Home"
   fi
-  eval "$dest_var=\"$home\""
+
+  printf -v "$dest_var" '%s' "$home"
 }
 
+CN1_VERSION=$(awk -F'[<>]' '/<version>/{print $3; exit}' maven/pom.xml)
+log "Detected Codename One snapshot version ${CN1_VERSION}"
+
 log "Ensuring JDK 8 is available"
-if [ ! -x "${JAVA_HOME:-}/bin/java" ] || ! "${JAVA_HOME:-}/bin/java" -version 2>&1 | grep -q '8\.0'; then
+if [ -z "${JAVA_HOME:-}" ] || [ ! -x "$JAVA_HOME/bin/java" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '8\.0'; then
   log "Provisioning JDK 8..."
   install_jdk "$JDK8_URL" JAVA_HOME
 else
@@ -103,15 +116,15 @@ else
 fi
 
 log "Ensuring JDK 17 is available"
-if [ ! -x "${JAVA_HOME_17:-}/bin/java" ] || ! "${JAVA_HOME_17:-}/bin/java" -version 2>&1 | grep -q '17\.0'; then
+if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ] || ! "$JAVA17_HOME/bin/java" -version 2>&1 | grep -q '17\.0'; then
   log "Provisioning JDK 17..."
-  install_jdk "$JDK17_URL" JAVA_HOME_17
+  install_jdk "$JDK17_URL" JAVA17_HOME
 else
-  log "Using existing JDK 17 at $JAVA_HOME_17"
+  log "Using existing JDK 17 at $JAVA17_HOME"
 fi
 
 log "Ensuring Maven is available"
-if ! [ -x "${MAVEN_HOME:-}/bin/mvn" ]; then
+if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
   mvn_archive="$DOWNLOAD_DIR/$(basename "$MAVEN_URL")"
   if [ -f "$mvn_archive" ]; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
@@ -120,6 +133,10 @@ if ! [ -x "${MAVEN_HOME:-}/bin/mvn" ]; then
     curl -fL "$MAVEN_URL" -o "$mvn_archive"
   fi
   mvn_top=$(tar -tzf "$mvn_archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
+  if [ -z "$mvn_top" ]; then
+    log "Unable to determine extracted directory from $(basename "$mvn_archive")" >&2
+    exit 1
+  fi
   if [ -n "$mvn_top" ] && [ -d "$DOWNLOAD_DIR/$mvn_top" ]; then
     log "Maven already extracted at $DOWNLOAD_DIR/$mvn_top"
   else
@@ -131,19 +148,36 @@ else
   log "Using existing Maven at $MAVEN_HOME"
 fi
 
-log "Writing environment to $ENV_DIR/env.sh"
-cat > "$ENV_DIR/env.sh" <<ENV
+ARCHETYPE_PLUGIN_COORD="org.apache.maven.plugins:maven-archetype-plugin:3.2.1"
+log "Preloading Maven archetype plugin ($ARCHETYPE_PLUGIN_COORD) for offline project generation"
+if "$MAVEN_HOME/bin/mvn" -B -N "$ARCHETYPE_PLUGIN_COORD:help" -Ddetail -Dgoal=generate >/dev/null 2>&1; then
+  log "Maven archetype plugin cached locally"
+else
+  log "Failed to preload $ARCHETYPE_PLUGIN_COORD; archetype generation may download dependencies" >&2
+fi
+
+log "Writing environment to $ENV_FILE"
+cat > "$ENV_FILE" <<ENV
 export JAVA_HOME="$JAVA_HOME"
-export JAVA_HOME_17="$JAVA_HOME_17"
+export JAVA17_HOME="$JAVA17_HOME"
 export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
 ENV
 
+log "Workspace environment file metadata"
+if [ -f "$ENV_FILE" ]; then
+  ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
+  log "Workspace environment file contents"
+  sed 's/^/[setup-workspace] ENV: /' "$ENV_FILE"
+else
+  log "Environment file was not created at $ENV_FILE" >&2
+fi
+
 # shellcheck disable=SC1090
-source "$ENV_DIR/env.sh"
+source "$ENV_FILE"
 
 log "JDK 8 version:"; "$JAVA_HOME/bin/java" -version
-log "JDK 17 version:"; "$JAVA_HOME_17/bin/java" -version
+log "JDK 17 version:"; "$JAVA17_HOME/bin/java" -version
 log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
 PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
@@ -184,6 +218,15 @@ fi
 set -e
 
 if [ "${skip_archetypes:-0}" -eq 0 ]; then
-  (cd cn1-maven-archetypes && "$MAVEN_HOME/bin/mvn" -DskipTests -DskipITs=true -Dinvoker.skip=true install) || \
-    log "Archetype mvn install failed; continuing."
+  (
+    cd cn1-maven-archetypes
+    current_version=$("$MAVEN_HOME/bin/mvn" -q -DforceStdout help:evaluate -Dexpression=project.version | tr -d '\r' | tail -n 1)
+    if [ -z "$current_version" ]; then
+      log "Unable to determine cn1-maven-archetypes version; proceeding with defaults"
+    elif [ "$current_version" != "$CN1_VERSION" ]; then
+      log "Updating cn1-maven-archetypes version from $current_version to $CN1_VERSION to match local snapshot"
+      "$MAVEN_HOME/bin/mvn" -q -B versions:set -DnewVersion="$CN1_VERSION" -DgenerateBackupPoms=false
+    fi
+    "$MAVEN_HOME/bin/mvn" -DskipTests -DskipITs=true -Dinvoker.skip=true install
+  ) || log "Archetype mvn install failed; continuing."
 fi

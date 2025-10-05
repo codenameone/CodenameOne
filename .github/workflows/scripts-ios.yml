@@ -1,23 +1,31 @@
----
 name: Test iOS build scripts
 
-'on':
+on:
   pull_request:
     paths:
       - 'scripts/**'
       - 'BUILDING.md'
   push:
-    branches:
-      - master
+    branches: [ master ]
     paths-ignore:
       - '**/*.md'
 
 jobs:
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
+    timeout-minutes: 25         # hard-stop the job after 25 minutes
+    concurrency:                # ensure only one mac build runs at once
+      group: mac-ci
+      cancel-in-progress: false # queue new ones instead of canceling in-flight
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
+        # per-step timeout
+        timeout-minutes: 15
+
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
+        timeout-minutes: 15

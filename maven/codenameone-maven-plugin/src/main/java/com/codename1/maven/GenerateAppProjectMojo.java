@@ -81,6 +81,8 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
         request.setGoals( Collections.singletonList( "archetype:generate" ) );
 
+        request.setBatchMode(true);
+
         String[] propsArr = {
                 "interactiveMode=false",
             "archetypeArtifactId=cn1app-archetype",
