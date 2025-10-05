@@ -713,6 +713,7 @@ public class ToastBar {
             this.getAllStyles().setBgColor(0x0);
             this.getAllStyles().setBackgroundType(Style.BACKGROUND_NONE);
             this.getAllStyles().setBgTransparency(128);
+            setSafeArea(true);
             setVisible(false);
             label = new TextArea();
             label.setUIID(defaultMessageUIID);
@@ -834,6 +835,9 @@ public class ToastBar {
                 c.hidden = true;
                 f.putClientProperty("ToastBarComponent", c);
                 Container layered = getLayeredPane();
+                // Mark the ToastBar overlay container as a safe area so it respects
+                // device notches/system bars (e.g. Android navigation, iPhone notch).
+                layered.setSafeArea(true);
                 layered.setLayout(new BorderLayout());
                 layered.addComponent(position==Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();

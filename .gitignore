@@ -71,3 +71,13 @@ pom.xml.releaseBackup
 pom.xml.tag
 !maven/**/*.zip
 **/.flattened-pom.xml
+
+### BROKK'S CONFIGURATION ###
+.brokk/**
+/.brokk/workspace.properties
+/.brokk/sessions/
+/.brokk/dependencies/
+/.brokk/history.zip
+!.brokk/style.md
+!.brokk/review.md
+!.brokk/project.properties
