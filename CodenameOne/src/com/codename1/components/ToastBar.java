@@ -41,6 +41,7 @@ import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -713,7 +714,6 @@ public class ToastBar {
             this.getAllStyles().setBgColor(0x0);
             this.getAllStyles().setBackgroundType(Style.BACKGROUND_NONE);
             this.getAllStyles().setBgTransparency(128);
-            setSafeArea(true);
             setVisible(false);
             label = new TextArea();
             label.setUIID(defaultMessageUIID);
@@ -835,18 +835,33 @@ public class ToastBar {
                 c.hidden = true;
                 f.putClientProperty("ToastBarComponent", c);
                 Container layered = getLayeredPane();
-                // Mark the ToastBar overlay container as a safe area so it respects
-                // device notches/system bars (e.g. Android navigation, iPhone notch).
-                layered.setSafeArea(true);
                 layered.setLayout(new BorderLayout());
                 layered.addComponent(position==Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();
             }
-            if(position == Component.BOTTOM && f.getInvisibleAreaUnderVKB() > 0) {
-                Style s = c.getAllStyles();
-                s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
-                s.setMarginBottom(f.getInvisibleAreaUnderVKB());
+            Rectangle safeArea = Display.getInstance().getDisplaySafeArea(new Rectangle(0, 0, 0, 0));
+            if(position == Component.BOTTOM) {
+                if (f.getInvisibleAreaUnderVKB() > 0) {
+                    Style s = c.getAllStyles();
+                    s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+                    s.setMarginBottom(f.getInvisibleAreaUnderVKB());
+                }
+                int safeBottomMargin = Display.getInstance().getDisplayHeight()
+                        - safeArea.getY()
+                        - safeArea.getHeight();
+                if (0 < safeBottomMargin) {
+                    Style s = c.getAllStyles();
+                    s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                    s.setPaddingBottom(safeBottomMargin);
+                }
+            } else if (position == Component.TOP) {
+                if (safeArea.getY() > 0) {
+                    Style s = c.getAllStyles();
+                    s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                    s.setPaddingTop(safeArea.getY());
+                }
             }
+
             return c;
         }
         return null;
