@@ -11,11 +11,6 @@ TEST_OPTIONS_SNIPPET = """    testOptions {\n        animationsDisabled = true\n
 
 DEFAULT_CONFIG_SNIPPET = """    defaultConfig {\n        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\"\n    }\n\n"""
 
-CONFIGURATION_GUARDS = (
-    "configurations.maybeCreate(\"androidTestImplementation\")\n",
-    "configurations.maybeCreate(\"androidTestCompile\")\n",
-)
-
 ANDROID_TEST_DEPENDENCIES = (
     "androidx.test:core:1.5.0",
     "androidx.test.ext:junit:1.1.5",
@@ -87,32 +82,17 @@ class GradleFile:
             insert = android_block[0] + len("android {")
         self.content = self.content[:insert] + DEFAULT_CONFIG_SNIPPET + self.content[insert:]
 
-    def ensure_configuration_guards(self) -> None:
-        missing = [snippet for snippet in CONFIGURATION_GUARDS if snippet not in self.content]
-        if not missing:
-            return
-        insert = 0
-        plugins_block = self.find_block("plugins")
-        if plugins_block:
-            insert = plugins_block[1] + 1
-        self.content = (
-            self.content[:insert] + "".join(missing) + "\n" + self.content[insert:]
-        )
-
     def ensure_dependencies(self) -> None:
         block = self.find_block("dependencies")
         if not block:
             raise SystemExit("Unable to locate dependencies block in Gradle file")
         insertion_point = block[1] - 1
         existing_block = self.content[block[0]:block[1]]
+        configuration = self._select_configuration(existing_block)
         for coordinate in ANDROID_TEST_DEPENDENCIES:
             if self._has_dependency(existing_block, coordinate):
                 continue
-            line = (
-                f"    add(\"androidTestImplementation\", \"{coordinate}\")\n"
-                f"    add(\"androidTestCompile\", \"{coordinate}\")\n"
-            )
-            combined = "".join(line)
+            combined = f"    {configuration} \"{coordinate}\"\n"
             self.content = (
                 self.content[:insertion_point]
                 + combined
@@ -127,14 +107,19 @@ class GradleFile:
         return bool(
             re.search(rf"androidTestImplementation\s+['\"]{escaped}['\"]", block)
             or re.search(rf"androidTestCompile\s+['\"]{escaped}['\"]", block)
-            or re.search(rf"add\(\"androidTestImplementation\",\s*['\"]{escaped}['\"]\)", block)
-            or re.search(rf"add\(\"androidTestCompile\",\s*['\"]{escaped}['\"]\)", block)
         )
+
+    @staticmethod
+    def _select_configuration(block: str) -> str:
+        if "androidTestImplementation" in block:
+            return "androidTestImplementation"
+        if "androidTestCompile" in block:
+            return "androidTestCompile"
+        return "androidTestImplementation"
 
     def apply(self) -> None:
         self.ensure_test_options()
         self.ensure_instrumentation_runner()
-        self.ensure_configuration_guards()
         self.ensure_dependencies()
 
 
