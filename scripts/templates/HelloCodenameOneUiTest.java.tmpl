@@ -14,7 +14,13 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.concurrent.TimeUnit;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
@@ -28,54 +34,68 @@ import org.robolectric.shadows.ShadowLooper;
 @LooperMode(LooperMode.Mode.LEGACY)
 public class @MAIN_NAME@UiTest {
 
+    private static final long TEST_TIMEOUT_SECONDS = 300L;
+
+    private ActivityController<@MAIN_NAME@Stub> controller;
+    private @MAIN_NAME@Stub activity;
+
+    @Rule
+    public final TestRule timeoutRule = Timeout.builder()
+            .withTimeout(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .withLookingForStuckThread(true)
+            .build();
+
+    @Before
+    public void setUp() {
+        log("Starting Robolectric activity for screenshot test");
+        controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
+        log("ActivityController created");
+        log("Invoking controller.setup() to create/start/resume activity");
+        activity = controller.setup();
+        log("controller.setup() completed (Display.isInitialized=" + Display.isInitialized() + ")");
+        log("Processing pending Codename One tasks after setup");
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+        log("Initial runUiThreadTasksIncludingDelayedTasks call finished");
+    }
+
+    @After
+    public void tearDown() {
+        if (controller == null) {
+            return;
+        }
+        safelyInvokeLifecycle(controller::pause, "pause");
+        safelyInvokeLifecycle(controller::stop, "stop");
+        safelyInvokeLifecycle(controller::destroy, "destroy");
+    }
+
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
-        log("Starting Robolectric activity for screenshot test");
-        ActivityController<@MAIN_NAME@Stub> controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
-        log("ActivityController created");
-        controller.create();
-        log("Activity created (Display.isInitialized=" + Display.isInitialized() + ")");
-        controller.start();
-        log("Activity started");
-        log("Calling controller.resume() on Robolectric thread");
-        controller.resume();
-        log("controller.resume() completed");
-        log("Display initialized after resume: " + Display.isInitialized());
-        controller.visible();
-        log("Activity made visible");
+        log("Running screenshot assertions with prepared activity");
+        log("Idling main looper to process pending tasks");
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+        log("Completed runUiThreadTasksIncludingDelayedTasks");
 
-        try {
-            log("Idling main looper to process pending tasks");
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-            log("Completed runUiThreadTasksIncludingDelayedTasks");
-
-            if (Display.isInitialized()) {
-                log("Codename One display reports current form="
-                        + Display.getInstance().getCurrent());
-            } else {
-                log("Codename One display not initialized; continuing with screenshot capture");
-            }
-
-            @MAIN_NAME@Stub activity = controller.get();
-            log("Capturing decor view screenshot without additional waits");
-            Bitmap screenshot = captureScreenshot(activity);
-            assertTrue("Screenshot capture should succeed", screenshot != null);
-            log("Screenshot dimensions=" + screenshot.getWidth() + "x" + screenshot.getHeight());
-            assertTrue("Screenshot width should be positive", screenshot.getWidth() > 0);
-            assertTrue("Screenshot height should be positive", screenshot.getHeight() > 0);
-            boolean hasContent = hasRenderableContent(screenshot);
-            log("Screenshot content analysis result=" + hasContent);
-            assertTrue("Screenshot should contain rendered content beyond the background", hasContent);
-
-            File screenshotFile = saveScreenshot(screenshot);
-            log("Screenshot stored at " + screenshotFile.getAbsolutePath());
-            assertTrue("Screenshot file should exist", screenshotFile.isFile());
-            assertTrue("Screenshot file should not be empty", screenshotFile.length() > 0L);
-        } finally {
-            safelyInvokeLifecycle(controller::pause, "pause");
-            safelyInvokeLifecycle(controller::stop, "stop");
-            safelyInvokeLifecycle(controller::destroy, "destroy");
+        if (Display.isInitialized()) {
+            log("Codename One display reports current form="
+                    + Display.getInstance().getCurrent());
+        } else {
+            log("Codename One display not initialized; continuing with screenshot capture");
         }
+
+        log("Capturing decor view screenshot without additional waits");
+        Bitmap screenshot = captureScreenshot(activity);
+        assertTrue("Screenshot capture should succeed", screenshot != null);
+        log("Screenshot dimensions=" + screenshot.getWidth() + "x" + screenshot.getHeight());
+        assertTrue("Screenshot width should be positive", screenshot.getWidth() > 0);
+        assertTrue("Screenshot height should be positive", screenshot.getHeight() > 0);
+        boolean hasContent = hasRenderableContent(screenshot);
+        log("Screenshot content analysis result=" + hasContent);
+        assertTrue("Screenshot should contain rendered content beyond the background", hasContent);
+
+        File screenshotFile = saveScreenshot(screenshot);
+        log("Screenshot stored at " + screenshotFile.getAbsolutePath());
+        assertTrue("Screenshot file should exist", screenshotFile.isFile());
+        assertTrue("Screenshot file should not be empty", screenshotFile.length() > 0L);
     }
 
     private static Bitmap captureScreenshot(@MAIN_NAME@Stub activity) {
