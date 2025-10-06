@@ -8,22 +8,36 @@ import re
 import sys
 
 
+TEST_OPTIONS_INJECTION = (
+    "    testOptions {\n"
+    "        unitTests.includeAndroidResources = true\n"
+    "        unitTests.all {\n"
+    "            systemProperty 'http.agent', 'CodenameOneUiTest'\n"
+    "        }\n"
+    "    }\n\n"
+)
+
+
 def ensure_test_options(content: str) -> str:
-    if "unitTests.includeAndroidResources" in content:
+    if "systemProperty 'http.agent'" in content:
         return content
+
+    legacy_block = (
+        "    testOptions {\n"
+        "        unitTests.includeAndroidResources = true\n"
+        "    }\n\n"
+    )
+
+    if legacy_block in content:
+        return content.replace(legacy_block, TEST_OPTIONS_INJECTION)
 
     pattern = re.compile(r"(android\s*\{\s*\r?\n)")
     match = pattern.search(content)
     if not match:
         raise SystemExit("Unable to locate android block in Gradle file")
 
-    injection = (
-        "    testOptions {\n"
-        "        unitTests.includeAndroidResources = true\n"
-        "    }\n\n"
-    )
     start, end = match.span(1)
-    return content[:end] + injection + content[end:]
+    return content[:end] + TEST_OPTIONS_INJECTION + content[end:]
 
 
 def ensure_dependencies(content: str) -> str:
