@@ -21,7 +21,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.RunWith;
 import org.junit.runner.Description;
@@ -37,16 +36,10 @@ import org.robolectric.shadows.ShadowLooper;
 @LooperMode(LooperMode.Mode.LEGACY)
 public class @MAIN_NAME@UiTest {
 
-    private static final long TEST_TIMEOUT_SECONDS = 300L;
+    private static final long HANG_DETECTION_SECONDS = 300L;
 
     private ActivityController<@MAIN_NAME@Stub> controller;
     private @MAIN_NAME@Stub activity;
-
-    @Rule
-    public final TestRule timeoutRule = Timeout.builder()
-            .withTimeout(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .withLookingForStuckThread(true)
-            .build();
 
     @Rule
     public final TestWatcher loggingWatcher = new TestWatcher() {
@@ -71,6 +64,9 @@ public class @MAIN_NAME@UiTest {
             log("Finished test method: " + description.getDisplayName());
         }
     };
+
+    @Rule
+    public final HangDetectionRule hangDetectionRule = new HangDetectionRule(HANG_DETECTION_SECONDS, TimeUnit.SECONDS);
 
     @Before
     public void setUp() {
@@ -284,5 +280,40 @@ public class @MAIN_NAME@UiTest {
                 }
             }
         });
+    }
+
+    private static final class HangDetectionRule implements TestRule {
+        private final long timeoutMillis;
+
+        HangDetectionRule(long timeout, TimeUnit unit) {
+            this.timeoutMillis = unit.toMillis(timeout);
+        }
+
+        @Override
+        public org.junit.runners.model.Statement apply(org.junit.runners.model.Statement base, Description description) {
+            return new org.junit.runners.model.Statement() {
+                @Override
+                public void evaluate() throws Throwable {
+                    java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                        Thread thread = new Thread(r, "@MAIN_NAME@UiTest-HangWatcher");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+                    java.util.concurrent.atomic.AtomicBoolean finished = new java.util.concurrent.atomic.AtomicBoolean(false);
+                    executor.schedule(() -> {
+                        if (!finished.get()) {
+                            log("Hang detection triggered after " + timeoutMillis + "ms");
+                            dumpAllThreads("Hang detection timeout");
+                        }
+                    }, timeoutMillis, TimeUnit.MILLISECONDS);
+                    try {
+                        base.evaluate();
+                    } finally {
+                        finished.set(true);
+                        executor.shutdownNow();
+                    }
+                }
+            };
+        }
     }
 }
