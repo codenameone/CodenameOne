@@ -29,12 +29,15 @@ public class @MAIN_NAME@UiTest {
 
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
+        log("Starting Robolectric activity for screenshot test");
         ActivityController<@MAIN_NAME@Stub> controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class).setup().visible();
         try {
+            log("Waiting for Codename One main form to be displayed");
             Form displayed = waitForDisplayedForm(5000L);
             assertNotNull("Codename One form should be displayed", displayed);
 
             @MAIN_NAME@Stub activity = controller.get();
+            log("Captured Codename One form; capturing decor view screenshot");
             Bitmap screenshot = captureScreenshot(activity);
             assertNotNull("Screenshot capture should succeed", screenshot);
             assertTrue("Screenshot width should be positive", screenshot.getWidth() > 0);
@@ -42,6 +45,7 @@ public class @MAIN_NAME@UiTest {
             assertTrue("Screenshot should contain rendered content beyond the background", hasRenderableContent(screenshot));
 
             File screenshotFile = saveScreenshot(screenshot);
+            log("Screenshot stored at " + screenshotFile.getAbsolutePath());
             assertTrue("Screenshot file should exist", screenshotFile.isFile());
             assertTrue("Screenshot file should not be empty", screenshotFile.length() > 0L);
         } finally {
@@ -51,6 +55,7 @@ public class @MAIN_NAME@UiTest {
 
     private static Form waitForDisplayedForm(long timeoutMillis) throws InterruptedException {
         long deadline = SystemClock.uptimeMillis() + timeoutMillis;
+        long nextLog = SystemClock.uptimeMillis();
         while (SystemClock.uptimeMillis() < deadline) {
             ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
             if (Display.isInitialized()) {
@@ -60,6 +65,11 @@ public class @MAIN_NAME@UiTest {
                 }
             }
             Thread.sleep(50L);
+            long now = SystemClock.uptimeMillis();
+            if (now >= nextLog) {
+                log("Still waiting for Codename One form; displayInitialized=" + Display.isInitialized());
+                nextLog = now + 1000L;
+            }
         }
         throw new AssertionError("Timed out waiting for Codename One form to be displayed");
     }
@@ -117,6 +127,7 @@ public class @MAIN_NAME@UiTest {
 
     private static View waitForDecorViewWithDimensions(@MAIN_NAME@Stub activity, long timeoutMillis) throws InterruptedException {
         long deadline = SystemClock.uptimeMillis() + timeoutMillis;
+        long nextLog = SystemClock.uptimeMillis();
         while (SystemClock.uptimeMillis() < deadline) {
             View decorView = activity.getWindow().getDecorView();
             if (decorView != null) {
@@ -127,6 +138,12 @@ public class @MAIN_NAME@UiTest {
             }
             ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
             Thread.sleep(50L);
+            long now = SystemClock.uptimeMillis();
+            if (now >= nextLog) {
+                log("Waiting for decor view layout; width=" + (decorView != null ? decorView.getWidth() : 0)
+                        + " height=" + (decorView != null ? decorView.getHeight() : 0));
+                nextLog = now + 1000L;
+            }
         }
         throw new AssertionError("Timed out waiting for decor view layout");
     }
@@ -140,5 +157,9 @@ public class @MAIN_NAME@UiTest {
         int heightSpec = View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY);
         view.measure(widthSpec, heightSpec);
         view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+    }
+
+    private static void log(String message) {
+        System.out.println("[@MAIN_NAME@UiTest] " + message);
     }
 }

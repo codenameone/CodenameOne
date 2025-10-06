@@ -311,13 +311,42 @@ elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
   yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
 fi
 
+UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-600}"
+if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
+  ba_log "Invalid UI_TEST_TIMEOUT_SECONDS=$UI_TEST_TIMEOUT_SECONDS provided; falling back to 600"
+  UI_TEST_TIMEOUT_SECONDS=600
+fi
+
+GRADLE_TEST_CMD=("./gradlew" "--no-daemon" "test")
+if command -v timeout >/dev/null 2>&1; then
+  ba_log "Running Gradle UI tests with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
+  GRADLE_TEST_WRAPPER=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${GRADLE_TEST_CMD[@]}")
+else
+  ba_log "timeout command not found; running Gradle UI tests without external watchdog"
+  GRADLE_TEST_WRAPPER=("${GRADLE_TEST_CMD[@]}")
+fi
+
 set +e
 (
   cd "$GRADLE_PROJECT_DIR"
-  ./gradlew --no-daemon test
+  "${GRADLE_TEST_WRAPPER[@]}"
 )
 TEST_EXIT_CODE=$?
 set -e
+
+if [ "$TEST_EXIT_CODE" -eq 124 ]; then
+  ba_log "Gradle UI tests exceeded ${UI_TEST_TIMEOUT_SECONDS}s timeout and were terminated"
+fi
+if [ "$TEST_EXIT_CODE" -ne 0 ]; then
+  ba_log "Gradle UI tests exited with status $TEST_EXIT_CODE"
+  TEST_RESULTS_DIR="$APP_MODULE_DIR/build/test-results/testDebugUnitTest"
+  if [ -d "$TEST_RESULTS_DIR" ]; then
+    ba_log "Available XML results under $TEST_RESULTS_DIR:"
+    find "$TEST_RESULTS_DIR" -maxdepth 1 -type f -name '*.xml' -print | sed 's#^.*/##' | sed 's/^/[build-android-app]   /'
+  else
+    ba_log "No test result XML directory found at $TEST_RESULTS_DIR"
+  fi
+fi
 
 if [ "$TEST_EXIT_CODE" -eq 0 ]; then
   (
