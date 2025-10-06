@@ -377,10 +377,6 @@ wait_for_emulator() {
   return 0
 }
 
-get_emulator_serial() {
-  "$ADB_BIN" devices | awk '/emulator-/{print $1; exit}'
-}
-
 stop_emulator() {
   if [ -n "${EMULATOR_SERIAL:-}" ]; then
     "$ADB_BIN" -s "$EMULATOR_SERIAL" emu kill >/dev/null 2>&1 || true
@@ -420,23 +416,36 @@ create_avd "$AVDMANAGER_BIN" "$AVD_NAME" "$SYSTEM_IMAGE" "$AVD_HOME"
 
 ANDROID_AVD_HOME="$AVD_HOME" "$ADB_BIN" start-server >/dev/null
 
+EMULATOR_PORT="${EMULATOR_PORT:-5560}"
+if ! [[ "$EMULATOR_PORT" =~ ^[0-9]+$ ]]; then
+  EMULATOR_PORT=5560
+elif [ $((EMULATOR_PORT % 2)) -ne 0 ] || [ $EMULATOR_PORT -lt 5554 ] || [ $EMULATOR_PORT -gt 5584 ]; then
+  # emulator requires an even console port between 5554-5584; fall back if invalid
+  EMULATOR_PORT=5560
+fi
+EMULATOR_SERIAL="emulator-$EMULATOR_PORT"
+
 EMULATOR_LOG="$GRADLE_PROJECT_DIR/emulator.log"
-ba_log "Starting headless Android emulator $AVD_NAME"
-ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off >"$EMULATOR_LOG" 2>&1 &
+ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
+ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
 sleep 5
-EMULATOR_SERIAL=""
+EMULATOR_READY=0
 for _ in $(seq 1 30); do
-  EMULATOR_SERIAL="$(get_emulator_serial)"
-  if [ -n "$EMULATOR_SERIAL" ]; then
+  if "$ADB_BIN" -s "$EMULATOR_SERIAL" get-state >/dev/null 2>&1; then
+    EMULATOR_READY=1
     break
   fi
   sleep 2
 done
-if [ -z "$EMULATOR_SERIAL" ]; then
-  ba_log "Failed to determine emulator serial" >&2
+if [ "$EMULATOR_READY" -ne 1 ]; then
+  ba_log "Failed to connect to emulator serial $EMULATOR_SERIAL" >&2
+  if [ -f "$EMULATOR_LOG" ]; then
+    ba_log "Emulator log tail:" >&2
+    tail -n 40 "$EMULATOR_LOG" | sed 's/^/[build-android-app] | /' >&2
+  fi
   stop_emulator
   exit 1
 fi
