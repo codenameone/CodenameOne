@@ -367,22 +367,64 @@ wait_for_emulator() {
   local serial="$1"
   "$ADB_BIN" start-server >/dev/null
   "$ADB_BIN" -s "$serial" wait-for-device
-  local booted="0"
-  for _ in $(seq 1 120); do
-    booted="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
-    if [ "$booted" = "1" ]; then
+
+  local boot_timeout="${EMULATOR_BOOT_TIMEOUT_SECONDS:-600}"
+  if ! [[ "$boot_timeout" =~ ^[0-9]+$ ]] || [ "$boot_timeout" -le 0 ]; then
+    ba_log "Invalid EMULATOR_BOOT_TIMEOUT_SECONDS=$boot_timeout provided; falling back to 600"
+    boot_timeout=600
+  fi
+  local poll_interval="${EMULATOR_BOOT_POLL_INTERVAL_SECONDS:-5}"
+  if ! [[ "$poll_interval" =~ ^[0-9]+$ ]] || [ "$poll_interval" -le 0 ]; then
+    poll_interval=5
+  fi
+  local status_log_interval="${EMULATOR_BOOT_STATUS_LOG_INTERVAL_SECONDS:-30}"
+  if ! [[ "$status_log_interval" =~ ^[0-9]+$ ]] || [ "$status_log_interval" -le 0 ]; then
+    status_log_interval=30
+  fi
+
+  local deadline=$((SECONDS + boot_timeout))
+  local last_log=$SECONDS
+  local boot_completed="0"
+  local dev_boot_completed="0"
+  local bootanim=""
+  local device_state=""
+
+  while [ $SECONDS -lt $deadline ]; do
+    device_state="$($ADB_BIN -s "$serial" get-state 2>/dev/null | tr -d '\r')"
+    if [ "$device_state" != "device" ]; then
+      if [ $((SECONDS - last_log)) -ge $status_log_interval ]; then
+        ba_log "Waiting for emulator $serial to become ready (state=$device_state)"
+        last_log=$SECONDS
+      fi
+      sleep "$poll_interval"
+      continue
+    fi
+
+    boot_completed="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    dev_boot_completed="$($ADB_BIN -s "$serial" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r')"
+    bootanim="$($ADB_BIN -s "$serial" shell getprop init.svc.bootanim 2>/dev/null | tr -d '\r')"
+
+    if [ "$boot_completed" = "1" ] && [ "$dev_boot_completed" = "1" ]; then
       break
     fi
-    sleep 2
+
+    if [ $((SECONDS - last_log)) -ge $status_log_interval ]; then
+      ba_log "Waiting for emulator $serial to boot (sys.boot_completed=${boot_completed:-<unset>} dev.bootcomplete=${dev_boot_completed:-<unset>} bootanim=${bootanim:-<unset>})"
+      last_log=$SECONDS
+    fi
+    sleep "$poll_interval"
   done
-  if [ "$booted" != "1" ]; then
-    ba_log "Emulator $serial failed to boot within expected time" >&2
+
+  if [ "$boot_completed" != "1" ] || [ "$dev_boot_completed" != "1" ]; then
+    ba_log "Emulator $serial failed to boot within ${boot_timeout}s (sys.boot_completed=${boot_completed:-<unset>} dev.bootcomplete=${dev_boot_completed:-<unset>} bootanim=${bootanim:-<unset>} state=${device_state:-<unset>})" >&2
     return 1
   fi
+
   "$ADB_BIN" -s "$serial" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$serial" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$serial" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$serial" shell input keyevent 82 >/dev/null 2>&1 || true
+  "$ADB_BIN" -s "$serial" shell wm dismiss-keyguard >/dev/null 2>&1 || true
   return 0
 }
 
