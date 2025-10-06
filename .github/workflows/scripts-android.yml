@@ -25,7 +25,7 @@ jobs:
         run: ./scripts/build-android-app.sh -q -DskipTests
       - name: Upload UI test screenshot artifact
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: hello-codenameone-ui-test-screenshot
           path: ${{ env.CN1_UI_TEST_SCREENSHOT }}
