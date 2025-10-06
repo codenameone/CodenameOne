@@ -365,6 +365,13 @@ if [ "$TEST_EXIT_CODE" -ne 0 ]; then
   if [ -d "$TEST_RESULTS_DIR" ]; then
     ba_log "Available XML results under $TEST_RESULTS_DIR:"
     find "$TEST_RESULTS_DIR" -maxdepth 1 -type f -name '*.xml' -print | sed 's#^.*/##' | sed 's/^/[build-android-app]   /'
+    shopt -s nullglob
+    for result_xml in "$TEST_RESULTS_DIR"/*.xml; do
+      ba_log "----- Begin test result XML: $(basename "$result_xml") -----"
+      sed 's/^/[build-android-app] | /' "$result_xml"
+      ba_log "----- End test result XML: $(basename "$result_xml") -----"
+    done
+    shopt -u nullglob
   else
     ba_log "No test result XML directory found at $TEST_RESULTS_DIR"
   fi

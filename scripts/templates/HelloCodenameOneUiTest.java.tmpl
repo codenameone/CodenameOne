@@ -14,6 +14,7 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
@@ -21,7 +22,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.rules.TestWatcher;
 import org.junit.runner.RunWith;
+import org.junit.runner.Description;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.android.controller.ActivityController;
@@ -45,17 +48,58 @@ public class @MAIN_NAME@UiTest {
             .withLookingForStuckThread(true)
             .build();
 
+    @Rule
+    public final TestWatcher loggingWatcher = new TestWatcher() {
+        @Override
+        protected void starting(Description description) {
+            log("Starting test method: " + description.getDisplayName());
+        }
+
+        @Override
+        protected void succeeded(Description description) {
+            log("Test method succeeded: " + description.getDisplayName());
+        }
+
+        @Override
+        protected void failed(Throwable e, Description description) {
+            logError("Test method failed: " + description.getDisplayName(), e);
+            dumpAllThreads("Failure diagnostics for " + description.getDisplayName());
+        }
+
+        @Override
+        protected void finished(Description description) {
+            log("Finished test method: " + description.getDisplayName());
+        }
+    };
+
     @Before
     public void setUp() {
         log("Starting Robolectric activity for screenshot test");
-        controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
-        log("ActivityController created");
+        try {
+            controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
+            log("ActivityController created");
+        } catch (RuntimeException ex) {
+            logError("Failed to create ActivityController", ex);
+            throw ex;
+        }
         log("Invoking controller.setup() to create/start/resume activity");
-        activity = controller.setup().get();
-        log("controller.setup() completed (Display.isInitialized=" + Display.isInitialized() + ")");
+        try {
+            activity = controller.setup().get();
+            log("controller.setup() completed (Display.isInitialized=" + Display.isInitialized()
+                    + ", activity=" + activity + ")");
+        } catch (RuntimeException ex) {
+            logError("controller.setup() threw an exception", ex);
+            dumpAllThreads("controller.setup() failure diagnostics");
+            throw ex;
+        }
         log("Processing pending Codename One tasks after setup");
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-        log("Initial runUiThreadTasksIncludingDelayedTasks call finished");
+        try {
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+            log("Initial runUiThreadTasksIncludingDelayedTasks call finished");
+        } catch (RuntimeException ex) {
+            logError("runUiThreadTasksIncludingDelayedTasks threw an exception", ex);
+            throw ex;
+        }
     }
 
     @After
@@ -72,8 +116,13 @@ public class @MAIN_NAME@UiTest {
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
         log("Running screenshot assertions with prepared activity");
         log("Idling main looper to process pending tasks");
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-        log("Completed runUiThreadTasksIncludingDelayedTasks");
+        try {
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+            log("Completed runUiThreadTasksIncludingDelayedTasks");
+        } catch (RuntimeException ex) {
+            logError("runUiThreadTasksIncludingDelayedTasks during test threw an exception", ex);
+            throw ex;
+        }
 
         if (Display.isInitialized()) {
             log("Codename One display reports current form="
@@ -189,6 +238,17 @@ public class @MAIN_NAME@UiTest {
         appendLogLine(formatted);
     }
 
+    private static void logError(String message, Throwable error) {
+        log(message + ": " + error);
+        StringWriter buffer = new StringWriter();
+        error.printStackTrace(new PrintWriter(buffer));
+        for (String line : buffer.toString().split("\r?\n")) {
+            if (!line.isEmpty()) {
+                log(line);
+            }
+        }
+    }
+
     private static void safelyInvokeLifecycle(Runnable invocation, String name) {
         try {
             invocation.run();
@@ -209,5 +269,20 @@ public class @MAIN_NAME@UiTest {
         } catch (IOException ex) {
             System.out.println("[@MAIN_NAME@UiTest] Failed to persist log entry: " + ex.getMessage());
         }
+    }
+
+    private static void dumpAllThreads(String reason) {
+        log("Capturing thread dump: " + reason);
+        Thread.getAllStackTraces().forEach((thread, stack) -> {
+            log("Thread '" + thread.getName() + "' (id=" + thread.getId()
+                    + ", state=" + thread.getState() + ")");
+            if (stack.length == 0) {
+                log("  <no stack trace>");
+            } else {
+                for (StackTraceElement element : stack) {
+                    log("  at " + element);
+                }
+            }
+        });
     }
 }
