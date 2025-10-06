@@ -265,20 +265,94 @@ if [ -z "$GRADLE_PROJECT_DIR" ]; then
   exit 1
 fi
 
+# --- Inject Robolectric UI test into Gradle project ---
+APP_MODULE_DIR=$(find "$GRADLE_PROJECT_DIR" -maxdepth 1 -type d -name "app" | head -n 1 || true)
+if [ -z "$APP_MODULE_DIR" ]; then
+  ba_log "Unable to locate Gradle app module inside $GRADLE_PROJECT_DIR" >&2
+  exit 1
+fi
+
+UI_TEST_TEMPLATE="$SCRIPT_DIR/templates/HelloCodenameOneUiTest.java.tmpl"
+if [ ! -f "$UI_TEST_TEMPLATE" ]; then
+  ba_log "UI test template not found: $UI_TEST_TEMPLATE" >&2
+  exit 1
+fi
+
+UI_TEST_DIR="$APP_MODULE_DIR/src/test/java/${PACKAGE_PATH}"
+mkdir -p "$UI_TEST_DIR"
+UI_TEST_FILE="$UI_TEST_DIR/${MAIN_NAME}UiTest.java"
+
+sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
+    -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
+    "$UI_TEST_TEMPLATE" > "$UI_TEST_FILE"
+ba_log "Created Robolectric UI test at $UI_TEST_FILE"
+
+APP_BUILD_GRADLE="$APP_MODULE_DIR/build.gradle"
+if [ ! -f "$APP_BUILD_GRADLE" ]; then
+  ba_log "Expected Gradle build file not found at $APP_BUILD_GRADLE" >&2
+  exit 1
+fi
+
+"$SCRIPT_DIR/update_android_ui_test_gradle.py" "$APP_BUILD_GRADLE"
+
+# Capture UI test screenshots in a deterministic directory
+SCREENSHOT_OUTPUT_DIR="$GRADLE_PROJECT_DIR/test-artifacts/screenshots"
+rm -rf "$SCREENSHOT_OUTPUT_DIR"
+mkdir -p "$SCREENSHOT_OUTPUT_DIR"
+export CN1_TEST_SCREENSHOT_DIR="$SCREENSHOT_OUTPUT_DIR"
+
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME="$JAVA17_HOME"
+if command -v sdkmanager >/dev/null 2>&1; then
+  yes | sdkmanager --licenses >/dev/null 2>&1 || true
+elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+  yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+fi
+
+set +e
 (
   cd "$GRADLE_PROJECT_DIR"
-  if command -v sdkmanager >/dev/null 2>&1; then
-    yes | sdkmanager --licenses >/dev/null 2>&1 || true
-  elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
-  fi
-  ./gradlew --no-daemon assembleDebug
+  ./gradlew --no-daemon test
 )
+TEST_EXIT_CODE=$?
+set -e
+
+if [ "$TEST_EXIT_CODE" -eq 0 ]; then
+  (
+    cd "$GRADLE_PROJECT_DIR"
+    ./gradlew --no-daemon assembleDebug
+  )
+else
+  ba_log "UI tests failed (exit code $TEST_EXIT_CODE); skipping assembleDebug"
+fi
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
+
+SCREENSHOT_FILE=$(find "$SCREENSHOT_OUTPUT_DIR" -maxdepth 1 -name '*.png' | head -n 1 || true)
+SCREENSHOT_STATUS=0
+if [ -z "$SCREENSHOT_FILE" ]; then
+  ba_log "UI test completed but no screenshot was produced in $SCREENSHOT_OUTPUT_DIR" >&2
+  SCREENSHOT_STATUS=1
+else
+  FINAL_SCREENSHOT_DIR="${CN1_TEST_SCREENSHOT_EXPORT_DIR:-$REPO_ROOT/build-artifacts}"
+  mkdir -p "$FINAL_SCREENSHOT_DIR"
+  FINAL_SCREENSHOT="$FINAL_SCREENSHOT_DIR/ui-test-screenshot.png"
+  cp "$SCREENSHOT_FILE" "$FINAL_SCREENSHOT"
+  if [ -n "${GITHUB_ENV:-}" ]; then
+    printf 'CN1_UI_TEST_SCREENSHOT=%s\n' "$FINAL_SCREENSHOT" >> "$GITHUB_ENV"
+  fi
+  ba_log "UI test screenshot available at $FINAL_SCREENSHOT"
+fi
+unset CN1_TEST_SCREENSHOT_DIR
+
+if [ "$TEST_EXIT_CODE" -ne 0 ]; then
+  exit "$TEST_EXIT_CODE"
+fi
+
+if [ "$SCREENSHOT_STATUS" -ne 0 ]; then
+  exit 1
+fi
 
 APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" | head -n 1 || true)
 [ -n "$APK_PATH" ] || { ba_log "Gradle build completed but no APK was found" >&2; exit 1; }

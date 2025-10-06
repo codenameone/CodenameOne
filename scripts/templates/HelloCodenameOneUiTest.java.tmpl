@@ -1,0 +1,176 @@
+package @PACKAGE@;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.util.DisplayMetrics;
+import android.view.View;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.android.controller.ActivityController;
+import org.robolectric.annotation.Config;
+
+@RunWith(RobolectricTestRunner.class)
+@Config(sdk = 30)
+public class @MAIN_NAME@UiTest {
+
+    @Test
+    public void mainFormScreenshotContainsRenderedContent() throws Exception {
+        ActivityController<@MAIN_NAME@Stub> controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class).setup();
+        try {
+            Form displayed = waitForDisplayedForm(5000L);
+            assertNotNull("Codename One form should be displayed", displayed);
+
+            @MAIN_NAME@Stub activity = controller.get();
+            Bitmap screenshot = captureScreenshot(activity);
+            assertNotNull("Screenshot capture should succeed", screenshot);
+            assertTrue("Screenshot width should be positive", screenshot.getWidth() > 0);
+            assertTrue("Screenshot height should be positive", screenshot.getHeight() > 0);
+            assertTrue("Screenshot should contain rendered content beyond the background", hasRenderableContent(screenshot));
+
+            File screenshotFile = saveScreenshot(screenshot);
+            assertTrue("Screenshot file should exist", screenshotFile.isFile());
+            assertTrue("Screenshot file should not be empty", screenshotFile.length() > 0L);
+        } finally {
+            controller.pause().stop().destroy();
+        }
+    }
+
+    private static Form waitForDisplayedForm(long timeoutMillis) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        final Form[] current = new Form[1];
+        while (System.currentTimeMillis() < deadline) {
+            if (Display.isInitialized()) {
+                Display.getInstance().callSeriallyAndWait(() -> current[0] = Display.getInstance().getCurrent());
+                if (current[0] != null) {
+                    return current[0];
+                }
+            }
+            Thread.sleep(50L);
+        }
+        throw new AssertionError("Timed out waiting for Codename One form to be displayed");
+    }
+
+    private static Bitmap captureScreenshot(@MAIN_NAME@Stub activity) throws InterruptedException {
+        View decorView = waitForDecorViewWithDimensions(activity, 5000L);
+        Bitmap bitmap = Bitmap.createBitmap(decorView.getWidth(), decorView.getHeight(), Bitmap.Config.ARGB_8888);
+        runOnUiThreadAndWait(activity, () -> {
+            Canvas canvas = new Canvas(bitmap);
+            decorView.draw(canvas);
+        });
+        return bitmap;
+    }
+
+    private static boolean hasRenderableContent(Bitmap screenshot) {
+        int width = screenshot.getWidth();
+        int height = screenshot.getHeight();
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        int[] pixels = new int[width * height];
+        screenshot.getPixels(pixels, 0, width, 0, 0, width, height);
+        if (pixels.length == 0) {
+            return false;
+        }
+        int background = pixels[0];
+        int contentPixels = 0;
+        for (int argb : pixels) {
+            int alpha = (argb >>> 24) & 0xFF;
+            if (alpha == 0) {
+                continue;
+            }
+            if (argb != background) {
+                contentPixels++;
+                if (contentPixels > width) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static File saveScreenshot(Bitmap screenshot) throws IOException {
+        String directory = System.getenv("CN1_TEST_SCREENSHOT_DIR");
+        File outputDir = (directory != null && !directory.isEmpty()) ? new File(directory) : new File("build/ui-test-screenshots");
+        if (!outputDir.exists() && !outputDir.mkdirs()) {
+            throw new IOException("Failed to create screenshot directory " + outputDir.getAbsolutePath());
+        }
+        File screenshotFile = new File(outputDir, "@MAIN_NAME@-ui-test.png");
+        try (FileOutputStream out = new FileOutputStream(screenshotFile)) {
+            if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                throw new IOException("Failed to encode screenshot as PNG");
+            }
+        }
+        return screenshotFile;
+    }
+
+    private static View waitForDecorViewWithDimensions(@MAIN_NAME@Stub activity, long timeoutMillis) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        while (System.currentTimeMillis() < deadline) {
+            View decorView = activity.getWindow().getDecorView();
+            if (decorView != null) {
+                ensureViewHasLayout(activity, decorView);
+                if (decorView.getWidth() > 0 && decorView.getHeight() > 0) {
+                    return decorView;
+                }
+            }
+            Thread.sleep(50L);
+        }
+        throw new AssertionError("Timed out waiting for decor view layout");
+    }
+
+    private static void ensureViewHasLayout(@MAIN_NAME@Stub activity, View view) throws InterruptedException {
+        if (view.getWidth() > 0 && view.getHeight() > 0) {
+            return;
+        }
+        runOnUiThreadAndWait(activity, () -> {
+            DisplayMetrics metrics = activity.getResources().getDisplayMetrics();
+            int widthSpec = View.MeasureSpec.makeMeasureSpec(metrics.widthPixels, View.MeasureSpec.EXACTLY);
+            int heightSpec = View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY);
+            view.measure(widthSpec, heightSpec);
+            view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+        });
+    }
+
+    private static void runOnUiThreadAndWait(@MAIN_NAME@Stub activity, Runnable runnable) throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        activity.runOnUiThread(() -> {
+            try {
+                runnable.run();
+            } catch (Throwable t) {
+                error.set(t);
+            } finally {
+                latch.countDown();
+            }
+        });
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            throw new AssertionError("Timed out waiting for UI thread task");
+        }
+        if (error.get() != null) {
+            Throwable thrown = error.get();
+            if (thrown instanceof RuntimeException) {
+                throw (RuntimeException) thrown;
+            }
+            if (thrown instanceof Error) {
+                throw (Error) thrown;
+            }
+            throw new RuntimeException(thrown);
+        }
+    }
+}
