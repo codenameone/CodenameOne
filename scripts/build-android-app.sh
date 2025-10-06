@@ -325,26 +325,6 @@ elif command -v avdmanager >/dev/null 2>&1; then
   AVDMANAGER_BIN="$(command -v avdmanager)"
 fi
 
-ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
-if [ ! -x "$ADB_BIN" ]; then
-  if command -v adb >/dev/null 2>&1; then
-    ADB_BIN="$(command -v adb)"
-  else
-    ba_log "adb not found in Android SDK. Ensure platform-tools are installed." >&2
-    exit 1
-  fi
-fi
-
-EMULATOR_BIN="$ANDROID_SDK_ROOT/emulator/emulator"
-if [ ! -x "$EMULATOR_BIN" ]; then
-  if command -v emulator >/dev/null 2>&1; then
-    EMULATOR_BIN="$(command -v emulator)"
-  else
-    ba_log "Android emulator binary not found" >&2
-    exit 1
-  fi
-fi
-
 install_android_packages() {
   local manager="$1"
   if [ -z "$manager" ]; then
@@ -352,7 +332,11 @@ install_android_packages() {
     exit 1
   fi
   yes | "$manager" --licenses >/dev/null 2>&1 || true
-  "$manager" --install "platform-tools" "platforms;android-33" "system-images;android-33;google_apis;x86_64" >/dev/null 2>&1 || true
+  "$manager" --install \
+    "platform-tools" \
+    "emulator" \
+    "platforms;android-33" \
+    "system-images;android-33;google_apis;x86_64" >/dev/null 2>&1 || true
 }
 
 create_avd() {
@@ -408,6 +392,26 @@ stop_emulator() {
 }
 
 install_android_packages "$SDKMANAGER_BIN"
+
+ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
+if [ ! -x "$ADB_BIN" ]; then
+  if command -v adb >/dev/null 2>&1; then
+    ADB_BIN="$(command -v adb)"
+  else
+    ba_log "adb not found in Android SDK. Ensure platform-tools are installed." >&2
+    exit 1
+  fi
+fi
+
+EMULATOR_BIN="$ANDROID_SDK_ROOT/emulator/emulator"
+if [ ! -x "$EMULATOR_BIN" ]; then
+  if command -v emulator >/dev/null 2>&1; then
+    EMULATOR_BIN="$(command -v emulator)"
+  else
+    ba_log "Android emulator binary not found" >&2
+    exit 1
+  fi
+fi
 
 AVD_NAME="cn1UiTestAvd"
 SYSTEM_IMAGE="system-images;android-33;google_apis;x86_64"
