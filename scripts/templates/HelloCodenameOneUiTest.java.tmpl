@@ -7,8 +7,11 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
+import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
 
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -17,8 +20,11 @@ import com.codename1.ui.util.ImageIO;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.concurrent.Callable;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
 import org.junit.Before;
@@ -64,10 +70,7 @@ public class @MAIN_NAME@UiTest {
         View decorView = activity.getWindow().getDecorView();
         assertNotNull("Activity decor view should be available", decorView);
 
-        ensureViewHasLayout(decorView);
-
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-        Bitmap androidScreenshot = captureBitmap(decorView);
+        Bitmap androidScreenshot = captureAndroidScreenshot(decorView);
         assertTrue("Android screenshot width should be positive", androidScreenshot.getWidth() > 0);
         assertTrue("Android screenshot height should be positive", androidScreenshot.getHeight() > 0);
         assertTrue(
@@ -78,7 +81,6 @@ public class @MAIN_NAME@UiTest {
         assertTrue("Android screenshot file should exist", androidScreenshotFile.isFile());
         assertTrue("Android screenshot file should not be empty", androidScreenshotFile.length() > 0L);
 
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
         Image codenameOneScreenshot = captureCodenameOneScreenshot();
         assertNotNull("Codename One screenshot should be available", codenameOneScreenshot);
         assertTrue("Codename One screenshot width should be positive", codenameOneScreenshot.getWidth() > 0);
@@ -92,6 +94,21 @@ public class @MAIN_NAME@UiTest {
                 "@MAIN_NAME@-codenameone-ui.png");
         assertTrue("Codename One screenshot file should exist", codenameOneScreenshotFile.isFile());
         assertTrue("Codename One screenshot file should not be empty", codenameOneScreenshotFile.length() > 0L);
+    }
+
+    private Bitmap captureAndroidScreenshot(View decorView) throws Exception {
+        ensureViewHasLayout(decorView);
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+        flushCodenameOneGraphics();
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+
+        View codenameOneSurface = findCodenameOneSurface(decorView);
+        Bitmap surfaceBitmap = captureSurfaceBitmap(codenameOneSurface);
+        if (surfaceBitmap != null && hasRenderableContent(surfaceBitmap)) {
+            return surfaceBitmap;
+        }
+
+        return captureBitmap(decorView);
     }
 
     private static Bitmap captureBitmap(View view) {
@@ -130,7 +147,7 @@ public class @MAIN_NAME@UiTest {
     private static boolean hasRenderableContent(Image screenshot) throws Exception {
         int width = screenshot.getWidth();
         int height = screenshot.getHeight();
-        int[] pixels = callOnEdt(screenshot::getRGB);
+        int[] pixels = callSeriallyAndWait(screenshot::getRGB);
         return hasRenderableContent(pixels, width, height);
     }
 
@@ -169,11 +186,11 @@ public class @MAIN_NAME@UiTest {
     private static File saveCodenameOneScreenshot(Image screenshot, String fileName) throws Exception {
         File outputDir = resolveArtifactDirectory();
         File screenshotFile = new File(outputDir, fileName);
-        ImageIO io = callOnEdt(() -> Display.getInstance().getImageIO());
+        ImageIO io = callSeriallyAndWait(() -> Display.getInstance().getImageIO());
         assertNotNull("Codename One ImageIO should be available", io);
         try (FileOutputStream out = new FileOutputStream(screenshotFile)) {
             FileOutputStream stream = out;
-            callOnEdt(() -> {
+            callSeriallyAndWait(() -> {
                 io.save(screenshot, stream, ImageIO.FORMAT_PNG, 1.0f);
                 return null;
             });
@@ -208,20 +225,163 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static Image captureCodenameOneScreenshot() throws Exception {
-        return callOnEdt(() -> Display.getInstance().captureScreen());
+        return callSeriallyAndWait(() -> Display.getInstance().captureScreen());
     }
 
-    private static <T> T callOnEdt(Callable<T> callable) throws Exception {
-        FutureTask<T> task = new FutureTask<>(callable);
-        Display.getInstance().callSerially(task);
-        long deadline = SystemClock.uptimeMillis() + EDT_TIMEOUT_MS;
-        while (!task.isDone() && SystemClock.uptimeMillis() < deadline) {
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-            SystemClock.sleep(4L);
+    private static Bitmap captureSurfaceBitmap(View view) {
+        if (view == null) {
+            return null;
         }
-        if (!task.isDone()) {
+        if (view instanceof TextureView) {
+            Bitmap bitmap = ((TextureView) view).getBitmap();
+            if (bitmap != null) {
+                return bitmap;
+            }
+        }
+
+        Bitmap reflectionBitmap = extractCodenameOneViewBitmap(view);
+        if (reflectionBitmap != null) {
+            return reflectionBitmap;
+        }
+
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Bitmap childBitmap = captureSurfaceBitmap(group.getChildAt(i));
+                if (childBitmap != null) {
+                    return childBitmap;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Bitmap extractCodenameOneViewBitmap(View view) {
+        try {
+            Field cn1Field = view.getClass().getDeclaredField("cn1View");
+            cn1Field.setAccessible(true);
+            Object cn1View = cn1Field.get(view);
+            if (cn1View != null) {
+                Field bitmapField = cn1View.getClass().getDeclaredField("bitmap");
+                bitmapField.setAccessible(true);
+                Object bitmapValue = bitmapField.get(cn1View);
+                if (bitmapValue instanceof Bitmap) {
+                    Bitmap bitmap = (Bitmap) bitmapValue;
+                    if (bitmap.getWidth() > 0 && bitmap.getHeight() > 0) {
+                        Bitmap copy = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+                        if (copy == null) {
+                            copy = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+                            Canvas canvas = new Canvas(copy);
+                            canvas.drawBitmap(bitmap, 0f, 0f, null);
+                        }
+                        return copy;
+                    }
+                }
+            }
+        } catch (NoSuchFieldException ignored) {
+            // View does not expose a Codename One backing field.
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Unable to access Codename One view bitmap", e);
+        }
+        return null;
+    }
+
+    private static View findCodenameOneSurface(View root) {
+        if (root == null) {
+            return null;
+        }
+        if (root.getId() == 2001) {
+            return root;
+        }
+        if (root.getClass().getName().contains("CodenameOne")) {
+            return root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View child = group.getChildAt(i);
+                View match = findCodenameOneSurface(child);
+                if (match != null) {
+                    return match;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void flushCodenameOneGraphics() throws Exception {
+        callSeriallyAndWait(() -> {
+            Form current = Display.getInstance().getCurrent();
+            if (current != null) {
+                current.revalidate();
+                current.repaint();
+            }
+            return null;
+        });
+        callSeriallyAndWait(() -> {
+            AndroidImplementation impl = getAndroidImplementation();
+            if (impl != null) {
+                impl.flushGraphics();
+            }
+            return null;
+        });
+    }
+
+    private static AndroidImplementation getAndroidImplementation() {
+        try {
+            Field implField = Display.class.getDeclaredField("impl");
+            implField.setAccessible(true);
+            Object impl = implField.get(null);
+            if (impl instanceof AndroidImplementation) {
+                return (AndroidImplementation) impl;
+            }
+            return null;
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException("Unable to access Codename One implementation", e);
+        }
+    }
+
+    private static <T> T callSeriallyAndWait(Callable<T> callable) throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<T> result = new AtomicReference<>();
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        Display.getInstance().callSerially(() -> {
+            try {
+                result.set(callable.call());
+            } catch (Throwable t) {
+                error.set(t);
+            } finally {
+                latch.countDown();
+            }
+        });
+        boolean completed;
+        try {
+            completed = awaitLatch(latch, EDT_TIMEOUT_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw e;
+        }
+        if (!completed) {
             throw new AssertionError("Timed out waiting for Codename One EDT task to finish");
         }
-        return task.get();
+        if (error.get() != null) {
+            Throwable throwable = error.get();
+            if (throwable instanceof Exception) {
+                throw (Exception) throwable;
+            }
+            throw new RuntimeException(throwable);
+        }
+        return result.get();
+    }
+
+    private static boolean awaitLatch(CountDownLatch latch, long timeoutMs) throws InterruptedException {
+        long deadline = SystemClock.uptimeMillis() + timeoutMs;
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (latch.await(4L, TimeUnit.MILLISECONDS)) {
+                return true;
+            }
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+        }
+        return latch.await(0L, TimeUnit.MILLISECONDS);
     }
 }
