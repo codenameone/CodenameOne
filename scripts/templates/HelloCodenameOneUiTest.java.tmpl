@@ -16,6 +16,7 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -24,6 +25,7 @@ import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowLooper;
+import org.robolectric.util.Scheduler;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 30)
@@ -187,11 +189,58 @@ public class @MAIN_NAME@UiTest {
         appendLogLine(formatted);
     }
 
+    private static final AtomicInteger PUMP_INVOCATION_COUNTER = new AtomicInteger();
+
     private static void pumpSchedulers() {
-        ShadowLooper.idleMainLooper();
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-        Robolectric.flushForegroundThreadScheduler();
-        Robolectric.flushBackgroundThreadScheduler();
+        int invocation = PUMP_INVOCATION_COUNTER.incrementAndGet();
+        long start = System.currentTimeMillis();
+        boolean verbose = invocation <= 5 || invocation % 10 == 0;
+        if (verbose) {
+            log("pumpSchedulers[" + invocation + "] begin");
+        }
+        try {
+            ShadowLooper.idleMainLooper();
+            if (verbose) {
+                log("pumpSchedulers[" + invocation + "] after idleMainLooper");
+            }
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+            if (verbose) {
+                log("pumpSchedulers[" + invocation + "] after runUiThreadTasksIncludingDelayedTasks");
+            }
+            flushScheduler(Robolectric.getForegroundThreadScheduler(), "foreground", invocation, verbose);
+            flushScheduler(Robolectric.getBackgroundThreadScheduler(), "background", invocation, verbose);
+        } catch (Throwable t) {
+            log("pumpSchedulers[" + invocation + "] threw " + t);
+            throw t;
+        } finally {
+            if (verbose) {
+                long elapsed = System.currentTimeMillis() - start;
+                log("pumpSchedulers[" + invocation + "] finished after " + elapsed + "ms");
+            }
+        }
+    }
+
+    private static void flushScheduler(Scheduler scheduler, String label, int invocation, boolean verbose) {
+        if (scheduler == null) {
+            if (verbose) {
+                log("pumpSchedulers[" + invocation + "] no " + label + " scheduler available");
+            }
+            return;
+        }
+        int iterations = 0;
+        while (scheduler.advanceToLastPostedRunnable()) {
+            iterations++;
+            if (iterations <= 5 || iterations % 50 == 0) {
+                log("pumpSchedulers[" + invocation + "] ran " + label + " runnable #" + iterations);
+            }
+            if (iterations >= 5000) {
+                log("pumpSchedulers[" + invocation + "] aborting " + label + " flush after " + iterations + " iterations");
+                break;
+            }
+        }
+        if (verbose) {
+            log("pumpSchedulers[" + invocation + "] flushed " + label + " scheduler in " + iterations + " iterations");
+        }
     }
 
     private static synchronized void appendLogLine(String message) {
