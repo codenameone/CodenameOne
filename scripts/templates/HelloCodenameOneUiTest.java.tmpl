@@ -5,7 +5,6 @@ import static org.junit.Assert.assertTrue;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.View;
 
@@ -36,7 +35,7 @@ public class @MAIN_NAME@UiTest {
         pumpSchedulers();
         try {
             log("Waiting for Codename One main form to be displayed");
-            Form displayed = waitForDisplayedForm(5000L);
+            Form displayed = waitForDisplayedForm(10000L);
             assertNotNull("Codename One form should be displayed", displayed);
 
             @MAIN_NAME@Stub activity = controller.get();
@@ -57,9 +56,9 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static Form waitForDisplayedForm(long timeoutMillis) throws InterruptedException {
-        long deadline = SystemClock.uptimeMillis() + timeoutMillis;
-        long nextLog = SystemClock.uptimeMillis();
-        while (SystemClock.uptimeMillis() < deadline) {
+        long start = System.currentTimeMillis();
+        long nextLog = start;
+        while (System.currentTimeMillis() - start < timeoutMillis) {
             pumpSchedulers();
             if (Display.isInitialized()) {
                 Form current = Display.getInstance().getCurrent();
@@ -68,7 +67,7 @@ public class @MAIN_NAME@UiTest {
                 }
             }
             Thread.sleep(50L);
-            long now = SystemClock.uptimeMillis();
+            long now = System.currentTimeMillis();
             if (now >= nextLog) {
                 log("Still waiting for Codename One form; displayInitialized=" + Display.isInitialized());
                 nextLog = now + 1000L;
@@ -79,7 +78,7 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static Bitmap captureScreenshot(@MAIN_NAME@Stub activity) throws InterruptedException {
-        View decorView = waitForDecorViewWithDimensions(activity, 5000L);
+        View decorView = waitForDecorViewWithDimensions(activity, 10000L);
         Bitmap bitmap = Bitmap.createBitmap(decorView.getWidth(), decorView.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         decorView.draw(canvas);
@@ -130,9 +129,9 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static View waitForDecorViewWithDimensions(@MAIN_NAME@Stub activity, long timeoutMillis) throws InterruptedException {
-        long deadline = SystemClock.uptimeMillis() + timeoutMillis;
-        long nextLog = SystemClock.uptimeMillis();
-        while (SystemClock.uptimeMillis() < deadline) {
+        long start = System.currentTimeMillis();
+        long nextLog = start;
+        while (System.currentTimeMillis() - start < timeoutMillis) {
             View decorView = activity.getWindow().getDecorView();
             if (decorView != null) {
                 ensureViewHasLayout(decorView);
@@ -142,9 +141,10 @@ public class @MAIN_NAME@UiTest {
             }
             pumpSchedulers();
             Thread.sleep(50L);
-            long now = SystemClock.uptimeMillis();
+            long now = System.currentTimeMillis();
             if (now >= nextLog) {
-                log("Waiting for decor view layout; width=" + (decorView != null ? decorView.getWidth() : 0)
+                log("Waiting for decor view layout; decorPresent=" + (decorView != null)
+                        + " width=" + (decorView != null ? decorView.getWidth() : 0)
                         + " height=" + (decorView != null ? decorView.getHeight() : 0));
                 nextLog = now + 1000L;
             }
@@ -169,6 +169,7 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static void pumpSchedulers() {
+        ShadowLooper.idleMainLooper();
         ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
         Robolectric.flushForegroundThreadScheduler();
         Robolectric.flushBackgroundThreadScheduler();
