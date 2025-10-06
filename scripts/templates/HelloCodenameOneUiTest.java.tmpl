@@ -1,29 +1,25 @@
 package @PACKAGE@;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.View;
 
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.concurrent.TimeUnit;
+
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.TestWatcher;
 import org.junit.runner.RunWith;
-import org.junit.runner.Description;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.android.controller.ActivityController;
@@ -36,125 +32,70 @@ import org.robolectric.shadows.ShadowLooper;
 @LooperMode(LooperMode.Mode.LEGACY)
 public class @MAIN_NAME@UiTest {
 
-    private static final long HANG_DETECTION_SECONDS = 300L;
+    private static final long STARTUP_TIMEOUT_MS = 30_000L;
+    private static final long LAYOUT_TIMEOUT_MS = 5_000L;
 
     private ActivityController<@MAIN_NAME@Stub> controller;
     private @MAIN_NAME@Stub activity;
 
-    @Rule
-    public final TestWatcher loggingWatcher = new TestWatcher() {
-        @Override
-        protected void starting(Description description) {
-            log("Starting test method: " + description.getDisplayName());
-        }
-
-        @Override
-        protected void succeeded(Description description) {
-            log("Test method succeeded: " + description.getDisplayName());
-        }
-
-        @Override
-        protected void failed(Throwable e, Description description) {
-            logError("Test method failed: " + description.getDisplayName(), e);
-            dumpAllThreads("Failure diagnostics for " + description.getDisplayName());
-        }
-
-        @Override
-        protected void finished(Description description) {
-            log("Finished test method: " + description.getDisplayName());
-        }
-    };
-
-    @Rule
-    public final HangDetectionRule hangDetectionRule = new HangDetectionRule(HANG_DETECTION_SECONDS, TimeUnit.SECONDS);
-
     @Before
     public void setUp() {
-        log("Starting Robolectric activity for screenshot test");
-        try {
-            controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
-            log("ActivityController created");
-        } catch (RuntimeException ex) {
-            logError("Failed to create ActivityController", ex);
-            throw ex;
-        }
-        log("Invoking controller.setup() to create/start/resume activity");
-        try {
-            activity = controller.setup().get();
-            log("controller.setup() completed (Display.isInitialized=" + Display.isInitialized()
-                    + ", activity=" + activity + ")");
-        } catch (RuntimeException ex) {
-            logError("controller.setup() threw an exception", ex);
-            dumpAllThreads("controller.setup() failure diagnostics");
-            throw ex;
-        }
-        log("Processing pending Codename One tasks after setup");
-        try {
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-            log("Initial runUiThreadTasksIncludingDelayedTasks call finished");
-        } catch (RuntimeException ex) {
-            logError("runUiThreadTasksIncludingDelayedTasks threw an exception", ex);
-            throw ex;
-        }
+        controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
+        activity = controller.setup().get();
+        waitForCodenameOneForm();
     }
 
     @After
     public void tearDown() {
-        if (controller == null) {
-            return;
+        if (controller != null) {
+            controller.pause();
+            controller.stop();
+            controller.destroy();
         }
-        safelyInvokeLifecycle(controller::pause, "pause");
-        safelyInvokeLifecycle(controller::stop, "stop");
-        safelyInvokeLifecycle(controller::destroy, "destroy");
     }
 
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
-        log("Running screenshot assertions with prepared activity");
-        log("Idling main looper to process pending tasks");
-        try {
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-            log("Completed runUiThreadTasksIncludingDelayedTasks");
-        } catch (RuntimeException ex) {
-            logError("runUiThreadTasksIncludingDelayedTasks during test threw an exception", ex);
-            throw ex;
-        }
+        View decorView = activity.getWindow().getDecorView();
+        assertNotNull("Activity decor view should be available", decorView);
 
-        if (Display.isInitialized()) {
-            log("Codename One display reports current form="
-                    + Display.getInstance().getCurrent());
-        } else {
-            log("Codename One display not initialized; continuing with screenshot capture");
-        }
+        ensureViewHasLayout(decorView);
 
-        log("Capturing decor view screenshot without additional waits");
-        Bitmap screenshot = captureScreenshot(activity);
-        assertTrue("Screenshot capture should succeed", screenshot != null);
-        log("Screenshot dimensions=" + screenshot.getWidth() + "x" + screenshot.getHeight());
+        Bitmap screenshot = captureBitmap(decorView);
         assertTrue("Screenshot width should be positive", screenshot.getWidth() > 0);
         assertTrue("Screenshot height should be positive", screenshot.getHeight() > 0);
-        boolean hasContent = hasRenderableContent(screenshot);
-        log("Screenshot content analysis result=" + hasContent);
-        assertTrue("Screenshot should contain rendered content beyond the background", hasContent);
+        assertTrue(
+                "Screenshot should contain rendered content beyond the background",
+                hasRenderableContent(screenshot));
 
         File screenshotFile = saveScreenshot(screenshot);
-        log("Screenshot stored at " + screenshotFile.getAbsolutePath());
         assertTrue("Screenshot file should exist", screenshotFile.isFile());
         assertTrue("Screenshot file should not be empty", screenshotFile.length() > 0L);
     }
 
-    private static Bitmap captureScreenshot(@MAIN_NAME@Stub activity) {
-        View decorView = activity.getWindow().getDecorView();
-        log("Decor view instance=" + decorView);
-        if (decorView == null) {
-            throw new AssertionError("Activity decor view was null");
-        }
-        ensureViewHasLayout(decorView);
-        log("Decor view layout dimensions after ensure: " + decorView.getWidth() + "x" + decorView.getHeight());
-        Bitmap bitmap = Bitmap.createBitmap(decorView.getWidth(), decorView.getHeight(), Bitmap.Config.ARGB_8888);
+    private static Bitmap captureBitmap(View view) {
+        Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
-        decorView.draw(canvas);
+        view.draw(canvas);
         return bitmap;
+    }
+
+    private static void ensureViewHasLayout(View view) {
+        long deadline = SystemClock.uptimeMillis() + LAYOUT_TIMEOUT_MS;
+        DisplayMetrics metrics = view.getResources().getDisplayMetrics();
+        int widthSpec = View.MeasureSpec.makeMeasureSpec(metrics.widthPixels, View.MeasureSpec.EXACTLY);
+        int heightSpec = View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY);
+
+        while ((view.getWidth() == 0 || view.getHeight() == 0) && SystemClock.uptimeMillis() < deadline) {
+            view.measure(widthSpec, heightSpec);
+            view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+            SystemClock.sleep(16L);
+        }
+
+        if (view.getWidth() == 0 || view.getHeight() == 0) {
+            throw new AssertionError("Timed out waiting for decor view to obtain layout bounds");
+        }
     }
 
     private static boolean hasRenderableContent(Bitmap screenshot) {
@@ -198,7 +139,8 @@ public class @MAIN_NAME@UiTest {
 
     private static File resolveArtifactDirectory() throws IOException {
         String directory = System.getenv("CN1_TEST_SCREENSHOT_DIR");
-        File outputDir = (directory != null && !directory.isEmpty()) ? new File(directory)
+        File outputDir = (directory != null && !directory.isEmpty())
+                ? new File(directory)
                 : new File("build/ui-test-screenshots");
         if (!outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Failed to create screenshot directory " + outputDir.getAbsolutePath());
@@ -206,114 +148,18 @@ public class @MAIN_NAME@UiTest {
         return outputDir;
     }
 
-    private static File resolveArtifactDirectoryForLogging() {
-        try {
-            return resolveArtifactDirectory();
-        } catch (IOException ex) {
-            System.out.println("[@MAIN_NAME@UiTest] Unable to prepare artifact directory for logging: " + ex.getMessage());
-            return null;
-        }
-    }
-
-    private static void ensureViewHasLayout(View view) {
-        if (view.getWidth() > 0 && view.getHeight() > 0) {
-            log("ensureViewHasLayout: view already laid out with size " + view.getWidth() + "x" + view.getHeight());
-            return;
-        }
-        DisplayMetrics metrics = view.getResources().getDisplayMetrics();
-        int widthSpec = View.MeasureSpec.makeMeasureSpec(metrics.widthPixels, View.MeasureSpec.EXACTLY);
-        int heightSpec = View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY);
-        view.measure(widthSpec, heightSpec);
-        view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
-        log("ensureViewHasLayout: forced layout to " + view.getWidth() + "x" + view.getHeight());
-    }
-
-    private static void log(String message) {
-        String formatted = "[@MAIN_NAME@UiTest] " + message;
-        System.out.println(formatted);
-        appendLogLine(formatted);
-    }
-
-    private static void logError(String message, Throwable error) {
-        log(message + ": " + error);
-        StringWriter buffer = new StringWriter();
-        error.printStackTrace(new PrintWriter(buffer));
-        for (String line : buffer.toString().split("\r?\n")) {
-            if (!line.isEmpty()) {
-                log(line);
-            }
-        }
-    }
-
-    private static void safelyInvokeLifecycle(Runnable invocation, String name) {
-        try {
-            invocation.run();
-            log("Activity " + name + " invoked");
-        } catch (RuntimeException ex) {
-            log("Lifecycle invocation " + name + " failed: " + ex);
-        }
-    }
-
-    private static synchronized void appendLogLine(String message) {
-        File directory = resolveArtifactDirectoryForLogging();
-        if (directory == null) {
-            return;
-        }
-        File logFile = new File(directory, "@MAIN_NAME@UiTest.log");
-        try (FileWriter writer = new FileWriter(logFile, true); PrintWriter out = new PrintWriter(writer)) {
-            out.println(message);
-        } catch (IOException ex) {
-            System.out.println("[@MAIN_NAME@UiTest] Failed to persist log entry: " + ex.getMessage());
-        }
-    }
-
-    private static void dumpAllThreads(String reason) {
-        log("Capturing thread dump: " + reason);
-        Thread.getAllStackTraces().forEach((thread, stack) -> {
-            log("Thread '" + thread.getName() + "' (id=" + thread.getId()
-                    + ", state=" + thread.getState() + ")");
-            if (stack.length == 0) {
-                log("  <no stack trace>");
-            } else {
-                for (StackTraceElement element : stack) {
-                    log("  at " + element);
+    private static void waitForCodenameOneForm() {
+        long deadline = SystemClock.uptimeMillis() + STARTUP_TIMEOUT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+            if (Display.isInitialized()) {
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    return;
                 }
             }
-        });
-    }
-
-    private static final class HangDetectionRule implements TestRule {
-        private final long timeoutMillis;
-
-        HangDetectionRule(long timeout, TimeUnit unit) {
-            this.timeoutMillis = unit.toMillis(timeout);
+            SystemClock.sleep(16L);
         }
-
-        @Override
-        public org.junit.runners.model.Statement apply(org.junit.runners.model.Statement base, Description description) {
-            return new org.junit.runners.model.Statement() {
-                @Override
-                public void evaluate() throws Throwable {
-                    java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
-                        Thread thread = new Thread(r, "@MAIN_NAME@UiTest-HangWatcher");
-                        thread.setDaemon(true);
-                        return thread;
-                    });
-                    java.util.concurrent.atomic.AtomicBoolean finished = new java.util.concurrent.atomic.AtomicBoolean(false);
-                    executor.schedule(() -> {
-                        if (!finished.get()) {
-                            log("Hang detection triggered after " + timeoutMillis + "ms");
-                            dumpAllThreads("Hang detection timeout");
-                        }
-                    }, timeoutMillis, TimeUnit.MILLISECONDS);
-                    try {
-                        base.evaluate();
-                    } finally {
-                        finished.set(true);
-                        executor.shutdownNow();
-                    }
-                }
-            };
-        }
+        throw new AssertionError("Timed out waiting for Codename One main form to be displayed");
     }
 }

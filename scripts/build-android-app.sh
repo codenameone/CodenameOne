@@ -326,20 +326,19 @@ fi
 GRADLE_TEST_CMD=("./gradlew" "--no-daemon" "test")
 if command -v timeout >/dev/null 2>&1; then
   ba_log "Running Gradle UI tests with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
-  GRADLE_TEST_WRAPPER=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${GRADLE_TEST_CMD[@]}")
+  GRADLE_TEST_CMD=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${GRADLE_TEST_CMD[@]}")
 else
   ba_log "timeout command not found; running Gradle UI tests without external watchdog"
-  GRADLE_TEST_WRAPPER=("${GRADLE_TEST_CMD[@]}")
 fi
 
 GRADLE_UI_TEST_LOG="$GRADLE_PROJECT_DIR/gradle-ui-test.log"
-ba_log "Capturing Gradle UI test output to $GRADLE_UI_TEST_LOG"
-ba_log "Robolectric UI tests execute without launching an emulator; consult the captured log for lifecycle output"
+ba_log "Streaming Gradle UI test output (also saved to $GRADLE_UI_TEST_LOG)"
 
 set +e
 (
   cd "$GRADLE_PROJECT_DIR"
-  "${GRADLE_TEST_WRAPPER[@]}" &>"$GRADLE_UI_TEST_LOG"
+  "${GRADLE_TEST_CMD[@]}" | tee "$GRADLE_UI_TEST_LOG"
+  exit "${PIPESTATUS[0]}"
 )
 TEST_EXIT_CODE=$?
 set -e
@@ -351,37 +350,8 @@ fi
 
 if [ "$TEST_EXIT_CODE" -eq 124 ]; then
   ba_log "Gradle UI tests exceeded ${UI_TEST_TIMEOUT_SECONDS}s timeout and were terminated"
-fi
-if [ "$TEST_EXIT_CODE" -ne 0 ]; then
+elif [ "$TEST_EXIT_CODE" -ne 0 ]; then
   ba_log "Gradle UI tests exited with status $TEST_EXIT_CODE"
-  if [ -s "$GRADLE_UI_TEST_LOG" ]; then
-    ba_log "----- Begin Gradle UI test log -----"
-    sed 's/^/[build-android-app] | /' "$GRADLE_UI_TEST_LOG"
-    ba_log "----- End Gradle UI test log -----"
-  else
-    ba_log "Gradle UI test log $GRADLE_UI_TEST_LOG was empty or missing"
-  fi
-  TEST_RESULTS_DIR="$APP_MODULE_DIR/build/test-results/testDebugUnitTest"
-  if [ -d "$TEST_RESULTS_DIR" ]; then
-    ba_log "Available XML results under $TEST_RESULTS_DIR:"
-    find "$TEST_RESULTS_DIR" -maxdepth 1 -type f -name '*.xml' -print | sed 's#^.*/##' | sed 's/^/[build-android-app]   /'
-    shopt -s nullglob
-    for result_xml in "$TEST_RESULTS_DIR"/*.xml; do
-      ba_log "----- Begin test result XML: $(basename "$result_xml") -----"
-      sed 's/^/[build-android-app] | /' "$result_xml"
-      ba_log "----- End test result XML: $(basename "$result_xml") -----"
-    done
-    shopt -u nullglob
-  else
-    ba_log "No test result XML directory found at $TEST_RESULTS_DIR"
-  fi
-  shopt -s nullglob
-  for ui_log in "$SCREENSHOT_OUTPUT_DIR"/*.log; do
-    ba_log "----- Begin UI test log: $(basename "$ui_log") -----"
-    sed 's/^/[build-android-app] | /' "$ui_log"
-    ba_log "----- End UI test log: $(basename "$ui_log") -----"
-  done
-  shopt -u nullglob
 fi
 
 if [ "$TEST_EXIT_CODE" -eq 0 ]; then
@@ -407,12 +377,6 @@ else
   fi
   ba_log "UI test screenshot available at $FINAL_SCREENSHOT"
 fi
-shopt -s nullglob
-for ui_log in "$SCREENSHOT_OUTPUT_DIR"/*.log; do
-  cp "$ui_log" "$FINAL_ARTIFACT_DIR/$(basename "$ui_log")"
-  ba_log "UI test log saved to $FINAL_ARTIFACT_DIR/$(basename "$ui_log")"
-done
-shopt -u nullglob
 unset CN1_TEST_SCREENSHOT_DIR
 
 if [ "$TEST_EXIT_CODE" -ne 0 ]; then
