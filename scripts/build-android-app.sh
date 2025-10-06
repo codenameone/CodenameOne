@@ -425,6 +425,8 @@ create_avd "$AVDMANAGER_BIN" "$AVD_NAME" "$SYSTEM_IMAGE" "$AVD_HOME"
 
 ANDROID_AVD_HOME="$AVD_HOME" "$ADB_BIN" start-server >/dev/null
 
+mapfile -t EXISTING_EMULATORS < <("$ADB_BIN" devices | awk '/^emulator-/{print $1}')
+
 EMULATOR_PORT="${EMULATOR_PORT:-5560}"
 if ! [[ "$EMULATOR_PORT" =~ ^[0-9]+$ ]]; then
   EMULATOR_PORT=5560
@@ -441,22 +443,48 @@ EMULATOR_PID=$!
 trap stop_emulator EXIT
 
 sleep 5
-EMULATOR_READY=0
-for _ in $(seq 1 30); do
-  if "$ADB_BIN" -s "$EMULATOR_SERIAL" get-state >/dev/null 2>&1; then
-    EMULATOR_READY=1
-    break
+
+detect_emulator_serial() {
+  local deadline current_devices serial existing
+  deadline=$((SECONDS + 180))
+  while [ $SECONDS -lt $deadline ]; do
+    mapfile -t current_devices < <("$ADB_BIN" devices | awk '/^emulator-/{print $1}')
+    for serial in "${current_devices[@]}"; do
+      for existing in "${EXISTING_EMULATORS[@]}"; do
+        if [ "$serial" = "$existing" ]; then
+          # already present before launch; ignore unless it matches requested serial
+          if [ "$serial" = "$EMULATOR_SERIAL" ]; then
+            EMULATOR_SERIAL="$serial"
+            return 0
+          fi
+          serial=""
+          break
+        fi
+      done
+      if [ -n "$serial" ]; then
+        EMULATOR_SERIAL="$serial"
+        return 0
+      fi
+    done
+    sleep 2
+  done
+  return 1
+}
+
+if ! detect_emulator_serial; then
+  mapfile -t CURRENT_EMULATORS < <("$ADB_BIN" devices | awk '/^emulator-/{print $1}')
+  if [ -z "${EMULATOR_SERIAL:-}" ] && [ ${#CURRENT_EMULATORS[@]} -gt 0 ]; then
+    EMULATOR_SERIAL="${CURRENT_EMULATORS[0]}"
   fi
-  sleep 2
-done
-if [ "$EMULATOR_READY" -ne 1 ]; then
-  ba_log "Failed to connect to emulator serial $EMULATOR_SERIAL" >&2
-  if [ -f "$EMULATOR_LOG" ]; then
-    ba_log "Emulator log tail:" >&2
-    tail -n 40 "$EMULATOR_LOG" | sed 's/^/[build-android-app] | /' >&2
+  if [ -z "${EMULATOR_SERIAL:-}" ] || ! printf '%s\n' "${CURRENT_EMULATORS[@]}" | grep -Fxq "$EMULATOR_SERIAL"; then
+    ba_log "Failed to detect emulator serial after launch" >&2
+    if [ -f "$EMULATOR_LOG" ]; then
+      ba_log "Emulator log tail:" >&2
+      tail -n 40 "$EMULATOR_LOG" | sed 's/^/[build-android-app] | /' >&2
+    fi
+    stop_emulator
+    exit 1
   fi
-  stop_emulator
-  exit 1
 fi
 ba_log "Using emulator serial $EMULATOR_SERIAL"
 
