@@ -350,8 +350,17 @@ create_avd() {
   fi
   rm -rf "$avd_dir"
   mkdir -p "$avd_dir"
-  ANDROID_AVD_HOME="$avd_dir" \
-    printf 'no\n' | "$manager" create avd -n "$name" -k "$image" --device "pixel_6" --force >/dev/null
+  if ! ANDROID_AVD_HOME="$avd_dir" "$manager" create avd -n "$name" -k "$image" --device "pixel_6" --force >/dev/null <<<'no'
+  then
+    ba_log "Failed to create Android Virtual Device $name using image $image" >&2
+    find "$avd_dir" -maxdepth 2 -mindepth 1 -print | sed 's/^/[build-android-app] AVD: /' >&2 || true
+    exit 1
+  fi
+  if [ ! -f "$avd_dir/$name.ini" ]; then
+    ba_log "AVD $name was created but configuration file $avd_dir/$name.ini is missing" >&2
+    find "$avd_dir" -maxdepth 1 -mindepth 1 -print | sed 's/^/[build-android-app] AVD: /' >&2 || true
+    exit 1
+  fi
 }
 
 wait_for_emulator() {
