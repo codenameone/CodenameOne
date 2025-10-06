@@ -30,19 +30,21 @@ LEGACY_TEST_OPTIONS_BLOCK = (
 
 RUNNER_LINE = "        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\"\n"
 
-ANDROID_TEST_DEPENDENCIES = [
-    "    androidTestImplementation 'androidx.test:core:1.5.0'\n",
-    "    androidTestImplementation 'androidx.test.ext:junit:1.1.5'\n",
-    "    androidTestImplementation 'androidx.test:rules:1.5.0'\n",
-    "    androidTestImplementation 'androidx.test:runner:1.5.2'\n",
-    "    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'\n",
-    "    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'\n",
-]
+ANDROID_TEST_DEPENDENCIES = (
+    "androidx.test:core:1.5.0",
+    "androidx.test.ext:junit:1.1.5",
+    "androidx.test:rules:1.5.0",
+    "androidx.test:runner:1.5.2",
+    "androidx.test.espresso:espresso-core:3.5.1",
+    "androidx.test.uiautomator:uiautomator:2.2.0",
+)
 
 TEST_DEPENDENCIES_TO_REMOVE = [
     re.compile(r"\s+testImplementation 'org\.robolectric:robolectric:[^']*'\n"),
     re.compile(r"\s+testImplementation 'androidx\.test:core:[^']*'\n"),
     re.compile(r"\s+testImplementation 'androidx\.test:runner:[^']*'\n"),
+    re.compile(r"\s+androidTest(?:Implementation|Compile) 'androidx\.test:[^']*'\n"),
+    re.compile(r"\s+androidTest(?:Implementation|Compile) 'androidx\.test\.[^']*'\n"),
 ]
 
 
@@ -115,6 +117,22 @@ class GradleEditor:
                 + self.content[insert_position:]
             )
 
+    def _determine_android_test_configuration(self, block_body: str) -> str:
+        if (
+            "androidTestImplementation" in block_body
+            or " implementation " in block_body
+            or "implementation(" in block_body
+        ):
+            return "androidTestImplementation"
+        if (
+            "androidTestCompile" in block_body
+            or " compile " in block_body
+            or "compile(" in block_body
+        ):
+            return "androidTestCompile"
+        # Default to new-style configuration when undetermined.
+        return "androidTestImplementation"
+
     def ensure_dependencies(self) -> None:
         for pattern in TEST_DEPENDENCIES_TO_REMOVE:
             self.content = pattern.sub('\n', self.content)
@@ -123,16 +141,18 @@ class GradleEditor:
             raise SystemExit("Unable to locate dependencies block in Gradle file")
         block_body = self.content[block[0]:block[1]]
         insertion_point = block[1] - 1
+        configuration = self._determine_android_test_configuration(block_body)
         for dependency in ANDROID_TEST_DEPENDENCIES:
-            if dependency.strip() in block_body:
+            declaration = f"    {configuration} '{dependency}'\n"
+            if declaration.strip() in block_body:
                 continue
             self.content = (
                 self.content[:insertion_point]
-                + dependency
+                + declaration
                 + self.content[insertion_point:]
             )
-            insertion_point += len(dependency)
-            block_body += dependency
+            insertion_point += len(declaration)
+            block_body += declaration
 
     def updated(self) -> str:
         return self.content
