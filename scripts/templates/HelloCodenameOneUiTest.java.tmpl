@@ -21,16 +21,19 @@ import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowLooper;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 30)
+@LooperMode(LooperMode.Mode.PAUSED)
 public class @MAIN_NAME@UiTest {
 
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
         log("Starting Robolectric activity for screenshot test");
         ActivityController<@MAIN_NAME@Stub> controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class).setup().visible();
+        pumpSchedulers();
         try {
             log("Waiting for Codename One main form to be displayed");
             Form displayed = waitForDisplayedForm(5000L);
@@ -57,7 +60,7 @@ public class @MAIN_NAME@UiTest {
         long deadline = SystemClock.uptimeMillis() + timeoutMillis;
         long nextLog = SystemClock.uptimeMillis();
         while (SystemClock.uptimeMillis() < deadline) {
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+            pumpSchedulers();
             if (Display.isInitialized()) {
                 Form current = Display.getInstance().getCurrent();
                 if (current != null) {
@@ -71,6 +74,7 @@ public class @MAIN_NAME@UiTest {
                 nextLog = now + 1000L;
             }
         }
+        log("Timed out waiting for Codename One form; Display.isInitialized=" + Display.isInitialized());
         throw new AssertionError("Timed out waiting for Codename One form to be displayed");
     }
 
@@ -136,7 +140,7 @@ public class @MAIN_NAME@UiTest {
                     return decorView;
                 }
             }
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+            pumpSchedulers();
             Thread.sleep(50L);
             long now = SystemClock.uptimeMillis();
             if (now >= nextLog) {
@@ -145,6 +149,7 @@ public class @MAIN_NAME@UiTest {
                 nextLog = now + 1000L;
             }
         }
+        log("Timed out waiting for decor view layout");
         throw new AssertionError("Timed out waiting for decor view layout");
     }
 
@@ -161,5 +166,11 @@ public class @MAIN_NAME@UiTest {
 
     private static void log(String message) {
         System.out.println("[@MAIN_NAME@UiTest] " + message);
+    }
+
+    private static void pumpSchedulers() {
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+        Robolectric.flushForegroundThreadScheduler();
+        Robolectric.flushBackgroundThreadScheduler();
     }
 }
