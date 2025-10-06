@@ -23,10 +23,10 @@ jobs:
         run: ./scripts/build-android-port.sh -q -DskipTests
       - name: Build Hello Codename One Android app
         run: ./scripts/build-android-app.sh -q -DskipTests
-      - name: Upload UI test screenshot artifact
+      - name: Upload UI test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hello-codenameone-ui-test-screenshot
-          path: ${{ env.CN1_UI_TEST_SCREENSHOT }}
+          name: hello-codenameone-ui-test-artifacts
+          path: ${{ env.CN1_UI_TEST_ARTIFACT_DIR }}
           if-no-files-found: warn

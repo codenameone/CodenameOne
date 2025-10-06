@@ -301,6 +301,12 @@ rm -rf "$SCREENSHOT_OUTPUT_DIR"
 mkdir -p "$SCREENSHOT_OUTPUT_DIR"
 export CN1_TEST_SCREENSHOT_DIR="$SCREENSHOT_OUTPUT_DIR"
 
+FINAL_ARTIFACT_DIR="${CN1_TEST_SCREENSHOT_EXPORT_DIR:-$REPO_ROOT/build-artifacts}"
+mkdir -p "$FINAL_ARTIFACT_DIR"
+if [ -n "${GITHUB_ENV:-}" ]; then
+  printf 'CN1_UI_TEST_ARTIFACT_DIR=%s\n' "$FINAL_ARTIFACT_DIR" >> "$GITHUB_ENV"
+fi
+
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
@@ -326,19 +332,35 @@ else
   GRADLE_TEST_WRAPPER=("${GRADLE_TEST_CMD[@]}")
 fi
 
+GRADLE_UI_TEST_LOG="$GRADLE_PROJECT_DIR/gradle-ui-test.log"
+ba_log "Capturing Gradle UI test output to $GRADLE_UI_TEST_LOG"
+ba_log "Robolectric UI tests execute without launching an emulator; consult the captured log for lifecycle output"
+
 set +e
 (
   cd "$GRADLE_PROJECT_DIR"
-  "${GRADLE_TEST_WRAPPER[@]}"
+  "${GRADLE_TEST_WRAPPER[@]}" &>"$GRADLE_UI_TEST_LOG"
 )
 TEST_EXIT_CODE=$?
 set -e
+
+if [ -f "$GRADLE_UI_TEST_LOG" ]; then
+  cp "$GRADLE_UI_TEST_LOG" "$FINAL_ARTIFACT_DIR/ui-test-gradle.log"
+  ba_log "Gradle UI test log saved to $FINAL_ARTIFACT_DIR/ui-test-gradle.log"
+fi
 
 if [ "$TEST_EXIT_CODE" -eq 124 ]; then
   ba_log "Gradle UI tests exceeded ${UI_TEST_TIMEOUT_SECONDS}s timeout and were terminated"
 fi
 if [ "$TEST_EXIT_CODE" -ne 0 ]; then
   ba_log "Gradle UI tests exited with status $TEST_EXIT_CODE"
+  if [ -s "$GRADLE_UI_TEST_LOG" ]; then
+    ba_log "----- Begin Gradle UI test log -----"
+    sed 's/^/[build-android-app] | /' "$GRADLE_UI_TEST_LOG"
+    ba_log "----- End Gradle UI test log -----"
+  else
+    ba_log "Gradle UI test log $GRADLE_UI_TEST_LOG was empty or missing"
+  fi
   TEST_RESULTS_DIR="$APP_MODULE_DIR/build/test-results/testDebugUnitTest"
   if [ -d "$TEST_RESULTS_DIR" ]; then
     ba_log "Available XML results under $TEST_RESULTS_DIR:"
@@ -346,6 +368,13 @@ if [ "$TEST_EXIT_CODE" -ne 0 ]; then
   else
     ba_log "No test result XML directory found at $TEST_RESULTS_DIR"
   fi
+  shopt -s nullglob
+  for ui_log in "$SCREENSHOT_OUTPUT_DIR"/*.log; do
+    ba_log "----- Begin UI test log: $(basename "$ui_log") -----"
+    sed 's/^/[build-android-app] | /' "$ui_log"
+    ba_log "----- End UI test log: $(basename "$ui_log") -----"
+  done
+  shopt -u nullglob
 fi
 
 if [ "$TEST_EXIT_CODE" -eq 0 ]; then
@@ -364,15 +393,19 @@ if [ -z "$SCREENSHOT_FILE" ]; then
   ba_log "UI test completed but no screenshot was produced in $SCREENSHOT_OUTPUT_DIR" >&2
   SCREENSHOT_STATUS=1
 else
-  FINAL_SCREENSHOT_DIR="${CN1_TEST_SCREENSHOT_EXPORT_DIR:-$REPO_ROOT/build-artifacts}"
-  mkdir -p "$FINAL_SCREENSHOT_DIR"
-  FINAL_SCREENSHOT="$FINAL_SCREENSHOT_DIR/ui-test-screenshot.png"
+  FINAL_SCREENSHOT="$FINAL_ARTIFACT_DIR/ui-test-screenshot.png"
   cp "$SCREENSHOT_FILE" "$FINAL_SCREENSHOT"
   if [ -n "${GITHUB_ENV:-}" ]; then
     printf 'CN1_UI_TEST_SCREENSHOT=%s\n' "$FINAL_SCREENSHOT" >> "$GITHUB_ENV"
   fi
   ba_log "UI test screenshot available at $FINAL_SCREENSHOT"
 fi
+shopt -s nullglob
+for ui_log in "$SCREENSHOT_OUTPUT_DIR"/*.log; do
+  cp "$ui_log" "$FINAL_ARTIFACT_DIR/$(basename "$ui_log")"
+  ba_log "UI test log saved to $FINAL_ARTIFACT_DIR/$(basename "$ui_log")"
+done
+shopt -u nullglob
 unset CN1_TEST_SCREENSHOT_DIR
 
 if [ "$TEST_EXIT_CODE" -ne 0 ]; then

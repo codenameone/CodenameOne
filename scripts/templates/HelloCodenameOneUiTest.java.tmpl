@@ -13,7 +13,9 @@ import com.codename1.ui.Form;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -114,11 +116,7 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static File saveScreenshot(Bitmap screenshot) throws IOException {
-        String directory = System.getenv("CN1_TEST_SCREENSHOT_DIR");
-        File outputDir = (directory != null && !directory.isEmpty()) ? new File(directory) : new File("build/ui-test-screenshots");
-        if (!outputDir.exists() && !outputDir.mkdirs()) {
-            throw new IOException("Failed to create screenshot directory " + outputDir.getAbsolutePath());
-        }
+        File outputDir = resolveArtifactDirectory();
         File screenshotFile = new File(outputDir, "@MAIN_NAME@-ui-test.png");
         try (FileOutputStream out = new FileOutputStream(screenshotFile)) {
             if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, out)) {
@@ -126,6 +124,25 @@ public class @MAIN_NAME@UiTest {
             }
         }
         return screenshotFile;
+    }
+
+    private static File resolveArtifactDirectory() throws IOException {
+        String directory = System.getenv("CN1_TEST_SCREENSHOT_DIR");
+        File outputDir = (directory != null && !directory.isEmpty()) ? new File(directory)
+                : new File("build/ui-test-screenshots");
+        if (!outputDir.exists() && !outputDir.mkdirs()) {
+            throw new IOException("Failed to create screenshot directory " + outputDir.getAbsolutePath());
+        }
+        return outputDir;
+    }
+
+    private static File resolveArtifactDirectoryForLogging() {
+        try {
+            return resolveArtifactDirectory();
+        } catch (IOException ex) {
+            System.out.println("[@MAIN_NAME@UiTest] Unable to prepare artifact directory for logging: " + ex.getMessage());
+            return null;
+        }
     }
 
     private static View waitForDecorViewWithDimensions(@MAIN_NAME@Stub activity, long timeoutMillis) throws InterruptedException {
@@ -165,7 +182,9 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static void log(String message) {
-        System.out.println("[@MAIN_NAME@UiTest] " + message);
+        String formatted = "[@MAIN_NAME@UiTest] " + message;
+        System.out.println(formatted);
+        appendLogLine(formatted);
     }
 
     private static void pumpSchedulers() {
@@ -173,5 +192,18 @@ public class @MAIN_NAME@UiTest {
         ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
         Robolectric.flushForegroundThreadScheduler();
         Robolectric.flushBackgroundThreadScheduler();
+    }
+
+    private static synchronized void appendLogLine(String message) {
+        File directory = resolveArtifactDirectoryForLogging();
+        if (directory == null) {
+            return;
+        }
+        File logFile = new File(directory, "@MAIN_NAME@UiTest.log");
+        try (FileWriter writer = new FileWriter(logFile, true); PrintWriter out = new PrintWriter(writer)) {
+            out.println(message);
+        } catch (IOException ex) {
+            System.out.println("[@MAIN_NAME@UiTest] Failed to persist log entry: " + ex.getMessage());
+        }
     }
 }
