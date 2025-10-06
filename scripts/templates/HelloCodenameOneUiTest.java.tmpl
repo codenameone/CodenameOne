@@ -23,6 +23,14 @@ import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowLooper;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 30)
 @LooperMode(LooperMode.Mode.LEGACY)
@@ -37,8 +45,8 @@ public class @MAIN_NAME@UiTest {
         log("Activity created (Display.isInitialized=" + Display.isInitialized() + ")");
         controller.start();
         log("Activity started");
-        controller.resume();
-        log("Activity resumed");
+        resumeWithPumpedMainLooper(controller);
+        log("Display initialized after resume: " + Display.isInitialized());
         controller.visible();
         log("Activity made visible");
 
@@ -70,12 +78,48 @@ public class @MAIN_NAME@UiTest {
             assertTrue("Screenshot file should exist", screenshotFile.isFile());
             assertTrue("Screenshot file should not be empty", screenshotFile.length() > 0L);
         } finally {
-            controller.pause();
-            log("Activity paused");
-            controller.stop();
-            log("Activity stopped");
-            controller.destroy();
-            log("Activity destroyed");
+            safelyInvokeLifecycle(controller::pause, "pause");
+            safelyInvokeLifecycle(controller::stop, "stop");
+            safelyInvokeLifecycle(controller::destroy, "destroy");
+        }
+    }
+
+    private static void resumeWithPumpedMainLooper(ActivityController<@MAIN_NAME@Stub> controller)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        log("Preparing to resume activity with pumped main looper");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<Void> future = executor.submit(new Callable<Void>() {
+            @Override
+            public Void call() {
+                log("Invoking controller.resume()");
+                controller.resume();
+                log("controller.resume() returned");
+                return null;
+            }
+        });
+
+        long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        int iterations = 0;
+        try {
+            while (!future.isDone()) {
+                if (System.nanoTime() >= deadlineNanos) {
+                    log("controller.resume() did not finish before deadline; cancelling");
+                    future.cancel(true);
+                    throw new TimeoutException("controller.resume() timed out");
+                }
+                ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+                if (++iterations % 50 == 0) {
+                    log("Still waiting for controller.resume() after " + iterations + " pump iterations");
+                }
+                Thread.sleep(20L);
+            }
+            future.get(5L, TimeUnit.SECONDS);
+            log("Activity resumed");
+        } catch (TimeoutException | InterruptedException | ExecutionException ex) {
+            log("Failed while resuming activity: " + ex);
+            throw ex;
+        } finally {
+            executor.shutdownNow();
         }
     }
 
@@ -168,6 +212,15 @@ public class @MAIN_NAME@UiTest {
         String formatted = "[@MAIN_NAME@UiTest] " + message;
         System.out.println(formatted);
         appendLogLine(formatted);
+    }
+
+    private static void safelyInvokeLifecycle(Runnable invocation, String name) {
+        try {
+            invocation.run();
+            log("Activity " + name + " invoked");
+        } catch (RuntimeException ex) {
+            log("Lifecycle invocation " + name + " failed: " + ex);
+        }
     }
 
     private static synchronized void appendLogLine(String message) {
