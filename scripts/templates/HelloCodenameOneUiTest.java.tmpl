@@ -51,7 +51,7 @@ public class @MAIN_NAME@UiTest {
         controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
         log("ActivityController created");
         log("Invoking controller.setup() to create/start/resume activity");
-        activity = controller.setup();
+        activity = controller.setup().get();
         log("controller.setup() completed (Display.isInitialized=" + Display.isInitialized() + ")");
         log("Processing pending Codename One tasks after setup");
         ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
