@@ -44,16 +44,22 @@ public class @MAIN_NAME@UiTest {
 
     private static final long STARTUP_TIMEOUT_MS = 30_000L;
     private static final long LAYOUT_TIMEOUT_MS = 5_000L;
+    private static final long RENDER_TIMEOUT_MS = 10_000L;
     private static final long EDT_TIMEOUT_MS = 10_000L;
 
     private ActivityController<@MAIN_NAME@Stub> controller;
     private @MAIN_NAME@Stub activity;
+    private View contentView;
 
     @Before
     public void setUp() throws Exception {
         controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
-        activity = controller.setup().get();
-        bootstrapCodenameOneApp();
+        activity = controller.create().start().resume().visible().get();
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+
+        contentView = activity.findViewById(android.R.id.content);
+        assertNotNull("Activity content view should be available after onResume", contentView);
+
         waitForCodenameOneForm();
     }
 
@@ -63,15 +69,13 @@ public class @MAIN_NAME@UiTest {
             controller.pause();
             controller.stop();
             controller.destroy();
+            controller = null;
         }
     }
 
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
-        View decorView = activity.getWindow().getDecorView();
-        assertNotNull("Activity decor view should be available", decorView);
-
-        Bitmap androidScreenshot = captureAndroidScreenshot(decorView);
+        Bitmap androidScreenshot = waitForAndroidScreenshot(contentView);
         assertTrue("Android screenshot width should be positive", androidScreenshot.getWidth() > 0);
         assertTrue("Android screenshot height should be positive", androidScreenshot.getHeight() > 0);
         assertTrue(
@@ -82,7 +86,7 @@ public class @MAIN_NAME@UiTest {
         assertTrue("Android screenshot file should exist", androidScreenshotFile.isFile());
         assertTrue("Android screenshot file should not be empty", androidScreenshotFile.length() > 0L);
 
-        Image codenameOneScreenshot = captureCodenameOneScreenshot();
+        Image codenameOneScreenshot = waitForCodenameOneScreenshot();
         assertNotNull("Codename One screenshot should be available", codenameOneScreenshot);
         assertTrue("Codename One screenshot width should be positive", codenameOneScreenshot.getWidth() > 0);
         assertTrue("Codename One screenshot height should be positive", codenameOneScreenshot.getHeight() > 0);
@@ -97,7 +101,27 @@ public class @MAIN_NAME@UiTest {
         assertTrue("Codename One screenshot file should not be empty", codenameOneScreenshotFile.length() > 0L);
     }
 
-    private Bitmap captureAndroidScreenshot(View decorView) throws Exception {
+    private Bitmap waitForAndroidScreenshot(View viewFromOnResume) throws Exception {
+        View decorView = viewFromOnResume.getRootView();
+        long deadline = SystemClock.uptimeMillis() + RENDER_TIMEOUT_MS;
+        Bitmap lastCapture = null;
+
+        while (SystemClock.uptimeMillis() < deadline) {
+            Bitmap candidate = attemptAndroidScreenshot(decorView);
+            lastCapture = candidate;
+            if (candidate != null && hasRenderableContent(candidate)) {
+                return candidate;
+            }
+            SystemClock.sleep(32L);
+        }
+
+        if (lastCapture != null) {
+            return lastCapture;
+        }
+        throw new AssertionError("Timed out waiting for Android screenshot to contain rendered content");
+    }
+
+    private Bitmap attemptAndroidScreenshot(View decorView) throws Exception {
         ensureViewHasLayout(decorView);
         ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
         flushCodenameOneGraphics();
@@ -112,7 +136,30 @@ public class @MAIN_NAME@UiTest {
         return captureBitmap(decorView);
     }
 
+    private Image waitForCodenameOneScreenshot() throws Exception {
+        long deadline = SystemClock.uptimeMillis() + RENDER_TIMEOUT_MS;
+        Image lastCapture = null;
+
+        while (SystemClock.uptimeMillis() < deadline) {
+            flushCodenameOneGraphics();
+            Image screenshot = captureCodenameOneScreenshot();
+            lastCapture = screenshot;
+            if (screenshot != null && hasRenderableContent(screenshot)) {
+                return screenshot;
+            }
+            SystemClock.sleep(32L);
+        }
+
+        if (lastCapture != null) {
+            return lastCapture;
+        }
+        throw new AssertionError("Timed out waiting for Codename One screenshot to contain rendered content");
+    }
+
     private static Bitmap captureBitmap(View view) {
+        if (view.getWidth() <= 0 || view.getHeight() <= 0) {
+            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+        }
         Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         view.draw(canvas);
@@ -146,6 +193,9 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static boolean hasRenderableContent(Image screenshot) throws Exception {
+        if (!Display.isInitialized()) {
+            return false;
+        }
         int width = screenshot.getWidth();
         int height = screenshot.getHeight();
         int[] pixels = callSeriallyAndWait(screenshot::getRGB);
@@ -210,12 +260,12 @@ public class @MAIN_NAME@UiTest {
         return outputDir;
     }
 
-    private static void waitForCodenameOneForm() {
+    private static void waitForCodenameOneForm() throws Exception {
         long deadline = SystemClock.uptimeMillis() + STARTUP_TIMEOUT_MS;
         while (SystemClock.uptimeMillis() < deadline) {
             ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
             if (Display.isInitialized()) {
-                Form current = Display.getInstance().getCurrent();
+                Form current = callSeriallyAndWait(() -> Display.getInstance().getCurrent());
                 if (current != null) {
                     return;
                 }
@@ -225,37 +275,10 @@ public class @MAIN_NAME@UiTest {
         throw new AssertionError("Timed out waiting for Codename One main form to be displayed");
     }
 
-    private void bootstrapCodenameOneApp() throws Exception {
-        runOnMainSync(() -> AndroidImplementation.startContext(activity));
-        if (!Display.isInitialized()) {
-            runOnMainSync(() -> Display.init(activity));
-        }
-        if (!Display.isInitialized()) {
-            throw new AssertionError("Codename One Display failed to initialize");
-        }
-        callSeriallyAndWait(() -> {
-            @MAIN_NAME@ app = @MAIN_NAME@Stub.getAppInstance();
-            boolean needsInit = isStubFirstStart(app);
-            if (app == null) {
-                app = new @MAIN_NAME@();
-                assignStubAppInstance(app);
-                needsInit = true;
-            }
-            if (needsInit) {
-                app.init(activity);
-            }
-            app.start();
-            markStubFirstTimeConsumed();
-            return null;
-        });
-    }
-
-    private void runOnMainSync(Runnable runnable) {
-        activity.runOnUiThread(runnable);
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-    }
-
     private static Image captureCodenameOneScreenshot() throws Exception {
+        if (!Display.isInitialized()) {
+            return null;
+        }
         return callSeriallyAndWait(() -> Display.getInstance().captureScreen());
     }
 
@@ -341,6 +364,9 @@ public class @MAIN_NAME@UiTest {
     }
 
     private static void flushCodenameOneGraphics() throws Exception {
+        if (!Display.isInitialized()) {
+            return;
+        }
         callSeriallyAndWait(() -> {
             Form current = Display.getInstance().getCurrent();
             if (current != null) {
@@ -372,51 +398,10 @@ public class @MAIN_NAME@UiTest {
         }
     }
 
-    private static void assignStubAppInstance(@MAIN_NAME@ app) {
-        try {
-            Field appField = @MAIN_NAME@Stub.class.getDeclaredField("i");
-            appField.setAccessible(true);
-            appField.set(null, app);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException("Unable to assign Codename One application instance", e);
-        }
-    }
-
-    private boolean isStubFirstStart(@MAIN_NAME@ appInstance) {
-        try {
-            Field firstTimeField = @MAIN_NAME@Stub.class.getDeclaredField("firstTime");
-            firstTimeField.setAccessible(true);
-            boolean firstTimeValue;
-            if (java.lang.reflect.Modifier.isStatic(firstTimeField.getModifiers())) {
-                firstTimeValue = firstTimeField.getBoolean(null);
-            } else {
-                firstTimeValue = firstTimeField.getBoolean(activity);
-            }
-            return firstTimeValue || appInstance == null;
-        } catch (NoSuchFieldException ignored) {
-            return appInstance == null;
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Unable to inspect Codename One stub firstTime flag", e);
-        }
-    }
-
-    private void markStubFirstTimeConsumed() {
-        try {
-            Field firstTimeField = @MAIN_NAME@Stub.class.getDeclaredField("firstTime");
-            firstTimeField.setAccessible(true);
-            if (java.lang.reflect.Modifier.isStatic(firstTimeField.getModifiers())) {
-                firstTimeField.setBoolean(null, false);
-            } else {
-                firstTimeField.setBoolean(activity, false);
-            }
-        } catch (NoSuchFieldException ignored) {
-            // Field absent in some stub variants; nothing to update.
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Unable to update Codename One stub firstTime flag", e);
-        }
-    }
-
     private static <T> T callSeriallyAndWait(Callable<T> callable) throws Exception {
+        if (!Display.isInitialized()) {
+            throw new IllegalStateException("Codename One Display must be initialized before invoking EDT work");
+        }
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<T> result = new AtomicReference<>();
         AtomicReference<Throwable> error = new AtomicReference<>();
