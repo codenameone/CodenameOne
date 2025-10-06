@@ -39,6 +39,30 @@ ANDROID_TEST_DEPENDENCIES = (
     "androidx.test.uiautomator:uiautomator:2.2.0",
 )
 
+HELPER_SNIPPET = (
+    "    if (!project.ext.has('cn1AddAndroidTestDependency')) {\n"
+    "        project.ext.cn1AddAndroidTestDependency = { String notation ->\n"
+    "            def parts = notation.split(':')\n"
+    "            def coordinate = parts.size() >= 2 ? parts[0] + ':' + parts[1] : notation\n"
+    "            def targetNames = ['androidTestImplementation', 'androidTestCompile'].findAll { cfgName ->\n"
+    "                configurations.findByName(cfgName) != null\n"
+    "            }\n"
+    "            if (targetNames.isEmpty()) {\n"
+    "                targetNames = ['androidTestImplementation']\n"
+    "            }\n"
+    "            targetNames.each { cfgName ->\n"
+    "                def cfg = configurations.maybeCreate(cfgName)\n"
+    "                def exists = cfg.dependencies.any { dep ->\n"
+    "                    dep.group != null && dep.name != null && (dep.group + ':' + dep.name) == coordinate\n"
+    "                }\n"
+    "                if (!exists) {\n"
+    "                    project.dependencies.add(cfgName, notation)\n"
+    "                }\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+)
+
 TEST_DEPENDENCIES_TO_REMOVE = [
     re.compile(r"\s+testImplementation 'org\.robolectric:robolectric:[^']*'\n"),
     re.compile(r"\s+testImplementation 'androidx\.test:core:[^']*'\n"),
@@ -117,22 +141,6 @@ class GradleEditor:
                 + self.content[insert_position:]
             )
 
-    def _determine_android_test_configuration(self, block_body: str) -> str:
-        if (
-            "androidTestImplementation" in block_body
-            or " implementation " in block_body
-            or "implementation(" in block_body
-        ):
-            return "androidTestImplementation"
-        if (
-            "androidTestCompile" in block_body
-            or " compile " in block_body
-            or "compile(" in block_body
-        ):
-            return "androidTestCompile"
-        # Default to new-style configuration when undetermined.
-        return "androidTestImplementation"
-
     def ensure_dependencies(self) -> None:
         for pattern in TEST_DEPENDENCIES_TO_REMOVE:
             self.content = pattern.sub('\n', self.content)
@@ -141,10 +149,23 @@ class GradleEditor:
             raise SystemExit("Unable to locate dependencies block in Gradle file")
         block_body = self.content[block[0]:block[1]]
         insertion_point = block[1] - 1
-        configuration = self._determine_android_test_configuration(block_body)
+        if "cn1AddAndroidTestDependency" not in block_body:
+            block_text = self.content[block[0]:block[1]]
+            newline_offset = block_text.find('\n')
+            if newline_offset < 0:
+                newline_offset = len(block_text)
+            helper_insert = block[0] + newline_offset + 1
+            self.content = (
+                self.content[:helper_insert]
+                + HELPER_SNIPPET
+                + self.content[helper_insert:]
+            )
+            block = self.find_block("dependencies")
+            block_body = self.content[block[0]:block[1]]
+            insertion_point = block[1] - 1
         for dependency in ANDROID_TEST_DEPENDENCIES:
-            declaration = f"    {configuration} '{dependency}'\n"
-            if declaration.strip() in block_body:
+            declaration = f"    project.ext.cn1AddAndroidTestDependency('{dependency}')\n"
+            if dependency in block_body:
                 continue
             self.content = (
                 self.content[:insertion_point]
