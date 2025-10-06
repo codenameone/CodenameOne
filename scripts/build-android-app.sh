@@ -265,7 +265,7 @@ if [ -z "$GRADLE_PROJECT_DIR" ]; then
   exit 1
 fi
 
-# --- Inject Robolectric UI test into Gradle project ---
+# --- Inject instrumentation UI test into Gradle project ---
 APP_MODULE_DIR=$(find "$GRADLE_PROJECT_DIR" -maxdepth 1 -type d -name "app" | head -n 1 || true)
 if [ -z "$APP_MODULE_DIR" ]; then
   ba_log "Unable to locate Gradle app module inside $GRADLE_PROJECT_DIR" >&2
@@ -278,14 +278,14 @@ if [ ! -f "$UI_TEST_TEMPLATE" ]; then
   exit 1
 fi
 
-UI_TEST_DIR="$APP_MODULE_DIR/src/test/java/${PACKAGE_PATH}"
+UI_TEST_DIR="$APP_MODULE_DIR/src/androidTest/java/${PACKAGE_PATH}"
 mkdir -p "$UI_TEST_DIR"
 UI_TEST_FILE="$UI_TEST_DIR/${MAIN_NAME}UiTest.java"
 
 sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
     -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
     "$UI_TEST_TEMPLATE" > "$UI_TEST_FILE"
-ba_log "Created Robolectric UI test at $UI_TEST_FILE"
+ba_log "Created instrumentation UI test at $UI_TEST_FILE"
 
 APP_BUILD_GRADLE="$APP_MODULE_DIR/build.gradle"
 if [ ! -f "$APP_BUILD_GRADLE" ]; then
@@ -294,12 +294,6 @@ if [ ! -f "$APP_BUILD_GRADLE" ]; then
 fi
 
 "$SCRIPT_DIR/update_android_ui_test_gradle.py" "$APP_BUILD_GRADLE"
-
-# Capture UI test screenshots in a deterministic directory
-SCREENSHOT_OUTPUT_DIR="$GRADLE_PROJECT_DIR/test-artifacts/screenshots"
-rm -rf "$SCREENSHOT_OUTPUT_DIR"
-mkdir -p "$SCREENSHOT_OUTPUT_DIR"
-export CN1_TEST_SCREENSHOT_DIR="$SCREENSHOT_OUTPUT_DIR"
 
 FINAL_ARTIFACT_DIR="${CN1_TEST_SCREENSHOT_EXPORT_DIR:-$REPO_ROOT/build-artifacts}"
 mkdir -p "$FINAL_ARTIFACT_DIR"
@@ -311,24 +305,156 @@ ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME="$JAVA17_HOME"
-if command -v sdkmanager >/dev/null 2>&1; then
-  yes | sdkmanager --licenses >/dev/null 2>&1 || true
-elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-  yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
+
+SDKMANAGER_BIN=""
+if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+  SDKMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager" ]; then
+  SDKMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager"
+elif command -v sdkmanager >/dev/null 2>&1; then
+  SDKMANAGER_BIN="$(command -v sdkmanager)"
 fi
 
-UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-600}"
+AVDMANAGER_BIN=""
+if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" ]; then
+  AVDMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/bin/avdmanager" ]; then
+  AVDMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/bin/avdmanager"
+elif command -v avdmanager >/dev/null 2>&1; then
+  AVDMANAGER_BIN="$(command -v avdmanager)"
+fi
+
+ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
+if [ ! -x "$ADB_BIN" ]; then
+  if command -v adb >/dev/null 2>&1; then
+    ADB_BIN="$(command -v adb)"
+  else
+    ba_log "adb not found in Android SDK. Ensure platform-tools are installed." >&2
+    exit 1
+  fi
+fi
+
+EMULATOR_BIN="$ANDROID_SDK_ROOT/emulator/emulator"
+if [ ! -x "$EMULATOR_BIN" ]; then
+  if command -v emulator >/dev/null 2>&1; then
+    EMULATOR_BIN="$(command -v emulator)"
+  else
+    ba_log "Android emulator binary not found" >&2
+    exit 1
+  fi
+fi
+
+install_android_packages() {
+  local manager="$1"
+  if [ -z "$manager" ]; then
+    ba_log "sdkmanager not available; cannot install system images" >&2
+    exit 1
+  fi
+  yes | "$manager" --licenses >/dev/null 2>&1 || true
+  "$manager" --install "platform-tools" "platforms;android-33" "system-images;android-33;google_apis;x86_64" >/dev/null 2>&1 || true
+}
+
+create_avd() {
+  local manager="$1"
+  local name="$2"
+  local image="$3"
+  local avd_dir="$4"
+  if [ -z "$manager" ]; then
+    ba_log "avdmanager not available; cannot create emulator" >&2
+    exit 1
+  fi
+  rm -rf "$avd_dir"
+  mkdir -p "$avd_dir"
+  ANDROID_AVD_HOME="$avd_dir" \
+    printf 'no\n' | "$manager" create avd -n "$name" -k "$image" --device "pixel_6" --force >/dev/null
+}
+
+wait_for_emulator() {
+  local serial="$1"
+  "$ADB_BIN" start-server >/dev/null
+  "$ADB_BIN" -s "$serial" wait-for-device
+  local booted="0"
+  for _ in $(seq 1 120); do
+    booted="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    if [ "$booted" = "1" ]; then
+      break
+    fi
+    sleep 2
+  done
+  if [ "$booted" != "1" ]; then
+    ba_log "Emulator $serial failed to boot within expected time" >&2
+    return 1
+  fi
+  "$ADB_BIN" -s "$serial" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
+  "$ADB_BIN" -s "$serial" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
+  "$ADB_BIN" -s "$serial" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
+  "$ADB_BIN" -s "$serial" shell input keyevent 82 >/dev/null 2>&1 || true
+  return 0
+}
+
+get_emulator_serial() {
+  "$ADB_BIN" devices | awk '/emulator-/{print $1; exit}'
+}
+
+stop_emulator() {
+  if [ -n "${EMULATOR_SERIAL:-}" ]; then
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" emu kill >/dev/null 2>&1 || true
+  fi
+  if [ -n "${EMULATOR_PID:-}" ]; then
+    kill "$EMULATOR_PID" >/dev/null 2>&1 || true
+    wait "$EMULATOR_PID" 2>/dev/null || true
+  fi
+}
+
+install_android_packages "$SDKMANAGER_BIN"
+
+AVD_NAME="cn1UiTestAvd"
+SYSTEM_IMAGE="system-images;android-33;google_apis;x86_64"
+AVD_HOME="$WORK_DIR/android-avd"
+create_avd "$AVDMANAGER_BIN" "$AVD_NAME" "$SYSTEM_IMAGE" "$AVD_HOME"
+
+ANDROID_AVD_HOME="$AVD_HOME" "$ADB_BIN" start-server >/dev/null
+
+EMULATOR_LOG="$GRADLE_PROJECT_DIR/emulator.log"
+ba_log "Starting headless Android emulator $AVD_NAME"
+ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off >"$EMULATOR_LOG" 2>&1 &
+EMULATOR_PID=$!
+trap stop_emulator EXIT
+
+sleep 5
+EMULATOR_SERIAL=""
+for _ in $(seq 1 30); do
+  EMULATOR_SERIAL="$(get_emulator_serial)"
+  if [ -n "$EMULATOR_SERIAL" ]; then
+    break
+  fi
+  sleep 2
+done
+if [ -z "$EMULATOR_SERIAL" ]; then
+  ba_log "Failed to determine emulator serial" >&2
+  stop_emulator
+  exit 1
+fi
+ba_log "Using emulator serial $EMULATOR_SERIAL"
+
+if ! wait_for_emulator "$EMULATOR_SERIAL"; then
+  stop_emulator
+  exit 1
+fi
+
+UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
-  ba_log "Invalid UI_TEST_TIMEOUT_SECONDS=$UI_TEST_TIMEOUT_SECONDS provided; falling back to 600"
-  UI_TEST_TIMEOUT_SECONDS=600
+  ba_log "Invalid UI_TEST_TIMEOUT_SECONDS=$UI_TEST_TIMEOUT_SECONDS provided; falling back to 900"
+  UI_TEST_TIMEOUT_SECONDS=900
 fi
 
-GRADLE_TEST_CMD=("./gradlew" "--no-daemon" "test")
+GRADLE_TEST_CMD=("./gradlew" "--no-daemon" "connectedDebugAndroidTest")
 if command -v timeout >/dev/null 2>&1; then
-  ba_log "Running Gradle UI tests with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
+  ba_log "Running instrumentation UI tests with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
   GRADLE_TEST_CMD=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${GRADLE_TEST_CMD[@]}")
 else
-  ba_log "timeout command not found; running Gradle UI tests without external watchdog"
+  ba_log "timeout command not found; running instrumentation tests without external watchdog"
 fi
 
 GRADLE_UI_TEST_LOG="$GRADLE_PROJECT_DIR/gradle-ui-test.log"
@@ -349,9 +475,82 @@ if [ -f "$GRADLE_UI_TEST_LOG" ]; then
 fi
 
 if [ "$TEST_EXIT_CODE" -eq 124 ]; then
-  ba_log "Gradle UI tests exceeded ${UI_TEST_TIMEOUT_SECONDS}s timeout and were terminated"
+  ba_log "Instrumentation tests exceeded ${UI_TEST_TIMEOUT_SECONDS}s timeout and were terminated"
 elif [ "$TEST_EXIT_CODE" -ne 0 ]; then
-  ba_log "Gradle UI tests exited with status $TEST_EXIT_CODE"
+  ba_log "Instrumentation tests exited with status $TEST_EXIT_CODE"
+fi
+
+copy_device_file() {
+  local src="$1"
+  local dest="$2"
+  if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell run-as "$PACKAGE_NAME" ls "$src" >/dev/null 2>&1; then
+    return 1
+  fi
+  if "$ADB_BIN" -s "$EMULATOR_SERIAL" exec-out run-as "$PACKAGE_NAME" cat "$src" >"$dest"; then
+    return 0
+  fi
+  rm -f "$dest"
+  return 1
+}
+
+SCREENSHOT_STATUS=0
+ANDROID_SCREENSHOT=""
+CODENAMEONE_SCREENSHOT=""
+DEFAULT_SCREENSHOT=""
+
+SCREENSHOT_DIR_ON_DEVICE="files/ui-test-screenshots"
+ANDROID_SCREENSHOT_NAME="${MAIN_NAME}-android-ui.png"
+CODENAMEONE_SCREENSHOT_NAME="${MAIN_NAME}-codenameone-ui.png"
+
+ANDROID_SCREENSHOT_PATH_DEVICE="$SCREENSHOT_DIR_ON_DEVICE/$ANDROID_SCREENSHOT_NAME"
+CODENAMEONE_SCREENSHOT_PATH_DEVICE="$SCREENSHOT_DIR_ON_DEVICE/$CODENAMEONE_SCREENSHOT_NAME"
+
+ANDROID_SCREENSHOT_DEST="$FINAL_ARTIFACT_DIR/$ANDROID_SCREENSHOT_NAME"
+CODENAMEONE_SCREENSHOT_DEST="$FINAL_ARTIFACT_DIR/$CODENAMEONE_SCREENSHOT_NAME"
+
+if copy_device_file "$ANDROID_SCREENSHOT_PATH_DEVICE" "$ANDROID_SCREENSHOT_DEST"; then
+  ba_log "Android screenshot copied to $ANDROID_SCREENSHOT_DEST"
+  ANDROID_SCREENSHOT="$ANDROID_SCREENSHOT_DEST"
+  DEFAULT_SCREENSHOT="$ANDROID_SCREENSHOT_DEST"
+else
+  ba_log "Android screenshot not found at $ANDROID_SCREENSHOT_PATH_DEVICE" >&2
+  SCREENSHOT_STATUS=1
+fi
+
+if copy_device_file "$CODENAMEONE_SCREENSHOT_PATH_DEVICE" "$CODENAMEONE_SCREENSHOT_DEST"; then
+  ba_log "Codename One screenshot copied to $CODENAMEONE_SCREENSHOT_DEST"
+  CODENAMEONE_SCREENSHOT="$CODENAMEONE_SCREENSHOT_DEST"
+  if [ -z "$DEFAULT_SCREENSHOT" ]; then
+    DEFAULT_SCREENSHOT="$CODENAMEONE_SCREENSHOT_DEST"
+  fi
+else
+  ba_log "Codename One screenshot not found at $CODENAMEONE_SCREENSHOT_PATH_DEVICE" >&2
+  SCREENSHOT_STATUS=1
+fi
+
+if [ -f "$EMULATOR_LOG" ]; then
+  cp "$EMULATOR_LOG" "$FINAL_ARTIFACT_DIR/emulator.log" || true
+fi
+
+TEST_RESULT_DIR="$APP_MODULE_DIR/build/outputs/androidTest-results/connected"
+if [ -d "$TEST_RESULT_DIR" ]; then
+  RESULT_DEST="$FINAL_ARTIFACT_DIR/androidTest-results"
+  rm -rf "$RESULT_DEST"
+  mkdir -p "$RESULT_DEST"
+  cp -R "$TEST_RESULT_DIR/." "$RESULT_DEST/"
+  ba_log "Android test results copied to $RESULT_DEST"
+fi
+
+if [ -n "${GITHUB_ENV:-}" ]; then
+  if [ -n "$DEFAULT_SCREENSHOT" ]; then
+    printf 'CN1_UI_TEST_SCREENSHOT=%s\n' "$DEFAULT_SCREENSHOT" >> "$GITHUB_ENV"
+  fi
+  if [ -n "$ANDROID_SCREENSHOT" ]; then
+    printf 'CN1_UI_TEST_ANDROID_SCREENSHOT=%s\n' "$ANDROID_SCREENSHOT" >> "$GITHUB_ENV"
+  fi
+  if [ -n "$CODENAMEONE_SCREENSHOT" ]; then
+    printf 'CN1_UI_TEST_CODENAMEONE_SCREENSHOT=%s\n' "$CODENAMEONE_SCREENSHOT" >> "$GITHUB_ENV"
+  fi
 fi
 
 if [ "$TEST_EXIT_CODE" -eq 0 ]; then
@@ -360,55 +559,13 @@ if [ "$TEST_EXIT_CODE" -eq 0 ]; then
     ./gradlew --no-daemon assembleDebug
   )
 else
-  ba_log "UI tests failed (exit code $TEST_EXIT_CODE); skipping assembleDebug"
+  ba_log "Instrumentation tests failed (exit code $TEST_EXIT_CODE); skipping assembleDebug"
 fi
+
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
-readarray -t SCREENSHOT_FILES < <(find "$SCREENSHOT_OUTPUT_DIR" -maxdepth 1 -type f -name '*.png' -print | sort)
-SCREENSHOT_STATUS=0
-if [ "${#SCREENSHOT_FILES[@]}" -eq 0 ]; then
-  ba_log "UI test completed but no screenshot was produced in $SCREENSHOT_OUTPUT_DIR" >&2
-  SCREENSHOT_STATUS=1
-else
-  DEFAULT_SCREENSHOT=""
-  ANDROID_SCREENSHOT=""
-  CODENAMEONE_SCREENSHOT=""
-  for src in "${SCREENSHOT_FILES[@]}"; do
-    base=$(basename "$src")
-    dest="$FINAL_ARTIFACT_DIR/$base"
-    cp "$src" "$dest"
-    label="UI test"
-    case "$base" in
-      *-android-*.png)
-        ANDROID_SCREENSHOT="$dest"
-        label="Android"
-        ;;
-      *-codenameone-*.png)
-        CODENAMEONE_SCREENSHOT="$dest"
-        label="Codename One"
-        ;;
-    esac
-    if [ -z "$DEFAULT_SCREENSHOT" ]; then
-      DEFAULT_SCREENSHOT="$dest"
-    fi
-    ba_log "$label screenshot copied to $dest"
-  done
-  if [ -n "$ANDROID_SCREENSHOT" ]; then
-    DEFAULT_SCREENSHOT="$ANDROID_SCREENSHOT"
-  fi
-  if [ -n "${GITHUB_ENV:-}" ]; then
-    if [ -n "$DEFAULT_SCREENSHOT" ]; then
-      printf 'CN1_UI_TEST_SCREENSHOT=%s\n' "$DEFAULT_SCREENSHOT" >> "$GITHUB_ENV"
-    fi
-    if [ -n "$ANDROID_SCREENSHOT" ]; then
-      printf 'CN1_UI_TEST_ANDROID_SCREENSHOT=%s\n' "$ANDROID_SCREENSHOT" >> "$GITHUB_ENV"
-    fi
-    if [ -n "$CODENAMEONE_SCREENSHOT" ]; then
-      printf 'CN1_UI_TEST_CODENAMEONE_SCREENSHOT=%s\n' "$CODENAMEONE_SCREENSHOT" >> "$GITHUB_ENV"
-    fi
-  fi
-fi
-unset CN1_TEST_SCREENSHOT_DIR
+stop_emulator
+trap - EXIT
 
 if [ "$TEST_EXIT_CODE" -ne 0 ]; then
   exit "$TEST_EXIT_CODE"

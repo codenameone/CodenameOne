@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Utility to inject Robolectric UI test settings into an Android Gradle module."""
+"""Configure Android instrumentation UI test dependencies for the generated project."""
 from __future__ import annotations
 
 import argparse
@@ -7,8 +7,13 @@ import pathlib
 import re
 import sys
 
+TEST_OPTIONS_BLOCK = (
+    "    testOptions {\n"
+    "        animationsDisabled = true\n"
+    "    }\n\n"
+)
 
-TEST_OPTIONS_INJECTION = (
+OLD_TEST_OPTIONS_BLOCK = (
     "    testOptions {\n"
     "        unitTests.includeAndroidResources = true\n"
     "        unitTests.all {\n"
@@ -17,59 +22,128 @@ TEST_OPTIONS_INJECTION = (
     "    }\n\n"
 )
 
+LEGACY_TEST_OPTIONS_BLOCK = (
+    "    testOptions {\n"
+    "        unitTests.includeAndroidResources = true\n"
+    "    }\n\n"
+)
 
-def ensure_test_options(content: str) -> str:
-    if "systemProperty 'http.agent'" in content:
-        return content
+RUNNER_LINE = "        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\"\n"
 
-    legacy_block = (
-        "    testOptions {\n"
-        "        unitTests.includeAndroidResources = true\n"
-        "    }\n\n"
-    )
+ANDROID_TEST_DEPENDENCIES = [
+    "    androidTestImplementation 'androidx.test:core:1.5.0'\n",
+    "    androidTestImplementation 'androidx.test.ext:junit:1.1.5'\n",
+    "    androidTestImplementation 'androidx.test:rules:1.5.0'\n",
+    "    androidTestImplementation 'androidx.test:runner:1.5.2'\n",
+    "    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'\n",
+    "    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'\n",
+]
 
-    if legacy_block in content:
-        return content.replace(legacy_block, TEST_OPTIONS_INJECTION)
-
-    pattern = re.compile(r"(android\s*\{\s*\r?\n)")
-    match = pattern.search(content)
-    if not match:
-        raise SystemExit("Unable to locate android block in Gradle file")
-
-    start, end = match.span(1)
-    return content[:end] + TEST_OPTIONS_INJECTION + content[end:]
+TEST_DEPENDENCIES_TO_REMOVE = [
+    re.compile(r"\s+testImplementation 'org\.robolectric:robolectric:[^']*'\n"),
+    re.compile(r"\s+testImplementation 'androidx\.test:core:[^']*'\n"),
+    re.compile(r"\s+testImplementation 'androidx\.test:runner:[^']*'\n"),
+]
 
 
-def ensure_dependencies(content: str) -> str:
-    if "org.robolectric:robolectric" in content:
-        return content
+class GradleEditor:
+    def __init__(self, content: str) -> None:
+        self.content = content
 
-    additions = (
-        "    testImplementation 'junit:junit:4.13.2'\n"
-        "    testImplementation 'androidx.test:core:1.5.0'\n"
-        "    testImplementation 'org.robolectric:robolectric:4.11.1'\n"
-        "    androidTestImplementation 'androidx.test.ext:junit:1.1.5'\n"
-        "    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'\n"
-        "    androidTestImplementation 'androidx.test:rules:1.5.0'\n"
-        "    androidTestImplementation 'androidx.test:runner:1.5.2'\n"
-    )
+    def find_block(self, name: str) -> tuple[int, int] | None:
+        pattern = re.compile(rf"(^\s*{re.escape(name)}\s*\{{)", re.MULTILINE)
+        match = pattern.search(self.content)
+        if not match:
+            return None
+        start = match.start()
+        index = match.end()
+        depth = 1
+        while index < len(self.content):
+            char = self.content[index]
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    return start, index + 1
+            index += 1
+        return None
 
-    pattern = re.compile(r"dependencies\s*\{\s*\r?\n", re.MULTILINE)
-    matches = list(pattern.finditer(content))
-    if not matches:
-        raise SystemExit("Unable to locate dependencies block in Gradle file")
+    def ensure_test_options(self) -> None:
+        if "animationsDisabled" in self.content:
+            return
+        if OLD_TEST_OPTIONS_BLOCK in self.content:
+            self.content = self.content.replace(OLD_TEST_OPTIONS_BLOCK, TEST_OPTIONS_BLOCK, 1)
+            return
+        if LEGACY_TEST_OPTIONS_BLOCK in self.content:
+            self.content = self.content.replace(LEGACY_TEST_OPTIONS_BLOCK, TEST_OPTIONS_BLOCK, 1)
+            return
+        android_block = self.find_block("android")
+        if not android_block:
+            raise SystemExit("Unable to locate android block in Gradle file")
+        insert_position = self.content.find('\n', android_block[0]) + 1
+        if insert_position <= 0:
+            insert_position = android_block[0] + len("android {")
+        self.content = self.content[:insert_position] + TEST_OPTIONS_BLOCK + self.content[insert_position:]
 
-    target = matches[-1] if len(matches) == 1 else matches[1]
-    insert_at = target.end()
-    return content[:insert_at] + additions + content[insert_at:]
+    def ensure_instrumentation_runner(self) -> None:
+        default_block = self.find_block("defaultConfig")
+        if default_block:
+            block_content = self.content[default_block[0]:default_block[1]]
+            if RUNNER_LINE.strip() in block_content:
+                return
+            insert_position = self.content.find('\n', default_block[0]) + 1
+            self.content = (
+                self.content[:insert_position]
+                + RUNNER_LINE
+                + self.content[insert_position:default_block[1]]
+                + self.content[default_block[1]:]
+            )
+        else:
+            android_block = self.find_block("android")
+            if not android_block:
+                raise SystemExit("Unable to locate android block in Gradle file")
+            insert_position = self.content.find('\n', android_block[0]) + 1
+            default_config_block = (
+                "    defaultConfig {\n"
+                + RUNNER_LINE
+                + "    }\n\n"
+            )
+            self.content = (
+                self.content[:insert_position]
+                + default_config_block
+                + self.content[insert_position:]
+            )
+
+    def ensure_dependencies(self) -> None:
+        for pattern in TEST_DEPENDENCIES_TO_REMOVE:
+            self.content = pattern.sub('\n', self.content)
+        block = self.find_block("dependencies")
+        if not block:
+            raise SystemExit("Unable to locate dependencies block in Gradle file")
+        block_body = self.content[block[0]:block[1]]
+        insertion_point = block[1] - 1
+        for dependency in ANDROID_TEST_DEPENDENCIES:
+            if dependency.strip() in block_body:
+                continue
+            self.content = (
+                self.content[:insertion_point]
+                + dependency
+                + self.content[insertion_point:]
+            )
+            insertion_point += len(dependency)
+            block_body += dependency
+
+    def updated(self) -> str:
+        return self.content
 
 
 def process_gradle_file(path: pathlib.Path) -> None:
-    content = path.read_text(encoding="utf-8")
-    updated = ensure_test_options(content)
-    updated = ensure_dependencies(updated)
-    if updated != content:
-        path.write_text(updated, encoding="utf-8")
+    editor = GradleEditor(path.read_text(encoding="utf-8"))
+    editor.ensure_test_options()
+    editor.ensure_instrumentation_runner()
+    editor.ensure_dependencies()
+    path.write_text(editor.updated(), encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:

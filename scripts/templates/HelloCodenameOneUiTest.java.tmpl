@@ -3,207 +3,277 @@ package @PACKAGE@;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
-import android.util.DisplayMetrics;
+import android.util.Log;
+import android.view.PixelCopy;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 
-import com.codename1.impl.android.AndroidImplementation;
+import androidx.annotation.Nullable;
+import androidx.test.ext.junit.rules.ActivityScenarioRule;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
 
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.Robolectric;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.android.controller.ActivityController;
-import org.robolectric.annotation.Config;
-import org.robolectric.annotation.LooperMode;
-import org.robolectric.shadows.ShadowLooper;
-
-@RunWith(RobolectricTestRunner.class)
-@Config(sdk = 30)
-@LooperMode(LooperMode.Mode.LEGACY)
+@RunWith(AndroidJUnit4.class)
 public class @MAIN_NAME@UiTest {
 
+    private static final String TAG = "@MAIN_NAME@UiTest";
     private static final long STARTUP_TIMEOUT_MS = 30_000L;
-    private static final long LAYOUT_TIMEOUT_MS = 5_000L;
-    private static final long RENDER_TIMEOUT_MS = 10_000L;
+    private static final long RENDER_TIMEOUT_MS = 20_000L;
     private static final long EDT_TIMEOUT_MS = 10_000L;
 
-    private ActivityController<@MAIN_NAME@Stub> controller;
-    private @MAIN_NAME@Stub activity;
-    private View contentView;
-
-    @Before
-    public void setUp() throws Exception {
-        controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
-        activity = controller.create().start().resume().visible().get();
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-
-        contentView = activity.findViewById(android.R.id.content);
-        assertNotNull("Activity content view should be available after onResume", contentView);
-
-        waitForCodenameOneForm();
-    }
-
-    @After
-    public void tearDown() {
-        if (controller != null) {
-            controller.pause();
-            controller.stop();
-            controller.destroy();
-            controller = null;
-        }
-    }
+    @Rule
+    public final ActivityScenarioRule<@MAIN_NAME@Stub> scenarioRule =
+            new ActivityScenarioRule<>(@MAIN_NAME@Stub.class);
 
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
-        Bitmap androidScreenshot = waitForAndroidScreenshot(contentView);
-        assertTrue("Android screenshot width should be positive", androidScreenshot.getWidth() > 0);
-        assertTrue("Android screenshot height should be positive", androidScreenshot.getHeight() > 0);
-        assertTrue(
-                "Android screenshot should contain rendered content beyond the background",
-                hasRenderableContent(androidScreenshot));
+        waitForCodenameOneForm();
 
+        Bitmap androidScreenshot = waitForAndroidScreenshot();
+        assertTrue("Android screenshot should contain rendered content", hasRenderableContent(androidScreenshot));
         File androidScreenshotFile = saveBitmap(androidScreenshot, "@MAIN_NAME@-android-ui.png");
         assertTrue("Android screenshot file should exist", androidScreenshotFile.isFile());
-        assertTrue("Android screenshot file should not be empty", androidScreenshotFile.length() > 0L);
 
         Image codenameOneScreenshot = waitForCodenameOneScreenshot();
-        assertNotNull("Codename One screenshot should be available", codenameOneScreenshot);
-        assertTrue("Codename One screenshot width should be positive", codenameOneScreenshot.getWidth() > 0);
-        assertTrue("Codename One screenshot height should be positive", codenameOneScreenshot.getHeight() > 0);
-        assertTrue(
-                "Codename One screenshot should contain rendered content beyond the background",
-                hasRenderableContent(codenameOneScreenshot));
-
-        File codenameOneScreenshotFile = saveCodenameOneScreenshot(
-                codenameOneScreenshot,
-                "@MAIN_NAME@-codenameone-ui.png");
+        assertNotNull("Codename One screenshot should not be null", codenameOneScreenshot);
+        assertTrue("Codename One screenshot should contain rendered content", hasRenderableContent(codenameOneScreenshot));
+        File codenameOneScreenshotFile = saveCodenameOneScreenshot(codenameOneScreenshot, "@MAIN_NAME@-codenameone-ui.png");
         assertTrue("Codename One screenshot file should exist", codenameOneScreenshotFile.isFile());
-        assertTrue("Codename One screenshot file should not be empty", codenameOneScreenshotFile.length() > 0L);
     }
 
-    private Bitmap waitForAndroidScreenshot(View viewFromOnResume) throws Exception {
-        View decorView = viewFromOnResume.getRootView();
+    private void waitForCodenameOneForm() throws Exception {
+        long deadline = SystemClock.uptimeMillis() + STARTUP_TIMEOUT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (Display.isInitialized()) {
+                Form current = callSeriallyAndWait(() -> Display.getInstance().getCurrent());
+                if (current != null) {
+                    Log.i(TAG, "Codename One current form available: " + current.getName());
+                    return;
+                }
+            }
+            SystemClock.sleep(50L);
+        }
+        throw new AssertionError("Timed out waiting for Codename One main form");
+    }
+
+    private Bitmap waitForAndroidScreenshot() throws Exception {
         long deadline = SystemClock.uptimeMillis() + RENDER_TIMEOUT_MS;
         Bitmap lastCapture = null;
-
+        Exception lastError = null;
         while (SystemClock.uptimeMillis() < deadline) {
-            Bitmap candidate = attemptAndroidScreenshot(decorView);
-            lastCapture = candidate;
-            if (candidate != null && hasRenderableContent(candidate)) {
-                return candidate;
+            AtomicReference<Bitmap> bitmapRef = new AtomicReference<>();
+            AtomicReference<Exception> errorRef = new AtomicReference<>();
+            scenarioRule.getScenario().onActivity(activity -> {
+                try {
+                    bitmapRef.set(captureFromActivity(activity));
+                } catch (Exception e) {
+                    errorRef.set(e);
+                }
+            });
+            if (errorRef.get() != null) {
+                lastError = errorRef.get();
             }
-            SystemClock.sleep(32L);
+            Bitmap candidate = bitmapRef.get();
+            if (candidate != null) {
+                lastCapture = candidate;
+                if (hasRenderableContent(candidate)) {
+                    return candidate;
+                }
+            }
+            if (lastError != null) {
+                throw lastError;
+            }
+            SystemClock.sleep(64L);
         }
-
         if (lastCapture != null) {
             return lastCapture;
+        }
+        if (lastError != null) {
+            throw lastError;
         }
         throw new AssertionError("Timed out waiting for Android screenshot to contain rendered content");
     }
 
-    private Bitmap attemptAndroidScreenshot(View decorView) throws Exception {
-        ensureViewHasLayout(decorView);
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+    private Bitmap captureFromActivity(Activity activity) throws Exception {
+        Window window = activity.getWindow();
+        View decorView = window.getDecorView();
+        ensureLaidOut(decorView);
         flushCodenameOneGraphics();
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
 
-        View codenameOneSurface = findCodenameOneSurface(decorView);
-        Bitmap surfaceBitmap = captureSurfaceBitmap(codenameOneSurface);
+        Bitmap pixelCopy = attemptPixelCopy(window);
+        if (pixelCopy != null && hasRenderableContent(pixelCopy)) {
+            Log.i(TAG, "Captured screenshot via PixelCopy");
+            return pixelCopy;
+        }
+
+        Bitmap surfaceBitmap = captureCodenameOneSurface(decorView);
         if (surfaceBitmap != null && hasRenderableContent(surfaceBitmap)) {
+            Log.i(TAG, "Captured screenshot via TextureView bitmap");
             return surfaceBitmap;
         }
 
-        return captureBitmap(decorView);
+        Bitmap fallback = captureByDrawing(decorView);
+        Log.i(TAG, "Captured screenshot via decorView.draw()");
+        return fallback;
+    }
+
+    private static void ensureLaidOut(View view) {
+        if (view.getWidth() > 0 && view.getHeight() > 0) {
+            return;
+        }
+        int widthSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        view.measure(widthSpec, heightSpec);
+        view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+    }
+
+    @Nullable
+    private Bitmap attemptPixelCopy(Window window) throws InterruptedException {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return null;
+        }
+        View decorView = window.getDecorView();
+        if (decorView.getWidth() <= 0 || decorView.getHeight() <= 0) {
+            return null;
+        }
+        Bitmap bitmap = Bitmap.createBitmap(decorView.getWidth(), decorView.getHeight(), Bitmap.Config.ARGB_8888);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicInteger resultCode = new AtomicInteger(PixelCopy.ERROR_UNKNOWN);
+        PixelCopy.request(window, bitmap, copyResult -> {
+            resultCode.set(copyResult);
+            latch.countDown();
+        }, new Handler(Looper.getMainLooper()));
+        if (!latch.await(EDT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            Log.w(TAG, "PixelCopy timed out");
+            return null;
+        }
+        if (resultCode.get() == PixelCopy.SUCCESS) {
+            return bitmap;
+        }
+        Log.w(TAG, "PixelCopy failed with code " + resultCode.get());
+        return null;
+    }
+
+    @Nullable
+    private Bitmap captureCodenameOneSurface(View root) {
+        if (root instanceof TextureView) {
+            Bitmap bitmap = ((TextureView) root).getBitmap();
+            if (bitmap != null) {
+                return bitmap;
+            }
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Bitmap child = captureCodenameOneSurface(group.getChildAt(i));
+                if (child != null) {
+                    return child;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Bitmap captureByDrawing(View view) {
+        int width = Math.max(view.getWidth(), 1);
+        int height = Math.max(view.getHeight(), 1);
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        view.draw(canvas);
+        return bitmap;
     }
 
     private Image waitForCodenameOneScreenshot() throws Exception {
         long deadline = SystemClock.uptimeMillis() + RENDER_TIMEOUT_MS;
         Image lastCapture = null;
-
         while (SystemClock.uptimeMillis() < deadline) {
-            flushCodenameOneGraphics();
             Image screenshot = captureCodenameOneScreenshot();
-            lastCapture = screenshot;
-            if (screenshot != null && hasRenderableContent(screenshot)) {
-                return screenshot;
+            if (screenshot != null) {
+                lastCapture = screenshot;
+                if (hasRenderableContent(screenshot)) {
+                    return screenshot;
+                }
             }
-            SystemClock.sleep(32L);
+            SystemClock.sleep(64L);
         }
-
         if (lastCapture != null) {
             return lastCapture;
         }
         throw new AssertionError("Timed out waiting for Codename One screenshot to contain rendered content");
     }
 
-    private static Bitmap captureBitmap(View view) {
-        if (view.getWidth() <= 0 || view.getHeight() <= 0) {
-            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+    @Nullable
+    private Image captureCodenameOneScreenshot() throws Exception {
+        if (!Display.isInitialized()) {
+            return null;
         }
-        Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        view.draw(canvas);
-        return bitmap;
+        return callSeriallyAndWait(() -> Display.getInstance().captureScreen());
     }
 
-    private static void ensureViewHasLayout(View view) {
-        long deadline = SystemClock.uptimeMillis() + LAYOUT_TIMEOUT_MS;
-        DisplayMetrics metrics = view.getResources().getDisplayMetrics();
-        int widthSpec = View.MeasureSpec.makeMeasureSpec(metrics.widthPixels, View.MeasureSpec.EXACTLY);
-        int heightSpec = View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY);
-
-        while ((view.getWidth() == 0 || view.getHeight() == 0) && SystemClock.uptimeMillis() < deadline) {
-            view.measure(widthSpec, heightSpec);
-            view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-            SystemClock.sleep(16L);
+    private void flushCodenameOneGraphics() throws Exception {
+        if (!Display.isInitialized()) {
+            return;
         }
-
-        if (view.getWidth() == 0 || view.getHeight() == 0) {
-            throw new AssertionError("Timed out waiting for decor view to obtain layout bounds");
-        }
+        callSeriallyAndWait(() -> {
+            Display display = Display.getInstance();
+            Form current = display.getCurrent();
+            if (current != null) {
+                current.revalidate();
+                current.repaint();
+            }
+            display.repaint(null);
+            return null;
+        });
     }
 
-    private static boolean hasRenderableContent(Bitmap screenshot) {
-        int width = screenshot.getWidth();
-        int height = screenshot.getHeight();
+    private static boolean hasRenderableContent(Bitmap bitmap) {
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        if (width <= 1 || height <= 1) {
+            return false;
+        }
         int[] pixels = new int[width * height];
-        screenshot.getPixels(pixels, 0, width, 0, 0, width, height);
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
         return hasRenderableContent(pixels, width, height);
     }
 
     private static boolean hasRenderableContent(Image screenshot) throws Exception {
-        if (!Display.isInitialized()) {
+        if (screenshot == null || screenshot.getWidth() <= 1 || screenshot.getHeight() <= 1) {
             return false;
         }
-        int width = screenshot.getWidth();
-        int height = screenshot.getHeight();
         int[] pixels = callSeriallyAndWait(screenshot::getRGB);
-        return hasRenderableContent(pixels, width, height);
+        return hasRenderableContent(pixels, screenshot.getWidth(), screenshot.getHeight());
     }
 
     private static boolean hasRenderableContent(int[] pixels, int width, int height) {
-        if (width <= 0 || height <= 0 || pixels == null || pixels.length == 0) {
+        if (pixels == null || pixels.length == 0) {
             return false;
         }
         int background = pixels[0];
@@ -223,184 +293,45 @@ public class @MAIN_NAME@UiTest {
         return false;
     }
 
-    private static File saveBitmap(Bitmap screenshot, String fileName) throws IOException {
+    private static File saveBitmap(Bitmap bitmap, String fileName) throws IOException {
         File outputDir = resolveArtifactDirectory();
-        File screenshotFile = new File(outputDir, fileName);
-        try (FileOutputStream out = new FileOutputStream(screenshotFile)) {
-            if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, out)) {
-                throw new IOException("Failed to encode Android screenshot as PNG");
+        File destination = new File(outputDir, fileName);
+        try (FileOutputStream out = new FileOutputStream(destination)) {
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                throw new IOException("Failed to encode bitmap as PNG");
             }
         }
-        return screenshotFile;
+        Log.i(TAG, "Saved Android screenshot to " + destination.getAbsolutePath());
+        return destination;
     }
 
     private static File saveCodenameOneScreenshot(Image screenshot, String fileName) throws Exception {
         File outputDir = resolveArtifactDirectory();
-        File screenshotFile = new File(outputDir, fileName);
+        File destination = new File(outputDir, fileName);
         ImageIO io = callSeriallyAndWait(() -> Display.getInstance().getImageIO());
         assertNotNull("Codename One ImageIO should be available", io);
-        try (FileOutputStream out = new FileOutputStream(screenshotFile)) {
-            FileOutputStream stream = out;
+        try (FileOutputStream out = new FileOutputStream(destination)) {
             callSeriallyAndWait(() -> {
-                io.save(screenshot, stream, ImageIO.FORMAT_PNG, 1.0f);
+                io.save(screenshot, out, ImageIO.FORMAT_PNG, 1.0f);
                 return null;
             });
         }
-        return screenshotFile;
+        Log.i(TAG, "Saved Codename One screenshot to " + destination.getAbsolutePath());
+        return destination;
     }
 
     private static File resolveArtifactDirectory() throws IOException {
-        String directory = System.getenv("CN1_TEST_SCREENSHOT_DIR");
-        File outputDir = (directory != null && !directory.isEmpty())
-                ? new File(directory)
-                : new File("build/ui-test-screenshots");
+        File filesDir = InstrumentationRegistry.getInstrumentation().getTargetContext().getFilesDir();
+        File outputDir = new File(filesDir, "ui-test-screenshots");
         if (!outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Failed to create screenshot directory " + outputDir.getAbsolutePath());
         }
         return outputDir;
     }
 
-    private static void waitForCodenameOneForm() throws Exception {
-        long deadline = SystemClock.uptimeMillis() + STARTUP_TIMEOUT_MS;
-        while (SystemClock.uptimeMillis() < deadline) {
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
-            if (Display.isInitialized()) {
-                Form current = callSeriallyAndWait(() -> Display.getInstance().getCurrent());
-                if (current != null) {
-                    return;
-                }
-            }
-            SystemClock.sleep(16L);
-        }
-        throw new AssertionError("Timed out waiting for Codename One main form to be displayed");
-    }
-
-    private static Image captureCodenameOneScreenshot() throws Exception {
-        if (!Display.isInitialized()) {
-            return null;
-        }
-        return callSeriallyAndWait(() -> Display.getInstance().captureScreen());
-    }
-
-    private static Bitmap captureSurfaceBitmap(View view) {
-        if (view == null) {
-            return null;
-        }
-        if (view instanceof TextureView) {
-            Bitmap bitmap = ((TextureView) view).getBitmap();
-            if (bitmap != null) {
-                return bitmap;
-            }
-        }
-
-        Bitmap reflectionBitmap = extractCodenameOneViewBitmap(view);
-        if (reflectionBitmap != null) {
-            return reflectionBitmap;
-        }
-
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                Bitmap childBitmap = captureSurfaceBitmap(group.getChildAt(i));
-                if (childBitmap != null) {
-                    return childBitmap;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static Bitmap extractCodenameOneViewBitmap(View view) {
-        try {
-            Field cn1Field = view.getClass().getDeclaredField("cn1View");
-            cn1Field.setAccessible(true);
-            Object cn1View = cn1Field.get(view);
-            if (cn1View != null) {
-                Field bitmapField = cn1View.getClass().getDeclaredField("bitmap");
-                bitmapField.setAccessible(true);
-                Object bitmapValue = bitmapField.get(cn1View);
-                if (bitmapValue instanceof Bitmap) {
-                    Bitmap bitmap = (Bitmap) bitmapValue;
-                    if (bitmap.getWidth() > 0 && bitmap.getHeight() > 0) {
-                        Bitmap copy = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-                        if (copy == null) {
-                            copy = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
-                            Canvas canvas = new Canvas(copy);
-                            canvas.drawBitmap(bitmap, 0f, 0f, null);
-                        }
-                        return copy;
-                    }
-                }
-            }
-        } catch (NoSuchFieldException ignored) {
-            // View does not expose a Codename One backing field.
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Unable to access Codename One view bitmap", e);
-        }
-        return null;
-    }
-
-    private static View findCodenameOneSurface(View root) {
-        if (root == null) {
-            return null;
-        }
-        if (root.getId() == 2001) {
-            return root;
-        }
-        if (root.getClass().getName().contains("CodenameOne")) {
-            return root;
-        }
-        if (root instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) root;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                View child = group.getChildAt(i);
-                View match = findCodenameOneSurface(child);
-                if (match != null) {
-                    return match;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static void flushCodenameOneGraphics() throws Exception {
-        if (!Display.isInitialized()) {
-            return;
-        }
-        callSeriallyAndWait(() -> {
-            Form current = Display.getInstance().getCurrent();
-            if (current != null) {
-                current.revalidate();
-                current.repaint();
-            }
-            return null;
-        });
-        callSeriallyAndWait(() -> {
-            AndroidImplementation impl = getAndroidImplementation();
-            if (impl != null) {
-                impl.flushGraphics();
-            }
-            return null;
-        });
-    }
-
-    private static AndroidImplementation getAndroidImplementation() {
-        try {
-            Field implField = Display.class.getDeclaredField("impl");
-            implField.setAccessible(true);
-            Object impl = implField.get(null);
-            if (impl instanceof AndroidImplementation) {
-                return (AndroidImplementation) impl;
-            }
-            return null;
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException("Unable to access Codename One implementation", e);
-        }
-    }
-
     private static <T> T callSeriallyAndWait(Callable<T> callable) throws Exception {
         if (!Display.isInitialized()) {
-            throw new IllegalStateException("Codename One Display must be initialized before invoking EDT work");
+            throw new IllegalStateException("Codename One Display must be initialized");
         }
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<T> result = new AtomicReference<>();
@@ -414,15 +345,8 @@ public class @MAIN_NAME@UiTest {
                 latch.countDown();
             }
         });
-        boolean completed;
-        try {
-            completed = awaitLatch(latch, EDT_TIMEOUT_MS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw e;
-        }
-        if (!completed) {
-            throw new AssertionError("Timed out waiting for Codename One EDT task to finish");
+        if (!awaitLatch(latch, EDT_TIMEOUT_MS)) {
+            throw new AssertionError("Timed out waiting for Codename One EDT work");
         }
         if (error.get() != null) {
             Throwable throwable = error.get();
@@ -437,10 +361,9 @@ public class @MAIN_NAME@UiTest {
     private static boolean awaitLatch(CountDownLatch latch, long timeoutMs) throws InterruptedException {
         long deadline = SystemClock.uptimeMillis() + timeoutMs;
         while (SystemClock.uptimeMillis() < deadline) {
-            if (latch.await(4L, TimeUnit.MILLISECONDS)) {
+            if (latch.await(16L, TimeUnit.MILLISECONDS)) {
                 return true;
             }
-            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
         }
         return latch.await(0L, TimeUnit.MILLISECONDS);
     }
