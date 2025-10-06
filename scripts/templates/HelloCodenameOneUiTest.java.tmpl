@@ -50,9 +50,10 @@ public class @MAIN_NAME@UiTest {
     private @MAIN_NAME@Stub activity;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
         activity = controller.setup().get();
+        bootstrapCodenameOneApp();
         waitForCodenameOneForm();
     }
 
@@ -224,6 +225,36 @@ public class @MAIN_NAME@UiTest {
         throw new AssertionError("Timed out waiting for Codename One main form to be displayed");
     }
 
+    private void bootstrapCodenameOneApp() throws Exception {
+        runOnMainSync(() -> AndroidImplementation.startContext(activity));
+        if (!Display.isInitialized()) {
+            runOnMainSync(() -> Display.init(activity));
+        }
+        if (!Display.isInitialized()) {
+            throw new AssertionError("Codename One Display failed to initialize");
+        }
+        callSeriallyAndWait(() -> {
+            @MAIN_NAME@ app = @MAIN_NAME@Stub.getAppInstance();
+            boolean needsInit = isStubFirstStart(app);
+            if (app == null) {
+                app = new @MAIN_NAME@();
+                assignStubAppInstance(app);
+                needsInit = true;
+            }
+            if (needsInit) {
+                app.init(activity);
+            }
+            app.start();
+            markStubFirstTimeConsumed();
+            return null;
+        });
+    }
+
+    private void runOnMainSync(Runnable runnable) {
+        activity.runOnUiThread(runnable);
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+    }
+
     private static Image captureCodenameOneScreenshot() throws Exception {
         return callSeriallyAndWait(() -> Display.getInstance().captureScreen());
     }
@@ -338,6 +369,50 @@ public class @MAIN_NAME@UiTest {
             return null;
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException("Unable to access Codename One implementation", e);
+        }
+    }
+
+    private static void assignStubAppInstance(@MAIN_NAME@ app) {
+        try {
+            Field appField = @MAIN_NAME@Stub.class.getDeclaredField("i");
+            appField.setAccessible(true);
+            appField.set(null, app);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException("Unable to assign Codename One application instance", e);
+        }
+    }
+
+    private boolean isStubFirstStart(@MAIN_NAME@ appInstance) {
+        try {
+            Field firstTimeField = @MAIN_NAME@Stub.class.getDeclaredField("firstTime");
+            firstTimeField.setAccessible(true);
+            boolean firstTimeValue;
+            if (java.lang.reflect.Modifier.isStatic(firstTimeField.getModifiers())) {
+                firstTimeValue = firstTimeField.getBoolean(null);
+            } else {
+                firstTimeValue = firstTimeField.getBoolean(activity);
+            }
+            return firstTimeValue || appInstance == null;
+        } catch (NoSuchFieldException ignored) {
+            return appInstance == null;
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Unable to inspect Codename One stub firstTime flag", e);
+        }
+    }
+
+    private void markStubFirstTimeConsumed() {
+        try {
+            Field firstTimeField = @MAIN_NAME@Stub.class.getDeclaredField("firstTime");
+            firstTimeField.setAccessible(true);
+            if (java.lang.reflect.Modifier.isStatic(firstTimeField.getModifiers())) {
+                firstTimeField.setBoolean(null, false);
+            } else {
+                firstTimeField.setBoolean(activity, false);
+            }
+        } catch (NoSuchFieldException ignored) {
+            // Field absent in some stub variants; nothing to update.
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Unable to update Codename One stub firstTime flag", e);
         }
     }
 
