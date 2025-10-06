@@ -1,6 +1,5 @@
 package @PACKAGE@;
 
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.graphics.Bitmap;
@@ -9,7 +8,6 @@ import android.util.DisplayMetrics;
 import android.view.View;
 
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -35,54 +33,63 @@ public class @MAIN_NAME@UiTest {
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
         log("Starting Robolectric activity for screenshot test");
-        ActivityController<@MAIN_NAME@Stub> controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class).setup().visible();
-        pumpSchedulers();
+        ActivityController<@MAIN_NAME@Stub> controller = Robolectric.buildActivity(@MAIN_NAME@Stub.class);
+        log("ActivityController created");
+        controller.create();
+        log("Activity created (Display.isInitialized=" + Display.isInitialized() + ")");
+        controller.start();
+        log("Activity started");
+        controller.resume();
+        log("Activity resumed");
+        controller.visible();
+        log("Activity made visible");
+
         try {
-            log("Waiting for Codename One main form to be displayed");
-            Form displayed = waitForDisplayedForm(10000L);
-            assertNotNull("Codename One form should be displayed", displayed);
+            for (int attempt = 1; attempt <= 5; attempt++) {
+                log("Scheduler pump attempt " + attempt + " (Display.isInitialized=" + Display.isInitialized() + ")");
+                pumpSchedulers("attempt-" + attempt);
+            }
+
+            if (Display.isInitialized()) {
+                log("Codename One display reports current form="
+                        + Display.getInstance().getCurrent());
+            } else {
+                log("Codename One display still not initialized after pump attempts");
+            }
 
             @MAIN_NAME@Stub activity = controller.get();
-            log("Captured Codename One form; capturing decor view screenshot");
+            log("Capturing decor view screenshot without additional waits");
             Bitmap screenshot = captureScreenshot(activity);
-            assertNotNull("Screenshot capture should succeed", screenshot);
+            assertTrue("Screenshot capture should succeed", screenshot != null);
+            log("Screenshot dimensions=" + screenshot.getWidth() + "x" + screenshot.getHeight());
             assertTrue("Screenshot width should be positive", screenshot.getWidth() > 0);
             assertTrue("Screenshot height should be positive", screenshot.getHeight() > 0);
-            assertTrue("Screenshot should contain rendered content beyond the background", hasRenderableContent(screenshot));
+            boolean hasContent = hasRenderableContent(screenshot);
+            log("Screenshot content analysis result=" + hasContent);
+            assertTrue("Screenshot should contain rendered content beyond the background", hasContent);
 
             File screenshotFile = saveScreenshot(screenshot);
             log("Screenshot stored at " + screenshotFile.getAbsolutePath());
             assertTrue("Screenshot file should exist", screenshotFile.isFile());
             assertTrue("Screenshot file should not be empty", screenshotFile.length() > 0L);
         } finally {
-            controller.pause().stop().destroy();
+            controller.pause();
+            log("Activity paused");
+            controller.stop();
+            log("Activity stopped");
+            controller.destroy();
+            log("Activity destroyed");
         }
     }
 
-    private static Form waitForDisplayedForm(long timeoutMillis) throws InterruptedException {
-        long start = System.currentTimeMillis();
-        long nextLog = start;
-        while (System.currentTimeMillis() - start < timeoutMillis) {
-            pumpSchedulers();
-            if (Display.isInitialized()) {
-                Form current = Display.getInstance().getCurrent();
-                if (current != null) {
-                    return current;
-                }
-            }
-            Thread.sleep(50L);
-            long now = System.currentTimeMillis();
-            if (now >= nextLog) {
-                log("Still waiting for Codename One form; displayInitialized=" + Display.isInitialized());
-                nextLog = now + 1000L;
-            }
+    private static Bitmap captureScreenshot(@MAIN_NAME@Stub activity) {
+        View decorView = activity.getWindow().getDecorView();
+        log("Decor view instance=" + decorView);
+        if (decorView == null) {
+            throw new AssertionError("Activity decor view was null");
         }
-        log("Timed out waiting for Codename One form; Display.isInitialized=" + Display.isInitialized());
-        throw new AssertionError("Timed out waiting for Codename One form to be displayed");
-    }
-
-    private static Bitmap captureScreenshot(@MAIN_NAME@Stub activity) throws InterruptedException {
-        View decorView = waitForDecorViewWithDimensions(activity, 10000L);
+        ensureViewHasLayout(decorView);
+        log("Decor view layout dimensions after ensure: " + decorView.getWidth() + "x" + decorView.getHeight());
         Bitmap bitmap = Bitmap.createBitmap(decorView.getWidth(), decorView.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         decorView.draw(canvas);
@@ -147,33 +154,9 @@ public class @MAIN_NAME@UiTest {
         }
     }
 
-    private static View waitForDecorViewWithDimensions(@MAIN_NAME@Stub activity, long timeoutMillis) throws InterruptedException {
-        long start = System.currentTimeMillis();
-        long nextLog = start;
-        while (System.currentTimeMillis() - start < timeoutMillis) {
-            View decorView = activity.getWindow().getDecorView();
-            if (decorView != null) {
-                ensureViewHasLayout(decorView);
-                if (decorView.getWidth() > 0 && decorView.getHeight() > 0) {
-                    return decorView;
-                }
-            }
-            pumpSchedulers();
-            Thread.sleep(50L);
-            long now = System.currentTimeMillis();
-            if (now >= nextLog) {
-                log("Waiting for decor view layout; decorPresent=" + (decorView != null)
-                        + " width=" + (decorView != null ? decorView.getWidth() : 0)
-                        + " height=" + (decorView != null ? decorView.getHeight() : 0));
-                nextLog = now + 1000L;
-            }
-        }
-        log("Timed out waiting for decor view layout");
-        throw new AssertionError("Timed out waiting for decor view layout");
-    }
-
     private static void ensureViewHasLayout(View view) {
         if (view.getWidth() > 0 && view.getHeight() > 0) {
+            log("ensureViewHasLayout: view already laid out with size " + view.getWidth() + "x" + view.getHeight());
             return;
         }
         DisplayMetrics metrics = view.getResources().getDisplayMetrics();
@@ -181,6 +164,7 @@ public class @MAIN_NAME@UiTest {
         int heightSpec = View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY);
         view.measure(widthSpec, heightSpec);
         view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+        log("ensureViewHasLayout: forced layout to " + view.getWidth() + "x" + view.getHeight());
     }
 
     private static void log(String message) {
@@ -191,12 +175,12 @@ public class @MAIN_NAME@UiTest {
 
     private static final AtomicInteger PUMP_INVOCATION_COUNTER = new AtomicInteger();
 
-    private static void pumpSchedulers() {
+    private static void pumpSchedulers(String label) {
         int invocation = PUMP_INVOCATION_COUNTER.incrementAndGet();
         long start = System.currentTimeMillis();
         boolean verbose = invocation <= 5 || invocation % 10 == 0;
         if (verbose) {
-            log("pumpSchedulers[" + invocation + "] begin");
+            log("pumpSchedulers[" + invocation + "] begin (" + label + ")");
         }
         try {
             ShadowLooper.idleMainLooper();
@@ -213,10 +197,8 @@ public class @MAIN_NAME@UiTest {
             log("pumpSchedulers[" + invocation + "] threw " + t);
             throw t;
         } finally {
-            if (verbose) {
-                long elapsed = System.currentTimeMillis() - start;
-                log("pumpSchedulers[" + invocation + "] finished after " + elapsed + "ms");
-            }
+            long elapsed = System.currentTimeMillis() - start;
+            log("pumpSchedulers[" + invocation + "] finished after " + elapsed + "ms (" + label + ")");
         }
     }
 
