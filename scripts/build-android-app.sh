@@ -364,18 +364,49 @@ else
 fi
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
-SCREENSHOT_FILE=$(find "$SCREENSHOT_OUTPUT_DIR" -maxdepth 1 -name '*.png' | head -n 1 || true)
+readarray -t SCREENSHOT_FILES < <(find "$SCREENSHOT_OUTPUT_DIR" -maxdepth 1 -type f -name '*.png' -print | sort)
 SCREENSHOT_STATUS=0
-if [ -z "$SCREENSHOT_FILE" ]; then
+if [ "${#SCREENSHOT_FILES[@]}" -eq 0 ]; then
   ba_log "UI test completed but no screenshot was produced in $SCREENSHOT_OUTPUT_DIR" >&2
   SCREENSHOT_STATUS=1
 else
-  FINAL_SCREENSHOT="$FINAL_ARTIFACT_DIR/ui-test-screenshot.png"
-  cp "$SCREENSHOT_FILE" "$FINAL_SCREENSHOT"
-  if [ -n "${GITHUB_ENV:-}" ]; then
-    printf 'CN1_UI_TEST_SCREENSHOT=%s\n' "$FINAL_SCREENSHOT" >> "$GITHUB_ENV"
+  DEFAULT_SCREENSHOT=""
+  ANDROID_SCREENSHOT=""
+  CODENAMEONE_SCREENSHOT=""
+  for src in "${SCREENSHOT_FILES[@]}"; do
+    base=$(basename "$src")
+    dest="$FINAL_ARTIFACT_DIR/$base"
+    cp "$src" "$dest"
+    label="UI test"
+    case "$base" in
+      *-android-*.png)
+        ANDROID_SCREENSHOT="$dest"
+        label="Android"
+        ;;
+      *-codenameone-*.png)
+        CODENAMEONE_SCREENSHOT="$dest"
+        label="Codename One"
+        ;;
+    esac
+    if [ -z "$DEFAULT_SCREENSHOT" ]; then
+      DEFAULT_SCREENSHOT="$dest"
+    fi
+    ba_log "$label screenshot copied to $dest"
+  done
+  if [ -n "$ANDROID_SCREENSHOT" ]; then
+    DEFAULT_SCREENSHOT="$ANDROID_SCREENSHOT"
   fi
-  ba_log "UI test screenshot available at $FINAL_SCREENSHOT"
+  if [ -n "${GITHUB_ENV:-}" ]; then
+    if [ -n "$DEFAULT_SCREENSHOT" ]; then
+      printf 'CN1_UI_TEST_SCREENSHOT=%s\n' "$DEFAULT_SCREENSHOT" >> "$GITHUB_ENV"
+    fi
+    if [ -n "$ANDROID_SCREENSHOT" ]; then
+      printf 'CN1_UI_TEST_ANDROID_SCREENSHOT=%s\n' "$ANDROID_SCREENSHOT" >> "$GITHUB_ENV"
+    fi
+    if [ -n "$CODENAMEONE_SCREENSHOT" ]; then
+      printf 'CN1_UI_TEST_CODENAMEONE_SCREENSHOT=%s\n' "$CODENAMEONE_SCREENSHOT" >> "$GITHUB_ENV"
+    fi
+  fi
 fi
 unset CN1_TEST_SCREENSHOT_DIR
 
