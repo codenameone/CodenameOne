@@ -7,7 +7,7 @@ import pathlib
 import re
 import sys
 
-COMPILE_SDK_LINE = "    compileSdkVersion 33\n"
+COMPILE_SDK_LINE = "    compileSdkVersion 35\n"
 
 TEST_OPTIONS_SNIPPET = """    testOptions {\n        animationsDisabled = true\n    }\n\n"""
 
@@ -234,7 +234,12 @@ class GradleFile:
 
 
 def process(path: pathlib.Path) -> None:
-    editor = GradleFile(path.read_text(encoding="utf-8"))
+    content = path.read_text(encoding="utf-8")
+    if "android {" not in content:
+        raise SystemExit(
+            "Selected Gradle file doesn't contain an android { } block. Check module path."
+        )
+    editor = GradleFile(content)
     editor.apply()
     path.write_text(editor.content, encoding="utf-8")
     print(editor.summary())

@@ -344,8 +344,8 @@ install_android_packages() {
   "$manager" --install \
     "platform-tools" \
     "emulator" \
-    "platforms;android-33" \
-    "system-images;android-33;google_apis;x86_64" >/dev/null 2>&1 || true
+    "platforms;android-35" \
+    "system-images;android-35;default;x86_64" >/dev/null 2>&1 || true
 }
 
 create_avd() {
@@ -357,16 +357,26 @@ create_avd() {
     ba_log "avdmanager not available; cannot create emulator" >&2
     exit 1
   fi
-  rm -rf "$avd_dir"
   mkdir -p "$avd_dir"
-  if ! ANDROID_AVD_HOME="$avd_dir" "$manager" create avd -n "$name" -k "$image" --device "pixel_6" --force >/dev/null <<<'no'
+  local ini_file="$avd_dir/$name.ini"
+  local image_dir="$avd_dir/$name.avd"
+  if [ -f "$ini_file" ] && [ -d "$image_dir" ]; then
+    if grep -F -q "$image" "$ini_file" 2>/dev/null; then
+      ba_log "Reusing existing Android Virtual Device $name"
+      return
+    fi
+    ba_log "Existing Android Virtual Device $name uses a different system image; recreating"
+    rm -f "$ini_file"
+    rm -rf "$image_dir"
+  fi
+  if ! ANDROID_AVD_HOME="$avd_dir" "$manager" create avd -n "$name" -k "$image" --device "2.7in QVGA" --force >/dev/null <<<'no'
   then
     ba_log "Failed to create Android Virtual Device $name using image $image" >&2
     find "$avd_dir" -maxdepth 2 -mindepth 1 -print | sed 's/^/[build-android-app] AVD: /' >&2 || true
     exit 1
   fi
-  if [ ! -f "$avd_dir/$name.ini" ]; then
-    ba_log "AVD $name was created but configuration file $avd_dir/$name.ini is missing" >&2
+  if [ ! -f "$ini_file" ]; then
+    ba_log "AVD $name was created but configuration file $ini_file is missing" >&2
     find "$avd_dir" -maxdepth 1 -mindepth 1 -print | sed 's/^/[build-android-app] AVD: /' >&2 || true
     exit 1
   fi
@@ -377,10 +387,10 @@ wait_for_emulator() {
   "$ADB_BIN" start-server >/dev/null
   "$ADB_BIN" -s "$serial" wait-for-device
 
-  local boot_timeout="${EMULATOR_BOOT_TIMEOUT_SECONDS:-600}"
+  local boot_timeout="${EMULATOR_BOOT_TIMEOUT_SECONDS:-900}"
   if ! [[ "$boot_timeout" =~ ^[0-9]+$ ]] || [ "$boot_timeout" -le 0 ]; then
-    ba_log "Invalid EMULATOR_BOOT_TIMEOUT_SECONDS=$boot_timeout provided; falling back to 600"
-    boot_timeout=600
+    ba_log "Invalid EMULATOR_BOOT_TIMEOUT_SECONDS=$boot_timeout provided; falling back to 900"
+    boot_timeout=900
   fi
   local poll_interval="${EMULATOR_BOOT_POLL_INTERVAL_SECONDS:-5}"
   if ! [[ "$poll_interval" =~ ^[0-9]+$ ]] || [ "$poll_interval" -le 0 ]; then
@@ -451,24 +461,34 @@ wait_for_emulator() {
 
 wait_for_package_service() {
   local serial="$1"
-  local timeout="${PACKAGE_SERVICE_TIMEOUT:-120}"
+  local configured_timeout="${PACKAGE_SERVICE_TIMEOUT_SECONDS:-${PACKAGE_SERVICE_TIMEOUT:-600}}"
+  local timeout="$configured_timeout"
   if ! [[ "$timeout" =~ ^[0-9]+$ ]] || [ "$timeout" -le 0 ]; then
-    timeout=120
+    timeout=600
   fi
+  local poll_interval=5
   local deadline=$((SECONDS + timeout))
   local last_log=$SECONDS
   while [ $SECONDS -lt $deadline ]; do
-    if "$ADB_BIN" -s "$serial" shell cmd package list packages >/dev/null 2>&1; then
-      return 0
+    local boot_ok
+    boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    local ce_ok
+    ce_ok="$($ADB_BIN -s "$serial" shell getprop sys.user.0.ce_available 2>/dev/null | tr -d '\r')"
+    if [ "$boot_ok" = "1" ] && [ "$ce_ok" = "1" ]; then
+      local android_id
+      android_id="$($ADB_BIN -s "$serial" shell settings get secure android_id 2>/dev/null | tr -d '\r')"
+      if [ -n "$android_id" ] && [ "$android_id" != "null" ]; then
+        if "$ADB_BIN" -s "$serial" shell cmd package path android >/dev/null 2>&1 \
+          || "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1; then
+          return 0
+        fi
+      fi
     fi
-    if "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1; then
-      return 0
-    fi
-    if [ $((SECONDS - last_log)) -ge 10 ]; then
-      ba_log "Waiting for package manager service on $serial"
+    if [ $((SECONDS - last_log)) -ge 15 ]; then
+      ba_log "Waiting for package manager service on $serial (boot_ok=${boot_ok:-<unset>} ce_ok=${ce_ok:-<unset>})"
       last_log=$SECONDS
     fi
-    sleep 2
+    sleep "$poll_interval"
   done
   ba_log "Package manager service not ready on $serial after ${timeout}s" >&2
   return 1
@@ -507,8 +527,11 @@ if [ ! -x "$EMULATOR_BIN" ]; then
 fi
 
 AVD_NAME="cn1UiTestAvd"
-SYSTEM_IMAGE="system-images;android-33;google_apis;x86_64"
-AVD_HOME="$WORK_DIR/android-avd"
+SYSTEM_IMAGE="system-images;android-35;default;x86_64"
+AVD_CACHE_ROOT="${AVD_CACHE_ROOT:-${RUNNER_TEMP:-$HOME}/cn1-android-avd}"
+mkdir -p "$AVD_CACHE_ROOT"
+AVD_HOME="$AVD_CACHE_ROOT"
+ba_log "Using AVD home at $AVD_HOME"
 create_avd "$AVDMANAGER_BIN" "$AVD_NAME" "$SYSTEM_IMAGE" "$AVD_HOME"
 
 ANDROID_AVD_HOME="$AVD_HOME" "$ADB_BIN" start-server >/dev/null
@@ -526,7 +549,10 @@ EMULATOR_SERIAL="emulator-$EMULATOR_PORT"
 
 EMULATOR_LOG="$GRADLE_PROJECT_DIR/emulator.log"
 ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
-ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off >"$EMULATOR_LOG" 2>&1 &
+ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" \
+  -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off \
+  -camera-back none -camera-front none -no-snapshot-load -no-snapshot-save -skip-adb-auth \
+  -no-accel -netfast >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
@@ -581,7 +607,12 @@ if ! wait_for_emulator "$EMULATOR_SERIAL"; then
   exit 1
 fi
 
+sleep 20
+ba_log "Waiting briefly for emulator system services to stabilize"
+
 if ! wait_for_package_service "$EMULATOR_SERIAL"; then
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop | sed 's/^/[build-android-app] getprop: /' || true
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 | tail -n 200 | sed 's/^/[build-android-app] logcat: /' || true
   stop_emulator
   exit 1
 fi
