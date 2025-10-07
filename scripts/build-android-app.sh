@@ -907,31 +907,19 @@ if [ -z "$RUNNER" ]; then
 fi
 ba_log "Using instrumentation runner: $RUNNER"
 
-STUB_ACTIVITY="$PACKAGE_NAME/.${MAIN_NAME}Stub"
-
-RESOLVE_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$STUB_ACTIVITY" 2>&1 || true)"
-RESOLVE_STATUS=$?
-if [ -n "$RESOLVE_OUTPUT" ]; then
-  printf '%s\n' "$RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve: /'
+ba_log "Inspecting launcher activities for $PACKAGE_NAME"
+LAUNCH_RESOLVE_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>&1 || true)"
+if [ -n "$LAUNCH_RESOLVE_OUTPUT" ]; then
+  printf '%s\n' "$LAUNCH_RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve-launch: /'
 fi
-if [ "$RESOLVE_STATUS" -ne 0 ]; then
-  ba_log "Failed to resolve activity $STUB_ACTIVITY"
-  dump_emulator_diagnostics
-  stop_emulator
-  exit 1
-fi
-
-START_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell am start -W -n "$STUB_ACTIVITY" 2>&1 || true)"
-START_STATUS=$?
-if [ -n "$START_OUTPUT" ]; then
-  printf '%s\n' "$START_OUTPUT" | sed 's/^/[build-android-app] start: /'
-fi
-if [ "$START_STATUS" -ne 0 ]; then
-  ba_log "Failed to start activity $STUB_ACTIVITY"
-  dump_emulator_diagnostics
-  stop_emulator
-  exit 1
-fi
+for candidate in CodenameOneActivity MainActivity HelloCodenameOneStub; do
+  CANDIDATE_RESOLVE_OUTPUT="$(
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$PACKAGE_NAME/.$candidate" 2>&1 || true
+  )"
+  if [ -n "$CANDIDATE_RESOLVE_OUTPUT" ]; then
+    printf '%s\n' "$CANDIDATE_RESOLVE_OUTPUT" | sed "s/^/[build-android-app] resolve-$candidate: /"
+  fi
+done
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "${PACKAGE_NAME}.test" >/dev/null 2>&1 || true

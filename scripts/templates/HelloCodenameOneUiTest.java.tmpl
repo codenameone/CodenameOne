@@ -15,9 +15,13 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 
 import androidx.annotation.Nullable;
-import androidx.test.ext.junit.rules.ActivityScenarioRule;
+import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
@@ -26,7 +30,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
 
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -45,22 +48,48 @@ public class @MAIN_NAME@UiTest {
     private static final long RENDER_TIMEOUT_MS = 15_000L;
     private static final long EDT_TIMEOUT_MS = 10_000L;
 
-    @Rule
-    public final ActivityScenarioRule<@MAIN_NAME@Stub> scenarioRule =
-            new ActivityScenarioRule<>(@MAIN_NAME@Stub.class);
-
     @Test
     public void mainFormScreenshotContainsRenderedContent() throws Exception {
-        Form form = waitForMainForm();
-        assertNotNull("Codename One main form should be available", form);
+        try (ActivityScenario<? extends Activity> scenario = launchAppActivity()) {
+            Form form = waitForMainForm();
+            assertNotNull("Codename One main form should be available", form);
 
-        Bitmap androidScreenshot = waitForAndroidScreenshot();
-        assertTrue("Android screenshot should show rendered content", hasRenderableContent(androidScreenshot));
-        saveBitmap(androidScreenshot, "@MAIN_NAME@-android-ui.png");
+            Bitmap androidScreenshot = waitForAndroidScreenshot(scenario);
+            assertTrue("Android screenshot should show rendered content", hasRenderableContent(androidScreenshot));
+            saveBitmap(androidScreenshot, "@MAIN_NAME@-android-ui.png");
 
-        Image codenameOneScreenshot = waitForCodenameOneScreenshot();
-        assertTrue("Codename One screenshot should show rendered content", hasRenderableContent(codenameOneScreenshot));
-        saveCodenameOneScreenshot(codenameOneScreenshot, "@MAIN_NAME@-codenameone-ui.png");
+            Image codenameOneScreenshot = waitForCodenameOneScreenshot();
+            assertTrue("Codename One screenshot should show rendered content", hasRenderableContent(codenameOneScreenshot));
+            saveCodenameOneScreenshot(codenameOneScreenshot, "@MAIN_NAME@-codenameone-ui.png");
+        }
+    }
+
+    private ActivityScenario<? extends Activity> launchAppActivity() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        PackageManager packageManager = context.getPackageManager();
+        String packageName = context.getPackageName();
+
+        Intent launchIntent = packageManager.getLaunchIntentForPackage(packageName);
+        if (launchIntent != null) {
+            return ActivityScenario.launch(launchIntent);
+        }
+
+        String[] fallbacks = new String[] {
+                packageName + ".CodenameOneActivity",
+                packageName + ".MainActivity",
+                packageName + ".HelloCodenameOneStub"
+        };
+        for (String candidate : fallbacks) {
+            ComponentName component = new ComponentName(packageName, candidate);
+            try {
+                packageManager.getActivityInfo(component, 0);
+                Intent intent = new Intent().setComponent(component);
+                return ActivityScenario.launch(intent);
+            } catch (PackageManager.NameNotFoundException ignored) {
+                // Try the next candidate.
+            }
+        }
+        throw new AssertionError("No launchable activity found for package " + packageName);
     }
 
     private Form waitForMainForm() throws Exception {
@@ -77,11 +106,11 @@ public class @MAIN_NAME@UiTest {
         throw new AssertionError("Timed out waiting for Codename One form to appear");
     }
 
-    private Bitmap waitForAndroidScreenshot() throws Exception {
+    private Bitmap waitForAndroidScreenshot(ActivityScenario<? extends Activity> scenario) throws Exception {
         AtomicReference<Bitmap> lastCapture = new AtomicReference<>();
         long deadline = SystemClock.uptimeMillis() + RENDER_TIMEOUT_MS;
         while (SystemClock.uptimeMillis() < deadline) {
-            scenarioRule.getScenario().onActivity(activity -> {
+            scenario.onActivity(activity -> {
                 try {
                     Bitmap capture = captureAndroidScreenshot(activity);
                     if (capture != null) {
