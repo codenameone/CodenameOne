@@ -87,14 +87,7 @@ class GradleFile:
         if not block:
             raise SystemExit("Unable to locate dependencies block in Gradle file")
         existing_block = self.content[block[0]:block[1]]
-        configuration, rewrite = self._select_configuration(existing_block, self.content)
-        if rewrite:
-            updated_block = existing_block.replace("androidTestImplementation", configuration)
-            self.content = (
-                self.content[:block[0]] + updated_block + self.content[block[1]:]
-            )
-            block = (block[0], block[0] + len(updated_block))
-            existing_block = updated_block
+        configuration = self._select_configuration(existing_block, self.content)
         insertion_point = block[1] - 1
         for coordinate in ANDROID_TEST_DEPENDENCIES:
             if self._has_dependency(existing_block, coordinate):
@@ -117,19 +110,16 @@ class GradleFile:
         )
 
     @staticmethod
-    def _select_configuration(block: str, content: str) -> tuple[str, bool]:
-        uses_modern = bool(re.search(r"^\s*implementation\b", content, re.MULTILINE))
-        uses_legacy = bool(re.search(r"^\s*compile\b", content, re.MULTILINE))
-
-        if "androidTestCompile" in block:
-            return "androidTestCompile", False
-        if "androidTestImplementation" in block:
-            if uses_modern:
-                return "androidTestImplementation", False
-            return "androidTestCompile", True
-        if uses_modern and not uses_legacy:
-            return "androidTestImplementation", False
-        return "androidTestCompile", False
+    def _select_configuration(block: str, content: str) -> str:
+        if re.search(r"^\s*androidTestImplementation\b", block, re.MULTILINE):
+            return "androidTestImplementation"
+        if re.search(r"^\s*androidTestCompile\b", block, re.MULTILINE):
+            return "androidTestCompile"
+        if re.search(r"^\s*androidTestImplementation\b", content, re.MULTILINE):
+            return "androidTestImplementation"
+        if re.search(r"^\s*androidTestCompile\b", content, re.MULTILINE):
+            return "androidTestCompile"
+        return "androidTestCompile"
 
     def apply(self) -> None:
         self.ensure_test_options()
