@@ -27,9 +27,9 @@ class GradleFile:
         self.configuration_used: str | None = None
         self.added_dependencies: list[str] = []
 
-    def find_block(self, name: str) -> tuple[int, int] | None:
+    def find_block(self, name: str, start: int = 0) -> tuple[int, int] | None:
         pattern = re.compile(rf"(^\s*{re.escape(name)}\s*\{{)", re.MULTILINE)
-        match = pattern.search(self.content)
+        match = pattern.search(self.content, start)
         if not match:
             return None
         start = match.start()
@@ -85,7 +85,7 @@ class GradleFile:
         self.content = self.content[:insert] + DEFAULT_CONFIG_SNIPPET + self.content[insert:]
 
     def ensure_dependencies(self) -> None:
-        block = self.find_block("dependencies")
+        block = self._find_dependencies_block()
         if not block:
             raise SystemExit("Unable to locate dependencies block in Gradle file")
         existing_block = self.content[block[0]:block[1]]
@@ -112,6 +112,27 @@ class GradleFile:
             re.search(rf"androidTestImplementation\s+['\"]{escaped}['\"]", block)
             or re.search(rf"androidTestCompile\s+['\"]{escaped}['\"]", block)
         )
+
+    def _find_dependencies_block(self) -> tuple[int, int] | None:
+        search_start = 0
+        while True:
+            block = self.find_block("dependencies", start=search_start)
+            if not block:
+                return None
+            block_text = self.content[block[0]:block[1]]
+            has_android_entries = re.search(
+                r"^\s*(implementation|api|compile|androidTestImplementation|androidTestCompile)\b",
+                block_text,
+                re.MULTILINE,
+            )
+            has_only_classpath = (
+                not has_android_entries
+                and re.search(r"^\s*classpath\b", block_text, re.MULTILINE)
+            )
+            if has_only_classpath:
+                search_start = block[1]
+                continue
+            return block
 
     @staticmethod
     def _select_configuration(block: str, content: str) -> str:
