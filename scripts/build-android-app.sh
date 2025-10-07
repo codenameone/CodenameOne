@@ -287,9 +287,92 @@ sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
     "$UI_TEST_TEMPLATE" > "$UI_TEST_FILE"
 ba_log "Created instrumentation UI test at $UI_TEST_FILE"
 
+STUB_SRC_DIR="$APP_MODULE_DIR/src/main/java/${PACKAGE_PATH}"
+mkdir -p "$STUB_SRC_DIR"
+STUB_SRC_FILE="$STUB_SRC_DIR/${MAIN_NAME}Stub.java"
+if [ ! -f "$STUB_SRC_FILE" ]; then
+  cat >"$STUB_SRC_FILE" <<EOF
+package ${PACKAGE_NAME};
+
+import android.os.Bundle;
+
+import com.codename1.impl.android.CodenameOneActivity;
+
+public class ${MAIN_NAME}Stub extends CodenameOneActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+    }
+}
+EOF
+  ba_log "Created Codename One stub activity at $STUB_SRC_FILE"
+else
+  ba_log "Codename One stub activity already present at $STUB_SRC_FILE"
+fi
+
+MANIFEST_FILE="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
+if [ ! -f "$MANIFEST_FILE" ]; then
+  ba_log "AndroidManifest.xml not found at $MANIFEST_FILE" >&2
+  exit 1
+fi
+
+ensure_manifest_stub() {
+  python3 - "$MANIFEST_FILE" "$MAIN_NAME" <<'PY'
+import sys
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
+manifest_path = Path(sys.argv[1])
+main_name = sys.argv[2]
+ns_android = "http://schemas.android.com/apk/res/android"
+
+ET.register_namespace('android', ns_android)
+tree = ET.parse(manifest_path)
+root = tree.getroot()
+app = root.find('application')
+if app is None:
+    sys.exit("Application element missing in AndroidManifest.xml")
+
+target = f".{main_name}Stub"
+android_name = f"{{{ns_android}}}name"
+android_exported = f"{{{ns_android}}}exported"
+
+for activity in app.findall('activity'):
+    name = activity.get(android_name)
+    if name in (target, target.lstrip('.')):
+        break
+else:
+    activity = ET.Element('activity')
+    activity.set(android_name, target)
+    activity.set(android_exported, 'false')
+    app.append(activity)
+    tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
+PY
+}
+
+if ! ensure_manifest_stub; then
+  ba_log "Failed to ensure stub activity declaration in $MANIFEST_FILE" >&2
+  exit 1
+fi
+
+if ! grep -Eq "android:name=\"(\.${MAIN_NAME}Stub|${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub)\"" "$MANIFEST_FILE"; then
+  ba_log "Manifest does not declare ${MAIN_NAME}Stub activity" >&2
+  exit 1
+fi
+
+if [ ! -f "$STUB_SRC_FILE" ]; then
+  ba_log "Missing stub activity source at $STUB_SRC_FILE" >&2
+  exit 1
+fi
+
 APP_BUILD_GRADLE="$APP_MODULE_DIR/build.gradle"
 if [ ! -f "$APP_BUILD_GRADLE" ]; then
   ba_log "Expected Gradle build file not found at $APP_BUILD_GRADLE" >&2
+  exit 1
+fi
+
+if ! grep -q "android[[:space:]]*{" "$APP_BUILD_GRADLE"; then
+  ba_log "Gradle build file at $APP_BUILD_GRADLE is missing an android { } block" >&2
   exit 1
 fi
 
@@ -843,6 +926,13 @@ if [ -z "$TEST_APK" ] || [ ! -f "$TEST_APK" ]; then
   exit 1
 fi
 
+MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
+if [ -f "$MERGED_MANIFEST" ]; then
+  grep -n "${MAIN_NAME}Stub" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /' || true
+else
+  ba_log "Merged manifest not found at $MERGED_MANIFEST"
+fi
+
 adb_install_retry() {
   local serial="$1" apk="$2" tries=5
   local attempt
@@ -912,14 +1002,15 @@ LAUNCH_RESOLVE_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package reso
 if [ -n "$LAUNCH_RESOLVE_OUTPUT" ]; then
   printf '%s\n' "$LAUNCH_RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve-launch: /'
 fi
-for candidate in CodenameOneActivity MainActivity HelloCodenameOneStub; do
-  CANDIDATE_RESOLVE_OUTPUT="$(
-    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$PACKAGE_NAME/.$candidate" 2>&1 || true
+STUB_ACTIVITY_FQCN="$PACKAGE_NAME/.${MAIN_NAME}Stub"
+STUB_RESOLVE_OUTPUT="$(
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$STUB_ACTIVITY_FQCN" 2>&1 || true
   )"
-  if [ -n "$CANDIDATE_RESOLVE_OUTPUT" ]; then
-    printf '%s\n' "$CANDIDATE_RESOLVE_OUTPUT" | sed "s/^/[build-android-app] resolve-$candidate: /"
-  fi
-done
+if [ -n "$STUB_RESOLVE_OUTPUT" ]; then
+  printf '%s\n' "$STUB_RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve-stub: /'
+else
+  ba_log "Unable to resolve stub activity $STUB_ACTIVITY_FQCN on device"
+fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "${PACKAGE_NAME}.test" >/dev/null 2>&1 || true
