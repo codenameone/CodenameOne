@@ -173,13 +173,22 @@ class GradleFile:
         )
 
     def _find_dependencies_block(self) -> tuple[int, int] | None:
+        preferred: tuple[int, int] | None = None
+        fallback: tuple[int, int] | None = None
         for name, start, end, parents in self._iter_blocks():
             if name != "dependencies":
                 continue
             if parents and parents[-1] in {"buildscript", "pluginManagement"}:
                 continue
-            return start, end
-        return None
+            block_content = self.content[start:end]
+            if re.search(r"^\s*(implementation|api|compile|androidTestImplementation|androidTestCompile)\b", block_content, re.MULTILINE):
+                preferred = (start, end)
+                break
+            if "classpath" in block_content and not re.search(r"^\s*(implementation|api|compile)\b", block_content, re.MULTILINE):
+                continue
+            if fallback is None:
+                fallback = (start, end)
+        return preferred or fallback
 
     def _append_dependencies_block(self) -> None:
         if not self.content.endswith("\n"):

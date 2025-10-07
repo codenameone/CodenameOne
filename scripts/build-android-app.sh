@@ -449,6 +449,31 @@ wait_for_emulator() {
   return 0
 }
 
+wait_for_package_service() {
+  local serial="$1"
+  local timeout="${PACKAGE_SERVICE_TIMEOUT:-120}"
+  if ! [[ "$timeout" =~ ^[0-9]+$ ]] || [ "$timeout" -le 0 ]; then
+    timeout=120
+  fi
+  local deadline=$((SECONDS + timeout))
+  local last_log=$SECONDS
+  while [ $SECONDS -lt $deadline ]; do
+    if "$ADB_BIN" -s "$serial" shell cmd package list packages >/dev/null 2>&1; then
+      return 0
+    fi
+    if "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1; then
+      return 0
+    fi
+    if [ $((SECONDS - last_log)) -ge 10 ]; then
+      ba_log "Waiting for package manager service on $serial"
+      last_log=$SECONDS
+    fi
+    sleep 2
+  done
+  ba_log "Package manager service not ready on $serial after ${timeout}s" >&2
+  return 1
+}
+
 stop_emulator() {
   if [ -n "${EMULATOR_SERIAL:-}" ]; then
     "$ADB_BIN" -s "$EMULATOR_SERIAL" emu kill >/dev/null 2>&1 || true
@@ -552,6 +577,11 @@ fi
 ba_log "Using emulator serial $EMULATOR_SERIAL"
 
 if ! wait_for_emulator "$EMULATOR_SERIAL"; then
+  stop_emulator
+  exit 1
+fi
+
+if ! wait_for_package_service "$EMULATOR_SERIAL"; then
   stop_emulator
   exit 1
 fi
