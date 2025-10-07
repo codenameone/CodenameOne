@@ -363,6 +363,7 @@ create_avd() {
   if [ -f "$ini_file" ] && [ -d "$image_dir" ]; then
     if grep -F -q "$image" "$ini_file" 2>/dev/null; then
       ba_log "Reusing existing Android Virtual Device $name"
+      configure_avd "$avd_dir" "$name"
       return
     fi
     ba_log "Existing Android Virtual Device $name uses a different system image; recreating"
@@ -380,6 +381,34 @@ create_avd() {
     find "$avd_dir" -maxdepth 1 -mindepth 1 -print | sed 's/^/[build-android-app] AVD: /' >&2 || true
     exit 1
   fi
+  configure_avd "$avd_dir" "$name"
+}
+
+configure_avd() {
+  local avd_dir="$1"
+  local name="$2"
+  local cfg="$avd_dir/$name.avd/config.ini"
+  if [ ! -f "$cfg" ]; then
+    return
+  fi
+  declare -A settings=(
+    ["hw.ramSize"]=3072
+    ["disk.dataPartition.size"]=4096M
+    ["hw.bluetooth"]=no
+    ["hw.camera.back"]=none
+    ["hw.camera.front"]=none
+    ["hw.audioInput"]=no
+    ["hw.audioOutput"]=no
+  )
+  local key value
+  for key in "${!settings[@]}"; do
+    value="${settings[$key]}"
+    if grep -q "^${key}=" "$cfg" 2>/dev/null; then
+      sed -i "s/^${key}=.*/${key}=${value}/" "$cfg"
+    else
+      echo "${key}=${value}" >>"$cfg"
+    fi
+  done
 }
 
 wait_for_emulator() {
@@ -538,8 +567,7 @@ dump_emulator_diagnostics() {
 }
 
 log_instrumentation_state() {
-  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android \
-    | sed 's/^/[build-android-app] pm path android: /' || true
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android | sed 's/^/[build-android-app] pm path android: /' || true
 
   local instrumentation_list
   instrumentation_list="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation 2>/dev/null || true)"
@@ -629,8 +657,9 @@ EMULATOR_SERIAL="emulator-$EMULATOR_PORT"
 EMULATOR_LOG="$GRADLE_PROJECT_DIR/emulator.log"
 ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
 ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" \
-  -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off \
-  -camera-back none -camera-front none -skip-adb-auth -no-accel -netfast -memory 2048 >"$EMULATOR_LOG" 2>&1 &
+  -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim \
+  -accel off -no-accel -camera-back none -camera-front none -skip-adb-auth \
+  -feature -Vulkan -netfast -memory 3072 >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
@@ -700,11 +729,18 @@ if ! wait_for_package_service "$EMULATOR_SERIAL"; then
   exit 1
 fi
 
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global device_provisioned 1 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put secure user_setup_complete 1 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell wm dismiss-keyguard >/dev/null 2>&1 || true
+
 if ! wait_for_api_level "$EMULATOR_SERIAL"; then
   dump_emulator_diagnostics
   stop_emulator
   exit 1
 fi
+
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android | sed 's/^/[build-android-app] pm path android: /' || true
 
 "$ADB_BIN" kill-server >/dev/null 2>&1 || true
 "$ADB_BIN" start-server >/dev/null 2>&1 || true
@@ -832,37 +868,48 @@ if [ -z "$RUNNER" ]; then
 fi
 ba_log "Using instrumentation runner: $RUNNER"
 
-UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}" 
+UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
   ba_log "Invalid UI_TEST_TIMEOUT_SECONDS=$UI_TEST_TIMEOUT_SECONDS provided; falling back to 900"
   UI_TEST_TIMEOUT_SECONDS=900
 fi
 
-INSTRUMENT_ARGS=(
-  "-w"
-  "-r"
-  "-e"
-  "clearPackageData"
-  "true"
-  "-e"
-  "log"
-  "true"
-)
-INSTRUMENT_CMD=("$ADB_BIN" "-s" "$EMULATOR_SERIAL" "shell" "am" "instrument" "${INSTRUMENT_ARGS[@]}" "$RUNNER")
-if command -v timeout >/dev/null 2>&1; then
-  ba_log "Running instrumentation via am instrument with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
-  INSTRUMENT_CMD=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${INSTRUMENT_CMD[@]}")
-else
-  ba_log "timeout command not found; running instrumentation without external watchdog"
-fi
+INSTRUMENT_EXIT_CODE=1
 
-INSTRUMENT_LOG="$FINAL_ARTIFACT_DIR/ui-test-instrumentation.log"
-set +e
-"${INSTRUMENT_CMD[@]}" | tee "$INSTRUMENT_LOG"
-INSTRUMENT_EXIT_CODE=${PIPESTATUS[0]}
-set -e
+run_instrumentation() {
+  local tries=3 delay=15 attempt exit_code=1
+  local args=(-w -r -e clearPackageData true -e log true -e class "${PACKAGE_NAME}.${MAIN_NAME}UiTest")
+  for attempt in $(seq 1 "$tries"); do
+    local cmd=("$ADB_BIN" "-s" "$EMULATOR_SERIAL" "shell" "am" "instrument" "${args[@]}" "$RUNNER")
+    if command -v timeout >/dev/null 2>&1; then
+      cmd=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${cmd[@]}")
+      ba_log "Instrumentation attempt $attempt/$tries with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
+    else
+      ba_log "Instrumentation attempt $attempt/$tries without external watchdog"
+    fi
+    local attempt_log="$FINAL_ARTIFACT_DIR/ui-test-instrumentation-attempt-$attempt.log"
+    set +e
+    "${cmd[@]}" | tee "$attempt_log"
+    exit_code=${PIPESTATUS[0]}
+    set -e
+    cp "$attempt_log" "$FINAL_ARTIFACT_DIR/ui-test-instrumentation.log" 2>/dev/null || true
+    if [ "$exit_code" -eq 0 ]; then
+      INSTRUMENT_EXIT_CODE=0
+      return 0
+    fi
+    if grep -q "INSTRUMENTATION_ABORTED: System has crashed." "$attempt_log" 2>/dev/null && [ "$attempt" -lt "$tries" ]; then
+      ba_log "System crashed during instrumentation attempt $attempt; retrying after ${delay}s"
+      sleep "$delay"
+      continue
+    fi
+    INSTRUMENT_EXIT_CODE=$exit_code
+    return $exit_code
+  done
+  INSTRUMENT_EXIT_CODE=$exit_code
+  return $exit_code
+}
 
-if [ "$INSTRUMENT_EXIT_CODE" -ne 0 ]; then
+if ! run_instrumentation; then
   ba_log "Instrumentation command exited with status $INSTRUMENT_EXIT_CODE"
   dump_emulator_diagnostics
 fi
