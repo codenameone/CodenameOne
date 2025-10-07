@@ -29,29 +29,72 @@ class GradleFile:
         self.configuration_used: str | None = None
         self.added_dependencies: list[str] = []
 
-    def find_block(self, name: str, start: int = 0) -> tuple[int, int] | None:
-        pattern = re.compile(rf"(^\s*{re.escape(name)}\s*\{{)", re.MULTILINE)
-        match = pattern.search(self.content, start)
-        if not match:
-            return None
-        start = match.start()
-        index = match.end()
-        depth = 1
-        while index < len(self.content):
-            char = self.content[index]
-            if char == '{':
-                depth += 1
-            elif char == '}':
-                depth -= 1
-                if depth == 0:
-                    return start, index + 1
-            index += 1
+    def _iter_blocks(self):
+        content = self.content
+        length = len(content)
+        stack: list[tuple[str, int]] = []
+        i = 0
+        while i < length:
+            if content.startswith("//", i):
+                end = content.find("\n", i)
+                if end == -1:
+                    break
+                i = end + 1
+                continue
+            if content.startswith("/*", i):
+                end = content.find("*/", i + 2)
+                if end == -1:
+                    break
+                i = end + 2
+                continue
+            char = content[i]
+            if char in ('"', "'"):
+                quote = char
+                i += 1
+                while i < length:
+                    if content[i] == "\\":
+                        i += 2
+                        continue
+                    if content[i] == quote:
+                        i += 1
+                        break
+                    i += 1
+                continue
+            if char == '}':
+                if stack:
+                    name, start = stack.pop()
+                    parents = [entry[0] for entry in stack]
+                    yield name, start, i + 1, parents
+                i += 1
+                continue
+            match = re.match(r'[A-Za-z_][A-Za-z0-9_\.]*', content[i:])
+            if match:
+                name = match.group(0)
+                j = i + len(name)
+                while j < length and content[j].isspace():
+                    j += 1
+                if j < length and content[j] == '{':
+                    stack.append((name, i))
+                    i = j + 1
+                    continue
+            i += 1
+
+    def _find_block(self, name: str, *, parent: str | None = None) -> tuple[int, int] | None:
+        for block_name, start, end, parents in self._iter_blocks():
+            if block_name != name:
+                continue
+            if parent is None:
+                if not parents:
+                    return start, end
+            else:
+                if parents and parents[-1] == parent:
+                    return start, end
         return None
 
     def ensure_compile_sdk(self) -> None:
         if re.search(r"compileSdkVersion\s+\d+", self.content):
             return
-        android_block = self.find_block("android")
+        android_block = self._find_block("android")
         if not android_block:
             raise SystemExit("Unable to locate android block in Gradle file")
         insert = self.content.find('\n', android_block[0]) + 1
@@ -62,7 +105,7 @@ class GradleFile:
     def ensure_test_options(self) -> None:
         if "animationsDisabled" in self.content:
             return
-        test_block = self.find_block("testOptions")
+        test_block = self._find_block("testOptions", parent="android")
         if test_block:
             insert = self.content.find('\n', test_block[0]) + 1
             body = "        animationsDisabled = true\n"
@@ -70,7 +113,7 @@ class GradleFile:
                 self.content[:insert] + body + self.content[insert:test_block[1]] + self.content[test_block[1]:]
             )
             return
-        android_block = self.find_block("android")
+        android_block = self._find_block("android")
         if not android_block:
             raise SystemExit("Unable to locate android block in Gradle file")
         insert = self.content.find('\n', android_block[0]) + 1
@@ -81,7 +124,7 @@ class GradleFile:
     def ensure_instrumentation_runner(self) -> None:
         if "testInstrumentationRunner" in self.content:
             return
-        default_block = self.find_block("defaultConfig")
+        default_block = self._find_block("defaultConfig", parent="android")
         if default_block:
             insert = self.content.find('\n', default_block[0]) + 1
             line = "        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\"\n"
@@ -89,7 +132,7 @@ class GradleFile:
                 self.content[:insert] + line + self.content[insert:default_block[1]] + self.content[default_block[1]:]
             )
             return
-        android_block = self.find_block("android")
+        android_block = self._find_block("android")
         if not android_block:
             raise SystemExit("Unable to locate android block in Gradle file")
         insert = self.content.find('\n', android_block[0]) + 1
@@ -100,7 +143,10 @@ class GradleFile:
     def ensure_dependencies(self) -> None:
         block = self._find_dependencies_block()
         if not block:
-            raise SystemExit("Unable to locate dependencies block in Gradle file")
+            self._append_dependencies_block()
+            block = self._find_dependencies_block()
+            if not block:
+                raise SystemExit("Unable to locate dependencies block in Gradle file after insertion")
         existing_block = self.content[block[0]:block[1]]
         configuration = self._select_configuration(existing_block, self.content)
         self.configuration_used = configuration
@@ -127,25 +173,18 @@ class GradleFile:
         )
 
     def _find_dependencies_block(self) -> tuple[int, int] | None:
-        search_start = 0
-        while True:
-            block = self.find_block("dependencies", start=search_start)
-            if not block:
-                return None
-            block_text = self.content[block[0]:block[1]]
-            has_android_entries = re.search(
-                r"^\s*(implementation|api|compile|androidTestImplementation|androidTestCompile)\b",
-                block_text,
-                re.MULTILINE,
-            )
-            has_only_classpath = (
-                not has_android_entries
-                and re.search(r"^\s*classpath\b", block_text, re.MULTILINE)
-            )
-            if has_only_classpath:
-                search_start = block[1]
+        for name, start, end, parents in self._iter_blocks():
+            if name != "dependencies":
                 continue
-            return block
+            if parents and parents[-1] in {"buildscript", "pluginManagement"}:
+                continue
+            return start, end
+        return None
+
+    def _append_dependencies_block(self) -> None:
+        if not self.content.endswith("\n"):
+            self.content += "\n"
+        self.content += "\ndependencies {\n}\n"
 
     @staticmethod
     def _select_configuration(block: str, content: str) -> str:
