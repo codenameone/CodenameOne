@@ -601,6 +601,45 @@ log_instrumentation_state() {
   fi
 }
 
+collect_instrumentation_crash() {
+  local attempt="$1"
+  local crash_log="$FINAL_ARTIFACT_DIR/ui-test-crash-attempt-$attempt.log"
+  local latest_log="$FINAL_ARTIFACT_DIR/ui-test-crash.log"
+  local log_tmp filtered_tmp tomb_tmp tombstones
+
+  log_tmp="$(mktemp "${TMPDIR:-/tmp}/ui-test-logcat.XXXXXX")"
+  filtered_tmp="$(mktemp "${TMPDIR:-/tmp}/ui-test-logcat-filtered.XXXXXX")"
+  tomb_tmp="$(mktemp "${TMPDIR:-/tmp}/ui-test-tombstones.XXXXXX")"
+
+  : >"$crash_log"
+
+  if "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 >"$log_tmp" 2>/dev/null; then
+    if grep -E "FATAL EXCEPTION|AndroidRuntime|Process: ${PACKAGE_NAME}(\\.test)?|Abort message:" "$log_tmp" >"$filtered_tmp" 2>/dev/null; then
+      if [ -s "$filtered_tmp" ]; then
+        while IFS= read -r line; do
+          echo "[build-android-app] crash: $line"
+        done <"$filtered_tmp"
+        cat "$filtered_tmp" >>"$crash_log"
+      fi
+    fi
+  fi
+
+  tombstones="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell ls /data/tombstones 2>/dev/null | tail -n 3 || true)"
+  if [ -n "$tombstones" ]; then
+    printf '%s\n' "$tombstones" | sed 's/^/[build-android-app] tombstone: /'
+    printf '%s\n' "$tombstones" >"$tomb_tmp"
+    cat "$tomb_tmp" >>"$crash_log"
+  fi
+
+  if [ -s "$crash_log" ]; then
+    cp "$crash_log" "$latest_log" 2>/dev/null || true
+  else
+    rm -f "$crash_log"
+  fi
+
+  rm -f "$log_tmp" "$filtered_tmp" "$tomb_tmp"
+}
+
 stop_emulator() {
   if [ -n "${EMULATOR_SERIAL:-}" ]; then
     "$ADB_BIN" -s "$EMULATOR_SERIAL" emu kill >/dev/null 2>&1 || true
@@ -868,6 +907,35 @@ if [ -z "$RUNNER" ]; then
 fi
 ba_log "Using instrumentation runner: $RUNNER"
 
+STUB_ACTIVITY="$PACKAGE_NAME/.${MAIN_NAME}Stub"
+
+RESOLVE_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$STUB_ACTIVITY" 2>&1 || true)"
+RESOLVE_STATUS=$?
+if [ -n "$RESOLVE_OUTPUT" ]; then
+  printf '%s\n' "$RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve: /'
+fi
+if [ "$RESOLVE_STATUS" -ne 0 ]; then
+  ba_log "Failed to resolve activity $STUB_ACTIVITY"
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
+
+START_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell am start -W -n "$STUB_ACTIVITY" 2>&1 || true)"
+START_STATUS=$?
+if [ -n "$START_OUTPUT" ]; then
+  printf '%s\n' "$START_OUTPUT" | sed 's/^/[build-android-app] start: /'
+fi
+if [ "$START_STATUS" -ne 0 ]; then
+  ba_log "Failed to start activity $STUB_ACTIVITY"
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
+
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "${PACKAGE_NAME}.test" >/dev/null 2>&1 || true
+
 UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
   ba_log "Invalid UI_TEST_TIMEOUT_SECONDS=$UI_TEST_TIMEOUT_SECONDS provided; falling back to 900"
@@ -888,11 +956,15 @@ run_instrumentation() {
       ba_log "Instrumentation attempt $attempt/$tries without external watchdog"
     fi
     local attempt_log="$FINAL_ARTIFACT_DIR/ui-test-instrumentation-attempt-$attempt.log"
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" logcat -c >/dev/null 2>&1 || true
     set +e
     "${cmd[@]}" | tee "$attempt_log"
     exit_code=${PIPESTATUS[0]}
     set -e
     cp "$attempt_log" "$FINAL_ARTIFACT_DIR/ui-test-instrumentation.log" 2>/dev/null || true
+    if [ "$exit_code" -ne 0 ]; then
+      collect_instrumentation_crash "$attempt"
+    fi
     if [ "$exit_code" -eq 0 ]; then
       INSTRUMENT_EXIT_CODE=0
       return 0
