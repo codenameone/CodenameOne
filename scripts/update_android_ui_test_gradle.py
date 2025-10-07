@@ -86,9 +86,16 @@ class GradleFile:
         block = self.find_block("dependencies")
         if not block:
             raise SystemExit("Unable to locate dependencies block in Gradle file")
-        insertion_point = block[1] - 1
         existing_block = self.content[block[0]:block[1]]
-        configuration = self._select_configuration(existing_block)
+        configuration, rewrite = self._select_configuration(existing_block, self.content)
+        if rewrite:
+            updated_block = existing_block.replace("androidTestImplementation", configuration)
+            self.content = (
+                self.content[:block[0]] + updated_block + self.content[block[1]:]
+            )
+            block = (block[0], block[0] + len(updated_block))
+            existing_block = updated_block
+        insertion_point = block[1] - 1
         for coordinate in ANDROID_TEST_DEPENDENCIES:
             if self._has_dependency(existing_block, coordinate):
                 continue
@@ -110,12 +117,19 @@ class GradleFile:
         )
 
     @staticmethod
-    def _select_configuration(block: str) -> str:
-        if "androidTestImplementation" in block:
-            return "androidTestImplementation"
+    def _select_configuration(block: str, content: str) -> tuple[str, bool]:
+        uses_modern = bool(re.search(r"^\s*implementation\b", content, re.MULTILINE))
+        uses_legacy = bool(re.search(r"^\s*compile\b", content, re.MULTILINE))
+
         if "androidTestCompile" in block:
-            return "androidTestCompile"
-        return "androidTestImplementation"
+            return "androidTestCompile", False
+        if "androidTestImplementation" in block:
+            if uses_modern:
+                return "androidTestImplementation", False
+            return "androidTestCompile", True
+        if uses_modern and not uses_legacy:
+            return "androidTestImplementation", False
+        return "androidTestCompile", False
 
     def apply(self) -> None:
         self.ensure_test_options()
