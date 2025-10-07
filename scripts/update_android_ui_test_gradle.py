@@ -7,6 +7,8 @@ import pathlib
 import re
 import sys
 
+COMPILE_SDK_LINE = "    compileSdkVersion 33\n"
+
 TEST_OPTIONS_SNIPPET = """    testOptions {\n        animationsDisabled = true\n    }\n\n"""
 
 DEFAULT_CONFIG_SNIPPET = """    defaultConfig {\n        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\"\n    }\n\n"""
@@ -45,6 +47,17 @@ class GradleFile:
                     return start, index + 1
             index += 1
         return None
+
+    def ensure_compile_sdk(self) -> None:
+        if re.search(r"compileSdkVersion\s+\d+", self.content):
+            return
+        android_block = self.find_block("android")
+        if not android_block:
+            raise SystemExit("Unable to locate android block in Gradle file")
+        insert = self.content.find('\n', android_block[0]) + 1
+        if insert <= 0:
+            insert = android_block[0] + len("android {")
+        self.content = self.content[:insert] + COMPILE_SDK_LINE + self.content[insert:]
 
     def ensure_test_options(self) -> None:
         if "animationsDisabled" in self.content:
@@ -155,6 +168,7 @@ class GradleFile:
         return "androidTestImplementation"
 
     def apply(self) -> None:
+        self.ensure_compile_sdk()
         self.ensure_test_options()
         self.ensure_instrumentation_runner()
         self.ensure_dependencies()
