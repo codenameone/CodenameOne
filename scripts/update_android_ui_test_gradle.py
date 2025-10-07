@@ -24,6 +24,8 @@ ANDROID_TEST_DEPENDENCIES = (
 class GradleFile:
     def __init__(self, content: str) -> None:
         self.content = content
+        self.configuration_used: str | None = None
+        self.added_dependencies: list[str] = []
 
     def find_block(self, name: str) -> tuple[int, int] | None:
         pattern = re.compile(rf"(^\s*{re.escape(name)}\s*\{{)", re.MULTILINE)
@@ -88,6 +90,7 @@ class GradleFile:
             raise SystemExit("Unable to locate dependencies block in Gradle file")
         existing_block = self.content[block[0]:block[1]]
         configuration = self._select_configuration(existing_block, self.content)
+        self.configuration_used = configuration
         insertion_point = block[1] - 1
         for coordinate in ANDROID_TEST_DEPENDENCIES:
             if self._has_dependency(existing_block, coordinate):
@@ -100,6 +103,7 @@ class GradleFile:
             )
             insertion_point += len(combined)
             existing_block += combined
+            self.added_dependencies.append(coordinate)
 
     @staticmethod
     def _has_dependency(block: str, coordinate: str) -> bool:
@@ -119,18 +123,38 @@ class GradleFile:
             return "androidTestImplementation"
         if re.search(r"^\s*androidTestCompile\b", content, re.MULTILINE):
             return "androidTestCompile"
-        return "androidTestCompile"
+        if re.search(r"^\s*implementation\b", block, re.MULTILINE) or re.search(
+            r"^\s*implementation\b", content, re.MULTILINE
+        ):
+            return "androidTestImplementation"
+        if re.search(r"^\s*compile\b", block, re.MULTILINE) or re.search(
+            r"^\s*compile\b", content, re.MULTILINE
+        ):
+            return "androidTestCompile"
+        return "androidTestImplementation"
 
     def apply(self) -> None:
         self.ensure_test_options()
         self.ensure_instrumentation_runner()
         self.ensure_dependencies()
 
+    def summary(self) -> str:
+        configuration = self.configuration_used or "<unknown>"
+        if self.added_dependencies:
+            deps = ", ".join(self.added_dependencies)
+        else:
+            deps = "none (already present)"
+        return (
+            "Instrumentation dependency configuration: "
+            f"{configuration}; added dependencies: {deps}"
+        )
+
 
 def process(path: pathlib.Path) -> None:
     editor = GradleFile(path.read_text(encoding="utf-8"))
     editor.apply()
     path.write_text(editor.content, encoding="utf-8")
+    print(editor.summary())
 
 
 def main(argv: list[str] | None = None) -> int:

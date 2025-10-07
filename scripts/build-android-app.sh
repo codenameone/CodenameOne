@@ -293,7 +293,16 @@ if [ ! -f "$APP_BUILD_GRADLE" ]; then
   exit 1
 fi
 
-"$SCRIPT_DIR/update_android_ui_test_gradle.py" "$APP_BUILD_GRADLE"
+GRADLE_UPDATE_OUTPUT="$("$SCRIPT_DIR/update_android_ui_test_gradle.py" "$APP_BUILD_GRADLE")"
+if [ -n "$GRADLE_UPDATE_OUTPUT" ]; then
+  while IFS= read -r line; do
+    [ -n "$line" ] && ba_log "$line"
+  done <<<"$GRADLE_UPDATE_OUTPUT"
+fi
+
+ba_log "Dependencies block after instrumentation update:"
+awk '/^\s*dependencies\s*\{/{flag=1} flag{print} /^\s*\}/{if(flag){exit}}' "$APP_BUILD_GRADLE" \
+  | sed 's/^/[build-android-app] | /'
 
 FINAL_ARTIFACT_DIR="${CN1_TEST_SCREENSHOT_EXPORT_DIR:-$REPO_ROOT/build-artifacts}"
 mkdir -p "$FINAL_ARTIFACT_DIR"
