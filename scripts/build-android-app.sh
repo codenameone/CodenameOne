@@ -571,30 +571,6 @@ log_instrumentation_state() {
   else
     ba_log "Package manager returned no packages on $EMULATOR_SERIAL"
   fi
-
-  local instrumentation_target instrumentation_line
-  instrumentation_target=""
-  if [ -n "$instrumentation_list" ]; then
-    instrumentation_line="$(printf '%s\n' "$instrumentation_list" | awk -v pkg='${PACKAGE_NAME}.test' '$0 ~ pkg {print; exit}')"
-    if [ -n "$instrumentation_line" ]; then
-      instrumentation_target="${instrumentation_line#instrumentation:}"
-      instrumentation_target="${instrumentation_target%% *}"
-    else
-      instrumentation_target="$(printf '%s\n' "$instrumentation_list" | awk -F' ' '/^instrumentation:/{print $1}' | head -n1)"
-      instrumentation_target="${instrumentation_target#instrumentation:}"
-    fi
-  fi
-
-  if [ -n "$instrumentation_target" ] && [ "$have_test_apk" -eq 1 ]; then
-    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am instrument -w -r \
-      -e log true \
-      "$instrumentation_target" \
-      2>&1 | sed 's/^/[build-android-app] am instrument: /'
-  elif [ -n "$instrumentation_target" ]; then
-    ba_log "Instrumentation target $instrumentation_target available but test APK missing; skipping am instrument dry run"
-  else
-    ba_log "Skipping am instrument dry run; no instrumentation target detected on $EMULATOR_SERIAL"
-  fi
 }
 
 stop_emulator() {
@@ -735,51 +711,130 @@ fi
 "$ADB_BIN" -s "$EMULATOR_SERIAL" wait-for-device
 export ANDROID_SERIAL="$EMULATOR_SERIAL"
 
-INSTALL_TIMEOUT_SECONDS="${INSTALL_TIMEOUT_SECONDS:-600}"
-if ! [[ "$INSTALL_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$INSTALL_TIMEOUT_SECONDS" -le 0 ]; then
-  INSTALL_TIMEOUT_SECONDS=600
+ASSEMBLE_TIMEOUT_SECONDS="${ASSEMBLE_TIMEOUT_SECONDS:-900}"
+if ! [[ "$ASSEMBLE_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$ASSEMBLE_TIMEOUT_SECONDS" -le 0 ]; then
+  ASSEMBLE_TIMEOUT_SECONDS=900
 fi
 
-INSTALL_CMD=(
+GRADLE_ASSEMBLE_CMD=(
   "./gradlew"
   "--no-daemon"
-  "installDebug"
-  "installDebugAndroidTest"
+  ":app:assembleDebug"
+  ":app:assembleDebugAndroidTest"
+  "-x"
+  "lint"
+  "-x"
+  "test"
 )
 if command -v timeout >/dev/null 2>&1; then
-  ba_log "Installing app and androidTest APKs with external timeout of ${INSTALL_TIMEOUT_SECONDS}s"
-  INSTALL_CMD=("timeout" "$INSTALL_TIMEOUT_SECONDS" "${INSTALL_CMD[@]}")
+  ba_log "Building app and androidTest APKs with external timeout of ${ASSEMBLE_TIMEOUT_SECONDS}s"
+  GRADLE_ASSEMBLE_CMD=("timeout" "$ASSEMBLE_TIMEOUT_SECONDS" "${GRADLE_ASSEMBLE_CMD[@]}")
 else
-  ba_log "timeout command not found; running install tasks without external watchdog"
+  ba_log "timeout command not found; running Gradle assemble tasks without external watchdog"
 fi
 
-GRADLE_INSTALL_LOG="$GRADLE_PROJECT_DIR/gradle-ui-install.log"
+GRADLE_ASSEMBLE_LOG="$GRADLE_PROJECT_DIR/gradle-ui-assemble.log"
 set +e
 (
   cd "$GRADLE_PROJECT_DIR"
-  "${INSTALL_CMD[@]}" | tee "$GRADLE_INSTALL_LOG"
+  "${GRADLE_ASSEMBLE_CMD[@]}" | tee "$GRADLE_ASSEMBLE_LOG"
   exit "${PIPESTATUS[0]}"
 )
-INSTALL_EXIT_CODE=$?
+ASSEMBLE_EXIT_CODE=$?
 set -e
 
-if [ -f "$GRADLE_INSTALL_LOG" ]; then
-  cp "$GRADLE_INSTALL_LOG" "$FINAL_ARTIFACT_DIR/ui-test-install.log"
-  ba_log "Gradle install log saved to $FINAL_ARTIFACT_DIR/ui-test-install.log"
+if [ -f "$GRADLE_ASSEMBLE_LOG" ]; then
+  cp "$GRADLE_ASSEMBLE_LOG" "$FINAL_ARTIFACT_DIR/ui-test-assemble.log"
+  ba_log "Gradle assemble log saved to $FINAL_ARTIFACT_DIR/ui-test-assemble.log"
 fi
 
-if [ "$INSTALL_EXIT_CODE" -ne 0 ]; then
-  ba_log "Gradle install tasks exited with status $INSTALL_EXIT_CODE"
+if [ "$ASSEMBLE_EXIT_CODE" -ne 0 ]; then
+  ba_log "Gradle assemble tasks exited with status $ASSEMBLE_EXIT_CODE"
   stop_emulator
   exit 1
 fi
 
+APP_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk/debug" -maxdepth 1 -name '*-debug.apk' | head -n1 || true)"
+TEST_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk/androidTest/debug" -maxdepth 1 -name '*-debug-androidTest.apk' | head -n1 || true)"
+
+if [ -z "$APP_APK" ] || [ ! -f "$APP_APK" ]; then
+  ba_log "App APK not found after assemble tasks" >&2
+  stop_emulator
+  exit 1
+fi
+if [ -z "$TEST_APK" ] || [ ! -f "$TEST_APK" ]; then
+  ba_log "androidTest APK not found after assemble tasks" >&2
+  stop_emulator
+  exit 1
+fi
+
+adb_install_retry() {
+  local serial="$1" apk="$2" tries=5
+  local attempt
+  for attempt in $(seq 1 "$tries"); do
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 120 "$ADB_BIN" -s "$serial" install -r -t "$apk" && return 0
+    else
+      "$ADB_BIN" -s "$serial" install -r -t "$apk" && return 0
+    fi
+    if [ "$attempt" -lt "$tries" ]; then
+      ba_log "install retry $attempt/$tries for $(basename "$apk")"
+      "$ADB_BIN" -s "$serial" wait-for-device
+      sleep 3
+    fi
+  done
+  return 1
+}
+
+ba_log "Installing app APK: $APP_APK"
+if ! adb_install_retry "$EMULATOR_SERIAL" "$APP_APK"; then
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
+
+ba_log "Installing androidTest APK: $TEST_APK"
+if ! adb_install_retry "$EMULATOR_SERIAL" "$TEST_APK"; then
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
+
+APP_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' || true)"
+if [ -n "$APP_PACKAGE_PATH" ]; then
+  printf '%s\n' "$APP_PACKAGE_PATH" | sed 's/^/[build-android-app] app-apk: /'
+else
+  ba_log "App package $PACKAGE_NAME not yet reported by pm path on $EMULATOR_SERIAL"
+fi
+
+TEST_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "${PACKAGE_NAME}.test" 2>/dev/null | tr -d '\r' || true)"
+if [ -n "$TEST_PACKAGE_PATH" ]; then
+  printf '%s\n' "$TEST_PACKAGE_PATH" | sed 's/^/[build-android-app] test-apk: /'
+else
+  ba_log "Test package ${PACKAGE_NAME}.test not yet reported by pm path on $EMULATOR_SERIAL"
+fi
+
 log_instrumentation_state
 
-"$ADB_BIN" kill-server >/dev/null 2>&1 || true
-"$ADB_BIN" start-server >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" wait-for-device
-export ANDROID_SERIAL="$EMULATOR_SERIAL"
+RUNNER="$(
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation \
+    | awk -v pkg="${PACKAGE_NAME}" '$1=="instrumentation:" && $0 ~ ("target=" pkg) {print $2; exit}'
+)"
+if [ -z "$RUNNER" ]; then
+  RUNNER="$(
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation \
+      | awk '$1=="instrumentation:" {print $2; exit}'
+  )"
+fi
+RUNNER="${RUNNER//$'\r'/}"
+RUNNER="${RUNNER//$'\n'/}"
+
+if [ -z "$RUNNER" ]; then
+  ba_log "No instrumentation runner found for $PACKAGE_NAME"
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
 
 UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
@@ -787,40 +842,36 @@ if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS
   UI_TEST_TIMEOUT_SECONDS=900
 fi
 
-GRADLE_TEST_CMD=(
-  "./gradlew"
-  "--no-daemon"
-  "-Pandroid.testInstrumentationRunnerArguments=class=${PACKAGE_NAME}.${MAIN_NAME}UiTest"
-  "connectedDebugAndroidTest"
+INSTRUMENT_ARGS=(
+  "-w"
+  "-r"
+  "-e"
+  "log"
+  "true"
+  "-e"
+  "clearPackageData"
+  "true"
+  "-e"
+  "class"
+  "${PACKAGE_NAME}.${MAIN_NAME}UiTest"
 )
+INSTRUMENT_CMD=("$ADB_BIN" "-s" "$EMULATOR_SERIAL" "shell" "am" "instrument" "${INSTRUMENT_ARGS[@]}" "$RUNNER")
 if command -v timeout >/dev/null 2>&1; then
-  ba_log "Running instrumentation UI tests with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
-  GRADLE_TEST_CMD=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${GRADLE_TEST_CMD[@]}")
+  ba_log "Running instrumentation via am instrument with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
+  INSTRUMENT_CMD=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${INSTRUMENT_CMD[@]}")
 else
-  ba_log "timeout command not found; running instrumentation tests without external watchdog"
+  ba_log "timeout command not found; running instrumentation without external watchdog"
 fi
 
-GRADLE_UI_TEST_LOG="$GRADLE_PROJECT_DIR/gradle-ui-test.log"
-ba_log "Streaming Gradle UI test output (also saved to $GRADLE_UI_TEST_LOG)"
-
+INSTRUMENT_LOG="$FINAL_ARTIFACT_DIR/ui-test-instrumentation.log"
 set +e
-(
-  cd "$GRADLE_PROJECT_DIR"
-  "${GRADLE_TEST_CMD[@]}" | tee "$GRADLE_UI_TEST_LOG"
-  exit "${PIPESTATUS[0]}"
-)
-TEST_EXIT_CODE=$?
+"${INSTRUMENT_CMD[@]}" | tee "$INSTRUMENT_LOG"
+INSTRUMENT_EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
-if [ -f "$GRADLE_UI_TEST_LOG" ]; then
-  cp "$GRADLE_UI_TEST_LOG" "$FINAL_ARTIFACT_DIR/ui-test-gradle.log"
-  ba_log "Gradle UI test log saved to $FINAL_ARTIFACT_DIR/ui-test-gradle.log"
-fi
-
-if [ "$TEST_EXIT_CODE" -eq 124 ]; then
-  ba_log "Instrumentation tests exceeded ${UI_TEST_TIMEOUT_SECONDS}s timeout and were terminated"
-elif [ "$TEST_EXIT_CODE" -ne 0 ]; then
-  ba_log "Instrumentation tests exited with status $TEST_EXIT_CODE"
+if [ "$INSTRUMENT_EXIT_CODE" -ne 0 ]; then
+  ba_log "Instrumentation command exited with status $INSTRUMENT_EXIT_CODE"
+  dump_emulator_diagnostics
 fi
 
 copy_device_file() {
@@ -875,15 +926,6 @@ if [ -f "$EMULATOR_LOG" ]; then
   cp "$EMULATOR_LOG" "$FINAL_ARTIFACT_DIR/emulator.log" || true
 fi
 
-TEST_RESULT_DIR="$APP_MODULE_DIR/build/outputs/androidTest-results/connected"
-if [ -d "$TEST_RESULT_DIR" ]; then
-  RESULT_DEST="$FINAL_ARTIFACT_DIR/androidTest-results"
-  rm -rf "$RESULT_DEST"
-  mkdir -p "$RESULT_DEST"
-  cp -R "$TEST_RESULT_DIR/." "$RESULT_DEST/"
-  ba_log "Android test results copied to $RESULT_DEST"
-fi
-
 if [ -n "${GITHUB_ENV:-}" ]; then
   if [ -n "$DEFAULT_SCREENSHOT" ]; then
     printf 'CN1_UI_TEST_SCREENSHOT=%s\n' "$DEFAULT_SCREENSHOT" >> "$GITHUB_ENV"
@@ -896,22 +938,13 @@ if [ -n "${GITHUB_ENV:-}" ]; then
   fi
 fi
 
-if [ "$TEST_EXIT_CODE" -eq 0 ]; then
-  (
-    cd "$GRADLE_PROJECT_DIR"
-    ./gradlew --no-daemon assembleDebug
-  )
-else
-  ba_log "Instrumentation tests failed (exit code $TEST_EXIT_CODE); skipping assembleDebug"
-fi
-
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
 stop_emulator
 trap - EXIT
 
-if [ "$TEST_EXIT_CODE" -ne 0 ]; then
-  exit "$TEST_EXIT_CODE"
+if [ "$INSTRUMENT_EXIT_CODE" -ne 0 ]; then
+  exit "$INSTRUMENT_EXIT_CODE"
 fi
 
 if [ "$SCREENSHOT_STATUS" -ne 0 ]; then
