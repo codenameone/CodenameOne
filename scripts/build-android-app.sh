@@ -629,6 +629,35 @@ fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android \
   | sed 's/^/[build-android-app] pm path android: /' || true
+INSTRUMENTATION_LIST="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation 2>/dev/null || true)"
+if [ -n "$INSTRUMENTATION_LIST" ]; then
+  printf '%s\n' "$INSTRUMENTATION_LIST" | sed 's/^/[build-android-app] instrumentation: /'
+else
+  ba_log "No instrumentation targets reported on $EMULATOR_SERIAL before installation"
+fi
+
+PACKAGE_REGEX="${PACKAGE_NAME//./\\.}"
+PACKAGE_LIST="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages 2>/dev/null || true)"
+if [ -n "$PACKAGE_LIST" ]; then
+  PACKAGE_MATCHES="$(printf '%s\n' "$PACKAGE_LIST" | grep -E "${PACKAGE_REGEX}|${PACKAGE_REGEX}\\.test" || true)"
+  if [ -n "$PACKAGE_MATCHES" ]; then
+    printf '%s\n' "$PACKAGE_MATCHES" | sed 's/^/[build-android-app] package: /'
+  else
+    ba_log "Packages matching $PACKAGE_NAME not yet installed on $EMULATOR_SERIAL"
+  fi
+else
+  ba_log "Package manager returned no packages on $EMULATOR_SERIAL"
+fi
+
+INSTRUMENTATION_TARGET="$(printf '%s\n' "$INSTRUMENTATION_LIST" | awk -F' ' '/instrumentation/{print $2}' | head -n1)"
+if [ -n "$INSTRUMENTATION_TARGET" ]; then
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am instrument -w -r \
+    -e log true \
+    "$INSTRUMENTATION_TARGET" \
+    2>&1 | sed 's/^/[build-android-app] am instrument: /'
+else
+  ba_log "Skipping am instrument dry run; no instrumentation target detected on $EMULATOR_SERIAL"
+fi
 
 UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
@@ -636,7 +665,12 @@ if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS
   UI_TEST_TIMEOUT_SECONDS=900
 fi
 
-GRADLE_TEST_CMD=("./gradlew" "--no-daemon" "connectedDebugAndroidTest")
+GRADLE_TEST_CMD=(
+  "./gradlew"
+  "--no-daemon"
+  "-Pandroid.testInstrumentationRunnerArguments=class=${PACKAGE_NAME}.${MAIN_NAME}UiTest"
+  "connectedDebugAndroidTest"
+)
 if command -v timeout >/dev/null 2>&1; then
   ba_log "Running instrumentation UI tests with external timeout of ${UI_TEST_TIMEOUT_SECONDS}s"
   GRADLE_TEST_CMD=("timeout" "$UI_TEST_TIMEOUT_SECONDS" "${GRADLE_TEST_CMD[@]}")
