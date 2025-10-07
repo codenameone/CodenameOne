@@ -461,35 +461,40 @@ wait_for_emulator() {
 
 wait_for_package_service() {
   local serial="$1"
-  local configured_timeout="${PACKAGE_SERVICE_TIMEOUT_SECONDS:-${PACKAGE_SERVICE_TIMEOUT:-600}}"
-  local timeout="$configured_timeout"
+  local timeout="${PACKAGE_SERVICE_TIMEOUT_SECONDS:-${PACKAGE_SERVICE_TIMEOUT:-600}}"
+  local per_try="${PACKAGE_SERVICE_PER_TRY_TIMEOUT_SECONDS:-${PACKAGE_SERVICE_PER_TRY_TIMEOUT:-5}}"
   if ! [[ "$timeout" =~ ^[0-9]+$ ]] || [ "$timeout" -le 0 ]; then
     timeout=600
   fi
-  local poll_interval=5
+  if ! [[ "$per_try" =~ ^[0-9]+$ ]] || [ "$per_try" -le 0 ]; then
+    per_try=5
+  fi
+
   local deadline=$((SECONDS + timeout))
   local last_log=$SECONDS
+
   while [ $SECONDS -lt $deadline ]; do
-    local boot_ok
+    local boot_ok ce_ok
     boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
-    local ce_ok
     ce_ok="$($ADB_BIN -s "$serial" shell getprop sys.user.0.ce_available 2>/dev/null | tr -d '\r')"
     if [ "$boot_ok" = "1" ] && [ "$ce_ok" = "1" ]; then
-      local android_id
-      android_id="$($ADB_BIN -s "$serial" shell settings get secure android_id 2>/dev/null | tr -d '\r')"
-      if [ -n "$android_id" ] && [ "$android_id" != "null" ]; then
-        if "$ADB_BIN" -s "$serial" shell cmd package path android >/dev/null 2>&1 \
-          || "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1; then
+      if timeout "$per_try" "$ADB_BIN" -s "$serial" shell settings get secure android_id >/dev/null 2>&1; then
+        if timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package path android >/dev/null 2>&1 \
+          || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
+          || timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package list packages >/dev/null 2>&1 \
+          || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1; then
           return 0
         fi
       fi
     fi
-    if [ $((SECONDS - last_log)) -ge 15 ]; then
-      ba_log "Waiting for package manager service on $serial (boot_ok=${boot_ok:-<unset>} ce_ok=${ce_ok:-<unset>})"
+
+    if [ $((SECONDS - last_log)) -ge 10 ]; then
+      ba_log "Waiting for package manager service on $serial (boot_ok=${boot_ok:-?} ce_ok=${ce_ok:-?})"
       last_log=$SECONDS
     fi
-    sleep "$poll_interval"
+    sleep 2
   done
+
   ba_log "Package manager service not ready on $serial after ${timeout}s" >&2
   return 1
 }
@@ -550,9 +555,8 @@ EMULATOR_SERIAL="emulator-$EMULATOR_PORT"
 EMULATOR_LOG="$GRADLE_PROJECT_DIR/emulator.log"
 ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
 ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" \
-  -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off \
-  -camera-back none -camera-front none -no-snapshot-load -no-snapshot-save -skip-adb-auth \
-  -no-accel -netfast >"$EMULATOR_LOG" 2>&1 &
+  -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -accel off \
+  -camera-back none -camera-front none -skip-adb-auth -no-accel -netfast -memory 2048 >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
@@ -607,12 +611,20 @@ if ! wait_for_emulator "$EMULATOR_SERIAL"; then
   exit 1
 fi
 
-sleep 20
-ba_log "Waiting briefly for emulator system services to stabilize"
+POST_BOOT_GRACE="${EMULATOR_POST_BOOT_GRACE_SECONDS:-20}"
+if ! [[ "$POST_BOOT_GRACE" =~ ^[0-9]+$ ]] || [ "$POST_BOOT_GRACE" -lt 0 ]; then
+  POST_BOOT_GRACE=20
+fi
+if [ "$POST_BOOT_GRACE" -gt 0 ]; then
+  ba_log "Waiting ${POST_BOOT_GRACE}s for emulator system services to stabilize"
+  sleep "$POST_BOOT_GRACE"
+fi
 
 if ! wait_for_package_service "$EMULATOR_SERIAL"; then
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop | sed 's/^/[build-android-app] getprop: /' || true
-  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 | tail -n 200 | sed 's/^/[build-android-app] logcat: /' || true
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 \
+    | grep -v -E 'com\.android\.bluetooth|BtGd|bluetooth' \
+    | tail -n 200 | sed 's/^/[build-android-app] logcat: /' || true
   stop_emulator
   exit 1
 fi
