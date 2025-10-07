@@ -477,15 +477,13 @@ wait_for_package_service() {
     local boot_ok ce_ok
     boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
     ce_ok="$($ADB_BIN -s "$serial" shell getprop sys.user.0.ce_available 2>/dev/null | tr -d '\r')"
-    if [ "$boot_ok" = "1" ] && [ "$ce_ok" = "1" ]; then
-      if timeout "$per_try" "$ADB_BIN" -s "$serial" shell settings get secure android_id >/dev/null 2>&1; then
-        if timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package path android >/dev/null 2>&1 \
-          || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
-          || timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package list packages >/dev/null 2>&1 \
-          || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1; then
-          return 0
-        fi
-      fi
+
+    if timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package path android >/dev/null 2>&1 \
+      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
+      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package list packages >/dev/null 2>&1 \
+      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1 \
+      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell dumpsys package >/dev/null 2>&1; then
+      return 0
     fi
 
     if [ $((SECONDS - last_log)) -ge 10 ]; then
@@ -628,6 +626,9 @@ if ! wait_for_package_service "$EMULATOR_SERIAL"; then
   stop_emulator
   exit 1
 fi
+
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android \
+  | sed 's/^/[build-android-app] pm path android: /' || true
 
 UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
