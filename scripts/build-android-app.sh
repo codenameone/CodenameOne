@@ -497,6 +497,106 @@ wait_for_package_service() {
   return 1
 }
 
+wait_for_api_level() {
+  local serial="$1"
+  local timeout="${API_LEVEL_TIMEOUT_SECONDS:-600}"
+  local per_try="${API_LEVEL_PER_TRY_TIMEOUT_SECONDS:-5}"
+  if ! [[ "$timeout" =~ ^[0-9]+$ ]] || [ "$timeout" -le 0 ]; then
+    timeout=600
+  fi
+  if ! [[ "$per_try" =~ ^[0-9]+$ ]] || [ "$per_try" -le 0 ]; then
+    per_try=5
+  fi
+
+  local deadline=$((SECONDS + timeout))
+  local last_log=$SECONDS
+  local sdk=""
+
+  while [ $SECONDS -lt $deadline ]; do
+    if sdk="$(timeout "$per_try" "$ADB_BIN" -s "$serial" shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' | tr -d '\n')"; then
+      if [[ "$sdk" =~ ^[0-9]+$ ]]; then
+        ba_log "Device API level is $sdk"
+        return 0
+      fi
+    fi
+    if [ $((SECONDS - last_log)) -ge 10 ]; then
+      ba_log "Waiting for ro.build.version.sdk on $serial"
+      last_log=$SECONDS
+    fi
+    sleep 2
+  done
+
+  ba_log "ro.build.version.sdk not available after ${timeout}s" >&2
+  return 1
+}
+
+dump_emulator_diagnostics() {
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop | sed 's/^/[build-android-app] getprop: /' || true
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 \
+    | grep -v -E 'com\\.android\\.bluetooth|BtGd|bluetooth' \
+    | tail -n 200 | sed 's/^/[build-android-app] logcat: /' || true
+}
+
+log_instrumentation_state() {
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android \
+    | sed 's/^/[build-android-app] pm path android: /' || true
+
+  local instrumentation_list
+  instrumentation_list="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation 2>/dev/null || true)"
+  if [ -n "$instrumentation_list" ]; then
+    printf '%s\n' "$instrumentation_list" | sed 's/^/[build-android-app] instrumentation: /'
+  else
+    ba_log "No instrumentation targets reported on $EMULATOR_SERIAL before installation"
+  fi
+
+  local have_test_apk=0
+  if "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "${PACKAGE_NAME}.test" >/dev/null 2>&1; then
+    have_test_apk=1
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "${PACKAGE_NAME}.test" \
+      | sed 's/^/[build-android-app] test-apk: /'
+  else
+    ba_log "Test APK for ${PACKAGE_NAME}.test not yet installed on $EMULATOR_SERIAL"
+  fi
+
+  local package_regex package_list package_matches
+  package_regex="${PACKAGE_NAME//./\.}"
+  package_list="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages 2>/dev/null || true)"
+  if [ -n "$package_list" ]; then
+    package_matches="$(printf '%s\n' "$package_list" | grep -E "${package_regex}|${package_regex}\.test" || true)"
+    if [ -n "$package_matches" ]; then
+      printf '%s\n' "$package_matches" | sed 's/^/[build-android-app] package: /'
+    else
+      ba_log "Packages matching $PACKAGE_NAME not yet installed on $EMULATOR_SERIAL"
+    fi
+  else
+    ba_log "Package manager returned no packages on $EMULATOR_SERIAL"
+  fi
+
+  local instrumentation_target instrumentation_line
+  instrumentation_target=""
+  if [ -n "$instrumentation_list" ]; then
+    instrumentation_line="$(printf '%s\n' "$instrumentation_list" | awk -v pkg='${PACKAGE_NAME}.test' '$0 ~ pkg {print; exit}')"
+    if [ -n "$instrumentation_line" ]; then
+      instrumentation_target="${instrumentation_line#instrumentation:}"
+      instrumentation_target="${instrumentation_target%% *}"
+    else
+      instrumentation_target="$(printf '%s\n' "$instrumentation_list" | awk -F' ' '/^instrumentation:/{print $1}' | head -n1)"
+      instrumentation_target="${instrumentation_target#instrumentation:}"
+    fi
+  fi
+
+  if [ -n "$instrumentation_target" ] && [ "$have_test_apk" -eq 1 ]; then
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am instrument -w -r \
+      -e log true \
+      "$instrumentation_target" \
+      2>&1 | sed 's/^/[build-android-app] am instrument: /'
+  elif [ -n "$instrumentation_target" ]; then
+    ba_log "Instrumentation target $instrumentation_target available but test APK missing; skipping am instrument dry run"
+  else
+    ba_log "Skipping am instrument dry run; no instrumentation target detected on $EMULATOR_SERIAL"
+  fi
+}
+
 stop_emulator() {
   if [ -n "${EMULATOR_SERIAL:-}" ]; then
     "$ADB_BIN" -s "$EMULATOR_SERIAL" emu kill >/dev/null 2>&1 || true
@@ -619,45 +719,67 @@ if [ "$POST_BOOT_GRACE" -gt 0 ]; then
 fi
 
 if ! wait_for_package_service "$EMULATOR_SERIAL"; then
-  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop | sed 's/^/[build-android-app] getprop: /' || true
-  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 \
-    | grep -v -E 'com\.android\.bluetooth|BtGd|bluetooth' \
-    | tail -n 200 | sed 's/^/[build-android-app] logcat: /' || true
+  dump_emulator_diagnostics
   stop_emulator
   exit 1
 fi
 
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android \
-  | sed 's/^/[build-android-app] pm path android: /' || true
-INSTRUMENTATION_LIST="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation 2>/dev/null || true)"
-if [ -n "$INSTRUMENTATION_LIST" ]; then
-  printf '%s\n' "$INSTRUMENTATION_LIST" | sed 's/^/[build-android-app] instrumentation: /'
-else
-  ba_log "No instrumentation targets reported on $EMULATOR_SERIAL before installation"
+if ! wait_for_api_level "$EMULATOR_SERIAL"; then
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
 fi
 
-PACKAGE_REGEX="${PACKAGE_NAME//./\\.}"
-PACKAGE_LIST="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages 2>/dev/null || true)"
-if [ -n "$PACKAGE_LIST" ]; then
-  PACKAGE_MATCHES="$(printf '%s\n' "$PACKAGE_LIST" | grep -E "${PACKAGE_REGEX}|${PACKAGE_REGEX}\\.test" || true)"
-  if [ -n "$PACKAGE_MATCHES" ]; then
-    printf '%s\n' "$PACKAGE_MATCHES" | sed 's/^/[build-android-app] package: /'
-  else
-    ba_log "Packages matching $PACKAGE_NAME not yet installed on $EMULATOR_SERIAL"
-  fi
-else
-  ba_log "Package manager returned no packages on $EMULATOR_SERIAL"
+"$ADB_BIN" kill-server >/dev/null 2>&1 || true
+"$ADB_BIN" start-server >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" wait-for-device
+export ANDROID_SERIAL="$EMULATOR_SERIAL"
+
+INSTALL_TIMEOUT_SECONDS="${INSTALL_TIMEOUT_SECONDS:-600}"
+if ! [[ "$INSTALL_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$INSTALL_TIMEOUT_SECONDS" -le 0 ]; then
+  INSTALL_TIMEOUT_SECONDS=600
 fi
 
-INSTRUMENTATION_TARGET="$(printf '%s\n' "$INSTRUMENTATION_LIST" | awk -F' ' '/instrumentation/{print $2}' | head -n1)"
-if [ -n "$INSTRUMENTATION_TARGET" ]; then
-  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am instrument -w -r \
-    -e log true \
-    "$INSTRUMENTATION_TARGET" \
-    2>&1 | sed 's/^/[build-android-app] am instrument: /'
+INSTALL_CMD=(
+  "./gradlew"
+  "--no-daemon"
+  "installDebug"
+  "installDebugAndroidTest"
+)
+if command -v timeout >/dev/null 2>&1; then
+  ba_log "Installing app and androidTest APKs with external timeout of ${INSTALL_TIMEOUT_SECONDS}s"
+  INSTALL_CMD=("timeout" "$INSTALL_TIMEOUT_SECONDS" "${INSTALL_CMD[@]}")
 else
-  ba_log "Skipping am instrument dry run; no instrumentation target detected on $EMULATOR_SERIAL"
+  ba_log "timeout command not found; running install tasks without external watchdog"
 fi
+
+GRADLE_INSTALL_LOG="$GRADLE_PROJECT_DIR/gradle-ui-install.log"
+set +e
+(
+  cd "$GRADLE_PROJECT_DIR"
+  "${INSTALL_CMD[@]}" | tee "$GRADLE_INSTALL_LOG"
+  exit "${PIPESTATUS[0]}"
+)
+INSTALL_EXIT_CODE=$?
+set -e
+
+if [ -f "$GRADLE_INSTALL_LOG" ]; then
+  cp "$GRADLE_INSTALL_LOG" "$FINAL_ARTIFACT_DIR/ui-test-install.log"
+  ba_log "Gradle install log saved to $FINAL_ARTIFACT_DIR/ui-test-install.log"
+fi
+
+if [ "$INSTALL_EXIT_CODE" -ne 0 ]; then
+  ba_log "Gradle install tasks exited with status $INSTALL_EXIT_CODE"
+  stop_emulator
+  exit 1
+fi
+
+log_instrumentation_state
+
+"$ADB_BIN" kill-server >/dev/null 2>&1 || true
+"$ADB_BIN" start-server >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" wait-for-device
+export ANDROID_SERIAL="$EMULATOR_SERIAL"
 
 UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
