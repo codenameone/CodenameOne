@@ -818,25 +818,21 @@ log_instrumentation_state
 
 RUNNER="$(
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation \
-    | awk -v pkg="${PACKAGE_NAME}" '$1=="instrumentation:" && $0 ~ ("target=" pkg) {print $2; exit}'
+    | tr -d '\r' \
+    | grep -F "(target=$PACKAGE_NAME)" \
+    | head -n1 \
+    | sed -E 's/^instrumentation:([^ ]+).*/\1/'
 )"
 if [ -z "$RUNNER" ]; then
-  RUNNER="$(
-    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation \
-      | awk '$1=="instrumentation:" {print $2; exit}'
-  )"
-fi
-RUNNER="${RUNNER//$'\r'/}"
-RUNNER="${RUNNER//$'\n'/}"
-
-if [ -z "$RUNNER" ]; then
   ba_log "No instrumentation runner found for $PACKAGE_NAME"
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation | sed 's/^/[build-android-app] instrumentation: /'
   dump_emulator_diagnostics
   stop_emulator
   exit 1
 fi
+ba_log "Using instrumentation runner: $RUNNER"
 
-UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
+UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}" 
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
   ba_log "Invalid UI_TEST_TIMEOUT_SECONDS=$UI_TEST_TIMEOUT_SECONDS provided; falling back to 900"
   UI_TEST_TIMEOUT_SECONDS=900
@@ -846,14 +842,11 @@ INSTRUMENT_ARGS=(
   "-w"
   "-r"
   "-e"
-  "log"
-  "true"
-  "-e"
   "clearPackageData"
   "true"
   "-e"
-  "class"
-  "${PACKAGE_NAME}.${MAIN_NAME}UiTest"
+  "log"
+  "true"
 )
 INSTRUMENT_CMD=("$ADB_BIN" "-s" "$EMULATOR_SERIAL" "shell" "am" "instrument" "${INSTRUMENT_ARGS[@]}" "$RUNNER")
 if command -v timeout >/dev/null 2>&1; then
