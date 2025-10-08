@@ -1067,7 +1067,7 @@ APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{pr
 NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')"
 
 if [ -f "$APP_BUILD_GRADLE" ]; then
-  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
+  if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ]; then
     ba_log "Patching applicationId -> $PACKAGE_NAME"
     awk -v appid="$PACKAGE_NAME" '
       BEGIN{inDc=0;had=0}
@@ -1097,16 +1097,16 @@ if [ -f "$APP_BUILD_GRADLE" ]; then
 fi
 
 FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
-STUB_BASENAME="${MAIN_NAME}Stub"
 remove_stub_declaration() {
   local manifest_path="$1"
   [ -f "$manifest_path" ] || return 0
-  local tmp
+  local tmp escaped
   tmp=$(mktemp)
-  perl -0777 -pe "s{<activity\\b[^>]*android:name=\\\"[^\\\"]*${STUB_BASENAME}\\\"[^>]*/>\\s*}{}g; s{<activity\\b[^>]*android:name=\\\"[^\\\"]*${STUB_BASENAME}\\\"[^>]*>.*?<\/activity>\\s*}{}gs" "$manifest_path" >"$tmp"
+  escaped=$(printf '%s' "$FQCN" | sed 's/[\\&/]/\\&/g')
+  perl -0777 -pe "s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*/>\\s*}{}g; s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*>.*?<\\/activity>\\s*}{}gs" "$manifest_path" >"$tmp"
   if ! cmp -s "$manifest_path" "$tmp"; then
     mv "$tmp" "$manifest_path"
-    ba_log "Removed existing ${STUB_BASENAME} declarations from $manifest_path"
+    ba_log "Removed existing ${FQCN} declarations from $manifest_path"
   else
     rm -f "$tmp"
   fi
@@ -1122,20 +1122,16 @@ MAIN_MANIFEST="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
 if [ ! -f "$MAIN_MANIFEST" ]; then
   mkdir -p "$(dirname "$MAIN_MANIFEST")"
   cat >"$MAIN_MANIFEST" <<EOF
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="$PACKAGE_NAME">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application/>
 </manifest>
 EOF
   ba_log "Created $MAIN_MANIFEST"
 fi
 
-if grep -q '<manifest[^>]*package=' "$MAIN_MANIFEST"; then
-  sed -i "0,/<manifest[^>]*package=/ s/package=\"[^\"]*\"/package=\"$PACKAGE_NAME\"/" "$MAIN_MANIFEST"
-else
-  sed -i "0,/<manifest/ s#<manifest#<manifest package=\"$PACKAGE_NAME\"#" "$MAIN_MANIFEST"
-fi
-
 grep -q '<application' "$MAIN_MANIFEST" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MAIN_MANIFEST"
+
+perl -0777 -pe 's/\s+package="[^"]*"//; s#<uses-sdk\b[^>]*/>\s*##g' -i "$MAIN_MANIFEST"
 
 # Ensure no stale stub declarations remain before inserting the canonical entry.
 remove_stub_declaration "$MAIN_MANIFEST"
@@ -1149,6 +1145,7 @@ awk -v fqcn="$FQCN" '
   {print}
 ' "$MAIN_MANIFEST" >"$MAIN_MANIFEST.tmp"
 mv "$MAIN_MANIFEST.tmp" "$MAIN_MANIFEST"
+
 ba_log "Canonicalized stub activity declaration in $MAIN_MANIFEST"
 
 ba_log "Validating manifest merge after stub declaration"
