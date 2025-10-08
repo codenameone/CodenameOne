@@ -755,6 +755,25 @@ dump_emulator_diagnostics() {
     | tail -n 200 | sed 's/^/[build-android-app] logcat: /' || true
 }
 
+dump_manifest_merger_reports() {
+  local blame_a blame_b merged
+  blame_a="$APP_MODULE_DIR/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt"
+  blame_b="$APP_MODULE_DIR/build/intermediates/incremental/processDebugMainManifest/manifest-merger-blame-report.txt"
+  merged="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
+
+  for report in "$blame_a" "$blame_b"; do
+    if [ -f "$report" ]; then
+      ba_log "manifest-merger blame report: $report"
+      sed -n '1,200p' "$report" | sed 's/^/[build-android-app] manifest-blame: /'
+    fi
+  done
+
+  if [ -f "$merged" ]; then
+    ba_log "merged manifest (first 120 lines): $merged"
+    sed -n '1,120p' "$merged" | sed 's/^/[build-android-app] merged-manifest: /'
+  fi
+}
+
 log_instrumentation_state() {
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android | sed 's/^/[build-android-app] pm path android: /' || true
 
@@ -1014,6 +1033,7 @@ fi
 
 if [ "$ASSEMBLE_EXIT_CODE" -ne 0 ]; then
   ba_log "Gradle assemble tasks exited with status $ASSEMBLE_EXIT_CODE"
+  dump_manifest_merger_reports
   stop_emulator
   exit 1
 fi
@@ -1076,33 +1096,56 @@ if [ -f "$APP_BUILD_GRADLE" ]; then
   fi
 fi
 
-SRC_SETS=(main debug release)
 FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
+SRC_SETS=(main debug release)
 for SS in "${SRC_SETS[@]}"; do
   MANIFEST_PATH="$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
-  if [ ! -f "$MANIFEST_PATH" ]; then
-    mkdir -p "$(dirname "$MANIFEST_PATH")"
-    cat >"$MANIFEST_PATH" <<EOF
+  [ -f "$MANIFEST_PATH" ] || continue
+  if grep -q "android:name=\"$FQCN\"" "$MANIFEST_PATH"; then
+    sed -i "/<activity[^>]*android:name=\"$FQCN\"/d" "$MANIFEST_PATH"
+    ba_log "Removed existing $FQCN declaration from $MANIFEST_PATH"
+  fi
+done
+
+MAIN_MANIFEST="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
+if [ ! -f "$MAIN_MANIFEST" ]; then
+  mkdir -p "$(dirname "$MAIN_MANIFEST")"
+  cat >"$MAIN_MANIFEST" <<EOF
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="$PACKAGE_NAME">
   <application/>
 </manifest>
 EOF
-    ba_log "Created $MANIFEST_PATH"
-  fi
+  ba_log "Created $MAIN_MANIFEST"
+fi
 
-  grep -q '<application' "$MANIFEST_PATH" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MANIFEST_PATH"
+if grep -q '<manifest[^>]*package=' "$MAIN_MANIFEST"; then
+  sed -i "0,/<manifest[^>]*package=/ s/package=\"[^\"]*\"/package=\"$PACKAGE_NAME\"/" "$MAIN_MANIFEST"
+else
+  sed -i "0,/<manifest/ s#<manifest#<manifest package=\"$PACKAGE_NAME\"#" "$MAIN_MANIFEST"
+fi
 
-  if grep -q '<manifest[^>]*package=' "$MANIFEST_PATH"; then
-    sed -i '0,/<manifest[^>]*package=/ s/package="[^"]*"/package="$PACKAGE_NAME"/' "$MANIFEST_PATH"
-  else
-    sed -i '0,/<manifest/ s#<manifest#<manifest package="$PACKAGE_NAME"#' "$MANIFEST_PATH"
-  fi
+grep -q '<application' "$MAIN_MANIFEST" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MAIN_MANIFEST"
 
-  if ! grep -q "android:name=\"$FQCN\"" "$MANIFEST_PATH"; then
-    sed -i "/<\/application>/i \n    <activity android:name="$FQCN" android:exported="false" />" "$MANIFEST_PATH"
-    ba_log "Declared $FQCN in $MANIFEST_PATH"
-  fi
-done
+if ! grep -q "android:name=\"$FQCN\"" "$MAIN_MANIFEST"; then
+  sed -i "/<\/application>/i \
+    <activity android:name=\"$FQCN\" android:exported=\"false\" />" "$MAIN_MANIFEST"
+  ba_log "Declared $FQCN in $MAIN_MANIFEST"
+fi
+
+ba_log "Validating manifest merge after stub declaration"
+set +e
+(
+  cd "$GRADLE_PROJECT_DIR"
+  ./gradlew --no-daemon :app:processDebugMainManifest
+)
+PROCESS_EXIT=$?
+set -e
+if [ "$PROCESS_EXIT" -ne 0 ]; then
+  ba_log ":app:processDebugMainManifest failed after manifest updates"
+  dump_manifest_merger_reports
+  stop_emulator
+  exit 1
+fi
 
 ba_log "Rebuilding :app after identifier and manifest patches"
 set +e
@@ -1114,14 +1157,15 @@ PATCH_EXIT=$?
 set -e
 if [ "$PATCH_EXIT" -ne 0 ]; then
   ba_log "Gradle assemble failed after identifier patching"
+  dump_manifest_merger_reports
   stop_emulator
   exit 1
 fi
 
 MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
 if [ -f "$MERGED_MANIFEST" ]; then
-  if grep -q "android:name=\"${FQCN//./\.}\"" "$MERGED_MANIFEST"; then
-    grep -n "${FQCN//./\.}" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /'
+  if grep -Fq "android:name=\"$FQCN\"" "$MERGED_MANIFEST"; then
+    grep -Fn "android:name=\"$FQCN\"" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /'
   else
     ba_log "ERROR: merged manifest missing $FQCN"
     sed -n '1,160p' "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged: /'
