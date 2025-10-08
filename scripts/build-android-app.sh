@@ -337,8 +337,8 @@ tree = ET.parse(manifest_path)
 root = tree.getroot()
 changed = False
 
-# Ensure manifest declares the package attribute for clarity
-if 'package' not in root.attrib:
+# Ensure manifest package aligns with the Codename One package
+if root.get('package') != package_name:
     root.set('package', package_name)
     changed = True
 
@@ -377,7 +377,9 @@ if ! ensure_manifest_stub; then
   exit 1
 fi
 
-if ! grep -Eq "android:name=\"${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub\"" "$MANIFEST_FILE"; then
+FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
+
+if ! grep -Eq "android:name=\"${PACKAGE_NAME//./\\.}\\.${MAIN_NAME}Stub\"" "$MANIFEST_FILE"; then
   ba_log "Manifest does not declare ${MAIN_NAME}Stub activity" >&2
   exit 1
 fi
@@ -486,8 +488,52 @@ if APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties
   printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | \
     sed 's/^/[build-android-app] props: /'
   APP_ID=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')
+  NS_VALUE=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')
+  PROPS_MODIFIED=0
+  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
+    ba_log "Patching applicationId -> $PACKAGE_NAME"
+    awk -v appid="$PACKAGE_NAME" '
+      BEGIN{inDc=0;done=0}
+      /^\s*defaultConfig\s*\{/ {inDc=1}
+      inDc && /^\s*applicationId\s+/ {print "        applicationId \""appid"\""; done=1; next}
+      inDc && /^\s*}/ {
+        if(!done){print "        applicationId \""appid"\""; done=1}
+        inDc=0
+      }
+      {print}
+    ' "$APP_BUILD_GRADLE" > "$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
+    PROPS_MODIFIED=1
+  fi
+  if [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+    ba_log "Patching namespace -> $PACKAGE_NAME"
+    awk -v ns="$PACKAGE_NAME" '
+      BEGIN{inAndroid=0;done=0}
+      /^android\s*\{/ {inAndroid=1}
+      inAndroid && /^\s*namespace\s+/ {print "    namespace \""ns"\""; done=1; next}
+      inAndroid && /^\s*}/ {
+        if(inAndroid && !done){print "    namespace \""ns"\""; done=1}
+        inAndroid=0
+      }
+      {print}
+    ' "$APP_BUILD_GRADLE" > "$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
+    PROPS_MODIFIED=1
+  fi
+  if [ "$PROPS_MODIFIED" -eq 1 ]; then
+    if APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null); then
+      printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | \
+        sed 's/^/[build-android-app] props (post-patch): /'
+    else
+      ba_log "Warning: unable to re-query :app:properties after patch" >&2
+    fi
+  fi
+  APP_ID=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')
+  NS_VALUE=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')
   if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
     ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
+    exit 1
+  fi
+  if [ -n "$NS_VALUE" ] && [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+    ba_log "ERROR: namespace=$NS_VALUE does not match Codename One package $PACKAGE_NAME" >&2
     exit 1
   fi
 else
@@ -1126,7 +1172,7 @@ LAUNCH_RESOLVE_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package reso
 if [ -n "$LAUNCH_RESOLVE_OUTPUT" ]; then
   printf '%s\n' "$LAUNCH_RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve-launch: /'
 fi
-STUB_ACTIVITY_FQCN="$PACKAGE_NAME/$PACKAGE_NAME.${MAIN_NAME}Stub"
+STUB_ACTIVITY_FQCN="$PACKAGE_NAME/$FQCN"
 STUB_RESOLVE_OUTPUT="$(
     "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$STUB_ACTIVITY_FQCN" 2>&1 || true
   )"
