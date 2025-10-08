@@ -313,8 +313,8 @@ fi
 MANIFEST_FILE="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
 if [ ! -f "$MANIFEST_FILE" ]; then
   mkdir -p "$(dirname "$MANIFEST_FILE")"
-  cat >"$MANIFEST_FILE" <<'EOF'
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  cat >"$MANIFEST_FILE" <<EOF
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="$PACKAGE_NAME">
     <application/>
 </manifest>
 EOF
@@ -322,13 +322,14 @@ EOF
 fi
 
 ensure_manifest_stub() {
-  python3 - "$MANIFEST_FILE" "$MAIN_NAME" <<'PY'
+  python3 - "$MANIFEST_FILE" "$MAIN_NAME" "$PACKAGE_NAME" <<'PY'
 import sys
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
 manifest_path = Path(sys.argv[1])
 main_name = sys.argv[2]
+package_name = sys.argv[3]
 ns_android = "http://schemas.android.com/apk/res/android"
 
 ET.register_namespace('android', ns_android)
@@ -336,22 +337,32 @@ tree = ET.parse(manifest_path)
 root = tree.getroot()
 changed = False
 
+# Ensure manifest declares the package attribute for clarity
+if 'package' not in root.attrib:
+    root.set('package', package_name)
+    changed = True
+
 app = root.find('application')
 if app is None:
     app = ET.SubElement(root, 'application')
     changed = True
 
-target = f".{main_name}Stub"
+target_fqcn = f"{package_name}.{main_name}Stub"
+target_relative = f".{main_name}Stub"
 android_name = f"{{{ns_android}}}name"
 android_exported = f"{{{ns_android}}}exported"
 
 for activity in app.findall('activity'):
     name = activity.get(android_name)
-    if name in (target, target.lstrip('.')):
+    if name == target_relative:
+        activity.set(android_name, target_fqcn)
+        changed = True
+        break
+    if name == target_fqcn:
         break
 else:
     activity = ET.Element('activity')
-    activity.set(android_name, target)
+    activity.set(android_name, target_fqcn)
     activity.set(android_exported, 'false')
     app.append(activity)
     changed = True
@@ -366,7 +377,7 @@ if ! ensure_manifest_stub; then
   exit 1
 fi
 
-if ! grep -Eq "android:name=\"(\.${MAIN_NAME}Stub|${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub)\"" "$MANIFEST_FILE"; then
+if ! grep -Eq "android:name=\"${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub\"" "$MANIFEST_FILE"; then
   ba_log "Manifest does not declare ${MAIN_NAME}Stub activity" >&2
   exit 1
 fi
@@ -385,6 +396,87 @@ fi
 if ! grep -q "android[[:space:]]*{" "$APP_BUILD_GRADLE"; then
   ba_log "Gradle build file at $APP_BUILD_GRADLE is missing an android { } block" >&2
   exit 1
+fi
+
+ensure_gradle_package_config() {
+  python3 - "$APP_BUILD_GRADLE" "$PACKAGE_NAME" <<'PY'
+import sys
+from pathlib import Path
+import re
+
+path = Path(sys.argv[1])
+package_name = sys.argv[2]
+text = path.read_text()
+original = text
+messages = []
+
+def ensure_namespace(source: str) -> str:
+    pattern = re.compile(r'\bnamespace\s+["\']([^"\']+)["\']')
+    match = pattern.search(source)
+    if match:
+        if match.group(1) != package_name:
+            start, end = match.span()
+            replacement = f'namespace "{package_name}"'
+            source = source[:start] + replacement + source[end:]
+            messages.append(f"Updated namespace to {package_name}")
+    else:
+        android_match = re.search(r'android\s*\{', source)
+        if not android_match:
+            sys.exit("Unable to locate android block when inserting namespace")
+        insert = android_match.end()
+        insertion = f"\n    namespace \"{package_name}\""
+        source = source[:insert] + insertion + source[insert:]
+        messages.append(f"Inserted namespace {package_name}")
+    return source
+
+def ensure_application_id(source: str) -> str:
+    pattern = re.compile(r'\bapplicationId\s+["\']([^"\']+)["\']')
+    match = pattern.search(source)
+    if match:
+        if match.group(1) != package_name:
+            start, end = match.span()
+            indent = source[:start].split('\n')[-1].split('applicationId')[0]
+            replacement = f"{indent}applicationId \"{package_name}\""
+            source = source[:start] + replacement + source[end:]
+            messages.append(f"Updated applicationId to {package_name}")
+        return source
+
+    default_match = re.search(r'defaultConfig\s*\{', source)
+    if default_match:
+        insert = default_match.end()
+        insertion = f"\n        applicationId \"{package_name}\""
+        source = source[:insert] + insertion + source[insert:]
+        messages.append(f"Inserted applicationId {package_name}")
+        return source
+
+    android_match = re.search(r'android\s*\{', source)
+    if not android_match:
+        sys.exit("Unable to locate android block when creating defaultConfig")
+    insert = android_match.end()
+    insertion = ("\n    defaultConfig {\n        applicationId \"{0}\"\n    }\n".format(package_name))
+    source = source[:insert] + insertion + source[insert:]
+    messages.append(f"Created defaultConfig with applicationId {package_name}")
+    return source
+
+text = ensure_namespace(text)
+text = ensure_application_id(text)
+
+if text != original:
+    path.write_text(text)
+
+for message in messages:
+    print(message)
+PY
+}
+
+if ! GRADLE_PACKAGE_LOG=$(ensure_gradle_package_config); then
+  ba_log "Failed to align namespace/applicationId with Codename One package" >&2
+  exit 1
+fi
+if [ -n "$GRADLE_PACKAGE_LOG" ]; then
+  while IFS= read -r line; do
+    [ -n "$line" ] && ba_log "$line"
+  done <<<"$GRADLE_PACKAGE_LOG"
 fi
 
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
@@ -953,8 +1045,8 @@ fi
 
 MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
 if [ -f "$MERGED_MANIFEST" ]; then
-  if grep -q "${MAIN_NAME}Stub" "$MERGED_MANIFEST"; then
-    grep -n "${MAIN_NAME}Stub" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /' || true
+  if grep -q "android:name=\"${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub\"" "$MERGED_MANIFEST"; then
+    grep -n "${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /' || true
   else
     ba_log "ERROR: merged manifest missing ${MAIN_NAME}Stub declaration"
     sed -n '1,200p' "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /'
@@ -1034,7 +1126,7 @@ LAUNCH_RESOLVE_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package reso
 if [ -n "$LAUNCH_RESOLVE_OUTPUT" ]; then
   printf '%s\n' "$LAUNCH_RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve-launch: /'
 fi
-STUB_ACTIVITY_FQCN="$PACKAGE_NAME/.${MAIN_NAME}Stub"
+STUB_ACTIVITY_FQCN="$PACKAGE_NAME/$PACKAGE_NAME.${MAIN_NAME}Stub"
 STUB_RESOLVE_OUTPUT="$(
     "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$STUB_ACTIVITY_FQCN" 2>&1 || true
   )"
