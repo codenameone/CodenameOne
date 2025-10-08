@@ -312,8 +312,13 @@ fi
 
 MANIFEST_FILE="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
 if [ ! -f "$MANIFEST_FILE" ]; then
-  ba_log "AndroidManifest.xml not found at $MANIFEST_FILE" >&2
-  exit 1
+  mkdir -p "$(dirname "$MANIFEST_FILE")"
+  cat >"$MANIFEST_FILE" <<'EOF'
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application/>
+</manifest>
+EOF
+  ba_log "Created minimal Android manifest at $MANIFEST_FILE"
 fi
 
 ensure_manifest_stub() {
@@ -329,9 +334,12 @@ ns_android = "http://schemas.android.com/apk/res/android"
 ET.register_namespace('android', ns_android)
 tree = ET.parse(manifest_path)
 root = tree.getroot()
+changed = False
+
 app = root.find('application')
 if app is None:
-    sys.exit("Application element missing in AndroidManifest.xml")
+    app = ET.SubElement(root, 'application')
+    changed = True
 
 target = f".{main_name}Stub"
 android_name = f"{{{ns_android}}}name"
@@ -346,6 +354,9 @@ else:
     activity.set(android_name, target)
     activity.set(android_exported, 'false')
     app.append(activity)
+    changed = True
+
+if changed:
     tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
 PY
 }
@@ -376,6 +387,21 @@ if ! grep -q "android[[:space:]]*{" "$APP_BUILD_GRADLE"; then
   exit 1
 fi
 
+chmod +x "$GRADLE_PROJECT_DIR/gradlew"
+
+ba_log "Inspecting Gradle application identifiers"
+if APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null); then
+  printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | \
+    sed 's/^/[build-android-app] props: /'
+  APP_ID=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')
+  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
+    ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
+    exit 1
+  fi
+else
+  ba_log "Warning: unable to query :app:properties via Gradle" >&2
+fi
+
 GRADLE_UPDATE_OUTPUT="$("$SCRIPT_DIR/update_android_ui_test_gradle.py" "$APP_BUILD_GRADLE")"
 if [ -n "$GRADLE_UPDATE_OUTPUT" ]; then
   while IFS= read -r line; do
@@ -394,7 +420,6 @@ if [ -n "${GITHUB_ENV:-}" ]; then
 fi
 
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
-chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
 export JAVA_HOME="$JAVA17_HOME"
 export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
@@ -928,7 +953,14 @@ fi
 
 MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
 if [ -f "$MERGED_MANIFEST" ]; then
-  grep -n "${MAIN_NAME}Stub" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /' || true
+  if grep -q "${MAIN_NAME}Stub" "$MERGED_MANIFEST"; then
+    grep -n "${MAIN_NAME}Stub" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /' || true
+  else
+    ba_log "ERROR: merged manifest missing ${MAIN_NAME}Stub declaration"
+    sed -n '1,200p' "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /'
+    stop_emulator
+    exit 1
+  fi
 else
   ba_log "Merged manifest not found at $MERGED_MANIFEST"
 fi
@@ -1010,6 +1042,12 @@ if [ -n "$STUB_RESOLVE_OUTPUT" ]; then
   printf '%s\n' "$STUB_RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve-stub: /'
 else
   ba_log "Unable to resolve stub activity $STUB_ACTIVITY_FQCN on device"
+fi
+if [[ "$STUB_RESOLVE_OUTPUT" == *"No activity found"* ]] || [ -z "$STUB_RESOLVE_OUTPUT" ]; then
+  ba_log "Stub activity $STUB_ACTIVITY_FQCN is not resolvable on the device"
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
 fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
