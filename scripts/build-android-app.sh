@@ -483,63 +483,6 @@ fi
 
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
-ba_log "Inspecting Gradle application identifiers"
-if APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null); then
-  printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | \
-    sed 's/^/[build-android-app] props: /'
-  APP_ID=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')
-  NS_VALUE=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')
-  PROPS_MODIFIED=0
-  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
-    ba_log "Patching applicationId -> $PACKAGE_NAME"
-    awk -v appid="$PACKAGE_NAME" '
-      BEGIN{inDc=0;done=0}
-      /^\s*defaultConfig\s*\{/ {inDc=1}
-      inDc && /^\s*applicationId\s+/ {print "        applicationId \""appid"\""; done=1; next}
-      inDc && /^\s*}/ {
-        if(!done){print "        applicationId \""appid"\""; done=1}
-        inDc=0
-      }
-      {print}
-    ' "$APP_BUILD_GRADLE" > "$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
-    PROPS_MODIFIED=1
-  fi
-  if [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
-    ba_log "Patching namespace -> $PACKAGE_NAME"
-    awk -v ns="$PACKAGE_NAME" '
-      BEGIN{inAndroid=0;done=0}
-      /^android\s*\{/ {inAndroid=1}
-      inAndroid && /^\s*namespace\s+/ {print "    namespace \""ns"\""; done=1; next}
-      inAndroid && /^\s*}/ {
-        if(inAndroid && !done){print "    namespace \""ns"\""; done=1}
-        inAndroid=0
-      }
-      {print}
-    ' "$APP_BUILD_GRADLE" > "$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
-    PROPS_MODIFIED=1
-  fi
-  if [ "$PROPS_MODIFIED" -eq 1 ]; then
-    if APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null); then
-      printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | \
-        sed 's/^/[build-android-app] props (post-patch): /'
-    else
-      ba_log "Warning: unable to re-query :app:properties after patch" >&2
-    fi
-  fi
-  APP_ID=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')
-  NS_VALUE=$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')
-  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
-    ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
-    exit 1
-  fi
-  if [ -n "$NS_VALUE" ] && [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
-    ba_log "ERROR: namespace=$NS_VALUE does not match Codename One package $PACKAGE_NAME" >&2
-    exit 1
-  fi
-else
-  ba_log "Warning: unable to query :app:properties via Gradle" >&2
-fi
-
 GRADLE_UPDATE_OUTPUT="$("$SCRIPT_DIR/update_android_ui_test_gradle.py" "$APP_BUILD_GRADLE")"
 if [ -n "$GRADLE_UPDATE_OUTPUT" ]; then
   while IFS= read -r line; do
@@ -1075,34 +1018,6 @@ if [ "$ASSEMBLE_EXIT_CODE" -ne 0 ]; then
   exit 1
 fi
 
-APP_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk/debug" -maxdepth 1 -name '*-debug.apk' | head -n1 || true)"
-TEST_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk/androidTest/debug" -maxdepth 1 -name '*-debug-androidTest.apk' | head -n1 || true)"
-
-if [ -z "$APP_APK" ] || [ ! -f "$APP_APK" ]; then
-  ba_log "App APK not found after assemble tasks" >&2
-  stop_emulator
-  exit 1
-fi
-if [ -z "$TEST_APK" ] || [ ! -f "$TEST_APK" ]; then
-  ba_log "androidTest APK not found after assemble tasks" >&2
-  stop_emulator
-  exit 1
-fi
-
-MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
-if [ -f "$MERGED_MANIFEST" ]; then
-  if grep -q "android:name=\"${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub\"" "$MERGED_MANIFEST"; then
-    grep -n "${PACKAGE_NAME//./\\.}.${MAIN_NAME}Stub" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /' || true
-  else
-    ba_log "ERROR: merged manifest missing ${MAIN_NAME}Stub declaration"
-    sed -n '1,200p' "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /'
-    stop_emulator
-    exit 1
-  fi
-else
-  ba_log "Merged manifest not found at $MERGED_MANIFEST"
-fi
-
 adb_install_retry() {
   local serial="$1" apk="$2" tries=5
   local attempt
@@ -1121,6 +1036,135 @@ adb_install_retry() {
   return 1
 }
 
+ba_log "Inspecting Gradle application identifiers"
+
+APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null || true)
+if [ -n "$APP_PROPERTIES_RAW" ]; then
+  printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | sed 's/^/[build-android-app] props: /'
+fi
+
+APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')"
+NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')"
+
+if [ -f "$APP_BUILD_GRADLE" ]; then
+  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
+    ba_log "Patching applicationId -> $PACKAGE_NAME"
+    awk -v appid="$PACKAGE_NAME" '
+      BEGIN{inDc=0;had=0}
+      /^\s*defaultConfig\s*\{/ {inDc=1}
+      inDc && /^\s*applicationId\s+/ {printf "        applicationId \"%s\"\n", appid; had=1; next}
+      inDc && /^\s*}/ {
+        if(!had){printf "        applicationId \"%s\"\n", appid; had=1}
+        inDc=0
+      }
+      {print}
+    ' "$APP_BUILD_GRADLE" >"$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
+  fi
+
+  if [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+    ba_log "Patching namespace -> $PACKAGE_NAME"
+    awk -v ns="$PACKAGE_NAME" '
+      BEGIN{inAndroid=0;had=0}
+      /^android\s*\{/ {inAndroid=1}
+      inAndroid && /^\s*namespace\s+/ {printf "    namespace \"%s\"\n", ns; had=1; next}
+      inAndroid && /^\s*}/ {
+        if(inAndroid && !had){printf "    namespace \"%s\"\n", ns; had=1}
+        inAndroid=0
+      }
+      {print}
+    ' "$APP_BUILD_GRADLE" >"$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
+  fi
+fi
+
+SRC_SETS=(main debug release)
+FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
+for SS in "${SRC_SETS[@]}"; do
+  MANIFEST_PATH="$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
+  if [ ! -f "$MANIFEST_PATH" ]; then
+    mkdir -p "$(dirname "$MANIFEST_PATH")"
+    cat >"$MANIFEST_PATH" <<EOF
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="$PACKAGE_NAME">
+  <application/>
+</manifest>
+EOF
+    ba_log "Created $MANIFEST_PATH"
+  fi
+
+  grep -q '<application' "$MANIFEST_PATH" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MANIFEST_PATH"
+
+  if grep -q '<manifest[^>]*package=' "$MANIFEST_PATH"; then
+    sed -i '0,/<manifest[^>]*package=/ s/package="[^"]*"/package="$PACKAGE_NAME"/' "$MANIFEST_PATH"
+  else
+    sed -i '0,/<manifest/ s#<manifest#<manifest package="$PACKAGE_NAME"#' "$MANIFEST_PATH"
+  fi
+
+  if ! grep -q "android:name=\"$FQCN\"" "$MANIFEST_PATH"; then
+    sed -i "/<\/application>/i \n    <activity android:name="$FQCN" android:exported="false" />" "$MANIFEST_PATH"
+    ba_log "Declared $FQCN in $MANIFEST_PATH"
+  fi
+done
+
+ba_log "Rebuilding :app after identifier and manifest patches"
+set +e
+(
+  cd "$GRADLE_PROJECT_DIR"
+  ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest -x lint -x test
+)
+PATCH_EXIT=$?
+set -e
+if [ "$PATCH_EXIT" -ne 0 ]; then
+  ba_log "Gradle assemble failed after identifier patching"
+  stop_emulator
+  exit 1
+fi
+
+MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
+if [ -f "$MERGED_MANIFEST" ]; then
+  if grep -q "android:name=\"${FQCN//./\.}\"" "$MERGED_MANIFEST"; then
+    grep -n "${FQCN//./\.}" "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged-manifest: /'
+  else
+    ba_log "ERROR: merged manifest missing $FQCN"
+    sed -n '1,160p' "$MERGED_MANIFEST" | sed 's/^/[build-android-app] merged: /'
+    stop_emulator
+    exit 1
+  fi
+else
+  ba_log "WARN: merged manifest not found at $MERGED_MANIFEST"
+fi
+
+APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null || true)
+if [ -n "$APP_PROPERTIES_RAW" ]; then
+  printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | sed 's/^/[build-android-app] props (post-patch): /'
+  APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')"
+  NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')"
+  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
+    ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
+    stop_emulator
+    exit 1
+  fi
+  if [ -n "$NS_VALUE" ] && [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+    ba_log "ERROR: namespace=$NS_VALUE does not match Codename One package $PACKAGE_NAME" >&2
+    stop_emulator
+    exit 1
+  fi
+else
+  ba_log "Warning: unable to query :app:properties after patching" >&2
+fi
+
+APP_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk/debug" -maxdepth 1 -name '*-debug.apk' | head -n1 || true)"
+TEST_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk/androidTest/debug" -maxdepth 1 -name '*-debug-androidTest.apk' | head -n1 || true)"
+
+if [ -z "$APP_APK" ] || [ ! -f "$APP_APK" ]; then
+  ba_log "App APK not found after identifier patch assemble" >&2
+  stop_emulator
+  exit 1
+fi
+if [ -z "$TEST_APK" ] || [ ! -f "$TEST_APK" ]; then
+  ba_log "androidTest APK not found after identifier patch assemble" >&2
+  stop_emulator
+  exit 1
+fi
+
 ba_log "Installing app APK: $APP_APK"
 if ! adb_install_retry "$EMULATOR_SERIAL" "$APP_APK"; then
   dump_emulator_diagnostics
@@ -1134,6 +1178,10 @@ if ! adb_install_retry "$EMULATOR_SERIAL" "$TEST_APK"; then
   stop_emulator
   exit 1
 fi
+
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation | sed "s/^/[build-android-app] instrumentation: /" || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages | grep -E "${PACKAGE_NAME//./\.}|${PACKAGE_NAME//./\.}\.test" | sed "s/^/[build-android-app] package: /" || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$PACKAGE_NAME/$FQCN" | sed "s/^/[build-android-app] resolve-stub (pre-test): /" || true
 
 APP_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' || true)"
 if [ -n "$APP_PACKAGE_PATH" ]; then
