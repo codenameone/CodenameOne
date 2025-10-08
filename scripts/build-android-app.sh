@@ -363,6 +363,25 @@ EOF
   ba_log "Canonicalized stub activity declaration in $MANIFEST_FILE"
 }
 
+dump_manifest_merger_reports() {
+  local blame_a blame_b merged
+  blame_a="$APP_MODULE_DIR/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt"
+  blame_b="$APP_MODULE_DIR/build/intermediates/incremental/processDebugMainManifest/manifest-merger-blame-report.txt"
+  merged="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
+
+  for report in "$blame_a" "$blame_b"; do
+    if [ -f "$report" ]; then
+      ba_log "manifest-merger blame report: $report"
+      sed -n '1,200p' "$report" | sed 's/^/[build-android-app] manifest-blame: /'
+    fi
+  done
+
+  if [ -f "$merged" ]; then
+    ba_log "merged manifest (first 120 lines): $merged"
+    sed -n '1,120p' "$merged" | sed 's/^/[build-android-app] merged-manifest: /'
+  fi
+}
+
 normalize_stub_manifest
 
 if [ ! -f "$STUB_SRC_FILE" ]; then
@@ -749,25 +768,6 @@ dump_emulator_diagnostics() {
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 \
     | grep -v -E 'com\\.android\\.bluetooth|BtGd|bluetooth' \
     | tail -n 200 | sed 's/^/[build-android-app] logcat: /' || true
-}
-
-dump_manifest_merger_reports() {
-  local blame_a blame_b merged
-  blame_a="$APP_MODULE_DIR/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt"
-  blame_b="$APP_MODULE_DIR/build/intermediates/incremental/processDebugMainManifest/manifest-merger-blame-report.txt"
-  merged="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
-
-  for report in "$blame_a" "$blame_b"; do
-    if [ -f "$report" ]; then
-      ba_log "manifest-merger blame report: $report"
-      sed -n '1,200p' "$report" | sed 's/^/[build-android-app] manifest-blame: /'
-    fi
-  done
-
-  if [ -f "$merged" ]; then
-    ba_log "merged manifest (first 120 lines): $merged"
-    sed -n '1,120p' "$merged" | sed 's/^/[build-android-app] merged-manifest: /'
-  fi
 }
 
 log_instrumentation_state() {
