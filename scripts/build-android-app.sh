@@ -1097,14 +1097,25 @@ if [ -f "$APP_BUILD_GRADLE" ]; then
 fi
 
 FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
+STUB_BASENAME="${MAIN_NAME}Stub"
+remove_stub_declaration() {
+  local manifest_path="$1"
+  [ -f "$manifest_path" ] || return 0
+  local tmp
+  tmp=$(mktemp)
+  perl -0777 -pe "s{<activity\\b[^>]*android:name=\\\"[^\\\"]*${STUB_BASENAME}\\\"[^>]*/>\\s*}{}g; s{<activity\\b[^>]*android:name=\\\"[^\\\"]*${STUB_BASENAME}\\\"[^>]*>.*?<\/activity>\\s*}{}gs" "$manifest_path" >"$tmp"
+  if ! cmp -s "$manifest_path" "$tmp"; then
+    mv "$tmp" "$manifest_path"
+    ba_log "Removed existing ${STUB_BASENAME} declarations from $manifest_path"
+  else
+    rm -f "$tmp"
+  fi
+}
+
 SRC_SETS=(main debug release)
 for SS in "${SRC_SETS[@]}"; do
   MANIFEST_PATH="$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
-  [ -f "$MANIFEST_PATH" ] || continue
-  if grep -q "android:name=\"$FQCN\"" "$MANIFEST_PATH"; then
-    sed -i "/<activity[^>]*android:name=\"$FQCN\"/d" "$MANIFEST_PATH"
-    ba_log "Removed existing $FQCN declaration from $MANIFEST_PATH"
-  fi
+  remove_stub_declaration "$MANIFEST_PATH"
 done
 
 MAIN_MANIFEST="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
@@ -1126,11 +1137,19 @@ fi
 
 grep -q '<application' "$MAIN_MANIFEST" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MAIN_MANIFEST"
 
-if ! grep -q "android:name=\"$FQCN\"" "$MAIN_MANIFEST"; then
-  sed -i "/<\/application>/i \
-    <activity android:name=\"$FQCN\" android:exported=\"false\" />" "$MAIN_MANIFEST"
-  ba_log "Declared $FQCN in $MAIN_MANIFEST"
-fi
+# Ensure no stale stub declarations remain before inserting the canonical entry.
+remove_stub_declaration "$MAIN_MANIFEST"
+
+awk -v fqcn="$FQCN" '
+  BEGIN{inserted=0}
+  /<\/application>/ && !inserted {
+    print "    <activity android:name=\"" fqcn "\" android:exported=\"false\" />"
+    inserted=1
+  }
+  {print}
+' "$MAIN_MANIFEST" >"$MAIN_MANIFEST.tmp"
+mv "$MAIN_MANIFEST.tmp" "$MAIN_MANIFEST"
+ba_log "Canonicalized stub activity declaration in $MAIN_MANIFEST"
 
 ba_log "Validating manifest merge after stub declaration"
 set +e
