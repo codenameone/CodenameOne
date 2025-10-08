@@ -310,82 +310,68 @@ else
   ba_log "Codename One stub activity already present at $STUB_SRC_FILE"
 fi
 
+FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
 MANIFEST_FILE="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
-if [ ! -f "$MANIFEST_FILE" ]; then
+
+normalize_stub_manifest() {
   mkdir -p "$(dirname "$MANIFEST_FILE")"
-  cat >"$MANIFEST_FILE" <<EOF
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="$PACKAGE_NAME">
-    <application/>
+  if [ ! -f "$MANIFEST_FILE" ]; then
+    cat >"$MANIFEST_FILE" <<'EOF'
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application/>
 </manifest>
 EOF
-  ba_log "Created minimal Android manifest at $MANIFEST_FILE"
-fi
+    ba_log "Created minimal Android manifest at $MANIFEST_FILE"
+  fi
 
-ensure_manifest_stub() {
-  python3 - "$MANIFEST_FILE" "$MAIN_NAME" "$PACKAGE_NAME" <<'PY'
-import sys
-from pathlib import Path
-import xml.etree.ElementTree as ET
+  # Ensure the main manifest has an <application> element
+  grep -q '<application' "$MANIFEST_FILE" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MANIFEST_FILE"
 
-manifest_path = Path(sys.argv[1])
-main_name = sys.argv[2]
-package_name = sys.argv[3]
-ns_android = "http://schemas.android.com/apk/res/android"
+  # Remove deprecated package attribute and any inline <uses-sdk/> declarations
+  perl -0777 -pe 's/\s+package="[^"]*"//; s#<uses-sdk\b[^>]*/>\s*##g' -i "$MANIFEST_FILE"
 
-ET.register_namespace('android', ns_android)
-tree = ET.parse(manifest_path)
-root = tree.getroot()
-changed = False
+  remove_stub_declaration() {
+    local manifest_path="$1"
+    [ -f "$manifest_path" ] || return 0
+    local escaped tmp
+    escaped=$(printf '%s' "$FQCN" | sed 's/[\\&/]/\\&/g')
+    tmp=$(mktemp)
+    perl -0777 -pe "s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*/>\\s*}{}g; s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*>.*?<\\/activity>\\s*}{}gs" "$manifest_path" >"$tmp"
+    mv "$tmp" "$manifest_path"
+  }
 
-# Ensure manifest package aligns with the Codename One package
-if root.get('package') != package_name:
-    root.set('package', package_name)
-    changed = True
+  for SS in main debug release; do
+    remove_stub_declaration "$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
+  done
 
-app = root.find('application')
-if app is None:
-    app = ET.SubElement(root, 'application')
-    changed = True
+  # Ensure tools namespace is available for merge directives
+  if ! grep -q 'xmlns:tools=' "$MANIFEST_FILE"; then
+    perl -0777 -pe 's/<manifest\b([^>]*)>/<manifest\1 xmlns:tools="http:\/\/schemas.android.com\/tools">/' -i "$MANIFEST_FILE"
+  fi
 
-target_fqcn = f"{package_name}.{main_name}Stub"
-target_relative = f".{main_name}Stub"
-android_name = f"{{{ns_android}}}name"
-android_exported = f"{{{ns_android}}}exported"
+  # Insert a single canonical stub declaration
+  awk -v fqcn="$FQCN" '
+    BEGIN{inserted=0}
+    /<\/application>/ && !inserted {
+      print "    <activity android:name=\"" fqcn "\" android:exported=\"false\" tools:node=\"replace\" />"
+      inserted=1
+    }
+    {print}
+  ' "$MANIFEST_FILE" >"$MANIFEST_FILE.tmp"
+  mv "$MANIFEST_FILE.tmp" "$MANIFEST_FILE"
 
-for activity in app.findall('activity'):
-    name = activity.get(android_name)
-    if name == target_relative:
-        activity.set(android_name, target_fqcn)
-        changed = True
-        break
-    if name == target_fqcn:
-        break
-else:
-    activity = ET.Element('activity')
-    activity.set(android_name, target_fqcn)
-    activity.set(android_exported, 'false')
-    app.append(activity)
-    changed = True
-
-if changed:
-    tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
-PY
+  ba_log "Canonicalized stub activity declaration in $MANIFEST_FILE"
 }
 
-if ! ensure_manifest_stub; then
-  ba_log "Failed to ensure stub activity declaration in $MANIFEST_FILE" >&2
-  exit 1
-fi
-
-FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
-
-if ! grep -Eq "android:name=\"${PACKAGE_NAME//./\\.}\\.${MAIN_NAME}Stub\"" "$MANIFEST_FILE"; then
-  ba_log "Manifest does not declare ${MAIN_NAME}Stub activity" >&2
-  exit 1
-fi
+normalize_stub_manifest
 
 if [ ! -f "$STUB_SRC_FILE" ]; then
   ba_log "Missing stub activity source at $STUB_SRC_FILE" >&2
+  exit 1
+fi
+
+if ! grep -Fq "android:name=\"$FQCN\"" "$MANIFEST_FILE"; then
+  ba_log "Manifest does not declare ${MAIN_NAME}Stub activity" >&2
   exit 1
 fi
 
@@ -493,6 +479,16 @@ fi
 ba_log "Dependencies block after instrumentation update:"
 awk '/^\s*dependencies\s*\{/{flag=1} flag{print} /^\s*\}/{if(flag){exit}}' "$APP_BUILD_GRADLE" \
   | sed 's/^/[build-android-app] | /'
+
+ba_log "Validating manifest merge before assemble"
+if ! (
+  cd "$GRADLE_PROJECT_DIR" &&
+  JAVA_HOME="$JAVA17_HOME" PATH="$JAVA17_HOME/bin:$PATH" ./gradlew --no-daemon :app:processDebugMainManifest
+); then
+  ba_log ":app:processDebugMainManifest failed during preflight" >&2
+  dump_manifest_merger_reports
+  exit 1
+fi
 
 FINAL_ARTIFACT_DIR="${CN1_TEST_SCREENSHOT_EXPORT_DIR:-$REPO_ROOT/build-artifacts}"
 mkdir -p "$FINAL_ARTIFACT_DIR"
@@ -1066,114 +1062,14 @@ fi
 APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')"
 NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')"
 
-if [ -f "$APP_BUILD_GRADLE" ]; then
-  if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ]; then
-    ba_log "Patching applicationId -> $PACKAGE_NAME"
-    awk -v appid="$PACKAGE_NAME" '
-      BEGIN{inDc=0;had=0}
-      /^\s*defaultConfig\s*\{/ {inDc=1}
-      inDc && /^\s*applicationId\s+/ {printf "        applicationId \"%s\"\n", appid; had=1; next}
-      inDc && /^\s*}/ {
-        if(!had){printf "        applicationId \"%s\"\n", appid; had=1}
-        inDc=0
-      }
-      {print}
-    ' "$APP_BUILD_GRADLE" >"$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
-  fi
-
-  if [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
-    ba_log "Patching namespace -> $PACKAGE_NAME"
-    awk -v ns="$PACKAGE_NAME" '
-      BEGIN{inAndroid=0;had=0}
-      /^android\s*\{/ {inAndroid=1}
-      inAndroid && /^\s*namespace\s+/ {printf "    namespace \"%s\"\n", ns; had=1; next}
-      inAndroid && /^\s*}/ {
-        if(inAndroid && !had){printf "    namespace \"%s\"\n", ns; had=1}
-        inAndroid=0
-      }
-      {print}
-    ' "$APP_BUILD_GRADLE" >"$APP_BUILD_GRADLE.tmp" && mv "$APP_BUILD_GRADLE.tmp" "$APP_BUILD_GRADLE"
-  fi
-fi
-
-FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
-remove_stub_declaration() {
-  local manifest_path="$1"
-  [ -f "$manifest_path" ] || return 0
-  local tmp escaped
-  tmp=$(mktemp)
-  escaped=$(printf '%s' "$FQCN" | sed 's/[\\&/]/\\&/g')
-  perl -0777 -pe "s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*/>\\s*}{}g; s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*>.*?<\\/activity>\\s*}{}gs" "$manifest_path" >"$tmp"
-  if ! cmp -s "$manifest_path" "$tmp"; then
-    mv "$tmp" "$manifest_path"
-    ba_log "Removed existing ${FQCN} declarations from $manifest_path"
-  else
-    rm -f "$tmp"
-  fi
-}
-
-SRC_SETS=(main debug release)
-for SS in "${SRC_SETS[@]}"; do
-  MANIFEST_PATH="$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
-  remove_stub_declaration "$MANIFEST_PATH"
-done
-
-MAIN_MANIFEST="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
-if [ ! -f "$MAIN_MANIFEST" ]; then
-  mkdir -p "$(dirname "$MAIN_MANIFEST")"
-  cat >"$MAIN_MANIFEST" <<EOF
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <application/>
-</manifest>
-EOF
-  ba_log "Created $MAIN_MANIFEST"
-fi
-
-grep -q '<application' "$MAIN_MANIFEST" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MAIN_MANIFEST"
-
-perl -0777 -pe 's/\s+package="[^"]*"//; s#<uses-sdk\b[^>]*/>\s*##g' -i "$MAIN_MANIFEST"
-
-# Ensure no stale stub declarations remain before inserting the canonical entry.
-remove_stub_declaration "$MAIN_MANIFEST"
-
-awk -v fqcn="$FQCN" '
-  BEGIN{inserted=0}
-  /<\/application>/ && !inserted {
-    print "    <activity android:name=\"" fqcn "\" android:exported=\"false\" />"
-    inserted=1
-  }
-  {print}
-' "$MAIN_MANIFEST" >"$MAIN_MANIFEST.tmp"
-mv "$MAIN_MANIFEST.tmp" "$MAIN_MANIFEST"
-
-ba_log "Canonicalized stub activity declaration in $MAIN_MANIFEST"
-
-ba_log "Validating manifest merge after stub declaration"
-set +e
-(
-  cd "$GRADLE_PROJECT_DIR"
-  ./gradlew --no-daemon :app:processDebugMainManifest
-)
-PROCESS_EXIT=$?
-set -e
-if [ "$PROCESS_EXIT" -ne 0 ]; then
-  ba_log ":app:processDebugMainManifest failed after manifest updates"
-  dump_manifest_merger_reports
+if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ]; then
+  ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
   stop_emulator
   exit 1
 fi
 
-ba_log "Rebuilding :app after identifier and manifest patches"
-set +e
-(
-  cd "$GRADLE_PROJECT_DIR"
-  ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest -x lint -x test
-)
-PATCH_EXIT=$?
-set -e
-if [ "$PATCH_EXIT" -ne 0 ]; then
-  ba_log "Gradle assemble failed after identifier patching"
-  dump_manifest_merger_reports
+if [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+  ba_log "ERROR: namespace=$NS_VALUE does not match Codename One package $PACKAGE_NAME" >&2
   stop_emulator
   exit 1
 fi
@@ -1192,23 +1088,8 @@ else
   ba_log "WARN: merged manifest not found at $MERGED_MANIFEST"
 fi
 
-APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null || true)
-if [ -n "$APP_PROPERTIES_RAW" ]; then
-  printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | sed 's/^/[build-android-app] props (post-patch): /'
-  APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')"
-  NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')"
-  if [ -n "$APP_ID" ] && [ "$APP_ID" != "$PACKAGE_NAME" ]; then
-    ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
-    stop_emulator
-    exit 1
-  fi
-  if [ -n "$NS_VALUE" ] && [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
-    ba_log "ERROR: namespace=$NS_VALUE does not match Codename One package $PACKAGE_NAME" >&2
-    stop_emulator
-    exit 1
-  fi
-else
-  ba_log "Warning: unable to query :app:properties after patching" >&2
+if [ -z "$APP_PROPERTIES_RAW" ]; then
+  ba_log "Warning: unable to query :app:properties" >&2
 fi
 
 APP_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk/debug" -maxdepth 1 -name '*-debug.apk' | head -n1 || true)"
