@@ -428,8 +428,8 @@ fi
 ensure_gradle_package_config() {
   python3 - "$APP_BUILD_GRADLE" "$PACKAGE_NAME" <<'PY'
 import sys
-from pathlib import Path
 import re
+from pathlib import Path
 
 path = Path(sys.argv[1])
 package_name = sys.argv[2]
@@ -437,55 +437,74 @@ text = path.read_text()
 original = text
 messages = []
 
+def ensure_application_plugin(source: str) -> str:
+    plugin_id = "com.android.application"
+    if plugin_id in source:
+        return source
+    if "plugins" in source:
+        updated = re.sub(r"(plugins\s*\{)", r"\1\n    id \"%s\"" % plugin_id, source, count=1)
+        if updated != source:
+            messages.append(f"Applied {plugin_id} via plugins block")
+            return updated
+    messages.append(f"Applied {plugin_id} via legacy apply plugin syntax")
+    return f"apply plugin: \"{plugin_id}\"\n" + source
+
+def ensure_android_block(source: str) -> str:
+    if re.search(r"android\s*\{", source):
+        return source
+    messages.append("Inserted android block")
+    return source + "\nandroid {\n}\n"
+
 def ensure_namespace(source: str) -> str:
-    pattern = re.compile(r'\bnamespace\s+["\']([^"\']+)["\']')
+    pattern = re.compile(r"\bnamespace\s+[\"']([^\"']+)[\"']")
     match = pattern.search(source)
     if match:
         if match.group(1) != package_name:
             start, end = match.span()
-            replacement = f'namespace "{package_name}"'
-            source = source[:start] + replacement + source[end:]
+            source = source[:start] + f"namespace \"{package_name}\"" + source[end:]
             messages.append(f"Updated namespace to {package_name}")
-    else:
-        android_match = re.search(r'android\s*\{', source)
-        if not android_match:
-            sys.exit("Unable to locate android block when inserting namespace")
-        insert = android_match.end()
-        insertion = f"\n    namespace \"{package_name}\""
-        source = source[:insert] + insertion + source[insert:]
-        messages.append(f"Inserted namespace {package_name}")
+        return source
+    android_match = re.search(r"android\s*\{", source)
+    if not android_match:
+        raise SystemExit("Unable to locate android block when inserting namespace")
+    insert = android_match.end()
+    source = source[:insert] + f"\n    namespace \"{package_name}\"" + source[insert:]
+    messages.append(f"Inserted namespace {package_name}")
     return source
+
+def ensure_default_config(source: str) -> str:
+    if re.search(r"defaultConfig\s*\{", source):
+        return source
+    android_match = re.search(r"android\s*\{", source)
+    if not android_match:
+        raise SystemExit("Unable to locate android block when creating defaultConfig")
+    insert = android_match.end()
+    snippet = "\n    defaultConfig {\n    }"
+    messages.append("Inserted defaultConfig block")
+    return source[:insert] + snippet + source[insert:]
 
 def ensure_application_id(source: str) -> str:
-    pattern = re.compile(r'\bapplicationId\s+["\']([^"\']+)["\']')
+    pattern = re.compile(r"\bapplicationId\s+[\"']([^\"']+)[\"']")
     match = pattern.search(source)
     if match:
         if match.group(1) != package_name:
             start, end = match.span()
-            indent = source[:start].split('\n')[-1].split('applicationId')[0]
-            replacement = f"{indent}applicationId \"{package_name}\""
-            source = source[:start] + replacement + source[end:]
+            indent = source[:start].split("\n")[-1].split("applicationId")[0]
+            source = source[:start] + f"{indent}applicationId \"{package_name}\"" + source[end:]
             messages.append(f"Updated applicationId to {package_name}")
         return source
-
-    default_match = re.search(r'defaultConfig\s*\{', source)
-    if default_match:
-        insert = default_match.end()
-        insertion = f"\n        applicationId \"{package_name}\""
-        source = source[:insert] + insertion + source[insert:]
-        messages.append(f"Inserted applicationId {package_name}")
-        return source
-
-    android_match = re.search(r'android\s*\{', source)
-    if not android_match:
-        sys.exit("Unable to locate android block when creating defaultConfig")
-    insert = android_match.end()
-    insertion = ("\n    defaultConfig {\n        applicationId \"{0}\"\n    }\n".format(package_name))
-    source = source[:insert] + insertion + source[insert:]
-    messages.append(f"Created defaultConfig with applicationId {package_name}")
+    default_match = re.search(r"defaultConfig\s*\{", source)
+    if not default_match:
+        raise SystemExit("Unable to locate defaultConfig when inserting applicationId")
+    insert = default_match.end()
+    source = source[:insert] + f"\n        applicationId \"{package_name}\"" + source[insert:]
+    messages.append(f"Inserted applicationId {package_name}")
     return source
 
+text = ensure_application_plugin(text)
+text = ensure_android_block(text)
 text = ensure_namespace(text)
+text = ensure_default_config(text)
 text = ensure_application_id(text)
 
 if text != original:
@@ -1099,25 +1118,44 @@ ba_log "Inspecting Gradle application identifiers"
 APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null || true)
 if [ -n "$APP_PROPERTIES_RAW" ]; then
   set +o pipefail
-  printf '%s\n' "$APP_PROPERTIES_RAW" \
-    | grep -E '^(applicationId|testApplicationId|namespace):' \
-    | sed 's/^/[build-android-app] props: /' || true
+  MATCHED_PROPS=$(printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' || true)
   set -o pipefail
+  if [ -n "$MATCHED_PROPS" ]; then
+    printf '%s\n' "$MATCHED_PROPS" | sed 's/^/[build-android-app] props: /'
+  fi
 fi
 
-APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}' || true)"
-NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}' || true)"
+APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; found=1} END{if(!found) print ""}' || true)"
+NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; found=1} END{if(!found) print ""}' || true)"
 
-if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ]; then
-  ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
-  stop_emulator
-  exit 1
-fi
-
-if [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
-  ba_log "ERROR: namespace=$NS_VALUE does not match Codename One package $PACKAGE_NAME" >&2
-  stop_emulator
-  exit 1
+if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ] || [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+  ba_log "applicationId/namespace mismatch (applicationId='${APP_ID:-<unset>}' namespace='${NS_VALUE:-<unset>}'), patching"
+  if ! GRADLE_PACKAGE_LOG=$(ensure_gradle_package_config); then
+    ba_log "Failed to align namespace/applicationId with Codename One package" >&2
+    stop_emulator
+    exit 1
+  fi
+  if [ -n "$GRADLE_PACKAGE_LOG" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && ba_log "$line"
+    done <<<"$GRADLE_PACKAGE_LOG"
+  fi
+  APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null || true)
+  if [ -n "$APP_PROPERTIES_RAW" ]; then
+    set +o pipefail
+    MATCHED_PROPS=$(printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' || true)
+    set -o pipefail
+    if [ -n "$MATCHED_PROPS" ]; then
+      printf '%s\n' "$MATCHED_PROPS" | sed 's/^/[build-android-app] props: /'
+    fi
+  fi
+  APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; found=1} END{if(!found) print ""}' || true)"
+  NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; found=1} END{if(!found) print ""}' || true)"
+  if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ] || [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+    ba_log "ERROR: Unable to enforce applicationId/namespace to $PACKAGE_NAME (applicationId='$APP_ID' namespace='$NS_VALUE')" >&2
+    stop_emulator
+    exit 1
+  fi
 fi
 
 MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
