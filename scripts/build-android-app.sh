@@ -693,7 +693,7 @@ install_android_packages() {
     "platform-tools" \
     "emulator" \
     "platforms;android-35" \
-    "system-images;android-35;default;x86_64" >/dev/null 2>&1 || true
+    "system-images;android-35;google_apis;x86_64" >/dev/null 2>&1 || true
 }
 
 create_avd() {
@@ -1024,7 +1024,7 @@ if [ ! -x "$EMULATOR_BIN" ]; then
 fi
 
 AVD_NAME="cn1UiTestAvd"
-SYSTEM_IMAGE="system-images;android-35;default;x86_64"
+SYSTEM_IMAGE="system-images;android-35;google_apis;x86_64"
 AVD_CACHE_ROOT="${AVD_CACHE_ROOT:-${RUNNER_TEMP:-$HOME}/cn1-android-avd}"
 mkdir -p "$AVD_CACHE_ROOT"
 AVD_HOME="$AVD_CACHE_ROOT"
@@ -1190,61 +1190,28 @@ if [ "$ASSEMBLE_EXIT_CODE" -ne 0 ]; then
   exit 1
 fi
 
-adb_install_retry() {
-  local serial="$1" apk="$2" tries=3
-  local attempt
-
-  for attempt in $(seq 1 "$tries"); do
-    if command -v timeout >/dev/null 2>&1; then
-      if timeout 120 "$ADB_BIN" -s "$serial" install -r -t --no-incremental "$apk"; then
-        return 0
-      fi
-    else
-      if "$ADB_BIN" -s "$serial" install -r -t --no-incremental "$apk"; then
-        return 0
-      fi
-    fi
-    if [ "$attempt" -lt "$tries" ]; then
-      ba_log "install retry $attempt/$tries for $(basename "$apk")"
-      "$ADB_BIN" -s "$serial" wait-for-device
-      sleep 3
-    fi
-  done
-
-  ba_log "Falling back to push+pm install for $(basename "$apk")"
+adb_install_file_path() {
+  local serial="$1" apk="$2"
   local remote_tmp="/data/local/tmp/$(basename "$apk")"
+
   "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
   if ! "$ADB_BIN" -s "$serial" push "$apk" "$remote_tmp" >/dev/null 2>&1; then
     ba_log "Failed to push $(basename "$apk") to $remote_tmp" >&2
     return 1
   fi
 
-  if command -v timeout >/dev/null 2>&1; then
-    if timeout 180 "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
-      "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
-      return 0
-    fi
-  else
-    if "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
-      "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
-      return 0
-    fi
+  if "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
+    "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+    return 0
   fi
 
   local size
   size=$(stat -c%s "$apk" 2>/dev/null || wc -c <"$apk")
   if [ -n "$size" ]; then
-    ba_log "Attempting size-piped install for $(basename "$apk")"
-    if command -v timeout >/dev/null 2>&1; then
-      if timeout 180 "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $size"; then
-        "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
-        return 0
-      fi
-    else
-      if "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $size"; then
-        "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
-        return 0
-      fi
+    ba_log "Falling back to size-piped install for $(basename "$apk")"
+    if "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $size"; then
+      "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+      return 0
     fi
   fi
 
@@ -1373,21 +1340,21 @@ fi
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell rm -f /data/local/tmp/*.apk >/dev/null 2>&1 || true
 
 ba_log "Installing app APK: $APP_APK"
-if ! adb_install_retry "$EMULATOR_SERIAL" "$APP_APK"; then
+if ! adb_install_file_path "$EMULATOR_SERIAL" "$APP_APK"; then
   dump_emulator_diagnostics
   stop_emulator
   exit 1
 fi
 
 ba_log "Installing androidTest APK: $TEST_APK"
-if ! adb_install_retry "$EMULATOR_SERIAL" "$TEST_APK"; then
+if ! adb_install_file_path "$EMULATOR_SERIAL" "$TEST_APK"; then
   dump_emulator_diagnostics
   stop_emulator
   exit 1
 fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation | sed "s/^/[build-android-app] instrumentation: /" || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages | grep -E "${RUNTIME_PACKAGE//./\.}|${RUNTIME_PACKAGE//./\.}\.test" | sed "s/^/[build-android-app] package: /" || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages | grep -E "${RUNTIME_PACKAGE//./\.}|${RUNTIME_PACKAGE//./\.}\\.test" | sed "s/^/[build-android-app] package: /" || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$RUNTIME_PACKAGE/$RUNTIME_STUB_FQCN" | sed "s/^/[build-android-app] resolve-stub (pre-test): /" || true
 
 APP_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$RUNTIME_PACKAGE" 2>/dev/null | tr -d '\r' || true)"
