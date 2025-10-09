@@ -1293,13 +1293,19 @@ adb_install_file_path() {
     return 1
   fi
 
+  local install_status=1
   if "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
-    "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
-    return 0
+    install_status=0
+  else
+    local apk_size
+    apk_size=$(stat -c%s "$apk" 2>/dev/null || wc -c <"$apk")
+    if [ -n "$apk_size" ] && "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $apk_size"; then
+      install_status=0
+    fi
   fi
 
   "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
-  return 1
+  return $install_status
 }
 
 ba_log "Inspecting Gradle application identifiers"
