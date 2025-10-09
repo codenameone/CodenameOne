@@ -4,6 +4,16 @@ set -euo pipefail
 
 ba_log() { echo "[build-android-app] $1"; }
 
+run_with_timeout() {
+  local duration="$1"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$duration" "$@"
+  else
+    "$@"
+  fi
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
@@ -907,6 +917,57 @@ wait_for_api_level() {
   return 1
 }
 
+ensure_framework_ready() {
+  local serial="$1"
+  "$ADB_BIN" -s "$serial" wait-for-device >/dev/null 2>&1 || return 1
+
+  local total_timeout="${FRAMEWORK_READY_TIMEOUT_SECONDS:-300}"
+  local per_try="${FRAMEWORK_READY_PER_TRY_TIMEOUT_SECONDS:-5}"
+  if ! [[ "$total_timeout" =~ ^[0-9]+$ ]] || [ "$total_timeout" -le 0 ]; then
+    total_timeout=300
+  fi
+  if ! [[ "$per_try" =~ ^[0-9]+$ ]] || [ "$per_try" -le 0 ]; then
+    per_try=5
+  fi
+
+  local deadline=$((SECONDS + total_timeout))
+  local last_log=$SECONDS
+
+  while [ $SECONDS -lt $deadline ]; do
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
+      || run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1 \
+      || run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell dumpsys package >/dev/null 2>&1; then
+      return 0
+    fi
+
+    if [ $((SECONDS - last_log)) -ge 10 ]; then
+      local boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+      local ce_ok="$($ADB_BIN -s "$serial" shell getprop sys.user.0.ce_available 2>/dev/null | tr -d '\r')"
+      ba_log "Waiting for framework readiness on $serial (boot_ok=${boot_ok:-?} ce_ok=${ce_ok:-?})"
+      last_log=$SECONDS
+    fi
+    sleep 2
+  done
+
+  ba_log "Framework appears stalled on $serial; restarting services" >&2
+  "$ADB_BIN" -s "$serial" shell stop >/dev/null 2>&1 || true
+  sleep 2
+  "$ADB_BIN" -s "$serial" shell start >/dev/null 2>&1 || true
+
+  local restart_deadline=$((SECONDS + 240))
+  while [ $SECONDS -lt $restart_deadline ]; do
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
+      || run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1 \
+      || run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell dumpsys package >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  ba_log "ERROR: Package Manager not available on $serial after restart" >&2
+  return 1
+}
+
 dump_emulator_diagnostics() {
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop | sed 's/^/[build-android-app] getprop: /' || true
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 \
@@ -1194,6 +1255,10 @@ adb_install_file_path() {
   local serial="$1" apk="$2"
   local remote_tmp="/data/local/tmp/$(basename "$apk")"
 
+  if ! ensure_framework_ready "$serial"; then
+    return 1
+  fi
+
   "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
   if ! "$ADB_BIN" -s "$serial" push "$apk" "$remote_tmp" >/dev/null 2>&1; then
     ba_log "Failed to push $(basename "$apk") to $remote_tmp" >&2
@@ -1324,14 +1389,20 @@ TEST_RUNTIME_PACKAGE="${RUNTIME_PACKAGE}.test"
 RUNTIME_STUB_FQCN="${RUNTIME_PACKAGE}.${MAIN_NAME}Stub"
 
 ba_log "Preparing device for APK installation"
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop sys.boot_completed >/dev/null 2>&1 || true
+if ! ensure_framework_ready "$EMULATOR_SERIAL"; then
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
 
-SESSION_IDS="$($ADB_BIN -s "$EMULATOR_SERIAL" shell cmd package list sessions 2>/dev/null | awk '{print $1}' | sed 's/sessionId=//g' || true)"
-if [ -n "$SESSION_IDS" ]; then
-  while IFS= read -r sid; do
-    [ -z "$sid" ] && continue
-    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package abort-session "$sid" >/dev/null 2>&1 || true
-  done <<<"$SESSION_IDS"
+if "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package list sessions >/dev/null 2>&1; then
+  SESSION_IDS="$($ADB_BIN -s "$EMULATOR_SERIAL" shell cmd package list sessions 2>/dev/null | awk '{print $1}' | sed 's/sessionId=//g' || true)"
+  if [ -n "$SESSION_IDS" ]; then
+    while IFS= read -r sid; do
+      [ -z "$sid" ] && continue
+      "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package abort-session "$sid" >/dev/null 2>&1 || true
+    done <<<"$SESSION_IDS"
+  fi
 fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm uninstall "$RUNTIME_PACKAGE" >/dev/null 2>&1 || true
@@ -1348,6 +1419,12 @@ fi
 
 ba_log "Installing androidTest APK: $TEST_APK"
 if ! adb_install_file_path "$EMULATOR_SERIAL" "$TEST_APK"; then
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
+
+if ! ensure_framework_ready "$EMULATOR_SERIAL"; then
   dump_emulator_diagnostics
   stop_emulator
   exit 1
