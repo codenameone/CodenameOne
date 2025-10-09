@@ -313,61 +313,10 @@ fi
 FQCN="${PACKAGE_NAME}.${MAIN_NAME}Stub"
 MANIFEST_FILE="$APP_MODULE_DIR/src/main/AndroidManifest.xml"
 
-normalize_stub_manifest() {
-  mkdir -p "$(dirname "$MANIFEST_FILE")"
-  if [ ! -f "$MANIFEST_FILE" ]; then
-    cat >"$MANIFEST_FILE" <<'EOF'
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <application/>
-</manifest>
-EOF
-    ba_log "Created minimal Android manifest at $MANIFEST_FILE"
-  fi
-
-  # Ensure the main manifest has an <application> element
-  grep -q '<application' "$MANIFEST_FILE" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MANIFEST_FILE"
-
-  # Remove deprecated package attribute and any inline <uses-sdk/> declarations
-  perl -0777 -pe 's/\s+package="[^"]*"//; s#<uses-sdk\b[^>]*/>\s*##g' -i "$MANIFEST_FILE"
-
-  remove_stub_declaration() {
-    local manifest_path="$1"
-    [ -f "$manifest_path" ] || return 0
-    local escaped tmp
-    escaped=$(printf '%s' "$FQCN" | sed 's/[\\&/]/\\&/g')
-    tmp=$(mktemp)
-    perl -0777 -pe "s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*/>\\s*}{}g; s{<activity\\b[^>]*android:name=\\\"$escaped\\\"[^>]*>.*?<\\/activity>\\s*}{}gs" "$manifest_path" >"$tmp"
-    mv "$tmp" "$manifest_path"
-  }
-
-  for SS in main debug release; do
-    remove_stub_declaration "$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
-  done
-
-  # Ensure tools namespace is available for merge directives
-  if ! grep -q 'xmlns:tools=' "$MANIFEST_FILE"; then
-    perl -0777 -pe 's/<manifest\b([^>]*)>/<manifest\1 xmlns:tools="http:\/\/schemas.android.com\/tools">/' -i "$MANIFEST_FILE"
-  fi
-
-  # Insert a single canonical stub declaration
-  awk -v fqcn="$FQCN" '
-    BEGIN{inserted=0}
-    /<\/application>/ && !inserted {
-      print "    <activity android:name=\"" fqcn "\" android:exported=\"false\" tools:node=\"replace\" />"
-      inserted=1
-    }
-    {print}
-  ' "$MANIFEST_FILE" >"$MANIFEST_FILE.tmp"
-  mv "$MANIFEST_FILE.tmp" "$MANIFEST_FILE"
-
-  ba_log "Canonicalized stub activity declaration in $MANIFEST_FILE"
-}
-
 dump_manifest_merger_reports() {
-  local blame_a blame_b merged
-  blame_a="$APP_MODULE_DIR/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt"
-  blame_b="$APP_MODULE_DIR/build/intermediates/incremental/processDebugMainManifest/manifest-merger-blame-report.txt"
-  merged="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
+  local blame_a="$APP_MODULE_DIR/build/intermediates/manifest_merge_blame_file/debug/manifest-merger-blame-debug-report.txt"
+  local blame_b="$APP_MODULE_DIR/build/intermediates/incremental/processDebugMainManifest/manifest-merger-blame-report.txt"
+  local merged="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
 
   for report in "$blame_a" "$blame_b"; do
     if [ -f "$report" ]; then
@@ -382,15 +331,64 @@ dump_manifest_merger_reports() {
   fi
 }
 
-normalize_stub_manifest
+ba_log "Normalizing Codename One stub activity manifest"
+mkdir -p "$(dirname "$MANIFEST_FILE")"
+if [ ! -f "$MANIFEST_FILE" ]; then
+  cat >"$MANIFEST_FILE" <<'EOF'
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application/>
+</manifest>
+EOF
+  ba_log "Created minimal Android manifest at $MANIFEST_FILE"
+fi
 
-if [ ! -f "$STUB_SRC_FILE" ]; then
-  ba_log "Missing stub activity source at $STUB_SRC_FILE" >&2
+grep -q '<application' "$MANIFEST_FILE" || sed -i 's#</manifest>#  <application/>\n</manifest>#' "$MANIFEST_FILE"
+
+# Remove deprecated package attribute and inline <uses-sdk/> declarations
+perl -0777 -pe 's/\s+package="[^"]*"//; s#<uses-sdk\b[^>]*/>\s*##g' -i "$MANIFEST_FILE"
+
+prune_stub_declaration() {
+  local manifest_path="$1"
+  [ -f "$manifest_path" ] || return 0
+  local tmp
+  tmp=$(mktemp)
+  FQCN="$FQCN" perl -0777 -pe '
+    my $fq = quotemeta($ENV{FQCN});
+    s{<activity\b[^>]*android:name="$fq"[^>]*/>\s*}{}g;
+    s{<activity\b[^>]*android:name="$fq"[^>]*>.*?</activity>\s*}{}gs;
+  ' "$manifest_path" >"$tmp"
+  mv "$tmp" "$manifest_path"
+}
+
+for SS in main debug release; do
+  prune_stub_declaration "$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
+done
+
+if ! grep -Fq 'xmlns:tools=' "$MANIFEST_FILE"; then
+  perl -0777 -pe 's#<manifest\b([^>]*)>#<manifest\1 xmlns:tools="http://schemas.android.com/tools">#' -i "$MANIFEST_FILE"
+fi
+
+tmp_manifest="$(mktemp)"
+awk -v fqcn="$FQCN" '
+  BEGIN{inserted=0}
+  /<\/application>/ && !inserted {
+    print "    <activity android:name=\"" fqcn "\" android:exported=\"false\" tools:node=\"replace\" />"
+    inserted=1
+  }
+  {print}
+' "$MANIFEST_FILE" >"$tmp_manifest"
+mv "$tmp_manifest" "$MANIFEST_FILE"
+
+STUB_DECL_COUNT=$(grep -c "android:name=\"$FQCN\"" "$MANIFEST_FILE" || true)
+ba_log "Stub activity declarations present after normalization: $STUB_DECL_COUNT"
+if [ "$STUB_DECL_COUNT" -ne 1 ]; then
+  ba_log "Expected exactly one stub activity declaration after normalization" >&2
+  sed -n '1,160p' "$MANIFEST_FILE" | sed 's/^/[build-android-app] manifest: /'
   exit 1
 fi
 
-if ! grep -Fq "android:name=\"$FQCN\"" "$MANIFEST_FILE"; then
-  ba_log "Manifest does not declare ${MAIN_NAME}Stub activity" >&2
+if [ ! -f "$STUB_SRC_FILE" ]; then
+  ba_log "Missing stub activity source at $STUB_SRC_FILE" >&2
   exit 1
 fi
 
