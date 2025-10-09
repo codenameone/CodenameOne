@@ -514,24 +514,23 @@ def ensure_application_id(source: str) -> str:
 def ensure_compile_sdk(source: str) -> str:
     pattern = re.compile(r"\bcompileSdk(?:Version)?\s+(\d+)")
     match = pattern.search(source)
-    desired = "compileSdkVersion 35"
+    desired = "compileSdk 35"
     if match:
         start, end = match.span()
-        current = match.group(0)
-        if current != desired:
+        if match.group(0) != desired:
             source = source[:start] + desired + source[end:]
-            messages.append("Updated compileSdkVersion to 35")
+            messages.append("Updated compileSdk to 35")
         return source
     android_match = re.search(r"android\s*\{", source)
     if not android_match:
-        raise SystemExit("Unable to locate android block when inserting compileSdkVersion")
+        raise SystemExit("Unable to locate android block when inserting compileSdk")
     insert = android_match.end()
     source = source[:insert] + f"\n    {desired}" + source[insert:]
-    messages.append("Inserted compileSdkVersion 35")
+    messages.append("Inserted compileSdk 35")
     return source
 
-def ensure_default_config_value(source: str, key: str, value: str) -> str:
-    pattern = re.compile(rf"{key}\s+[\"']?([^\"'\s]+)[\"']?")
+def ensure_default_config_value(source: str, key: str, value: str, *, quoted: bool = False) -> str:
+    pattern = re.compile(rf"{key}(?:Version)?\s+[\"']?([^\"'\s]+)[\"']?")
     default_match = re.search(r"defaultConfig\s*\{", source)
     if not default_match:
         raise SystemExit(f"Unable to locate defaultConfig when inserting {key}")
@@ -539,9 +538,10 @@ def ensure_default_config_value(source: str, key: str, value: str) -> str:
     block_end = _find_matching_brace(source, default_match.start())
     block = source[block_start:block_end]
     match = pattern.search(block)
-    replacement = f"        {key} {value}"
+    replacement_value = f'"{value}"' if quoted else value
+    replacement = f"        {key} {replacement_value}"
     if match:
-        if match.group(1) != value:
+        if match.group(1) != value or "Version" in match.group(0):
             start = block_start + match.start()
             end = block_start + match.end()
             source = source[:start] + replacement + source[end:]
@@ -593,8 +593,10 @@ text = ensure_namespace(text)
 text = ensure_default_config(text)
 text = ensure_application_id(text)
 text = ensure_compile_sdk(text)
-text = ensure_default_config_value(text, "minSdkVersion", "19")
-text = ensure_default_config_value(text, "targetSdkVersion", "35")
+text = ensure_default_config_value(text, "minSdk", "19")
+text = ensure_default_config_value(text, "targetSdk", "35")
+text = ensure_default_config_value(text, "versionCode", "100")
+text = ensure_default_config_value(text, "versionName", "1.0", quoted=True)
 text = ensure_test_instrumentation_runner(text)
 
 if text != original:
@@ -918,14 +920,17 @@ wait_for_api_level() {
   return 1
 }
 
-framework_try_ready() {
+adb_framework_ready_once() {
   local serial="$1"
   local per_try="$2"
-  local phase_timeout="${FRAMEWORK_READY_PHASE_TIMEOUT_SECONDS:-180}"
+  local phase_timeout="$3"
   local log_interval="${FRAMEWORK_READY_STATUS_LOG_INTERVAL_SECONDS:-10}"
 
   if ! [[ "$phase_timeout" =~ ^[0-9]+$ ]] || [ "$phase_timeout" -le 0 ]; then
     phase_timeout=180
+  fi
+  if ! [[ "$per_try" =~ ^[0-9]+$ ]] || [ "$per_try" -le 0 ]; then
+    per_try=5
   fi
   if ! [[ "$log_interval" =~ ^[0-9]+$ ]] || [ "$log_interval" -le 0 ]; then
     log_interval=10
@@ -933,22 +938,27 @@ framework_try_ready() {
 
   local deadline=$((SECONDS + phase_timeout))
   local last_log=$SECONDS
-  local boot_ok="" ce_ok=""
 
   while [ $SECONDS -lt $deadline ]; do
-    boot_ok=""
-    ce_ok=""
-    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server >/dev/null 2>&1; then
-      boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
-      ce_ok="$($ADB_BIN -s "$serial" shell getprop sys.user.0.ce_available 2>/dev/null | tr -d '\r')"
-      if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
-        && run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd activity get-standby-bucket >/dev/null 2>&1; then
-        return 0
-      fi
+    local boot_ok system_pid pm_ok activity_ok
+    boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    system_pid="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server 2>/dev/null | tr -d '\r' || true)"
+    pm_ok=0
+    activity_ok=0
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1; then
+      pm_ok=1
+    fi
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd activity get-standby-bucket >/dev/null 2>&1; then
+      activity_ok=1
+    fi
+
+    if [ "$boot_ok" = "1" ] && [ -n "$system_pid" ] && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ]; then
+      ba_log "Android framework ready on $serial (system_server=$system_pid)"
+      return 0
     fi
 
     if [ $((SECONDS - last_log)) -ge $log_interval ]; then
-      ba_log "Waiting for Android framework on $serial (system_server=$([ -n "$boot_ok" ] && echo up || echo down) boot_ok=${boot_ok:-?} ce_ok=${ce_ok:-?})"
+      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?} pm_ready=$pm_ok activity_ready=$activity_ok)"
       last_log=$SECONDS
     fi
     sleep 2
@@ -957,33 +967,30 @@ framework_try_ready() {
   return 1
 }
 
-ensure_framework_ready() {
+adb_wait_framework_ready() {
   local serial="$1"
   "$ADB_BIN" -s "$serial" wait-for-device >/dev/null 2>&1 || return 1
 
   local per_try="${FRAMEWORK_READY_PER_TRY_TIMEOUT_SECONDS:-5}"
-  if ! [[ "$per_try" =~ ^[0-9]+$ ]] || [ "$per_try" -le 0 ]; then
-    per_try=5
-  fi
 
-  if framework_try_ready "$serial" "$per_try"; then
+  if adb_framework_ready_once "$serial" "$per_try" "${FRAMEWORK_READY_PRIMARY_TIMEOUT_SECONDS:-180}"; then
     return 0
   fi
 
-  ba_log "Framework not ready on $serial. Attempting framework restart (stop/start)…"
+  ba_log "Framework not ready on $serial; restarting system services"
   "$ADB_BIN" -s "$serial" shell stop >/dev/null 2>&1 || true
   sleep 2
   "$ADB_BIN" -s "$serial" shell start >/dev/null 2>&1 || true
 
-  if framework_try_ready "$serial" "$per_try"; then
+  if adb_framework_ready_once "$serial" "$per_try" "${FRAMEWORK_READY_RESTART_TIMEOUT_SECONDS:-120}"; then
     return 0
   fi
 
-  ba_log "Framework still unavailable on $serial. Rebooting device…"
+  ba_log "Framework still unavailable on $serial; rebooting device"
   "$ADB_BIN" -s "$serial" reboot >/dev/null 2>&1 || return 1
   "$ADB_BIN" -s "$serial" wait-for-device >/dev/null 2>&1 || return 1
 
-  if framework_try_ready "$serial" "$per_try"; then
+  if adb_framework_ready_once "$serial" "$per_try" "${FRAMEWORK_READY_REBOOT_TIMEOUT_SECONDS:-180}"; then
     return 0
   fi
 
@@ -1196,7 +1203,7 @@ if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pidof system_server >/dev/null 2>&1;
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell start >/dev/null 2>&1 || true
 fi
 
-if ! ensure_framework_ready "$EMULATOR_SERIAL"; then
+if ! adb_wait_framework_ready "$EMULATOR_SERIAL"; then
   dump_emulator_diagnostics
   stop_emulator
   exit 1
@@ -1283,7 +1290,7 @@ adb_install_file_path() {
   local serial="$1" apk="$2"
   local remote_tmp="/data/local/tmp/$(basename "$apk")"
 
-  if ! ensure_framework_ready "$serial"; then
+  if ! adb_wait_framework_ready "$serial"; then
     return 1
   fi
 
@@ -1323,32 +1330,15 @@ fi
 APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; found=1} END{if(!found) print ""}' || true)"
 NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; found=1} END{if(!found) print ""}' || true)"
 
-if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ] || [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
-  ba_log "applicationId/namespace mismatch (applicationId='${APP_ID:-<unset>}' namespace='${NS_VALUE:-<unset>}'), patching"
-  if ! GRADLE_PACKAGE_LOG=$(ensure_gradle_package_config); then
-    ba_log "Failed to align namespace/applicationId with Codename One package" >&2
-    stop_emulator
-    exit 1
-  fi
-  if [ -n "$GRADLE_PACKAGE_LOG" ]; then
-    while IFS= read -r line; do
-      [ -n "$line" ] && ba_log "$line"
-    done <<<"$GRADLE_PACKAGE_LOG"
-  fi
-  APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null || true)
-  if [ -n "$APP_PROPERTIES_RAW" ]; then
-    set +o pipefail
-    MATCHED_PROPS=$(printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' || true)
-    set -o pipefail
-    if [ -n "$MATCHED_PROPS" ]; then
-      printf '%s\n' "$MATCHED_PROPS" | sed 's/^/[build-android-app] props: /'
-    fi
-  fi
-  APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; found=1} END{if(!found) print ""}' || true)"
-  NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; found=1} END{if(!found) print ""}' || true)"
-  if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ] || [ -z "$NS_VALUE" ] || [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
-    ba_log "WARNING: applicationId/namespace remain misaligned (applicationId='${APP_ID:-<unset>}' namespace='${NS_VALUE:-<unset>}'); continuing with APK inspection" >&2
-  fi
+if [ -z "$APP_ID" ]; then
+  ba_log "Gradle did not report applicationId; relying on APK metadata"
+elif [ "$APP_ID" != "$PACKAGE_NAME" ]; then
+  ba_log "WARNING: Gradle applicationId '$APP_ID' differs from Codename One package '$PACKAGE_NAME'" >&2
+fi
+if [ -z "$NS_VALUE" ]; then
+  ba_log "Gradle did not report namespace; relying on APK metadata"
+elif [ "$NS_VALUE" != "$PACKAGE_NAME" ]; then
+  ba_log "WARNING: Gradle namespace '$NS_VALUE' differs from Codename One package '$PACKAGE_NAME'" >&2
 fi
 
 MERGED_MANIFEST="$APP_MODULE_DIR/build/intermediates/packaged_manifests/debug/AndroidManifest.xml"
@@ -1413,7 +1403,7 @@ TEST_RUNTIME_PACKAGE="${RUNTIME_PACKAGE}.test"
 RUNTIME_STUB_FQCN="${RUNTIME_PACKAGE}.${MAIN_NAME}Stub"
 
 ba_log "Preparing device for APK installation"
-if ! ensure_framework_ready "$EMULATOR_SERIAL"; then
+if ! adb_wait_framework_ready "$EMULATOR_SERIAL"; then
   dump_emulator_diagnostics
   stop_emulator
   exit 1
@@ -1448,7 +1438,7 @@ if ! adb_install_file_path "$EMULATOR_SERIAL" "$TEST_APK"; then
   exit 1
 fi
 
-if ! ensure_framework_ready "$EMULATOR_SERIAL"; then
+if ! adb_wait_framework_ready "$EMULATOR_SERIAL"; then
   dump_emulator_diagnostics
   stop_emulator
   exit 1
