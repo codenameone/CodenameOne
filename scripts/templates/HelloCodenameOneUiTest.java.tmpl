@@ -1,0 +1,315 @@
+package @PACKAGE@;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.view.PixelCopy;
+import android.view.TextureView;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+
+import androidx.annotation.Nullable;
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.ext.junit.rules.ActivityScenarioRule;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.ImageIO;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+@RunWith(AndroidJUnit4.class)
+public class @MAIN_NAME@UiTest {
+
+    private static final long STARTUP_TIMEOUT_MS = 30_000L;
+    private static final long RENDER_TIMEOUT_MS = 15_000L;
+    private static final long EDT_TIMEOUT_MS = 10_000L;
+
+    @Rule
+    public final ActivityScenarioRule<@MAIN_NAME@Stub> scenarioRule =
+            new ActivityScenarioRule<>(@MAIN_NAME@Stub.class);
+
+    @Test
+    public void mainFormScreenshotContainsRenderedContent() throws Exception {
+        ActivityScenario<@MAIN_NAME@Stub> scenario = scenarioRule.getScenario();
+        assertNotNull("ActivityScenario should be initialized", scenario);
+
+        Form form = waitForMainForm();
+        assertNotNull("Codename One main form should be available", form);
+
+        Bitmap androidScreenshot = waitForAndroidScreenshot(scenario);
+        assertTrue("Android screenshot should show rendered content", hasRenderableContent(androidScreenshot));
+        saveBitmap(androidScreenshot, "@MAIN_NAME@-android-ui.png");
+
+        Image codenameOneScreenshot = waitForCodenameOneScreenshot();
+        assertTrue("Codename One screenshot should show rendered content", hasRenderableContent(codenameOneScreenshot));
+        saveCodenameOneScreenshot(codenameOneScreenshot, "@MAIN_NAME@-codenameone-ui.png");
+    }
+
+    private Form waitForMainForm() throws Exception {
+        long deadline = SystemClock.uptimeMillis() + STARTUP_TIMEOUT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (Display.isInitialized()) {
+                Form current = callSeriallyAndWait(() -> Display.getInstance().getCurrent());
+                if (current != null) {
+                    return current;
+                }
+            }
+            SystemClock.sleep(50L);
+        }
+        throw new AssertionError("Timed out waiting for Codename One form to appear");
+    }
+
+    private Bitmap waitForAndroidScreenshot(ActivityScenario<? extends Activity> scenario) throws Exception {
+        AtomicReference<Bitmap> lastCapture = new AtomicReference<>();
+        long deadline = SystemClock.uptimeMillis() + RENDER_TIMEOUT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            scenario.onActivity(activity -> {
+                try {
+                    Bitmap capture = captureAndroidScreenshot(activity);
+                    if (capture != null) {
+                        lastCapture.set(capture);
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            Bitmap candidate = lastCapture.get();
+            if (candidate != null && hasRenderableContent(candidate)) {
+                return candidate;
+            }
+            SystemClock.sleep(100L);
+        }
+        Bitmap fallback = lastCapture.get();
+        if (fallback != null) {
+            return fallback;
+        }
+        throw new AssertionError("Timed out waiting for Android screenshot to contain rendered content");
+    }
+
+    private static Bitmap captureAndroidScreenshot(Activity activity) throws Exception {
+        Window window = activity.getWindow();
+        View decor = window.getDecorView();
+        ensureMeasured(decor);
+
+        Bitmap viaPixelCopy = pixelCopy(window);
+        if (viaPixelCopy != null && hasRenderableContent(viaPixelCopy)) {
+            return viaPixelCopy;
+        }
+
+        Bitmap viaTexture = captureTextureView(decor);
+        if (viaTexture != null && hasRenderableContent(viaTexture)) {
+            return viaTexture;
+        }
+
+        return drawToBitmap(decor);
+    }
+
+    private static void ensureMeasured(View view) {
+        if (view.getWidth() > 0 && view.getHeight() > 0) {
+            return;
+        }
+        int widthSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        view.measure(widthSpec, heightSpec);
+        view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+    }
+
+    @Nullable
+    private static Bitmap pixelCopy(Window window) throws InterruptedException {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return null;
+        }
+        View decor = window.getDecorView();
+        if (decor.getWidth() <= 0 || decor.getHeight() <= 0) {
+            return null;
+        }
+        Bitmap bitmap = Bitmap.createBitmap(decor.getWidth(), decor.getHeight(), Bitmap.Config.ARGB_8888);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<Integer> result = new AtomicReference<>(PixelCopy.ERROR_SOURCE_INVALID);
+        PixelCopy.request(window, bitmap, copyResult -> {
+            result.set(copyResult);
+            latch.countDown();
+        }, new Handler(Looper.getMainLooper()));
+        if (latch.await(EDT_TIMEOUT_MS, TimeUnit.MILLISECONDS) && result.get() == PixelCopy.SUCCESS) {
+            return bitmap;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Bitmap captureTextureView(View view) {
+        if (view instanceof TextureView) {
+            Bitmap bitmap = ((TextureView) view).getBitmap();
+            if (bitmap != null) {
+                return bitmap;
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Bitmap child = captureTextureView(group.getChildAt(i));
+                if (child != null) {
+                    return child;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Bitmap drawToBitmap(View view) {
+        int width = Math.max(1, view.getWidth());
+        int height = Math.max(1, view.getHeight());
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        view.draw(canvas);
+        return bitmap;
+    }
+
+    private Image waitForCodenameOneScreenshot() throws Exception {
+        Image lastCapture = null;
+        long deadline = SystemClock.uptimeMillis() + RENDER_TIMEOUT_MS;
+        while (SystemClock.uptimeMillis() < deadline) {
+            Image capture = captureCodenameOneScreenshot();
+            if (capture != null) {
+                lastCapture = capture;
+                if (hasRenderableContent(capture)) {
+                    return capture;
+                }
+            }
+            SystemClock.sleep(100L);
+        }
+        if (lastCapture != null) {
+            return lastCapture;
+        }
+        throw new AssertionError("Timed out waiting for Codename One screenshot to contain rendered content");
+    }
+
+    @Nullable
+    private Image captureCodenameOneScreenshot() throws Exception {
+        if (!Display.isInitialized()) {
+            return null;
+        }
+        return callSeriallyAndWait(() -> Display.getInstance().captureScreen());
+    }
+
+    private static boolean hasRenderableContent(Bitmap bitmap) {
+        if (bitmap == null || bitmap.getWidth() <= 1 || bitmap.getHeight() <= 1) {
+            return false;
+        }
+        int[] pixels = new int[bitmap.getWidth() * bitmap.getHeight()];
+        bitmap.getPixels(pixels, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+        return hasRenderablePixels(pixels);
+    }
+
+    private static boolean hasRenderableContent(Image image) throws Exception {
+        if (image == null || image.getWidth() <= 1 || image.getHeight() <= 1) {
+            return false;
+        }
+        int[] pixels = callSeriallyAndWait(image::getRGB);
+        return hasRenderablePixels(pixels);
+    }
+
+    private static boolean hasRenderablePixels(int[] pixels) {
+        if (pixels == null || pixels.length == 0) {
+            return false;
+        }
+        int reference = pixels[0];
+        int differing = 0;
+        for (int argb : pixels) {
+            int alpha = (argb >>> 24) & 0xFF;
+            if (alpha == 0) {
+                continue;
+            }
+            if (argb != reference) {
+                differing++;
+                if (differing > pixels.length / 100) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static File saveBitmap(Bitmap bitmap, String fileName) throws IOException {
+        File dir = resolveArtifactDirectory();
+        File destination = new File(dir, fileName);
+        try (FileOutputStream out = new FileOutputStream(destination)) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+        }
+        return destination;
+    }
+
+    private static File saveCodenameOneScreenshot(Image screenshot, String fileName) throws Exception {
+        File dir = resolveArtifactDirectory();
+        File destination = new File(dir, fileName);
+        ImageIO imageIO = callSeriallyAndWait(() -> Display.getInstance().getImageIO());
+        assertNotNull("Codename One ImageIO should be available", imageIO);
+        try (FileOutputStream out = new FileOutputStream(destination)) {
+            final FileOutputStream target = out;
+            callSeriallyAndWait(() -> {
+                imageIO.save(screenshot, target, ImageIO.FORMAT_PNG, 1.0f);
+                return null;
+            });
+        }
+        return destination;
+    }
+
+    private static File resolveArtifactDirectory() throws IOException {
+        File filesDir = InstrumentationRegistry.getInstrumentation()
+                .getTargetContext()
+                .getFilesDir();
+        File output = new File(filesDir, "ui-test-screenshots");
+        if (!output.exists() && !output.mkdirs()) {
+            throw new IOException("Failed to create " + output.getAbsolutePath());
+        }
+        return output;
+    }
+
+    private static <T> T callSeriallyAndWait(Callable<T> task) throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<T> result = new AtomicReference<>();
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        Display.getInstance().callSerially(() -> {
+            try {
+                result.set(task.call());
+            } catch (Throwable t) {
+                error.set(t);
+            } finally {
+                latch.countDown();
+            }
+        });
+        if (!latch.await(EDT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            throw new AssertionError("Timed out waiting for Codename One EDT");
+        }
+        if (error.get() != null) {
+            Throwable throwable = error.get();
+            if (throwable instanceof Exception) {
+                throw (Exception) throwable;
+            }
+            throw new RuntimeException(throwable);
+        }
+        return result.get();
+    }
+}

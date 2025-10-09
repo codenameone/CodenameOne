@@ -26,6 +26,7 @@
 **/.idea/*
 **/build/*
 **/dist/*
+build-artifacts/
 *.zip
 CodenameOneDesigner/src/version.properties
 /Ports/iOSPort/build/
