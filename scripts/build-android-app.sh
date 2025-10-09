@@ -334,11 +334,11 @@ dump_manifest_merger_reports() {
 ba_log "Normalizing Codename One stub activity manifest"
 mkdir -p "$(dirname "$MANIFEST_FILE")"
 if [ ! -f "$MANIFEST_FILE" ]; then
-  cat >"$MANIFEST_FILE" <<'EOF'
+  cat >"$MANIFEST_FILE" <<'EOF_MANIFEST'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application/>
 </manifest>
-EOF
+EOF_MANIFEST
   ba_log "Created minimal Android manifest at $MANIFEST_FILE"
 fi
 
@@ -347,42 +347,59 @@ grep -q '<application' "$MANIFEST_FILE" || sed -i 's#</manifest>#  <application/
 # Remove deprecated package attribute and inline <uses-sdk/> declarations
 perl -0777 -pe 's/\s+package="[^"]*"//; s#<uses-sdk\b[^>]*/>\s*##g' -i "$MANIFEST_FILE"
 
-prune_stub_declaration() {
-  local manifest_path="$1"
-  [ -f "$manifest_path" ] || return 0
-  local tmp
-  tmp=$(mktemp)
-  FQCN="$FQCN" perl -0777 -pe '
-    my $fq = quotemeta($ENV{FQCN});
-    s{<!--\s*CN1-STUB-BEGIN\s*-->.*?<!--\s*CN1-STUB-END\s*-->\s*}{}gs;
-    s{<activity\b[^>]*android:name="$fq"[^>]*/>\s*}{}g;
-    s{<activity\b[^>]*android:name="$fq"[^>]*>.*?</activity>\s*}{}gs;
-  ' "$manifest_path" >"$tmp"
-  mv "$tmp" "$manifest_path"
-}
-
-for SS in main debug release; do
-  prune_stub_declaration "$APP_MODULE_DIR/src/$SS/AndroidManifest.xml"
-done
-
+# Ensure tools namespace for tools:node annotations
 if ! grep -Fq 'xmlns:tools=' "$MANIFEST_FILE"; then
   perl -0777 -pe 's#<manifest\b([^>]*)>#<manifest\1 xmlns:tools="http://schemas.android.com/tools">#' -i "$MANIFEST_FILE"
 fi
 
-# Insert a sentinel-wrapped stub declaration
-perl -0777 -pe 's/<!--\s*CN1-STUB-BEGIN\s*-->.*?<!--\s*CN1-STUB-END\s*-->\s*//gs' -i "$MANIFEST_FILE"
-tmp_manifest="$(mktemp)"
-awk -v fqcn="$FQCN" '
-  BEGIN{inserted=0}
-  /<\/application>/ && !inserted {
-    print "    <!-- CN1-STUB-BEGIN -->"
-    print "    <activity android:name=\"" fqcn "\" android:exported=\"false\" tools:node=\"replace\" />"
-    print "    <!-- CN1-STUB-END -->"
-    inserted=1
-  }
-  {print}
-' "$MANIFEST_FILE" >"$tmp_manifest"
-mv "$tmp_manifest" "$MANIFEST_FILE"
+# Normalize existing stub declarations rather than inserting new ones
+python3 - "$MANIFEST_FILE" "$FQCN" "$PACKAGE_NAME" "$MAIN_NAME" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+manifest_path, fqcn, package_name, main_name = sys.argv[1:5]
+manifest = Path(manifest_path)
+text = manifest.read_text()
+
+text = re.sub(r'<!--\s*CN1-STUB-BEGIN\s*-->.*?<!--\s*CN1-STUB-END\s*-->', '', text, flags=re.S)
+
+name_pattern = re.compile(
+    r'(android:name=")(?:(?:%s)|(?:\.?%sStub)|(?:%s\.%sStub))"' % (
+        re.escape(fqcn), re.escape(main_name), re.escape(package_name), re.escape(main_name)
+    )
+)
+text = name_pattern.sub(r'\1%s"' % fqcn, text)
+
+activity_pattern = re.compile(
+    r'<activity\b[^>]*android:name="%s"[^>]*>(?:.*?)</activity>|<activity\b[^>]*android:name="%s"[^>]*/>' % (
+        re.escape(fqcn), re.escape(fqcn)
+    ),
+    flags=re.S,
+)
+
+seen = {"value": False}
+
+def replace_activity(match):
+    body = match.group(0)
+    if "tools:node=" in body:
+        body = re.sub(r'tools:node="[^"]*"', 'tools:node="replace"', body, count=1)
+    else:
+        close = body.find('>')
+        if close != -1:
+            body = body[:close] + ' tools:node="replace"' + body[close:]
+    if seen["value"]:
+        return ''
+    seen["value"] = True
+    return body
+
+text = activity_pattern.sub(replace_activity, text)
+
+if not seen["value"]:
+    raise SystemExit(f"Stub activity declaration not found in manifest: {manifest_path}")
+
+manifest.write_text(text)
+PY
 
 STUB_DECL_COUNT=$(grep -c "android:name=\"$FQCN\"" "$MANIFEST_FILE" || true)
 ba_log "Stub activity declarations present after normalization: $STUB_DECL_COUNT"
