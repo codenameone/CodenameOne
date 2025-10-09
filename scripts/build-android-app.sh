@@ -741,7 +741,7 @@ configure_avd() {
   fi
   declare -A settings=(
     ["hw.ramSize"]=3072
-    ["disk.dataPartition.size"]=4096M
+    ["disk.dataPartition.size"]=8192M
     ["hw.bluetooth"]=no
     ["hw.camera.back"]=none
     ["hw.camera.front"]=none
@@ -917,6 +917,9 @@ dump_emulator_diagnostics() {
 log_instrumentation_state() {
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android | sed 's/^/[build-android-app] pm path android: /' || true
 
+  local runtime_pkg="${RUNTIME_PACKAGE:-$PACKAGE_NAME}"
+  local test_pkg="${TEST_RUNTIME_PACKAGE:-${runtime_pkg}.test}"
+
   local instrumentation_list
   instrumentation_list="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation 2>/dev/null || true)"
   if [ -n "$instrumentation_list" ]; then
@@ -926,23 +929,23 @@ log_instrumentation_state() {
   fi
 
   local have_test_apk=0
-  if "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "${PACKAGE_NAME}.test" >/dev/null 2>&1; then
+  if [ -n "$test_pkg" ] && "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$test_pkg" >/dev/null 2>&1; then
     have_test_apk=1
-    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "${PACKAGE_NAME}.test" \
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$test_pkg" \
       | sed 's/^/[build-android-app] test-apk: /'
   else
-    ba_log "Test APK for ${PACKAGE_NAME}.test not yet installed on $EMULATOR_SERIAL"
+    ba_log "Test APK for $test_pkg not yet installed on $EMULATOR_SERIAL"
   fi
 
   local package_regex package_list package_matches
-  package_regex="${PACKAGE_NAME//./\.}"
+  package_regex="${runtime_pkg//./\.}"
   package_list="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages 2>/dev/null || true)"
   if [ -n "$package_list" ]; then
     package_matches="$(printf '%s\n' "$package_list" | grep -E "${package_regex}|${package_regex}\.test" || true)"
     if [ -n "$package_matches" ]; then
       printf '%s\n' "$package_matches" | sed 's/^/[build-android-app] package: /'
     else
-      ba_log "Packages matching $PACKAGE_NAME not yet installed on $EMULATOR_SERIAL"
+      ba_log "Packages matching $runtime_pkg not yet installed on $EMULATOR_SERIAL"
     fi
   else
     ba_log "Package manager returned no packages on $EMULATOR_SERIAL"
@@ -962,7 +965,7 @@ collect_instrumentation_crash() {
   : >"$crash_log"
 
   if "$ADB_BIN" -s "$EMULATOR_SERIAL" shell logcat -d -t 2000 >"$log_tmp" 2>/dev/null; then
-    if grep -E "FATAL EXCEPTION|AndroidRuntime|Process: ${PACKAGE_NAME}(\\.test)?|Abort message:" "$log_tmp" >"$filtered_tmp" 2>/dev/null; then
+    if grep -E "FATAL EXCEPTION|AndroidRuntime|Process: ${RUNTIME_PACKAGE}(\\.test)?|Abort message:" "$log_tmp" >"$filtered_tmp" 2>/dev/null; then
       if [ -s "$filtered_tmp" ]; then
         while IFS= read -r line; do
           echo "[build-android-app] crash: $line"
@@ -1043,14 +1046,23 @@ EMULATOR_SERIAL="emulator-$EMULATOR_PORT"
 
 EMULATOR_LOG="$GRADLE_PROJECT_DIR/emulator.log"
 ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
+EMULATOR_ADDITIONAL_ARGS=()
+WIPE_SENTINEL="$AVD_HOME/.${AVD_NAME}.wiped"
+if [ ! -f "$WIPE_SENTINEL" ]; then
+  EMULATOR_ADDITIONAL_ARGS+=(-wipe-data)
+fi
 ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" \
   -no-window -no-snapshot -gpu swiftshader_indirect -no-audio -no-boot-anim \
   -accel off -no-accel -camera-back none -camera-front none -skip-adb-auth \
-  -feature -Vulkan -netfast -memory 3072 >"$EMULATOR_LOG" 2>&1 &
+  -feature -Vulkan -netfast -memory 3072 "${EMULATOR_ADDITIONAL_ARGS[@]}" >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
 sleep 5
+
+if [ ! -f "$WIPE_SENTINEL" ]; then
+  touch "$WIPE_SENTINEL" 2>/dev/null || true
+fi
 
 detect_emulator_serial() {
   local deadline current_devices serial existing
@@ -1179,13 +1191,18 @@ if [ "$ASSEMBLE_EXIT_CODE" -ne 0 ]; then
 fi
 
 adb_install_retry() {
-  local serial="$1" apk="$2" tries=5
+  local serial="$1" apk="$2" tries=3
   local attempt
+
   for attempt in $(seq 1 "$tries"); do
     if command -v timeout >/dev/null 2>&1; then
-      timeout 120 "$ADB_BIN" -s "$serial" install -r -t "$apk" && return 0
+      if timeout 120 "$ADB_BIN" -s "$serial" install -r -t --no-incremental "$apk"; then
+        return 0
+      fi
     else
-      "$ADB_BIN" -s "$serial" install -r -t "$apk" && return 0
+      if "$ADB_BIN" -s "$serial" install -r -t --no-incremental "$apk"; then
+        return 0
+      fi
     fi
     if [ "$attempt" -lt "$tries" ]; then
       ba_log "install retry $attempt/$tries for $(basename "$apk")"
@@ -1193,6 +1210,45 @@ adb_install_retry() {
       sleep 3
     fi
   done
+
+  ba_log "Falling back to push+pm install for $(basename "$apk")"
+  local remote_tmp="/data/local/tmp/$(basename "$apk")"
+  "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+  if ! "$ADB_BIN" -s "$serial" push "$apk" "$remote_tmp" >/dev/null 2>&1; then
+    ba_log "Failed to push $(basename "$apk") to $remote_tmp" >&2
+    return 1
+  fi
+
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout 180 "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
+      "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+      return 0
+    fi
+  else
+    if "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
+      "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+      return 0
+    fi
+  fi
+
+  local size
+  size=$(stat -c%s "$apk" 2>/dev/null || wc -c <"$apk")
+  if [ -n "$size" ]; then
+    ba_log "Attempting size-piped install for $(basename "$apk")"
+    if command -v timeout >/dev/null 2>&1; then
+      if timeout 180 "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $size"; then
+        "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+        return 0
+      fi
+    else
+      if "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $size"; then
+        "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+        return 0
+      fi
+    fi
+  fi
+
+  "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
   return 1
 }
 
@@ -1281,6 +1337,7 @@ if [ -d "$ANDROID_SDK_ROOT/build-tools" ]; then
   done < <(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -Vr)
 fi
 
+RUNTIME_PACKAGE="$PACKAGE_NAME"
 if [ -n "$AAPT_BIN" ] && [ -x "$AAPT_BIN" ]; then
   APK_PACKAGE="$($AAPT_BIN dump badging "$APP_APK" 2>/dev/null | awk -F"'" '/^package: name=/{print $2; exit}')"
   if [ -n "$APK_PACKAGE" ]; then
@@ -1288,12 +1345,32 @@ if [ -n "$AAPT_BIN" ] && [ -x "$AAPT_BIN" ]; then
     if [ "$APK_PACKAGE" != "$PACKAGE_NAME" ]; then
       ba_log "WARNING: APK package ($APK_PACKAGE) differs from Codename One package ($PACKAGE_NAME)" >&2
     fi
+    RUNTIME_PACKAGE="$APK_PACKAGE"
   else
     ba_log "WARN: Unable to extract application package using $AAPT_BIN" >&2
   fi
 else
   ba_log "WARN: aapt binary not found under $ANDROID_SDK_ROOT/build-tools; skipping APK package verification" >&2
 fi
+
+TEST_RUNTIME_PACKAGE="${RUNTIME_PACKAGE}.test"
+RUNTIME_STUB_FQCN="${RUNTIME_PACKAGE}.${MAIN_NAME}Stub"
+
+ba_log "Preparing device for APK installation"
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop sys.boot_completed >/dev/null 2>&1 || true
+
+SESSION_IDS="$($ADB_BIN -s "$EMULATOR_SERIAL" shell cmd package list sessions 2>/dev/null | awk '{print $1}' | sed 's/sessionId=//g' || true)"
+if [ -n "$SESSION_IDS" ]; then
+  while IFS= read -r sid; do
+    [ -z "$sid" ] && continue
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package abort-session "$sid" >/dev/null 2>&1 || true
+  done <<<"$SESSION_IDS"
+fi
+
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm uninstall "$RUNTIME_PACKAGE" >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm uninstall "$TEST_RUNTIME_PACKAGE" >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package bg-dexopt-job >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell rm -f /data/local/tmp/*.apk >/dev/null 2>&1 || true
 
 ba_log "Installing app APK: $APP_APK"
 if ! adb_install_retry "$EMULATOR_SERIAL" "$APP_APK"; then
@@ -1310,21 +1387,21 @@ if ! adb_install_retry "$EMULATOR_SERIAL" "$TEST_APK"; then
 fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation | sed "s/^/[build-android-app] instrumentation: /" || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages | grep -E "${PACKAGE_NAME//./\.}|${PACKAGE_NAME//./\.}\.test" | sed "s/^/[build-android-app] package: /" || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$PACKAGE_NAME/$FQCN" | sed "s/^/[build-android-app] resolve-stub (pre-test): /" || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages | grep -E "${RUNTIME_PACKAGE//./\.}|${RUNTIME_PACKAGE//./\.}\.test" | sed "s/^/[build-android-app] package: /" || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$RUNTIME_PACKAGE/$RUNTIME_STUB_FQCN" | sed "s/^/[build-android-app] resolve-stub (pre-test): /" || true
 
-APP_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' || true)"
+APP_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$RUNTIME_PACKAGE" 2>/dev/null | tr -d '\r' || true)"
 if [ -n "$APP_PACKAGE_PATH" ]; then
   printf '%s\n' "$APP_PACKAGE_PATH" | sed 's/^/[build-android-app] app-apk: /'
 else
-  ba_log "App package $PACKAGE_NAME not yet reported by pm path on $EMULATOR_SERIAL"
+  ba_log "App package $RUNTIME_PACKAGE not yet reported by pm path on $EMULATOR_SERIAL"
 fi
 
-TEST_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "${PACKAGE_NAME}.test" 2>/dev/null | tr -d '\r' || true)"
+TEST_PACKAGE_PATH="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path "$TEST_RUNTIME_PACKAGE" 2>/dev/null | tr -d '\r' || true)"
 if [ -n "$TEST_PACKAGE_PATH" ]; then
   printf '%s\n' "$TEST_PACKAGE_PATH" | sed 's/^/[build-android-app] test-apk: /'
 else
-  ba_log "Test package ${PACKAGE_NAME}.test not yet reported by pm path on $EMULATOR_SERIAL"
+  ba_log "Test package $TEST_RUNTIME_PACKAGE not yet reported by pm path on $EMULATOR_SERIAL"
 fi
 
 log_instrumentation_state
@@ -1332,12 +1409,12 @@ log_instrumentation_state
 RUNNER="$(
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation \
     | tr -d '\r' \
-    | grep -F "(target=$PACKAGE_NAME)" \
+    | grep -F "(target=$RUNTIME_PACKAGE)" \
     | head -n1 \
     | sed -E 's/^instrumentation:([^ ]+).*/\1/'
 )"
 if [ -z "$RUNNER" ]; then
-  ba_log "No instrumentation runner found for $PACKAGE_NAME"
+  ba_log "No instrumentation runner found for $RUNTIME_PACKAGE"
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list instrumentation | sed 's/^/[build-android-app] instrumentation: /'
   dump_emulator_diagnostics
   stop_emulator
@@ -1350,7 +1427,7 @@ LAUNCH_RESOLVE_OUTPUT="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package reso
 if [ -n "$LAUNCH_RESOLVE_OUTPUT" ]; then
   printf '%s\n' "$LAUNCH_RESOLVE_OUTPUT" | sed 's/^/[build-android-app] resolve-launch: /'
 fi
-STUB_ACTIVITY_FQCN="$PACKAGE_NAME/$FQCN"
+STUB_ACTIVITY_FQCN="$RUNTIME_PACKAGE/$RUNTIME_STUB_FQCN"
 STUB_RESOLVE_OUTPUT="$(
     "$ADB_BIN" -s "$EMULATOR_SERIAL" shell cmd package resolve-activity --brief "$STUB_ACTIVITY_FQCN" 2>&1 || true
   )"
@@ -1366,8 +1443,8 @@ if [[ "$STUB_RESOLVE_OUTPUT" == *"No activity found"* ]] || [ -z "$STUB_RESOLVE_
   exit 1
 fi
 
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "${PACKAGE_NAME}.test" >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "$RUNTIME_PACKAGE" >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am force-stop "$TEST_RUNTIME_PACKAGE" >/dev/null 2>&1 || true
 
 UI_TEST_TIMEOUT_SECONDS="${UI_TEST_TIMEOUT_SECONDS:-900}"
 if ! [[ "$UI_TEST_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [ "$UI_TEST_TIMEOUT_SECONDS" -le 0 ]; then
@@ -1422,10 +1499,10 @@ fi
 copy_device_file() {
   local src="$1"
   local dest="$2"
-  if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell run-as "$PACKAGE_NAME" ls "$src" >/dev/null 2>&1; then
+  if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell run-as "$RUNTIME_PACKAGE" ls "$src" >/dev/null 2>&1; then
     return 1
   fi
-  if "$ADB_BIN" -s "$EMULATOR_SERIAL" exec-out run-as "$PACKAGE_NAME" cat "$src" >"$dest"; then
+  if "$ADB_BIN" -s "$EMULATOR_SERIAL" exec-out run-as "$RUNTIME_PACKAGE" cat "$src" >"$dest"; then
     return 0
   fi
   rm -f "$dest"
