@@ -1098,11 +1098,15 @@ ba_log "Inspecting Gradle application identifiers"
 
 APP_PROPERTIES_RAW=$(cd "$GRADLE_PROJECT_DIR" && ./gradlew -q :app:properties 2>/dev/null || true)
 if [ -n "$APP_PROPERTIES_RAW" ]; then
-  printf '%s\n' "$APP_PROPERTIES_RAW" | grep -E '^(applicationId|testApplicationId|namespace):' | sed 's/^/[build-android-app] props: /'
+  set +o pipefail
+  printf '%s\n' "$APP_PROPERTIES_RAW" \
+    | grep -E '^(applicationId|testApplicationId|namespace):' \
+    | sed 's/^/[build-android-app] props: /' || true
+  set -o pipefail
 fi
 
-APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}')"
-NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}')"
+APP_ID="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^applicationId:/{print $2; exit}' || true)"
+NS_VALUE="$(printf '%s\n' "$APP_PROPERTIES_RAW" | awk -F': ' '/^namespace:/{print $2; exit}' || true)"
 
 if [ -z "$APP_ID" ] || [ "$APP_ID" != "$PACKAGE_NAME" ]; then
   ba_log "ERROR: applicationId=$APP_ID does not match Codename One package $PACKAGE_NAME" >&2
