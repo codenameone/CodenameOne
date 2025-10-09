@@ -354,6 +354,7 @@ prune_stub_declaration() {
   tmp=$(mktemp)
   FQCN="$FQCN" perl -0777 -pe '
     my $fq = quotemeta($ENV{FQCN});
+    s{<!--\s*CN1-STUB-BEGIN\s*-->.*?<!--\s*CN1-STUB-END\s*-->\s*}{}gs;
     s{<activity\b[^>]*android:name="$fq"[^>]*/>\s*}{}g;
     s{<activity\b[^>]*android:name="$fq"[^>]*>.*?</activity>\s*}{}gs;
   ' "$manifest_path" >"$tmp"
@@ -368,11 +369,15 @@ if ! grep -Fq 'xmlns:tools=' "$MANIFEST_FILE"; then
   perl -0777 -pe 's#<manifest\b([^>]*)>#<manifest\1 xmlns:tools="http://schemas.android.com/tools">#' -i "$MANIFEST_FILE"
 fi
 
+# Insert a sentinel-wrapped stub declaration
+perl -0777 -pe 's/<!--\s*CN1-STUB-BEGIN\s*-->.*?<!--\s*CN1-STUB-END\s*-->\s*//gs' -i "$MANIFEST_FILE"
 tmp_manifest="$(mktemp)"
 awk -v fqcn="$FQCN" '
   BEGIN{inserted=0}
   /<\/application>/ && !inserted {
+    print "    <!-- CN1-STUB-BEGIN -->"
     print "    <activity android:name=\"" fqcn "\" android:exported=\"false\" tools:node=\"replace\" />"
+    print "    <!-- CN1-STUB-END -->"
     inserted=1
   }
   {print}
@@ -496,6 +501,28 @@ fi
 ba_log "Dependencies block after instrumentation update:"
 awk '/^\s*dependencies\s*\{/{flag=1} flag{print} /^\s*\}/{if(flag){exit}}' "$APP_BUILD_GRADLE" \
   | sed 's/^/[build-android-app] | /'
+
+# Final manifest sanity before Gradle preflight
+if [ -f "$MANIFEST_FILE" ]; then
+  tmp_manifest_pruned="$(mktemp)"
+  FQCN="$FQCN" perl -0777 -pe '
+    my $fq = quotemeta($ENV{FQCN});
+    my $seen = 0;
+    s{
+       (<activity\b[^>]*android:name="$fq"[^>]*/>\s*)
+      |
+       (<activity\b[^>]*android:name="$fq"[^>]*>.*?</activity>\s*)
+     }{
+       $seen++ ? "" : $&
+     }gsxe;
+  ' "$MANIFEST_FILE" >"$tmp_manifest_pruned"
+  mv "$tmp_manifest_pruned" "$MANIFEST_FILE"
+  STUB_COUNT=$(grep -c "android:name=\"$FQCN\"" "$MANIFEST_FILE" || true)
+  ba_log "Stub declarations in manifest after pruning: $STUB_COUNT"
+  ba_log "Dumping manifest contents prior to preflight"
+  nl -ba "$MANIFEST_FILE" | sed 's/^/[build-android-app] manifest: /'
+  grep -n "android:name=\"$FQCN\"" "$MANIFEST_FILE" | sed 's/^/[build-android-app] manifest-match: /' || true
+fi
 
 ba_log "Validating manifest merge before assemble"
 if ! (
