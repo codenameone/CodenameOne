@@ -1238,6 +1238,7 @@ fi
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell locksettings set-disabled true >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global device_provisioned 1 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put secure user_setup_complete 1 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell svc power stayon true >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell wm dismiss-keyguard >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
@@ -1492,6 +1493,20 @@ if ! adb_install_file_path "$EMULATOR_SERIAL" "$TEST_APK"; then
 fi
 
 if ! adb_wait_framework_ready "$EMULATOR_SERIAL"; then
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
+
+if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages | grep -q "^package:${RUNTIME_PACKAGE//./\.}$"; then
+  ba_log "ERROR: Installed package $RUNTIME_PACKAGE not visible on $EMULATOR_SERIAL"
+  dump_emulator_diagnostics
+  stop_emulator
+  exit 1
+fi
+
+if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm list packages | grep -q "^package:${TEST_RUNTIME_PACKAGE//./\.}$"; then
+  ba_log "ERROR: Installed test package $TEST_RUNTIME_PACKAGE not visible on $EMULATOR_SERIAL"
   dump_emulator_diagnostics
   stop_emulator
   exit 1
