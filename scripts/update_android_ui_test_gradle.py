@@ -231,6 +231,37 @@ class GradleFile:
     def remove_dex_options(self) -> None:
         self.content = re.sub(r"\s*dexOptions\s*\{[^{}]*\}\s*", "\n", self.content)
 
+    def convert_lint_options(self) -> None:
+        block = self._find_block("lintOptions", parent="android")
+        if not block:
+            return
+        block_text = self.content[block[0]:block[1]]
+        start = block_text.find('{')
+        end = block_text.rfind('}')
+        if start == -1 or end == -1 or end <= start:
+            self.content = (
+                self.content[:block[0]]
+                + "    lint {\n    }\n"
+                + self.content[block[1]:]
+            )
+            return
+        body = block_text[start + 1 : end]
+        lines = []
+        for line in body.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                lines.append("")
+            else:
+                lines.append(f"        {stripped}")
+        joined = "\n".join(lines)
+        if joined:
+            joined = joined + "\n"
+        replacement = f"    lint {{\n{joined}    }}\n"
+        self.content = self.content[:block[0]] + replacement + self.content[block[1]:]
+
+    def remove_jcenter(self) -> None:
+        self.content = re.sub(r"^\s*jcenter\(\)\s*$\n?", "", self.content, flags=re.MULTILINE)
+
     def ensure_dependencies(self) -> None:
         block = self._find_dependencies_block()
         if not block:
@@ -318,6 +349,8 @@ class GradleFile:
         self.ensure_default_config()
         self.ensure_test_options()
         self.remove_dex_options()
+        self.convert_lint_options()
+        self.remove_jcenter()
         self.ensure_dependencies()
 
     def summary(self) -> str:

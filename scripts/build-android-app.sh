@@ -392,12 +392,13 @@ seen = {"value": False}
 
 def replace_activity(match):
     body = match.group(0)
-    if "tools:node=" in body:
-        body = re.sub(r'tools:node="[^"]*"', 'tools:node="replace"', body, count=1)
+    body = re.sub(r'\s+tools:node="[^"]*"', '', body)
+    if 'android:exported=' in body:
+        body = re.sub(r'android:exported="[^"]*"', 'android:exported="true"', body, count=1)
     else:
         close = body.find('>')
         if close != -1:
-            body = body[:close] + ' tools:node="replace"' + body[close:]
+            body = body[:close] + ' android:exported="true"' + body[close:]
     if seen["value"]:
         return ''
     seen["value"] = True
