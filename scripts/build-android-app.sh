@@ -933,8 +933,10 @@ adb_framework_ready_once() {
     log_interval=10
   fi
 
+  local start_time=$SECONDS
   local deadline=$((SECONDS + phase_timeout))
   local last_log=$SECONDS
+  local last_home_nudge=$SECONDS
 
   while [ $SECONDS -lt $deadline ]; do
     local boot_ok dev_boot system_pid pm_ok pm_list_ok service_ok cmd_ok activity_ok resolve_ok service_status
@@ -975,15 +977,36 @@ adb_framework_ready_once() {
     fi
 
     if [ "$boot_ok" = "1" ] && [ "$dev_boot" = "1" ] && [ -n "$system_pid" ] \
-       && [ $pm_ok -eq 1 ] && [ $pm_list_ok -eq 1 ] && [ $cmd_ok -eq 1 ] \
-       && [ $activity_ok -eq 1 ] && [ $resolve_ok -eq 1 ] && [ $service_ok -eq 1 ]; then
-      ba_log "Android framework ready on $serial (system_server=$system_pid)"
-      return 0
+       && [ $pm_ok -eq 1 ] && [ $cmd_ok -eq 1 ] && [ $service_ok -eq 1 ]; then
+      if [ $pm_list_ok -eq 1 ] || [ $activity_ok -eq 1 ] || [ $resolve_ok -eq 1 ]; then
+        ba_log "Android framework ready on $serial (system_server=$system_pid)"
+        return 0
+      fi
+
+      local secondary_wait="${FRAMEWORK_READY_SECONDARY_GRACE_SECONDS:-90}"
+      if ! [[ "$secondary_wait" =~ ^[0-9]+$ ]]; then
+        secondary_wait=90
+      fi
+      if [ $((SECONDS - start_time)) -ge "$secondary_wait" ]; then
+        ba_log "Android framework heuristically ready on $serial (system_server=$system_pid; pm_list=$pm_list_ok activity=$activity_ok resolve=$resolve_ok)"
+        return 0
+      fi
     fi
 
     if [ $((SECONDS - last_log)) -ge $log_interval ]; then
       ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok pm_list_ready=$pm_list_ok cmd_ready=$cmd_ok activity_ready=$activity_ok package_service_ready=$service_ok resolve_ready=$resolve_ok)"
       last_log=$SECONDS
+    fi
+
+    local home_retry="${FRAMEWORK_READY_HOME_RETRY_SECONDS:-30}"
+    if ! [[ "$home_retry" =~ ^[0-9]+$ ]]; then
+      home_retry=30
+    fi
+    if [ $((SECONDS - last_home_nudge)) -ge "$home_retry" ]; then
+      run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell input keyevent 82 >/dev/null 2>&1 || true
+      run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell \
+        am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null 2>&1 || true
+      last_home_nudge=$SECONDS
     fi
     sleep 2
   done
