@@ -23,6 +23,12 @@ ANDROID_TEST_DEPENDENCIES = (
     "androidx.test.uiautomator:uiautomator:2.2.0",
 )
 
+TEST_OPTIONS_SNIPPET = """
+    testOptions {
+        animationsDisabled = true
+    }
+"""
+
 
 class GradleFile:
     def __init__(self, content: str) -> None:
