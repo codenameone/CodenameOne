@@ -622,7 +622,7 @@ sed -n '1,80p' "$APP_BUILD_GRADLE" | sed 's/^/[build-android-app] app.gradle: /'
 
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
-GRADLE_UPDATE_OUTPUT="$("$SCRIPT_DIR/update_android_ui_test_gradle.py" "$APP_BUILD_GRADLE")"
+GRADLE_UPDATE_OUTPUT="$("$SCRIPT_DIR/update_android_ui_test_gradle.py" --package-name "$PACKAGE_NAME" "$APP_BUILD_GRADLE")"
 if [ -n "$GRADLE_UPDATE_OUTPUT" ]; then
   while IFS= read -r line; do
     [ -n "$line" ] && ba_log "$line"
@@ -1426,16 +1426,28 @@ fi
 
 ba_log "Installing app APK: $APP_APK"
 if ! adb_install_file_path "$EMULATOR_SERIAL" "$APP_APK"; then
-  dump_emulator_diagnostics
-  stop_emulator
-  exit 1
+  ba_log "App APK install failed; restarting framework services and retrying"
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell stop >/dev/null 2>&1 || true
+  sleep 2
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell start >/dev/null 2>&1 || true
+  if ! adb_install_file_path "$EMULATOR_SERIAL" "$APP_APK"; then
+    dump_emulator_diagnostics
+    stop_emulator
+    exit 1
+  fi
 fi
 
 ba_log "Installing androidTest APK: $TEST_APK"
 if ! adb_install_file_path "$EMULATOR_SERIAL" "$TEST_APK"; then
-  dump_emulator_diagnostics
-  stop_emulator
-  exit 1
+  ba_log "androidTest APK install failed; restarting framework services and retrying"
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell stop >/dev/null 2>&1 || true
+  sleep 2
+  "$ADB_BIN" -s "$EMULATOR_SERIAL" shell start >/dev/null 2>&1 || true
+  if ! adb_install_file_path "$EMULATOR_SERIAL" "$TEST_APK"; then
+    dump_emulator_diagnostics
+    stop_emulator
+    exit 1
+  fi
 fi
 
 if ! adb_wait_framework_ready "$EMULATOR_SERIAL"; then
