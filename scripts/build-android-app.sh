@@ -940,25 +940,30 @@ adb_framework_ready_once() {
   local last_log=$SECONDS
 
   while [ $SECONDS -lt $deadline ]; do
-    local boot_ok system_pid pm_ok activity_ok
+    local boot_ok system_pid pm_ok activity_ok service_ok service_status
     boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
     system_pid="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server 2>/dev/null | tr -d '\r' || true)"
     pm_ok=0
     activity_ok=0
+    service_ok=0
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1; then
       pm_ok=1
     fi
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd activity get-standby-bucket >/dev/null 2>&1; then
       activity_ok=1
     fi
+    service_status="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell service check package 2>/dev/null | tr -d '\r' || true)"
+    if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
+      service_ok=1
+    fi
 
-    if [ "$boot_ok" = "1" ] && [ -n "$system_pid" ] && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ]; then
+    if [ "$boot_ok" = "1" ] && [ -n "$system_pid" ] && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ] && [ $service_ok -eq 1 ]; then
       ba_log "Android framework ready on $serial (system_server=$system_pid)"
       return 0
     fi
 
     if [ $((SECONDS - last_log)) -ge $log_interval ]; then
-      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?} pm_ready=$pm_ok activity_ready=$activity_ok)"
+      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?} pm_ready=$pm_ok activity_ready=$activity_ok package_service_ready=$service_ok)"
       last_log=$SECONDS
     fi
     sleep 2
