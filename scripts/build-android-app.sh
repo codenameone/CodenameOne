@@ -937,47 +937,42 @@ adb_framework_ready_once() {
   local last_log=$SECONDS
 
   while [ $SECONDS -lt $deadline ]; do
-    local boot_ok dev_boot system_pid pm_ok activity_ok service_ok user_ready service_status cmd_ok resolve_ok
+    local boot_ok dev_boot system_pid pm_ok service_ok cmd_ok resolve_ok service_status
     boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
     dev_boot="$($ADB_BIN -s "$serial" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r')"
     system_pid="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server 2>/dev/null | tr -d '\r' || true)"
+
     pm_ok=0
-    activity_ok=0
-    service_ok=0
-    user_ready=0
-    cmd_ok=0
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1; then
       pm_ok=1
     fi
-    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd activity get-standby-bucket >/dev/null 2>&1; then
-      activity_ok=1
-    fi
-    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell am get-current-user >/dev/null 2>&1; then
-      user_ready=1
-    fi
+
+    cmd_ok=0
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd -l >/dev/null 2>&1; then
       cmd_ok=1
     fi
+
     resolve_ok=0
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell \
       "cmd package resolve-activity --brief android.intent.action.MAIN -c android.intent.category.HOME" >/dev/null 2>&1; then
       resolve_ok=1
     fi
+
+    service_ok=0
     service_status="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell service check package 2>/dev/null | tr -d '\r' || true)"
     if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
       service_ok=1
     fi
 
     if [ "$boot_ok" = "1" ] && [ "$dev_boot" = "1" ] && [ -n "$system_pid" ] \
-       && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ] && [ $service_ok -eq 1 ] \
-       && [ $resolve_ok -eq 1 ] \
-       && [ $cmd_ok -eq 1 ] && [ $user_ready -eq 1 ]; then
+       && [ $pm_ok -eq 1 ] && [ $cmd_ok -eq 1 ] && [ $resolve_ok -eq 1 ] \
+       && [ $service_ok -eq 1 ]; then
       ba_log "Android framework ready on $serial (system_server=$system_pid)"
       return 0
     fi
 
     if [ $((SECONDS - last_log)) -ge $log_interval ]; then
-      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok activity_ready=$activity_ok cmd_ready=$cmd_ok package_service_ready=$service_ok resolve_ready=$resolve_ok user_ready=$user_ready)"
+      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok cmd_ready=$cmd_ok package_service_ready=$service_ok resolve_ready=$resolve_ok)"
       last_log=$SECONDS
     fi
     sleep 2
@@ -1161,7 +1156,7 @@ ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_P
   -gpu swiftshader_indirect -no-audio -no-boot-anim \
   -accel off -no-metrics -camera-back none -camera-front none -skip-adb-auth \
   -feature -Vulkan -netfast -skin 1080x1920 -memory 2048 -cores 2 \
-  -writable-system -selinux permissive -partition-size 2048 >"$EMULATOR_LOG" 2>&1 &
+  -partition-size 4096 >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
@@ -1221,6 +1216,13 @@ if ! wait_for_emulator "$EMULATOR_SERIAL"; then
   exit 1
 fi
 
+# Provision and wake the device before framework readiness checks
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell svc power stayon true >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global device_provisioned 1 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put secure user_setup_complete 1 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null 2>&1 || true
+
 if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pidof system_server >/dev/null 2>&1; then
   ba_log "system_server not running after boot; restarting framework"
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell stop >/dev/null 2>&1 || true
@@ -1250,12 +1252,8 @@ if ! wait_for_package_service "$EMULATOR_SERIAL"; then
 fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell locksettings set-disabled true >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global device_provisioned 1 >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put secure user_setup_complete 1 >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell svc power stayon usb >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell svc power stayon true >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell wm dismiss-keyguard >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
