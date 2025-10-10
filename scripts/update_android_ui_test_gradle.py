@@ -23,7 +23,8 @@ ANDROID_TEST_DEPENDENCIES = (
     "androidx.test.uiautomator:uiautomator:2.2.0",
 )
 
-TEST_OPTIONS_SNIPPET = """
+# Snippet injected into the android { } block to keep instrumentation runs stable.
+TEST_OPTIONS_SNIPPET: str = """
     testOptions {
         animationsDisabled = true
     }
