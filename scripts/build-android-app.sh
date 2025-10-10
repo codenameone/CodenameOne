@@ -706,7 +706,7 @@ install_android_packages() {
     "platform-tools" \
     "emulator" \
     "platforms;android-35" \
-    "system-images;android-35;google_apis;arm64-v8a" >/dev/null 2>&1 || true
+    "system-images;android-35;google_apis;x86_64" >/dev/null 2>&1 || true
 }
 
 create_avd() {
@@ -755,8 +755,8 @@ configure_avd() {
     ["hw.audioInput"]=no
     ["hw.audioOutput"]=no
     ["hw.cpu.ncore"]=2
-    ["hw.cpu.arch"]="arm64"
-    ["abi.type"]="arm64-v8a"
+    ["hw.cpu.arch"]="x86_64"
+    ["abi.type"]="x86_64"
   )
   local key value
   for key in "${!settings[@]}"; do
@@ -1134,7 +1134,7 @@ if [ ! -x "$EMULATOR_BIN" ]; then
 fi
 
 AVD_NAME="cn1UiTestAvd"
-SYSTEM_IMAGE="system-images;android-35;google_apis;arm64-v8a"
+SYSTEM_IMAGE="system-images;android-35;google_apis;x86_64"
 AVD_CACHE_ROOT="${AVD_CACHE_ROOT:-${RUNNER_TEMP:-$HOME}/cn1-android-avd}"
 mkdir -p "$AVD_CACHE_ROOT"
 AVD_HOME="$AVD_CACHE_ROOT"
