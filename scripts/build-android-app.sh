@@ -731,7 +731,7 @@ create_avd() {
     rm -f "$ini_file"
     rm -rf "$image_dir"
   fi
-  if ! ANDROID_AVD_HOME="$avd_dir" "$manager" create avd -n "$name" -k "$image" --device "2.7in QVGA" --force >/dev/null <<<'no'
+  if ! ANDROID_AVD_HOME="$avd_dir" "$manager" create avd -n "$name" -k "$image" --device "pixel_5" --force >/dev/null <<<'no'
   then
     ba_log "Failed to create Android Virtual Device $name using image $image" >&2
     find "$avd_dir" -maxdepth 2 -mindepth 1 -print | sed 's/^/[build-android-app] AVD: /' >&2 || true
@@ -753,7 +753,7 @@ configure_avd() {
     return
   fi
   declare -A settings=(
-    ["hw.ramSize"]=4096
+    ["hw.ramSize"]=2048
     ["disk.dataPartition.size"]=8192M
     ["fastboot.forceColdBoot"]=yes
     ["hw.bluetooth"]=no
@@ -761,6 +761,7 @@ configure_avd() {
     ["hw.camera.front"]=none
     ["hw.audioInput"]=no
     ["hw.audioOutput"]=no
+    ["hw.cpu.ncore"]=2
   )
   local key value
   for key in "${!settings[@]}"; do
@@ -941,7 +942,7 @@ adb_framework_ready_once() {
   local last_log=$SECONDS
 
   while [ $SECONDS -lt $deadline ]; do
-    local boot_ok dev_boot system_pid pm_ok activity_ok service_ok user_ready service_status
+    local boot_ok dev_boot system_pid pm_ok activity_ok service_ok user_ready service_status cmd_ok
     boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
     dev_boot="$($ADB_BIN -s "$serial" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r')"
     system_pid="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server 2>/dev/null | tr -d '\r' || true)"
@@ -949,6 +950,7 @@ adb_framework_ready_once() {
     activity_ok=0
     service_ok=0
     user_ready=0
+    cmd_ok=0
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1; then
       pm_ok=1
     fi
@@ -958,19 +960,23 @@ adb_framework_ready_once() {
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell am get-current-user >/dev/null 2>&1; then
       user_ready=1
     fi
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd -l >/dev/null 2>&1; then
+      cmd_ok=1
+    fi
     service_status="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell service check package 2>/dev/null | tr -d '\r' || true)"
     if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
       service_ok=1
     fi
 
     if [ "$boot_ok" = "1" ] && [ "$dev_boot" = "1" ] && [ -n "$system_pid" ] \
-       && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ] && [ $service_ok -eq 1 ] && [ $user_ready -eq 1 ]; then
+       && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ] && [ $service_ok -eq 1 ] \
+       && [ $cmd_ok -eq 1 ] && [ $user_ready -eq 1 ]; then
       ba_log "Android framework ready on $serial (system_server=$system_pid)"
       return 0
     fi
 
     if [ $((SECONDS - last_log)) -ge $log_interval ]; then
-      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok activity_ready=$activity_ok package_service_ready=$service_ok user_ready=$user_ready)"
+      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok activity_ready=$activity_ok cmd_ready=$cmd_ok package_service_ready=$service_ok user_ready=$user_ready)"
       last_log=$SECONDS
     fi
     sleep 2
@@ -1152,8 +1158,9 @@ ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
 ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" \
   -no-window -no-snapshot -no-snapshot-load -no-snapshot-save -wipe-data \
   -gpu swiftshader_indirect -no-audio -no-boot-anim \
-  -accel off -no-accel -camera-back none -camera-front none -skip-adb-auth \
-  -feature -Vulkan -netfast -memory 4096 >"$EMULATOR_LOG" 2>&1 &
+  -accel on -camera-back none -camera-front none -skip-adb-auth \
+  -feature -Vulkan -netfast -skin 1080x1920 -memory 2048 -cores 2 \
+  -writable-system -selinux permissive >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
@@ -1239,9 +1246,10 @@ fi
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell locksettings set-disabled true >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global device_provisioned 1 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put secure user_setup_complete 1 >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell svc power stayon true >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell svc power stayon usb >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell wm dismiss-keyguard >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
