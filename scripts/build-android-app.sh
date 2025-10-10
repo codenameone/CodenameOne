@@ -1306,29 +1306,53 @@ fi
 adb_install_file_path() {
   local serial="$1" apk="$2"
   local remote_tmp="/data/local/tmp/$(basename "$apk")"
+  local attempts="${ADB_INSTALL_ATTEMPTS:-3}"
+  local sleep_between="${ADB_INSTALL_RETRY_DELAY_SECONDS:-5}"
+  local attempt install_status apk_size
 
-  if ! adb_wait_framework_ready "$serial"; then
-    return 1
+  if ! [[ "$attempts" =~ ^[0-9]+$ ]] || [ "$attempts" -le 0 ]; then
+    attempts=3
+  fi
+  if ! [[ "$sleep_between" =~ ^[0-9]+$ ]]; then
+    sleep_between=5
   fi
 
-  "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
-  if ! "$ADB_BIN" -s "$serial" push "$apk" "$remote_tmp" >/dev/null 2>&1; then
-    ba_log "Failed to push $(basename "$apk") to $remote_tmp" >&2
-    return 1
-  fi
+  install_status=1
 
-  local install_status=1
-  if "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
-    install_status=0
-  else
-    local apk_size
-    apk_size=$(stat -c%s "$apk" 2>/dev/null || wc -c <"$apk")
-    if [ -n "$apk_size" ] && "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $apk_size"; then
-      install_status=0
+  for attempt in $(seq 1 "$attempts"); do
+    if ! adb_wait_framework_ready "$serial"; then
+      ba_log "Android framework not ready before install attempt $attempt for $(basename "$apk")"
+      sleep "$sleep_between"
+      continue
     fi
-  fi
 
-  "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+    "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+    if ! "$ADB_BIN" -s "$serial" push "$apk" "$remote_tmp" >/dev/null 2>&1; then
+      ba_log "Failed to push $(basename "$apk") to $remote_tmp on attempt $attempt" >&2
+      sleep "$sleep_between"
+      continue
+    fi
+
+    if "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
+      install_status=0
+    else
+      apk_size=$(stat -c%s "$apk" 2>/dev/null || wc -c <"$apk")
+      if [ -n "$apk_size" ] && "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $apk_size"; then
+        install_status=0
+      fi
+    fi
+
+    "$ADB_BIN" -s "$serial" shell rm -f "$remote_tmp" >/dev/null 2>&1 || true
+
+    if [ "$install_status" -eq 0 ]; then
+      ba_log "Install of $(basename "$apk") succeeded on attempt $attempt"
+      break
+    fi
+
+    ba_log "Install attempt $attempt for $(basename "$apk") failed; retrying after ${sleep_between}s"
+    sleep "$sleep_between"
+  done
+
   return $install_status
 }
 
