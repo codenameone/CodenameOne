@@ -940,30 +940,36 @@ adb_framework_ready_once() {
   local last_log=$SECONDS
 
   while [ $SECONDS -lt $deadline ]; do
-    local boot_ok system_pid pm_ok activity_ok service_ok service_status
+    local boot_ok dev_boot system_pid pm_ok activity_ok service_ok user_ready service_status
     boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    dev_boot="$($ADB_BIN -s "$serial" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r')"
     system_pid="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server 2>/dev/null | tr -d '\r' || true)"
     pm_ok=0
     activity_ok=0
     service_ok=0
+    user_ready=0
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1; then
       pm_ok=1
     fi
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd activity get-standby-bucket >/dev/null 2>&1; then
       activity_ok=1
     fi
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell am get-current-user >/dev/null 2>&1; then
+      user_ready=1
+    fi
     service_status="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell service check package 2>/dev/null | tr -d '\r' || true)"
     if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
       service_ok=1
     fi
 
-    if [ "$boot_ok" = "1" ] && [ -n "$system_pid" ] && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ] && [ $service_ok -eq 1 ]; then
+    if [ "$boot_ok" = "1" ] && [ "$dev_boot" = "1" ] && [ -n "$system_pid" ] \
+       && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ] && [ $service_ok -eq 1 ] && [ $user_ready -eq 1 ]; then
       ba_log "Android framework ready on $serial (system_server=$system_pid)"
       return 0
     fi
 
     if [ $((SECONDS - last_log)) -ge $log_interval ]; then
-      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?} pm_ready=$pm_ok activity_ready=$activity_ok package_service_ready=$service_ok)"
+      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok activity_ready=$activity_ok package_service_ready=$service_ok user_ready=$user_ready)"
       last_log=$SECONDS
     fi
     sleep 2
@@ -1229,10 +1235,15 @@ if ! wait_for_package_service "$EMULATOR_SERIAL"; then
   exit 1
 fi
 
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell locksettings set-disabled true >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global device_provisioned 1 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put secure user_setup_complete 1 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell wm dismiss-keyguard >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell am get-current-user >/dev/null 2>&1 || true
 
 if ! wait_for_api_level "$EMULATOR_SERIAL"; then
   dump_emulator_diagnostics
@@ -1242,6 +1253,7 @@ fi
 
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pm path android | sed 's/^/[build-android-app] pm path android: /' || true
 
+"$ADB_BIN" start-server >/dev/null 2>&1 || true
 "$ADB_BIN" kill-server >/dev/null 2>&1 || true
 "$ADB_BIN" start-server >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" wait-for-device
