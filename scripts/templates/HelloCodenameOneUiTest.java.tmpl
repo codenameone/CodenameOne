@@ -235,21 +235,48 @@ public class @MAIN_NAME@UiTest {
         if (pixels == null || pixels.length == 0) {
             return false;
         }
-        int reference = pixels[0];
+
+        final int minVisiblePixels = 32;
+        final int minDifferingPixels = 8;
+        final int minLumaSpread = 12;
+
+        int reference = -1;
         int differing = 0;
+        int visible = 0;
+        int minLuma = 255;
+        int maxLuma = 0;
+
         for (int argb : pixels) {
             int alpha = (argb >>> 24) & 0xFF;
-            if (alpha == 0) {
+            if (alpha < 16) {
                 continue;
             }
-            if (argb != reference) {
+
+            visible++;
+            int rgb = argb & 0x00FFFFFF;
+            if (reference == -1) {
+                reference = rgb;
+            } else if (rgb != reference) {
                 differing++;
-                if (differing > pixels.length / 100) {
-                    return true;
-                }
+            }
+
+            int r = (rgb >>> 16) & 0xFF;
+            int g = (rgb >>> 8) & 0xFF;
+            int b = rgb & 0xFF;
+            int luma = (299 * r + 587 * g + 114 * b) / 1000;
+            if (luma < minLuma) {
+                minLuma = luma;
+            }
+            if (luma > maxLuma) {
+                maxLuma = luma;
+            }
+
+            if (visible >= minVisiblePixels && differing >= minDifferingPixels) {
+                return true;
             }
         }
-        return false;
+
+        return visible >= minVisiblePixels && (differing >= minDifferingPixels || (maxLuma - minLuma) >= minLumaSpread);
     }
 
     private static File saveBitmap(Bitmap bitmap, String fileName) throws IOException {
