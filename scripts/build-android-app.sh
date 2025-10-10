@@ -706,7 +706,7 @@ install_android_packages() {
     "platform-tools" \
     "emulator" \
     "platforms;android-35" \
-    "system-images;android-35;google_apis;x86_64" >/dev/null 2>&1 || true
+    "system-images;android-35;google_apis;arm64-v8a" >/dev/null 2>&1 || true
 }
 
 create_avd() {
@@ -721,16 +721,9 @@ create_avd() {
   mkdir -p "$avd_dir"
   local ini_file="$avd_dir/$name.ini"
   local image_dir="$avd_dir/$name.avd"
-  if [ -f "$ini_file" ] && [ -d "$image_dir" ]; then
-    if grep -F -q "$image" "$ini_file" 2>/dev/null; then
-      ba_log "Reusing existing Android Virtual Device $name"
-      configure_avd "$avd_dir" "$name"
-      return
-    fi
-    ba_log "Existing Android Virtual Device $name uses a different system image; recreating"
-    rm -f "$ini_file"
-    rm -rf "$image_dir"
-  fi
+  ANDROID_AVD_HOME="$avd_dir" "$manager" delete avd -n "$name" >/dev/null 2>&1 || true
+  rm -f "$ini_file"
+  rm -rf "$image_dir"
   if ! ANDROID_AVD_HOME="$avd_dir" "$manager" create avd -n "$name" -k "$image" --device "pixel_5" --force >/dev/null <<<'no'
   then
     ba_log "Failed to create Android Virtual Device $name using image $image" >&2
@@ -762,6 +755,8 @@ configure_avd() {
     ["hw.audioInput"]=no
     ["hw.audioOutput"]=no
     ["hw.cpu.ncore"]=2
+    ["hw.cpu.arch"]="arm64"
+    ["abi.type"]="arm64-v8a"
   )
   local key value
   for key in "${!settings[@]}"; do
@@ -942,7 +937,7 @@ adb_framework_ready_once() {
   local last_log=$SECONDS
 
   while [ $SECONDS -lt $deadline ]; do
-    local boot_ok dev_boot system_pid pm_ok activity_ok service_ok user_ready service_status cmd_ok
+    local boot_ok dev_boot system_pid pm_ok activity_ok service_ok user_ready service_status cmd_ok resolve_ok
     boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
     dev_boot="$($ADB_BIN -s "$serial" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r')"
     system_pid="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server 2>/dev/null | tr -d '\r' || true)"
@@ -963,6 +958,11 @@ adb_framework_ready_once() {
     if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd -l >/dev/null 2>&1; then
       cmd_ok=1
     fi
+    resolve_ok=0
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell \
+      "cmd package resolve-activity --brief android.intent.action.MAIN -c android.intent.category.HOME" >/dev/null 2>&1; then
+      resolve_ok=1
+    fi
     service_status="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell service check package 2>/dev/null | tr -d '\r' || true)"
     if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
       service_ok=1
@@ -970,13 +970,14 @@ adb_framework_ready_once() {
 
     if [ "$boot_ok" = "1" ] && [ "$dev_boot" = "1" ] && [ -n "$system_pid" ] \
        && [ $pm_ok -eq 1 ] && [ $activity_ok -eq 1 ] && [ $service_ok -eq 1 ] \
+       && [ $resolve_ok -eq 1 ] \
        && [ $cmd_ok -eq 1 ] && [ $user_ready -eq 1 ]; then
       ba_log "Android framework ready on $serial (system_server=$system_pid)"
       return 0
     fi
 
     if [ $((SECONDS - last_log)) -ge $log_interval ]; then
-      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok activity_ready=$activity_ok cmd_ready=$cmd_ok package_service_ready=$service_ok user_ready=$user_ready)"
+      ba_log "Waiting for Android framework on $serial (system_server=${system_pid:-down} boot_ok=${boot_ok:-?}/${dev_boot:-?} pm_ready=$pm_ok activity_ready=$activity_ok cmd_ready=$cmd_ok package_service_ready=$service_ok resolve_ready=$resolve_ok user_ready=$user_ready)"
       last_log=$SECONDS
     fi
     sleep 2
@@ -1133,7 +1134,7 @@ if [ ! -x "$EMULATOR_BIN" ]; then
 fi
 
 AVD_NAME="cn1UiTestAvd"
-SYSTEM_IMAGE="system-images;android-35;google_apis;x86_64"
+SYSTEM_IMAGE="system-images;android-35;google_apis;arm64-v8a"
 AVD_CACHE_ROOT="${AVD_CACHE_ROOT:-${RUNNER_TEMP:-$HOME}/cn1-android-avd}"
 mkdir -p "$AVD_CACHE_ROOT"
 AVD_HOME="$AVD_CACHE_ROOT"
@@ -1160,7 +1161,7 @@ ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_P
   -gpu swiftshader_indirect -no-audio -no-boot-anim \
   -accel off -no-metrics -camera-back none -camera-front none -skip-adb-auth \
   -feature -Vulkan -netfast -skin 1080x1920 -memory 2048 -cores 2 \
-  -writable-system -selinux permissive >"$EMULATOR_LOG" 2>&1 &
+  -writable-system -selinux permissive -partition-size 2048 >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
@@ -1348,11 +1349,11 @@ adb_install_file_path() {
       continue
     fi
 
-    if "$ADB_BIN" -s "$serial" shell pm install -r -t -g "$remote_tmp"; then
+    if "$ADB_BIN" -s "$serial" shell pm install -r -t -d -g "$remote_tmp"; then
       install_status=0
     else
       apk_size=$(stat -c%s "$apk" 2>/dev/null || wc -c <"$apk")
-      if [ -n "$apk_size" ] && "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -g -S $apk_size"; then
+      if [ -n "$apk_size" ] && "$ADB_BIN" -s "$serial" shell "cat '$remote_tmp' | pm install -r -t -d -g -S $apk_size"; then
         install_status=0
       fi
     fi
