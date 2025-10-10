@@ -1158,13 +1158,18 @@ ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
 ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" \
   -no-window -no-snapshot -no-snapshot-load -no-snapshot-save -wipe-data \
   -gpu swiftshader_indirect -no-audio -no-boot-anim \
-  -accel on -camera-back none -camera-front none -skip-adb-auth \
+  -accel off -no-metrics -camera-back none -camera-front none -skip-adb-auth \
   -feature -Vulkan -netfast -skin 1080x1920 -memory 2048 -cores 2 \
   -writable-system -selinux permissive >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
-sleep 5
+for _ in {1..60}; do
+  if "$ADB_BIN" -s "$EMULATOR_SERIAL" get-state >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 
 detect_emulator_serial() {
   local deadline current_devices serial existing
