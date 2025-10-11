@@ -27,14 +27,29 @@ load_environment() {
   ls -l "$ENV_FILE" | while IFS= read -r line; do log "$line"; done
   log "Workspace environment file contents"
   sed 's/^/[build-android-port] ENV: /' "$ENV_FILE"
+
+  # Preserve system PATH before sourcing
+  SYSTEM_PATH_BACKUP="$PATH"
+
   # shellcheck disable=SC1090
   source "$ENV_FILE"
 
-  # Ensure common system binaries remain reachable even if the sourced
-  # environment overrides PATH.
-  if ! command -v xvfb-run >/dev/null 2>&1; then
-    export PATH="$PATH:/usr/bin:/bin:/usr/local/bin"
-  fi
+  # Restore system paths that may have been lost during sourcing
+  # Ensure common system binaries remain reachable
+  case ":$PATH:" in
+    *:/usr/bin:*) ;;
+    *) PATH="$PATH:/usr/bin" ;;
+  esac
+  case ":$PATH:" in
+    *:/bin:*) ;;
+    *) PATH="$PATH:/bin" ;;
+  esac
+  case ":$PATH:" in
+    *:/usr/local/bin:*) ;;
+    *) PATH="$PATH:/usr/local/bin" ;;
+  esac
+
+  export PATH
 }
 
 check_java_home() {
@@ -114,22 +129,6 @@ fi
 
 log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA17_HOME=${JAVA17_HOME:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
 
-# setup-workspace.sh already prepends the Java and Maven bin directories to PATH
-# when generating env.sh. Ensure common system locations remain reachable even
-# if the inherited PATH was truncated before sourcing the environment file.
-case ":$PATH:" in
-  *:/usr/bin:*) ;;
-  *) PATH="$PATH:/usr/bin" ;;
-esac
-case ":$PATH:" in
-  *:/bin:*) ;;
-  *) PATH="$PATH:/bin" ;;
-esac
-case ":$PATH:" in
-  *:/usr/local/bin:*) ;;
-  *) PATH="$PATH:/usr/local/bin" ;;
-esac
-export PATH
 "$JAVA_HOME/bin/java" -version
 "$JAVA17_HOME/bin/java" -version
 "$MAVEN_HOME/bin/mvn" -version
