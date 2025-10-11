@@ -709,6 +709,42 @@ install_android_packages() {
     "system-images;android-35;google_apis;x86_64" >/dev/null 2>&1 || true
 }
 
+check_disk_space() {
+  local target_dir="$1"
+  local required_mb="$2"
+
+  ba_log "Checking disk space for AVD creation in $target_dir"
+  df -h "$target_dir" | sed 's/^/[build-android-app] disk: /'
+
+  local available_mb
+  available_mb=$(df -m "$target_dir" | awk 'NR==2 {print $4}')
+  ba_log "Available space: ${available_mb} MB (required ${required_mb} MB)"
+
+  if [ "$available_mb" -lt "$required_mb" ]; then
+    ba_log "Insufficient disk space detected; attempting cleanup" >&2
+    cleanup_disk_space
+    available_mb=$(df -m "$target_dir" | awk 'NR==2 {print $4}')
+    ba_log "Post-cleanup available space: ${available_mb} MB"
+    if [ "$available_mb" -lt "$required_mb" ]; then
+      return 1
+    fi
+  fi
+  return 0
+}
+
+cleanup_disk_space() {
+  ba_log "Cleaning up disk space before AVD creation"
+  if [ -n "${HOME:-}" ]; then
+    rm -rf "$HOME/.gradle/caches/build-cache-*" 2>/dev/null || true
+    rm -rf "$HOME/.m2/repository" 2>/dev/null || true
+  fi
+  if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "$ANDROID_SDK_ROOT/system-images" ]; then
+    find "$ANDROID_SDK_ROOT/system-images" -mindepth 1 -maxdepth 1 ! -name "android-35" -exec rm -rf {} + 2>/dev/null || true
+  fi
+  rm -rf /tmp/cn1-* 2>/dev/null || true
+  df -h | sed 's/^/[build-android-app] disk-after-cleanup: /'
+}
+
 create_avd() {
   local manager="$1"
   local name="$2"
@@ -719,6 +755,13 @@ create_avd() {
     exit 1
   fi
   mkdir -p "$avd_dir"
+
+  local required_mb=10240
+  if ! check_disk_space "$avd_dir" "$required_mb"; then
+    ba_log "ERROR: insufficient disk space for AVD creation (need ${required_mb} MB)" >&2
+    exit 1
+  fi
+
   local ini_file="$avd_dir/$name.ini"
   local image_dir="$avd_dir/$name.avd"
   ANDROID_AVD_HOME="$avd_dir" "$manager" delete avd -n "$name" >/dev/null 2>&1 || true
@@ -736,6 +779,7 @@ create_avd() {
     exit 1
   fi
   configure_avd "$avd_dir" "$name"
+  du -sh "$image_dir" 2>/dev/null | sed 's/^/[build-android-app] AVD-size: /' || true
 }
 
 configure_avd() {
@@ -746,8 +790,8 @@ configure_avd() {
     return
   fi
   declare -A settings=(
-    ["hw.ramSize"]=6144
-    ["disk.dataPartition.size"]=12288M
+    ["hw.ramSize"]=4096
+    ["disk.dataPartition.size"]=6144M
     ["fastboot.forceColdBoot"]=yes
     ["hw.bluetooth"]=no
     ["hw.camera.back"]=none
@@ -1242,7 +1286,11 @@ fi
 
 AVD_NAME="cn1UiTestAvd"
 SYSTEM_IMAGE="system-images;android-35;google_apis;x86_64"
-AVD_CACHE_ROOT="${AVD_CACHE_ROOT:-${RUNNER_TEMP:-$HOME}/cn1-android-avd}"
+if [ -n "${GITHUB_WORKSPACE:-}" ]; then
+  AVD_CACHE_ROOT="${AVD_CACHE_ROOT:-$GITHUB_WORKSPACE/.android-avd}"
+else
+  AVD_CACHE_ROOT="${AVD_CACHE_ROOT:-${RUNNER_TEMP:-$HOME}/cn1-android-avd}"
+fi
 mkdir -p "$AVD_CACHE_ROOT"
 AVD_HOME="$AVD_CACHE_ROOT"
 ba_log "Using AVD home at $AVD_HOME"
@@ -1271,8 +1319,8 @@ ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_P
   -gpu auto -no-audio -no-boot-anim \
   -accel off -no-metrics -camera-back none -camera-front none -skip-adb-auth \
   -feature -Vulkan -feature -GLDMA -feature -GLDirectMem -no-passive-gps \
-  -netdelay none -netspeed full -skin 720x1280 -memory 6144 -cores 4 \
-  -partition-size 12288 -delay-adb >"$EMULATOR_LOG" 2>&1 &
+  -netdelay none -netspeed full -skin 720x1280 -memory 4096 -cores 4 \
+  -partition-size 6144 -delay-adb >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 

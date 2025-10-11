@@ -18,6 +18,16 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Free disk space (action)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
       - name: Free disk space for emulator
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -47,6 +57,8 @@ jobs:
         run: ./scripts/build-android-port.sh -q -DskipTests
       - name: Build Hello Codename One Android app
         run: ./scripts/build-android-app.sh -q -DskipTests
+        env:
+          AVD_CACHE_ROOT: ${{ github.workspace }}/.android-avd
       - name: Upload UI test artifacts
         if: always()
         uses: actions/upload-artifact@v4
