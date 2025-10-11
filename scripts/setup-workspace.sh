@@ -157,11 +157,23 @@ else
 fi
 
 log "Writing environment to $ENV_FILE"
+current_path="${PATH:-}"
+for required in /usr/bin /bin /usr/local/bin; do
+  case ":$current_path:" in
+    *:"$required":*) ;;
+    *) current_path="${current_path:+$current_path:}$required" ;;
+  esac
+done
+if [ -n "$current_path" ]; then
+  path_suffix=":$current_path"
+else
+  path_suffix=""
+fi
 cat > "$ENV_FILE" <<ENV
 export JAVA_HOME="$JAVA_HOME"
 export JAVA17_HOME="$JAVA17_HOME"
 export MAVEN_HOME="$MAVEN_HOME"
-export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:/usr/bin:/bin:/usr/local/bin\${PATH:+:\$PATH}"
+export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin$path_suffix"
 ENV
 
 log "Workspace environment file metadata"
