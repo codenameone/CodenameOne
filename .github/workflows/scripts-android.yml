@@ -15,8 +15,32 @@ name: Test Android build scripts
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Free disk space for emulator
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+      - name: Increase swap space for emulator
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+      - name: Configure emulator timeouts
+        run: |
+          echo "EMULATOR_BOOT_TIMEOUT_SECONDS=1200" >> "$GITHUB_ENV"
+          echo "PACKAGE_SERVICE_TIMEOUT_SECONDS=1200" >> "$GITHUB_ENV"
+          echo "FRAMEWORK_READY_PRIMARY_TIMEOUT_SECONDS=300" >> "$GITHUB_ENV"
+          echo "FRAMEWORK_READY_RESTART_TIMEOUT_SECONDS=240" >> "$GITHUB_ENV"
+          echo "EMULATOR_POST_BOOT_GRACE_SECONDS=30" >> "$GITHUB_ENV"
+          echo "UI_TEST_TIMEOUT_SECONDS=1200" >> "$GITHUB_ENV"
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port

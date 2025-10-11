@@ -746,17 +746,34 @@ configure_avd() {
     return
   fi
   declare -A settings=(
-    ["hw.ramSize"]=2048
-    ["disk.dataPartition.size"]=8192M
+    ["hw.ramSize"]=6144
+    ["disk.dataPartition.size"]=12288M
     ["fastboot.forceColdBoot"]=yes
     ["hw.bluetooth"]=no
     ["hw.camera.back"]=none
     ["hw.camera.front"]=none
     ["hw.audioInput"]=no
     ["hw.audioOutput"]=no
-    ["hw.cpu.ncore"]=2
+    ["hw.cpu.ncore"]=4
     ["hw.cpu.arch"]="x86_64"
     ["abi.type"]="x86_64"
+    ["hw.gpu.enabled"]=yes
+    ["hw.gpu.mode"]=auto
+    ["hw.keyboard"]=yes
+    ["hw.sensors.proximity"]=no
+    ["hw.sensors.magnetic_field"]=no
+    ["hw.sensors.orientation"]=no
+    ["hw.sensors.temperature"]=no
+    ["hw.sensors.light"]=no
+    ["hw.sensors.pressure"]=no
+    ["hw.sensors.humidity"]=no
+    ["hw.gps"]=no
+    ["showDeviceFrame"]=no
+    ["skin.dynamic"]=yes
+    ["hw.lcd.density"]=320
+    ["hw.lcd.width"]=720
+    ["hw.lcd.height"]=1280
+    ["vm.heapSize"]=512
   )
   local key value
   for key in "${!settings[@]}"; do
@@ -771,117 +788,179 @@ configure_avd() {
 
 wait_for_emulator() {
   local serial="$1"
+
   "$ADB_BIN" start-server >/dev/null
   "$ADB_BIN" -s "$serial" wait-for-device
 
-  local boot_timeout="${EMULATOR_BOOT_TIMEOUT_SECONDS:-900}"
+  local boot_timeout="${EMULATOR_BOOT_TIMEOUT_SECONDS:-1200}"
   if ! [[ "$boot_timeout" =~ ^[0-9]+$ ]] || [ "$boot_timeout" -le 0 ]; then
-    ba_log "Invalid EMULATOR_BOOT_TIMEOUT_SECONDS=$boot_timeout provided; falling back to 900"
-    boot_timeout=900
+    boot_timeout=1200
   fi
-  local poll_interval="${EMULATOR_BOOT_POLL_INTERVAL_SECONDS:-5}"
-  if ! [[ "$poll_interval" =~ ^[0-9]+$ ]] || [ "$poll_interval" -le 0 ]; then
-    poll_interval=5
-  fi
-  local status_log_interval="${EMULATOR_BOOT_STATUS_LOG_INTERVAL_SECONDS:-30}"
-  if ! [[ "$status_log_interval" =~ ^[0-9]+$ ]] || [ "$status_log_interval" -le 0 ]; then
-    status_log_interval=30
+
+  local log_interval="${EMULATOR_BOOT_STATUS_LOG_INTERVAL_SECONDS:-15}"
+  if ! [[ "$log_interval" =~ ^[0-9]+$ ]] || [ "$log_interval" -le 0 ]; then
+    log_interval=15
   fi
 
   local deadline=$((SECONDS + boot_timeout))
   local last_log=$SECONDS
-  local boot_completed="0"
-  local dev_boot_completed="0"
-  local bootanim=""
-  local bootanim_exit=""
-  local device_state=""
-  local boot_ready=0
 
+  # Stage 1: wait for device to report "device"
+  ba_log "Stage 1: waiting for emulator $serial to report device state"
+  local device_online=0
   while [ $SECONDS -lt $deadline ]; do
-    device_state="$($ADB_BIN -s "$serial" get-state 2>/dev/null | tr -d '\r')"
-    if [ "$device_state" != "device" ]; then
-      if [ $((SECONDS - last_log)) -ge $status_log_interval ]; then
-        ba_log "Waiting for emulator $serial to become ready (state=$device_state)"
-        last_log=$SECONDS
-      fi
-      sleep "$poll_interval"
-      continue
+    local state
+    state="$($ADB_BIN -s "$serial" get-state 2>/dev/null | tr -d '\r')"
+    if [ "$state" = "device" ]; then
+      device_online=1
+      break
     fi
+    if [ $((SECONDS - last_log)) -ge $log_interval ]; then
+      ba_log "Waiting for emulator $serial to come online (state=${state:-<unknown>})"
+      last_log=$SECONDS
+    fi
+    sleep 3
+  done
 
-    boot_completed="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
-    dev_boot_completed="$($ADB_BIN -s "$serial" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r')"
-    bootanim="$($ADB_BIN -s "$serial" shell getprop init.svc.bootanim 2>/dev/null | tr -d '\r')"
-    bootanim_exit="$($ADB_BIN -s "$serial" shell getprop service.bootanim.exit 2>/dev/null | tr -d '\r')"
+  if [ $device_online -ne 1 ]; then
+    ba_log "Emulator $serial did not report device state within ${boot_timeout}s" >&2
+    return 1
+  fi
 
-    if { [ "$boot_completed" = "1" ] || [ "$boot_completed" = "true" ]; } \
-      && { [ -z "$dev_boot_completed" ] || [ "$dev_boot_completed" = "1" ] || [ "$dev_boot_completed" = "true" ]; }; then
-      boot_ready=1
+  # Stage 2: wait for boot properties to indicate readiness
+  ba_log "Stage 2: waiting for core system properties on $serial"
+  local system_ready=0
+  last_log=$SECONDS
+  while [ $SECONDS -lt $deadline ]; do
+    local sys_boot dev_boot bootanim bootanim_exit
+    sys_boot="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')"
+    dev_boot="$($ADB_BIN -s "$serial" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r\n')"
+    bootanim="$($ADB_BIN -s "$serial" shell getprop init.svc.bootanim 2>/dev/null | tr -d '\r\n')"
+    bootanim_exit="$($ADB_BIN -s "$serial" shell getprop service.bootanim.exit 2>/dev/null | tr -d '\r\n')"
+
+    if { [ "$sys_boot" = "1" ] || [ "$sys_boot" = "true" ]; } && {
+         [ "$dev_boot" = "1" ] || [ "$dev_boot" = "true" ];
+       }; then
+      system_ready=1
       break
     fi
 
     if [ "$bootanim" = "stopped" ] || [ "$bootanim_exit" = "1" ]; then
-      boot_ready=2
+      system_ready=1
+      ba_log "Emulator $serial reported boot animation stopped; continuing despite unset bootcomplete"
       break
     fi
 
-    if [ $((SECONDS - last_log)) -ge $status_log_interval ]; then
-      ba_log "Waiting for emulator $serial to boot (sys.boot_completed=${boot_completed:-<unset>} dev.bootcomplete=${dev_boot_completed:-<unset>} bootanim=${bootanim:-<unset>} bootanim_exit=${bootanim_exit:-<unset>})"
+    if [ $((SECONDS - last_log)) -ge $log_interval ]; then
+      ba_log "Waiting for system services on $serial (sys.boot_completed=${sys_boot:-<unset>} dev.bootcomplete=${dev_boot:-<unset>} bootanim=${bootanim:-<unset>} bootanim_exit=${bootanim_exit:-<unset>})"
       last_log=$SECONDS
     fi
-    sleep "$poll_interval"
+    sleep 3
   done
 
-  if [ $boot_ready -eq 0 ]; then
-    ba_log "Emulator $serial failed to boot within ${boot_timeout}s (sys.boot_completed=${boot_completed:-<unset>} dev.bootcomplete=${dev_boot_completed:-<unset>} bootanim=${bootanim:-<unset>} bootanim_exit=${bootanim_exit:-<unset>} state=${device_state:-<unset>})" >&2
+  if [ $system_ready -ne 1 ]; then
+    ba_log "Emulator $serial failed to finish boot sequence within ${boot_timeout}s" >&2
     return 1
-  elif [ $boot_ready -eq 2 ]; then
-    ba_log "Emulator $serial reported boot animation stopped; proceeding without bootcomplete properties"
   fi
 
+  # Stage 3: baseline device configuration
+  ba_log "Stage 3: configuring emulator $serial for UI testing"
   "$ADB_BIN" -s "$serial" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$serial" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$serial" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$serial" shell input keyevent 82 >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$serial" shell wm dismiss-keyguard >/dev/null 2>&1 || true
+
   return 0
 }
 
 wait_for_package_service() {
   local serial="$1"
-  local timeout="${PACKAGE_SERVICE_TIMEOUT_SECONDS:-${PACKAGE_SERVICE_TIMEOUT:-600}}"
-  local per_try="${PACKAGE_SERVICE_PER_TRY_TIMEOUT_SECONDS:-${PACKAGE_SERVICE_PER_TRY_TIMEOUT:-5}}"
+  local timeout="${PACKAGE_SERVICE_TIMEOUT_SECONDS:-1200}"
+  local per_try="${PACKAGE_SERVICE_PER_TRY_TIMEOUT_SECONDS:-15}"
   if ! [[ "$timeout" =~ ^[0-9]+$ ]] || [ "$timeout" -le 0 ]; then
-    timeout=600
+    timeout=1200
   fi
   if ! [[ "$per_try" =~ ^[0-9]+$ ]] || [ "$per_try" -le 0 ]; then
-    per_try=5
+    per_try=15
   fi
 
   local deadline=$((SECONDS + timeout))
   local last_log=$SECONDS
+  local restart_count=0
+  local max_restarts=5
+
+  ba_log "Waiting for package manager service on $serial"
 
   while [ $SECONDS -lt $deadline ]; do
-    local boot_ok ce_ok
-    boot_ok="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
-    ce_ok="$($ADB_BIN -s "$serial" shell getprop sys.user.0.ce_available 2>/dev/null | tr -d '\r')"
+    local sys_boot system_server pm_ready pm_list
 
-    if timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package path android >/dev/null 2>&1 \
-      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
-      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package list packages >/dev/null 2>&1 \
-      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1 \
-      || timeout "$per_try" "$ADB_BIN" -s "$serial" shell dumpsys package >/dev/null 2>&1; then
+    sys_boot="$($ADB_BIN -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    system_server="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pidof system_server 2>/dev/null | tr -d '\r' || true)"
+
+    pm_ready=0
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 \
+      || run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell cmd package path android >/dev/null 2>&1; then
+      pm_ready=1
+    fi
+
+    pm_list=0
+    if run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell pm list packages >/dev/null 2>&1; then
+      pm_list=1
+    fi
+
+    if [ $pm_ready -eq 1 ] && [ $pm_list -eq 1 ] && [ -n "$system_server" ]; then
+      ba_log "Package manager ready on $serial (system_server=$system_server)"
       return 0
     fi
 
-    if [ $((SECONDS - last_log)) -ge 10 ]; then
-      ba_log "Waiting for package manager service on $serial (boot_ok=${boot_ok:-?} ce_ok=${ce_ok:-?})"
+    local service_status
+    service_status="$(run_with_timeout "$per_try" "$ADB_BIN" -s "$serial" shell service check package 2>/dev/null | tr -d '\r' | tr -d '\n' || true)"
+    if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
+      if [ $pm_ready -eq 1 ] && [ -n "$system_server" ]; then
+        ba_log "Package service responding despite limited signals; continuing"
+        return 0
+      fi
+    fi
+
+    if [ $((SECONDS - last_log)) -ge 20 ]; then
+      ba_log "PM status on $serial: boot=${sys_boot:-?} system_server=${system_server:-<none>} pm_ready=$pm_ready pm_list=$pm_list"
       last_log=$SECONDS
     fi
-    sleep 2
+
+    local elapsed=$((SECONDS - (deadline - timeout)))
+    if [ "$sys_boot" = "1" ] && [ $pm_ready -eq 0 ] && [ $elapsed -gt 0 ] && [ $((elapsed % 180)) -eq 0 ] \
+       && [ $restart_count -lt $max_restarts ]; then
+      restart_count=$((restart_count + 1))
+      ba_log "Package manager not ready after ${elapsed}s; restarting framework (attempt ${restart_count}/${max_restarts})"
+      "$ADB_BIN" -s "$serial" shell stop >/dev/null 2>&1 || true
+      sleep 5
+      "$ADB_BIN" -s "$serial" shell start >/dev/null 2>&1 || true
+      sleep 15
+      continue
+    fi
+
+    sleep 3
   done
 
   ba_log "Package manager service not ready on $serial after ${timeout}s" >&2
   return 1
+}
+
+optimize_api35_after_boot() {
+  local serial="$1"
+  ba_log "Optimizing emulator $serial for headless testing"
+
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell pm disable-user com.google.android.googlequicksearchbox >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell pm disable-user com.android.vending >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell pm disable-user com.google.android.gms >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell cmd package bg-dexopt-job >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell logcat -c >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell locksettings set-disabled true >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell svc power stayon true >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell wm dismiss-keyguard >/dev/null 2>&1 || true
+  run_with_timeout 30 "$ADB_BIN" -s "$serial" shell am kill-all >/dev/null 2>&1 || true
+  sleep 10
 }
 
 wait_for_api_level() {
@@ -1184,12 +1263,16 @@ EMULATOR_SERIAL="emulator-$EMULATOR_PORT"
 
 EMULATOR_LOG="$GRADLE_PROJECT_DIR/emulator.log"
 ba_log "Starting headless Android emulator $AVD_NAME on port $EMULATOR_PORT"
+export ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL="${ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL:-120}"
+export ANDROID_EMULATOR_KVM_DISABLE_CHECK=1
+export ANDROID_SDK_ROOT_NO_SETTINGS=1
 ANDROID_AVD_HOME="$AVD_HOME" "$EMULATOR_BIN" -avd "$AVD_NAME" -port "$EMULATOR_PORT" \
   -no-window -no-snapshot -no-snapshot-load -no-snapshot-save -wipe-data \
-  -gpu swiftshader_indirect -no-audio -no-boot-anim \
+  -gpu auto -no-audio -no-boot-anim \
   -accel off -no-metrics -camera-back none -camera-front none -skip-adb-auth \
-  -feature -Vulkan -netfast -skin 1080x1920 -memory 2048 -cores 2 \
-  -partition-size 4096 >"$EMULATOR_LOG" 2>&1 &
+  -feature -Vulkan -feature -GLDMA -feature -GLDirectMem -no-passive-gps \
+  -netdelay none -netspeed full -skin 720x1280 -memory 6144 -cores 4 \
+  -partition-size 12288 -delay-adb >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 trap stop_emulator EXIT
 
@@ -1284,12 +1367,7 @@ if ! wait_for_package_service "$EMULATOR_SERIAL"; then
   exit 1
 fi
 
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell locksettings set-disabled true >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell svc power stayon true >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell wm dismiss-keyguard >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
-"$ADB_BIN" -s "$EMULATOR_SERIAL" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
+optimize_api35_after_boot "$EMULATOR_SERIAL"
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am get-current-user >/dev/null 2>&1 || true
 
 if ! wait_for_api_level "$EMULATOR_SERIAL"; then
