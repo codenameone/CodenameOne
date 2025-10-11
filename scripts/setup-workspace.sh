@@ -157,12 +157,12 @@ else
 fi
 
 log "Writing environment to $ENV_FILE"
-cat > "$ENV_FILE" <<'ENV'
+cat > "$ENV_FILE" <<EOF
 export JAVA_HOME="$JAVA_HOME"
 export JAVA17_HOME="$JAVA17_HOME"
 export MAVEN_HOME="$MAVEN_HOME"
 export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
-ENV
+EOF
 
 log "Workspace environment file metadata"
 if [ -f "$ENV_FILE" ]; then
