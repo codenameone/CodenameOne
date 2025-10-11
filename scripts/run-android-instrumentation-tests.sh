@@ -41,6 +41,8 @@ ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 if [ -z "$ANDROID_SDK_ROOT" ]; then
   if [ -d "/usr/local/lib/android/sdk" ]; then
     ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+  elif [ -d "/usr/lib/android-sdk" ]; then
+    ANDROID_SDK_ROOT="/usr/lib/android-sdk"
   elif [ -d "$HOME/Android/Sdk" ]; then
     ANDROID_SDK_ROOT="$HOME/Android/Sdk"
   fi
@@ -63,20 +65,21 @@ find_tool() {
   return 1
 }
 
-SDKMANAGER=$(find_tool sdkmanager \
-  "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" \
-  "$ANDROID_SDK_ROOT/cmdline-tools/bin" \
-  "$ANDROID_SDK_ROOT/tools/bin" || true)
-AVDMANAGER=$(find_tool avdmanager \
-  "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" \
-  "$ANDROID_SDK_ROOT/cmdline-tools/bin" \
-  "$ANDROID_SDK_ROOT/tools/bin" || true)
-EMU_BIN="$ANDROID_SDK_ROOT/emulator/emulator"
-ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
+cmdline_tool_dirs=(
+  "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin"
+  "$ANDROID_SDK_ROOT/cmdline-tools/bin"
+  "$ANDROID_SDK_ROOT/tools/bin"
+)
+while IFS= read -r -d '' dir; do
+  cmdline_tool_dirs+=("$dir")
+done < <(find "$ANDROID_SDK_ROOT/cmdline-tools" -maxdepth 2 -type d -name bin -print0 2>/dev/null || true)
 
-if [ -z "$SDKMANAGER" ] || [ -z "$AVDMANAGER" ] || [ ! -x "$EMU_BIN" ] || [ ! -x "$ADB_BIN" ]; then
+SDKMANAGER=$(find_tool sdkmanager "${cmdline_tool_dirs[@]}" || true)
+AVDMANAGER=$(find_tool avdmanager "${cmdline_tool_dirs[@]}" || true)
+
+if [ -z "$SDKMANAGER" ] || [ -z "$AVDMANAGER" ]; then
   log "Required Android command-line tools were not found." >&2
-  log "SDKMANAGER=$SDKMANAGER AVDMANAGER=$AVDMANAGER EMULATOR=$EMU_BIN ADB=$ADB_BIN" >&2
+  log "SDKMANAGER=$SDKMANAGER AVDMANAGER=$AVDMANAGER" >&2
   exit 1
 fi
 
@@ -90,6 +93,15 @@ yes | "$SDKMANAGER" --install \
   "emulator" \
   "system-images;android-35;google_apis;arm64-v8a" >/dev/null
 
+EMU_BIN="$ANDROID_SDK_ROOT/emulator/emulator"
+ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
+
+if [ ! -x "$EMU_BIN" ] || [ ! -x "$ADB_BIN" ]; then
+  log "Android emulator or adb binary not found after installation." >&2
+  log "EMULATOR=$EMU_BIN ADB=$ADB_BIN" >&2
+  exit 1
+fi
+
 AVD_NAME="cn1-api35-arm"
 if ! "$AVDMANAGER" list avd | grep -q "Name: $AVD_NAME"; then
   log "Creating AVD $AVD_NAME"
@@ -97,20 +109,41 @@ if ! "$AVDMANAGER" list avd | grep -q "Name: $AVD_NAME"; then
 fi
 
 log "Starting AVD $AVD_NAME in headless mode"
-"$EMU_BIN" -avd "$AVD_NAME" -no-boot-anim -no-audio -no-snapshot -no-window -gpu swiftshader_indirect -netfast >/tmp/$AVD_NAME.log 2>&1 &
+"$EMU_BIN" -avd "$AVD_NAME" -no-boot-anim -no-audio -no-snapshot -no-window -gpu swiftshader_indirect -netfast \
+  >/tmp/$AVD_NAME.log 2>&1 &
 EMU_PID=$!
 cleanup() {
   log "Cleaning up emulator"
-  "$ADB_BIN" emu kill >/dev/null 2>&1 || true
+  if [ -n "${EMULATOR_SERIAL:-}" ]; then
+    "$ADB_BIN" -s "$EMULATOR_SERIAL" emu kill >/dev/null 2>&1 || true
+  else
+    "$ADB_BIN" emu kill >/dev/null 2>&1 || true
+  fi
   kill "$EMU_PID" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
+log "Waiting for emulator to register with adb"
+"$ADB_BIN" start-server >/dev/null 2>&1 || true
+
+ADB_DEVICE_TIMEOUT=120
+for _ in $(seq 1 "$ADB_DEVICE_TIMEOUT"); do
+  EMULATOR_SERIAL=$("$ADB_BIN" devices | awk 'NR>1 && /^emulator-/{print $1; exit}') || true
+  if [ -n "${EMULATOR_SERIAL:-}" ]; then
+    break
+  fi
+  sleep 1
+done
+
+if [ -z "${EMULATOR_SERIAL:-}" ]; then
+  log "Emulator did not appear in adb devices within ${ADB_DEVICE_TIMEOUT}s" >&2
+  exit 1
+fi
+
 log "Waiting for emulator to boot"
-"$ADB_BIN" wait-for-device
 BOOT_COMPLETED="0"
 for _ in $(seq 1 120); do
-  BOOT_COMPLETED=$("$ADB_BIN" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') || true
+  BOOT_COMPLETED=$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') || true
   if [ "$BOOT_COMPLETED" = "1" ]; then
     break
   fi
@@ -133,14 +166,14 @@ export JAVA_HOME="$JAVA17_HOME"
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
 log "Launching application to capture screenshot"
-"$ADB_BIN" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+"$ADB_BIN" -s "$EMULATOR_SERIAL" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
 sleep 10
 
 ARTIFACTS_DIR="$WORK_DIR/artifacts"
 mkdir -p "$ARTIFACTS_DIR"
 SCREENSHOT_PATH="$ARTIFACTS_DIR/${ARTIFACT_ID}-emulator.png"
 log "Capturing screenshot at $SCREENSHOT_PATH"
-"$ADB_BIN" exec-out screencap -p > "$SCREENSHOT_PATH"
+"$ADB_BIN" -s "$EMULATOR_SERIAL" exec-out screencap -p > "$SCREENSHOT_PATH"
 log "Screenshot captured"
 
 persist_build_info() {
