@@ -283,3 +283,15 @@ export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" | head -n 1 || true)
 [ -n "$APK_PATH" ] || { ba_log "Gradle build completed but no APK was found" >&2; exit 1; }
 ba_log "Successfully built Android APK at $APK_PATH"
+
+BUILD_INFO_FILE="$SCRIPT_DIR/.android-build-info"
+ba_log "Recording Android build metadata for downstream stages at $BUILD_INFO_FILE"
+{
+  printf "APP_DIR=%q\n" "$APP_DIR"
+  printf "GRADLE_PROJECT_DIR=%q\n" "$GRADLE_PROJECT_DIR"
+  printf "PACKAGE_NAME=%q\n" "$PACKAGE_NAME"
+  printf "ARTIFACT_ID=%q\n" "$ARTIFACT_ID"
+  printf "WORK_DIR=%q\n" "$WORK_DIR"
+  printf "APK_PATH=%q\n" "$APK_PATH"
+} > "$BUILD_INFO_FILE"
+
