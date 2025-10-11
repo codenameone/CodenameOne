@@ -114,7 +114,7 @@ MAVEN_CMD=(
 ba_log "Generating Codename One application skeleton via codenameone-maven-plugin"
 (
   cd "$WORK_DIR"
-  xvfb-run -a "${MAVEN_CMD[@]}" -q \
+  /usr/bin/xvfb-run -a "${MAVEN_CMD[@]}" -q \
     com.codenameone:codenameone-maven-plugin:7.0.204:generate-app-project \
     -DgroupId="$GROUP_ID" \
     -DartifactId="$ARTIFACT_ID" \

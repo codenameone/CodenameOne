@@ -134,7 +134,7 @@ log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA17_HOME=${JAVA17_HO
 "$MAVEN_HOME/bin/mvn" -version
 
 run_maven() {
-  xvfb-run -a "$MAVEN_HOME/bin/mvn" "$@"
+  /usr/bin/xvfb-run -a "$MAVEN_HOME/bin/mvn" "$@"
 }
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
