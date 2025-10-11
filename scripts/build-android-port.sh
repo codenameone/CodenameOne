@@ -108,7 +108,22 @@ fi
 
 log "Loaded environment: JAVA_HOME=${JAVA_HOME:-<unset>} JAVA17_HOME=${JAVA17_HOME:-<unset>} MAVEN_HOME=${MAVEN_HOME:-<unset>}"
 
-export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
+# setup-workspace.sh already prepends the Java and Maven bin directories to PATH
+# when generating env.sh. Ensure common system locations remain reachable even
+# if the inherited PATH was truncated before sourcing the environment file.
+case ":$PATH:" in
+  *:/usr/bin:*) ;;
+  *) PATH="$PATH:/usr/bin" ;;
+esac
+case ":$PATH:" in
+  *:/bin:*) ;;
+  *) PATH="$PATH:/bin" ;;
+esac
+case ":$PATH:" in
+  *:/usr/local/bin:*) ;;
+  *) PATH="$PATH:/usr/local/bin" ;;
+esac
+export PATH
 "$JAVA_HOME/bin/java" -version
 "$JAVA17_HOME/bin/java" -version
 "$MAVEN_HOME/bin/mvn" -version
