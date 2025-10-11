@@ -161,7 +161,7 @@ cat > "$ENV_FILE" <<ENV
 export JAVA_HOME="$JAVA_HOME"
 export JAVA17_HOME="$JAVA17_HOME"
 export MAVEN_HOME="$MAVEN_HOME"
-export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$PATH"
+export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin\${PATH:+:\$PATH}"
 ENV
 
 log "Workspace environment file metadata"
@@ -179,8 +179,6 @@ source "$ENV_FILE"
 log "JDK 8 version:"; "$JAVA_HOME/bin/java" -version
 log "JDK 17 version:"; "$JAVA17_HOME/bin/java" -version
 log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
-
-PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
 log "Cloning cn1-binaries"
 rm -Rf "$CN1_BINARIES"
