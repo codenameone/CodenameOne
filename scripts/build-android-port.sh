@@ -29,6 +29,12 @@ load_environment() {
   sed 's/^/[build-android-port] ENV: /' "$ENV_FILE"
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+
+  # Ensure common system binaries remain reachable even if the sourced
+  # environment overrides PATH.
+  if ! command -v xvfb-run >/dev/null 2>&1; then
+    export PATH="$PATH:/usr/bin:/bin:/usr/local/bin"
+  fi
 }
 
 check_java_home() {

@@ -161,7 +161,7 @@ cat > "$ENV_FILE" <<ENV
 export JAVA_HOME="$JAVA_HOME"
 export JAVA17_HOME="$JAVA17_HOME"
 export MAVEN_HOME="$MAVEN_HOME"
-export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin\${PATH:+:\$PATH}"
+export PATH="\$JAVA_HOME/bin:\$MAVEN_HOME/bin:/usr/bin:/bin:/usr/local/bin\${PATH:+:\$PATH}"
 ENV
 
 log "Workspace environment file metadata"
