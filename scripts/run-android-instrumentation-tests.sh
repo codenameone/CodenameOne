@@ -73,6 +73,26 @@ find_tool() {
   return 1
 }
 
+run_sdkmanager_noninteractive() {
+  local description="$1"
+  shift
+  log "$description"
+  # Temporarily disable errexit and pipefail so we can inspect the pipeline exit
+  # codes manually without the shell aborting on the SIGPIPE emitted by `yes`.
+  set +e
+  set +o pipefail
+  yes 2>/dev/null | "$SDKMANAGER" "$@" >/dev/null
+  local statuses=("${PIPESTATUS[@]}")
+  set -o pipefail
+  set -e
+  local sdk_status="${statuses[1]:-1}"
+  if [ "$sdk_status" -ne 0 ]; then
+    log "sdkmanager command failed (exit $sdk_status): $SDKMANAGER $*" >&2
+    return "$sdk_status"
+  fi
+  return 0
+}
+
 cmdline_tool_dirs=(
   "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin"
   "$ANDROID_SDK_ROOT/cmdline-tools/bin"
@@ -91,15 +111,13 @@ if [ -z "$SDKMANAGER" ] || [ -z "$AVDMANAGER" ]; then
   exit 1
 fi
 
-log "Accepting Android SDK licenses"
-yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+run_sdkmanager_noninteractive "Accepting Android SDK licenses" --licenses
 
-log "Installing Android 35 ARM system image"
-yes | "$SDKMANAGER" --install \
+run_sdkmanager_noninteractive "Installing Android 35 ARM system image" --install \
   "platform-tools" \
   "platforms;android-35" \
   "emulator" \
-  "system-images;android-35;google_apis;arm64-v8a" >/dev/null
+  "system-images;android-35;google_apis;arm64-v8a"
 
 EMU_BIN="$ANDROID_SDK_ROOT/emulator/emulator"
 ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
