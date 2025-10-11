@@ -1,4 +1,3 @@
----
 name: Test Android build scripts
 
 'on':
@@ -16,13 +15,11 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    
     steps:
       - uses: actions/checkout@v4
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y xvfb libxrender1 libxtst6 libxi6 xmlstarlet
-      - name: Free disk space (action)
+
+      - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: true
@@ -31,38 +28,41 @@ jobs:
           haskell: true
           large-packages: true
           docker-images: true
-          swap-storage: true
-      - name: Free disk space for emulator
+          swap-storage: false  # Changed to false - might be removing packages
+
+      - name: Install System Dependencies
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get update -y
+          sudo apt-get install -y xvfb libxrender1 libxtst6 libxi6 xmlstarlet
+          echo "Verifying xvfb installation:"
+          ls -la /usr/bin/xvfb-run
+          which xvfb-run
+          /usr/bin/xvfb-run --help || true
+
+      - name: Additional Cleanup
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk/build-tools/* 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/android/sdk/platforms/* 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/android/sdk/platform-tools 2>/dev/null || true
           df -h
-      - name: Increase swap space for emulator
-        run: |
-          sudo swapoff -a
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          free -h
-      - name: Configure emulator timeouts
-        run: |
-          echo "EMULATOR_BOOT_TIMEOUT_SECONDS=1200" >> "$GITHUB_ENV"
-          echo "PACKAGE_SERVICE_TIMEOUT_SECONDS=1200" >> "$GITHUB_ENV"
-          echo "FRAMEWORK_READY_PRIMARY_TIMEOUT_SECONDS=300" >> "$GITHUB_ENV"
-          echo "FRAMEWORK_READY_RESTART_TIMEOUT_SECONDS=240" >> "$GITHUB_ENV"
-          echo "EMULATOR_POST_BOOT_GRACE_SECONDS=30" >> "$GITHUB_ENV"
-          echo "UI_TEST_TIMEOUT_SECONDS=1200" >> "$GITHUB_ENV"
+
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
+
       - name: Build Android port
         run: ./scripts/build-android-port.sh -q -DskipTests
+
       - name: Build Hello Codename One Android app
         run: ./scripts/build-android-app.sh -q -DskipTests
         env:
           AVD_CACHE_ROOT: ${{ github.workspace }}/.android-avd
+          EMULATOR_BOOT_TIMEOUT_SECONDS: 1200
+          PACKAGE_SERVICE_TIMEOUT_SECONDS: 1200
+          FRAMEWORK_READY_PRIMARY_TIMEOUT_SECONDS: 300
+          FRAMEWORK_READY_RESTART_TIMEOUT_SECONDS: 240
+          EMULATOR_POST_BOOT_GRACE_SECONDS: 30
+          UI_TEST_TIMEOUT_SECONDS: 1200
+
       - name: Upload UI test artifacts
         if: always()
         uses: actions/upload-artifact@v4
