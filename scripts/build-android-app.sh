@@ -1098,7 +1098,7 @@ adb_framework_ready_once() {
     if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
       service_ok=1
     fi
-    
+
     # Success conditions - prioritize package manager over activity manager for API 35
     if [ -n "$system_server" ] && [ $pm_ok -eq 1 ] && [ $pm_list_ok -eq 1 ] && [ $service_ok -eq 1 ]; then
       ba_log "Android framework ready on $serial (system_server=$system_server; package manager operational)"
@@ -1402,11 +1402,14 @@ fi
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
 "$ADB_BIN" -s "$EMULATOR_SERIAL" shell am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null 2>&1 || true
 
-if ! "$ADB_BIN" -s "$EMULATOR_SERIAL" shell pidof system_server >/dev/null 2>&1; then
+system_server_pid="$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell pidof system_server 2>/dev/null | tr -d '\r\n' || echo "")"
+if [ -z "$system_server_pid" ]; then
   ba_log "system_server not running after boot; restarting framework"
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell stop >/dev/null 2>&1 || true
   sleep 2
   "$ADB_BIN" -s "$EMULATOR_SERIAL" shell start >/dev/null 2>&1 || true
+else
+  ba_log "system_server running with PID $system_server_pid"
 fi
 
 if ! adb_wait_framework_ready "$EMULATOR_SERIAL"; then
