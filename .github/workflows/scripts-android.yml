@@ -23,3 +23,25 @@ jobs:
         run: ./scripts/build-android-port.sh -q -DskipTests
       - name: Build Hello Codename One Android app
         run: ./scripts/build-android-app.sh -q -DskipTests
+      - name: Add Android instrumentation test
+        run: ./scripts/add-android-instrumentation-test.sh
+      - name: Run Android instrumentation tests on emulator
+        run: ./scripts/run-android-instrumentation-tests.sh
+      - name: Export Android emulator screenshot path
+        if: always()
+        run: |
+          set -euo pipefail
+          echo "ANDROID_SCREENSHOT=" >> "$GITHUB_ENV"
+          if [ -f scripts/.android-build-info ]; then
+            # shellcheck disable=SC1090
+            source scripts/.android-build-info
+            if [ -n "${SCREENSHOT_PATH:-}" ] && [ -f "$SCREENSHOT_PATH" ]; then
+              echo "ANDROID_SCREENSHOT=$SCREENSHOT_PATH" >> "$GITHUB_ENV"
+            fi
+          fi
+      - name: Upload Android emulator screenshot
+        if: ${{ always() && env.ANDROID_SCREENSHOT != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-emulator-screenshot
+          path: ${{ env.ANDROID_SCREENSHOT }}

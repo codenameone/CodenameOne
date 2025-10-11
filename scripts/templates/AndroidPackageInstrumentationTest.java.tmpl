@@ -1,0 +1,25 @@
+package @PACKAGE@;
+
+import static org.junit.Assert.assertEquals;
+
+import android.content.Context;
+
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+/**
+ * Basic instrumentation test that verifies the generated application's package name.
+ */
+@RunWith(AndroidJUnit4.class)
+public class PackageNameInstrumentationTest {
+
+    @Test
+    public void appContextMatchesPackage() {
+        Context targetContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        assertEquals("@PACKAGE@", targetContext.getPackageName());
+    }
+}
+
