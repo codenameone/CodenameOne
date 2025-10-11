@@ -18,6 +18,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y xvfb libxrender1 libxtst6 libxi6 xmlstarlet
       - name: Free disk space (action)
         uses: jlumbroso/free-disk-space@main
         with:
