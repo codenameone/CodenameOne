@@ -21,6 +21,14 @@ else
   exit 1
 fi
 
+if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
+  log "JAVA17_HOME is not configured. Run scripts/setup-workspace.sh to provision Java 17." >&2
+  exit 1
+fi
+
+export JAVA_HOME="$JAVA17_HOME"
+export PATH="$JAVA17_HOME/bin:$PATH"
+
 BUILD_INFO_FILE="$SCRIPT_DIR/.android-build-info"
 if [ ! -f "$BUILD_INFO_FILE" ]; then
   log "Android build metadata not found at $BUILD_INFO_FILE. Run scripts/build-android-app.sh first." >&2
