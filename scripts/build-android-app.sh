@@ -1098,11 +1098,26 @@ adb_framework_ready_once() {
     if [ -n "$service_status" ] && printf '%s' "$service_status" | grep -q "found"; then
       service_ok=1
     fi
+    
+    # Success conditions - prioritize package manager over activity manager for API 35
+    if [ -n "$system_server" ] && [ $pm_ok -eq 1 ] && [ $pm_list_ok -eq 1 ] && [ $service_ok -eq 1 ]; then
+      ba_log "Android framework ready on $serial (system_server=$system_server; package manager operational)"
+      return 0
+    fi
 
-    if [ "$boot_ok" = "1" ] && [ "$dev_boot" = "1" ] && [ -n "$system_pid" ] \
+    # Fallback: if boot is complete and PM works, proceed even without full activity manager
+    if [ "$sys_boot" = "1" ] && [ $pm_ok -eq 1 ] && [ $pm_list_ok -eq 1 ]; then
+      local time_waiting=$((SECONDS - start_time))
+      if [ $time_waiting -ge 120 ]; then
+        ba_log "Android framework heuristically ready on $serial after ${time_waiting}s (system_server=$system_server; pm functional but activity_manager slow)"
+        return 0
+      fi
+    fi
+
+    # Original stricter check for early success
+    if [ "$boot_ok" = "1" ] && [ "$dev_boot" = "1" ] && [ -n "$system_server" ] \
        && [ $pm_ok -eq 1 ] && [ $cmd_ok -eq 1 ] && [ $service_ok -eq 1 ]; then
-      if [ $pm_list_ok -eq 1 ] || [ $activity_ok -eq 1 ] || [ $resolve_ok -eq 1 ]; then
-        ba_log "Android framework ready on $serial (system_server=$system_pid)"
+      if [ $pm_list_ok -eq 1 ] || [ $activity_ok -eq 1 ] || [ $resolve_ok -eq 1 ]; then        ba_log "Android framework ready on $serial (system_server=$system_pid)"
         return 0
       fi
 
