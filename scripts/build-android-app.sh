@@ -277,10 +277,10 @@ path = pathlib.Path(sys.argv[1])
 text = path.read_text()
 modified = False
 
-if "androidx.test.runner.AndroidJUnitRunner" not in text:
+if "android.test.InstrumentationTestRunner" not in text:
     def add_runner(match):
         prefix = match.group(0)
-        return prefix + "\n        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\""
+        return prefix + "\n        testInstrumentationRunner \"android.test.InstrumentationTestRunner\""
 
     new_text, count = re.subn(r"(defaultConfig\s*\{)", add_runner, text, count=1, flags=re.MULTILINE)
     if count:
@@ -289,43 +289,12 @@ if "androidx.test.runner.AndroidJUnitRunner" not in text:
     else:
         raise SystemExit("defaultConfig block not found while adding instrumentation runner")
 
-config_block = "\nconfigurations {\n    maybeCreate(\"androidTestImplementation\")\n}\n"
-
-if 'maybeCreate("androidTestImplementation")' not in text:
-    new_text, count = re.subn(r"(android\s*\{)", config_block + r"\1", text, count=1, flags=re.MULTILINE)
-    if count:
-        text = new_text
-        modified = True
-    else:
-        text = text.rstrip() + config_block
-        modified = True
-
-dependency_lines = []
-if "androidx.test.ext:junit" not in text:
-    dependency_lines.append('    androidTestImplementation "androidx.test.ext:junit:1.1.5"')
-if "androidx.test.espresso:espresso-core" not in text:
-    dependency_lines.append('    androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"')
-
-if dependency_lines:
-    dependencies_to_add = "\n" + "\n".join(dependency_lines)
-
-    def add_dependencies(match):
-        prefix = match.group(0)
-        return prefix + dependencies_to_add
-
-    new_text, count = re.subn(r"(dependencies\s*\{)", add_dependencies, text, count=1, flags=re.MULTILINE)
-    if count:
-        text = new_text
-        modified = True
-    else:
-        raise SystemExit("dependencies block not found while adding androidTest dependencies")
-
 if modified:
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text)
 PYTHON
-  ba_log "Ensured instrumentation runner and dependencies are declared"
+  ba_log "Ensured instrumentation runner is declared"
 else
   ba_log "Warning: Gradle build file not found at $APP_BUILD_GRADLE; skipping instrumentation dependency configuration" >&2
 fi
@@ -337,21 +306,12 @@ cat >"$TEST_CLASS" <<EOF
 package $PACKAGE_NAME;
 
 import android.content.Context;
+import android.test.InstrumentationTestCase;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
+public class HelloCodenameOneInstrumentedTest extends InstrumentationTestCase {
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-
-import static org.junit.Assert.assertEquals;
-
-@RunWith(AndroidJUnit4.class)
-public class HelloCodenameOneInstrumentedTest {
-
-    @Test
-    public void useAppContext() {
-        Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    public void testUseAppContext() {
+        Context appContext = getInstrumentation().getTargetContext();
         assertEquals("$PACKAGE_NAME", appContext.getPackageName());
     }
 }
