@@ -55,34 +55,12 @@ jobs:
           accept-android-sdk-licenses: false
           packages: ''
 
-      - name: Ensure Android tools available on PATH
+      - name: Install adb for ARM environment
         shell: bash
         run: |
           set -euxo pipefail
-          if ! command -v sdkmanager >/dev/null 2>&1; then
-            echo "sdkmanager executable is required" >&2
-            exit 1
-          fi
-
-          SDKMANAGER="$(command -v sdkmanager)"
-
-          run_sdk() {
-            set +o pipefail
-            yes | "$SDKMANAGER" "$@" >/dev/null 2>&1
-            local rc=${PIPESTATUS[1]}
-            set -o pipefail
-            return $rc
-          }
-
-          run_sdk --licenses
-          run_sdk --install "platform-tools" "build-tools;34.0.0"
-          run_sdk --install "platforms;android-33" || echo "Warning: failed to install Android 33 platform" >&2
-          if [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/platform-tools" ]; then
-            echo "${ANDROID_HOME}/platform-tools" >> "$GITHUB_PATH"
-          fi
-          if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}/platform-tools" ]; then
-            echo "${ANDROID_SDK_ROOT}/platform-tools" >> "$GITHUB_PATH"
-          fi
+          sudo apt-get update -y
+          sudo apt-get install -y adb
           command -v adb
           adb version
 
@@ -106,23 +84,15 @@ jobs:
             adb install -r "artifacts/${{ needs.build-android.outputs.app_apk }}"
             adb install -r -t "artifacts/${{ needs.build-android.outputs.test_apk }}"
             adb logcat -c
-            AAPT_BIN=""
-            if command -v aapt >/dev/null 2>&1; then
-              AAPT_BIN="$(command -v aapt)"
-            elif [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/build-tools" ]; then
-              AAPT_BIN="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name aapt -type f | sort | tail -n1 || true)"
-            elif [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}/build-tools" ]; then
-              AAPT_BIN="$(find "${ANDROID_SDK_ROOT}/build-tools" -maxdepth 2 -name aapt -type f | sort | tail -n1 || true)"
-            fi
-
+            PACKAGE_NAME="${{ needs.build-android.outputs.package_name }}"
             TEST_PACKAGE=""
             INSTRUMENTATION_NAME=""
-            if [ -n "$AAPT_BIN" ] && [ -x "$AAPT_BIN" ]; then
-              BADGING_OUTPUT="$($AAPT_BIN dump badging artifacts/${{ needs.build-android.outputs.test_apk }} || true)"
-              if [ -n "$BADGING_OUTPUT" ]; then
-                TEST_PACKAGE="$(printf '%s\n' "$BADGING_OUTPUT" | awk -F"'" '/^package: /{print $2; exit}')"
-                INSTRUMENTATION_NAME="$(printf '%s\n' "$BADGING_OUTPUT" | awk -F"'" '/^instrumentation: /{print $2; exit}')"
-              fi
+
+            INSTRUMENTATION_LINE="$(adb shell cmd package list instrumentation | tr -d '\r' | grep "target=${PACKAGE_NAME})" || true)"
+            if [ -n "$INSTRUMENTATION_LINE" ]; then
+              INSTRUMENTATION_NAME="${INSTRUMENTATION_LINE#instrumentation:}"
+              INSTRUMENTATION_NAME="${INSTRUMENTATION_NAME%% (*}"
+              TEST_PACKAGE="${INSTRUMENTATION_NAME%%/*}"
             fi
 
             if [ -n "$INSTRUMENTATION_NAME" ]; then
@@ -130,7 +100,7 @@ jobs:
               adb shell am instrument -w "$INSTRUMENTATION_NAME"
             else
               if [ -z "$TEST_PACKAGE" ]; then
-                TEST_PACKAGE="${{ needs.build-android.outputs.package_name }}.tests"
+                TEST_PACKAGE="${PACKAGE_NAME}.tests"
               fi
               echo "Instrumentation runner not found, launching $TEST_PACKAGE via monkey"
               adb shell monkey -p "$TEST_PACKAGE" 1
