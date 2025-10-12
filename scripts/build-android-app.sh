@@ -289,15 +289,29 @@ if "androidx.test.runner.AndroidJUnitRunner" not in text:
     else:
         raise SystemExit("defaultConfig block not found while adding instrumentation runner")
 
-dependencies_to_add = (
-    '    androidTestImplementation "androidx.test.ext:junit:1.1.5"\n'
-    '    androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"'
-)
+config_block = "\nconfigurations {\n    maybeCreate(\"androidTestImplementation\")\n}\n"
 
-if "androidx.test.ext:junit" not in text and "androidx.test.espresso:espresso-core" not in text:
+if 'maybeCreate("androidTestImplementation")' not in text:
+    new_text, count = re.subn(r"(android\s*\{)", config_block + r"\1", text, count=1, flags=re.MULTILINE)
+    if count:
+        text = new_text
+        modified = True
+    else:
+        text = text.rstrip() + config_block
+        modified = True
+
+dependency_lines = []
+if "androidx.test.ext:junit" not in text:
+    dependency_lines.append('    androidTestImplementation "androidx.test.ext:junit:1.1.5"')
+if "androidx.test.espresso:espresso-core" not in text:
+    dependency_lines.append('    androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"')
+
+if dependency_lines:
+    dependencies_to_add = "\n" + "\n".join(dependency_lines)
+
     def add_dependencies(match):
         prefix = match.group(0)
-        return prefix + "\n" + dependencies_to_add
+        return prefix + dependencies_to_add
 
     new_text, count = re.subn(r"(dependencies\s*\{)", add_dependencies, text, count=1, flags=re.MULTILINE)
     if count:
