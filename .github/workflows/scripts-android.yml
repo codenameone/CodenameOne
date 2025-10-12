@@ -59,8 +59,24 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          yes | sdkmanager --install "platform-tools" "build-tools;34.0.0" >/dev/null
-          yes | sdkmanager --licenses >/dev/null
+          if ! command -v sdkmanager >/dev/null 2>&1; then
+            echo "sdkmanager executable is required" >&2
+            exit 1
+          fi
+
+          SDKMANAGER="$(command -v sdkmanager)"
+
+          run_sdk() {
+            set +o pipefail
+            yes | "$SDKMANAGER" "$@" >/dev/null 2>&1
+            local rc=${PIPESTATUS[1]}
+            set -o pipefail
+            return $rc
+          }
+
+          run_sdk --licenses
+          run_sdk --install "platform-tools" "build-tools;34.0.0"
+          run_sdk --install "platforms;android-33" || echo "Warning: failed to install Android 33 platform" >&2
           if [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/platform-tools" ]; then
             echo "${ANDROID_HOME}/platform-tools" >> "$GITHUB_PATH"
           fi
