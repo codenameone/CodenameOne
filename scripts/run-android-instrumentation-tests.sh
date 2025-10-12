@@ -131,7 +131,10 @@ fi
 AVD_NAME="cn1-api35-arm"
 if ! "$AVDMANAGER" list avd | grep -q "Name: $AVD_NAME"; then
   log "Creating AVD $AVD_NAME"
-  printf 'no\n' | "$AVDMANAGER" create avd -n "$AVD_NAME" -k "system-images;android-35;google_apis;arm64-v8a" -d pixel >/dev/null
+  if ! printf 'no\n' | "$AVDMANAGER" create avd -n "$AVD_NAME" -k "system-images;android-35;google_apis;arm64-v8a" -d pixel >/dev/null 2>&1; then
+    log "Failed to create AVD $AVD_NAME" >&2
+    exit 1
+  fi
 fi
 
 log "Starting AVD $AVD_NAME in headless mode"
