@@ -40,6 +40,26 @@ jobs:
     needs: build-android
     runs-on: ubuntu-22.04-arm
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Ensure platform-tools available on PATH
+        shell: bash
+        run: |
+          set -euxo pipefail
+          yes | sdkmanager --install "platform-tools" >/dev/null
+          if [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/platform-tools" ]; then
+            echo "${ANDROID_HOME}/platform-tools" >> "$GITHUB_PATH"
+          fi
+          if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}/platform-tools" ]; then
+            echo "${ANDROID_SDK_ROOT}/platform-tools" >> "$GITHUB_PATH"
+          fi
+          command -v adb
+          adb version
+
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
         with:
@@ -53,22 +73,12 @@ jobs:
           profile: pixel_6
           pre-emulator-launch-script: |
             set -euxo pipefail
-            if command -v sdkmanager >/dev/null 2>&1; then
-              yes | sdkmanager --install "platform-tools" >/dev/null
-            else
-              echo "sdkmanager executable is required for installing platform-tools" >&2
-              exit 1
-            fi
-            if [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/platform-tools" ]; then
-              echo "${ANDROID_HOME}/platform-tools" >> "$GITHUB_PATH"
-            elif [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}/platform-tools" ]; then
-              echo "${ANDROID_SDK_ROOT}/platform-tools" >> "$GITHUB_PATH"
-            fi
+            adb version
           script: |
             set -euxo pipefail
             mkdir -p screenshots
-            adb install -r artifacts/${{ needs.build-android.outputs.app_apk }}
-            adb install -r -t artifacts/${{ needs.build-android.outputs.test_apk }}
+            adb install -r "artifacts/${{ needs.build-android.outputs.app_apk }}"
+            adb install -r -t "artifacts/${{ needs.build-android.outputs.test_apk }}"
             adb logcat -c
             AAPT_BIN=""
             if command -v aapt >/dev/null 2>&1; then
@@ -100,7 +110,7 @@ jobs:
               adb shell monkey -p "$TEST_PACKAGE" 1
             fi
 
-            adb shell monkey -p ${{ needs.build-android.outputs.package_name }} 1 || true
+            adb shell monkey -p "${{ needs.build-android.outputs.package_name }}" 1 || true
             sleep 20
             if [ -f artifacts/tests.txt ]; then
               while IFS= read -r testName; do
