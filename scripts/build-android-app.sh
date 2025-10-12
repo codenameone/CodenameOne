@@ -289,12 +289,29 @@ if "android.test.InstrumentationTestRunner" not in text:
     else:
         raise SystemExit("defaultConfig block not found while adding instrumentation runner")
 
+libraries = [
+    "useLibrary 'android.test.base'",
+    "useLibrary 'android.test.mock'",
+    "useLibrary 'android.test.runner'",
+]
+
+missing_libraries = [lib for lib in libraries if lib not in text]
+if missing_libraries:
+    match = re.search(r"^(\s*android\s*\{)", text, flags=re.MULTILINE)
+    if not match:
+        raise SystemExit("android block not found while adding instrumentation libraries")
+    line = match.group(1)
+    indent = re.match(r"^(\s*)", line).group(1)
+    insertion = "".join(f"\n{indent}    {lib}" for lib in missing_libraries)
+    text = text[: match.end()] + insertion + text[match.end():]
+    modified = True
+
 if modified:
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text)
 PYTHON
-  ba_log "Ensured instrumentation runner is declared"
+  ba_log "Ensured instrumentation runner and libraries are declared"
 else
   ba_log "Warning: Gradle build file not found at $APP_BUILD_GRADLE; skipping instrumentation dependency configuration" >&2
 fi
@@ -317,6 +334,17 @@ public class HelloCodenameOneInstrumentedTest extends InstrumentationTestCase {
 }
 EOF
 ba_log "Created instrumentation test at $TEST_CLASS"
+
+DEFAULT_ANDROID_TEST="$GRADLE_PROJECT_DIR/app/src/androidTest/java/com/example/myapplication2/ExampleInstrumentedTest.java"
+if [ -f "$DEFAULT_ANDROID_TEST" ]; then
+  rm -f "$DEFAULT_ANDROID_TEST"
+  ba_log "Removed default instrumentation stub at $DEFAULT_ANDROID_TEST"
+  DEFAULT_ANDROID_TEST_DIR="$(dirname "$DEFAULT_ANDROID_TEST")"
+  DEFAULT_ANDROID_TEST_PARENT="$(dirname "$DEFAULT_ANDROID_TEST_DIR")"
+  rmdir "$DEFAULT_ANDROID_TEST_DIR" 2>/dev/null || true
+  rmdir "$DEFAULT_ANDROID_TEST_PARENT" 2>/dev/null || true
+  rmdir "$(dirname "$DEFAULT_ANDROID_TEST_PARENT")" 2>/dev/null || true
+fi
 
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
