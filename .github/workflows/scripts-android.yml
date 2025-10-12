@@ -68,8 +68,14 @@ jobs:
 
           run_sdk() {
             set +o pipefail
-            yes | "$SDKMANAGER" "$@" >/dev/null 2>&1
-            local rc=${PIPESTATUS[1]}
+            local rc
+            if arch -arm64 true 2>/dev/null; then
+              yes | arch -arm64 "$SDKMANAGER" "$@" >/dev/null 2>&1
+              rc=${PIPESTATUS[2]}
+            else
+              yes | "$SDKMANAGER" "$@" >/dev/null 2>&1
+              rc=${PIPESTATUS[1]}
+            fi
             set -o pipefail
             return $rc
           }
@@ -145,7 +151,7 @@ jobs:
           avd-name: test
           force-avd-creation: true
           emulator-boot-timeout: 600
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -accel hvf
+          emulator-options: -no-window -gpu host -no-snapshot -noaudio -no-boot-anim -feature HVF -accel hvf
       - name: Upload emulator screenshots
         uses: actions/upload-artifact@v4
         with:
