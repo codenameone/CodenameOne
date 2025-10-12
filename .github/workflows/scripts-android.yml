@@ -43,27 +43,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Install Android SDK tools
-        uses: android-actions/setup-android@v3
-
-      - name: Install required Android packages
-        run: |
-          set -eux
-          yes 2>/dev/null | sdkmanager --licenses >/dev/null
-          yes 2>/dev/null | sdkmanager --install "platform-tools" "build-tools;34.0.0" "platforms;android-33" "emulator" >/dev/null
-
-      - name: Verify platform tools
-        run: |
-          set -eux
-          command -v adb
-          adb version
-
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
         with:
@@ -77,6 +56,7 @@ jobs:
           profile: pixel_6
           pre-emulator-launch-script: |
             set -euxo pipefail
+            adb kill-server || true
             adb version
           script: |
             set -euxo pipefail
@@ -121,7 +101,7 @@ jobs:
           avd-name: test
           force-avd-creation: true
           emulator-boot-timeout: 600
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim
       - name: Upload emulator screenshots
         uses: actions/upload-artifact@v4
         with:
