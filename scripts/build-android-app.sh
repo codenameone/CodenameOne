@@ -265,6 +265,85 @@ if [ -z "$GRADLE_PROJECT_DIR" ]; then
   exit 1
 fi
 
+ba_log "Configuring instrumentation test sources in $GRADLE_PROJECT_DIR"
+APP_BUILD_GRADLE="$GRADLE_PROJECT_DIR/app/build.gradle"
+if [ -f "$APP_BUILD_GRADLE" ]; then
+  python3 - "$APP_BUILD_GRADLE" <<'PYTHON'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+modified = False
+
+if "androidx.test.runner.AndroidJUnitRunner" not in text:
+    def add_runner(match):
+        prefix = match.group(0)
+        return prefix + "\n        testInstrumentationRunner \"androidx.test.runner.AndroidJUnitRunner\""
+
+    new_text, count = re.subn(r"(defaultConfig\s*\{)", add_runner, text, count=1, flags=re.MULTILINE)
+    if count:
+        text = new_text
+        modified = True
+    else:
+        raise SystemExit("defaultConfig block not found while adding instrumentation runner")
+
+dependencies_to_add = (
+    '    androidTestImplementation "androidx.test.ext:junit:1.1.5"\n'
+    '    androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"'
+)
+
+if "androidx.test.ext:junit" not in text and "androidx.test.espresso:espresso-core" not in text:
+    def add_dependencies(match):
+        prefix = match.group(0)
+        return prefix + "\n" + dependencies_to_add
+
+    new_text, count = re.subn(r"(dependencies\s*\{)", add_dependencies, text, count=1, flags=re.MULTILINE)
+    if count:
+        text = new_text
+        modified = True
+    else:
+        raise SystemExit("dependencies block not found while adding androidTest dependencies")
+
+if modified:
+    if not text.endswith("\n"):
+        text += "\n"
+    path.write_text(text)
+PYTHON
+  ba_log "Ensured instrumentation runner and dependencies are declared"
+else
+  ba_log "Warning: Gradle build file not found at $APP_BUILD_GRADLE; skipping instrumentation dependency configuration" >&2
+fi
+
+TEST_SRC_DIR="$GRADLE_PROJECT_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
+mkdir -p "$TEST_SRC_DIR"
+TEST_CLASS="$TEST_SRC_DIR/HelloCodenameOneInstrumentedTest.java"
+cat >"$TEST_CLASS" <<EOF
+package $PACKAGE_NAME;
+
+import android.content.Context;
+
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+import static org.junit.Assert.assertEquals;
+
+@RunWith(AndroidJUnit4.class)
+public class HelloCodenameOneInstrumentedTest {
+
+    @Test
+    public void useAppContext() {
+        Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        assertEquals("$PACKAGE_NAME", appContext.getPackageName());
+    }
+}
+EOF
+ba_log "Created instrumentation test at $TEST_CLASS"
+
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
@@ -283,3 +362,12 @@ export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" | head -n 1 || true)
 [ -n "$APK_PATH" ] || { ba_log "Gradle build completed but no APK was found" >&2; exit 1; }
 ba_log "Successfully built Android APK at $APK_PATH"
+
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "gradle_project_dir=$GRADLE_PROJECT_DIR"
+    echo "apk_path=$APK_PATH"
+    echo "instrumentation_test_class=$PACKAGE_NAME.HelloCodenameOneInstrumentedTest"
+  } >> "$GITHUB_OUTPUT"
+  ba_log "Published GitHub Actions outputs for downstream steps"
+fi
