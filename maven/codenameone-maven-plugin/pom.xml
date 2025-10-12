@@ -20,6 +20,13 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
+        <!--
+          Codename One embeds Chromium via the codenameone-cef artifact which is
+          only published for x86/x64 targets.  Linux ARM runners cannot resolve
+          this dependency, so allow scripts to disable it with
+          -Dinclude.cef=false.
+        -->
+        <include.cef>true</include.cef>
     </properties>
 
     <profiles>
@@ -30,6 +37,23 @@
                     <exists>${cn1.build.client.path}</exists>
                 </file>
             </activation>
+        </profile>
+        <profile>
+            <id>include-cef</id>
+            <activation>
+                <property>
+                    <name>include.cef</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-cef</artifactId>
+                    <version>84.4.1-M3</version>
+                    <type>pom</type>
+                </dependency>
+            </dependencies>
         </profile>
     </profiles>
 
@@ -115,14 +139,6 @@
             <groupId>com.guardsquare</groupId>
             <artifactId>proguard-base</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-cef</artifactId>
-            <version>84.4.1-M3</version>
-            <type>pom</type>
-        </dependency>
-
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

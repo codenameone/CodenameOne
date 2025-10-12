@@ -18,6 +18,27 @@ log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 ENV_FILE="$ENV_DIR/env.sh"
 
+host_os="$(uname -s)"
+host_arch="$(uname -m)"
+if [ "$host_os" = "Linux" ]; then
+  case "$host_arch" in
+    arm64|aarch64)
+      include_cef_arg_present=0
+      for arg in "$@"; do
+        case "$arg" in
+          -Dinclude.cef=*) include_cef_arg_present=1; break ;;
+        esac
+      done
+      if [ "$include_cef_arg_present" -eq 0 ]; then
+        log "Linux ARM host detected; disabling codenameone-cef dependency"
+        set -- "$@" "-Dinclude.cef=false"
+      else
+        log "Linux ARM host detected; using custom include.cef flag"
+      fi
+      ;;
+  esac
+fi
+
 load_environment() {
   if [ ! -f "$ENV_FILE" ]; then
     return 1

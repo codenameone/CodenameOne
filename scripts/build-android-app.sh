@@ -13,6 +13,27 @@ DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 EXTRA_MVN_ARGS=("$@")
 
+HOST_OS="$(uname -s)"
+HOST_ARCH="$(uname -m)"
+if [ "$HOST_OS" = "Linux" ]; then
+  case "$HOST_ARCH" in
+    arm64|aarch64)
+      include_cef_arg_present=0
+      for arg in "${EXTRA_MVN_ARGS[@]}"; do
+        case "$arg" in
+          -Dinclude.cef=*) include_cef_arg_present=1; break ;;
+        esac
+      done
+      if [ "$include_cef_arg_present" -eq 0 ]; then
+        ba_log "Linux ARM host detected; disabling codenameone-cef dependency"
+        EXTRA_MVN_ARGS+=("-Dinclude.cef=false")
+      else
+        ba_log "Linux ARM host detected; using custom include.cef flag"
+      fi
+      ;;
+  esac
+fi
+
 ENV_FILE="$ENV_DIR/env.sh"
 ba_log "Loading workspace environment from $ENV_FILE"
 if [ -f "$ENV_FILE" ]; then
