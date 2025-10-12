@@ -52,28 +52,15 @@ jobs:
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
         with:
-          accept-android-sdk-licenses: false
-          packages: ''
+          accept-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            build-tools;34.0.0
+            platforms;android-33
 
-      - name: Install Android platform tools
-        shell: bash
+      - name: Verify platform tools
         run: |
-          set -eux
-          if ! command -v sdkmanager >/dev/null 2>&1; then
-            echo "sdkmanager executable is required" >&2
-            exit 1
-          fi
-
-          yes 2>/dev/null | sdkmanager --licenses >/dev/null
-          yes 2>/dev/null | sdkmanager --install "platform-tools" "build-tools;34.0.0" "platforms;android-33" >/dev/null
-
-          if [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/platform-tools" ]; then
-            echo "${ANDROID_HOME}/platform-tools" >> "$GITHUB_PATH"
-          fi
-          if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}/platform-tools" ]; then
-            echo "${ANDROID_SDK_ROOT}/platform-tools" >> "$GITHUB_PATH"
-          fi
-
+          set -euxo pipefail
           command -v adb
           adb version
 
