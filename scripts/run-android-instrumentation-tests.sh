@@ -135,9 +135,19 @@ if ! "$AVDMANAGER" list avd | grep -q "Name: $AVD_NAME"; then
 fi
 
 log "Starting AVD $AVD_NAME in headless mode"
+EMU_LOG="$TMPDIR/$AVD_NAME.log"
+: >"$EMU_LOG"
 "$EMU_BIN" -avd "$AVD_NAME" -no-boot-anim -no-audio -no-snapshot -no-window -gpu swiftshader_indirect -netfast \
-  >/tmp/$AVD_NAME.log 2>&1 &
+  >"$EMU_LOG" 2>&1 &
 EMU_PID=$!
+dump_emulator_log() {
+  if [ -f "$EMU_LOG" ]; then
+    log "Emulator log tail ($EMU_LOG):"
+    tail -n 200 "$EMU_LOG" | while IFS= read -r line; do
+      echo "[run-android-instrumentation-tests] | $line"
+    done
+  fi
+}
 cleanup() {
   log "Cleaning up emulator"
   if [ -n "${EMULATOR_SERIAL:-}" ]; then
@@ -152,8 +162,13 @@ trap cleanup EXIT
 log "Waiting for emulator to register with adb"
 "$ADB_BIN" start-server >/dev/null 2>&1 || true
 
-ADB_DEVICE_TIMEOUT=120
+ADB_DEVICE_TIMEOUT=180
 for _ in $(seq 1 "$ADB_DEVICE_TIMEOUT"); do
+  if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
+    log "Emulator process exited before appearing in adb" >&2
+    dump_emulator_log
+    exit 1
+  fi
   EMULATOR_SERIAL=$("$ADB_BIN" devices | awk 'NR>1 && /^emulator-/{print $1; exit}') || true
   if [ -n "${EMULATOR_SERIAL:-}" ]; then
     break
@@ -163,6 +178,7 @@ done
 
 if [ -z "${EMULATOR_SERIAL:-}" ]; then
   log "Emulator did not appear in adb devices within ${ADB_DEVICE_TIMEOUT}s" >&2
+  dump_emulator_log
   exit 1
 fi
 
@@ -173,11 +189,17 @@ for _ in $(seq 1 120); do
   if [ "$BOOT_COMPLETED" = "1" ]; then
     break
   fi
+  if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
+    log "Emulator process exited before boot completed" >&2
+    dump_emulator_log
+    exit 1
+  fi
   sleep 5
 done
 
 if [ "$BOOT_COMPLETED" != "1" ]; then
   log "Emulator did not boot in the allotted time" >&2
+  dump_emulator_log
   exit 1
 fi
 
