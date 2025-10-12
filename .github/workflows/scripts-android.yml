@@ -26,7 +26,18 @@ jobs:
       - name: Add Android instrumentation test
         run: ./scripts/add-android-instrumentation-test.sh
       - name: Run Android instrumentation tests on emulator
-        run: ./scripts/run-android-instrumentation-tests.sh
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: arm64-v8a
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: >-
+            -no-window -no-boot-anim -gpu swiftshader_indirect
+            -no-snapshot -camera-back none -camera-front none
+            -accel off
+          script: ./scripts/run-android-instrumentation-tests.sh
       - name: Export Android emulator screenshot path
         if: always()
         run: |

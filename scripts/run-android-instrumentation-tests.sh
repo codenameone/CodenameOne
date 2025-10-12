@@ -61,150 +61,54 @@ if [ -z "$ANDROID_SDK_ROOT" ] || [ ! -d "$ANDROID_SDK_ROOT" ]; then
 fi
 export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
 
-find_tool() {
-  local binary="$1"
-  shift
-  for dir in "$@"; do
-    if [ -x "$dir/$binary" ]; then
-      printf '%s' "$dir/$binary"
-      return 0
-    fi
-  done
-  return 1
-}
-
-run_sdkmanager_noninteractive() {
-  local description="$1"
-  shift
-  log "$description"
-  # Temporarily disable errexit and pipefail so we can inspect the pipeline exit
-  # codes manually without the shell aborting on the SIGPIPE emitted by `yes`.
-  set +e
-  set +o pipefail
-  yes 2>/dev/null | "$SDKMANAGER" "$@" >/dev/null
-  local statuses=("${PIPESTATUS[@]}")
-  set -o pipefail
-  set -e
-  local sdk_status="${statuses[1]:-1}"
-  if [ "$sdk_status" -ne 0 ]; then
-    log "sdkmanager command failed (exit $sdk_status): $SDKMANAGER $*" >&2
-    return "$sdk_status"
-  fi
-  return 0
-}
-
-cmdline_tool_dirs=(
-  "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin"
-  "$ANDROID_SDK_ROOT/cmdline-tools/bin"
-  "$ANDROID_SDK_ROOT/tools/bin"
-)
-while IFS= read -r -d '' dir; do
-  cmdline_tool_dirs+=("$dir")
-done < <(find "$ANDROID_SDK_ROOT/cmdline-tools" -maxdepth 2 -type d -name bin -print0 2>/dev/null || true)
-
-SDKMANAGER=$(find_tool sdkmanager "${cmdline_tool_dirs[@]}" || true)
-AVDMANAGER=$(find_tool avdmanager "${cmdline_tool_dirs[@]}" || true)
-
-if [ -z "$SDKMANAGER" ] || [ -z "$AVDMANAGER" ]; then
-  log "Required Android command-line tools were not found." >&2
-  log "SDKMANAGER=$SDKMANAGER AVDMANAGER=$AVDMANAGER" >&2
-  exit 1
-fi
-
-run_sdkmanager_noninteractive "Accepting Android SDK licenses" --licenses
-
-run_sdkmanager_noninteractive "Installing Android 35 ARM system image" --install \
-  "platform-tools" \
-  "platforms;android-35" \
-  "emulator" \
-  "system-images;android-35;google_apis;arm64-v8a"
-
-EMU_BIN="$ANDROID_SDK_ROOT/emulator/emulator"
 ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
 
-if [ ! -x "$EMU_BIN" ] || [ ! -x "$ADB_BIN" ]; then
-  log "Android emulator or adb binary not found after installation." >&2
-  log "EMULATOR=$EMU_BIN ADB=$ADB_BIN" >&2
+if [ ! -x "$ADB_BIN" ]; then
+  log "adb binary not found. Ensure Android platform-tools are installed." >&2
+  log "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
   exit 1
 fi
 
-AVD_NAME="cn1-api35-arm"
-if ! "$AVDMANAGER" list avd | grep -q "Name: $AVD_NAME"; then
-  log "Creating AVD $AVD_NAME"
-  if ! printf 'no\n' | "$AVDMANAGER" create avd -n "$AVD_NAME" -k "system-images;android-35;google_apis;arm64-v8a" -d pixel >/dev/null 2>&1; then
-    log "Failed to create AVD $AVD_NAME" >&2
+ensure_emulator_ready() {
+  log "Waiting for emulator to register with adb"
+  "$ADB_BIN" start-server >/dev/null 2>&1 || true
+
+  local adb_device_timeout=180
+  for _ in $(seq 1 "$adb_device_timeout"); do
+    EMULATOR_SERIAL=$("$ADB_BIN" devices | awk 'NR>1 && /^emulator-/{print $1; exit}') || true
+    if [ -n "${EMULATOR_SERIAL:-}" ]; then
+      break
+    fi
+    sleep 1
+  done
+
+  if [ -z "${EMULATOR_SERIAL:-}" ]; then
+    log "No emulator appeared in adb devices within ${adb_device_timeout}s" >&2
+    "$ADB_BIN" devices >&2 || true
+    cat <<'EOF' >&2
+Ensure an Android emulator is booted before invoking this script. In CI, run it
+inside the reactivecircus/android-emulator-runner action (see scripts-android.yml).
+EOF
     exit 1
   fi
-fi
 
-log "Starting AVD $AVD_NAME in headless mode"
-EMU_LOG="$TMPDIR/$AVD_NAME.log"
-: >"$EMU_LOG"
-"$EMU_BIN" -avd "$AVD_NAME" -no-boot-anim -no-audio -no-snapshot -no-window -gpu swiftshader_indirect -netfast \
-  >"$EMU_LOG" 2>&1 &
-EMU_PID=$!
-dump_emulator_log() {
-  if [ -f "$EMU_LOG" ]; then
-    log "Emulator log tail ($EMU_LOG):"
-    tail -n 200 "$EMU_LOG" | while IFS= read -r line; do
-      echo "[run-android-instrumentation-tests] | $line"
-    done
+  log "Waiting for emulator to boot"
+  local boot_completed="0"
+  for _ in $(seq 1 120); do
+    boot_completed=$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') || true
+    if [ "$boot_completed" = "1" ]; then
+      break
+    fi
+    sleep 5
+  done
+
+  if [ "$boot_completed" != "1" ]; then
+    log "Emulator did not boot in the allotted time" >&2
+    exit 1
   fi
 }
-cleanup() {
-  log "Cleaning up emulator"
-  if [ -n "${EMULATOR_SERIAL:-}" ]; then
-    "$ADB_BIN" -s "$EMULATOR_SERIAL" emu kill >/dev/null 2>&1 || true
-  else
-    "$ADB_BIN" emu kill >/dev/null 2>&1 || true
-  fi
-  kill "$EMU_PID" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
 
-log "Waiting for emulator to register with adb"
-"$ADB_BIN" start-server >/dev/null 2>&1 || true
-
-ADB_DEVICE_TIMEOUT=180
-for _ in $(seq 1 "$ADB_DEVICE_TIMEOUT"); do
-  if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
-    log "Emulator process exited before appearing in adb" >&2
-    dump_emulator_log
-    exit 1
-  fi
-  EMULATOR_SERIAL=$("$ADB_BIN" devices | awk 'NR>1 && /^emulator-/{print $1; exit}') || true
-  if [ -n "${EMULATOR_SERIAL:-}" ]; then
-    break
-  fi
-  sleep 1
-done
-
-if [ -z "${EMULATOR_SERIAL:-}" ]; then
-  log "Emulator did not appear in adb devices within ${ADB_DEVICE_TIMEOUT}s" >&2
-  dump_emulator_log
-  exit 1
-fi
-
-log "Waiting for emulator to boot"
-BOOT_COMPLETED="0"
-for _ in $(seq 1 120); do
-  BOOT_COMPLETED=$("$ADB_BIN" -s "$EMULATOR_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') || true
-  if [ "$BOOT_COMPLETED" = "1" ]; then
-    break
-  fi
-  if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
-    log "Emulator process exited before boot completed" >&2
-    dump_emulator_log
-    exit 1
-  fi
-  sleep 5
-done
-
-if [ "$BOOT_COMPLETED" != "1" ]; then
-  log "Emulator did not boot in the allotted time" >&2
-  dump_emulator_log
-  exit 1
-fi
+ensure_emulator_ready
 
 log "Executing connected Android tests"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
