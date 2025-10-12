@@ -68,7 +68,7 @@ jobs:
             set -euxo pipefail
             mkdir -p screenshots
             adb install -r artifacts/${{ needs.build-android.outputs.app_apk }}
-            adb install -r artifacts/${{ needs.build-android.outputs.test_apk }}
+            adb install -r -t artifacts/${{ needs.build-android.outputs.test_apk }}
             adb logcat -c
             AAPT_BIN=""
             if command -v aapt >/dev/null 2>&1; then
