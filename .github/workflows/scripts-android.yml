@@ -51,12 +51,16 @@ jobs:
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: false
+          packages: ''
 
-      - name: Ensure platform-tools available on PATH
+      - name: Ensure Android tools available on PATH
         shell: bash
         run: |
           set -euxo pipefail
-          yes | sdkmanager --install "platform-tools" >/dev/null
+          yes | sdkmanager --install "platform-tools" "build-tools;34.0.0" >/dev/null
+          yes | sdkmanager --licenses >/dev/null
           if [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/platform-tools" ]; then
             echo "${ANDROID_HOME}/platform-tools" >> "$GITHUB_PATH"
           fi
