@@ -459,15 +459,11 @@ public final class StringBuilder implements CharSequence, Appendable {
             for (int i = 0, mid = count / 2; i < mid; i++, --end) {
                 char frontLow = value[i + 1];
                 char endHigh = value[end - 1];
-                boolean surAtFront = allowFrontSur && frontLow >= 0xdc00
-                        && frontLow <= 0xdfff && frontHigh >= 0xd800
-                        && frontHigh <= 0xdbff;
+                boolean surAtFront = allowFrontSur && Character.isSurrogatePair(frontHigh, frontLow);
                 if (surAtFront && (count < 3)) {
                     return this;
                 }
-                boolean surAtEnd = allowEndSur && endHigh >= 0xd800
-                        && endHigh <= 0xdbff && endLow >= 0xdc00
-                        && endLow <= 0xdfff;
+                boolean surAtEnd = allowEndSur && Character.isSurrogatePair(endHigh, endLow);
                 allowFrontSur = allowEndSur = true;
                 if (surAtFront == surAtEnd) {
                     if (surAtFront) {
@@ -524,7 +520,7 @@ public final class StringBuilder implements CharSequence, Appendable {
         }*/
         return this;
     }
-
+    
     /**
      * The character at the specified index of this string builder is set to ch. The string builder is altered to represent a new character sequence that is identical to the old character sequence, except that it contains the character ch at position index.
      * The offset argument must be greater than or equal to 0, and less than the length of this string builder.
