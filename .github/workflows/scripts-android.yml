@@ -15,6 +15,11 @@ name: Test Android build scripts
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    outputs:
+      artifact_dir: ${{ steps.build-app.outputs.artifact_dir }}
+      app_apk: ${{ steps.build-app.outputs.app_apk }}
+      test_apk: ${{ steps.build-app.outputs.test_apk }}
+      package_name: ${{ steps.build-app.outputs.package_name }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup workspace
@@ -22,4 +27,92 @@ jobs:
       - name: Build Android port
         run: ./scripts/build-android-port.sh -q -DskipTests
       - name: Build Hello Codename One Android app
+        id: build-app
         run: ./scripts/build-android-app.sh -q -DskipTests
+      - name: Upload Android APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-codenameone-apks
+          path: ${{ steps.build-app.outputs.artifact_dir }}
+          if-no-files-found: error
+
+  android-device-tests:
+    needs: build-android
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hello-codenameone-apks
+          path: artifacts
+      - name: Launch emulator and capture screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: arm64-v8a
+          profile: pixel_6
+          pre-emulator-launch-script: |
+            set -euxo pipefail
+            if command -v sdkmanager >/dev/null 2>&1; then
+              yes | sdkmanager --install "platform-tools" >/dev/null
+            else
+              echo "sdkmanager executable is required for installing platform-tools" >&2
+              exit 1
+            fi
+            if [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/platform-tools" ]; then
+              echo "${ANDROID_HOME}/platform-tools" >> "$GITHUB_PATH"
+            elif [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}/platform-tools" ]; then
+              echo "${ANDROID_SDK_ROOT}/platform-tools" >> "$GITHUB_PATH"
+            fi
+          script: |
+            set -euxo pipefail
+            mkdir -p screenshots
+            adb install -r artifacts/${{ needs.build-android.outputs.app_apk }}
+            adb install -r artifacts/${{ needs.build-android.outputs.test_apk }}
+            adb logcat -c
+            AAPT_BIN=""
+            if command -v aapt >/dev/null 2>&1; then
+              AAPT_BIN="$(command -v aapt)"
+            elif [ -n "${ANDROID_HOME:-}" ] && [ -d "${ANDROID_HOME}/build-tools" ]; then
+              AAPT_BIN="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name aapt -type f | sort | tail -n1 || true)"
+            elif [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}/build-tools" ]; then
+              AAPT_BIN="$(find "${ANDROID_SDK_ROOT}/build-tools" -maxdepth 2 -name aapt -type f | sort | tail -n1 || true)"
+            fi
+
+            TEST_PACKAGE=""
+            INSTRUMENTATION_NAME=""
+            if [ -n "$AAPT_BIN" ] && [ -x "$AAPT_BIN" ]; then
+              BADGING_OUTPUT="$($AAPT_BIN dump badging artifacts/${{ needs.build-android.outputs.test_apk }} || true)"
+              if [ -n "$BADGING_OUTPUT" ]; then
+                TEST_PACKAGE="$(printf '%s\n' "$BADGING_OUTPUT" | awk -F"'" '/^package: /{print $2; exit}')"
+                INSTRUMENTATION_NAME="$(printf '%s\n' "$BADGING_OUTPUT" | awk -F"'" '/^instrumentation: /{print $2; exit}')"
+              fi
+            fi
+
+            if [ -n "$INSTRUMENTATION_NAME" ]; then
+              echo "Running instrumentation tests via $INSTRUMENTATION_NAME"
+              adb shell am instrument -w "$INSTRUMENTATION_NAME"
+            else
+              if [ -z "$TEST_PACKAGE" ]; then
+                TEST_PACKAGE="${{ needs.build-android.outputs.package_name }}.tests"
+              fi
+              echo "Instrumentation runner not found, launching $TEST_PACKAGE via monkey"
+              adb shell monkey -p "$TEST_PACKAGE" 1
+            fi
+
+            adb shell monkey -p ${{ needs.build-android.outputs.package_name }} 1 || true
+            sleep 20
+            if [ -f artifacts/tests.txt ]; then
+              while IFS= read -r testName; do
+                [ -n "$testName" ] || continue
+                adb exec-out screencap -p > "screenshots/${testName}.png"
+              done < artifacts/tests.txt
+            else
+              adb exec-out screencap -p > screenshots/test-suite.png
+            fi
+      - name: Upload emulator screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-codenameone-test-screenshots
+          path: screenshots
+          if-no-files-found: error

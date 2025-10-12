@@ -79,6 +79,10 @@ ba_log "Detected Codename One version $CN1_VERSION"
 
 WORK_DIR="$TMPDIR/cn1-hello-android"
 rm -rf "$WORK_DIR"; mkdir -p "$WORK_DIR"
+ARTIFACTS_DIR="$WORK_DIR/artifacts"
+mkdir -p "$ARTIFACTS_DIR"
+TEST_LIST_FILE="$ARTIFACTS_DIR/tests.txt"
+> "$TEST_LIST_FILE"
 
 GROUP_ID="com.codenameone.examples"
 ARTIFACT_ID="hello-codenameone"
@@ -191,6 +195,25 @@ done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 # 5) Build with the property set so any lingering refs resolve to the local snapshot
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 
+# --- Record discovered unit tests ---
+while IFS= read -r -d '' TEST_FILE; do
+  REL_PATH="${TEST_FILE#$APP_DIR/}"
+  REL_PATH="${REL_PATH#*/src/test/java/}"
+  CLASS_NAME="${REL_PATH%.java}"
+  CLASS_NAME="${CLASS_NAME//\//.}"
+  if [ -n "$CLASS_NAME" ]; then
+    echo "$CLASS_NAME" >> "$TEST_LIST_FILE"
+  fi
+done < <(find "$APP_DIR" -path "*/src/test/java/*.java" -print0)
+
+if [ ! -s "$TEST_LIST_FILE" ]; then
+  rm -f "$TEST_LIST_FILE"
+  ba_log "Warning: no unit test sources were discovered"
+else
+  ba_log "Recorded unit test classes:" 
+  sed 's/^/[build-android-app]   /' "$TEST_LIST_FILE"
+fi
+
 # (Optional) quick non-fatal checks
 xmlstarlet sel -N "$NS" -t -v "/mvn:project/mvn:properties/mvn:codenameone.version" -n "$ROOT_POM" || true
 xmlstarlet sel -N "$NS" -t -c "/mvn:project/mvn:build/mvn:plugins" -n "$ROOT_POM" | head -n 60 || true
@@ -282,4 +305,59 @@ export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
 APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" | head -n 1 || true)
 [ -n "$APK_PATH" ] || { ba_log "Gradle build completed but no APK was found" >&2; exit 1; }
+FINAL_APP_APK="$ARTIFACTS_DIR/${ARTIFACT_ID}-debug.apk"
+cp "$APK_PATH" "$FINAL_APP_APK"
 ba_log "Successfully built Android APK at $APK_PATH"
+ba_log "Copied Android APK to $FINAL_APP_APK"
+
+ba_log "Building Android unit test APK"
+rm -rf "$APP_DIR/android/target"
+xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package \
+  -DskipTests \
+  -Dcodename1.platform=android \
+  -Dcodename1.buildTarget=android-source \
+  -Dcodename1.arg.build.unitTest=1 \
+  -Dopen=false \
+  "${EXTRA_MVN_ARGS[@]}"
+
+GRADLE_PROJECT_DIR=$(find "$APP_DIR/android/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
+[ -n "$GRADLE_PROJECT_DIR" ] || { ba_log "Failed to locate generated Android project for unit tests" >&2; exit 1; }
+
+ba_log "Invoking Gradle build for unit test project in $GRADLE_PROJECT_DIR"
+chmod +x "$GRADLE_PROJECT_DIR/gradlew"
+ORIGINAL_JAVA_HOME="$JAVA_HOME"
+export JAVA_HOME="$JAVA17_HOME"
+(
+  cd "$GRADLE_PROJECT_DIR"
+  if command -v sdkmanager >/dev/null 2>&1; then
+    yes | sdkmanager --licenses >/dev/null 2>&1 || true
+  elif [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+  fi
+  ./gradlew --no-daemon assembleDebug
+)
+export JAVA_HOME="$ORIGINAL_JAVA_HOME"
+
+UNIT_TEST_APK_PATH=$(find "$GRADLE_PROJECT_DIR" -path "*/outputs/apk/debug/*.apk" | head -n 1 || true)
+[ -n "$UNIT_TEST_APK_PATH" ] || { ba_log "Gradle unit test build completed but no APK was found" >&2; exit 1; }
+FINAL_TEST_APK="$ARTIFACTS_DIR/${ARTIFACT_ID}-tests-debug.apk"
+cp "$UNIT_TEST_APK_PATH" "$FINAL_TEST_APK"
+ba_log "Successfully built Android unit test APK at $UNIT_TEST_APK_PATH"
+ba_log "Copied Android unit test APK to $FINAL_TEST_APK"
+
+TESTS_METADATA=$(find "$APP_DIR" -name tests.dat | head -n 1 || true)
+if [ -n "$TESTS_METADATA" ]; then
+  cp "$TESTS_METADATA" "$ARTIFACTS_DIR/tests.dat"
+  ba_log "Copied test metadata to $ARTIFACTS_DIR/tests.dat"
+else
+  ba_log "Warning: tests.dat metadata file not found"
+fi
+
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "artifact_dir=$ARTIFACTS_DIR"
+    echo "app_apk=$(basename "$FINAL_APP_APK")"
+    echo "test_apk=$(basename "$FINAL_TEST_APK")"
+    echo "package_name=$PACKAGE_NAME"
+  } >> "$GITHUB_OUTPUT"
+fi
