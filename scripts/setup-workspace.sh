@@ -60,20 +60,24 @@ case "$arch_name" in
   *) echo "Unsupported architecture: $arch_name" >&2; exit 1 ;;
 esac
 
-if [ "$os" = "linux" ] && [ "$arch" = "aarch64" ]; then
-  include_cef_arg_present=0
+detect_local_repo() {
+  local repo="${LOCAL_MAVEN_REPO:-}"
   for arg in "$@"; do
     case "$arg" in
-      -Dinclude.cef=*) include_cef_arg_present=1; break ;;
+      -Dmaven.repo.local=*)
+        repo="${arg#*=}"
+        ;;
     esac
   done
-  if [ "$include_cef_arg_present" -eq 0 ]; then
-    log "Linux ARM host detected; disabling codenameone-cef dependency"
-    set -- "$@" "-Dinclude.cef=false"
-  else
-    log "Linux ARM host detected; using custom include.cef flag"
+  if [ -z "$repo" ]; then
+    repo="$HOME/.m2/repository"
   fi
-fi
+  printf '%s' "${repo%/}"
+}
+
+LOCAL_MAVEN_REPO="$(detect_local_repo "$@")"
+log "Using local Maven repository at $LOCAL_MAVEN_REPO"
+mkdir -p "$LOCAL_MAVEN_REPO"
 
 # Determine platform-specific JDK download URLs
 arch_jdk8="$arch"
@@ -161,6 +165,11 @@ if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
   MAVEN_HOME="$DOWNLOAD_DIR/$mvn_top"
 else
   log "Using existing Maven at $MAVEN_HOME"
+fi
+
+if [ "$os" = "linux" ] && [ "$arch" = "aarch64" ]; then
+  log "Ensuring codenameone-cef stub artifact is installed for Linux ARM builds"
+  MAVEN_BIN="$MAVEN_HOME/bin/mvn" LOCAL_MAVEN_REPO="$LOCAL_MAVEN_REPO" ./scripts/ensure-cef-stub.sh
 fi
 
 ARCHETYPE_PLUGIN_COORD="org.apache.maven.plugins:maven-archetype-plugin:3.2.1"

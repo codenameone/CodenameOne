@@ -12,27 +12,23 @@ TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 EXTRA_MVN_ARGS=("$@")
-
 HOST_OS="$(uname -s)"
 HOST_ARCH="$(uname -m)"
-if [ "$HOST_OS" = "Linux" ]; then
-  case "$HOST_ARCH" in
-    arm64|aarch64)
-      include_cef_arg_present=0
-      for arg in "${EXTRA_MVN_ARGS[@]}"; do
-        case "$arg" in
-          -Dinclude.cef=*) include_cef_arg_present=1; break ;;
-        esac
-      done
-      if [ "$include_cef_arg_present" -eq 0 ]; then
-        ba_log "Linux ARM host detected; disabling codenameone-cef dependency"
-        EXTRA_MVN_ARGS+=("-Dinclude.cef=false")
-      else
-        ba_log "Linux ARM host detected; using custom include.cef flag"
-      fi
-      ;;
-  esac
-fi
+
+detect_local_repo() {
+  local repo="${LOCAL_MAVEN_REPO:-}"
+  for arg in "${EXTRA_MVN_ARGS[@]}"; do
+    case "$arg" in
+      -Dmaven.repo.local=*)
+        repo="${arg#*=}"
+        ;;
+    esac
+  done
+  if [ -z "$repo" ]; then
+    repo="$HOME/.m2/repository"
+  fi
+  printf '%s' "${repo%/}"
+}
 
 ENV_FILE="$ENV_DIR/env.sh"
 ba_log "Loading workspace environment from $ENV_FILE"
@@ -83,6 +79,11 @@ ba_log "Using JAVA17_HOME at $JAVA17_HOME"
 ba_log "Using Maven installation at $MAVEN_HOME"
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
+if [ "$HOST_OS" = "Linux" ] && { [ "$HOST_ARCH" = "arm64" ] || [ "$HOST_ARCH" = "aarch64" ]; }; then
+  ba_log "Ensuring codenameone-cef stub artifact is installed for Linux ARM builds"
+  MAVEN_BIN="$MAVEN_HOME/bin/mvn" LOCAL_MAVEN_REPO="$LOCAL_MAVEN_REPO" ./scripts/ensure-cef-stub.sh
+fi
+
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 if [ -z "$ANDROID_SDK_ROOT" ]; then
   if [ -d "/usr/local/lib/android/sdk" ]; then ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
@@ -112,7 +113,7 @@ if [ ! -d "$SOURCE_PROJECT" ]; then
 fi
 ba_log "Using source project template at $SOURCE_PROJECT"
 
-LOCAL_MAVEN_REPO="${LOCAL_MAVEN_REPO:-$HOME/.m2/repository}"
+LOCAL_MAVEN_REPO="$(detect_local_repo)"
 ba_log "Using local Maven repository at $LOCAL_MAVEN_REPO"
 mkdir -p "$LOCAL_MAVEN_REPO"
 MAVEN_CMD=(

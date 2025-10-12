@@ -20,24 +20,24 @@ ENV_FILE="$ENV_DIR/env.sh"
 
 host_os="$(uname -s)"
 host_arch="$(uname -m)"
-if [ "$host_os" = "Linux" ]; then
-  case "$host_arch" in
-    arm64|aarch64)
-      include_cef_arg_present=0
-      for arg in "$@"; do
-        case "$arg" in
-          -Dinclude.cef=*) include_cef_arg_present=1; break ;;
-        esac
-      done
-      if [ "$include_cef_arg_present" -eq 0 ]; then
-        log "Linux ARM host detected; disabling codenameone-cef dependency"
-        set -- "$@" "-Dinclude.cef=false"
-      else
-        log "Linux ARM host detected; using custom include.cef flag"
-      fi
-      ;;
-  esac
-fi
+
+detect_local_repo() {
+  local repo="${LOCAL_MAVEN_REPO:-}"
+  for arg in "$@"; do
+    case "$arg" in
+      -Dmaven.repo.local=*)
+        repo="${arg#*=}"
+        ;;
+    esac
+  done
+  if [ -z "$repo" ]; then
+    repo="$HOME/.m2/repository"
+  fi
+  printf '%s' "${repo%/}"
+}
+
+LOCAL_REPO_PATH="$(detect_local_repo "$@")"
+mkdir -p "$LOCAL_REPO_PATH"
 
 load_environment() {
   if [ ! -f "$ENV_FILE" ]; then
@@ -133,6 +133,11 @@ export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 "$JAVA_HOME/bin/java" -version
 "$JAVA17_HOME/bin/java" -version
 "$MAVEN_HOME/bin/mvn" -version
+
+if [ "$host_os" = "Linux" ] && { [ "$host_arch" = "arm64" ] || [ "$host_arch" = "aarch64" ]; }; then
+  log "Ensuring codenameone-cef stub artifact is installed for Linux ARM builds"
+  MAVEN_BIN="$MAVEN_HOME/bin/mvn" LOCAL_MAVEN_REPO="$LOCAL_REPO_PATH" ./scripts/ensure-cef-stub.sh
+fi
 
 run_maven() {
   xvfb-run -a "$MAVEN_HOME/bin/mvn" "$@"
