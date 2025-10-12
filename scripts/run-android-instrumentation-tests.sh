@@ -45,6 +45,54 @@ if [ -z "$ANDROID_SDK_ROOT" ] || [ ! -d "$ANDROID_SDK_ROOT" ]; then
 fi
 export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
 
+ADB_BIN="$(command -v adb || true)"
+if [ -z "$ADB_BIN" ] && [ -x "$ANDROID_SDK_ROOT/platform-tools/adb" ]; then
+  ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
+fi
+if [ -z "$ADB_BIN" ]; then
+  ra_log "adb executable not found in PATH or Android SDK" >&2
+  exit 1
+fi
+"$ADB_BIN" start-server >/dev/null 2>&1 || true
+ra_log "Connected Android devices before selecting target:"
+"$ADB_BIN" devices -l || true
+
+DEVICE_SERIAL="${ANDROID_SERIAL:-}"
+if [ -z "$DEVICE_SERIAL" ]; then
+  DEVICE_SERIAL=$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {print $1; exit}')
+fi
+if [ -z "$DEVICE_SERIAL" ]; then
+  ra_log "No booted Android emulator/device detected" >&2
+  exit 1
+fi
+
+ADB_TARGET=("$ADB_BIN" -s "$DEVICE_SERIAL")
+adb_target() { "${ADB_TARGET[@]}" "$@"; }
+
+ra_log "Using Android device serial $DEVICE_SERIAL"
+adb_target wait-for-device
+
+wait_for_property() {
+  local property="$1" expected="$2" attempts="${3:-60}" delay="${4:-5}" value=""
+  for attempt in $(seq 1 "$attempts"); do
+    value="$(adb_target shell getprop "$property" 2>/dev/null | tr -d '\r')"
+    if [ "$value" = "$expected" ]; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+  ra_log "Timed out waiting for $property to become $expected (last value: ${value:-<unset>})" >&2
+  return 1
+}
+
+ra_log "Waiting for emulator to finish booting"
+wait_for_property sys.boot_completed 1 120 5
+wait_for_property dev.bootcomplete 1 120 5 || true
+adb_target shell input keyevent 82 >/dev/null 2>&1 || true
+ra_log "Device build fingerprint: $(adb_target shell getprop ro.build.fingerprint | tr -d '\r')"
+ra_log "Installed instrumentation targets:"
+adb_target shell pm list instrumentation || true
+
 if [ ! -d "$GRADLE_PROJECT_DIR" ]; then
   ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR" >&2
   exit 1
