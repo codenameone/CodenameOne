@@ -36,4 +36,11 @@ jobs:
           arch: x86_64
           target: google_apis
           script: |
-            ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+            ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}" "${{ steps.build-android-app.outputs.package_name }}"
+      - name: Upload emulator screenshot
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-emulator-screenshot
+          path: out/android-emulator/hello-codenameone.png
+          if-no-files-found: error

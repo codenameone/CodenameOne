@@ -370,6 +370,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "gradle_project_dir=$GRADLE_PROJECT_DIR"
     echo "apk_path=$APK_PATH"
     echo "instrumentation_test_class=$PACKAGE_NAME.HelloCodenameOneInstrumentedTest"
+    echo "package_name=$PACKAGE_NAME"
   } >> "$GITHUB_OUTPUT"
   ba_log "Published GitHub Actions outputs for downstream steps"
 fi

@@ -5,11 +5,12 @@ set -euo pipefail
 ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 
 if [ $# -lt 1 ]; then
-  ra_log "Usage: $0 <gradle_project_dir>" >&2
+  ra_log "Usage: $0 <gradle_project_dir> [package_name]" >&2
   exit 1
 fi
 
 GRADLE_PROJECT_DIR="$1"
+PACKAGE_NAME="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -93,6 +94,13 @@ ra_log "Device build fingerprint: $(adb_target shell getprop ro.build.fingerprin
 ra_log "Installed instrumentation targets:"
 adb_target shell pm list instrumentation || true
 
+if [ -z "$PACKAGE_NAME" ]; then
+  PACKAGE_NAME="$(adb_target shell pm list instrumentation 2>/dev/null | sed -n 's/.*target=\([^)]*\)).*/\1/p' | tr -d '\r' | head -n 1 || true)"
+  if [ -n "$PACKAGE_NAME" ]; then
+    ra_log "Detected application package from instrumentation list: $PACKAGE_NAME"
+  fi
+fi
+
 if [ ! -d "$GRADLE_PROJECT_DIR" ]; then
   ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR" >&2
   exit 1
@@ -110,3 +118,35 @@ ORIGINAL_JAVA_HOME="${JAVA_HOME:-}"; export JAVA_HOME="$JAVA17_HOME"
 )
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 ra_log "Instrumentation tests completed successfully"
+
+if [ -z "$PACKAGE_NAME" ]; then
+  ra_log "Application package name not available; skipping screenshot capture" >&2
+  exit 1
+fi
+
+ra_log "Launching $PACKAGE_NAME before capturing screenshot"
+adb_target shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || {
+  ra_log "Failed to launch $PACKAGE_NAME via monkey" >&2
+  exit 1
+}
+
+SCREENSHOT_DEVICE_PATH="/sdcard/Download/cn1-instrumentation-screenshot.png"
+SCREENSHOT_DIR="$REPO_ROOT/out/android-emulator"
+SCREENSHOT_PATH="$SCREENSHOT_DIR/hello-codenameone.png"
+mkdir -p "$SCREENSHOT_DIR"
+rm -f "$SCREENSHOT_PATH"
+
+ra_log "Capturing emulator screenshot to $SCREENSHOT_DEVICE_PATH"
+adb_target shell rm "$SCREENSHOT_DEVICE_PATH" >/dev/null 2>&1 || true
+adb_target shell screencap -p "$SCREENSHOT_DEVICE_PATH" >/dev/null || {
+  ra_log "Failed to capture screenshot on device" >&2
+  exit 1
+}
+
+ra_log "Pulling screenshot to $SCREENSHOT_PATH"
+adb_target pull "$SCREENSHOT_DEVICE_PATH" "$SCREENSHOT_PATH" >/dev/null || {
+  ra_log "Failed to pull screenshot from device" >&2
+  exit 1
+}
+adb_target shell rm "$SCREENSHOT_DEVICE_PATH" >/dev/null 2>&1 || true
+ra_log "Screenshot available at $SCREENSHOT_PATH"
