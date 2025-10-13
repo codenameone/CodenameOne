@@ -129,23 +129,10 @@ if adb_target shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHE
   ra_log "Application launch via monkey succeeded"
 else
   ra_log "Failed to launch $PACKAGE_NAME via monkey; attempting explicit resolve" >&2
-  RESOLVE_OUTPUT="$(adb_target shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
-  MAIN_ACTIVITY="$(printf '%s\n' "$RESOLVE_OUTPUT" | awk 'NF && $1 ~ /\// {print $1; exit}')"
-  if [ -z "$MAIN_ACTIVITY" ]; then
-    RESOLVE_OUTPUT="$(adb_target shell cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
-    MAIN_ACTIVITY="$(printf '%s\n' "$RESOLVE_OUTPUT" | sed -n 's/.*name=\([^ ]*\).*/\1/p' | head -n 1)"
-  fi
-  if [ -n "$MAIN_ACTIVITY" ] && [[ "$MAIN_ACTIVITY" != */* ]]; then
-    MAIN_ACTIVITY="$PACKAGE_NAME/$MAIN_ACTIVITY"
-  fi
+  MAIN_ACTIVITY="$(adb_target shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' | tail -n 1)"
+  MAIN_ACTIVITY="${MAIN_ACTIVITY##* }"
   if [[ -z "$MAIN_ACTIVITY" || "$MAIN_ACTIVITY" != */* ]]; then
-    RESOLVE_OUTPUT="$(adb_target shell dumpsys package "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
-    MAIN_ACTIVITY="$(printf '%s\n' "$RESOLVE_OUTPUT" | sed -n 's/.*cmp=\([^ ]*\).*/\1/p' | head -n 1)"
-  fi
-  if [[ -z "$MAIN_ACTIVITY" || "$MAIN_ACTIVITY" != */* ]]; then
-    OUTPUT_SNIPPET="$(printf '%s\n' "$RESOLVE_OUTPUT" | head -n 5)"
-    ra_log "Unable to resolve launchable activity for $PACKAGE_NAME; resolve-activity output snippet:" >&2
-    printf '%s\n' "${OUTPUT_SNIPPET:-<empty>}" >&2
+    ra_log "Unable to resolve launchable activity for $PACKAGE_NAME (cmd package output: ${MAIN_ACTIVITY:-<empty>})" >&2
     exit 1
   fi
   ra_log "Resolved main activity $MAIN_ACTIVITY; starting via am"
