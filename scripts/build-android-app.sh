@@ -325,11 +325,50 @@ package $PACKAGE_NAME;
 import android.content.Context;
 import android.test.InstrumentationTestCase;
 
+import android.app.Instrumentation;
+import android.os.ParcelFileDescriptor;
+import android.util.Base64;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 public class HelloCodenameOneInstrumentedTest extends InstrumentationTestCase {
 
     public void testUseAppContext() {
         Context appContext = getInstrumentation().getTargetContext();
         assertEquals("$PACKAGE_NAME", appContext.getPackageName());
+    }
+
+    private static final int CHUNK = 200_000;
+
+    public static void printPngToStdout(Instrumentation inst) {
+      try {
+        ParcelFileDescriptor pfd = inst.getUiAutomation().executeShellCommand("screencap -p");
+        byte[] png;
+        try (InputStream in = new FileInputStream(pfd.getFileDescriptor())) {
+            png = readAll(in);
+        }
+        String b64 = Base64.encodeToString(png, Base64.NO_WRAP);
+        System.out.println("<<CN1_SCREENSHOT_BEGIN>>");
+        for (int i = 0; i < b64.length(); i += CHUNK) {
+            int end = Math.min(i + CHUNK, b64.length());
+            System.out.println(b64.substring(i, end));
+        }
+        System.out.println("<<CN1_SCREENSHOT_END>>");
+        System.out.flush();
+      } catch (IOException err) {
+        err.printStackTrace();
+        throw new RuntimeException(err);
+      }
+    }
+
+    private static byte[] readAll(InputStream in) throws IOException {
+        byte[] buf = new byte[64 * 1024];
+        int n;
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+        return out.toByteArray();
     }
 }
 EOF

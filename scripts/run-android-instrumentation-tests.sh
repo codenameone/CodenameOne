@@ -9,6 +9,11 @@ if [ $# -lt 1 ]; then
   exit 1
 fi
 
+# near the top
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
+mkdir -p "$ARTIFACTS_DIR"
+TEST_LOG="$ARTIFACTS_DIR/connectedAndroidTest.log"
+
 GRADLE_PROJECT_DIR="$1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -102,11 +107,77 @@ if [ ! -x "$GRADLE_PROJECT_DIR/gradlew" ]; then
   chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 fi
 
-ra_log "Running instrumentation tests from $GRADLE_PROJECT_DIR"
-ORIGINAL_JAVA_HOME="${JAVA_HOME:-}"; export JAVA_HOME="$JAVA17_HOME"
+set -o pipefail
+
+ra_log "Running instrumentation tests (stdout -> $TEST_LOG; stderr -> terminal)"
+status=0
 (
   cd "$GRADLE_PROJECT_DIR"
-  ./gradlew --no-daemon connectedDebugAndroidTest
+  # stdout goes to tee+file, stderr remains on the terminal
+  ./gradlew --no-daemon --console=plain connectedDebugAndroidTest | tee "$TEST_LOG"
+) || status=$?
+
+# Show the log now (helpful for review even on success)
+echo
+ra_log "==== Begin connectedAndroidTest.log (tail -n 200) ===="
+tail -n 200 "$TEST_LOG" || true
+ra_log "==== End connectedAndroidTest.log ===="
+echo
+
+# --- Harvest stdout from connected tests (AGP old & new layouts) ---
+RESULTS_ROOT="$GRADLE_PROJECT_DIR/app/build/outputs/androidTest-results/connected"
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
+mkdir -p "$ARTIFACTS_DIR"
+
+# Debug: show what exists
+ra_log "Listing connected test outputs under: $RESULTS_ROOT"
+find "$RESULTS_ROOT" -maxdepth 4 -printf '%y %p\n' 2>/dev/null | sed 's/^/[run-android-instrumentation-tests]   /' || true
+
+# Gather candidate XMLs (new: test-result.xml; old: TEST-*.xml)
+mapfile -t CANDIDATES < <(
+  find "$RESULTS_ROOT" -type f \( -name 'test-result.xml' -o -name 'TEST-*.xml' \) -printf '%T@ %p\n' 2>/dev/null \
+  | sort -nr \
+  | awk '{ $1=""; sub(/^ /,""); print }'
 )
-export JAVA_HOME="$ORIGINAL_JAVA_HOME"
+
+if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+  ra_log "No connected test XML files found under $RESULTS_ROOT"
+else
+  ra_log "Found ${#CANDIDATES[@]} test result file(s). Will scan for screenshot markers."
+fi
+
+# Try each candidate until one yields a non-empty PNG
+SCREENSHOT_PATH="$ARTIFACTS_DIR/emulator-screenshot.png"
+: > "$SCREENSHOT_PATH"
+
+extract_from_xml() {
+  local xml="$1" out="$2"
+  # Pull lines strictly between our markers, regardless of XML tag nesting or CDATA
+  awk '
+    /<<CN1_SCREENSHOT_BEGIN>>/ {on=1; next}
+    /<<CN1_SCREENSHOT_END>>/   {on=0}
+    on { gsub(/\r/,""); printf "%s", $0 }  # collapse to a single line for decoder robustness
+  ' "$xml" | base64 -d > "$out" 2>/dev/null
+}
+
+EXTRACTED=0
+for xml in "${CANDIDATES[@]}"; do
+  ra_log "Scanning: $xml"
+  if extract_from_xml "$xml" "$SCREENSHOT_PATH" && [ -s "$SCREENSHOT_PATH" ]; then
+    ra_log "Screenshot saved: $(ls -lh "$SCREENSHOT_PATH" | awk '{print $5, $9}')"
+    EXTRACTED=1
+    break
+  fi
+done
+
+if [ "$EXTRACTED" -ne 1 ]; then
+  ra_log "No markers found in XML. Dumping any marker snippets for debugging:"
+  for xml in "${CANDIDATES[@]}"; do
+    ra_log "---- ${xml} (BEGIN..END) ----"
+    sed -n '/<<CN1_SCREENSHOT_BEGIN>>/,/<<CN1_SCREENSHOT_END>>/p' "$xml" || true
+  done
+fi
+
+ra_log "Latest connected test report: ${NEWEST_XML:-<none>}"
+
 ra_log "Instrumentation tests completed successfully"
