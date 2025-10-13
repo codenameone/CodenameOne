@@ -125,24 +125,10 @@ if [ -z "$PACKAGE_NAME" ]; then
 fi
 
 ra_log "Launching $PACKAGE_NAME before capturing screenshot"
-if adb_target shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
-  ra_log "Application launch via monkey succeeded"
-else
-  ra_log "Failed to launch $PACKAGE_NAME via monkey; attempting explicit resolve" >&2
-  MAIN_ACTIVITY="$(adb_target shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' | tail -n 1)"
-  MAIN_ACTIVITY="${MAIN_ACTIVITY##* }"
-  if [[ -z "$MAIN_ACTIVITY" || "$MAIN_ACTIVITY" != */* ]]; then
-    ra_log "Unable to resolve launchable activity for $PACKAGE_NAME (cmd package output: ${MAIN_ACTIVITY:-<empty>})" >&2
-    exit 1
-  fi
-  ra_log "Resolved main activity $MAIN_ACTIVITY; starting via am"
-  if ! adb_target shell am start -n "$MAIN_ACTIVITY" >/dev/null 2>&1; then
-    ra_log "Failed to start $MAIN_ACTIVITY via am start" >&2
-    exit 1
-  fi
-fi
-
-sleep 5
+adb_target shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || {
+  ra_log "Failed to launch $PACKAGE_NAME via monkey" >&2
+  exit 1
+}
 
 SCREENSHOT_DEVICE_PATH="/sdcard/Download/cn1-instrumentation-screenshot.png"
 SCREENSHOT_DIR="$REPO_ROOT/out/android-emulator"
