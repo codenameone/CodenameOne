@@ -1,19 +1,58 @@
 #!/usr/bin/env bash
-# Run instrumentation tests against the generated Codename One Android project
+# Run instrumentation tests and reconstruct screenshot emitted as chunked Base64 (NO ADB)
 set -euo pipefail
 
 ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 
+# ---- Helpers ---------------------------------------------------------------
+
+ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
+
+# Count CN1SS chunk lines in a file
+count_chunks() {
+  local f="${1:-}" n="0"
+  if [ -n "$f" ] && [ -r "$f" ]; then
+    n="$(grep -cE 'CN1SS:[0-9]{6}:' "$f" 2>/dev/null || echo 0)"
+  fi
+  n="${n//[^0-9]/}"; [ -z "$n" ] && n="0"
+  printf '%s\n' "$n"
+}
+
+# Extract ordered CN1SS payload (by 6-digit index) and decode to PNG
+# Usage: extract_cn1ss_stream <input-file> > <png>
+extract_cn1ss_stream() {
+  local f="$1"
+  # stderr: pass through INFO/META for visibility
+  awk -F: '
+    /^CN1SS:[0-9]{6}:/ {
+      idx = substr($0, 8, 6) + 0
+      data = substr($0, 16)
+      gsub(/[ \t\r\n]/, "", data)
+      gsub(/[^A-Za-z0-9+\/=]/, "", data)
+      printf "%06d %s\n", idx, data
+      next
+    }
+    /^CN1SS:END$/   { print "#META END" > "/dev/stderr"; next }
+    /^CN1SS:/       { print "#META " $0  > "/dev/stderr"; next }
+  ' "$f" \
+  | sort -n \
+  | awk '{ $1=""; sub(/^ /,""); printf "%s", $0 }' \
+  | tr -d '\r\n'
+}
+
+# Verify PNG signature + non-zero size
+verify_png() {
+  local f="$1"
+  [ -s "$f" ] || return 1
+  head -c 8 "$f" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$'
+}
+
+# ---- Args & environment ----------------------------------------------------
+
 if [ $# -lt 1 ]; then
   ra_log "Usage: $0 <gradle_project_dir>" >&2
-  exit 1
+  exit 2
 fi
-
-# near the top
-ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
-mkdir -p "$ARTIFACTS_DIR"
-TEST_LOG="$ARTIFACTS_DIR/connectedAndroidTest.log"
-
 GRADLE_PROJECT_DIR="$1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,163 +60,174 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
-DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
+DOWNLOAD_DIR="${TMPDIR}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 ENV_FILE="$ENV_DIR/env.sh"
 
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
+ensure_dir "$ARTIFACTS_DIR"
+TEST_LOG="$ARTIFACTS_DIR/connectedAndroidTest.log"
+SCREENSHOT_OUT="$ARTIFACTS_DIR/emulator-screenshot.png"
+
 ra_log "Loading workspace environment from $ENV_FILE"
-if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-else
-  ra_log "Workspace environment file not found. Run scripts/setup-workspace.sh before this script." >&2
-  exit 1
-fi
+[ -f "$ENV_FILE" ] || { ra_log "Missing env file: $ENV_FILE"; exit 3; }
+# shellcheck disable=SC1090
+source "$ENV_FILE"
 
-if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
-  ra_log "JAVA17_HOME validation failed. Current value: ${JAVA17_HOME:-<unset>}" >&2
-  exit 1
-fi
+[ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
+[ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
-ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-if [ -z "$ANDROID_SDK_ROOT" ]; then
-  if [ -d "/usr/local/lib/android/sdk" ]; then ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
-  elif [ -d "$HOME/Android/Sdk" ]; then ANDROID_SDK_ROOT="$HOME/Android/Sdk"; fi
-fi
-if [ -z "$ANDROID_SDK_ROOT" ] || [ ! -d "$ANDROID_SDK_ROOT" ]; then
-  ra_log "Android SDK not found. Set ANDROID_SDK_ROOT or ANDROID_HOME to a valid installation." >&2
-  exit 1
-fi
-export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
-
-ADB_BIN="$(command -v adb || true)"
-if [ -z "$ADB_BIN" ] && [ -x "$ANDROID_SDK_ROOT/platform-tools/adb" ]; then
-  ADB_BIN="$ANDROID_SDK_ROOT/platform-tools/adb"
-fi
-if [ -z "$ADB_BIN" ]; then
-  ra_log "adb executable not found in PATH or Android SDK" >&2
-  exit 1
-fi
-"$ADB_BIN" start-server >/dev/null 2>&1 || true
-ra_log "Connected Android devices before selecting target:"
-"$ADB_BIN" devices -l || true
-
-DEVICE_SERIAL="${ANDROID_SERIAL:-}"
-if [ -z "$DEVICE_SERIAL" ]; then
-  DEVICE_SERIAL=$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {print $1; exit}')
-fi
-if [ -z "$DEVICE_SERIAL" ]; then
-  ra_log "No booted Android emulator/device detected" >&2
-  exit 1
-fi
-
-ADB_TARGET=("$ADB_BIN" -s "$DEVICE_SERIAL")
-adb_target() { "${ADB_TARGET[@]}" "$@"; }
-
-ra_log "Using Android device serial $DEVICE_SERIAL"
-adb_target wait-for-device
-
-wait_for_property() {
-  local property="$1" expected="$2" attempts="${3:-60}" delay="${4:-5}" value=""
-  for attempt in $(seq 1 "$attempts"); do
-    value="$(adb_target shell getprop "$property" 2>/dev/null | tr -d '\r')"
-    if [ "$value" = "$expected" ]; then
-      return 0
-    fi
-    sleep "$delay"
-  done
-  ra_log "Timed out waiting for $property to become $expected (last value: ${value:-<unset>})" >&2
-  return 1
-}
-
-ra_log "Waiting for emulator to finish booting"
-wait_for_property sys.boot_completed 1 120 5
-wait_for_property dev.bootcomplete 1 120 5 || true
-adb_target shell input keyevent 82 >/dev/null 2>&1 || true
-ra_log "Device build fingerprint: $(adb_target shell getprop ro.build.fingerprint | tr -d '\r')"
-ra_log "Installed instrumentation targets:"
-adb_target shell pm list instrumentation || true
-
-if [ ! -d "$GRADLE_PROJECT_DIR" ]; then
-  ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR" >&2
-  exit 1
-fi
-
-if [ ! -x "$GRADLE_PROJECT_DIR/gradlew" ]; then
-  chmod +x "$GRADLE_PROJECT_DIR/gradlew"
-fi
+# ---- Run tests -------------------------------------------------------------
 
 set -o pipefail
-
 ra_log "Running instrumentation tests (stdout -> $TEST_LOG; stderr -> terminal)"
-status=0
 (
   cd "$GRADLE_PROJECT_DIR"
-  # stdout goes to tee+file, stderr remains on the terminal
+  ORIG_JAVA_HOME="${JAVA_HOME:-}"
+  export JAVA_HOME="${JAVA17_HOME:?JAVA17_HOME not set}"
   ./gradlew --no-daemon --console=plain connectedDebugAndroidTest | tee "$TEST_LOG"
-) || status=$?
+  export JAVA_HOME="$ORIG_JAVA_HOME"
+) || { ra_log "STAGE:GRADLE_TEST_FAILED (see $TEST_LOG)"; exit 10; }
 
-# Show the log now (helpful for review even on success)
 echo
 ra_log "==== Begin connectedAndroidTest.log (tail -n 200) ===="
 tail -n 200 "$TEST_LOG" || true
 ra_log "==== End connectedAndroidTest.log ===="
 echo
 
-# --- Harvest stdout from connected tests (AGP old & new layouts) ---
-RESULTS_ROOT="$GRADLE_PROJECT_DIR/app/build/outputs/androidTest-results/connected"
-ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
-mkdir -p "$ARTIFACTS_DIR"
+# ---- Locate outputs (NO ADB) ----------------------------------------------
 
-# Debug: show what exists
+RESULTS_ROOT="$GRADLE_PROJECT_DIR/app/build/outputs/androidTest-results/connected"
 ra_log "Listing connected test outputs under: $RESULTS_ROOT"
 find "$RESULTS_ROOT" -maxdepth 4 -printf '%y %p\n' 2>/dev/null | sed 's/^/[run-android-instrumentation-tests]   /' || true
 
-# Gather candidate XMLs (new: test-result.xml; old: TEST-*.xml)
-mapfile -t CANDIDATES < <(
-  find "$RESULTS_ROOT" -type f \( -name 'test-result.xml' -o -name 'TEST-*.xml' \) -printf '%T@ %p\n' 2>/dev/null \
-  | sort -nr \
-  | awk '{ $1=""; sub(/^ /,""); print }'
-)
+# Arrays must be declared for set -u safety
+declare -a XMLS=()
+declare -a LOGCATS=()
+TEST_EXEC_LOG=""
 
-if [ "${#CANDIDATES[@]}" -eq 0 ]; then
-  ra_log "No connected test XML files found under $RESULTS_ROOT"
+# XML result candidates (new + old formats), mtime desc
+mapfile -t XMLS < <(
+  find "$RESULTS_ROOT" -type f \( -name 'test-result.xml' -o -name 'TEST-*.xml' \) \
+  -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk '{ $1=""; sub(/^ /,""); print }'
+) || XMLS=()
+
+# logcat files produced by AGP
+mapfile -t LOGCATS < <(
+  find "$RESULTS_ROOT" -type f -name 'logcat-*.txt' -print 2>/dev/null
+) || LOGCATS=()
+
+# execution log (use first if present)
+TEST_EXEC_LOG="$(find "$RESULTS_ROOT" -type f -path '*/testlog/test-results.log' -print -quit 2>/dev/null || true)"
+[ -n "${TEST_EXEC_LOG:-}" ] || TEST_EXEC_LOG=""
+
+if [ "${#XMLS[@]}" -gt 0 ]; then
+  ra_log "Found ${#XMLS[@]} test result file(s). First candidate: ${XMLS[0]}"
 else
-  ra_log "Found ${#CANDIDATES[@]} test result file(s). Will scan for screenshot markers."
+  ra_log "No test result XML files found under $RESULTS_ROOT"
 fi
 
-# Try each candidate until one yields a non-empty PNG
-SCREENSHOT_PATH="$ARTIFACTS_DIR/emulator-screenshot.png"
-: > "$SCREENSHOT_PATH"
+# Pick first logcat if any
+LOGCAT_FILE="${LOGCATS[0]:-}"
+if [ -z "${LOGCAT_FILE:-}" ] || [ ! -s "$LOGCAT_FILE" ]; then
+  ra_log "FATAL: No logcat-*.txt produced by connectedDebugAndroidTest (cannot extract CN1SS chunks)."
+  exit 12
+fi
 
-extract_from_xml() {
-  local xml="$1" out="$2"
-  # Pull lines strictly between our markers, regardless of XML tag nesting or CDATA
-  awk '
-    /<<CN1_SCREENSHOT_BEGIN>>/ {on=1; next}
-    /<<CN1_SCREENSHOT_END>>/   {on=0}
-    on { gsub(/\r/,""); printf "%s", $0 }  # collapse to a single line for decoder robustness
-  ' "$xml" | base64 -d > "$out" 2>/dev/null
-}
+# ---- Chunk accounting (diagnostics) ---------------------------------------
 
-EXTRACTED=0
-for xml in "${CANDIDATES[@]}"; do
-  ra_log "Scanning: $xml"
-  if extract_from_xml "$xml" "$SCREENSHOT_PATH" && [ -s "$SCREENSHOT_PATH" ]; then
-    ra_log "Screenshot saved: $(ls -lh "$SCREENSHOT_PATH" | awk '{print $5, $9}')"
-    EXTRACTED=1
-    break
-  fi
+XML_CHUNKS_TOTAL=0
+for x in "${XMLS[@]:-}"; do
+  c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
+  XML_CHUNKS_TOTAL=$(( XML_CHUNKS_TOTAL + c ))
 done
+LOGCAT_CHUNKS="$(count_chunks "$LOGCAT_FILE")"; LOGCAT_CHUNKS="${LOGCAT_CHUNKS//[^0-9]/}"; : "${LOGCAT_CHUNKS:=0}"
+EXECLOG_CHUNKS="$(count_chunks "${TEST_EXEC_LOG:-}")"; EXECLOG_CHUNKS="${EXECLOG_CHUNKS//[^0-9]/}"; : "${EXECLOG_CHUNKS:=0}"
 
-if [ "$EXTRACTED" -ne 1 ]; then
-  ra_log "No markers found in XML. Dumping any marker snippets for debugging:"
-  for xml in "${CANDIDATES[@]}"; do
-    ra_log "---- ${xml} (BEGIN..END) ----"
-    sed -n '/<<CN1_SCREENSHOT_BEGIN>>/,/<<CN1_SCREENSHOT_END>>/p' "$xml" || true
+ra_log "Chunk counts -> XML: ${XML_CHUNKS_TOTAL} | logcat: ${LOGCAT_CHUNKS} | test-results.log: ${EXECLOG_CHUNKS}"
+
+if [ "${LOGCAT_CHUNKS:-0}" = "0" ] && [ "${XML_CHUNKS_TOTAL:-0}" = "0" ] && [ "${EXECLOG_CHUNKS:-0}" = "0" ]; then
+  ra_log "STAGE:MARKERS_NOT_FOUND -> The test did not emit CN1SS chunks"
+  ra_log "Hints:"
+  ra_log "  • Ensure the test actually ran (check FAILED vs SUCCESS in $TEST_LOG)"
+  ra_log "  • Check for CN1SS:ERR or CN1SS:INFO lines below"
+  ra_log "---- CN1SS lines from any result files ----"
+  (grep -R "CN1SS:" "$RESULTS_ROOT" || true) | sed 's/^/[CN1SS] /'
+  exit 12
+fi
+
+# ---- Reassemble (prefer XML → logcat → exec log) --------------------------
+
+: > "$SCREENSHOT_OUT"
+SOURCE=""
+
+if [ "${#XMLS[@]:-0}" -gt 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ]; then
+  for x in "${XMLS[@]:-}"; do
+    c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
+    [ "$c" -gt 0 ] || continue
+    ra_log "Reassembling from XML: $x (chunks=$c)"
+    if extract_cn1ss_stream "$x" | base64 -d > "$SCREENSHOT_OUT" 2>/dev/null; then
+      if verify_png "$SCREENSHOT_OUT"; then SOURCE="XML"; break; fi
+    fi
   done
 fi
 
-ra_log "Latest connected test report: ${NEWEST_XML:-<none>}"
+if [ -z "$SOURCE" ] && [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then
+  ra_log "Reassembling from logcat: $LOGCAT_FILE (chunks=$LOGCAT_CHUNKS)"
+  if extract_cn1ss_stream "$LOGCAT_FILE" | base64 -d > "$SCREENSHOT_OUT" 2>/dev/null; then
+    if verify_png "$SCREENSHOT_OUT"; then SOURCE="LOGCAT"; fi
+  fi
+fi
 
-ra_log "Instrumentation tests completed successfully"
+if [ -z "$SOURCE" ] && [ -n "${TEST_EXEC_LOG:-}" ] && [ "${EXECLOG_CHUNKS:-0}" -gt 0 ]; then
+  ra_log "Reassembling from test-results.log: $TEST_EXEC_LOG (chunks=$EXECLOG_CHUNKS)"
+  if extract_cn1ss_stream "$TEST_EXEC_LOG" | base64 -d > "$SCREENSHOT_OUT" 2>/dev/null; then
+    if verify_png "$SCREENSHOT_OUT"; then SOURCE="EXECLOG"; fi
+  fi
+fi
+
+# ---- Final validation / failure paths -------------------------------------
+
+if [ -z "$SOURCE" ]; then
+  ra_log "FATAL: Failed to extract/decode CN1SS payload from any source"
+  # Keep partial for debugging
+  RAW_B64_OUT="${SCREENSHOT_OUT}.raw.b64"
+  {
+    # Try to emit concatenated base64 from whichever had chunks (priority logcat, then XML, then exec)
+    if [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then extract_cn1ss_stream "$LOGCAT_FILE"; fi
+    if [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ] && [ "${LOGCAT_CHUNKS:-0}" -eq 0 ]; then
+      # concatenate all XMLs
+      for x in "${XMLS[@]:-}"; do
+        if [ "$(count_chunks "$x")" -gt 0 ]; then extract_cn1ss_stream "$x"; fi
+      done
+    fi
+    if [ -n "${TEST_EXEC_LOG:-}" ] && [ "${EXECLOG_CHUNKS:-0}" -gt 0 ] && [ "${LOGCAT_CHUNKS:-0}" -eq 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -eq 0 ]; then
+      extract_cn1ss_stream "$TEST_EXEC_LOG"
+    fi
+  } > "$RAW_B64_OUT" 2>/dev/null || true
+  if [ -s "$RAW_B64_OUT" ]; then
+    head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
+    ra_log "Partial base64 saved at: $RAW_B64_OUT"
+  fi
+  # Emit contextual INFO lines
+  grep -n 'CN1SS:INFO' "$LOGCAT_FILE" 2>/dev/null || true
+  exit 12
+fi
+
+# Size & signature check (belt & suspenders)
+if ! verify_png "$SCREENSHOT_OUT"; then
+  ra_log "STAGE:BAD_PNG_SIGNATURE -> Not a PNG"
+  file "$SCREENSHOT_OUT" || true
+  exit 14
+fi
+
+ra_log "SUCCESS -> screenshot saved (${SOURCE}), size: $(stat -c '%s' "$SCREENSHOT_OUT") bytes at $SCREENSHOT_OUT"
+
+# Copy useful artifacts for GH Actions
+cp -f "$LOGCAT_FILE" "$ARTIFACTS_DIR/$(basename "$LOGCAT_FILE")" 2>/dev/null || true
+for x in "${XMLS[@]:-}"; do
+  cp -f "$x" "$ARTIFACTS_DIR/$(basename "$x")" 2>/dev/null || true
+done
+[ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
+
+exit 0
