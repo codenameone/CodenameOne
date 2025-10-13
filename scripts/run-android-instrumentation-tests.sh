@@ -95,16 +95,7 @@ ra_log "Installed instrumentation targets:"
 adb_target shell pm list instrumentation || true
 
 if [ -z "$PACKAGE_NAME" ]; then
-  PACKAGE_NAME="$(
-    adb_target shell pm list instrumentation 2>/dev/null \
-      | tr -d '\r' \
-      | awk '
-          match($0,/target=\([^)]*\)/){
-            s=substr($0,RSTART+7,RLENGTH-8);
-            print s; exit
-          }'
-      || true
-  )"
+  PACKAGE_NAME="$(adb_target shell pm list instrumentation 2>/dev/null | sed -n 's/.*target=\([^)]*\)).*/\1/p' | tr -d '\r' | head -n 1 || true)"
   if [ -n "$PACKAGE_NAME" ]; then
     ra_log "Detected application package from instrumentation list: $PACKAGE_NAME"
   fi
@@ -142,26 +133,14 @@ else
   MAIN_ACTIVITY="$(printf '%s\n' "$RESOLVE_OUTPUT" | awk 'NF && $1 ~ /\// {print $1; exit}')"
   if [ -z "$MAIN_ACTIVITY" ]; then
     RESOLVE_OUTPUT="$(adb_target shell cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
-    MAIN_ACTIVITY="$(
-      printf '%s\n' "$RESOLVE_OUTPUT" \
-        | awk '
-            match($0,/name=([^ ]+)/){
-              print substr($0,RSTART+5,RLENGTH-5); exit
-            }'
-    )"
+    MAIN_ACTIVITY="$(printf '%s\n' "$RESOLVE_OUTPUT" | sed -n 's/.*name=\([^ ]*\).*/\1/p' | head -n 1)"
   fi
   if [ -n "$MAIN_ACTIVITY" ] && [[ "$MAIN_ACTIVITY" != */* ]]; then
     MAIN_ACTIVITY="$PACKAGE_NAME/$MAIN_ACTIVITY"
   fi
   if [[ -z "$MAIN_ACTIVITY" || "$MAIN_ACTIVITY" != */* ]]; then
     RESOLVE_OUTPUT="$(adb_target shell dumpsys package "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
-    MAIN_ACTIVITY="$(
-      printf '%s\n' "$RESOLVE_OUTPUT" \
-        | awk '
-            match($0,/cmp=([^ ]+)/){
-              print substr($0,RSTART+4,RLENGTH-4); exit
-            }'
-    )"
+    MAIN_ACTIVITY="$(printf '%s\n' "$RESOLVE_OUTPUT" | sed -n 's/.*cmp=\([^ ]*\).*/\1/p' | head -n 1)"
   fi
   if [[ -z "$MAIN_ACTIVITY" || "$MAIN_ACTIVITY" != */* ]]; then
     OUTPUT_SNIPPET="$(printf '%s\n' "$RESOLVE_OUTPUT" | head -n 5)"
@@ -176,14 +155,9 @@ else
   fi
 fi
 
-adb_target shell <<EOF || true
-while [[ "\$(dumpsys window windows | grep mFocussedApp | grep -c '$PACKAGE_NAME')" -eq 0 ]]; do
-  sleep 0.5
-done
-EOF
-sleep 1
+sleep 5
 
-SCREENSHOT_DEVICE_PATH="/sdcard/cn1-instrumentation-screenshot.png"
+SCREENSHOT_DEVICE_PATH="/sdcard/Download/cn1-instrumentation-screenshot.png"
 SCREENSHOT_DIR="$REPO_ROOT/out/android-emulator"
 SCREENSHOT_PATH="$SCREENSHOT_DIR/hello-codenameone.png"
 mkdir -p "$SCREENSHOT_DIR"
