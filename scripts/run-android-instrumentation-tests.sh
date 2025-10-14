@@ -20,24 +20,32 @@ count_chunks() {
 
 # Extract ordered CN1SS payload (by 6-digit index) and decode to PNG
 # Usage: extract_cn1ss_stream <input-file> > <png>
+# Extract ordered CN1SS payload (by 6-digit index) from ANYWHERE in the line
+# Usage: extract_cn1ss_stream <input-file> > <concatenated-base64>
 extract_cn1ss_stream() {
   local f="$1"
-  # stderr: pass through INFO/META for visibility
-  awk -F: '
-    /^CN1SS:[0-9]{6}:/ {
-      idx = substr($0, 8, 6) + 0
-      data = substr($0, 16)
-      gsub(/[ \t\r\n]/, "", data)
-      gsub(/[^A-Za-z0-9+\/=]/, "", data)
-      printf "%06d %s\n", idx, data
-      next
+  awk '
+    {
+      # Find CN1SS:<6digits>: anywhere in the line
+      if (match($0, /CN1SS:[0-9][0-9][0-9][0-9][0-9][0-9]:/)) {
+        # Extract the 6-digit index just after CN1SS:
+        idx = substr($0, RSTART + 6, 6) + 0
+        # Payload is everything after the matched token
+        payload = substr($0, RSTART + RLENGTH)
+        gsub(/[ \t\r\n]/, "", payload)
+        gsub(/[^A-Za-z0-9+\/=]/, "", payload)
+        printf "%06d %s\n", idx, payload
+        next
+      }
+      # Pass through CN1SS meta lines for debugging (INFO/END/etc), even if prefixed
+      if (index($0, "CN1SS:") > 0) {
+        print "#META " $0 > "/dev/stderr"
+      }
     }
-    /^CN1SS:END$/   { print "#META END" > "/dev/stderr"; next }
-    /^CN1SS:/       { print "#META " $0  > "/dev/stderr"; next }
   ' "$f" \
   | sort -n \
   | awk '{ $1=""; sub(/^ /,""); printf "%s", $0 }' \
-  | tr -d '\r\n'
+  | tr -d "\r\n"
 }
 
 # Verify PNG signature + non-zero size
@@ -137,7 +145,7 @@ fi
 # ---- Chunk accounting (diagnostics) ---------------------------------------
 
 XML_CHUNKS_TOTAL=0
-for x in "${XMLS[@]:-}"; do
+for x in "${XMLS[@]}"; do
   c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
   XML_CHUNKS_TOTAL=$(( XML_CHUNKS_TOTAL + c ))
 done
@@ -161,8 +169,8 @@ fi
 : > "$SCREENSHOT_OUT"
 SOURCE=""
 
-if [ "${#XMLS[@]:-0}" -gt 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ]; then
-  for x in "${XMLS[@]:-}"; do
+if [ "${#XMLS[@]}" -gt 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ]; then
+  for x in "${XMLS[@]}"; do
     c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
     [ "$c" -gt 0 ] || continue
     ra_log "Reassembling from XML: $x (chunks=$c)"
@@ -197,7 +205,7 @@ if [ -z "$SOURCE" ]; then
     if [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then extract_cn1ss_stream "$LOGCAT_FILE"; fi
     if [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ] && [ "${LOGCAT_CHUNKS:-0}" -eq 0 ]; then
       # concatenate all XMLs
-      for x in "${XMLS[@]:-}"; do
+      for x in "${XMLS[@]}"; do
         if [ "$(count_chunks "$x")" -gt 0 ]; then extract_cn1ss_stream "$x"; fi
       done
     fi
@@ -225,7 +233,7 @@ ra_log "SUCCESS -> screenshot saved (${SOURCE}), size: $(stat -c '%s' "$SCREENSH
 
 # Copy useful artifacts for GH Actions
 cp -f "$LOGCAT_FILE" "$ARTIFACTS_DIR/$(basename "$LOGCAT_FILE")" 2>/dev/null || true
-for x in "${XMLS[@]:-}"; do
+for x in "${XMLS[@]}"; do
   cp -f "$x" "$ARTIFACTS_DIR/$(basename "$x")" 2>/dev/null || true
 done
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
