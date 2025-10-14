@@ -8,44 +8,42 @@ ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
-# Count CN1SS chunk lines in a file
+# CN1SS helpers are implemented in Python for easier maintenance
+CN1SS_TOOL=""
+
 count_chunks() {
-  local f="${1:-}" n="0"
-  if [ -n "$f" ] && [ -r "$f" ]; then
-    n="$(grep -cE 'CN1SS:[0-9]{6}:' "$f" 2>/dev/null || echo 0)"
+  local f="${1:-}"
+  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+    echo 0
+    return
   fi
-  n="${n//[^0-9]/}"; [ -z "$n" ] && n="0"
-  printf '%s\n' "$n"
+  if [ -z "$f" ] || [ ! -r "$f" ]; then
+    echo 0
+    return
+  fi
+  python3 "$CN1SS_TOOL" count "$f" 2>/dev/null || echo 0
 }
 
-# Extract ordered CN1SS payload (by 6-digit index) and decode to PNG
-# Usage: extract_cn1ss_stream <input-file> > <png>
-# Extract ordered CN1SS payload (by 6-digit index) from ANYWHERE in the line
-# Usage: extract_cn1ss_stream <input-file> > <concatenated-base64>
-extract_cn1ss_stream() {
-  local f="$1"
-  awk '
-    {
-      # Find CN1SS:<6digits>: anywhere in the line
-      if (match($0, /CN1SS:[0-9][0-9][0-9][0-9][0-9][0-9]:/)) {
-        # Extract the 6-digit index just after CN1SS:
-        idx = substr($0, RSTART + 6, 6) + 0
-        # Payload is everything after the matched token
-        payload = substr($0, RSTART + RLENGTH)
-        gsub(/[ \t\r\n]/, "", payload)
-        gsub(/[^A-Za-z0-9+\/=]/, "", payload)
-        printf "%06d %s\n", idx, payload
-        next
-      }
-      # Pass through CN1SS meta lines for debugging (INFO/END/etc), even if prefixed
-      if (index($0, "CN1SS:") > 0) {
-        print "#META " $0 > "/dev/stderr"
-      }
-    }
-  ' "$f" \
-  | sort -n \
-  | awk '{ $1=""; sub(/^ /,""); printf "%s", $0 }' \
-  | tr -d "\r\n"
+extract_cn1ss_base64() {
+  local f="${1:-}"
+  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+    return 1
+  fi
+  if [ -z "$f" ] || [ ! -r "$f" ]; then
+    return 1
+  fi
+  python3 "$CN1SS_TOOL" extract "$f"
+}
+
+decode_cn1ss_png() {
+  local f="${1:-}"
+  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+    return 1
+  fi
+  if [ -z "$f" ] || [ ! -r "$f" ]; then
+    return 1
+  fi
+  python3 "$CN1SS_TOOL" extract "$f" --decode
 }
 
 # Verify PNG signature + non-zero size
@@ -66,6 +64,12 @@ GRADLE_PROJECT_DIR="$1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
+
+CN1SS_TOOL="$SCRIPT_DIR/android/tests/cn1ss_chunk_tools.py"
+if [ ! -x "$CN1SS_TOOL" ]; then
+  ra_log "Missing CN1SS helper: $CN1SS_TOOL" >&2
+  exit 3
+fi
 
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR}/codenameone-tools"
@@ -174,7 +178,7 @@ if [ "${#XMLS[@]}" -gt 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ]; then
     c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
     [ "$c" -gt 0 ] || continue
     ra_log "Reassembling from XML: $x (chunks=$c)"
-    if extract_cn1ss_stream "$x" | base64 -d > "$SCREENSHOT_OUT" 2>/dev/null; then
+    if decode_cn1ss_png "$x" > "$SCREENSHOT_OUT" 2>/dev/null; then
       if verify_png "$SCREENSHOT_OUT"; then SOURCE="XML"; break; fi
     fi
   done
@@ -182,14 +186,14 @@ fi
 
 if [ -z "$SOURCE" ] && [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then
   ra_log "Reassembling from logcat: $LOGCAT_FILE (chunks=$LOGCAT_CHUNKS)"
-  if extract_cn1ss_stream "$LOGCAT_FILE" | base64 -d > "$SCREENSHOT_OUT" 2>/dev/null; then
+  if decode_cn1ss_png "$LOGCAT_FILE" > "$SCREENSHOT_OUT" 2>/dev/null; then
     if verify_png "$SCREENSHOT_OUT"; then SOURCE="LOGCAT"; fi
   fi
 fi
 
 if [ -z "$SOURCE" ] && [ -n "${TEST_EXEC_LOG:-}" ] && [ "${EXECLOG_CHUNKS:-0}" -gt 0 ]; then
   ra_log "Reassembling from test-results.log: $TEST_EXEC_LOG (chunks=$EXECLOG_CHUNKS)"
-  if extract_cn1ss_stream "$TEST_EXEC_LOG" | base64 -d > "$SCREENSHOT_OUT" 2>/dev/null; then
+  if decode_cn1ss_png "$TEST_EXEC_LOG" > "$SCREENSHOT_OUT" 2>/dev/null; then
     if verify_png "$SCREENSHOT_OUT"; then SOURCE="EXECLOG"; fi
   fi
 fi
@@ -202,15 +206,15 @@ if [ -z "$SOURCE" ]; then
   RAW_B64_OUT="${SCREENSHOT_OUT}.raw.b64"
   {
     # Try to emit concatenated base64 from whichever had chunks (priority logcat, then XML, then exec)
-    if [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then extract_cn1ss_stream "$LOGCAT_FILE"; fi
+    if [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then extract_cn1ss_base64 "$LOGCAT_FILE"; fi
     if [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ] && [ "${LOGCAT_CHUNKS:-0}" -eq 0 ]; then
       # concatenate all XMLs
       for x in "${XMLS[@]}"; do
-        if [ "$(count_chunks "$x")" -gt 0 ]; then extract_cn1ss_stream "$x"; fi
+        if [ "$(count_chunks "$x")" -gt 0 ]; then extract_cn1ss_base64 "$x"; fi
       done
     fi
     if [ -n "${TEST_EXEC_LOG:-}" ] && [ "${EXECLOG_CHUNKS:-0}" -gt 0 ] && [ "${LOGCAT_CHUNKS:-0}" -eq 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -eq 0 ]; then
-      extract_cn1ss_stream "$TEST_EXEC_LOG"
+      extract_cn1ss_base64 "$TEST_EXEC_LOG"
     fi
   } > "$RAW_B64_OUT" 2>/dev/null || true
   if [ -s "$RAW_B64_OUT" ]; then

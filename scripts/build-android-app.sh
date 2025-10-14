@@ -276,99 +276,18 @@ grep -q '^android.enableJetifier=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.
 
 APP_BUILD_GRADLE="$GRADLE_PROJECT_DIR/app/build.gradle"
 ROOT_BUILD_GRADLE="$GRADLE_PROJECT_DIR/build.gradle"
+PATCH_GRADLE_SCRIPT="$SCRIPT_DIR/android/lib/patch_gradle_files.py"
 
-# Ensure repos in both root and app
-for F in "$ROOT_BUILD_GRADLE" "$APP_BUILD_GRADLE"; do
-  if [ -f "$F" ]; then
-    if ! grep -qE '^\s*repositories\s*{' "$F"; then
-      cat >> "$F" <<'EOS'
+if [ ! -x "$PATCH_GRADLE_SCRIPT" ]; then
+  ba_log "Missing gradle patch helper: $PATCH_GRADLE_SCRIPT" >&2
+  exit 1
+fi
 
-repositories {
-    google()
-    mavenCentral()
-}
-EOS
-    else
-      grep -q 'google()' "$F" || sed -E -i '0,/repositories[[:space:]]*\{/s//repositories {\n    google()\n    mavenCentral()/' "$F"
-      grep -q 'mavenCentral()' "$F" || sed -E -i '0,/repositories[[:space:]]*\{/s//repositories {\n    google()\n    mavenCentral()/' "$F"
-    fi
-  fi
-done
-
-# Edit app/build.gradle
-python3 - "$APP_BUILD_GRADLE" <<'PY'
-import sys, re, pathlib
-p = pathlib.Path(sys.argv[1]); txt = p.read_text(); orig = txt; changed = False
-
-def strip_block(name, s):
-    return re.sub(rf'(?ms)^\s*{name}\s*\{{.*?\}}\s*', '', s)
-
-module_view = strip_block('buildscript', strip_block('pluginManagement', txt))
-
-# 1) android { compileSdkVersion/targetSdkVersion }
-def ensure_sdk(body):
-    # If android { ... } exists, update/insert inside defaultConfig and the android block
-    if re.search(r'(?m)^\s*android\s*\{', body):
-        # compileSdkVersion
-        if re.search(r'(?m)^\s*compileSdkVersion\s+\d+', body) is None:
-            body = re.sub(r'(?m)(^\s*android\s*\{)', r'\1\n    compileSdkVersion 33', body, count=1)
-        else:
-            body = re.sub(r'(?m)^\s*compileSdkVersion\s+\d+', '    compileSdkVersion 33', body)
-        # targetSdkVersion
-        if re.search(r'(?ms)^\s*defaultConfig\s*\{.*?^\s*\}', body):
-            dc = re.search(r'(?ms)^\s*defaultConfig\s*\{.*?^\s*\}', body)
-            block = dc.group(0)
-            if re.search(r'(?m)^\s*targetSdkVersion\s+\d+', block):
-                block2 = re.sub(r'(?m)^\s*targetSdkVersion\s+\d+', '        targetSdkVersion 33', block)
-            else:
-                block2 = re.sub(r'(\{\s*)', r'\1\n        targetSdkVersion 33', block, count=1)
-            body = body[:dc.start()] + block2 + body[dc.end():]
-        else:
-            body = re.sub(r'(?m)(^\s*android\s*\{)', r'\1\n    defaultConfig {\n        targetSdkVersion 33\n    }', body, count=1)
-    else:
-        # No android block at all: add minimal
-        body += '\n\nandroid {\n    compileSdkVersion 33\n    defaultConfig { targetSdkVersion 33 }\n}\n'
-    return body
-
-txt2 = ensure_sdk(txt)
-if txt2 != txt: txt = txt2; module_view = strip_block('buildscript', strip_block('pluginManagement', txt)); changed = True
-
-# 2) testInstrumentationRunner -> AndroidX
-if "androidx.test.runner.AndroidJUnitRunner" not in module_view:
-    t2, n = re.subn(r'(?m)^\s*testInstrumentationRunner\s*".*?"\s*$', '        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"', txt)
-    if n == 0:
-        t2, n = re.subn(r'(?m)(^\s*defaultConfig\s*\{)', r'\1\n        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"', txt, count=1)
-    if n == 0:
-        t2, n = re.subn(r'(?ms)(^\s*android\s*\{)', r'\1\n    defaultConfig {\n        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"\n    }', txt, count=1)
-    if n: txt = t2; module_view = strip_block('buildscript', strip_block('pluginManagement', txt)); changed = True
-
-# 3) remove legacy useLibrary lines
-t2, n = re.subn(r'(?m)^\s*useLibrary\s+\'android\.test\.(base|mock|runner)\'\s*$', '', txt)
-if n: txt = t2; module_view = strip_block('buildscript', strip_block('pluginManagement', txt)); changed = True
-
-# 4) deps: choose androidTestImplementation vs androidTestCompile
-uses_modern = re.search(r'(?m)^\s*(implementation|api|testImplementation|androidTestImplementation)\b', module_view) is not None
-conf = "androidTestImplementation" if uses_modern else "androidTestCompile"
-need = [
-    ("androidx.test.ext:junit:1.1.5", conf),   # AndroidJUnit4
-    ("androidx.test:runner:1.5.2", conf),
-    ("androidx.test:core:1.5.0", conf),
-    ("androidx.test.services:storage:1.4.2", conf),
-]
-to_add = [(c, k) for (c, k) in need if c not in module_view]
-
-if to_add:
-    block = "\n\ndependencies {\n" + "".join([f"    {k} \"{c}\"\n" for c, k in to_add]) + "}\n"
-    txt = txt.rstrip() + block
-    changed = True
-
-if changed and txt != orig:
-    if not txt.endswith("\n"): txt += "\n"
-    p.write_text(txt)
-    print(f"Patched app/build.gradle (SDK=33; deps via {conf})")
-else:
-    print("No changes needed in app/build.gradle")
-PY
+python3 "$PATCH_GRADLE_SCRIPT" \
+  --root "$ROOT_BUILD_GRADLE" \
+  --app "$APP_BUILD_GRADLE" \
+  --compile-sdk 33 \
+  --target-sdk 33
 # --- END: robust Gradle patch ---
 
 echo "----- app/build.gradle tail -----"
@@ -378,121 +297,14 @@ echo "---------------------------------"
 TEST_SRC_DIR="$GRADLE_PROJECT_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
 mkdir -p "$TEST_SRC_DIR"
 TEST_CLASS="$TEST_SRC_DIR/HelloCodenameOneInstrumentedTest.java"
-cat >"$TEST_CLASS" <<'EOF'
-package @PACKAGE@;
+TEST_TEMPLATE="$SCRIPT_DIR/android/tests/HelloCodenameOneInstrumentedTest.java"
 
-import android.app.Activity;
-import android.content.Context;
-import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.util.Base64;
-import android.util.DisplayMetrics;
-import android.view.View;
+if [ ! -f "$TEST_TEMPLATE" ]; then
+  ba_log "Missing instrumentation test template: $TEST_TEMPLATE" >&2
+  exit 1
+fi
 
-import androidx.test.core.app.ActivityScenario;
-import androidx.test.core.app.ApplicationProvider;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-
-import java.io.ByteArrayOutputStream;
-
-@RunWith(AndroidJUnit4.class)
-public class HelloCodenameOneInstrumentedTest {
-
-    private static void println(String s) { System.out.println(s); }
-
-    @Test
-    public void testUseAppContext_andEmitScreenshot() throws Exception {
-        Context ctx = ApplicationProvider.getApplicationContext();
-        String pkg = "@PACKAGE@";
-        Assert.assertEquals("Package mismatch", pkg, ctx.getPackageName());
-
-        // Resolve real launcher intent (don’t hard-code activity)
-        Intent launch = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
-        if (launch == null) {
-            // Fallback MAIN/LAUNCHER inside this package
-            Intent q = new Intent(Intent.ACTION_MAIN);
-            q.addCategory(Intent.CATEGORY_LAUNCHER);
-            q.setPackage(pkg);
-            launch = q;
-        }
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        println("CN1SS:INFO: about to launch Activity");
-        byte[] pngBytes = null;
-
-        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(launch)) {
-            // give the activity a tiny moment to layout
-            Thread.sleep(750);
-
-            println("CN1SS:INFO: activity launched");
-
-            final byte[][] holder = new byte[1][];
-            scenario.onActivity(activity -> {
-                try {
-                    View root = activity.getWindow().getDecorView().getRootView();
-                    int w = root.getWidth();
-                    int h = root.getHeight();
-                    if (w <= 0 || h <= 0) {
-                        DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-                        w = Math.max(1, dm.widthPixels);
-                        h = Math.max(1, dm.heightPixels);
-                        int sw = View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY);
-                        int sh = View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY);
-                        root.measure(sw, sh);
-                        root.layout(0, 0, w, h);
-                        println("CN1SS:INFO: forced layout to " + w + "x" + h);
-                    } else {
-                        println("CN1SS:INFO: natural layout " + w + "x" + h);
-                    }
-
-                    Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                    Canvas c = new Canvas(bmp);
-                    root.draw(c);
-
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream(Math.max(1024, w * h / 2));
-                    boolean ok = bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
-                    if (!ok) throw new RuntimeException("Bitmap.compress returned false");
-                    holder[0] = baos.toByteArray();
-                    println("CN1SS:INFO: png_bytes=" + holder[0].length);
-                } catch (Throwable t) {
-                    println("CN1SS:ERR: onActivity " + t);
-                    t.printStackTrace(System.out);
-                }
-            });
-
-            pngBytes = holder[0];
-        } catch (Throwable t) {
-            println("CN1SS:ERR: launch " + t);
-            t.printStackTrace(System.out);
-        }
-
-        if (pngBytes == null || pngBytes.length == 0) {
-            println("CN1SS:END");  // terminator for the runner parser
-            Assert.fail("Screenshot capture produced 0 bytes");
-            return;
-        }
-
-        // Chunk & emit (safe for Gradle/logcat capture)
-        String b64 = Base64.encodeToString(pngBytes, Base64.NO_WRAP);
-        final int CHUNK = 2000;
-        int count = 0;
-        for (int pos = 0; pos < b64.length(); pos += CHUNK) {
-            int end = Math.min(pos + CHUNK, b64.length());
-            System.out.println("CN1SS:" + String.format("%06d", pos) + ":" + b64.substring(pos, end));
-            count++;
-        }
-        println("CN1SS:INFO: chunks=" + count + " total_b64_len=" + b64.length());
-        System.out.println("CN1SS:END");
-        System.out.flush();
-    }
-}
-EOF
-sed -i "s|@PACKAGE@|$PACKAGE_NAME|g" "$TEST_CLASS"
+sed "s|@PACKAGE@|$PACKAGE_NAME|g" "$TEST_TEMPLATE" > "$TEST_CLASS"
 ba_log "Created instrumentation test at $TEST_CLASS"
 
 DEFAULT_ANDROID_TEST="$GRADLE_PROJECT_DIR/app/src/androidTest/java/com/example/myapplication2/ExampleInstrumentedTest.java"
