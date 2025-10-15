@@ -106,7 +106,8 @@ import pathlib
 import re
 import sys
 import urllib.parse
-from typing import Dict, Optional
+import uuid
+from typing import Dict, Optional, Tuple
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -148,6 +149,18 @@ def guess_mime(name: str) -> str:
     return "application/octet-stream"
 
 
+def build_multipart_payload(name: str, mime: str, data: bytes) -> Tuple[bytes, str]:
+    boundary = "cn1ss-" + uuid.uuid4().hex
+    body_parts = [
+        f"--{boundary}\r\n".encode("utf-8"),
+        f"Content-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\n".encode("utf-8"),
+        f"Content-Type: {mime}\r\n\r\n".encode("utf-8"),
+        data,
+        f"\r\n--{boundary}--\r\n".encode("utf-8"),
+    ]
+    return b"".join(body_parts), f"multipart/form-data; boundary={boundary}"
+
+
 body_path = pathlib.Path(sys.argv[1])
 preview_dir = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else None
 raw_body = body_path.read_text(encoding="utf-8")
@@ -182,19 +195,30 @@ headers = {
 
 comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments?per_page=100"
 existing_comment: Optional[Dict[str, object]] = None
+preferred_comment: Optional[Dict[str, object]] = None
+preferred_logins = set()
+if actor:
+    preferred_logins.add(actor)
+preferred_logins.add("github-actions[bot]")
 
 while comments_url:
     req = Request(comments_url, headers=headers)
     with urlopen(req) as resp:
         comments = json.load(resp)
         for comment in comments:
-            if MARKER in (comment.get("body") or ""):
-                if not actor or comment.get("user", {}).get("login") == actor:
-                    existing_comment = comment
+            body_text = comment.get("body") or ""
+            if MARKER in body_text:
+                existing_comment = comment
+                login = comment.get("user", {}).get("login")
+                if login in preferred_logins:
+                    preferred_comment = comment
         comments_url = next_link(resp.headers.get("Link"))
 
 comment_id: Optional[int] = None
 created_placeholder = False
+
+if preferred_comment is not None:
+    existing_comment = preferred_comment
 
 if existing_comment is not None:
     comment_id = existing_comment.get("id")
@@ -240,13 +264,15 @@ for name in attachment_names:
         f"{repo}/issues/comments/{comment_id}/attachments?name="
         + urllib.parse.quote(name, safe="")
     )
+    mime = guess_mime(name)
+    payload, content_type = build_multipart_payload(name, mime, data)
     upload_headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json",
-        "Content-Type": guess_mime(name),
+        "Content-Type": content_type,
     }
     try:
-        upload_req = Request(upload_url, data=data, headers=upload_headers, method="POST")
+        upload_req = Request(upload_url, data=payload, headers=upload_headers, method="POST")
         with urlopen(upload_req) as resp:
             upload_info = json.load(resp)
     except HTTPError as exc:
@@ -332,19 +358,21 @@ decode_test_png() {
       [ "$count" -gt 0 ] || continue
       ra_log "Reassembling test '$test_name' from XML: $x (chunks=$count)"
       if decode_cn1ss_png "$x" "$test_name" > "$dest" 2>/dev/null; then
-        if verify_png "$dest"; then source="XML"; break; fi
+        if verify_png "$dest"; then source="XML:$(basename "$x")"; break; fi
       fi
     done
   fi
 
-  if [ -z "$source" ] && [ -s "${LOGCAT_FILE:-}" ]; then
-    count="$(count_chunks "$LOGCAT_FILE" "$test_name")"; count="${count//[^0-9]/}"; : "${count:=0}"
-    if [ "$count" -gt 0 ]; then
-      ra_log "Reassembling test '$test_name' from logcat: $LOGCAT_FILE (chunks=$count)"
-      if decode_cn1ss_png "$LOGCAT_FILE" "$test_name" > "$dest" 2>/dev/null; then
-        if verify_png "$dest"; then source="LOGCAT"; fi
+  if [ -z "$source" ] && [ "${#LOGCAT_FILES[@]}" -gt 0 ]; then
+    for logcat in "${LOGCAT_FILES[@]}"; do
+      [ -s "$logcat" ] || continue
+      count="$(count_chunks "$logcat" "$test_name")"; count="${count//[^0-9]/}"; : "${count:=0}"
+      [ "$count" -gt 0 ] || continue
+      ra_log "Reassembling test '$test_name' from logcat: $logcat (chunks=$count)"
+      if decode_cn1ss_png "$logcat" "$test_name" > "$dest" 2>/dev/null; then
+        if verify_png "$dest"; then source="LOGCAT:$(basename "$logcat")"; break; fi
       fi
-    fi
+    done
   fi
 
   if [ -z "$source" ] && [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
@@ -352,7 +380,7 @@ decode_test_png() {
     if [ "$count" -gt 0 ]; then
       ra_log "Reassembling test '$test_name' from test-results.log: $TEST_EXEC_LOG (chunks=$count)"
       if decode_cn1ss_png "$TEST_EXEC_LOG" "$test_name" > "$dest" 2>/dev/null; then
-        if verify_png "$dest"; then source="EXECLOG"; fi
+        if verify_png "$dest"; then source="EXECLOG:$(basename "$TEST_EXEC_LOG")"; fi
       fi
     fi
   fi
@@ -446,9 +474,9 @@ mapfile -t XMLS < <(
 ) || XMLS=()
 
 # logcat files produced by AGP
-mapfile -t LOGCATS < <(
+mapfile -t LOGCAT_FILES < <(
   find "$RESULTS_ROOT" -type f -name 'logcat-*.txt' -print 2>/dev/null
-) || LOGCATS=()
+) || LOGCAT_FILES=()
 
 # execution log (use first if present)
 TEST_EXEC_LOG="$(find "$RESULTS_ROOT" -type f -path '*/testlog/test-results.log' -print -quit 2>/dev/null || true)"
@@ -460,12 +488,11 @@ else
   ra_log "No test result XML files found under $RESULTS_ROOT"
 fi
 
-# Pick first logcat if any
-LOGCAT_FILE="${LOGCATS[0]:-}"
-if [ -z "${LOGCAT_FILE:-}" ] || [ ! -s "$LOGCAT_FILE" ]; then
+if [ "${#LOGCAT_FILES[@]}" -eq 0 ]; then
   ra_log "FATAL: No logcat-*.txt produced by connectedDebugAndroidTest (cannot extract CN1SS chunks)."
   exit 12
 fi
+
 
 # ---- Chunk accounting (diagnostics) ---------------------------------------
 
@@ -474,7 +501,11 @@ for x in "${XMLS[@]}"; do
   c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
   XML_CHUNKS_TOTAL=$(( XML_CHUNKS_TOTAL + c ))
 done
-LOGCAT_CHUNKS="$(count_chunks "$LOGCAT_FILE")"; LOGCAT_CHUNKS="${LOGCAT_CHUNKS//[^0-9]/}"; : "${LOGCAT_CHUNKS:=0}"
+LOGCAT_CHUNKS=0
+for logcat in "${LOGCAT_FILES[@]}"; do
+  c="$(count_chunks "$logcat")"; c="${c//[^0-9]/}"; : "${c:=0}"
+  LOGCAT_CHUNKS=$(( LOGCAT_CHUNKS + c ))
+done
 EXECLOG_CHUNKS="$(count_chunks "${TEST_EXEC_LOG:-}")"; EXECLOG_CHUNKS="${EXECLOG_CHUNKS//[^0-9]/}"; : "${EXECLOG_CHUNKS:=0}"
 
 ra_log "Chunk counts -> XML: ${XML_CHUNKS_TOTAL} | logcat: ${LOGCAT_CHUNKS} | test-results.log: ${EXECLOG_CHUNKS}"
@@ -502,12 +533,13 @@ if [ "${#XMLS[@]}" -gt 0 ]; then
   done
 fi
 
-if [ -s "${LOGCAT_FILE:-}" ]; then
+for logcat in "${LOGCAT_FILES[@]}"; do
+  [ -s "$logcat" ] || continue
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     TEST_NAME_SET["$name"]=1
-  done < <(list_cn1ss_tests "$LOGCAT_FILE" 2>/dev/null || true)
-fi
+  done < <(list_cn1ss_tests "$logcat" 2>/dev/null || true)
+done
 
 if [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
   while IFS= read -r name; do
@@ -547,8 +579,11 @@ for test in "${TEST_NAMES[@]}"; do
     RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
     {
       local count
-      count="$(count_chunks "$LOGCAT_FILE" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-      if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$LOGCAT_FILE" "$test"; fi
+      for logcat in "${LOGCAT_FILES[@]}"; do
+        [ -s "$logcat" ] || continue
+        count="$(count_chunks "$logcat" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+        if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$logcat" "$test"; fi
+      done
       if [ "${#XMLS[@]}" -gt 0 ]; then
         for x in "${XMLS[@]}"; do
           count="$(count_chunks "$x" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
@@ -828,7 +863,9 @@ ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
 post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"
 
 # Copy useful artifacts for GH Actions
-cp -f "$LOGCAT_FILE" "$ARTIFACTS_DIR/$(basename "$LOGCAT_FILE")" 2>/dev/null || true
+for logcat in "${LOGCAT_FILES[@]}"; do
+  cp -f "$logcat" "$ARTIFACTS_DIR/$(basename "$logcat")" 2>/dev/null || true
+done
 for x in "${XMLS[@]}"; do
   cp -f "$x" "$ARTIFACTS_DIR/$(basename "$x")" 2>/dev/null || true
 done
