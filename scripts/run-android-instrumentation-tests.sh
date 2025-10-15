@@ -485,6 +485,7 @@ if comment_entries:
         if entry.get("base64"):
             lines.append("")
             lines.append(f"  ![{entry['test']}](data:image/png;base64,{entry['base64']})")
+            lines.append("  _(Preview image scaled for comment delivery.)_")
             lines.append("")
     comment_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 else:

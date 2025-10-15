@@ -7,10 +7,13 @@ import argparse
 import base64
 import json
 import pathlib
+import struct
 import sys
 import zlib
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Tuple
+
+MAX_COMMENT_BASE64 = 40_000
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -162,9 +165,7 @@ def load_png(path: pathlib.Path) -> PNGImage:
     return PNGImage(width, height, bit_depth, color_type, pixels, bpp)
 
 
-def compare_images(expected_path: pathlib.Path, actual_path: pathlib.Path) -> Dict[str, bool]:
-    expected = load_png(expected_path)
-    actual = load_png(actual_path)
+def compare_images(expected: PNGImage, actual: PNGImage) -> Dict[str, bool]:
     equal = (
         expected.width == actual.width
         and expected.height == actual.height
@@ -181,6 +182,85 @@ def compare_images(expected_path: pathlib.Path, actual_path: pathlib.Path) -> Di
     }
 
 
+def _encode_png(width: int, height: int, bit_depth: int, color_type: int, bpp: int, pixels: bytes) -> bytes:
+    import zlib as _zlib
+
+    if len(pixels) != width * height * bpp:
+        raise PNGError("Pixel buffer length does not match dimensions")
+
+    def chunk(tag: bytes, payload: bytes) -> bytes:
+        crc = _zlib.crc32(tag + payload) & 0xFFFFFFFF
+        return (
+            len(payload).to_bytes(4, "big")
+            + tag
+            + payload
+            + crc.to_bytes(4, "big")
+        )
+
+    raw = bytearray()
+    stride = width * bpp
+    for row in range(height):
+        raw.append(0)
+        start = row * stride
+        raw.extend(pixels[start : start + stride])
+
+    ihdr = struct.pack(
+        ">IIBBBBB",
+        width,
+        height,
+        bit_depth,
+        color_type,
+        0,
+        0,
+        0,
+    )
+
+    compressed = _zlib.compress(bytes(raw))
+    return b"".join(
+        [PNG_SIGNATURE, chunk(b"IHDR", ihdr), chunk(b"IDAT", compressed), chunk(b"IEND", b"")]
+    )
+
+
+def _downscale_half(width: int, height: int, bpp: int, pixels: bytes) -> Tuple[int, int, bytes]:
+    new_width = max(1, (width + 1) // 2)
+    new_height = max(1, (height + 1) // 2)
+    new_pixels = bytearray(new_width * new_height * bpp)
+
+    for ny in range(new_height):
+        for nx in range(new_width):
+            accum = [0] * bpp
+            samples = 0
+            for dy in (0, 1):
+                sy = min(height - 1, ny * 2 + dy)
+                for dx in (0, 1):
+                    sx = min(width - 1, nx * 2 + dx)
+                    src_index = (sy * width + sx) * bpp
+                    for channel in range(bpp):
+                        accum[channel] += pixels[src_index + channel]
+                    samples += 1
+            dst_index = (ny * new_width + nx) * bpp
+            for channel in range(bpp):
+                new_pixels[dst_index + channel] = accum[channel] // samples
+
+    return new_width, new_height, bytes(new_pixels)
+
+
+def build_preview_base64(image: PNGImage, max_length: int = MAX_COMMENT_BASE64) -> str:
+    width = image.width
+    height = image.height
+    bpp = image.bytes_per_pixel
+    pixels = image.pixels
+
+    while True:
+        png_bytes = _encode_png(width, height, image.bit_depth, image.color_type, bpp, pixels)
+        encoded = base64.b64encode(png_bytes).decode("ascii")
+        if len(encoded) <= max_length or width <= 1 or height <= 1:
+            return encoded
+        if image.color_type not in {0, 2, 4, 6}:
+            return encoded
+        width, height, pixels = _downscale_half(width, height, bpp, pixels)
+
+
 def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, pathlib.Path]], emit_base64: bool) -> Dict[str, List[Dict[str, object]]]:
     results: List[Dict[str, object]] = []
     for test_name, actual_path in actual_entries:
@@ -195,10 +275,15 @@ def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, p
         elif not expected_path.exists():
             record.update({"status": "missing_expected"})
             if emit_base64:
-                record["base64"] = base64.b64encode(actual_path.read_bytes()).decode("ascii")
+                try:
+                    record["base64"] = build_preview_base64(load_png(actual_path))
+                except Exception:
+                    record["base64"] = base64.b64encode(actual_path.read_bytes()).decode("ascii")
         else:
             try:
-                outcome = compare_images(expected_path, actual_path)
+                actual_img = load_png(actual_path)
+                expected_img = load_png(expected_path)
+                outcome = compare_images(expected_img, actual_img)
             except Exception as exc:
                 record.update({"status": "error", "message": str(exc)})
             else:
@@ -207,7 +292,10 @@ def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, p
                 else:
                     record.update({"status": "different", "details": outcome})
                     if emit_base64:
-                        record["base64"] = base64.b64encode(actual_path.read_bytes()).decode("ascii")
+                        try:
+                            record["base64"] = build_preview_base64(actual_img)
+                        except Exception:
+                            record["base64"] = base64.b64encode(actual_path.read_bytes()).decode("ascii")
         results.append(record)
     return {"results": results}
 
