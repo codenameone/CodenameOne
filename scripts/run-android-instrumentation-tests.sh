@@ -427,6 +427,8 @@ for result in data.get("results", []):
     actual_path = result.get("actual_path", "")
     details = result.get("details") or {}
     base64_data = result.get("base64")
+    base64_omitted = result.get("base64_omitted")
+    base64_length = result.get("base64_length")
     message = ""
     copy_flag = "0"
 
@@ -440,6 +442,9 @@ for result in data.get("results", []):
             "status": "missing reference",
             "message": message,
             "base64": base64_data,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "artifact_name": f"{test}.png",
         })
     elif status == "different":
         dims = ""
@@ -452,6 +457,9 @@ for result in data.get("results", []):
             "status": "updated screenshot",
             "message": message,
             "base64": base64_data,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "artifact_name": f"{test}.png",
         })
     elif status == "error":
         message = f"Comparison error: {result.get('message', 'unknown error')}"
@@ -461,6 +469,9 @@ for result in data.get("results", []):
             "status": "comparison error",
             "message": message,
             "base64": None,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "artifact_name": f"{test}.png",
         })
     elif status == "missing_actual":
         message = "Actual screenshot missing (test did not produce output)."
@@ -470,6 +481,9 @@ for result in data.get("results", []):
             "status": "missing actual screenshot",
             "message": message,
             "base64": None,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "artifact_name": None,
         })
     else:
         message = f"Status: {status}."
@@ -485,7 +499,19 @@ if comment_entries:
         if entry.get("base64"):
             lines.append("")
             lines.append(f"  ![{entry['test']}](data:image/png;base64,{entry['base64']})")
-            lines.append("  _(Preview image scaled for comment delivery.)_")
+            artifact_name = entry.get("artifact_name")
+            if artifact_name:
+                lines.append(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
+                lines.append("")
+        elif entry.get("base64_omitted") == "too_large":
+            artifact_name = entry.get("artifact_name")
+            size_note = ""
+            if entry.get("base64_length"):
+                size_note = f" (base64 length ≈ {entry['base64_length']:,} chars)"
+            lines.append("")
+            lines.append("  _Screenshot omitted from comment because the encoded payload exceeded GitHub's size limits" + size_note + "._")
+            if artifact_name:
+                lines.append(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
             lines.append("")
     comment_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 else:

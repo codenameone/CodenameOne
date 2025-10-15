@@ -13,7 +13,7 @@ import zlib
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Tuple
 
-MAX_COMMENT_BASE64 = 40_000
+MAX_COMMENT_BASE64 = 60_000
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -221,44 +221,19 @@ def _encode_png(width: int, height: int, bit_depth: int, color_type: int, bpp: i
     )
 
 
-def _downscale_half(width: int, height: int, bpp: int, pixels: bytes) -> Tuple[int, int, bytes]:
-    new_width = max(1, (width + 1) // 2)
-    new_height = max(1, (height + 1) // 2)
-    new_pixels = bytearray(new_width * new_height * bpp)
-
-    for ny in range(new_height):
-        for nx in range(new_width):
-            accum = [0] * bpp
-            samples = 0
-            for dy in (0, 1):
-                sy = min(height - 1, ny * 2 + dy)
-                for dx in (0, 1):
-                    sx = min(width - 1, nx * 2 + dx)
-                    src_index = (sy * width + sx) * bpp
-                    for channel in range(bpp):
-                        accum[channel] += pixels[src_index + channel]
-                    samples += 1
-            dst_index = (ny * new_width + nx) * bpp
-            for channel in range(bpp):
-                new_pixels[dst_index + channel] = accum[channel] // samples
-
-    return new_width, new_height, bytes(new_pixels)
-
-
-def build_preview_base64(image: PNGImage, max_length: int = MAX_COMMENT_BASE64) -> str:
-    width = image.width
-    height = image.height
-    bpp = image.bytes_per_pixel
-    pixels = image.pixels
-
-    while True:
-        png_bytes = _encode_png(width, height, image.bit_depth, image.color_type, bpp, pixels)
-        encoded = base64.b64encode(png_bytes).decode("ascii")
-        if len(encoded) <= max_length or width <= 1 or height <= 1:
-            return encoded
-        if image.color_type not in {0, 2, 4, 6}:
-            return encoded
-        width, height, pixels = _downscale_half(width, height, bpp, pixels)
+def build_base64_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64) -> Tuple[str | None, int]:
+    png_bytes = _encode_png(
+        image.width,
+        image.height,
+        image.bit_depth,
+        image.color_type,
+        image.bytes_per_pixel,
+        image.pixels,
+    )
+    encoded = base64.b64encode(png_bytes).decode("ascii")
+    if len(encoded) <= max_length:
+        return encoded, len(encoded)
+    return None, len(encoded)
 
 
 def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, pathlib.Path]], emit_base64: bool) -> Dict[str, List[Dict[str, object]]]:
@@ -275,10 +250,19 @@ def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, p
         elif not expected_path.exists():
             record.update({"status": "missing_expected"})
             if emit_base64:
+                payload = None
+                length = 0
                 try:
-                    record["base64"] = build_preview_base64(load_png(actual_path))
+                    payload, length = build_base64_payload(load_png(actual_path))
                 except Exception:
-                    record["base64"] = base64.b64encode(actual_path.read_bytes()).decode("ascii")
+                    raw = base64.b64encode(actual_path.read_bytes()).decode("ascii")
+                    length = len(raw)
+                    if length <= MAX_COMMENT_BASE64:
+                        payload = raw
+                if payload is not None:
+                    record["base64"] = payload
+                elif length:
+                    record.update({"base64_omitted": "too_large", "base64_length": length})
         else:
             try:
                 actual_img = load_png(actual_path)
@@ -292,10 +276,19 @@ def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, p
                 else:
                     record.update({"status": "different", "details": outcome})
                     if emit_base64:
+                        payload = None
+                        length = 0
                         try:
-                            record["base64"] = build_preview_base64(actual_img)
+                            payload, length = build_base64_payload(actual_img)
                         except Exception:
-                            record["base64"] = base64.b64encode(actual_path.read_bytes()).decode("ascii")
+                            raw = base64.b64encode(actual_path.read_bytes()).decode("ascii")
+                            length = len(raw)
+                            if length <= MAX_COMMENT_BASE64:
+                                payload = raw
+                        if payload is not None:
+                            record["base64"] = payload
+                        elif length:
+                            record.update({"base64_omitted": "too_large", "base64_length": length})
         results.append(record)
     return {"results": results}
 
