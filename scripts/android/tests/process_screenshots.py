@@ -8,8 +8,11 @@ import base64
 import io
 import json
 import pathlib
+import shutil
 import struct
+import subprocess
 import sys
+import tempfile
 import zlib
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -317,6 +320,12 @@ def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64)
             )
         note = note or "JPEG conversion unavailable"
     else:
+        # Attempt an external conversion using ImageMagick/GraphicsMagick if
+        # Pillow isn't present on the runner. This keeps the previews JPEG-based
+        # while avoiding large dependencies in the workflow environment.
+        cli_payload = _build_comment_payload_via_cli(image, max_length)
+        if cli_payload is not None:
+            return cli_payload
         note = "Pillow library not available; falling back to PNG previews."
 
     png_bytes = _build_png_payload(image)
@@ -340,6 +349,113 @@ def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64)
         omitted_reason="too_large",
         note=note,
     )
+
+
+def _build_comment_payload_via_cli(
+    image: PNGImage, max_length: int
+) -> Optional[CommentPayload]:
+    """Attempt to generate a JPEG preview using an external CLI."""
+
+    converters = _detect_cli_converters()
+    if not converters:
+        return None
+
+    png_bytes = _build_png_payload(image)
+
+    with tempfile.TemporaryDirectory(prefix="cn1ss-cli-jpeg-") as tmp_dir:
+        tmp_dir_path = pathlib.Path(tmp_dir)
+        src = tmp_dir_path / "input.png"
+        dst = tmp_dir_path / "preview.jpg"
+        src.write_bytes(png_bytes)
+
+        last_encoded: Optional[str] = None
+        last_length = 0
+        last_quality: Optional[int] = None
+        last_error: Optional[str] = None
+
+        for quality in JPEG_QUALITY_CANDIDATES:
+            for converter in converters:
+                try:
+                    _run_cli_converter(converter, src, dst, quality)
+                except RuntimeError as exc:
+                    last_error = str(exc)
+                    continue
+                if not dst.exists():
+                    last_error = "CLI converter did not create JPEG output"
+                    continue
+                data = dst.read_bytes()
+                encoded = base64.b64encode(data).decode("ascii")
+                last_encoded = encoded
+                last_length = len(encoded)
+                last_quality = quality
+                if len(encoded) <= max_length:
+                    return CommentPayload(
+                        base64=encoded,
+                        base64_length=len(encoded),
+                        mime="image/jpeg",
+                        codec="jpeg",
+                        quality=quality,
+                        omitted_reason=None,
+                        note=f"JPEG preview generated via {converter[0]}",
+                    )
+                break  # try next quality once any converter succeeded
+
+        if last_encoded is not None:
+            note = ""
+            if last_error:
+                note = last_error
+            return CommentPayload(
+                base64=None,
+                base64_length=last_length,
+                mime="image/jpeg",
+                codec="jpeg",
+                quality=last_quality,
+                omitted_reason="too_large",
+                note=(note or f"JPEG preview generated via {converters[0][0]}")
+                if converters
+                else note,
+            )
+
+    return None
+
+
+def _detect_cli_converters() -> List[Tuple[str, ...]]:
+    """Return a list of available CLI converters (command tuples)."""
+
+    candidates: List[Tuple[str, ...]] = []
+    for cmd in (("magick", "convert"), ("convert",)):
+        if shutil.which(cmd[0]):
+            candidates.append(cmd)
+    return candidates
+
+
+def _run_cli_converter(
+    command: Tuple[str, ...], src: pathlib.Path, dst: pathlib.Path, quality: int
+) -> None:
+    """Execute the CLI converter."""
+
+    if not command:
+        raise RuntimeError("No converter command provided")
+
+    cmd = list(command)
+    if len(cmd) == 2 and cmd[0] == "magick":
+        # magick convert <in> -quality <q> <out>
+        cmd.extend([str(src), "-quality", str(quality), str(dst)])
+    else:
+        # convert <in> -quality <q> <out>
+        cmd.extend([str(src), "-quality", str(quality), str(dst)])
+
+    result = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"{' '.join(command)} exited with {result.returncode}: {result.stderr.strip()}"
+        )
 
 
 def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, pathlib.Path]], emit_base64: bool) -> Dict[str, List[Dict[str, object]]]:

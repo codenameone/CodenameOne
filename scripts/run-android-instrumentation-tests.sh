@@ -103,6 +103,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 PREFIX = "[run-android-instrumentation-tests]"
+API_VERSION = "7.1-preview"
+ARTIFACT_VERSION = "4"
 
 source = pathlib.Path(sys.argv[1]).resolve()
 artifact_name = sys.argv[2]
@@ -112,7 +114,7 @@ run_id = os.environ.get("GITHUB_RUN_ID")
 
 headers = {
     "Authorization": f"Bearer {runtime_token}",
-    "Accept": "application/json;api-version=6.0-preview",
+    "Accept": f"application/json;api-version={API_VERSION}",
     "Content-Type": "application/json",
     "User-Agent": "codenameone-cn1ss-artifacts",
 }
@@ -122,7 +124,11 @@ if not files:
     print(f"{PREFIX} Artifact upload aborted: no files under {source}", file=sys.stderr)
     sys.exit(1)
 
-create_url = f"{runtime_url}_apis/pipelines/workflows/{run_id}/artifacts?api-version=6.0-preview"
+query = urllib.parse.urlencode({
+    "api-version": API_VERSION,
+    "artifactVersion": ARTIFACT_VERSION,
+})
+create_url = f"{runtime_url}_apis/pipelines/workflows/{run_id}/artifacts?{query}"
 create_payload = json.dumps({
     "name": artifact_name,
     "Name": artifact_name,
@@ -161,7 +167,7 @@ for path in files:
     relative = path.relative_to(source).as_posix()
     data = path.read_bytes()
     upload_url = (
-        f"{container_url}?itemPath={urllib.parse.quote(relative)}&api-version=6.0-preview"
+        f"{container_url}?itemPath={urllib.parse.quote(relative)}&api-version={API_VERSION}"
     )
     try:
         put_req = Request(upload_url, data=data, headers=upload_headers, method="PUT")
@@ -187,13 +193,13 @@ for path in files:
 
 final_headers = {
     "Authorization": f"Bearer {runtime_token}",
-    "Accept": "application/json;api-version=6.0-preview",
+    "Accept": f"application/json;api-version={API_VERSION}",
     "Content-Type": "application/json",
     "User-Agent": "codenameone-cn1ss-artifacts",
 }
 final_payload = json.dumps({"size": total_bytes}).encode("utf-8")
 final_url = (
-    f"{container_url}?artifactName={urllib.parse.quote(artifact_name)}&api-version=6.0-preview"
+    f"{container_url}?artifactName={urllib.parse.quote(artifact_name)}&api-version={API_VERSION}&artifactVersion={ARTIFACT_VERSION}"
 )
 
 try:
@@ -234,6 +240,9 @@ post_pr_comment() {
   if [ -z "$comment_token" ] && [ -n "${GH_TOKEN:-}" ]; then
     comment_token="${GH_TOKEN}"
     ra_log "PR comment auth using GH_TOKEN fallback"
+  fi
+  if [ -n "$comment_token" ]; then
+    ra_log "PR comment authentication token detected"
   fi
   if [ -z "$comment_token" ]; then
     ra_log "PR comment skipped (no GitHub token available)"

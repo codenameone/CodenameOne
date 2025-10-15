@@ -15,6 +15,9 @@ name: Test Android build scripts
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup workspace
@@ -36,8 +39,6 @@ jobs:
           arch: x86_64
           target: google_apis
           script: |
-            export GITHUB_TOKEN="${{ github.token }}"
-            export GH_TOKEN="${{ github.token }}"
             ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       - name: Upload emulator screenshot
         if: always()   # still collect it if tests fail
