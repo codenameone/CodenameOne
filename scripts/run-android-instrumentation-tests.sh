@@ -72,166 +72,10 @@ list_cn1ss_tests() {
   python3 "$CN1SS_TOOL" tests "$f"
 }
 
-upload_actions_artifact() {
-  local source_dir="${1:-}"
-  local artifact_name="${2:-cn1-android-screenshots}"
-
-  if [ -z "$source_dir" ] || [ ! -d "$source_dir" ]; then
-    ra_log "Artifact upload skipped (source directory missing: $source_dir)"
-    return 0
-  fi
-
-  if ! find "$source_dir" -mindepth 1 -maxdepth 20 -type f | read -r _; then
-    ra_log "Artifact upload skipped (no files under $source_dir)"
-    return 0
-  fi
-
-  if [ -z "${ACTIONS_RUNTIME_URL:-}" ] || [ -z "${ACTIONS_RUNTIME_TOKEN:-}" ] || [ -z "${GITHUB_RUN_ID:-}" ]; then
-    ra_log "Artifact upload skipped (Actions runtime metadata unavailable)"
-    return 0
-  fi
-
-  ra_log "STAGE:ARTIFACT_UPLOAD -> Publishing '$artifact_name' from $source_dir"
-
-  python3 - "$source_dir" "$artifact_name" <<'PY'
-import json
-import os
-import pathlib
-import sys
-import urllib.parse
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
-
-PREFIX = "[run-android-instrumentation-tests]"
-API_VERSION = "6.0"
-ARTIFACT_VERSION = "4"
-
-source = pathlib.Path(sys.argv[1]).resolve()
-artifact_name = sys.argv[2]
-runtime_url = os.environ.get("ACTIONS_RUNTIME_URL")
-runtime_token = os.environ.get("ACTIONS_RUNTIME_TOKEN")
-run_id = os.environ.get("GITHUB_RUN_ID")
-
-headers = {
-    "Authorization": f"Bearer {runtime_token}",
-    "Accept": f"application/json;api-version={API_VERSION}",
-    "Content-Type": "application/json",
-    "User-Agent": "codenameone-cn1ss-artifacts",
-}
-
-files = [p for p in source.rglob("*") if p.is_file()]
-if not files:
-    print(f"{PREFIX} Artifact upload aborted: no files under {source}", file=sys.stderr)
-    sys.exit(1)
-
-query = urllib.parse.urlencode({
-    "api-version": API_VERSION,
-    "artifactVersion": ARTIFACT_VERSION,
-})
-create_url = f"{runtime_url}_apis/pipelines/workflows/{run_id}/artifacts?{query}"
-create_payload = json.dumps({
-    "name": artifact_name,
-    "Name": artifact_name,
-    "type": "actions_storage",
-    "Type": "actions_storage",
-}).encode("utf-8")
-
-try:
-    create_req = Request(create_url, data=create_payload, headers=headers, method="POST")
-    with urlopen(create_req) as resp:
-        container_info = json.load(resp)
-except HTTPError as exc:
-    body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
-    if body:
-        print(f"{PREFIX} Artifact container create response: {body}", file=sys.stderr)
-    print(f"{PREFIX} Artifact container create failed: {exc} (status={exc.code})", file=sys.stderr)
-    sys.exit(1)
-except URLError as exc:
-    print(f"{PREFIX} Artifact container create connection error: {exc}", file=sys.stderr)
-    sys.exit(1)
-
-container_url = container_info.get("fileContainerResourceUrl")
-if not container_url:
-    print(f"{PREFIX} Artifact container missing upload URL", file=sys.stderr)
-    sys.exit(1)
-
-upload_headers = {
-    "Authorization": f"Bearer {runtime_token}",
-    "Content-Type": "application/octet-stream",
-    "User-Agent": "codenameone-cn1ss-artifacts",
-}
-
-total_bytes = 0
-uploaded = 0
-for path in files:
-    relative = path.relative_to(source).as_posix()
-    data = path.read_bytes()
-    upload_url = (
-        f"{container_url}?itemPath={urllib.parse.quote(relative)}&api-version={API_VERSION}"
-    )
-    try:
-        put_req = Request(upload_url, data=data, headers=upload_headers, method="PUT")
-        with urlopen(put_req) as resp:
-            resp.read()
-    except HTTPError as exc:
-        body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
-        if body:
-            print(
-                f"{PREFIX} Artifact file upload response for {relative}: {body}",
-                file=sys.stderr,
-            )
-        print(
-            f"{PREFIX} Artifact file upload failed for {relative}: {exc} (status={exc.code})",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    except URLError as exc:
-        print(f"{PREFIX} Artifact file upload connection error for {relative}: {exc}", file=sys.stderr)
-        sys.exit(1)
-    total_bytes += len(data)
-    uploaded += 1
-
-final_headers = {
-    "Authorization": f"Bearer {runtime_token}",
-    "Accept": f"application/json;api-version={API_VERSION}",
-    "Content-Type": "application/json",
-    "User-Agent": "codenameone-cn1ss-artifacts",
-}
-final_payload = json.dumps({"size": total_bytes}).encode("utf-8")
-final_url = (
-    f"{container_url}?artifactName={urllib.parse.quote(artifact_name)}&api-version={API_VERSION}&artifactVersion={ARTIFACT_VERSION}"
-)
-
-try:
-    finalize_req = Request(final_url, data=final_payload, headers=final_headers, method="PATCH")
-    with urlopen(finalize_req) as resp:
-        resp.read()
-except HTTPError as exc:
-    body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
-    if body:
-        print(f"{PREFIX} Artifact finalize response: {body}", file=sys.stderr)
-    print(f"{PREFIX} Artifact finalize failed: {exc} (status={exc.code})", file=sys.stderr)
-    sys.exit(1)
-except URLError as exc:
-    print(f"{PREFIX} Artifact finalize connection error: {exc}", file=sys.stderr)
-    sys.exit(1)
-
-print(
-    f"{PREFIX} Uploaded {uploaded} file(s) ({total_bytes} bytes) to artifact '{artifact_name}'",
-    flush=True,
-)
-PY
-  local rc=$?
-  if [ $rc -ne 0 ]; then
-    ra_log "Artifact upload failed (python exited with $rc)"
-  else
-    ra_log "Artifact upload completed"
-  fi
-  return $rc
-}
 
 post_pr_comment() {
   local body_file="${1:-}"
+  local preview_dir="${2:-}"
   if [ -z "$body_file" ] || [ ! -s "$body_file" ]; then
     ra_log "Skipping PR comment post (no content)."
     return 0
@@ -255,68 +99,213 @@ post_pr_comment() {
   local body_size
   body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
   ra_log "Attempting to post PR comment (payload bytes=${body_size})"
-  GITHUB_TOKEN="$comment_token" python3 - "$body_file" <<'PY'
+  GITHUB_TOKEN="$comment_token" python3 - "$body_file" "$preview_dir" <<'PY'
 import json
 import os
 import pathlib
+import re
 import sys
+import urllib.parse
+from typing import Dict, Optional
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
+
+
+def load_event(path: str) -> Dict[str, object]:
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def find_pr_number(event: Dict[str, object]) -> Optional[int]:
+    if "pull_request" in event:
+        return event["pull_request"].get("number")
+    issue = event.get("issue")
+    if isinstance(issue, dict) and issue.get("pull_request"):
+        return issue.get("number")
+    return None
+
+
+def next_link(header: Optional[str]) -> Optional[str]:
+    if not header:
+        return None
+    for part in header.split(","):
+        segment = part.strip()
+        if segment.endswith('rel="next"'):
+            url_part = segment.split(";", 1)[0].strip()
+            if url_part.startswith("<") and url_part.endswith(">"):
+                return url_part[1:-1]
+    return None
+
+
+def guess_mime(name: str) -> str:
+    lower = name.lower()
+    if lower.endswith(".jpg") or lower.endswith(".jpeg"):
+        return "image/jpeg"
+    if lower.endswith(".png"):
+        return "image/png"
+    return "application/octet-stream"
+
+
 body_path = pathlib.Path(sys.argv[1])
-body = body_path.read_text(encoding="utf-8").strip()
+preview_dir = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else None
+raw_body = body_path.read_text(encoding="utf-8")
+body = raw_body.strip()
 if not body:
+    sys.exit(0)
+
+if MARKER not in body:
+    body = body.rstrip() + "\n\n" + MARKER
+
+body_without_marker = body.replace(MARKER, "").strip()
+if not body_without_marker:
     sys.exit(0)
 
 event_path = os.environ.get("GITHUB_EVENT_PATH")
 repo = os.environ.get("GITHUB_REPOSITORY")
 token = os.environ.get("GITHUB_TOKEN")
+actor = os.environ.get("GITHUB_ACTOR")
 if not event_path or not repo or not token:
     sys.exit(0)
 
-with open(event_path, "r", encoding="utf-8") as fh:
-    event = json.load(fh)
-
-pr_number = None
-if "pull_request" in event:
-    pr_number = event["pull_request"].get("number")
-elif event.get("issue") and event["issue"].get("pull_request"):
-    pr_number = event["issue"].get("number")
-
+event = load_event(event_path)
+pr_number = find_pr_number(event)
 if not pr_number:
     sys.exit(0)
 
-payload = json.dumps({"body": body}).encode("utf-8")
-req = Request(
-    f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments",
-    data=payload,
-    headers={
+headers = {
+    "Authorization": f"token {token}",
+    "Accept": "application/vnd.github+json",
+    "Content-Type": "application/json",
+}
+
+comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments?per_page=100"
+existing_comment: Optional[Dict[str, object]] = None
+
+while comments_url:
+    req = Request(comments_url, headers=headers)
+    with urlopen(req) as resp:
+        comments = json.load(resp)
+        for comment in comments:
+            if MARKER in (comment.get("body") or ""):
+                if not actor or comment.get("user", {}).get("login") == actor:
+                    existing_comment = comment
+        comments_url = next_link(resp.headers.get("Link"))
+
+comment_id: Optional[int] = None
+created_placeholder = False
+
+if existing_comment is not None:
+    comment_id = existing_comment.get("id")
+else:
+    create_payload = json.dumps({"body": MARKER}).encode("utf-8")
+    create_req = Request(
+        f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments",
+        data=create_payload,
+        headers=headers,
+        method="POST",
+    )
+    with urlopen(create_req) as resp:
+        created = json.load(resp)
+        comment_id = created.get("id")
+    created_placeholder = True
+    print(
+        f"[run-android-instrumentation-tests] Created new screenshot comment placeholder (id={comment_id})",
+        file=sys.stdout,
+    )
+
+if comment_id is None:
+    sys.exit(0)
+
+attachment_pattern = re.compile(r"\(attachment:([^)]+)\)")
+attachment_names = attachment_pattern.findall(body)
+
+attachment_urls: Dict[str, str] = {}
+failed_uploads = []
+
+for name in attachment_names:
+    if name in attachment_urls or name in failed_uploads:
+        continue
+    if not preview_dir:
+        failed_uploads.append(name)
+        continue
+    file_path = preview_dir / name
+    if not file_path.exists():
+        failed_uploads.append(name)
+        continue
+    data = file_path.read_bytes()
+    upload_url = (
+        "https://uploads.github.com/repos/"
+        f"{repo}/issues/comments/{comment_id}/attachments?name="
+        + urllib.parse.quote(name, safe="")
+    )
+    upload_headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json",
-        "Content-Type": "application/json",
-    },
-    method="POST",
-)
-
-try:
-    with urlopen(req) as resp:
-        resp.read()
+        "Content-Type": guess_mime(name),
+    }
+    try:
+        upload_req = Request(upload_url, data=data, headers=upload_headers, method="POST")
+        with urlopen(upload_req) as resp:
+            upload_info = json.load(resp)
+    except HTTPError as exc:
+        failed_uploads.append(name)
+        error_body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
         print(
-            f"[run-android-instrumentation-tests] PR comment POST succeeded (status={resp.status}, bytes={len(payload)})",
+            f"[run-android-instrumentation-tests] Attachment upload failed for {name}: {exc} (status={exc.code})",
+            file=sys.stderr,
+        )
+        if error_body:
+            print(error_body, file=sys.stderr)
+        continue
+    url = (
+        upload_info.get("url")
+        or upload_info.get("download_url")
+        or upload_info.get("browser_download_url")
+        or upload_info.get("html_url")
+    )
+    if url:
+        attachment_urls[name] = url
+        print(
+            f"[run-android-instrumentation-tests] Uploaded preview attachment '{name}'",
             file=sys.stdout,
         )
-except HTTPError as exc:  # pragma: no cover - diagnostics only
+    else:
+        failed_uploads.append(name)
+
+
+def replace_attachment(match: re.Match[str]) -> str:
+    name = match.group(1)
+    url = attachment_urls.get(name)
+    if url:
+        return f"({url})"
+    failed_uploads.append(name)
+    return "(#)"
+
+
+final_body = attachment_pattern.sub(replace_attachment, body)
+
+if failed_uploads:
+    unique_failures = sorted(set(failed_uploads))
+    warning_line = "⚠️ _Preview upload failed for: " + ", ".join(unique_failures) + "._"
+    final_body = final_body.replace(MARKER, warning_line + "\n" + MARKER, 1)
+
+update_payload = json.dumps({"body": final_body}).encode("utf-8")
+update_req = Request(
+    f"https://api.github.com/repos/{repo}/issues/comments/{comment_id}",
+    data=update_payload,
+    headers=headers,
+    method="PATCH",
+)
+
+with urlopen(update_req) as resp:
+    resp.read()
+    action = "updated" if not created_placeholder else "posted"
     print(
-        f"[run-android-instrumentation-tests] PR comment POST failed: {exc} (status={exc.code})",
-        file=sys.stderr,
+        f"[run-android-instrumentation-tests] PR comment {action} (status={resp.status}, bytes={len(update_payload)})",
+        file=sys.stdout,
     )
-    sys.exit(1)
-except Exception as exc:  # pragma: no cover - defensive
-    print(
-        f"[run-android-instrumentation-tests] PR comment POST raised unexpected error: {exc}",
-        file=sys.stderr,
-    )
-    sys.exit(1)
 PY
   local rc=$?
   if [ $rc -eq 0 ]; then
@@ -412,8 +401,6 @@ TEST_LOG="$ARTIFACTS_DIR/connectedAndroidTest.log"
 SCREENSHOT_REF_DIR="$SCRIPT_DIR/android/screenshots"
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1ss-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1ss-tmp")"
 ensure_dir "$SCREENSHOT_TMP_DIR"
-SCREENSHOT_ARTIFACT_DIR="$ARTIFACTS_DIR/screenshots"
-ensure_dir "$SCREENSHOT_ARTIFACT_DIR"
 
 ra_log "Loading workspace environment from $ENV_FILE"
 [ -f "$ENV_FILE" ] || { ra_log "Missing env file: $ENV_FILE"; exit 3; }
@@ -591,10 +578,13 @@ for test in "${TEST_NAMES[@]}"; do
 done
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
+SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
+export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 ra_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
 python3 "$SCRIPT_DIR/android/tests/process_screenshots.py" \
   --reference-dir "$SCREENSHOT_REF_DIR" \
   --emit-base64 \
+  --preview-dir "$SCREENSHOT_PREVIEW_DIR" \
   "${COMPARE_ARGS[@]}" > "$COMPARE_JSON"
 
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
@@ -630,6 +620,12 @@ for result in data.get("results", []):
     message = ""
     copy_flag = "0"
 
+    preview = result.get("preview") or {}
+    preview_name = preview.get("name")
+    preview_path = preview.get("path")
+    preview_mime = preview.get("mime")
+    preview_note = preview.get("note")
+    preview_quality = preview.get("quality")
     if status == "equal":
         message = "Matches stored reference."
     elif status == "missing_expected":
@@ -639,10 +635,15 @@ for result in data.get("results", []):
             "test": test,
             "status": "missing reference",
             "message": message,
+            "artifact_name": f"{test}.png",
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
             "base64": base64_data,
             "base64_omitted": base64_omitted,
             "base64_length": base64_length,
-            "artifact_name": f"{test}.png",
             "base64_mime": base64_mime,
             "base64_codec": base64_codec,
             "base64_quality": base64_quality,
@@ -658,10 +659,15 @@ for result in data.get("results", []):
             "test": test,
             "status": "updated screenshot",
             "message": message,
+            "artifact_name": f"{test}.png",
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
             "base64": base64_data,
             "base64_omitted": base64_omitted,
             "base64_length": base64_length,
-            "artifact_name": f"{test}.png",
             "base64_mime": base64_mime,
             "base64_codec": base64_codec,
             "base64_quality": base64_quality,
@@ -674,10 +680,15 @@ for result in data.get("results", []):
             "test": test,
             "status": "comparison error",
             "message": message,
+            "artifact_name": f"{test}.png",
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
             "base64": None,
             "base64_omitted": base64_omitted,
             "base64_length": base64_length,
-            "artifact_name": f"{test}.png",
             "base64_mime": base64_mime,
             "base64_codec": base64_codec,
             "base64_quality": base64_quality,
@@ -690,10 +701,15 @@ for result in data.get("results", []):
             "test": test,
             "status": "missing actual screenshot",
             "message": message,
+            "artifact_name": None,
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
             "base64": None,
             "base64_omitted": base64_omitted,
             "base64_length": base64_length,
-            "artifact_name": None,
             "base64_mime": base64_mime,
             "base64_codec": base64_codec,
             "base64_quality": base64_quality,
@@ -702,7 +718,8 @@ for result in data.get("results", []):
     else:
         message = f"Status: {status}."
 
-    summary_lines.append("|".join([status, test, message, copy_flag, actual_path, base64_note or ""]))
+    note_column = preview_note or base64_note or ""
+    summary_lines.append("|".join([status, test, message, copy_flag, actual_path, note_column]))
 
 summary_path.write_text("\n".join(summary_lines) + ("\n" if summary_lines else ""), encoding="utf-8")
 
@@ -710,7 +727,22 @@ if comment_entries:
     lines = ["### Android screenshot updates", ""]
     for entry in comment_entries:
         lines.append(f"- **{entry['test']}** — {entry['status']}. {entry['message']}")
-        if entry.get("base64"):
+        preview_name = entry.get("preview_name")
+        if preview_name:
+            lines.append("")
+            lines.append(f"  ![{entry['test']}](attachment:{preview_name})")
+            preview_notes = []
+            preview_quality = entry.get("preview_quality")
+            preview_note = entry.get("preview_note")
+            if entry.get("preview_mime") == "image/jpeg" and preview_quality:
+                preview_notes.append(f"JPEG preview quality {preview_quality}")
+            if preview_note:
+                preview_notes.append(preview_note)
+            if entry.get("base64_note") and entry.get("base64_note") != preview_note:
+                preview_notes.append(entry["base64_note"])
+            if preview_notes:
+                lines.append(f"  _Preview info: {'; '.join(preview_notes)}._")
+        elif entry.get("base64"):
             lines.append("")
             mime = entry.get("base64_mime") or "image/png"
             lines.append(f"  ![{entry['test']}](data:{mime};base64,{entry['base64']})")
@@ -724,12 +756,7 @@ if comment_entries:
                 preview_notes.append(note)
             if preview_notes:
                 lines.append(f"  _Preview info: {'; '.join(preview_notes)}._")
-            artifact_name = entry.get("artifact_name")
-            if artifact_name:
-                lines.append(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
-                lines.append("")
         elif entry.get("base64_omitted") == "too_large":
-            artifact_name = entry.get("artifact_name")
             size_note = ""
             if entry.get("base64_length"):
                 size_note = f" (base64 length ≈ {entry['base64_length']:,} chars)"
@@ -750,9 +777,14 @@ if comment_entries:
                 + size_note
                 + "." + tail + "_"
             )
-            if artifact_name:
-                lines.append(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
-            lines.append("")
+        artifact_name = entry.get("artifact_name")
+        if artifact_name:
+            lines.append(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
+        lines.append("")
+    MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
+    if lines[-1] != "":
+        lines.append("")
+    lines.append(MARKER)
     comment_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 else:
     comment_path.write_text("", encoding="utf-8")
@@ -775,8 +807,8 @@ if [ -s "$SUMMARY_FILE" ]; then
     [ -n "${test:-}" ] || continue
     ra_log "Test '${test}': ${message}"
     if [ "$copy_flag" = "1" ] && [ -n "${path:-}" ] && [ -f "$path" ]; then
-      cp -f "$path" "$SCREENSHOT_ARTIFACT_DIR/${test}.png" 2>/dev/null || true
-      ra_log "  -> Stored PNG artifact copy at $SCREENSHOT_ARTIFACT_DIR/${test}.png"
+      cp -f "$path" "$ARTIFACTS_DIR/${test}.png" 2>/dev/null || true
+      ra_log "  -> Stored PNG artifact copy at $ARTIFACTS_DIR/${test}.png"
     fi
     if [ "$status" = "equal" ] && [ -n "${path:-}" ]; then
       rm -f "$path" 2>/dev/null || true
@@ -792,20 +824,8 @@ if [ -s "$COMMENT_FILE" ]; then
   cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
 fi
 
-if find "$SCREENSHOT_ARTIFACT_DIR" -maxdepth 1 -type f -name '*.png' | read -r _; then
-  SCREENSHOT_ARCHIVE="$ARTIFACTS_DIR/screenshot-updates.tar.gz"
-  ra_log "STAGE:ARTIFACT_PACKAGE -> Bundling full-resolution screenshots at $SCREENSHOT_ARCHIVE"
-  if tar -czf "$SCREENSHOT_ARCHIVE" -C "$SCREENSHOT_ARTIFACT_DIR" . 2>/dev/null; then
-    ra_log "  -> Packaged screenshot archive created"
-  else
-    ra_log "WARNING: Failed to create screenshot archive"
-  fi
-else
-  ra_log "No screenshot PNG artifacts to archive"
-fi
-
 ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
-post_pr_comment "$COMMENT_FILE"
+post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"
 
 # Copy useful artifacts for GH Actions
 cp -f "$LOGCAT_FILE" "$ARTIFACTS_DIR/$(basename "$LOGCAT_FILE")" 2>/dev/null || true
@@ -813,7 +833,5 @@ for x in "${XMLS[@]}"; do
   cp -f "$x" "$ARTIFACTS_DIR/$(basename "$x")" 2>/dev/null || true
 done
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
-
-upload_actions_artifact "$ARTIFACTS_DIR" "android-instrumentation-screenshots"
 
 exit 0

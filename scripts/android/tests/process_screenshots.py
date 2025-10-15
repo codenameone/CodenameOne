@@ -51,6 +51,7 @@ class CommentPayload:
     quality: Optional[int] = None
     omitted_reason: Optional[str] = None
     note: Optional[str] = None
+    data: Optional[bytes] = None
 
 
 def _read_chunks(path: pathlib.Path) -> Iterable[Tuple[bytes, bytes]]:
@@ -289,6 +290,8 @@ def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64)
     if Image is not None:
         last_encoded: Optional[str] = None
         last_length: int = 0
+        last_bytes: Optional[bytes] = None
+        last_quality: Optional[int] = None
         for quality in JPEG_QUALITY_CANDIDATES:
             try:
                 jpeg_bytes = _encode_comment_jpeg(image, quality)
@@ -298,6 +301,8 @@ def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64)
             encoded = base64.b64encode(jpeg_bytes).decode("ascii")
             last_encoded = encoded
             last_length = len(encoded)
+            last_bytes = jpeg_bytes
+            last_quality = quality
             if len(encoded) <= max_length:
                 return CommentPayload(
                     base64=encoded,
@@ -307,16 +312,18 @@ def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64)
                     quality=quality,
                     omitted_reason=None,
                     note=note,
+                    data=jpeg_bytes,
                 )
-        if last_encoded is not None:
+        if last_bytes is not None:
             return CommentPayload(
                 base64=None,
                 base64_length=last_length,
                 mime="image/jpeg",
                 codec="jpeg",
-                quality=JPEG_QUALITY_CANDIDATES[-1],
+                quality=last_quality,
                 omitted_reason="too_large",
                 note=note,
+                data=last_bytes,
             )
         note = note or "JPEG conversion unavailable"
     else:
@@ -339,6 +346,7 @@ def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64)
             quality=None,
             omitted_reason=None,
             note=note,
+            data=png_bytes,
         )
     return CommentPayload(
         base64=None,
@@ -348,6 +356,7 @@ def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64)
         quality=None,
         omitted_reason="too_large",
         note=note,
+        data=png_bytes,
     )
 
 
@@ -371,6 +380,7 @@ def _build_comment_payload_via_cli(
         last_encoded: Optional[str] = None
         last_length = 0
         last_quality: Optional[int] = None
+        last_data: Optional[bytes] = None
         last_error: Optional[str] = None
 
         for quality in JPEG_QUALITY_CANDIDATES:
@@ -388,6 +398,7 @@ def _build_comment_payload_via_cli(
                 last_encoded = encoded
                 last_length = len(encoded)
                 last_quality = quality
+                last_data = data
                 if len(encoded) <= max_length:
                     return CommentPayload(
                         base64=encoded,
@@ -397,6 +408,7 @@ def _build_comment_payload_via_cli(
                         quality=quality,
                         omitted_reason=None,
                         note=f"JPEG preview generated via {converter[0]}",
+                        data=data,
                     )
                 break  # try next quality once any converter succeeded
 
@@ -414,9 +426,49 @@ def _build_comment_payload_via_cli(
                 note=(note or f"JPEG preview generated via {converters[0][0]}")
                 if converters
                 else note,
+                data=last_data,
             )
 
     return None
+
+
+def _record_comment_payload(
+    record: Dict[str, object],
+    payload: CommentPayload,
+    default_name: str,
+    preview_dir: Optional[pathlib.Path],
+) -> None:
+    if payload.base64 is not None:
+        record["base64"] = payload.base64
+    else:
+        record.update(
+            {"base64_omitted": payload.omitted_reason, "base64_length": payload.base64_length}
+        )
+    record.update({
+        "base64_mime": payload.mime,
+        "base64_codec": payload.codec,
+    })
+    if payload.quality is not None:
+        record["base64_quality"] = payload.quality
+    if payload.note:
+        record["base64_note"] = payload.note
+
+    if preview_dir is None or payload.data is None:
+        return
+
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    suffix = ".jpg" if payload.mime == "image/jpeg" else ".png"
+    base_name = _slugify(default_name.rsplit(".", 1)[0] or "preview")
+    preview_path = preview_dir / f"{base_name}{suffix}"
+    preview_path.write_bytes(payload.data)
+    record["preview"] = {
+        "path": str(preview_path),
+        "name": preview_path.name,
+        "mime": payload.mime,
+        "codec": payload.codec,
+        "quality": payload.quality,
+        "note": payload.note,
+    }
 
 
 def _detect_cli_converters() -> List[Tuple[str, ...]]:
@@ -458,7 +510,16 @@ def _run_cli_converter(
         )
 
 
-def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, pathlib.Path]], emit_base64: bool) -> Dict[str, List[Dict[str, object]]]:
+def _slugify(name: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in name)
+
+
+def build_results(
+    reference_dir: pathlib.Path,
+    actual_entries: List[Tuple[str, pathlib.Path]],
+    emit_base64: bool,
+    preview_dir: Optional[pathlib.Path] = None,
+) -> Dict[str, List[Dict[str, object]]]:
     results: List[Dict[str, object]] = []
     for test_name, actual_path in actual_entries:
         expected_path = reference_dir / f"{test_name}.png"
@@ -473,18 +534,7 @@ def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, p
             record.update({"status": "missing_expected"})
             if emit_base64:
                 payload = build_comment_payload(load_png(actual_path))
-                if payload.base64 is not None:
-                    record["base64"] = payload.base64
-                else:
-                    record.update({"base64_omitted": payload.omitted_reason, "base64_length": payload.base64_length})
-                record.update({
-                    "base64_mime": payload.mime,
-                    "base64_codec": payload.codec,
-                })
-                if payload.quality is not None:
-                    record["base64_quality"] = payload.quality
-                if payload.note:
-                    record["base64_note"] = payload.note
+                _record_comment_payload(record, payload, actual_path.name, preview_dir)
         else:
             try:
                 actual_img = load_png(actual_path)
@@ -499,18 +549,7 @@ def build_results(reference_dir: pathlib.Path, actual_entries: List[Tuple[str, p
                     record.update({"status": "different", "details": outcome})
                     if emit_base64:
                         payload = build_comment_payload(actual_img)
-                        if payload.base64 is not None:
-                            record["base64"] = payload.base64
-                        else:
-                            record.update({"base64_omitted": payload.omitted_reason, "base64_length": payload.base64_length})
-                        record.update({
-                            "base64_mime": payload.mime,
-                            "base64_codec": payload.codec,
-                        })
-                        if payload.quality is not None:
-                            record["base64_quality"] = payload.quality
-                        if payload.note:
-                            record["base64_note"] = payload.note
+                        _record_comment_payload(record, payload, actual_path.name, preview_dir)
         results.append(record)
     return {"results": results}
 
@@ -519,6 +558,7 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference-dir", required=True, type=pathlib.Path)
     parser.add_argument("--emit-base64", action="store_true", help="Include base64 payloads for updated screenshots")
+    parser.add_argument("--preview-dir", type=pathlib.Path, help="Directory to store generated preview images")
     parser.add_argument("--actual", action="append", default=[], help="Mapping of test=path to evaluate")
     return parser.parse_args(argv)
 
@@ -534,7 +574,8 @@ def main(argv: List[str] | None = None) -> int:
         name, path_str = item.split("=", 1)
         actual_entries.append((name, pathlib.Path(path_str)))
 
-    payload = build_results(reference_dir, actual_entries, bool(args.emit_base64))
+    preview_dir = args.preview_dir
+    payload = build_results(reference_dir, actual_entries, bool(args.emit_base64), preview_dir)
     json.dump(payload, sys.stdout)
     return 0
 
