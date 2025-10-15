@@ -72,14 +72,150 @@ list_cn1ss_tests() {
   python3 "$CN1SS_TOOL" tests "$f"
 }
 
+upload_actions_artifact() {
+  local source_dir="${1:-}"
+  local artifact_name="${2:-cn1-android-screenshots}"
+
+  if [ -z "$source_dir" ] || [ ! -d "$source_dir" ]; then
+    ra_log "Artifact upload skipped (source directory missing: $source_dir)"
+    return 0
+  fi
+
+  if ! find "$source_dir" -mindepth 1 -maxdepth 20 -type f | read -r _; then
+    ra_log "Artifact upload skipped (no files under $source_dir)"
+    return 0
+  fi
+
+  if [ -z "${ACTIONS_RUNTIME_URL:-}" ] || [ -z "${ACTIONS_RUNTIME_TOKEN:-}" ] || [ -z "${GITHUB_RUN_ID:-}" ]; then
+    ra_log "Artifact upload skipped (Actions runtime metadata unavailable)"
+    return 0
+  fi
+
+  ra_log "STAGE:ARTIFACT_UPLOAD -> Publishing '$artifact_name' from $source_dir"
+
+  if ! python3 - "$source_dir" "$artifact_name" <<'PY'
+import json
+import os
+import pathlib
+import sys
+import urllib.parse
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+PREFIX = "[run-android-instrumentation-tests]"
+
+source = pathlib.Path(sys.argv[1]).resolve()
+artifact_name = sys.argv[2]
+runtime_url = os.environ.get("ACTIONS_RUNTIME_URL")
+runtime_token = os.environ.get("ACTIONS_RUNTIME_TOKEN")
+run_id = os.environ.get("GITHUB_RUN_ID")
+
+headers = {
+    "Authorization": f"Bearer {runtime_token}",
+    "Accept": "application/json;api-version=6.0-preview",
+    "Content-Type": "application/json",
+    "User-Agent": "codenameone-cn1ss-artifacts",
+}
+
+files = [p for p in source.rglob("*") if p.is_file()]
+if not files:
+    print(f"{PREFIX} Artifact upload aborted: no files under {source}", file=sys.stderr)
+    sys.exit(1)
+
+create_url = f"{runtime_url}_apis/pipelines/workflows/{run_id}/artifacts?api-version=6.0-preview"
+create_payload = json.dumps({"name": artifact_name}).encode("utf-8")
+
+try:
+    create_req = Request(create_url, data=create_payload, headers=headers, method="POST")
+    with urlopen(create_req) as resp:
+        container_info = json.load(resp)
+except HTTPError as exc:
+    print(f"{PREFIX} Artifact container create failed: {exc} (status={exc.code})", file=sys.stderr)
+    sys.exit(1)
+except URLError as exc:
+    print(f"{PREFIX} Artifact container create connection error: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+container_url = container_info.get("fileContainerResourceUrl")
+if not container_url:
+    print(f"{PREFIX} Artifact container missing upload URL", file=sys.stderr)
+    sys.exit(1)
+
+upload_headers = {
+    "Authorization": f"Bearer {runtime_token}",
+    "Content-Type": "application/octet-stream",
+    "User-Agent": "codenameone-cn1ss-artifacts",
+}
+
+total_bytes = 0
+uploaded = 0
+for path in files:
+    relative = path.relative_to(source).as_posix()
+    data = path.read_bytes()
+    upload_url = f"{container_url}?itemPath={urllib.parse.quote(relative)}"
+    try:
+        put_req = Request(upload_url, data=data, headers=upload_headers, method="PUT")
+        with urlopen(put_req) as resp:
+            resp.read()
+    except HTTPError as exc:
+        print(
+            f"{PREFIX} Artifact file upload failed for {relative}: {exc} (status={exc.code})",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except URLError as exc:
+        print(f"{PREFIX} Artifact file upload connection error for {relative}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    total_bytes += len(data)
+    uploaded += 1
+
+final_headers = {
+    "Authorization": f"Bearer {runtime_token}",
+    "Accept": "application/json;api-version=6.0-preview",
+    "Content-Type": "application/json",
+    "User-Agent": "codenameone-cn1ss-artifacts",
+}
+final_payload = json.dumps({"size": total_bytes}).encode("utf-8")
+final_url = f"{container_url}?api-version=6.0-preview"
+
+try:
+    finalize_req = Request(final_url, data=final_payload, headers=final_headers, method="PATCH")
+    with urlopen(finalize_req) as resp:
+        resp.read()
+except HTTPError as exc:
+    print(f"{PREFIX} Artifact finalize failed: {exc} (status={exc.code})", file=sys.stderr)
+    sys.exit(1)
+except URLError as exc:
+    print(f"{PREFIX} Artifact finalize connection error: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+print(
+    f"{PREFIX} Uploaded {uploaded} file(s) ({total_bytes} bytes) to artifact '{artifact_name}'",
+    flush=True,
+)
+PY
+  then
+    local rc=$?
+    ra_log "Artifact upload failed (python exited with $rc)"
+  else
+    ra_log "Artifact upload completed"
+  fi
+  return 0
+}
+
 post_pr_comment() {
   local body_file="${1:-}"
   if [ -z "$body_file" ] || [ ! -s "$body_file" ]; then
     ra_log "Skipping PR comment post (no content)."
     return 0
   fi
-  if [ -z "${GITHUB_TOKEN:-}" ]; then
-    ra_log "PR comment skipped (GITHUB_TOKEN not set)"
+  local comment_token="${GITHUB_TOKEN:-}"
+  if [ -z "$comment_token" ] && [ -n "${GH_TOKEN:-}" ]; then
+    comment_token="${GH_TOKEN}"
+    ra_log "PR comment auth using GH_TOKEN fallback"
+  fi
+  if [ -z "$comment_token" ]; then
+    ra_log "PR comment skipped (no GitHub token available)"
     return 0
   fi
   if [ -z "${GITHUB_EVENT_PATH:-}" ] || [ ! -f "$GITHUB_EVENT_PATH" ]; then
@@ -89,7 +225,7 @@ post_pr_comment() {
   local body_size
   body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
   ra_log "Attempting to post PR comment (payload bytes=${body_size})"
-  python3 - "$body_file" <<'PY'
+  GITHUB_TOKEN="$comment_token" python3 - "$body_file" <<'PY'
 import json
 import os
 import pathlib
@@ -647,5 +783,7 @@ for x in "${XMLS[@]}"; do
   cp -f "$x" "$ARTIFACTS_DIR/$(basename "$x")" 2>/dev/null || true
 done
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
+
+upload_actions_artifact "$ARTIFACTS_DIR" "android-instrumentation-screenshots"
 
 exit 0
