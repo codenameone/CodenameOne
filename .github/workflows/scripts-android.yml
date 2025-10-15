@@ -36,6 +36,8 @@ jobs:
           arch: x86_64
           target: google_apis
           script: |
+            export GITHUB_TOKEN="${{ github.token }}"
+            export GH_TOKEN="${{ github.token }}"
             ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       - name: Upload emulator screenshot
         if: always()   # still collect it if tests fail

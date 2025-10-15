@@ -93,7 +93,7 @@ upload_actions_artifact() {
 
   ra_log "STAGE:ARTIFACT_UPLOAD -> Publishing '$artifact_name' from $source_dir"
 
-  if ! python3 - "$source_dir" "$artifact_name" <<'PY'
+  python3 - "$source_dir" "$artifact_name" <<'PY'
 import json
 import os
 import pathlib
@@ -123,13 +123,21 @@ if not files:
     sys.exit(1)
 
 create_url = f"{runtime_url}_apis/pipelines/workflows/{run_id}/artifacts?api-version=6.0-preview"
-create_payload = json.dumps({"name": artifact_name}).encode("utf-8")
+create_payload = json.dumps({
+    "name": artifact_name,
+    "Name": artifact_name,
+    "type": "actions_storage",
+    "Type": "actions_storage",
+}).encode("utf-8")
 
 try:
     create_req = Request(create_url, data=create_payload, headers=headers, method="POST")
     with urlopen(create_req) as resp:
         container_info = json.load(resp)
 except HTTPError as exc:
+    body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
+    if body:
+        print(f"{PREFIX} Artifact container create response: {body}", file=sys.stderr)
     print(f"{PREFIX} Artifact container create failed: {exc} (status={exc.code})", file=sys.stderr)
     sys.exit(1)
 except URLError as exc:
@@ -152,12 +160,20 @@ uploaded = 0
 for path in files:
     relative = path.relative_to(source).as_posix()
     data = path.read_bytes()
-    upload_url = f"{container_url}?itemPath={urllib.parse.quote(relative)}"
+    upload_url = (
+        f"{container_url}?itemPath={urllib.parse.quote(relative)}&api-version=6.0-preview"
+    )
     try:
         put_req = Request(upload_url, data=data, headers=upload_headers, method="PUT")
         with urlopen(put_req) as resp:
             resp.read()
     except HTTPError as exc:
+        body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
+        if body:
+            print(
+                f"{PREFIX} Artifact file upload response for {relative}: {body}",
+                file=sys.stderr,
+            )
         print(
             f"{PREFIX} Artifact file upload failed for {relative}: {exc} (status={exc.code})",
             file=sys.stderr,
@@ -176,13 +192,18 @@ final_headers = {
     "User-Agent": "codenameone-cn1ss-artifacts",
 }
 final_payload = json.dumps({"size": total_bytes}).encode("utf-8")
-final_url = f"{container_url}?api-version=6.0-preview"
+final_url = (
+    f"{container_url}?artifactName={urllib.parse.quote(artifact_name)}&api-version=6.0-preview"
+)
 
 try:
     finalize_req = Request(final_url, data=final_payload, headers=final_headers, method="PATCH")
     with urlopen(finalize_req) as resp:
         resp.read()
 except HTTPError as exc:
+    body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
+    if body:
+        print(f"{PREFIX} Artifact finalize response: {body}", file=sys.stderr)
     print(f"{PREFIX} Artifact finalize failed: {exc} (status={exc.code})", file=sys.stderr)
     sys.exit(1)
 except URLError as exc:
@@ -194,13 +215,13 @@ print(
     flush=True,
 )
 PY
-  then
-    local rc=$?
+  local rc=$?
+  if [ $rc -ne 0 ]; then
     ra_log "Artifact upload failed (python exited with $rc)"
   else
     ra_log "Artifact upload completed"
   fi
-  return 0
+  return $rc
 }
 
 post_pr_comment() {
