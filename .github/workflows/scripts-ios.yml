@@ -39,7 +39,10 @@ jobs:
           derived_data="${tmpdir%/}/codenameone-derived"
           mkdir -p "$derived_data"
 
-          mapfile -d '' -t projects < <(find "$PWD" -type d -path '*/dist/*.xcodeproj' -print0)
+          projects=()
+          while IFS= read -r -d '' project; do
+            projects+=("$project")
+          done < <(find "$PWD" -type d -path '*/dist/*.xcodeproj' -print0)
 
           if [ "${#projects[@]}" -eq 0 ]; then
             echo "::notice::No generated Xcode project found under dist directories; skipping simulator build"
