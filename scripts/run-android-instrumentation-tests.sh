@@ -435,7 +435,7 @@ SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
 ra_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
-python3 <<'PY' "$COMPARE_JSON" "$COMMENT_FILE" "$SUMMARY_FILE"
+python3 - "$COMPARE_JSON" "$COMMENT_FILE" "$SUMMARY_FILE" <<'PY'
 import json
 import pathlib
 import sys
@@ -591,6 +591,18 @@ if comment_entries:
 else:
     comment_path.write_text("", encoding="utf-8")
 PY
+
+if [ -s "$SUMMARY_FILE" ]; then
+  ra_log "  -> Wrote summary entries to $SUMMARY_FILE ($(wc -l < "$SUMMARY_FILE" 2>/dev/null || echo 0) line(s))"
+else
+  ra_log "  -> No summary entries generated (all screenshots matched stored baselines)"
+fi
+
+if [ -s "$COMMENT_FILE" ]; then
+  ra_log "  -> Prepared PR comment payload at $COMMENT_FILE (bytes=$(wc -c < "$COMMENT_FILE" 2>/dev/null || echo 0))"
+else
+  ra_log "  -> No PR comment content produced"
+fi
 
 if [ -s "$SUMMARY_FILE" ]; then
   while IFS='|' read -r status test message copy_flag path preview_note; do
