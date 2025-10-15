@@ -53,8 +53,9 @@ jobs:
           done < <(find "$PWD" -type d -path '*/dist/*.xcodeproj' -print0)
 
           if [ "${#projects[@]}" -eq 0 ]; then
-            echo "::notice::No generated Xcode project found under dist directories; skipping simulator build"
-            exit 0
+            echo "::error::No generated Xcode project found under dist directories after build-ios-port.sh"
+            echo "Generated projects are required so CI can verify the Xcode output."
+            exit 1
           fi
 
           for project in "${projects[@]}"; do
