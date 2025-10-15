@@ -471,6 +471,45 @@ def _record_comment_payload(
     }
 
 
+def _load_external_preview_payload(
+    test_name: str, preview_dir: pathlib.Path
+) -> Optional[CommentPayload]:
+    slug = _slugify(test_name)
+    candidates = (
+        (preview_dir / f"{slug}.jpg", "image/jpeg", "jpeg"),
+        (preview_dir / f"{slug}.jpeg", "image/jpeg", "jpeg"),
+        (preview_dir / f"{slug}.png", "image/png", "png"),
+    )
+    for path, mime, codec in candidates:
+        if not path.exists():
+            continue
+        data = path.read_bytes()
+        encoded = base64.b64encode(data).decode("ascii")
+        note = "Preview provided by instrumentation"
+        if len(encoded) <= MAX_COMMENT_BASE64:
+            return CommentPayload(
+                base64=encoded,
+                base64_length=len(encoded),
+                mime=mime,
+                codec=codec,
+                quality=None,
+                omitted_reason=None,
+                note=note,
+                data=data,
+            )
+        return CommentPayload(
+            base64=None,
+            base64_length=len(encoded),
+            mime=mime,
+            codec=codec,
+            quality=None,
+            omitted_reason="too_large",
+            note=note,
+            data=data,
+        )
+    return None
+
+
 def _detect_cli_converters() -> List[Tuple[str, ...]]:
     """Return a list of available CLI converters (command tuples)."""
 
@@ -533,7 +572,11 @@ def build_results(
         elif not expected_path.exists():
             record.update({"status": "missing_expected"})
             if emit_base64:
-                payload = build_comment_payload(load_png(actual_path))
+                payload = None
+                if preview_dir is not None:
+                    payload = _load_external_preview_payload(test_name, preview_dir)
+                if payload is None:
+                    payload = build_comment_payload(load_png(actual_path))
                 _record_comment_payload(record, payload, actual_path.name, preview_dir)
         else:
             try:
@@ -548,7 +591,11 @@ def build_results(
                 else:
                     record.update({"status": "different", "details": outcome})
                     if emit_base64:
-                        payload = build_comment_payload(actual_img)
+                        payload = None
+                        if preview_dir is not None:
+                            payload = _load_external_preview_payload(test_name, preview_dir)
+                        if payload is None:
+                            payload = build_comment_payload(actual_img)
                         _record_comment_payload(record, payload, actual_path.name, preview_dir)
         results.append(record)
     return {"results": results}

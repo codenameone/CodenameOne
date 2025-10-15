@@ -14,6 +14,7 @@ CN1SS_TOOL=""
 count_chunks() {
   local f="${1:-}"
   local test="${2:-}"
+  local channel="${3:-}"
   if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
     echo 0
     return
@@ -26,12 +27,16 @@ count_chunks() {
   if [ -n "$test" ]; then
     args+=("--test" "$test")
   fi
+  if [ -n "$channel" ]; then
+    args+=("--channel" "$channel")
+  fi
   python3 "$CN1SS_TOOL" "${args[@]}" 2>/dev/null || echo 0
 }
 
 extract_cn1ss_base64() {
   local f="${1:-}"
   local test="${2:-}"
+  local channel="${3:-}"
   if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
     return 1
   fi
@@ -42,12 +47,16 @@ extract_cn1ss_base64() {
   if [ -n "$test" ]; then
     args+=("--test" "$test")
   fi
+  if [ -n "$channel" ]; then
+    args+=("--channel" "$channel")
+  fi
   python3 "$CN1SS_TOOL" "${args[@]}"
 }
 
-decode_cn1ss_png() {
+decode_cn1ss_binary() {
   local f="${1:-}"
   local test="${2:-}"
+  local channel="${3:-}"
   if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
     return 1
   fi
@@ -57,6 +66,9 @@ decode_cn1ss_png() {
   local args=("extract" "$f" "--decode")
   if [ -n "$test" ]; then
     args+=("--test" "$test")
+  fi
+  if [ -n "$channel" ]; then
+    args+=("--channel" "$channel")
   fi
   python3 "$CN1SS_TOOL" "${args[@]}"
 }
@@ -270,6 +282,8 @@ for name in attachment_names:
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json",
         "Content-Type": content_type,
+        "Content-Length": str(len(payload)),
+        "X-GitHub-Api-Version": "2022-11-28",
     }
     try:
         upload_req = Request(upload_url, data=payload, headers=upload_headers, method="POST")
@@ -346,19 +360,21 @@ PY
   return 0
 }
 
-decode_test_png() {
+decode_test_asset() {
   local test_name="${1:-}"
   local dest="${2:-}"
+  local channel="${3:-}"
+  local verifier="${4:-}"
   local source=""
   local count="0"
 
   if [ "${#XMLS[@]}" -gt 0 ]; then
     for x in "${XMLS[@]}"; do
-      count="$(count_chunks "$x" "$test_name")"; count="${count//[^0-9]/}"; : "${count:=0}"
+      count="$(count_chunks "$x" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
       [ "$count" -gt 0 ] || continue
       ra_log "Reassembling test '$test_name' from XML: $x (chunks=$count)"
-      if decode_cn1ss_png "$x" "$test_name" > "$dest" 2>/dev/null; then
-        if verify_png "$dest"; then source="XML:$(basename "$x")"; break; fi
+      if decode_cn1ss_binary "$x" "$test_name" "$channel" > "$dest" 2>/dev/null; then
+        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="XML:$(basename "$x")"; break; fi
       fi
     done
   fi
@@ -366,21 +382,21 @@ decode_test_png() {
   if [ -z "$source" ] && [ "${#LOGCAT_FILES[@]}" -gt 0 ]; then
     for logcat in "${LOGCAT_FILES[@]}"; do
       [ -s "$logcat" ] || continue
-      count="$(count_chunks "$logcat" "$test_name")"; count="${count//[^0-9]/}"; : "${count:=0}"
+      count="$(count_chunks "$logcat" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
       [ "$count" -gt 0 ] || continue
       ra_log "Reassembling test '$test_name' from logcat: $logcat (chunks=$count)"
-      if decode_cn1ss_png "$logcat" "$test_name" > "$dest" 2>/dev/null; then
-        if verify_png "$dest"; then source="LOGCAT:$(basename "$logcat")"; break; fi
+      if decode_cn1ss_binary "$logcat" "$test_name" "$channel" > "$dest" 2>/dev/null; then
+        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="LOGCAT:$(basename "$logcat")"; break; fi
       fi
     done
   fi
 
   if [ -z "$source" ] && [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
-    count="$(count_chunks "$TEST_EXEC_LOG" "$test_name")"; count="${count//[^0-9]/}"; : "${count:=0}"
+    count="$(count_chunks "$TEST_EXEC_LOG" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
     if [ "$count" -gt 0 ]; then
       ra_log "Reassembling test '$test_name' from test-results.log: $TEST_EXEC_LOG (chunks=$count)"
-      if decode_cn1ss_png "$TEST_EXEC_LOG" "$test_name" > "$dest" 2>/dev/null; then
-        if verify_png "$dest"; then source="EXECLOG:$(basename "$TEST_EXEC_LOG")"; fi
+      if decode_cn1ss_binary "$TEST_EXEC_LOG" "$test_name" "$channel" > "$dest" 2>/dev/null; then
+        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="EXECLOG:$(basename "$TEST_EXEC_LOG")"; fi
       fi
     fi
   fi
@@ -390,7 +406,16 @@ decode_test_png() {
     return 0
   fi
 
+  rm -f "$dest" 2>/dev/null || true
   return 1
+}
+
+decode_test_png() {
+  decode_test_asset "$1" "$2" "" verify_png
+}
+
+decode_test_preview() {
+  decode_test_asset "$1" "$2" "PREVIEW" verify_jpeg
 }
 
 # Verify PNG signature + non-zero size
@@ -398,6 +423,16 @@ verify_png() {
   local f="$1"
   [ -s "$f" ] || return 1
   head -c 8 "$f" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$'
+}
+
+verify_jpeg() {
+  local f="$1"
+  [ -s "$f" ] || return 1
+  local header
+  header="$(head -c 2 "$f" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
+  local trailer
+  trailer="$(tail -c 2 "$f" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
+  [ "$header" = "FFD8" ] && [ "$trailer" = "FFD9" ]
 }
 
 # ---- Args & environment ----------------------------------------------------
@@ -429,6 +464,7 @@ TEST_LOG="$ARTIFACTS_DIR/connectedAndroidTest.log"
 SCREENSHOT_REF_DIR="$SCRIPT_DIR/android/screenshots"
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1ss-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1ss-tmp")"
 ensure_dir "$SCREENSHOT_TMP_DIR"
+SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
 
 ra_log "Loading workspace environment from $ENV_FILE"
 [ -f "$ENV_FILE" ] || { ra_log "Missing env file: $ENV_FILE"; exit 3; }
@@ -567,6 +603,9 @@ ra_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 
 declare -A TEST_OUTPUTS=()
 declare -A TEST_SOURCES=()
+declare -A PREVIEW_OUTPUTS=()
+
+ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
@@ -574,6 +613,13 @@ for test in "${TEST_NAMES[@]}"; do
     TEST_OUTPUTS["$test"]="$dest"
     TEST_SOURCES["$test"]="$source_label"
     ra_log "Decoded screenshot for '$test' (source=${source_label}, size: $(stat -c '%s' "$dest") bytes)"
+    preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
+    if preview_source="$(decode_test_preview "$test" "$preview_dest")"; then
+      PREVIEW_OUTPUTS["$test"]="$preview_dest"
+      ra_log "Decoded preview for '$test' (source=${preview_source}, size: $(stat -c '%s' "$preview_dest") bytes)"
+    else
+      rm -f "$preview_dest" 2>/dev/null || true
+    fi
   else
     ra_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
     RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
@@ -613,7 +659,6 @@ for test in "${TEST_NAMES[@]}"; do
 done
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
-SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 ra_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
 python3 "$SCRIPT_DIR/android/tests/process_screenshots.py" \

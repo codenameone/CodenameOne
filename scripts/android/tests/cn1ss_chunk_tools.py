@@ -6,10 +6,17 @@ import sys
 from typing import Iterable, List, Optional, Tuple
 
 DEFAULT_TEST_NAME = "default"
-CHUNK_PATTERN = re.compile(r"CN1SS:(?:(?P<test>[A-Za-z0-9_.-]+):)?(?P<index>\d{6}):(.*)")
+DEFAULT_CHANNEL = ""
+CHUNK_PATTERN = re.compile(
+    r"CN1SS(?:(?P<channel>[A-Z]+))?:(?:(?P<test>[A-Za-z0-9_.-]+):)?(?P<index>\d{6}):(.*)"
+)
 
 
-def _iter_chunk_lines(path: pathlib.Path, test_filter: Optional[str] = None) -> Iterable[Tuple[str, int, str]]:
+def _iter_chunk_lines(
+    path: pathlib.Path,
+    test_filter: Optional[str] = None,
+    channel_filter: Optional[str] = DEFAULT_CHANNEL,
+) -> Iterable[Tuple[str, int, str]]:
     text = path.read_text(encoding="utf-8", errors="ignore")
     for line in text.splitlines():
         match = CHUNK_PATTERN.search(line)
@@ -18,23 +25,37 @@ def _iter_chunk_lines(path: pathlib.Path, test_filter: Optional[str] = None) -> 
         test_name = match.group("test") or DEFAULT_TEST_NAME
         if test_filter is not None and test_name != test_filter:
             continue
+        channel = match.group("channel") or DEFAULT_CHANNEL
+        if channel_filter is not None and channel != channel_filter:
+            continue
         index = int(match.group("index"))
         payload = re.sub(r"[^A-Za-z0-9+/=]", "", match.group(3))
         if payload:
             yield test_name, index, payload
 
 
-def count_chunks(path: pathlib.Path, test: Optional[str] = None) -> int:
-    return sum(1 for _ in _iter_chunk_lines(path, test_filter=test))
+def count_chunks(
+    path: pathlib.Path, test: Optional[str] = None, channel: Optional[str] = DEFAULT_CHANNEL
+) -> int:
+    return sum(1 for _ in _iter_chunk_lines(path, test_filter=test, channel_filter=channel))
 
 
-def concatenate_chunks(path: pathlib.Path, test: Optional[str] = None) -> str:
-    ordered = sorted(_iter_chunk_lines(path, test_filter=test), key=lambda item: item[1])
+def concatenate_chunks(
+    path: pathlib.Path, test: Optional[str] = None, channel: Optional[str] = DEFAULT_CHANNEL
+) -> str:
+    ordered = sorted(
+        _iter_chunk_lines(path, test_filter=test, channel_filter=channel),
+        key=lambda item: item[1],
+    )
     return "".join(payload for _, _, payload in ordered)
 
 
-def decode_chunks(path: pathlib.Path, test: Optional[str] = None) -> bytes:
-    data = concatenate_chunks(path, test=test)
+def decode_chunks(
+    path: pathlib.Path,
+    test: Optional[str] = None,
+    channel: Optional[str] = DEFAULT_CHANNEL,
+) -> bytes:
+    data = concatenate_chunks(path, test=test, channel=channel)
     if not data:
         return b""
     try:
@@ -44,7 +65,10 @@ def decode_chunks(path: pathlib.Path, test: Optional[str] = None) -> bytes:
 
 
 def list_tests(path: pathlib.Path) -> List[str]:
-    seen = {test for test, _, _ in _iter_chunk_lines(path)}
+    seen = {
+        test
+        for test, _, _ in _iter_chunk_lines(path, channel_filter=DEFAULT_CHANNEL)
+    }
     return sorted(seen)
 
 
@@ -55,11 +79,23 @@ def main(argv: List[str] | None = None) -> int:
     p_count = subparsers.add_parser("count", help="Count CN1SS chunks in a file")
     p_count.add_argument("path", type=pathlib.Path)
     p_count.add_argument("--test", dest="test", default=None, help="Optional test name filter")
+    p_count.add_argument(
+        "--channel",
+        dest="channel",
+        default=DEFAULT_CHANNEL,
+        help="Optional channel (default=primary)",
+    )
 
     p_extract = subparsers.add_parser("extract", help="Concatenate CN1SS payload chunks")
     p_extract.add_argument("path", type=pathlib.Path)
     p_extract.add_argument("--decode", action="store_true", help="Decode payload to binary PNG")
     p_extract.add_argument("--test", dest="test", default=None, help="Test name to extract (default=unnamed)")
+    p_extract.add_argument(
+        "--channel",
+        dest="channel",
+        default=DEFAULT_CHANNEL,
+        help="Optional channel (default=primary)",
+    )
 
     p_tests = subparsers.add_parser("tests", help="List distinct test names found in CN1SS chunks")
     p_tests.add_argument("path", type=pathlib.Path)
@@ -67,7 +103,7 @@ def main(argv: List[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "count":
-        print(count_chunks(args.path, args.test))
+        print(count_chunks(args.path, args.test, args.channel))
         return 0
 
     if args.command == "extract":
@@ -77,9 +113,9 @@ def main(argv: List[str] | None = None) -> int:
         else:
             target_test = args.test
         if args.decode:
-            sys.stdout.buffer.write(decode_chunks(args.path, target_test))
+            sys.stdout.buffer.write(decode_chunks(args.path, target_test, args.channel))
         else:
-            sys.stdout.write(concatenate_chunks(args.path, target_test))
+            sys.stdout.write(concatenate_chunks(args.path, target_test, args.channel))
         return 0
 
     if args.command == "tests":

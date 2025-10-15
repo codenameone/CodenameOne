@@ -13,10 +13,13 @@ import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.codename1.ui.Container;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 
 import org.junit.Assert;
 import org.junit.Assume;
@@ -32,6 +35,9 @@ import java.util.concurrent.TimeUnit;
 public class HelloCodenameOneInstrumentedTest {
 
     private static final int CHUNK_SIZE = 2000;
+    private static final String PREVIEW_CHANNEL = "PREVIEW";
+    private static final int[] PREVIEW_JPEG_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 15, 10};
+    private static final int MAX_PREVIEW_BYTES = 600 * 1024; // 600 KiB target for comment previews
     private static final String MAIN_SCREEN_TEST = "MainActivity";
     private static final String BROWSER_TEST = "BrowserComponent";
 
@@ -61,8 +67,21 @@ public class HelloCodenameOneInstrumentedTest {
         return ActivityScenario.launch(launch);
     }
 
-    private static byte[] captureScreenshot(ActivityScenario<Activity> scenario, String testName) {
-        final byte[][] holder = new byte[1][];
+    private static final class ScreenshotCapture {
+        final byte[] png;
+        final byte[] previewJpeg;
+        final int previewQuality;
+
+        ScreenshotCapture(byte[] png, byte[] previewJpeg, int previewQuality) {
+            this.png = png;
+            this.previewJpeg = previewJpeg;
+            this.previewQuality = previewQuality;
+        }
+    }
+
+    private static ScreenshotCapture captureScreenshot(ActivityScenario<Activity> scenario, String testName) {
+        final byte[][] holder = new byte[2][];
+        final int[] qualityHolder = new int[1];
         scenario.onActivity(activity -> {
             try {
                 View root = activity.getWindow().getDecorView().getRootView();
@@ -85,41 +104,106 @@ public class HelloCodenameOneInstrumentedTest {
                 Canvas c = new Canvas(bmp);
                 root.draw(c);
 
-                ByteArrayOutputStream baos = new ByteArrayOutputStream(Math.max(1024, w * h / 2));
-                if (!bmp.compress(Bitmap.CompressFormat.PNG, 100, baos)) {
+                ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, w * h / 2));
+                if (!bmp.compress(Bitmap.CompressFormat.PNG, 100, pngOut)) {
                     throw new RuntimeException("Bitmap.compress returned false");
                 }
-                holder[0] = baos.toByteArray();
-                println("CN1SS:INFO:test=" + testName + " png_bytes=" + holder[0].length);
+                holder[0] = pngOut.toByteArray();
+                println(
+                        "CN1SS:INFO:test="
+                                + testName
+                                + " png_bytes="
+                                + holder[0].length);
+
+                int chosenQuality = 0;
+                byte[] chosenPreview = null;
+                int smallestBytes = Integer.MAX_VALUE;
+
+                for (int quality : PREVIEW_JPEG_QUALITIES) {
+                    ByteArrayOutputStream jpegOut = new ByteArrayOutputStream(Math.max(1024, w * h / 2));
+                    if (!bmp.compress(Bitmap.CompressFormat.JPEG, quality, jpegOut)) {
+                        continue;
+                    }
+                    byte[] jpegBytes = jpegOut.toByteArray();
+                    int length = jpegBytes.length;
+                    if (length < smallestBytes) {
+                        smallestBytes = length;
+                        chosenQuality = quality;
+                        chosenPreview = jpegBytes;
+                    }
+                    if (length <= MAX_PREVIEW_BYTES) {
+                        break;
+                    }
+                }
+
+                holder[1] = chosenPreview;
+                qualityHolder[0] = chosenQuality;
+                if (chosenPreview != null) {
+                    println(
+                            "CN1SS:INFO:test="
+                                    + testName
+                                    + " preview_jpeg_bytes="
+                                    + chosenPreview.length
+                                    + " preview_quality="
+                                    + chosenQuality);
+                } else {
+                    println("CN1SS:INFO:test=" + testName + " preview_jpeg_bytes=0 preview_quality=0");
+                }
+                bmp.recycle();
             } catch (Throwable t) {
                 println("CN1SS:ERR:test=" + testName + " " + t);
                 t.printStackTrace(System.out);
             }
         });
-        return holder[0];
+        if (holder[0] == null) {
+            return new ScreenshotCapture(null, null, 0);
+        }
+        return new ScreenshotCapture(holder[0], holder[1], qualityHolder[0]);
     }
 
     private static String sanitizeTestName(String testName) {
         return testName.replaceAll("[^A-Za-z0-9_.-]", "_");
     }
 
-    private static void emitScreenshot(byte[] pngBytes, String testName) {
-        String safeName = sanitizeTestName(testName);
-        if (pngBytes == null || pngBytes.length == 0) {
-            println("CN1SS:END:" + safeName);
+    private static void emitScreenshot(ScreenshotCapture capture, String testName) {
+        if (capture == null || capture.png == null || capture.png.length == 0) {
+            println("CN1SS:END:" + sanitizeTestName(testName));
             Assert.fail("Screenshot capture produced 0 bytes for " + testName);
             return;
         }
-        String b64 = Base64.encodeToString(pngBytes, Base64.NO_WRAP);
+        emitScreenshotChannel(capture.png, testName, "");
+        if (capture.previewJpeg != null && capture.previewJpeg.length > 0) {
+            emitScreenshotChannel(capture.previewJpeg, testName, PREVIEW_CHANNEL);
+        }
+    }
+
+    private static void emitScreenshotChannel(byte[] bytes, String testName, String channel) {
+        String safeName = sanitizeTestName(testName);
+        String prefix = "CN1SS";
+        if (channel != null && channel.length() > 0) {
+            prefix += channel;
+        }
+        if (bytes == null || bytes.length == 0) {
+            println(prefix + ":END:" + safeName);
+            return;
+        }
+        String b64 = Base64.encodeToString(bytes, Base64.NO_WRAP);
         int count = 0;
         for (int pos = 0; pos < b64.length(); pos += CHUNK_SIZE) {
             int end = Math.min(pos + CHUNK_SIZE, b64.length());
             String chunk = b64.substring(pos, end);
-            System.out.println("CN1SS:" + safeName + ":" + String.format(Locale.US, "%06d", pos) + ":" + chunk);
+            System.out.println(
+                    prefix
+                            + ":"
+                            + safeName
+                            + ":"
+                            + String.format(Locale.US, "%06d", pos)
+                            + ":"
+                            + chunk);
             count++;
         }
         println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + b64.length());
-        System.out.println("CN1SS:END:" + safeName);
+        System.out.println(prefix + ":END:" + safeName);
         System.out.flush();
     }
 
@@ -172,33 +256,77 @@ public class HelloCodenameOneInstrumentedTest {
         }
     }
 
+    private static void prepareMainActivityContent(ActivityScenario<Activity> scenario) throws InterruptedException {
+        final CountDownLatch latch = new CountDownLatch(1);
+        scenario.onActivity(activity -> Display.getInstance().callSerially(() -> {
+            try {
+                Form current = Display.getInstance().getCurrent();
+                if (current == null) {
+                    current = new Form("Main Screen", new BorderLayout());
+                    current.show();
+                } else {
+                    current.setLayout(new BorderLayout());
+                    current.setTitle("Main Screen");
+                    current.removeAll();
+                }
+
+                Container content = new Container(BoxLayout.y());
+                content.getAllStyles().setBgColor(0x1f2937);
+                content.getAllStyles().setBgTransparency(255);
+                content.getAllStyles().setPadding(6, 6, 6, 6);
+                content.getAllStyles().setFgColor(0xf9fafb);
+
+                Label heading = new Label("Hello Codename One");
+                heading.getAllStyles().setFgColor(0x38bdf8);
+                heading.getAllStyles().setMargin(0, 4, 0, 0);
+
+                Label body = new Label("Instrumentation main activity preview");
+                body.getAllStyles().setFgColor(0xf9fafb);
+
+                content.add(heading);
+                content.add(body);
+
+                current.add(BorderLayout.CENTER, content);
+                current.revalidate();
+            } finally {
+                latch.countDown();
+            }
+        }));
+
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            Assert.fail("Timed out preparing main activity content");
+        }
+    }
+
     @Test
     public void testUseAppContext_andEmitScreenshot() throws Exception {
         Context ctx = ApplicationProvider.getApplicationContext();
         String pkg = "@PACKAGE@";
         Assert.assertEquals("Package mismatch", pkg, ctx.getPackageName());
 
-        byte[] pngBytes;
+        ScreenshotCapture capture;
         try (ActivityScenario<Activity> scenario = launchMainActivity(ctx)) {
             settle(750);
-            pngBytes = captureScreenshot(scenario, MAIN_SCREEN_TEST);
+            prepareMainActivityContent(scenario);
+            settle(500);
+            capture = captureScreenshot(scenario, MAIN_SCREEN_TEST);
         }
 
-        emitScreenshot(pngBytes, MAIN_SCREEN_TEST);
+        emitScreenshot(capture, MAIN_SCREEN_TEST);
     }
 
     @Test
     public void testBrowserComponentScreenshot() throws Exception {
         Context ctx = ApplicationProvider.getApplicationContext();
-        byte[] pngBytes;
+        ScreenshotCapture capture;
 
         try (ActivityScenario<Activity> scenario = launchMainActivity(ctx)) {
             settle(750);
             prepareBrowserComponentContent(scenario);
             settle(500);
-            pngBytes = captureScreenshot(scenario, BROWSER_TEST);
+            capture = captureScreenshot(scenario, BROWSER_TEST);
         }
 
-        emitScreenshot(pngBytes, BROWSER_TEST);
+        emitScreenshot(capture, BROWSER_TEST);
     }
 }
