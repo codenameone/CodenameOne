@@ -103,7 +103,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 PREFIX = "[run-android-instrumentation-tests]"
-API_VERSION = "7.1-preview"
+API_VERSION = "6.0"
 ARTIFACT_VERSION = "4"
 
 source = pathlib.Path(sys.argv[1]).resolve()
