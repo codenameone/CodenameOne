@@ -29,3 +29,34 @@ jobs:
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
         timeout-minutes: 15
+
+      - name: Compile generated Xcode project for Simulator
+        run: |
+          set -euo pipefail
+
+          tmpdir="${TMPDIR:-/tmp}"
+          derived_data="${tmpdir%/}/codenameone-derived"
+          mkdir -p "$derived_data"
+
+          built_any=0
+          while IFS= read -r -d '' project; do
+            built_any=1
+            scheme="$(basename "$project" .xcodeproj)"
+            echo "::group::Building $scheme from $project"
+            xcodebuild \
+              -project "$project" \
+              -scheme "$scheme" \
+              -sdk iphonesimulator \
+              -configuration Debug \
+              -destination 'generic/platform=iOS Simulator' \
+              -derivedDataPath "$derived_data" \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+              build
+            echo "::endgroup::"
+          done < <(find "$PWD" -type d -path '*/dist/*.xcodeproj' -print0)
+
+          if [ "$built_any" -eq 0 ]; then
+            echo "::error::No generated Xcode project found under dist directories" >&2
+            find "$PWD" -maxdepth 6 -type d -name '*.xcodeproj'
+            exit 1
+          fi
