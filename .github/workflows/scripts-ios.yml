@@ -22,6 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Ensure CocoaPods tooling
+        run: |
+          set -euo pipefail
+          if ! command -v pod >/dev/null 2>&1; then
+            sudo gem install cocoapods --no-document
+          fi
+          if ! ruby -rrubygems -e "exit(Gem::Specification::find_all_by_name('xcodeproj').empty? ? 1 : 0)"; then
+            sudo gem install xcodeproj --no-document
+          fi
+          pod --version
+
       - name: Restore cn1-binaries cache
         uses: actions/cache@v4
         with:
@@ -39,37 +50,7 @@ jobs:
         run: ./scripts/build-ios-port.sh -q -DskipTests
         timeout-minutes: 15
 
-      - name: Compile generated Xcode project for Simulator
-        run: |
-          set -euo pipefail
-
-          tmpdir="${TMPDIR:-/tmp}"
-          derived_data="${tmpdir%/}/codenameone-derived"
-          mkdir -p "$derived_data"
-
-          projects=()
-          while IFS= read -r -d '' project; do
-            projects+=("$project")
-          done < <(find "$PWD" -type d -path '*/dist/*.xcodeproj' -print0)
-
-          if [ "${#projects[@]}" -eq 0 ]; then
-            echo "::error::No generated Xcode project found under dist directories after build-ios-port.sh"
-            echo "Generated projects are required so CI can verify the Xcode output."
-            exit 1
-          fi
-
-          for project in "${projects[@]}"; do
-            scheme="$(basename "$project" .xcodeproj)"
-            echo "::group::Building $scheme from $project"
-            xcodebuild \
-              -project "$project" \
-              -scheme "$scheme" \
-              -sdk iphonesimulator \
-              -configuration Debug \
-              -destination 'generic/platform=iOS Simulator' \
-              -derivedDataPath "$derived_data" \
-              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-              build
-            echo "::endgroup::"
-          done
+      - name: Build sample iOS app and compile workspace
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 20
 
