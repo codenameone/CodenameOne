@@ -22,6 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v4
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
         # per-step timeout

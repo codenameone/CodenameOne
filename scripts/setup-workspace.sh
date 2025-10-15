@@ -21,9 +21,9 @@ DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$DOWNLOAD_DIR"
 mkdir -p "$ENV_DIR"
-mkdir -p ../cn1-binaries
-CN1_BINARIES="$(cd ../cn1-binaries && pwd -P)"
-rm -Rf ../cn1-binaries
+CN1_BINARIES_PARENT="$(cd .. && pwd -P)"
+CN1_BINARIES="${CN1_BINARIES_PARENT%/}/cn1-binaries"
+mkdir -p "$CN1_BINARIES_PARENT"
 
 ENV_FILE="$ENV_DIR/env.sh"
 
@@ -182,9 +182,48 @@ log "Maven version:"; "$MAVEN_HOME/bin/mvn" -version
 
 PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
-log "Cloning cn1-binaries"
-rm -Rf "$CN1_BINARIES"
-git clone https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
+log "Preparing cn1-binaries checkout"
+if [ -d "$CN1_BINARIES/.git" ]; then
+  log "Found existing cn1-binaries repository at $CN1_BINARIES"
+  if git -C "$CN1_BINARIES" remote get-url origin >/dev/null 2>&1; then
+    if git -C "$CN1_BINARIES" fetch --depth=1 origin; then
+      remote_head=$(git -C "$CN1_BINARIES" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+      if [ -z "$remote_head" ]; then
+        current_branch=$(git -C "$CN1_BINARIES" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+        if [ -n "$current_branch" ] && [ "$current_branch" != "HEAD" ]; then
+          remote_head="origin/$current_branch"
+        else
+          remote_head="origin/master"
+        fi
+      fi
+      if ! git -C "$CN1_BINARIES" rev-parse --verify "$remote_head" >/dev/null 2>&1; then
+        if git -C "$CN1_BINARIES" rev-parse --verify origin/main >/dev/null 2>&1; then
+          remote_head="origin/main"
+        elif git -C "$CN1_BINARIES" rev-parse --verify origin/master >/dev/null 2>&1; then
+          remote_head="origin/master"
+        else
+          log "Unable to determine remote head for cached cn1-binaries; removing checkout"
+          rm -rf "$CN1_BINARIES"
+        fi
+      fi
+      if [ -d "$CN1_BINARIES/.git" ]; then
+        log "Updating cn1-binaries to $remote_head"
+        git -C "$CN1_BINARIES" reset --hard "$remote_head"
+      fi
+    else
+      log "Failed to fetch updates for cached cn1-binaries; removing checkout"
+      rm -rf "$CN1_BINARIES"
+    fi
+  else
+    log "Cached cn1-binaries checkout missing origin remote; removing"
+    rm -rf "$CN1_BINARIES"
+  fi
+fi
+
+if [ ! -d "$CN1_BINARIES/.git" ]; then
+  log "Cloning cn1-binaries"
+  git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
+fi
 
 log "Building Codename One core modules"
 "$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android install "$@"
