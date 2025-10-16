@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/**'
+      - '.github/workflows/scripts-ios.yml'
       - 'BUILDING.md'
   push:
     branches: [ master ]
@@ -13,7 +14,7 @@ on:
 jobs:
   build-ios:
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
-    timeout-minutes: 25         # hard-stop the job after 25 minutes
+    timeout-minutes: 60         # allow enough time for dependency installs and full build
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci
       cancel-in-progress: false # queue new ones instead of canceling in-flight
@@ -21,11 +22,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Ensure CocoaPods tooling
+        run: |
+          set -euo pipefail
+          if ! command -v pod >/dev/null 2>&1; then
+            sudo gem install cocoapods --no-document
+          fi
+          if ! ruby -rrubygems -e "exit(Gem::Specification::find_all_by_name('xcodeproj').empty? ? 1 : 0)"; then
+            sudo gem install xcodeproj --no-document
+          fi
+          pod --version
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v4
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
         # per-step timeout
-        timeout-minutes: 15
+        timeout-minutes: 25
 
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
-        timeout-minutes: 15
+        timeout-minutes: 25
+
+      - name: Build sample iOS app and compile workspace
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
