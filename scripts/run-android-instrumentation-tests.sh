@@ -115,8 +115,11 @@ post_pr_comment() {
 import json
 import os
 import pathlib
+import re
+import shutil
+import subprocess
 import sys
-from typing import Dict, Optional
+from typing import Dict, List, Match, Optional
 from urllib.request import Request, urlopen
 
 MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
@@ -148,7 +151,112 @@ def next_link(header: Optional[str]) -> Optional[str]:
     return None
 
 
+def publish_previews_to_branch(
+    preview_dir: Optional[pathlib.Path],
+    repo: str,
+    pr_number: int,
+    token: Optional[str],
+    allow_push: bool,
+) -> Dict[str, str]:
+    """Publish preview images to the cn1ss-previews branch and return name->URL."""
+
+    if not preview_dir or not preview_dir.exists():
+        return {}
+    image_files = [
+        path
+        for path in sorted(preview_dir.iterdir())
+        if path.is_file() and path.suffix.lower() in {".jpg", ".jpeg", ".png"}
+    ]
+    if not image_files:
+        return {}
+    if not allow_push:
+        print(
+            "[run-android-instrumentation-tests] Preview publishing skipped for forked PR",  # noqa: E501
+            file=sys.stdout,
+        )
+        return {}
+    if not repo or not token:
+        return {}
+
+    workspace = pathlib.Path(os.environ.get("GITHUB_WORKSPACE", ".")).resolve()
+    worktree = workspace / f".cn1ss-previews-pr-{pr_number}"
+    if worktree.exists():
+        shutil.rmtree(worktree)
+    worktree.mkdir(parents=True, exist_ok=True)
+
+    try:
+        env = os.environ.copy()
+        env.setdefault("GIT_TERMINAL_PROMPT", "0")
+
+        def run_git(args, check: bool = True):
+            result = subprocess.run(
+                ["git", *args],
+                cwd=worktree,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            if check and result.returncode != 0:
+                raise RuntimeError(
+                    f"git {' '.join(args)} failed: {result.stderr.strip() or result.stdout.strip()}"
+                )
+            return result
+
+        run_git(["init"])
+        run_git(["config", "user.name", os.environ.get("GITHUB_ACTOR", "github-actions") or "github-actions"])
+        run_git(["config", "user.email", "github-actions@users.noreply.github.com"])
+        remote_url = f"https://x-access-token:{token}@github.com/{repo}.git"
+        run_git(["remote", "add", "origin", remote_url])
+
+        has_branch = run_git(["ls-remote", "--heads", "origin", "cn1ss-previews"], check=False)
+        if has_branch.returncode == 0 and has_branch.stdout.strip():
+            run_git(["fetch", "origin", "cn1ss-previews"])
+            run_git(["checkout", "cn1ss-previews"])
+        else:
+            run_git(["checkout", "--orphan", "cn1ss-previews"])
+
+        dest = worktree / f"pr-{pr_number}"
+        if dest.exists():
+            shutil.rmtree(dest)
+        dest.mkdir(parents=True, exist_ok=True)
+
+        for source in image_files:
+            shutil.copy2(source, dest / source.name)
+
+        run_git(["add", "-A", "."])
+        status = run_git(["status", "--porcelain"])
+        if status.stdout.strip():
+            run_git(["commit", "-m", f"Add previews for PR #{pr_number}"])
+            push = run_git(["push", "origin", "HEAD:cn1ss-previews"], check=False)
+            if push.returncode != 0:
+                raise RuntimeError(f"git push failed: {push.stderr.strip() or push.stdout.strip()}")
+            print(
+                f"[run-android-instrumentation-tests] Published {len(image_files)} preview(s) to cn1ss-previews/pr-{pr_number}",
+                file=sys.stdout,
+            )
+        else:
+            print(
+                f"[run-android-instrumentation-tests] Preview branch already up-to-date for PR #{pr_number}",
+                file=sys.stdout,
+            )
+
+        raw_base = f"https://raw.githubusercontent.com/{repo}/cn1ss-previews/pr-{pr_number}"
+        urls: Dict[str, str] = {}
+        if dest.exists():
+            for file in sorted(dest.iterdir()):
+                if file.is_file():
+                    urls[file.name] = f"{raw_base}/{file.name}"
+        return urls
+    finally:
+        shutil.rmtree(worktree, ignore_errors=True)
+
+
 body_path = pathlib.Path(sys.argv[1])
+preview_dir_arg: Optional[pathlib.Path] = None
+if len(sys.argv) > 2:
+    candidate = pathlib.Path(sys.argv[2])
+    if candidate.exists():
+        preview_dir_arg = candidate
 raw_body = body_path.read_text(encoding="utf-8")
 body = raw_body.strip()
 if not body:
@@ -178,6 +286,15 @@ headers = {
     "Accept": "application/vnd.github+json",
     "Content-Type": "application/json",
 }
+
+pr_data = event.get("pull_request")
+is_fork_pr = False
+if isinstance(pr_data, dict):
+    head = pr_data.get("head")
+    if isinstance(head, dict):
+        head_repo = head.get("repo")
+        if isinstance(head_repo, dict):
+            is_fork_pr = bool(head_repo.get("fork"))
 
 comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments?per_page=100"
 existing_comment: Optional[Dict[str, object]] = None
@@ -228,7 +345,59 @@ else:
 if comment_id is None:
     sys.exit(1)
 
-final_body = body
+attachment_pattern = re.compile(r"\(attachment:([^)]+)\)")
+attachment_urls: Dict[str, str] = {}
+missing_previews: List[str] = []
+if attachment_pattern.search(body):
+    try:
+        attachment_urls = publish_previews_to_branch(
+            preview_dir_arg,
+            repo,
+            pr_number,
+            token,
+            allow_push=not is_fork_pr,
+        )
+        if attachment_urls:
+            for name, url in attachment_urls.items():
+                print(
+                    f"[run-android-instrumentation-tests] Preview available for {name}: {url}",
+                    file=sys.stdout,
+                )
+    except Exception as exc:
+        print(
+            f"[run-android-instrumentation-tests] Preview publishing failed: {exc}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def replace_attachment(match: re.Match[str]) -> str:
+    name = match.group(1)
+    url = attachment_urls.get(name)
+    if url:
+        return f"({url})"
+    print(
+        f"[run-android-instrumentation-tests] Preview URL missing for {name}; leaving placeholder",
+        file=sys.stdout,
+    )
+    missing_previews.append(name)
+    return "(#)"
+
+
+final_body = attachment_pattern.sub(replace_attachment, body)
+
+if missing_previews:
+    if is_fork_pr:
+        print(
+            "[run-android-instrumentation-tests] Preview URLs unavailable in forked PR context; placeholders left as-is",
+            file=sys.stdout,
+        )
+    else:
+        print(
+            f"[run-android-instrumentation-tests] Failed to resolve preview URLs for: {', '.join(sorted(set(missing_previews)))}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 update_payload = json.dumps({"body": final_body}).encode("utf-8")
 update_req = Request(
@@ -704,76 +873,39 @@ summary_path.write_text("\n".join(summary_lines) + ("\n" if summary_lines else "
 
 if comment_entries:
     lines = ["### Android screenshot updates", ""]
-    max_comment_bytes = 63000
-    comment_len = sum(len(line) + 1 for line in lines)
-    comment_len_box = [comment_len]
 
     def add_line(text: str = "") -> None:
         lines.append(text)
-        comment_len_box[0] += len(text) + 1
 
     for entry in comment_entries:
         entry_header = f"- **{entry['test']}** — {entry['status']}. {entry['message']}"
         add_line(entry_header)
-        base64_data = entry.get("base64")
         preview_name = entry.get("preview_name")
         preview_quality = entry.get("preview_quality")
         preview_note = entry.get("preview_note")
         base64_note = entry.get("base64_note")
         preview_mime = entry.get("preview_mime")
 
-        inline_budget_exceeded = False
+        preview_notes = []
+        if preview_mime == "image/jpeg" and preview_quality:
+            preview_notes.append(f"JPEG preview quality {preview_quality}")
+        if preview_note:
+            preview_notes.append(preview_note)
+        if base64_note and base64_note != preview_note:
+            preview_notes.append(base64_note)
 
-        if base64_data:
-            mime = entry.get("base64_mime") or "image/png"
-            inline_notes = []
-            codec = entry.get("base64_codec")
-            quality = entry.get("base64_quality") or preview_quality
-            if codec == "jpeg" and quality:
-                inline_notes.append(f"JPEG preview quality {quality}")
-            elif preview_mime == "image/jpeg" and preview_quality:
-                inline_notes.append(f"JPEG preview quality {preview_quality}")
-            if preview_note:
-                inline_notes.append(preview_note)
-            if base64_note and base64_note != preview_note:
-                inline_notes.append(base64_note)
-            preview_lines = [
-                "",
-                f"  ![{entry['test']}](data:{mime};base64,{base64_data})",
-            ]
-            if inline_notes:
-                preview_lines.append(f"  _Preview info: {'; '.join(inline_notes)}._")
-            projected_len = comment_len_box[0] + sum(len(line) + 1 for line in preview_lines)
-            if projected_len <= max_comment_bytes:
-                for line in preview_lines:
-                    add_line(line)
-                continue
-            base64_data = None
-            inline_budget_exceeded = True
-        else:
-            inline_notes = []
-
-        if base64_data is None and preview_name:
-            preview_notes = []
-            if preview_mime == "image/jpeg" and preview_quality:
-                preview_notes.append(f"JPEG preview quality {preview_quality}")
-            if preview_note:
-                preview_notes.append(preview_note)
-            if base64_note and base64_note != preview_note:
-                preview_notes.append(base64_note)
-            if inline_budget_exceeded:
-                preview_notes.append("Inline preview omitted to satisfy GitHub comment limits")
+        if preview_name:
             add_line("")
-            add_line("  _Preview omitted from comment; see workflow artifacts for JPEG preview._")
+            add_line(f"  ![{entry['test']}](attachment:{preview_name})")
             if preview_notes:
                 add_line(f"  _Preview info: {'; '.join(preview_notes)}._")
-        elif base64_data:
-            # Fallback if the preview lines exceeded the comment size limit after adjustments
-            mime = entry.get("base64_mime") or "image/png"
+        elif entry.get("base64"):
             add_line("")
-            add_line(f"  ![{entry['test']}](data:{mime};base64,{base64_data})")
-            if inline_notes:
-                add_line(f"  _Preview info: {'; '.join(inline_notes)}._")
+            add_line(
+                "  _Preview generated but could not be published; see workflow artifacts for JPEG preview._"
+            )
+            if preview_notes:
+                add_line(f"  _Preview info: {'; '.join(preview_notes)}._")
         elif entry.get("base64_omitted") == "too_large":
             size_note = ""
             if entry.get("base64_length"):
@@ -795,6 +927,9 @@ if comment_entries:
                 + size_note
                 + "." + tail + "_"
             )
+        else:
+            add_line("")
+            add_line("  _No preview available for this screenshot._")
         artifact_name = entry.get("artifact_name")
         if artifact_name:
             add_line(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
