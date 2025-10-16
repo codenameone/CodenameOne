@@ -20,8 +20,8 @@ jobs:
       issues: write
     runs-on: ubuntu-latest
     env:
-      GITHUB_TOKEN: ${{ github.token }}
-      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Pillow for image processing
