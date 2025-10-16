@@ -8,7 +8,7 @@ from typing import Iterable, List, Optional, Tuple
 DEFAULT_TEST_NAME = "default"
 DEFAULT_CHANNEL = ""
 CHUNK_PATTERN = re.compile(
-    r"CN1SS(?:(?P<channel>[A-Z]+))?:(?:(?P<test>[A-Za-z0-9_.-]+):)?(?P<index>\d{6}):(.*)"
+    r"CN1SS(?:(?P<channel>[A-Z]+))?:(?:(?P<test>[A-Za-z0-9_.-]+):)?(?P<index>\d{6}):(?P<payload>.*)"
 )
 
 
@@ -29,7 +29,7 @@ def _iter_chunk_lines(
         if channel_filter is not None and channel != channel_filter:
             continue
         index = int(match.group("index"))
-        payload = re.sub(r"[^A-Za-z0-9+/=]", "", match.group(3))
+        payload = re.sub(r"[^A-Za-z0-9+/=]", "", match.group("payload"))
         if payload:
             yield test_name, index, payload
 
