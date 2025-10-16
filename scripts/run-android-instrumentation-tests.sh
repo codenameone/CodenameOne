@@ -304,15 +304,15 @@ for name in attachment_names:
             print(error_body, file=sys.stderr)
         continue
     url = (
-        upload_info.get("url")
-        or upload_info.get("download_url")
+        upload_info.get("download_url")
         or upload_info.get("browser_download_url")
         or upload_info.get("html_url")
+        or upload_info.get("url")
     )
     if url:
         attachment_urls[name] = url
         print(
-            f"[run-android-instrumentation-tests] Uploaded preview attachment '{name}'",
+            f"[run-android-instrumentation-tests] Uploaded preview attachment '{name}' -> {url}",
             file=sys.stdout,
         )
     else:
