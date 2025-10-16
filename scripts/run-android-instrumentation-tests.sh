@@ -259,19 +259,19 @@ attachment_names = attachment_pattern.findall(body)
 
 attachment_urls: Dict[str, str] = {}
 failed_uploads = []
-had_upload_failures = False
+failure_state = {"value": False}
 
 for name in attachment_names:
     if name in attachment_urls or name in failed_uploads:
         continue
     if not preview_dir:
         failed_uploads.append(name)
-        had_upload_failures = True
+        failure_state["value"] = True
         continue
     file_path = preview_dir / name
     if not file_path.exists():
         failed_uploads.append(name)
-        had_upload_failures = True
+        failure_state["value"] = True
         continue
     data = file_path.read_bytes()
     upload_url = (
@@ -294,7 +294,7 @@ for name in attachment_names:
             upload_info = json.load(resp)
     except HTTPError as exc:
         failed_uploads.append(name)
-        had_upload_failures = True
+        failure_state["value"] = True
         error_body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
         print(
             f"[run-android-instrumentation-tests] Attachment upload failed for {name}: {exc} (status={exc.code})",
@@ -317,17 +317,16 @@ for name in attachment_names:
         )
     else:
         failed_uploads.append(name)
-        had_upload_failures = True
+        failure_state["value"] = True
 
 
 def replace_attachment(match: re.Match[str]) -> str:
-    nonlocal had_upload_failures
     name = match.group(1)
     url = attachment_urls.get(name)
     if url:
         return f"({url})"
     failed_uploads.append(name)
-    had_upload_failures = True
+    failure_state["value"] = True
     return "(#)"
 
 
@@ -354,7 +353,7 @@ with urlopen(update_req) as resp:
         file=sys.stdout,
     )
 
-if had_upload_failures:
+if failure_state["value"]:
     sys.exit(4)
 PY
   local rc=$?
