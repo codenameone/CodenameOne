@@ -252,23 +252,26 @@ else:
     )
 
 if comment_id is None:
-    sys.exit(0)
+    sys.exit(1)
 
 attachment_pattern = re.compile(r"\(attachment:([^)]+)\)")
 attachment_names = attachment_pattern.findall(body)
 
 attachment_urls: Dict[str, str] = {}
 failed_uploads = []
+had_upload_failures = False
 
 for name in attachment_names:
     if name in attachment_urls or name in failed_uploads:
         continue
     if not preview_dir:
         failed_uploads.append(name)
+        had_upload_failures = True
         continue
     file_path = preview_dir / name
     if not file_path.exists():
         failed_uploads.append(name)
+        had_upload_failures = True
         continue
     data = file_path.read_bytes()
     upload_url = (
@@ -291,6 +294,7 @@ for name in attachment_names:
             upload_info = json.load(resp)
     except HTTPError as exc:
         failed_uploads.append(name)
+        had_upload_failures = True
         error_body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
         print(
             f"[run-android-instrumentation-tests] Attachment upload failed for {name}: {exc} (status={exc.code})",
@@ -313,14 +317,17 @@ for name in attachment_names:
         )
     else:
         failed_uploads.append(name)
+        had_upload_failures = True
 
 
 def replace_attachment(match: re.Match[str]) -> str:
+    nonlocal had_upload_failures
     name = match.group(1)
     url = attachment_urls.get(name)
     if url:
         return f"({url})"
     failed_uploads.append(name)
+    had_upload_failures = True
     return "(#)"
 
 
@@ -346,6 +353,9 @@ with urlopen(update_req) as resp:
         f"[run-android-instrumentation-tests] PR comment {action} (status={resp.status}, bytes={len(update_payload)})",
         file=sys.stdout,
     )
+
+if had_upload_failures:
+    sys.exit(4)
 PY
   local rc=$?
   if [ $rc -eq 0 ]; then
@@ -357,7 +367,7 @@ PY
       printf 'Comment POST failed at %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > "$failure_flag" 2>/dev/null || true
     fi
   fi
-  return 0
+  return $rc
 }
 
 decode_test_asset() {
@@ -805,42 +815,82 @@ summary_path.write_text("\n".join(summary_lines) + ("\n" if summary_lines else "
 
 if comment_entries:
     lines = ["### Android screenshot updates", ""]
+    max_comment_bytes = 63000
+    comment_len = sum(len(line) + 1 for line in lines)
+
+    def add_line(text: str = "") -> None:
+        nonlocal comment_len
+        lines.append(text)
+        comment_len += len(text) + 1
+
     for entry in comment_entries:
-        lines.append(f"- **{entry['test']}** — {entry['status']}. {entry['message']}")
+        entry_header = f"- **{entry['test']}** — {entry['status']}. {entry['message']}"
+        add_line(entry_header)
+        base64_data = entry.get("base64")
         preview_name = entry.get("preview_name")
-        if preview_name:
-            lines.append("")
-            lines.append(f"  ![{entry['test']}](attachment:{preview_name})")
+        preview_quality = entry.get("preview_quality")
+        preview_note = entry.get("preview_note")
+        base64_note = entry.get("base64_note")
+        preview_mime = entry.get("preview_mime")
+
+        inline_budget_exceeded = False
+
+        if base64_data:
+            mime = entry.get("base64_mime") or "image/png"
+            inline_notes = []
+            codec = entry.get("base64_codec")
+            quality = entry.get("base64_quality") or preview_quality
+            if codec == "jpeg" and quality:
+                inline_notes.append(f"JPEG preview quality {quality}")
+            elif preview_mime == "image/jpeg" and preview_quality:
+                inline_notes.append(f"JPEG preview quality {preview_quality}")
+            if preview_note:
+                inline_notes.append(preview_note)
+            if base64_note and base64_note != preview_note:
+                inline_notes.append(base64_note)
+            preview_lines = [
+                "",
+                f"  ![{entry['test']}](data:{mime};base64,{base64_data})",
+            ]
+            if inline_notes:
+                preview_lines.append(f"  _Preview info: {'; '.join(inline_notes)}._")
+            projected_len = comment_len + sum(len(line) + 1 for line in preview_lines)
+            if projected_len <= max_comment_bytes:
+                for line in preview_lines:
+                    add_line(line)
+                continue
+            base64_data = None
+            inline_budget_exceeded = True
+        else:
+            inline_notes = []
+
+        if base64_data is None and preview_name:
+            preview_lines = ["", f"  ![{entry['test']}](attachment:{preview_name})"]
             preview_notes = []
-            preview_quality = entry.get("preview_quality")
-            preview_note = entry.get("preview_note")
-            if entry.get("preview_mime") == "image/jpeg" and preview_quality:
+            if preview_mime == "image/jpeg" and preview_quality:
                 preview_notes.append(f"JPEG preview quality {preview_quality}")
             if preview_note:
                 preview_notes.append(preview_note)
-            if entry.get("base64_note") and entry.get("base64_note") != preview_note:
-                preview_notes.append(entry["base64_note"])
+            if base64_note and base64_note != preview_note:
+                preview_notes.append(base64_note)
+            if inline_budget_exceeded:
+                preview_notes.append("Preview embedded as attachment to satisfy GitHub comment limits")
             if preview_notes:
-                lines.append(f"  _Preview info: {'; '.join(preview_notes)}._")
-        elif entry.get("base64"):
-            lines.append("")
+                preview_lines.append(f"  _Preview info: {'; '.join(preview_notes)}._")
+            for line in preview_lines:
+                add_line(line)
+        elif base64_data:
+            # Fallback if the preview lines exceeded the comment size limit after adjustments
             mime = entry.get("base64_mime") or "image/png"
-            lines.append(f"  ![{entry['test']}](data:{mime};base64,{entry['base64']})")
-            preview_notes = []
-            codec = entry.get("base64_codec")
-            quality = entry.get("base64_quality")
-            note = entry.get("base64_note")
-            if codec == "jpeg" and quality:
-                preview_notes.append(f"JPEG preview quality {quality}")
-            if note:
-                preview_notes.append(note)
-            if preview_notes:
-                lines.append(f"  _Preview info: {'; '.join(preview_notes)}._")
+            add_line("")
+            add_line(f"  ![{entry['test']}](data:{mime};base64,{base64_data})")
+            if inline_notes:
+                add_line(f"  _Preview info: {'; '.join(inline_notes)}._")
         elif entry.get("base64_omitted") == "too_large":
             size_note = ""
             if entry.get("base64_length"):
                 size_note = f" (base64 length ≈ {entry['base64_length']:,} chars)"
-            lines.append("")
+            add_line("")
             codec = entry.get("base64_codec")
             quality = entry.get("base64_quality")
             note = entry.get("base64_note")
@@ -852,15 +902,15 @@ if comment_entries:
             tail = ""
             if extra_bits:
                 tail = " (" + "; ".join(extra_bits) + ")"
-            lines.append(
+            add_line(
                 "  _Screenshot omitted from comment because the encoded payload exceeded GitHub's size limits"
                 + size_note
                 + "." + tail + "_"
             )
         artifact_name = entry.get("artifact_name")
         if artifact_name:
-            lines.append(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
-        lines.append("")
+            add_line(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
+        add_line("")
     MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
     if lines[-1] != "":
         lines.append("")
@@ -905,7 +955,10 @@ if [ -s "$COMMENT_FILE" ]; then
 fi
 
 ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
-post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"
+comment_rc=0
+if ! post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
+  comment_rc=$?
+fi
 
 # Copy useful artifacts for GH Actions
 for logcat in "${LOGCAT_FILES[@]}"; do
@@ -916,4 +969,4 @@ for x in "${XMLS[@]}"; do
 done
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
-exit 0
+exit $comment_rc

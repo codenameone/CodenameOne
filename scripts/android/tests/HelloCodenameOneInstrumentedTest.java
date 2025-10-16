@@ -36,8 +36,9 @@ public class HelloCodenameOneInstrumentedTest {
 
     private static final int CHUNK_SIZE = 2000;
     private static final String PREVIEW_CHANNEL = "PREVIEW";
-    private static final int[] PREVIEW_JPEG_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 15, 10};
-    private static final int MAX_PREVIEW_BYTES = 600 * 1024; // 600 KiB target for comment previews
+    private static final int[] PREVIEW_JPEG_QUALITIES =
+            new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
+    private static final int MAX_PREVIEW_BYTES = 20 * 1024; // 20 KiB target keeps comment payloads small
     private static final String MAIN_SCREEN_TEST = "MainActivity";
     private static final String BROWSER_TEST = "BrowserComponent";
 
@@ -146,6 +147,15 @@ public class HelloCodenameOneInstrumentedTest {
                                     + chosenPreview.length
                                     + " preview_quality="
                                     + chosenQuality);
+                    if (chosenPreview.length > MAX_PREVIEW_BYTES) {
+                        println(
+                                "CN1SS:WARN:test="
+                                        + testName
+                                        + " preview_exceeds_limit_bytes="
+                                        + chosenPreview.length
+                                        + " max_preview_bytes="
+                                        + MAX_PREVIEW_BYTES);
+                    }
                 } else {
                     println("CN1SS:INFO:test=" + testName + " preview_jpeg_bytes=0 preview_quality=0");
                 }
