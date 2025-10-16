@@ -115,12 +115,8 @@ post_pr_comment() {
 import json
 import os
 import pathlib
-import re
 import sys
-import urllib.parse
-import uuid
-from typing import Dict, Optional, Tuple
-from urllib.error import HTTPError
+from typing import Dict, Optional
 from urllib.request import Request, urlopen
 
 MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
@@ -152,29 +148,7 @@ def next_link(header: Optional[str]) -> Optional[str]:
     return None
 
 
-def guess_mime(name: str) -> str:
-    lower = name.lower()
-    if lower.endswith(".jpg") or lower.endswith(".jpeg"):
-        return "image/jpeg"
-    if lower.endswith(".png"):
-        return "image/png"
-    return "application/octet-stream"
-
-
-def build_multipart_payload(name: str, mime: str, data: bytes) -> Tuple[bytes, str]:
-    boundary = "cn1ss-" + uuid.uuid4().hex
-    body_parts = [
-        f"--{boundary}\r\n".encode("utf-8"),
-        f"Content-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\n".encode("utf-8"),
-        f"Content-Type: {mime}\r\n\r\n".encode("utf-8"),
-        data,
-        f"\r\n--{boundary}--\r\n".encode("utf-8"),
-    ]
-    return b"".join(body_parts), f"multipart/form-data; boundary={boundary}"
-
-
 body_path = pathlib.Path(sys.argv[1])
-preview_dir = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else None
 raw_body = body_path.read_text(encoding="utf-8")
 body = raw_body.strip()
 if not body:
@@ -254,88 +228,7 @@ else:
 if comment_id is None:
     sys.exit(1)
 
-attachment_pattern = re.compile(r"\(attachment:([^)]+)\)")
-attachment_names = attachment_pattern.findall(body)
-
-attachment_urls: Dict[str, str] = {}
-failed_uploads = []
-failure_state = {"value": False}
-
-for name in attachment_names:
-    if name in attachment_urls or name in failed_uploads:
-        continue
-    if not preview_dir:
-        failed_uploads.append(name)
-        failure_state["value"] = True
-        continue
-    file_path = preview_dir / name
-    if not file_path.exists():
-        failed_uploads.append(name)
-        failure_state["value"] = True
-        continue
-    data = file_path.read_bytes()
-    upload_url = (
-        "https://uploads.github.com/repos/"
-        f"{repo}/issues/comments/{comment_id}/attachments?name="
-        + urllib.parse.quote(name, safe="")
-    )
-    mime = guess_mime(name)
-    payload, content_type = build_multipart_payload(name, mime, data)
-    upload_headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github+json",
-        "Content-Type": content_type,
-        "Content-Length": str(len(payload)),
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    try:
-        upload_req = Request(upload_url, data=payload, headers=upload_headers, method="POST")
-        with urlopen(upload_req) as resp:
-            upload_info = json.load(resp)
-    except HTTPError as exc:
-        failed_uploads.append(name)
-        failure_state["value"] = True
-        error_body = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
-        print(
-            f"[run-android-instrumentation-tests] Attachment upload failed for {name}: {exc} (status={exc.code})",
-            file=sys.stderr,
-        )
-        if error_body:
-            print(error_body, file=sys.stderr)
-        continue
-    url = (
-        upload_info.get("download_url")
-        or upload_info.get("browser_download_url")
-        or upload_info.get("html_url")
-        or upload_info.get("url")
-    )
-    if url:
-        attachment_urls[name] = url
-        print(
-            f"[run-android-instrumentation-tests] Uploaded preview attachment '{name}' -> {url}",
-            file=sys.stdout,
-        )
-    else:
-        failed_uploads.append(name)
-        failure_state["value"] = True
-
-
-def replace_attachment(match: re.Match[str]) -> str:
-    name = match.group(1)
-    url = attachment_urls.get(name)
-    if url:
-        return f"({url})"
-    failed_uploads.append(name)
-    failure_state["value"] = True
-    return "(#)"
-
-
-final_body = attachment_pattern.sub(replace_attachment, body)
-
-if failed_uploads:
-    unique_failures = sorted(set(failed_uploads))
-    warning_line = "⚠️ _Preview upload failed for: " + ", ".join(unique_failures) + "._"
-    final_body = final_body.replace(MARKER, warning_line + "\n" + MARKER, 1)
+final_body = body
 
 update_payload = json.dumps({"body": final_body}).encode("utf-8")
 update_req = Request(
@@ -352,9 +245,6 @@ with urlopen(update_req) as resp:
         f"[run-android-instrumentation-tests] PR comment {action} (status={resp.status}, bytes={len(update_payload)})",
         file=sys.stdout,
     )
-
-if failure_state["value"]:
-    sys.exit(4)
 PY
   local rc=$?
   if [ $rc -eq 0 ]; then
@@ -864,7 +754,6 @@ if comment_entries:
             inline_notes = []
 
         if base64_data is None and preview_name:
-            preview_lines = ["", f"  ![{entry['test']}](attachment:{preview_name})"]
             preview_notes = []
             if preview_mime == "image/jpeg" and preview_quality:
                 preview_notes.append(f"JPEG preview quality {preview_quality}")
@@ -873,11 +762,11 @@ if comment_entries:
             if base64_note and base64_note != preview_note:
                 preview_notes.append(base64_note)
             if inline_budget_exceeded:
-                preview_notes.append("Preview embedded as attachment to satisfy GitHub comment limits")
+                preview_notes.append("Inline preview omitted to satisfy GitHub comment limits")
+            add_line("")
+            add_line("  _Preview omitted from comment; see workflow artifacts for JPEG preview._")
             if preview_notes:
-                preview_lines.append(f"  _Preview info: {'; '.join(preview_notes)}._")
-            for line in preview_lines:
-                add_line(line)
+                add_line(f"  _Preview info: {'; '.join(preview_notes)}._")
         elif base64_data:
             # Fallback if the preview lines exceeded the comment size limit after adjustments
             mime = entry.get("base64_mime") or "image/png"

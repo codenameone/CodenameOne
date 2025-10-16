@@ -15,7 +15,7 @@ import sys
 import tempfile
 import zlib
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, cast
 
 try:
     from PIL import Image  # type: ignore
@@ -263,17 +263,6 @@ def _prepare_pillow_image(image: PNGImage):
     return pil_img
 
 
-def _encode_comment_jpeg(image: PNGImage, quality: int) -> bytes:
-    pil_img = _prepare_pillow_image(image)
-    buffer = io.BytesIO()
-    try:
-        pil_img.save(buffer, format="JPEG", quality=quality, optimize=True)
-    except OSError:
-        buffer = io.BytesIO()
-        pil_img.save(buffer, format="JPEG", quality=quality)
-    return buffer.getvalue()
-
-
 def _build_png_payload(image: PNGImage) -> bytes:
     return _encode_png(
         image.width,
@@ -288,44 +277,54 @@ def _build_png_payload(image: PNGImage) -> bytes:
 def build_comment_payload(image: PNGImage, max_length: int = MAX_COMMENT_BASE64) -> CommentPayload:
     note: Optional[str] = None
     if Image is not None:
-        last_encoded: Optional[str] = None
-        last_length: int = 0
-        last_bytes: Optional[bytes] = None
-        last_quality: Optional[int] = None
-        for quality in JPEG_QUALITY_CANDIDATES:
-            try:
-                jpeg_bytes = _encode_comment_jpeg(image, quality)
-            except Exception as exc:  # pragma: no cover - defensive
-                note = f"JPEG encode failed at quality {quality}: {exc}"
-                continue
-            encoded = base64.b64encode(jpeg_bytes).decode("ascii")
-            last_encoded = encoded
-            last_length = len(encoded)
-            last_bytes = jpeg_bytes
-            last_quality = quality
-            if len(encoded) <= max_length:
-                return CommentPayload(
-                    base64=encoded,
-                    base64_length=len(encoded),
-                    mime="image/jpeg",
-                    codec="jpeg",
-                    quality=quality,
-                    omitted_reason=None,
-                    note=note,
-                    data=jpeg_bytes,
-                )
-        if last_bytes is not None:
+        pil_img = cast("Image.Image", _prepare_pillow_image(image))
+        scales = [1.0, 0.7, 0.5, 0.35, 0.25]
+        smallest_data: Optional[bytes] = None
+        smallest_quality: Optional[int] = None
+        for scale in scales:
+            candidate = pil_img
+            if scale < 1.0:
+                width = max(1, int(image.width * scale))
+                height = max(1, int(image.height * scale))
+                candidate = pil_img.copy()
+                candidate.thumbnail((width, height))
+            for quality in JPEG_QUALITY_CANDIDATES:
+                buffer = io.BytesIO()
+                try:
+                    candidate.save(buffer, format="JPEG", quality=quality, optimize=True)
+                except OSError:
+                    buffer = io.BytesIO()
+                    candidate.save(buffer, format="JPEG", quality=quality)
+                data = buffer.getvalue()
+                smallest_data = data
+                smallest_quality = quality
+                encoded = base64.b64encode(data).decode("ascii")
+                if len(encoded) <= max_length:
+                    note_bits = [f"JPEG preview quality {quality}"]
+                    if scale < 1.0:
+                        note_bits.append(f"downscaled to {candidate.width}x{candidate.height}")
+                    return CommentPayload(
+                        base64=encoded,
+                        base64_length=len(encoded),
+                        mime="image/jpeg",
+                        codec="jpeg",
+                        quality=quality,
+                        omitted_reason=None,
+                        note="; ".join(note_bits),
+                        data=data,
+                    )
+        if smallest_data is not None and smallest_quality is not None:
             return CommentPayload(
                 base64=None,
-                base64_length=last_length,
+                base64_length=len(base64.b64encode(smallest_data).decode("ascii")),
                 mime="image/jpeg",
                 codec="jpeg",
-                quality=last_quality,
+                quality=smallest_quality,
                 omitted_reason="too_large",
-                note=note,
-                data=last_bytes,
+                note="All JPEG previews exceeded limit even after downscaling",
+                data=smallest_data,
             )
-        note = note or "JPEG conversion unavailable"
+        note = "JPEG conversion unavailable"
     else:
         # Attempt an external conversion using ImageMagick/GraphicsMagick if
         # Pillow isn't present on the runner. This keeps the previews JPEG-based
