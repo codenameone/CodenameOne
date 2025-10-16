@@ -940,7 +940,9 @@ if comment_entries:
     lines.append(MARKER)
     comment_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 else:
-    comment_path.write_text("", encoding="utf-8")
+    MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
+    passed = "✅ Native Android screenshot tests passed."
+    comment_path.write_text(passed + "\n\n" + MARKER + "\n", encoding="utf-8")
 PY
 
 if [ -s "$SUMMARY_FILE" ]; then
