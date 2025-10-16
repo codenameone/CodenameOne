@@ -13,6 +13,8 @@ CN1SS_TOOL=""
 
 count_chunks() {
   local f="${1:-}"
+  local test="${2:-}"
+  local channel="${3:-}"
   if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
     echo 0
     return
@@ -21,21 +23,57 @@ count_chunks() {
     echo 0
     return
   fi
-  python3 "$CN1SS_TOOL" count "$f" 2>/dev/null || echo 0
+  local args=("count" "$f")
+  if [ -n "$test" ]; then
+    args+=("--test" "$test")
+  fi
+  if [ -n "$channel" ]; then
+    args+=("--channel" "$channel")
+  fi
+  python3 "$CN1SS_TOOL" "${args[@]}" 2>/dev/null || echo 0
 }
 
 extract_cn1ss_base64() {
   local f="${1:-}"
+  local test="${2:-}"
+  local channel="${3:-}"
   if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
     return 1
   fi
   if [ -z "$f" ] || [ ! -r "$f" ]; then
     return 1
   fi
-  python3 "$CN1SS_TOOL" extract "$f"
+  local args=("extract" "$f")
+  if [ -n "$test" ]; then
+    args+=("--test" "$test")
+  fi
+  if [ -n "$channel" ]; then
+    args+=("--channel" "$channel")
+  fi
+  python3 "$CN1SS_TOOL" "${args[@]}"
 }
 
-decode_cn1ss_png() {
+decode_cn1ss_binary() {
+  local f="${1:-}"
+  local test="${2:-}"
+  local channel="${3:-}"
+  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+    return 1
+  fi
+  if [ -z "$f" ] || [ ! -r "$f" ]; then
+    return 1
+  fi
+  local args=("extract" "$f" "--decode")
+  if [ -n "$test" ]; then
+    args+=("--test" "$test")
+  fi
+  if [ -n "$channel" ]; then
+    args+=("--channel" "$channel")
+  fi
+  python3 "$CN1SS_TOOL" "${args[@]}"
+}
+
+list_cn1ss_tests() {
   local f="${1:-}"
   if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
     return 1
@@ -43,7 +81,409 @@ decode_cn1ss_png() {
   if [ -z "$f" ] || [ ! -r "$f" ]; then
     return 1
   fi
-  python3 "$CN1SS_TOOL" extract "$f" --decode
+  python3 "$CN1SS_TOOL" tests "$f"
+}
+
+
+post_pr_comment() {
+  local body_file="${1:-}"
+  local preview_dir="${2:-}"
+  if [ -z "$body_file" ] || [ ! -s "$body_file" ]; then
+    ra_log "Skipping PR comment post (no content)."
+    return 0
+  fi
+  local comment_token="${GITHUB_TOKEN:-}"
+  if [ -z "$comment_token" ] && [ -n "${GH_TOKEN:-}" ]; then
+    comment_token="${GH_TOKEN}"
+    ra_log "PR comment auth using GH_TOKEN fallback"
+  fi
+  if [ -n "$comment_token" ]; then
+    ra_log "PR comment authentication token detected"
+  fi
+  if [ -z "$comment_token" ]; then
+    ra_log "PR comment skipped (no GitHub token available)"
+    return 0
+  fi
+  if [ -z "${GITHUB_EVENT_PATH:-}" ] || [ ! -f "$GITHUB_EVENT_PATH" ]; then
+    ra_log "PR comment skipped (GITHUB_EVENT_PATH unavailable)"
+    return 0
+  fi
+  local body_size
+  body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
+  ra_log "Attempting to post PR comment (payload bytes=${body_size})"
+  GITHUB_TOKEN="$comment_token" python3 - "$body_file" "$preview_dir" <<'PY'
+import json
+import os
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+from typing import Dict, List, Match, Optional
+from urllib.request import Request, urlopen
+
+MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
+
+
+def load_event(path: str) -> Dict[str, object]:
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def find_pr_number(event: Dict[str, object]) -> Optional[int]:
+    if "pull_request" in event:
+        return event["pull_request"].get("number")
+    issue = event.get("issue")
+    if isinstance(issue, dict) and issue.get("pull_request"):
+        return issue.get("number")
+    return None
+
+
+def next_link(header: Optional[str]) -> Optional[str]:
+    if not header:
+        return None
+    for part in header.split(","):
+        segment = part.strip()
+        if segment.endswith('rel="next"'):
+            url_part = segment.split(";", 1)[0].strip()
+            if url_part.startswith("<") and url_part.endswith(">"):
+                return url_part[1:-1]
+    return None
+
+
+def publish_previews_to_branch(
+    preview_dir: Optional[pathlib.Path],
+    repo: str,
+    pr_number: int,
+    token: Optional[str],
+    allow_push: bool,
+) -> Dict[str, str]:
+    """Publish preview images to the cn1ss-previews branch and return name->URL."""
+
+    if not preview_dir or not preview_dir.exists():
+        return {}
+    image_files = [
+        path
+        for path in sorted(preview_dir.iterdir())
+        if path.is_file() and path.suffix.lower() in {".jpg", ".jpeg", ".png"}
+    ]
+    if not image_files:
+        return {}
+    if not allow_push:
+        print(
+            "[run-android-instrumentation-tests] Preview publishing skipped for forked PR",  # noqa: E501
+            file=sys.stdout,
+        )
+        return {}
+    if not repo or not token:
+        return {}
+
+    workspace = pathlib.Path(os.environ.get("GITHUB_WORKSPACE", ".")).resolve()
+    worktree = workspace / f".cn1ss-previews-pr-{pr_number}"
+    if worktree.exists():
+        shutil.rmtree(worktree)
+    worktree.mkdir(parents=True, exist_ok=True)
+
+    try:
+        env = os.environ.copy()
+        env.setdefault("GIT_TERMINAL_PROMPT", "0")
+
+        def run_git(args, check: bool = True):
+            result = subprocess.run(
+                ["git", *args],
+                cwd=worktree,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            if check and result.returncode != 0:
+                raise RuntimeError(
+                    f"git {' '.join(args)} failed: {result.stderr.strip() or result.stdout.strip()}"
+                )
+            return result
+
+        run_git(["init"])
+        run_git(["config", "user.name", os.environ.get("GITHUB_ACTOR", "github-actions") or "github-actions"])
+        run_git(["config", "user.email", "github-actions@users.noreply.github.com"])
+        remote_url = f"https://x-access-token:{token}@github.com/{repo}.git"
+        run_git(["remote", "add", "origin", remote_url])
+
+        has_branch = run_git(["ls-remote", "--heads", "origin", "cn1ss-previews"], check=False)
+        if has_branch.returncode == 0 and has_branch.stdout.strip():
+            run_git(["fetch", "origin", "cn1ss-previews"])
+            run_git(["checkout", "cn1ss-previews"])
+        else:
+            run_git(["checkout", "--orphan", "cn1ss-previews"])
+
+        dest = worktree / f"pr-{pr_number}"
+        if dest.exists():
+            shutil.rmtree(dest)
+        dest.mkdir(parents=True, exist_ok=True)
+
+        for source in image_files:
+            shutil.copy2(source, dest / source.name)
+
+        run_git(["add", "-A", "."])
+        status = run_git(["status", "--porcelain"])
+        if status.stdout.strip():
+            run_git(["commit", "-m", f"Add previews for PR #{pr_number}"])
+            push = run_git(["push", "origin", "HEAD:cn1ss-previews"], check=False)
+            if push.returncode != 0:
+                raise RuntimeError(f"git push failed: {push.stderr.strip() or push.stdout.strip()}")
+            print(
+                f"[run-android-instrumentation-tests] Published {len(image_files)} preview(s) to cn1ss-previews/pr-{pr_number}",
+                file=sys.stdout,
+            )
+        else:
+            print(
+                f"[run-android-instrumentation-tests] Preview branch already up-to-date for PR #{pr_number}",
+                file=sys.stdout,
+            )
+
+        raw_base = f"https://raw.githubusercontent.com/{repo}/cn1ss-previews/pr-{pr_number}"
+        urls: Dict[str, str] = {}
+        if dest.exists():
+            for file in sorted(dest.iterdir()):
+                if file.is_file():
+                    urls[file.name] = f"{raw_base}/{file.name}"
+        return urls
+    finally:
+        shutil.rmtree(worktree, ignore_errors=True)
+
+
+body_path = pathlib.Path(sys.argv[1])
+preview_dir_arg: Optional[pathlib.Path] = None
+if len(sys.argv) > 2:
+    candidate = pathlib.Path(sys.argv[2])
+    if candidate.exists():
+        preview_dir_arg = candidate
+raw_body = body_path.read_text(encoding="utf-8")
+body = raw_body.strip()
+if not body:
+    sys.exit(0)
+
+if MARKER not in body:
+    body = body.rstrip() + "\n\n" + MARKER
+
+body_without_marker = body.replace(MARKER, "").strip()
+if not body_without_marker:
+    sys.exit(0)
+
+event_path = os.environ.get("GITHUB_EVENT_PATH")
+repo = os.environ.get("GITHUB_REPOSITORY")
+token = os.environ.get("GITHUB_TOKEN")
+actor = os.environ.get("GITHUB_ACTOR")
+if not event_path or not repo or not token:
+    sys.exit(0)
+
+event = load_event(event_path)
+pr_number = find_pr_number(event)
+if not pr_number:
+    sys.exit(0)
+
+headers = {
+    "Authorization": f"token {token}",
+    "Accept": "application/vnd.github+json",
+    "Content-Type": "application/json",
+}
+
+pr_data = event.get("pull_request")
+is_fork_pr = False
+if isinstance(pr_data, dict):
+    head = pr_data.get("head")
+    if isinstance(head, dict):
+        head_repo = head.get("repo")
+        if isinstance(head_repo, dict):
+            is_fork_pr = bool(head_repo.get("fork"))
+
+comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments?per_page=100"
+existing_comment: Optional[Dict[str, object]] = None
+preferred_comment: Optional[Dict[str, object]] = None
+preferred_logins = set()
+if actor:
+    preferred_logins.add(actor)
+preferred_logins.add("github-actions[bot]")
+
+while comments_url:
+    req = Request(comments_url, headers=headers)
+    with urlopen(req) as resp:
+        comments = json.load(resp)
+        for comment in comments:
+            body_text = comment.get("body") or ""
+            if MARKER in body_text:
+                existing_comment = comment
+                login = comment.get("user", {}).get("login")
+                if login in preferred_logins:
+                    preferred_comment = comment
+        comments_url = next_link(resp.headers.get("Link"))
+
+comment_id: Optional[int] = None
+created_placeholder = False
+
+if preferred_comment is not None:
+    existing_comment = preferred_comment
+
+if existing_comment is not None:
+    comment_id = existing_comment.get("id")
+else:
+    create_payload = json.dumps({"body": MARKER}).encode("utf-8")
+    create_req = Request(
+        f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments",
+        data=create_payload,
+        headers=headers,
+        method="POST",
+    )
+    with urlopen(create_req) as resp:
+        created = json.load(resp)
+        comment_id = created.get("id")
+    created_placeholder = True
+    print(
+        f"[run-android-instrumentation-tests] Created new screenshot comment placeholder (id={comment_id})",
+        file=sys.stdout,
+    )
+
+if comment_id is None:
+    sys.exit(1)
+
+attachment_pattern = re.compile(r"\(attachment:([^)]+)\)")
+attachment_urls: Dict[str, str] = {}
+missing_previews: List[str] = []
+if attachment_pattern.search(body):
+    try:
+        attachment_urls = publish_previews_to_branch(
+            preview_dir_arg,
+            repo,
+            pr_number,
+            token,
+            allow_push=not is_fork_pr,
+        )
+        if attachment_urls:
+            for name, url in attachment_urls.items():
+                print(
+                    f"[run-android-instrumentation-tests] Preview available for {name}: {url}",
+                    file=sys.stdout,
+                )
+    except Exception as exc:
+        print(
+            f"[run-android-instrumentation-tests] Preview publishing failed: {exc}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def replace_attachment(match: re.Match[str]) -> str:
+    name = match.group(1)
+    url = attachment_urls.get(name)
+    if url:
+        return f"({url})"
+    print(
+        f"[run-android-instrumentation-tests] Preview URL missing for {name}; leaving placeholder",
+        file=sys.stdout,
+    )
+    missing_previews.append(name)
+    return "(#)"
+
+
+final_body = attachment_pattern.sub(replace_attachment, body)
+
+if missing_previews:
+    if is_fork_pr:
+        print(
+            "[run-android-instrumentation-tests] Preview URLs unavailable in forked PR context; placeholders left as-is",
+            file=sys.stdout,
+        )
+    else:
+        print(
+            f"[run-android-instrumentation-tests] Failed to resolve preview URLs for: {', '.join(sorted(set(missing_previews)))}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+update_payload = json.dumps({"body": final_body}).encode("utf-8")
+update_req = Request(
+    f"https://api.github.com/repos/{repo}/issues/comments/{comment_id}",
+    data=update_payload,
+    headers=headers,
+    method="PATCH",
+)
+
+with urlopen(update_req) as resp:
+    resp.read()
+    action = "updated" if not created_placeholder else "posted"
+    print(
+        f"[run-android-instrumentation-tests] PR comment {action} (status={resp.status}, bytes={len(update_payload)})",
+        file=sys.stdout,
+    )
+PY
+  local rc=$?
+  if [ $rc -eq 0 ]; then
+    ra_log "Posted screenshot comparison comment to PR"
+  else
+    ra_log "STAGE:COMMENT_POST_FAILED (see stderr for details)"
+    if [ -n "${ARTIFACTS_DIR:-}" ]; then
+      local failure_flag="$ARTIFACTS_DIR/pr-comment-failed.txt"
+      printf 'Comment POST failed at %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > "$failure_flag" 2>/dev/null || true
+    fi
+  fi
+  return $rc
+}
+
+decode_test_asset() {
+  local test_name="${1:-}"
+  local dest="${2:-}"
+  local channel="${3:-}"
+  local verifier="${4:-}"
+  local source=""
+  local count="0"
+
+  if [ "${#XMLS[@]}" -gt 0 ]; then
+    for x in "${XMLS[@]}"; do
+      count="$(count_chunks "$x" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
+      [ "$count" -gt 0 ] || continue
+      ra_log "Reassembling test '$test_name' from XML: $x (chunks=$count)"
+      if decode_cn1ss_binary "$x" "$test_name" "$channel" > "$dest" 2>/dev/null; then
+        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="XML:$(basename "$x")"; break; fi
+      fi
+    done
+  fi
+
+  if [ -z "$source" ] && [ "${#LOGCAT_FILES[@]}" -gt 0 ]; then
+    for logcat in "${LOGCAT_FILES[@]}"; do
+      [ -s "$logcat" ] || continue
+      count="$(count_chunks "$logcat" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
+      [ "$count" -gt 0 ] || continue
+      ra_log "Reassembling test '$test_name' from logcat: $logcat (chunks=$count)"
+      if decode_cn1ss_binary "$logcat" "$test_name" "$channel" > "$dest" 2>/dev/null; then
+        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="LOGCAT:$(basename "$logcat")"; break; fi
+      fi
+    done
+  fi
+
+  if [ -z "$source" ] && [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
+    count="$(count_chunks "$TEST_EXEC_LOG" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
+    if [ "$count" -gt 0 ]; then
+      ra_log "Reassembling test '$test_name' from test-results.log: $TEST_EXEC_LOG (chunks=$count)"
+      if decode_cn1ss_binary "$TEST_EXEC_LOG" "$test_name" "$channel" > "$dest" 2>/dev/null; then
+        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="EXECLOG:$(basename "$TEST_EXEC_LOG")"; fi
+      fi
+    fi
+  fi
+
+  if [ -n "$source" ]; then
+    printf '%s' "$source"
+    return 0
+  fi
+
+  rm -f "$dest" 2>/dev/null || true
+  return 1
+}
+
+decode_test_png() {
+  decode_test_asset "$1" "$2" "" verify_png
+}
+
+decode_test_preview() {
+  decode_test_asset "$1" "$2" "PREVIEW" verify_jpeg
 }
 
 # Verify PNG signature + non-zero size
@@ -51,6 +491,16 @@ verify_png() {
   local f="$1"
   [ -s "$f" ] || return 1
   head -c 8 "$f" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$'
+}
+
+verify_jpeg() {
+  local f="$1"
+  [ -s "$f" ] || return 1
+  local header
+  header="$(head -c 2 "$f" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
+  local trailer
+  trailer="$(tail -c 2 "$f" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
+  [ "$header" = "FFD8" ] && [ "$trailer" = "FFD9" ]
 }
 
 # ---- Args & environment ----------------------------------------------------
@@ -79,7 +529,10 @@ ENV_FILE="$ENV_DIR/env.sh"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 ensure_dir "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/connectedAndroidTest.log"
-SCREENSHOT_OUT="$ARTIFACTS_DIR/emulator-screenshot.png"
+SCREENSHOT_REF_DIR="$SCRIPT_DIR/android/screenshots"
+SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1ss-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1ss-tmp")"
+ensure_dir "$SCREENSHOT_TMP_DIR"
+SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
 
 ra_log "Loading workspace environment from $ENV_FILE"
 [ -f "$ENV_FILE" ] || { ra_log "Missing env file: $ENV_FILE"; exit 3; }
@@ -125,9 +578,9 @@ mapfile -t XMLS < <(
 ) || XMLS=()
 
 # logcat files produced by AGP
-mapfile -t LOGCATS < <(
+mapfile -t LOGCAT_FILES < <(
   find "$RESULTS_ROOT" -type f -name 'logcat-*.txt' -print 2>/dev/null
-) || LOGCATS=()
+) || LOGCAT_FILES=()
 
 # execution log (use first if present)
 TEST_EXEC_LOG="$(find "$RESULTS_ROOT" -type f -path '*/testlog/test-results.log' -print -quit 2>/dev/null || true)"
@@ -139,12 +592,11 @@ else
   ra_log "No test result XML files found under $RESULTS_ROOT"
 fi
 
-# Pick first logcat if any
-LOGCAT_FILE="${LOGCATS[0]:-}"
-if [ -z "${LOGCAT_FILE:-}" ] || [ ! -s "$LOGCAT_FILE" ]; then
+if [ "${#LOGCAT_FILES[@]}" -eq 0 ]; then
   ra_log "FATAL: No logcat-*.txt produced by connectedDebugAndroidTest (cannot extract CN1SS chunks)."
   exit 12
 fi
+
 
 # ---- Chunk accounting (diagnostics) ---------------------------------------
 
@@ -153,7 +605,11 @@ for x in "${XMLS[@]}"; do
   c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
   XML_CHUNKS_TOTAL=$(( XML_CHUNKS_TOTAL + c ))
 done
-LOGCAT_CHUNKS="$(count_chunks "$LOGCAT_FILE")"; LOGCAT_CHUNKS="${LOGCAT_CHUNKS//[^0-9]/}"; : "${LOGCAT_CHUNKS:=0}"
+LOGCAT_CHUNKS=0
+for logcat in "${LOGCAT_FILES[@]}"; do
+  c="$(count_chunks "$logcat")"; c="${c//[^0-9]/}"; : "${c:=0}"
+  LOGCAT_CHUNKS=$(( LOGCAT_CHUNKS + c ))
+done
 EXECLOG_CHUNKS="$(count_chunks "${TEST_EXEC_LOG:-}")"; EXECLOG_CHUNKS="${EXECLOG_CHUNKS//[^0-9]/}"; : "${EXECLOG_CHUNKS:=0}"
 
 ra_log "Chunk counts -> XML: ${XML_CHUNKS_TOTAL} | logcat: ${LOGCAT_CHUNKS} | test-results.log: ${EXECLOG_CHUNKS}"
@@ -168,78 +624,374 @@ if [ "${LOGCAT_CHUNKS:-0}" = "0" ] && [ "${XML_CHUNKS_TOTAL:-0}" = "0" ] && [ "$
   exit 12
 fi
 
-# ---- Reassemble (prefer XML → logcat → exec log) --------------------------
+# ---- Identify CN1SS test streams -----------------------------------------
 
-: > "$SCREENSHOT_OUT"
-SOURCE=""
+declare -A TEST_NAME_SET=()
 
-if [ "${#XMLS[@]}" -gt 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ]; then
+if [ "${#XMLS[@]}" -gt 0 ]; then
   for x in "${XMLS[@]}"; do
-    c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
-    [ "$c" -gt 0 ] || continue
-    ra_log "Reassembling from XML: $x (chunks=$c)"
-    if decode_cn1ss_png "$x" > "$SCREENSHOT_OUT" 2>/dev/null; then
-      if verify_png "$SCREENSHOT_OUT"; then SOURCE="XML"; break; fi
-    fi
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      TEST_NAME_SET["$name"]=1
+    done < <(list_cn1ss_tests "$x" 2>/dev/null || true)
   done
 fi
 
-if [ -z "$SOURCE" ] && [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then
-  ra_log "Reassembling from logcat: $LOGCAT_FILE (chunks=$LOGCAT_CHUNKS)"
-  if decode_cn1ss_png "$LOGCAT_FILE" > "$SCREENSHOT_OUT" 2>/dev/null; then
-    if verify_png "$SCREENSHOT_OUT"; then SOURCE="LOGCAT"; fi
-  fi
+for logcat in "${LOGCAT_FILES[@]}"; do
+  [ -s "$logcat" ] || continue
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    TEST_NAME_SET["$name"]=1
+  done < <(list_cn1ss_tests "$logcat" 2>/dev/null || true)
+done
+
+if [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    TEST_NAME_SET["$name"]=1
+  done < <(list_cn1ss_tests "$TEST_EXEC_LOG" 2>/dev/null || true)
 fi
 
-if [ -z "$SOURCE" ] && [ -n "${TEST_EXEC_LOG:-}" ] && [ "${EXECLOG_CHUNKS:-0}" -gt 0 ]; then
-  ra_log "Reassembling from test-results.log: $TEST_EXEC_LOG (chunks=$EXECLOG_CHUNKS)"
-  if decode_cn1ss_png "$TEST_EXEC_LOG" > "$SCREENSHOT_OUT" 2>/dev/null; then
-    if verify_png "$SCREENSHOT_OUT"; then SOURCE="EXECLOG"; fi
-  fi
+if [ "${#TEST_NAME_SET[@]}" -eq 0 ] && { [ "${LOGCAT_CHUNKS:-0}" -gt 0 ] || [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ] || [ "${EXECLOG_CHUNKS:-0}" -gt 0 ]; }; then
+  TEST_NAME_SET["default"]=1
 fi
 
-# ---- Final validation / failure paths -------------------------------------
-
-if [ -z "$SOURCE" ]; then
-  ra_log "FATAL: Failed to extract/decode CN1SS payload from any source"
-  # Keep partial for debugging
-  RAW_B64_OUT="${SCREENSHOT_OUT}.raw.b64"
-  {
-    # Try to emit concatenated base64 from whichever had chunks (priority logcat, then XML, then exec)
-    if [ "${LOGCAT_CHUNKS:-0}" -gt 0 ]; then extract_cn1ss_base64 "$LOGCAT_FILE"; fi
-    if [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ] && [ "${LOGCAT_CHUNKS:-0}" -eq 0 ]; then
-      # concatenate all XMLs
-      for x in "${XMLS[@]}"; do
-        if [ "$(count_chunks "$x")" -gt 0 ]; then extract_cn1ss_base64 "$x"; fi
-      done
-    fi
-    if [ -n "${TEST_EXEC_LOG:-}" ] && [ "${EXECLOG_CHUNKS:-0}" -gt 0 ] && [ "${LOGCAT_CHUNKS:-0}" -eq 0 ] && [ "${XML_CHUNKS_TOTAL:-0}" -eq 0 ]; then
-      extract_cn1ss_base64 "$TEST_EXEC_LOG"
-    fi
-  } > "$RAW_B64_OUT" 2>/dev/null || true
-  if [ -s "$RAW_B64_OUT" ]; then
-    head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-    ra_log "Partial base64 saved at: $RAW_B64_OUT"
-  fi
-  # Emit contextual INFO lines
-  grep -n 'CN1SS:INFO' "$LOGCAT_FILE" 2>/dev/null || true
+if [ "${#TEST_NAME_SET[@]}" -eq 0 ]; then
+  ra_log "FATAL: Could not determine any CN1SS test streams"
   exit 12
 fi
 
-# Size & signature check (belt & suspenders)
-if ! verify_png "$SCREENSHOT_OUT"; then
-  ra_log "STAGE:BAD_PNG_SIGNATURE -> Not a PNG"
-  file "$SCREENSHOT_OUT" || true
-  exit 14
+declare -a TEST_NAMES=()
+for name in "${!TEST_NAME_SET[@]}"; do
+  TEST_NAMES+=("$name")
+done
+IFS=$'\n' TEST_NAMES=($(printf '%s\n' "${TEST_NAMES[@]}" | sort))
+unset IFS
+ra_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
+
+declare -A TEST_OUTPUTS=()
+declare -A TEST_SOURCES=()
+declare -A PREVIEW_OUTPUTS=()
+
+ensure_dir "$SCREENSHOT_PREVIEW_DIR"
+
+for test in "${TEST_NAMES[@]}"; do
+  dest="$SCREENSHOT_TMP_DIR/${test}.png"
+  if source_label="$(decode_test_png "$test" "$dest")"; then
+    TEST_OUTPUTS["$test"]="$dest"
+    TEST_SOURCES["$test"]="$source_label"
+    ra_log "Decoded screenshot for '$test' (source=${source_label}, size: $(stat -c '%s' "$dest") bytes)"
+    preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
+    if preview_source="$(decode_test_preview "$test" "$preview_dest")"; then
+      PREVIEW_OUTPUTS["$test"]="$preview_dest"
+      ra_log "Decoded preview for '$test' (source=${preview_source}, size: $(stat -c '%s' "$preview_dest") bytes)"
+    else
+      rm -f "$preview_dest" 2>/dev/null || true
+    fi
+  else
+    ra_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
+    RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
+    {
+      local count
+      for logcat in "${LOGCAT_FILES[@]}"; do
+        [ -s "$logcat" ] || continue
+        count="$(count_chunks "$logcat" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+        if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$logcat" "$test"; fi
+      done
+      if [ "${#XMLS[@]}" -gt 0 ]; then
+        for x in "${XMLS[@]}"; do
+          count="$(count_chunks "$x" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+          if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$x" "$test"; fi
+        done
+      fi
+      if [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
+        count="$(count_chunks "$TEST_EXEC_LOG" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+        if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$TEST_EXEC_LOG" "$test"; fi
+      fi
+    } > "$RAW_B64_OUT" 2>/dev/null || true
+    if [ -s "$RAW_B64_OUT" ]; then
+      head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
+      ra_log "Partial base64 saved at: $RAW_B64_OUT"
+    fi
+    exit 12
+  fi
+done
+
+# ---- Compare against stored references ------------------------------------
+
+COMPARE_ARGS=()
+for test in "${TEST_NAMES[@]}"; do
+  dest="${TEST_OUTPUTS[$test]:-}"
+  [ -n "$dest" ] || continue
+  COMPARE_ARGS+=("--actual" "${test}=${dest}")
+done
+
+COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
+export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
+ra_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
+python3 "$SCRIPT_DIR/android/tests/process_screenshots.py" \
+  --reference-dir "$SCREENSHOT_REF_DIR" \
+  --emit-base64 \
+  --preview-dir "$SCREENSHOT_PREVIEW_DIR" \
+  "${COMPARE_ARGS[@]}" > "$COMPARE_JSON"
+
+SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
+COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
+
+ra_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
+python3 - "$COMPARE_JSON" "$COMMENT_FILE" "$SUMMARY_FILE" <<'PY'
+import json
+import pathlib
+import sys
+
+compare_path = pathlib.Path(sys.argv[1])
+comment_path = pathlib.Path(sys.argv[2])
+summary_path = pathlib.Path(sys.argv[3])
+
+data = json.loads(compare_path.read_text(encoding="utf-8"))
+summary_lines = []
+comment_entries = []
+
+for result in data.get("results", []):
+    test = result.get("test", "unknown")
+    status = result.get("status", "unknown")
+    expected_path = result.get("expected_path")
+    actual_path = result.get("actual_path", "")
+    details = result.get("details") or {}
+    base64_data = result.get("base64")
+    base64_omitted = result.get("base64_omitted")
+    base64_length = result.get("base64_length")
+    base64_mime = result.get("base64_mime") or "image/png"
+    base64_codec = result.get("base64_codec")
+    base64_quality = result.get("base64_quality")
+    base64_note = result.get("base64_note")
+    message = ""
+    copy_flag = "0"
+
+    preview = result.get("preview") or {}
+    preview_name = preview.get("name")
+    preview_path = preview.get("path")
+    preview_mime = preview.get("mime")
+    preview_note = preview.get("note")
+    preview_quality = preview.get("quality")
+    if status == "equal":
+        message = "Matches stored reference."
+    elif status == "missing_expected":
+        message = f"Reference screenshot missing at {expected_path}."
+        copy_flag = "1"
+        comment_entries.append({
+            "test": test,
+            "status": "missing reference",
+            "message": message,
+            "artifact_name": f"{test}.png",
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
+            "base64": base64_data,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "base64_mime": base64_mime,
+            "base64_codec": base64_codec,
+            "base64_quality": base64_quality,
+            "base64_note": base64_note,
+        })
+    elif status == "different":
+        dims = ""
+        if details:
+            dims = f" ({details.get('width')}x{details.get('height')} px, bit depth {details.get('bit_depth')})"
+        message = f"Screenshot differs{dims}."
+        copy_flag = "1"
+        comment_entries.append({
+            "test": test,
+            "status": "updated screenshot",
+            "message": message,
+            "artifact_name": f"{test}.png",
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
+            "base64": base64_data,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "base64_mime": base64_mime,
+            "base64_codec": base64_codec,
+            "base64_quality": base64_quality,
+            "base64_note": base64_note,
+        })
+    elif status == "error":
+        message = f"Comparison error: {result.get('message', 'unknown error')}"
+        copy_flag = "1"
+        comment_entries.append({
+            "test": test,
+            "status": "comparison error",
+            "message": message,
+            "artifact_name": f"{test}.png",
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
+            "base64": None,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "base64_mime": base64_mime,
+            "base64_codec": base64_codec,
+            "base64_quality": base64_quality,
+            "base64_note": base64_note,
+        })
+    elif status == "missing_actual":
+        message = "Actual screenshot missing (test did not produce output)."
+        copy_flag = "1"
+        comment_entries.append({
+            "test": test,
+            "status": "missing actual screenshot",
+            "message": message,
+            "artifact_name": None,
+            "preview_name": preview_name,
+            "preview_path": preview_path,
+            "preview_mime": preview_mime,
+            "preview_note": preview_note,
+            "preview_quality": preview_quality,
+            "base64": None,
+            "base64_omitted": base64_omitted,
+            "base64_length": base64_length,
+            "base64_mime": base64_mime,
+            "base64_codec": base64_codec,
+            "base64_quality": base64_quality,
+            "base64_note": base64_note,
+        })
+    else:
+        message = f"Status: {status}."
+
+    note_column = preview_note or base64_note or ""
+    summary_lines.append("|".join([status, test, message, copy_flag, actual_path, note_column]))
+
+summary_path.write_text("\n".join(summary_lines) + ("\n" if summary_lines else ""), encoding="utf-8")
+
+if comment_entries:
+    lines = ["### Android screenshot updates", ""]
+
+    def add_line(text: str = "") -> None:
+        lines.append(text)
+
+    for entry in comment_entries:
+        entry_header = f"- **{entry['test']}** — {entry['status']}. {entry['message']}"
+        add_line(entry_header)
+        preview_name = entry.get("preview_name")
+        preview_quality = entry.get("preview_quality")
+        preview_note = entry.get("preview_note")
+        base64_note = entry.get("base64_note")
+        preview_mime = entry.get("preview_mime")
+
+        preview_notes = []
+        if preview_mime == "image/jpeg" and preview_quality:
+            preview_notes.append(f"JPEG preview quality {preview_quality}")
+        if preview_note:
+            preview_notes.append(preview_note)
+        if base64_note and base64_note != preview_note:
+            preview_notes.append(base64_note)
+
+        if preview_name:
+            add_line("")
+            add_line(f"  ![{entry['test']}](attachment:{preview_name})")
+            if preview_notes:
+                add_line(f"  _Preview info: {'; '.join(preview_notes)}._")
+        elif entry.get("base64"):
+            add_line("")
+            add_line(
+                "  _Preview generated but could not be published; see workflow artifacts for JPEG preview._"
+            )
+            if preview_notes:
+                add_line(f"  _Preview info: {'; '.join(preview_notes)}._")
+        elif entry.get("base64_omitted") == "too_large":
+            size_note = ""
+            if entry.get("base64_length"):
+                size_note = f" (base64 length ≈ {entry['base64_length']:,} chars)"
+            add_line("")
+            codec = entry.get("base64_codec")
+            quality = entry.get("base64_quality")
+            note = entry.get("base64_note")
+            extra_bits = []
+            if codec == "jpeg" and quality:
+                extra_bits.append(f"attempted JPEG quality {quality}")
+            if note:
+                extra_bits.append(note)
+            tail = ""
+            if extra_bits:
+                tail = " (" + "; ".join(extra_bits) + ")"
+            add_line(
+                "  _Screenshot omitted from comment because the encoded payload exceeded GitHub's size limits"
+                + size_note
+                + "." + tail + "_"
+            )
+        else:
+            add_line("")
+            add_line("  _No preview available for this screenshot._")
+        artifact_name = entry.get("artifact_name")
+        if artifact_name:
+            add_line(f"  _Full-resolution PNG saved as `{artifact_name}` in workflow artifacts._")
+        add_line("")
+    MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
+    if lines[-1] != "":
+        lines.append("")
+    lines.append(MARKER)
+    comment_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+else:
+    MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->"
+    passed = "✅ Native Android screenshot tests passed."
+    comment_path.write_text(passed + "\n\n" + MARKER + "\n", encoding="utf-8")
+PY
+
+if [ -s "$SUMMARY_FILE" ]; then
+  ra_log "  -> Wrote summary entries to $SUMMARY_FILE ($(wc -l < "$SUMMARY_FILE" 2>/dev/null || echo 0) line(s))"
+else
+  ra_log "  -> No summary entries generated (all screenshots matched stored baselines)"
 fi
 
-ra_log "SUCCESS -> screenshot saved (${SOURCE}), size: $(stat -c '%s' "$SCREENSHOT_OUT") bytes at $SCREENSHOT_OUT"
+if [ -s "$COMMENT_FILE" ]; then
+  ra_log "  -> Prepared PR comment payload at $COMMENT_FILE (bytes=$(wc -c < "$COMMENT_FILE" 2>/dev/null || echo 0))"
+else
+  ra_log "  -> No PR comment content produced"
+fi
+
+if [ -s "$SUMMARY_FILE" ]; then
+  while IFS='|' read -r status test message copy_flag path preview_note; do
+    [ -n "${test:-}" ] || continue
+    ra_log "Test '${test}': ${message}"
+    if [ "$copy_flag" = "1" ] && [ -n "${path:-}" ] && [ -f "$path" ]; then
+      cp -f "$path" "$ARTIFACTS_DIR/${test}.png" 2>/dev/null || true
+      ra_log "  -> Stored PNG artifact copy at $ARTIFACTS_DIR/${test}.png"
+    fi
+    if [ "$status" = "equal" ] && [ -n "${path:-}" ]; then
+      rm -f "$path" 2>/dev/null || true
+    fi
+    if [ -n "${preview_note:-}" ]; then
+      ra_log "  Preview note: ${preview_note}"
+    fi
+  done < "$SUMMARY_FILE"
+fi
+
+cp -f "$COMPARE_JSON" "$ARTIFACTS_DIR/screenshot-compare.json" 2>/dev/null || true
+if [ -s "$COMMENT_FILE" ]; then
+  cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
+fi
+
+ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
+comment_rc=0
+if ! post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
+  comment_rc=$?
+fi
 
 # Copy useful artifacts for GH Actions
-cp -f "$LOGCAT_FILE" "$ARTIFACTS_DIR/$(basename "$LOGCAT_FILE")" 2>/dev/null || true
+for logcat in "${LOGCAT_FILES[@]}"; do
+  cp -f "$logcat" "$ARTIFACTS_DIR/$(basename "$logcat")" 2>/dev/null || true
+done
 for x in "${XMLS[@]}"; do
   cp -f "$x" "$ARTIFACTS_DIR/$(basename "$x")" 2>/dev/null || true
 done
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
-exit 0
+exit $comment_rc

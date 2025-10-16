@@ -14,9 +14,20 @@ name: Test Android build scripts
 
 jobs:
   build-android:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install Pillow for image processing
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pillow
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
