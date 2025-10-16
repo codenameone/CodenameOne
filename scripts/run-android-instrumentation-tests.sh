@@ -817,11 +817,11 @@ if comment_entries:
     lines = ["### Android screenshot updates", ""]
     max_comment_bytes = 63000
     comment_len = sum(len(line) + 1 for line in lines)
+    comment_len_box = [comment_len]
 
     def add_line(text: str = "") -> None:
-        nonlocal comment_len
         lines.append(text)
-        comment_len += len(text) + 1
+        comment_len_box[0] += len(text) + 1
 
     for entry in comment_entries:
         entry_header = f"- **{entry['test']}** — {entry['status']}. {entry['message']}"
@@ -854,7 +854,7 @@ if comment_entries:
             ]
             if inline_notes:
                 preview_lines.append(f"  _Preview info: {'; '.join(inline_notes)}._")
-            projected_len = comment_len + sum(len(line) + 1 for line in preview_lines)
+            projected_len = comment_len_box[0] + sum(len(line) + 1 for line in preview_lines)
             if projected_len <= max_comment_bytes:
                 for line in preview_lines:
                     add_line(line)
