@@ -101,10 +101,11 @@ if ! xcodebuild \
 fi
 set +o pipefail
 
-declare -a PNG_FILES=()
-if mapfile -t PNG_FILES < <(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print | sort); then
-  :
-fi
+PNG_FILES=()
+while IFS= read -r png; do
+  [ -n "$png" ] || continue
+  PNG_FILES+=("$png")
+done < <(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print | sort)
 
 if [ "${#PNG_FILES[@]}" -eq 0 ]; then
   ri_log "No screenshots produced under $SCREENSHOT_RAW_DIR" >&2
