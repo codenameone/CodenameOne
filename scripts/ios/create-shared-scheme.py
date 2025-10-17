@@ -245,10 +245,12 @@ def main(argv: List[str]) -> int:
 
     scheme_name = args.scheme_name or app.name
 
+    # Prefer UI tests only. Include unit tests only if there is no UI test target.
     testables: List[str] = []
-    for target in (unit, ui):
-        if target is not None:
-            testables.append(render_testable(target, project_container))
+    if ui is not None:
+        testables.append(render_testable(ui, project_container))
+    elif unit is not None:
+        testables.append(render_testable(unit, project_container))
 
     if not testables:
         print("warning: no unit or UI test targets discovered; emitting app-only scheme", file=sys.stderr)
