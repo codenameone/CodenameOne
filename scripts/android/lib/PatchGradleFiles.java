@@ -16,6 +16,7 @@ public class PatchGradleFiles {
 
     private static final Pattern ANDROID_BLOCK_PATTERN = Pattern.compile("(?m)^\\s*android\\s*\\{");
     private static final Pattern DEFAULT_CONFIG_PATTERN = Pattern.compile("(?ms)^\\s*defaultConfig\\s*\\{.*?^\\s*\\}");
+    private static final Pattern DEFAULT_CONFIG_HEADER_PATTERN = Pattern.compile("(?ms)^\\s*defaultConfig\\s*\\{");
     private static final Pattern COMPILE_SDK_PATTERN = Pattern.compile("(?m)^\\s*compileSdkVersion\\s+\\d+");
     private static final Pattern TARGET_SDK_PATTERN = Pattern.compile("(?m)^\\s*targetSdkVersion\\s+\\d+");
     private static final Pattern TEST_INSTRUMENTATION_PATTERN = Pattern.compile("(?m)^\\s*testInstrumentationRunner\\s*\".*?\"\\s*$");
@@ -187,9 +188,9 @@ public class PatchGradleFiles {
             return new Result(newContent, !newContent.equals(content));
         }
 
-        Matcher defaultConfigMatcher = DEFAULT_CONFIG_PATTERN.matcher(content);
-        if (defaultConfigMatcher.find()) {
-            int pos = defaultConfigMatcher.end();
+        Matcher defaultConfigHeaderMatcher = DEFAULT_CONFIG_HEADER_PATTERN.matcher(content);
+        if (defaultConfigHeaderMatcher.find()) {
+            int pos = defaultConfigHeaderMatcher.end();
             String snippet = "\n        testInstrumentationRunner \"" + runner + "\"";
             content = content.substring(0, pos) + snippet + content.substring(pos);
             return new Result(content, true);

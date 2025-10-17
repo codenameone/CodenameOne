@@ -26,43 +26,47 @@ public class PostPrComment {
     private static final String LOG_PREFIX = "[run-android-instrumentation-tests]";
 
     public static void main(String[] args) throws Exception {
+        int exitCode = execute(args);
+        System.exit(exitCode);
+    }
+
+    private static int execute(String[] args) throws Exception {
         Arguments arguments = Arguments.parse(args);
         if (arguments == null) {
-            System.exit(2);
-            return;
+            return 2;
         }
         Path bodyPath = arguments.body;
         if (!Files.isRegularFile(bodyPath)) {
-            return;
+            return 0;
         }
         String rawBody = Files.readString(bodyPath, StandardCharsets.UTF_8);
         String body = rawBody.trim();
         if (body.isEmpty()) {
-            return;
+            return 0;
         }
         if (!body.contains(MARKER)) {
             body = body.stripTrailing() + "\n\n" + MARKER;
         }
         String bodyWithoutMarker = body.replace(MARKER, "").trim();
         if (bodyWithoutMarker.isEmpty()) {
-            return;
+            return 0;
         }
 
         String eventPathEnv = System.getenv("GITHUB_EVENT_PATH");
         String repo = System.getenv("GITHUB_REPOSITORY");
         String token = System.getenv("GITHUB_TOKEN");
         if (eventPathEnv == null || repo == null || token == null) {
-            return;
+            return 0;
         }
         Path eventPath = Path.of(eventPathEnv);
         if (!Files.isRegularFile(eventPath)) {
-            return;
+            return 0;
         }
 
         Map<String, Object> event = JsonUtil.asObject(JsonUtil.parse(Files.readString(eventPath, StandardCharsets.UTF_8)));
         Integer prNumber = findPrNumber(event);
         if (prNumber == null) {
-            return;
+            return 0;
         }
 
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
@@ -75,7 +79,7 @@ public class PostPrComment {
         boolean isForkPr = isForkPullRequest(event);
         CommentContext context = locateExistingComment(client, headers, repo, prNumber, body, event);
         if (context == null) {
-            return;
+            return 1;
         }
         Long commentId = context.commentId;
         boolean createdPlaceholder = context.createdPlaceholder;
@@ -90,7 +94,7 @@ public class PostPrComment {
                 }
             } catch (Exception ex) {
                 err("Preview publishing failed: " + ex.getMessage());
-                return;
+                return 1;
             }
         }
 
@@ -100,7 +104,7 @@ public class PostPrComment {
                 log("Preview URLs unavailable in forked PR context; placeholders left as-is");
             } else {
                 err("Failed to resolve preview URLs for: " + String.join(", ", replacement.missing));
-                return;
+                return 1;
             }
         }
 
@@ -115,8 +119,10 @@ public class PostPrComment {
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             String action = createdPlaceholder ? "posted" : "updated";
             log("PR comment " + action + " (status=" + response.statusCode() + ", bytes=" + finalBody.length() + ")");
+            return 0;
         } else {
             err("Failed to update PR comment: HTTP " + response.statusCode() + " - " + response.body());
+            return 1;
         }
     }
 
@@ -191,6 +197,7 @@ public class PostPrComment {
             }
         }
         if (commentId == null) {
+            err("Unable to locate or create PR comment placeholder");
             return null;
         }
         return new CommentContext(commentId, createdPlaceholder);
