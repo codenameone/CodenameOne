@@ -85,9 +85,78 @@ auto_select_destination() {
     return
   fi
 
-  local selected
-  if ! selected="$(
-    xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
+  local show_dest selected
+  if show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null)"; then
+    selected="$(
+      printf '%s\n' "$show_dest" | python3 - <<'PY'
+import re
+import sys
+
+
+def parse_version_tuple(version: str):
+    parts = []
+    for piece in version.split('.'):
+        piece = piece.strip()
+        if not piece:
+            continue
+        try:
+            parts.append(int(piece))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def iter_showdestinations(text: str):
+    pattern = re.compile(r"\{([^}]+)\}")
+    for block in pattern.findall(text):
+        fields = {}
+        for chunk in block.split(','):
+            if ':' not in chunk:
+                continue
+            key, value = chunk.split(':', 1)
+            fields[key.strip()] = value.strip()
+        if fields.get('platform') != 'iOS Simulator':
+            continue
+        name = fields.get('name', '')
+        os_version = fields.get('OS') or fields.get('os') or ''
+        ident = fields.get('id', '')
+        priority = 0
+        if 'iPhone' in name:
+            priority = 2
+        elif 'iPad' in name:
+            priority = 1
+        yield (
+            priority,
+            parse_version_tuple(os_version.replace('latest', '')),
+            name,
+            os_version,
+            ident,
+        )
+
+
+def main() -> None:
+    candidates = sorted(iter_showdestinations(sys.stdin.read()), reverse=True)
+    if not candidates:
+        return
+    _, _, name, os_version, ident = candidates[0]
+    if ident:
+        print(f"platform=iOS Simulator,id={ident}")
+    elif os_version:
+        print(f"platform=iOS Simulator,OS={os_version},name={name}")
+    else:
+        print(f"platform=iOS Simulator,name={name}")
+
+
+if __name__ == "__main__":
+    main()
+PY
+    )"
+  fi
+
+  if [ -z "${selected:-}" ]; then
+    if command -v xcrun >/dev/null 2>&1; then
+      selected="$(
+        xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
 import json
 import sys
 
@@ -105,42 +174,49 @@ def parse_version_tuple(version: str):
     return tuple(parts)
 
 
-def iter_candidates(payload):
+def iter_devices(payload):
     devices = payload.get('devices', {})
     for runtime, entries in devices.items():
         if 'iOS' not in runtime:
             continue
         version = runtime.split('iOS-')[-1].replace('-', '.')
         version_tuple = parse_version_tuple(version)
-        for entry in entries:
+        for entry in entries or []:
             if not entry.get('isAvailable'):
                 continue
             name = entry.get('name') or ''
-            if 'iPhone' not in name:
-                continue
-            udid = entry.get('udid') or ''
-            if not udid:
-                continue
-            yield version_tuple, name, udid
+            ident = entry.get('udid') or ''
+            priority = 0
+            if 'iPhone' in name:
+                priority = 2
+            elif 'iPad' in name:
+                priority = 1
+            yield (
+                priority,
+                version_tuple,
+                name,
+                ident,
+            )
 
 
-def main():
+def main() -> None:
     try:
         data = json.load(sys.stdin)
     except Exception:
         return
-
-    candidates = sorted(iter_candidates(data), reverse=True)
-    if candidates:
-        _, _, udid = candidates[0]
-        print(f"platform=iOS Simulator,id={udid}")
+    candidates = sorted(iter_devices(data), reverse=True)
+    if not candidates:
+        return
+    _, _, name, ident = candidates[0]
+    if ident:
+        print(f"platform=iOS Simulator,id={ident}")
 
 
 if __name__ == "__main__":
     main()
 PY
-  )"; then
-    selected=""
+      )"
+    fi
   fi
 
   if [ -n "${selected:-}" ]; then
@@ -148,12 +224,15 @@ PY
   fi
 }
 
+
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
 if [ -z "$SIM_DESTINATION" ]; then
   SELECTED_DESTINATION="$(auto_select_destination)"
   if [ -n "$SELECTED_DESTINATION" ]; then
     SIM_DESTINATION="$SELECTED_DESTINATION"
     ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
+  else
+    ri_log "Simulator auto-selection did not return a destination"
   fi
 fi
 
