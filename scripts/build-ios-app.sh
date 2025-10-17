@@ -203,7 +203,8 @@ SCHEME_HELPER="$SCRIPT_DIR/ios/create-shared-scheme.py"
 if [ -f "$SCHEME_HELPER" ]; then
   bia_log "Ensuring shared Xcode scheme exposes UI tests"
   if command -v python3 >/dev/null 2>&1; then
-    if ! python3 "$SCHEME_HELPER" "$PROJECT_DIR" "$MAIN_NAME"; then
+    # Create a shared scheme named "<AppName>-CI" so it cannot be shadowed by any user scheme
+    if ! python3 "$SCHEME_HELPER" "$PROJECT_DIR" "$MAIN_NAME-CI"; then
       bia_log "Warning: Failed to configure shared Xcode scheme" >&2
     fi
   else
@@ -253,6 +254,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "workspace=$WORKSPACE"
     [ -n "$PRODUCT_APP" ] && echo "app_bundle=$PRODUCT_APP"
+    echo "scheme=${MAIN_NAME}-CI"
   } >> "$GITHUB_OUTPUT"
 fi
 
