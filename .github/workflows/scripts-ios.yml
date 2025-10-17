@@ -59,11 +59,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Pillow for image processing
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pillow
-
       - name: Ensure CocoaPods tooling
         run: |
           set -euo pipefail
