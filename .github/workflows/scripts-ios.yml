@@ -3,13 +3,37 @@ name: Test iOS build scripts
 on:
   pull_request:
     paths:
-      - 'scripts/**'
       - '.github/workflows/scripts-ios.yml'
-      - 'BUILDING.md'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-ios-port.sh'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/iOSPort/**'
+      - '!Ports/iOSPort/**/*.md'
+      - 'vm/**'
+      - '!vm/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
   push:
     branches: [ master ]
-    paths-ignore:
-      - '**/*.md'
+    paths:
+      - '.github/workflows/scripts-ios.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-ios-port.sh'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/iOSPort/**'
+      - '!Ports/iOSPort/**/*.md'
+      - 'vm/**'
+      - '!vm/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
 
 jobs:
   build-ios:
