@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class ContainerAndLayoutTest {
+public class ContainerAndLayoutTest extends UITestBase {
     @Test
     void containerAddRemoveMaintainsOrder() {
         Container container = new Container(BoxLayout.y());

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class ComponentBasicsTest {
+public class ComponentBasicsTest extends UITestBase {
     @Test
     void componentPropertyMutations() {
         Label label = new Label("Hello");

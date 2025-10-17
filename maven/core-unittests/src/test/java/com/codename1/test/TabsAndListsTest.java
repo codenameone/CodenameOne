@@ -14,7 +14,7 @@ import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class TabsAndListsTest {
+public class TabsAndListsTest extends UITestBase {
     @Test
     void tabsSelectionTracksComponents() {
         Tabs tabs = new Tabs();
