@@ -48,7 +48,7 @@ TARGET_BLOCK_RE = re.compile(
     (?P<body>.*?)
     ^\s*\};
     """,
-    re.MULTILINE | re.DOTALL,
+    re.MULTILINE | re.DOTALL | re.VERBOSE,
 )
 
 
