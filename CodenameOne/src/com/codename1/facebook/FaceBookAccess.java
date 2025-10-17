@@ -43,7 +43,6 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
-import com.codename1.ui.list.ListModel;
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -839,74 +838,6 @@ public class FaceBookAccess {
     }
 
     /**
-     * This method returns a list model of photos that automatically fetches additional images as necessary
-     * @param targetList required for the image download code
-     * @param albumId the id of the album
-     * @param photoCount the number of photos within the album 
-     * @param placeholder a placeholder image that will determine the size of the images requested
-     * @return the list of the images
-     */
-    private ListModel getAlbumPhotos(final Component targetList, final String albumId, final int photoCount, final Image placeholder) {
-        if(!isAuthenticated()) {
-            return null;
-        }
-        Hashtable[] h = new Hashtable[photoCount];
-        int hlen = h.length;
-        for(int iter = 0 ; iter < hlen ; iter++) {
-            h[iter] = new Hashtable();
-            h[iter].put("photo", placeholder);
-            if(iter < 30) {
-                h[iter].put("fetching", Boolean.TRUE);
-            }
-        }
-        DefaultListModel dl = new DefaultListModel((Object[])h) {
-            public Object getItem(int offset) {
-                Hashtable hash = (Hashtable)super.getItemAt(offset);
-                if(!hash.containsKey("fetching")) {
-                    int limit = Math.min(30, photoCount - offset);
-                    for(int iter = 0 ; iter < limit ; iter++) {
-                        Hashtable current = (Hashtable)super.getItemAt(iter + offset);
-                        if(current.containsKey("fetching")) {
-                            break;
-                        }
-                        current.put("fetching", Boolean.TRUE);
-                    }
-                    FacebookRESTService con = new FacebookRESTService(token, albumId, FacebookRESTService.PHOTOS, false);
-                    con.setResponseDestination(this);
-                    con.setResponseOffset(0);
-                    con.addArgument("limit", "" + limit);
-                    con.addArgument("offset", "" + offset);
-                    for (int i = 0; i < responseCodeListeners.size(); i++) {
-                        con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
-                    }
-                    NetworkManager.getInstance().addToQueueAndWait(con);
-                    for(int iter = 0 ; iter < limit ; iter++) {
-                        Hashtable current = (Hashtable)getItemAt(iter + offset);
-                        ImageDownloadService.createImageToStorage((String)current.get("photo"), targetList, iter + offset, "photo", ((String)current.get("id")) + placeholder.getHeight(), placeholder, ConnectionRequest.PRIORITY_NORMAL);
-                    }
-                }
-                return hash;
-            }
-        };
-        
-        FacebookRESTService con = new FacebookRESTService(token, albumId, FacebookRESTService.PHOTOS, false);
-        con.setResponseDestination(dl);
-        con.setResponseOffset(0);
-        con.addArgument("limit", "30");
-        con.addArgument("offset", "0");
-        for (int i = 0; i < responseCodeListeners.size(); i++) {
-            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));
-        }
-        NetworkManager.getInstance().addToQueueAndWait(con);
-        for(int iter = 0 ; iter < Math.min(30, photoCount) ; iter++) {
-            Hashtable hash = (Hashtable)dl.getItemAt(iter);
-            ImageDownloadService.createImageToStorage((String)hash.get("photo"), targetList, iter, "photo", ((String)hash.get("id")) + placeholder.getHeight(), placeholder, ConnectionRequest.PRIORITY_NORMAL);
-        }
-
-        return dl;
-    }
-    
-    /**
      *  Gets the post comments
      *
      * @param postId the id
@@ -914,6 +845,7 @@ public class FaceBookAccess {
      * each entry is an Hashtable Object contaning the Object data
      * @param callback the callback that should be updated when the data arrives
      */
+    // PMD Fix (UnusedPrivateMethod): Removed unused album photo ListModel helper.
     public void getPostComments(String postId, DefaultListModel comments, final ActionListener callback) throws IOException {
         getFaceBookObjectItems(postId, FacebookRESTService.COMMENTS, comments, null, callback);
     }
@@ -1122,7 +1054,8 @@ public class FaceBookAccess {
 
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/notifications.getList", false);
         con.addArgument("start_time", startTime);
-        con.addArgument("include_read", new Boolean(includeRead).toString());
+        // PMD Fix (UnnecessaryConversionTemporary, PrimitiveWrapperInstantiation): Avoid boxing boolean via constructor and temporary string while staying compatible with Codename One APIs.
+        con.addArgument("include_read", includeRead ? "true" : "false");
         con.addArgument("format", "json");
 
         con.setResponseDestination(notifications);

@@ -151,6 +151,11 @@ public class Post extends FBObject {
         return picture;
     }
 
+    // PMD Fix (UnusedPrivateField): Expose the created_time metadata via an accessor.
+    public String getCreatedTime() {
+        return created_time;
+    }
+
     /**
      * Gets the Link Count
      *

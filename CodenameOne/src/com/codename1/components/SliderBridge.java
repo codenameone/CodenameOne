@@ -91,10 +91,9 @@ public class SliderBridge extends Slider {
              * {@inheritDoc}
              */
             public void actionPerformed(ActionEvent evt) {
-                if(sources != null) {
-                    if(!sourceVec.contains(evt.getSource())) {
-                        return;
-                    }
+                // PMD Fix (CollapsibleIfStatements): Collapse the nested source checks into one conditional.
+                if(sources != null && !sourceVec.contains(evt.getSource())) {
+                    return;
                 }
                 NetworkEvent e = (NetworkEvent)evt;
                 switch(e.getProgressType()) {

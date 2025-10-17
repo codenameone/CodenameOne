@@ -244,10 +244,9 @@ public class ScaleImageLabel extends Label {
         }
         if (preferredW > 0) {
             Image i = getIcon();
-            if (i != null) {
-                if (preferredW < i.getWidth()) {
-                    return (int)(i.getHeight() * preferredW / (double)i.getWidth());
-                }
+            // PMD Fix (CollapsibleIfStatements): Combine the nested icon and width checks into a single conditional.
+            if (i != null && preferredW < i.getWidth()) {
+                return (int)(i.getHeight() * preferredW / (double)i.getWidth());
             }
         }
         return super.getPreferredH();
@@ -260,10 +259,9 @@ public class ScaleImageLabel extends Label {
         }
         if (preferredH > 0) {
             Image i = getIcon();
-            if (i != null) {
-                if (preferredH < i.getHeight()) {
-                    return (int)(i.getWidth() * preferredH / (double)i.getHeight());
-                }
+            // PMD Fix (CollapsibleIfStatements): Merge the icon nullity and height comparison into one condition.
+            if (i != null && preferredH < i.getHeight()) {
+                return (int)(i.getWidth() * preferredH / (double)i.getHeight());
             }
         }
         return super.getPreferredW();

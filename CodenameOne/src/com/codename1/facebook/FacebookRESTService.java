@@ -44,7 +44,7 @@ import java.util.Vector;
  */
 class FacebookRESTService extends ConnectionRequest implements JSONParseCallback {
 
-    private String token;
+    // PMD Fix (UnusedPrivateField): Removed redundant token storage; the access token is forwarded directly via request arguments.
 
     private Hashtable entry = new Hashtable();
     private Hashtable currentData = entry;
@@ -74,12 +74,10 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static final String GRAPH_URL = "https://graph.facebook.com/";
     
     public FacebookRESTService(boolean post, String token) {
-        this.token = token;
         setPost(post);
     }
 
     public FacebookRESTService(String token, String id, String connectionType, boolean post) {
-        this.token = token;
         setPost(post);
         String query = id;
         if (connectionType.length() > 0) {
@@ -92,7 +90,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public FacebookRESTService(String token, String url, boolean post) {
-        this.token = token;
         setPost(post);
         addArgumentNoEncoding("access_token", token);
         //addArgument("access_token", token);

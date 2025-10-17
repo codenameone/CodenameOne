@@ -58,10 +58,9 @@ public abstract class Database {
     }
     
     private static void validateDatabaseNameArgument(String databaseName) {
-        if (!isCustomPathSupported()) {
-            if (databaseName.indexOf("/") != -1 || databaseName.indexOf("\\") != -1) {
-                throw new IllegalArgumentException("This platform does not support custom database paths.  The database name cannot contain file separators.");
-            }
+        // PMD Fix (CollapsibleIfStatements): Merge the custom path support and separator checks into one condition.
+        if (!isCustomPathSupported() && (databaseName.indexOf("/") != -1 || databaseName.indexOf("\\") != -1)) {
+            throw new IllegalArgumentException("This platform does not support custom database paths.  The database name cannot contain file separators.");
         }
     }
     

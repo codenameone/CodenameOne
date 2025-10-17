@@ -66,11 +66,13 @@ public class ThreadSafeDatabase extends Database {
     }
 
     interface RunnableWithIOException {
-        public void run() throws IOException;
+        // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public.
+        void run() throws IOException;
     }
 
     interface RunnableWithResponseOrIOException {
-        public Object run() throws IOException;
+        // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public.
+        Object run() throws IOException;
     }
     
     private void invokeWithException(final RunnableWithIOException r) throws IOException {

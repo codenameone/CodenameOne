@@ -840,26 +840,23 @@ public class ToastBar {
                 updateStatus();
             }
             Rectangle safeArea = Display.getInstance().getDisplaySafeArea(new Rectangle(0, 0, 0, 0));
-            if(position == Component.BOTTOM) {
-                if (f.getInvisibleAreaUnderVKB() > 0) {
-                    Style s = c.getAllStyles();
-                    s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
-                    s.setMarginBottom(f.getInvisibleAreaUnderVKB());
-                }
-                int safeBottomMargin = Display.getInstance().getDisplayHeight()
-                        - safeArea.getY()
-                        - safeArea.getHeight();
-                if (0 < safeBottomMargin) {
-                    Style s = c.getAllStyles();
-                    s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                    s.setPaddingBottom(safeBottomMargin);
-                }
-            } else if (position == Component.TOP) {
-                if (safeArea.getY() > 0) {
-                    Style s = c.getAllStyles();
-                    s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                    s.setPaddingTop(safeArea.getY());
-                }
+            // PMD Fix (CollapsibleIfStatements): Combine nested position checks to simplify the layout adjustments.
+            if(position == Component.BOTTOM && f.getInvisibleAreaUnderVKB() > 0) {
+                Style s = c.getAllStyles();
+                s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+                s.setMarginBottom(f.getInvisibleAreaUnderVKB());
+            }
+            int safeBottomMargin = Display.getInstance().getDisplayHeight()
+                    - safeArea.getY()
+                    - safeArea.getHeight();
+            if (position == Component.BOTTOM && safeBottomMargin > 0) {
+                Style s = c.getAllStyles();
+                s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                s.setPaddingBottom(safeBottomMargin);
+            } else if (position == Component.TOP && safeArea.getY() > 0) {
+                Style s = c.getAllStyles();
+                s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                s.setPaddingTop(safeArea.getY());
             }
 
             return c;

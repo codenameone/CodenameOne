@@ -51,7 +51,7 @@ public abstract class FullScreenAdService {
     private boolean allowWithoutNetwork = true;
     private int timeout = 10000;
     private int adDisplayTime = 6000;
-    private int timeForNext = -1;
+    // PMD Fix (UnusedPrivateField): Removed redundant timeForNext cache; timing is provided per invocation.
     private boolean scaleMode;
     private boolean allowSkipping;
     private static Object LOCK = new Object();
