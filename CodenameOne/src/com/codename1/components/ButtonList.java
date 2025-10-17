@@ -105,9 +105,9 @@ public abstract class ButtonList extends Container implements DataChangedListene
      * @param <V> The type used for the view.  For RadioList T would be RadioButton.  For CheckBoxList, T would be CheckBox.  For SwitchList it's different because
      * the Switch uses a wrapper component.
      */
-    public static interface Decorator<M,V extends Component> {
-        public void decorate(M modelItem, V viewItem);
-        public void undecorate(V viewItem);
+    public interface Decorator<M,V extends Component> { // PMD Fix: UnnecessaryModifier removed redundant static
+        void decorate(M modelItem, V viewItem); // PMD Fix: UnnecessaryModifier removed redundant public
+        void undecorate(V viewItem); // PMD Fix: UnnecessaryModifier removed redundant public
     }
     
     

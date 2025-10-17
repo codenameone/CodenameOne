@@ -205,7 +205,7 @@ private static class IColor
 
 
 
-    private final static int ToARGB(IColor c){
+    private static int ToARGB(IColor c){ // PMD Fix: UnnecessaryModifier removed redundant final
         return ((c.alpha<<24) | 
                 (c.red<<16)|
                 (c.green<<8)|

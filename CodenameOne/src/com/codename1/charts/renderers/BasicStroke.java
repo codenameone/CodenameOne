@@ -56,6 +56,7 @@ public class BasicStroke {
     mJoin = join;
     mMiter = miter;
     mIntervals = intervals;
+    mPhase = phase; // PMD Fix: UnusedFormalParameter store constructor argument
   }
 
   /**

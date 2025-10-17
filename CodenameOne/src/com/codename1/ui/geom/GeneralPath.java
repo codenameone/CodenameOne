@@ -2872,7 +2872,8 @@ public final class GeneralPath implements Shape {
         // Check Y coordinate
         int up = 0;
         int down = 0;
-        for(int i = 2; i < bc; i += 4) {
+        boolean intersects = false;
+        for (int i = 2; i < bc; i += 4) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
             if (bound[i] < py1) {
                 up++;
                 continue;
@@ -2881,6 +2882,11 @@ public final class GeneralPath implements Shape {
                 down++;
                 continue;
             }
+            intersects = true;
+            break;
+        }
+
+        if (intersects) {
             return CROSSING;
         }
 
@@ -2893,12 +2899,18 @@ public final class GeneralPath implements Shape {
             // bc >= 2
             sortBound(bound, bc);
             boolean sign = bound[2] > py2;
-            for(int i = 6; i < bc; i += 4) {
+            boolean crossing = false;
+            for (int i = 6; i < bc; i += 4) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
                 boolean sign2 = bound[i] > py2;
                 if (sign != sign2 && bound[i + 1] != bound[i - 3]) {
-                    return CROSSING;
+                    crossing = true;
+                    sign = sign2;
+                    break;
                 }
                 sign = sign2;
+            }
+            if (crossing) {
+                return CROSSING;
             }
         }
         return UNKNOWN;

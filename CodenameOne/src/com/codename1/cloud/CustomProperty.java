@@ -40,5 +40,5 @@ public interface CustomProperty {
      * @param propertyName the name of the property
      * @return the property value
      */
-    public Object propertyValue(CloudObject obj, String propertyName);
+    Object propertyValue(CloudObject obj, String propertyName); // PMD Fix: UnnecessaryModifier removed
 }

@@ -39,5 +39,5 @@ public interface BindTarget {
      * @param oldValue the old value of the property
      * @param newValue the new value for the property
      */
-    public void propertyChanged(Component source, String propertyName, Object oldValue, Object newValue);
+    void propertyChanged(Component source, String propertyName, Object oldValue, Object newValue); // PMD Fix: UnnecessaryModifier removed
 }

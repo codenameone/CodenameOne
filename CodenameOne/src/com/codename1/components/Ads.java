@@ -524,7 +524,7 @@ public class Ads extends Container implements HTMLCallback {
             return getAppID();
         }
         if (name.equals("updateDuration")) {
-            return new Integer(getUpdateDuration());
+            return Integer.valueOf(getUpdateDuration()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
         if (name.equals("age")) {
             return getAge();

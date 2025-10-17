@@ -378,7 +378,7 @@ public final class CloudObject implements Externalizable {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
-        values.put(key, new Long(value));
+        values.put(key, Long.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
     
     /**
@@ -403,7 +403,7 @@ public final class CloudObject implements Externalizable {
     public Long getLong(String key) {
         Object o = getObject(key);
         if(o instanceof Integer) {
-            return new Long(((Integer)o).intValue());
+            return Long.valueOf(((Integer)o).intValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
         return (Long)o;
     }
@@ -419,7 +419,7 @@ public final class CloudObject implements Externalizable {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
-        values.put(key, new Integer(value));
+        values.put(key, Integer.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
     
     /**
@@ -444,7 +444,7 @@ public final class CloudObject implements Externalizable {
     public Integer getInteger(String key) {
         Object o = getObject(key);
         if(o instanceof Long) {
-            return new Integer((int)((Long)o).longValue());
+            return Integer.valueOf((int)((Long)o).longValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
         return (Integer)o;
     }
@@ -460,7 +460,7 @@ public final class CloudObject implements Externalizable {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
-        values.put(key, new Double(value));
+        values.put(key, Double.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
     
     /**
@@ -497,7 +497,7 @@ public final class CloudObject implements Externalizable {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
-        values.put(key, new Float(value));
+        values.put(key, Float.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
     
     /**
@@ -522,7 +522,7 @@ public final class CloudObject implements Externalizable {
     public Float getFloat(String key) {
         Object o = getObject(key);
         if(o instanceof Double) {
-            return new Float(((Double)o).floatValue());
+            return Float.valueOf(((Double)o).floatValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
         return (Float)o;
     }
@@ -538,7 +538,7 @@ public final class CloudObject implements Externalizable {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
-        values.put(key, new Boolean(value));
+        values.put(key, Boolean.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
     
     /**
@@ -760,7 +760,7 @@ public final class CloudObject implements Externalizable {
      */
     public void unbindProperty(Component cmp, String propertyName) {
         BindTarget t = (BindTarget)cmp.getClientProperty("CN1Bind" + propertyName);
-        cmp.unbindProperty(propertyName, t);;
+        cmp.unbindProperty(propertyName, t);
     }
     
     /**

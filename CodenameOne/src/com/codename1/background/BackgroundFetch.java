@@ -68,6 +68,6 @@ public interface BackgroundFetch {
      * @see com.codename1.ui.Display.getPreferredBackgroundFetchInterval()
      * @see com.codename1.ui.Display.isBackgroundFetchSupported()
      */
-    public void performBackgroundFetch(long deadline, Callback<Boolean> onComplete);
+    void performBackgroundFetch(long deadline, Callback<Boolean> onComplete); // PMD Fix: UnnecessaryModifier removed
     
 }

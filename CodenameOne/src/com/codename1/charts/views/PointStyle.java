@@ -30,7 +30,7 @@ public enum PointStyle {
    * 
    * @param name the name
    */
-  private PointStyle(String name) {
+  PointStyle(String name) { // PMD Fix: UnnecessaryModifier removed implicit private
     mName = name;
   }
 

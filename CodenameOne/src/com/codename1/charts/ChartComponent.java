@@ -536,29 +536,21 @@ public class ChartComponent extends Component {
                     }
                     
                     double[] zoomLimits = xyChart.getRenderer().getZoomLimits();
-                    if (zoomLimits != null && zoomLimits[0] != 0) {
-                        if (maxX - minX < zoomLimits[0]) {
-                            maxX = xyChart.getRenderer().getXAxisMax();
-                            minX = xyChart.getRenderer().getXAxisMin();
-                        }
+                    if (zoomLimits != null && zoomLimits[0] != 0 && maxX - minX < zoomLimits[0]) { // PMD Fix: CollapsibleIfStatements
+                        maxX = xyChart.getRenderer().getXAxisMax();
+                        minX = xyChart.getRenderer().getXAxisMin();
                     }
-                    if (zoomLimits != null && zoomLimits[1] != 0) {
-                        if (maxX - minX > zoomLimits[1]) {
-                            maxX = xyChart.getRenderer().getXAxisMax();
-                            minX = xyChart.getRenderer().getXAxisMin();
-                        }
+                    if (zoomLimits != null && zoomLimits[1] != 0 && maxX - minX > zoomLimits[1]) { // PMD Fix: CollapsibleIfStatements
+                        maxX = xyChart.getRenderer().getXAxisMax();
+                        minX = xyChart.getRenderer().getXAxisMin();
                     }
-                    if (zoomLimits != null && zoomLimits[2] != 0) {
-                        if (maxY - minY < zoomLimits[2]) {
-                            maxY = xyChart.getRenderer().getYAxisMax();
-                            minY = xyChart.getRenderer().getYAxisMin();
-                        }
+                    if (zoomLimits != null && zoomLimits[2] != 0 && maxY - minY < zoomLimits[2]) { // PMD Fix: CollapsibleIfStatements
+                        maxY = xyChart.getRenderer().getYAxisMax();
+                        minY = xyChart.getRenderer().getYAxisMin();
                     }
-                    if (zoomLimits != null && zoomLimits[3] != 0) {
-                        if (maxY - minY > zoomLimits[3]) {
-                            maxY = xyChart.getRenderer().getYAxisMax();
-                            minY = xyChart.getRenderer().getYAxisMin();
-                        }
+                    if (zoomLimits != null && zoomLimits[3] != 0 && maxY - minY > zoomLimits[3]) { // PMD Fix: CollapsibleIfStatements
+                        maxY = xyChart.getRenderer().getYAxisMax();
+                        minY = xyChart.getRenderer().getYAxisMin();
                     }
                     
                     if (!xyChart.getRenderer().isZoomXEnabled()) {
@@ -894,7 +886,7 @@ public class ChartComponent extends Component {
     }
     
     private interface IZoomTransition {
-        public void start();
+        void start();
     }
     
     private class ZoomTransition implements Animation, IZoomTransition {

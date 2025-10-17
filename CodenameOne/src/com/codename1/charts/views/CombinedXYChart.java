@@ -25,6 +25,7 @@ import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation;
 import com.codename1.charts.renderers.XYSeriesRenderer;
+import com.codename1.io.Log;
 
 
 
@@ -59,8 +60,8 @@ public class CombinedXYChart extends XYChart {
     for (int i = 0; i < length; i++) {
       try {
         mCharts[i] = getXYChart(chartDefinitions[i].getType());
-      } catch (Exception e) {
-        // ignore
+      } catch (Exception e) { // PMD Fix: EmptyCatchBlock log exception
+        Log.e(e);
       }
       if (mCharts[i] == null) {
         throw new IllegalArgumentException("Unknown chart type " + chartDefinitions[i].getType());

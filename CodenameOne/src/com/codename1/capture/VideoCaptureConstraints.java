@@ -101,8 +101,8 @@ public class VideoCaptureConstraints {
      * to transfer the "preferred" constraints to corresponding "actual" constraints
      * based on what the platform supports.
      */
-    public static interface Compiler {
-        public VideoCaptureConstraints compile(VideoCaptureConstraints cnst);
+    public interface Compiler { // PMD Fix: UnnecessaryModifier removed implicit static
+        VideoCaptureConstraints compile(VideoCaptureConstraints cnst); // PMD Fix: UnnecessaryModifier removed redundant public
     }
     
     /**

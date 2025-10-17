@@ -891,8 +891,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @see Component#isVisible() 
      */
     public boolean isVisible() {
-        for (Component c : this) {
-            return c.isVisible();
+        Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            return iterator.next().isVisible();
         }
         return false;
     }
@@ -903,8 +904,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @see Component#isHidden()
      */
     public boolean isHidden() {
-        for (Component c : this) {
-            return c.isHidden();
+        Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            return iterator.next().isHidden();
         }
         return false;
     }
@@ -2006,8 +2008,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return The first component in this set.
      */
     public Component asComponent() {
-        for (Component c : this) {
-            return c;
+        Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            return iterator.next();
         }
         return null;
     }
@@ -2232,8 +2235,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return The value of the client property.
      */
     public Object getClientProperty(String key) {
-        for (Component c : this) {
-            return c.getClientProperty(key);
+        Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            return iterator.next().getClientProperty(key);
         }
         return null;
     }
@@ -2794,9 +2798,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return 
      */
     public ComponentSelector requestFocus() {
-        for (Component c : this) {
-            c.requestFocus();
-            return this;
+        Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            iterator.next().requestFocus();
         }
         return this;
     }
@@ -2941,8 +2945,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     public boolean isIgnorePointerEvents() {
-        for (Component c : this) {
-            return c.isIgnorePointerEvents();
+        Iterator<Component> iterator = iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            return iterator.next().isIgnorePointerEvents();
         }
         return false;
     }

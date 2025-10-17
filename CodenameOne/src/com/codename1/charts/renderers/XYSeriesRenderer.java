@@ -29,7 +29,7 @@ import com.codename1.ui.Font;
 /**
  * A renderer for the XY type series.
  */
-public class XYSeriesRenderer extends SimpleSeriesRenderer {
+public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: UnnecessarySemicolon cleaned extra delimiter
   /** If the chart points should be filled. */
   private boolean mFillPoints = false;
   /** If the chart should be filled outside its line. */
@@ -63,7 +63,7 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer {
   public static class FillOutsideLine {
     public enum Type {
       NONE, BOUNDS_ALL, BOUNDS_BELOW, BOUNDS_ABOVE, BELOW, ABOVE
-    };
+    }
 
     /** The fill type. */
     private final Type mType;

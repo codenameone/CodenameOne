@@ -39,12 +39,12 @@ public interface ScanResult {
      * @param formatName the format of the scan
      * @param rawBytes the bytes of data
      */
-    public void scanCompleted(String contents, String formatName, byte[] rawBytes);
+    void scanCompleted(String contents, String formatName, byte[] rawBytes); // PMD Fix: UnnecessaryModifier removed
     
     /**
      * Invoked if the user canceled the scan
      */
-    public void scanCanceled();
+    void scanCanceled(); // PMD Fix: UnnecessaryModifier removed
     
     /**
      * Invoked if an error occurred during the scanning process
@@ -52,5 +52,5 @@ public interface ScanResult {
      * @param errorCode code
      * @param message descriptive message
      */
-    public void scanError(int errorCode, String message);
+    void scanError(int errorCode, String message); // PMD Fix: UnnecessaryModifier removed
 }

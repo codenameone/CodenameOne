@@ -637,11 +637,9 @@ public class InteractionDialog extends Container {
      *          This is ignored if there isn't enough space
      */
     public void showPopupDialog(Component c, boolean bias) {
-        Form f = c== null ? null : c.getComponentForm();
-        if (f != null) {
-            if (!formMode && !f.getContentPane().contains(c)) {
-                setFormMode(true);
-            }
+        Form f = c == null ? null : c.getComponentForm(); // PMD Fix: BrokenNullCheck
+        if (f != null && !formMode && !f.getContentPane().contains(c)) {
+            setFormMode(true);
         }
         disposed = false;
         getUnselectedStyle().setOpacity(255);
@@ -689,16 +687,15 @@ public class InteractionDialog extends Container {
             getContentPane().setUIID("PopupContentPane");
         }
 
-        Component contentPane = getContentPane();
         Label title = getTitleComponent();
 
         UIManager manager = getUIManager();
-        
+
         String dialogTitle = title.getText();
 
         // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
         // preferred size logic of the dialog won't work with large title borders
-        if((dialogTitle != null || dialogTitle.length() == 0) && manager.isThemeConstant("hideEmptyTitleBool", true)) {
+        if((dialogTitle == null || dialogTitle.length() == 0) && manager.isThemeConstant("hideEmptyTitleBool", true)) {
             boolean b = getTitle().length() > 0;
             titleArea.setVisible(b);
             getTitleComponent().setVisible(b);
@@ -712,9 +709,8 @@ public class InteractionDialog extends Container {
         // allows a text area to recalculate its preferred size if embedded within a dialog
         revalidate();
 
-        Style contentPaneStyle = getStyle();
+        Style contentPaneStyle = getStyle(); // PMD Fix: UnusedLocalVariable removed redundant contentPane reference
 
-        boolean restoreArrow = false;
         if(manager.isThemeConstant(getUIID()+ "ArrowBool", false)) {
             Image t = manager.getThemeImageConstant(getUIID() + "ArrowTopImage");
             Image b = manager.getThemeImageConstant(getUIID() + "ArrowBottomImage");
@@ -723,8 +719,7 @@ public class InteractionDialog extends Container {
             Border border = contentPaneStyle.getBorder();
             if(border != null) {
                 border.setImageBorderSpecialTile(t, b, l, r, rect);
-                restoreArrow = true;
-            } 
+            }
         } else {
             Border border = contentPaneStyle.getBorder();
             if(border != null) {

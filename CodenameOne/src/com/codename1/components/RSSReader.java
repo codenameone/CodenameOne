@@ -338,7 +338,7 @@ public class RSSReader extends List {
      */
     public Object getPropertyValue(String name) {
         if(name.equals("limit")) {
-            return new Integer(limit);
+            return Integer.valueOf(limit); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
         if(name.equals("url")) {
             return url;
