@@ -6,11 +6,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class PatchGradleFiles {
-    private static final String REPOSITORIES_BLOCK = String.join("\n",
-            "repositories {",
-            "    google()",
-            "    mavenCentral()",
-            "}");
+    private static final String REPOSITORIES_BLOCK = """
+            repositories {
+                google()
+                mavenCentral()
+            }
+            """.stripTrailing();
 
     private static final Pattern REPOSITORIES_PATTERN = Pattern.compile("(?ms)^\\s*repositories\\s*\\{.*?\\}");
 
