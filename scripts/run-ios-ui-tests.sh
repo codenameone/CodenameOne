@@ -251,10 +251,8 @@ rm -rf "$DERIVED_DATA_DIR"
 # Change these names if your targets have different names.
 #
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
-SKIP_TEST_TARGET="${SKIP_TEST_TARGET:-HelloCodenameOneTests}"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
-  -skip-testing:"${SKIP_TEST_TARGET}"
 )
 
 set -o pipefail
@@ -263,8 +261,7 @@ if ! xcodebuild \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
   -configuration Debug \
-  -destination "$SIM_DESTINATION" \
-  -derivedDataPath "$DERIVED_DATA_DIR" \
+  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.5' \  -derivedDataPath "$DERIVED_DATA_DIR" \
   -resultBundlePath "$RESULT_BUNDLE" \
   "${XCODE_TEST_FILTERS[@]}" \
   test | tee "$TEST_LOG"; then
