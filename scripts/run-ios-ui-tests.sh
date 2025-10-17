@@ -80,7 +80,88 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
-SIM_DESTINATION="${IOS_SIM_DESTINATION:-platform=iOS Simulator,name=iPhone 15}"
+auto_select_destination() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    return
+  fi
+
+  local selected
+  if ! selected="$(
+    xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
+import json
+import sys
+
+
+def parse_version_tuple(version: str):
+    parts = []
+    for piece in version.split('.'):
+        piece = piece.strip()
+        if not piece:
+            continue
+        try:
+            parts.append(int(piece))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def iter_candidates(payload):
+    devices = payload.get('devices', {})
+    for runtime, entries in devices.items():
+        if 'iOS' not in runtime:
+            continue
+        version = runtime.split('iOS-')[-1].replace('-', '.')
+        version_tuple = parse_version_tuple(version)
+        for entry in entries:
+            if not entry.get('isAvailable'):
+                continue
+            name = entry.get('name') or ''
+            if 'iPhone' not in name:
+                continue
+            udid = entry.get('udid') or ''
+            if not udid:
+                continue
+            yield version_tuple, name, udid
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+    except Exception:
+        return
+
+    candidates = sorted(iter_candidates(data), reverse=True)
+    if candidates:
+        _, _, udid = candidates[0]
+        print(f"platform=iOS Simulator,id={udid}")
+
+
+if __name__ == "__main__":
+    main()
+PY
+  )"; then
+    selected=""
+  fi
+
+  if [ -n "${selected:-}" ]; then
+    echo "$selected"
+  fi
+}
+
+SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
+if [ -z "$SIM_DESTINATION" ]; then
+  SELECTED_DESTINATION="$(auto_select_destination)"
+  if [ -n "$SELECTED_DESTINATION" ]; then
+    SIM_DESTINATION="$SELECTED_DESTINATION"
+    ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
+  fi
+fi
+
+if [ -z "$SIM_DESTINATION" ]; then
+  SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16"
+  ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
+fi
+
 ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
@@ -121,7 +202,7 @@ for png in "${PNG_FILES[@]}"; do
   COMPARE_ARGS+=("--actual" "${test_name}=${png}")
   cp "$png" "$ARTIFACTS_DIR/$(basename "$png")" 2>/dev/null || true
   ri_log "  -> Saved artifact copy for test '$test_name'"
-fi
+done
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
