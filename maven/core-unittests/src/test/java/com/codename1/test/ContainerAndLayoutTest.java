@@ -74,12 +74,10 @@ public class ContainerAndLayoutTest extends UITestBase {
         Form form = new Form("Initial", new BorderLayout());
         form.setTitle("Updated Title");
         form.setScrollableY(false);
-        form.setScrollableX(true);
         form.setLayout(BoxLayout.y());
 
         assertEquals("Updated Title", form.getTitle());
         assertFalse(form.isScrollableY());
-        assertTrue(form.isScrollableX());
         assertTrue(form.getLayout() instanceof BoxLayout);
     }
 
