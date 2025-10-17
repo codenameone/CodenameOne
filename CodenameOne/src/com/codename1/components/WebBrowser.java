@@ -117,20 +117,19 @@ public class WebBrowser extends Container {
                 return new ConnectionRequest() {
 
                     protected void buildRequestBody(OutputStream os) throws IOException {
-                        if (isPost()) {
-                            if (docInfo.getParams() != null) {
-                                String enc = docInfo.getEncoding();
-                                if(enc.indexOf('/') > -1) {
-                                    if(enc.indexOf("charset=") > -1) {
-                                        enc = enc.substring(enc.indexOf("charset=") + 8);
-                                    } else {
-                                        enc = DocumentInfo.ENCODING_UTF8;
-                                    }
+                        // PMD Fix (CollapsibleIfStatements): Merge the post and parameter checks into a single conditional.
+                        if (isPost() && docInfo.getParams() != null) {
+                            String enc = docInfo.getEncoding();
+                            if(enc.indexOf('/') > -1) {
+                                if(enc.indexOf("charset=") > -1) {
+                                    enc = enc.substring(enc.indexOf("charset=") + 8);
+                                } else {
+                                    enc = DocumentInfo.ENCODING_UTF8;
                                 }
-                                OutputStreamWriter w = new OutputStreamWriter(os, enc);
-                                w.write(docInfo.getParams());
-                                w.flush();
                             }
+                            OutputStreamWriter w = new OutputStreamWriter(os, enc);
+                            w.write(docInfo.getParams());
+                            w.flush();
                         }
                     }
 

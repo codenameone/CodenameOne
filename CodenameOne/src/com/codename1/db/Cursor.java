@@ -41,13 +41,14 @@ public interface Cursor {
 
     /**
      * Move the cursor to the first row.
-     * 
-     * If cursor provides forward-only navigation and is positioned after the 
-     * first row then calling first() method would throw a IOException.     
-     * @return true if succeeded 
-     * @throws IOException 
+     *
+     * If cursor provides forward-only navigation and is positioned after the
+     * first row then calling first() method would throw a IOException.
+     * @return true if succeeded
+     * @throws IOException
      */
-    public boolean first() throws IOException;
+    // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public; remove redundant modifiers.
+    boolean first() throws IOException;
 
     /**
      * Move the cursor to the last row.
@@ -55,7 +56,7 @@ public interface Cursor {
      * @return true if succeeded 
      * @throws IOException 
      */
-    public boolean last() throws IOException;
+    boolean last() throws IOException;
 
     /**
      * Moves the cursor to the next row.
@@ -64,7 +65,7 @@ public interface Cursor {
      * @return true if succeeded 
      * @throws IOException 
      */
-    public boolean next() throws IOException;
+    boolean next() throws IOException;
 
     /**
      * Moves the cursor to the previous row.
@@ -73,7 +74,7 @@ public interface Cursor {
      * @return true if succeeded 
      * @throws IOException 
      */
-    public boolean prev() throws IOException;
+    boolean prev() throws IOException;
 
     /**
      * Returns the zero-based index for a given column name.
@@ -84,7 +85,7 @@ public interface Cursor {
      * @return the index of the column
      * @throws IOException 
      */
-    public int getColumnIndex(String columnName) throws IOException;
+    int getColumnIndex(String columnName) throws IOException;
 
     /**
      * Returns the column name at a given zero-based column index.
@@ -96,14 +97,14 @@ public interface Cursor {
      * 
      * @throws IOException 
      */
-    public String getColumnName(int columnIndex) throws IOException;
+    String getColumnName(int columnIndex) throws IOException;
 
     /**
      * Returns the column count
      * @return the column count
      * @throws IOException 
      */
-    public int getColumnCount() throws IOException;
+    int getColumnCount() throws IOException;
     
     /**
      * Returns the current Cursor position.
@@ -111,7 +112,7 @@ public interface Cursor {
      * @return the cursor position
      * @throws IOException 
      */
-    public int getPosition() throws IOException;
+    int getPosition() throws IOException;
     
     /**
      * Move the cursor to an absolute row position
@@ -120,13 +121,13 @@ public interface Cursor {
      * @return true if succeeded 
      * @throws IOException 
      */
-    public boolean position(int row) throws IOException;
+    boolean position(int row) throws IOException;
 
     /**
      * Close the cursor and release its resources
      * @throws IOException 
      */
-    public void close() throws IOException;
+    void close() throws IOException;
     
     /**
      * Get the Row data Object.
@@ -134,6 +135,6 @@ public interface Cursor {
      * @return a Row Object
      * @throws IOException 
      */
-    public Row getRow() throws IOException; 
+    Row getRow() throws IOException;
     
 }

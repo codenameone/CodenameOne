@@ -124,7 +124,6 @@ public abstract class CodenameOneImplementation {
 
     private static boolean bidi;
     private String packageName;
-    private static int pollingMillis = 3 * 60 * 60000;
     private Component editingText;
     private String appArg;
     
@@ -2354,9 +2353,8 @@ public abstract class CodenameOneImplementation {
             try {
                 hasDragStartedXY = hasDragStarted(x, y);
             } catch ( Throwable t) {
-                // Since this method may be running off the EDT
-                // It is possible that hasDragStarted will throw an NPE
-                // as the UI may be in an inconsistent state.
+                // PMD Fix (EmptyCatchBlock): Log the exception to retain diagnostic information while tolerating inconsistent states.
+                Log.e(t);
             }
         }
         if (dragStarted || hasDragStartedXY) {
@@ -2596,10 +2594,10 @@ public abstract class CodenameOneImplementation {
                         current[6] == centerY &&
                         current[7] == size &&
                         getImageWidth(currentImage) == width &&
-                        getImageHeight(currentImage) == height) {
-                    if((horizontal && current[4] == 1) || ((!horizontal) && current[4] == 0)) {
-                        return currentImage;
-                    }
+                        getImageHeight(currentImage) == height &&
+                        ((horizontal && current[4] == 1) || (!horizontal && current[4] == 0))) {
+                    // PMD Fix (CollapsibleIfStatements): Collapse nested equality checks for cache reuse.
+                    return currentImage;
                 }
             }
         }
@@ -3381,12 +3379,11 @@ public abstract class CodenameOneImplementation {
      * @return a "visual" renderable string
      */
     public String convertBidiLogicalToVisual(String s) {
-        if (bidi) {
-            if (s.length() >= 2) {
-                char[] c = s.toCharArray();
-                swapBidiChars(c, 0, s.length(), -1);
-                return new String(c);
-            }
+        if (bidi && s.length() >= 2) {
+            // PMD Fix (CollapsibleIfStatements): Merge bidi activation and length checks prior to processing.
+            char[] c = s.toCharArray();
+            swapBidiChars(c, 0, s.length(), -1);
+            return new String(c);
         }
         return s;
     }
@@ -3436,7 +3433,8 @@ public abstract class CodenameOneImplementation {
         return (c >= RTL_RANGE_BEGIN && c <= RTL_RANGE_END);
     }
 
-    private final int swapBidiChars(char[] chars, int ixStart, int len, int index) {
+    // PMD Fix (UnnecessaryModifier): Private methods cannot be overridden, so final is redundant.
+    private int swapBidiChars(char[] chars, int ixStart, int len, int index) {
         int destIndex = -1;
 
         int ixEnd = ixStart + len;
@@ -3506,7 +3504,8 @@ public abstract class CodenameOneImplementation {
         return !isRTL(c) && !isRTLBreak(c);
     }
 
-    private final int scanSecond(char[] chars, int ixStart, int ixEnd) {
+    // PMD Fix (UnnecessaryModifier): Private helper does not require the final modifier.
+    private int scanSecond(char[] chars, int ixStart, int ixEnd) {
         int ixFound = -1;
         for (int ix = ixStart; ixFound < 0 && ix < ixEnd; ix++) {
             if (!isRTLOrWhitespace(chars[ix])) {
@@ -3516,7 +3515,8 @@ public abstract class CodenameOneImplementation {
         return ixFound;
     }
 
-    private final int scanBackFirst(char[] chars, int ixStart, int ixEnd) {
+    // PMD Fix (UnnecessaryModifier): Remove redundant final modifier on private helper.
+    private int scanBackFirst(char[] chars, int ixStart, int ixEnd) {
         int ix, ixFound = ixEnd;
         for (ix = ixStart + 1; ix < ixEnd; ix++) {
             if (isRTL(chars[ix]) || isRTLBreak(chars[ix])) {
@@ -7107,7 +7107,7 @@ public abstract class CodenameOneImplementation {
      * @param freq the frequency in milliseconds
      */
     public void setPollingFrequency(int freq) {
-        pollingMillis = freq;
+        // PMD Fix (UnusedPrivateField): Removed obsolete pollingMillis state; method now only triggers listener wake-up.
         if(callback != null && pollingThreadRunning) {
             synchronized(callback) {
                 callback.notify();
@@ -7260,10 +7260,9 @@ public abstract class CodenameOneImplementation {
      * @param commandBehavior the commandBehavior to set
      */
     public void setCommandBehavior(int commandBehavior) {
-        if(!isTouchDevice()) {
-            if(commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
-                commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
-            }
+        // PMD Fix (CollapsibleIfStatements): Combine touch capability and behavior checks.
+        if(!isTouchDevice() && commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
+            commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
         }
         this.commandBehavior = commandBehavior;
         notifyCommandBehavior(commandBehavior);
@@ -8252,13 +8251,14 @@ public abstract class CodenameOneImplementation {
                 // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
                 // the downside is that a part of a letter may be shown here as well.
 
+                if (rtl && !isTickerRunning && endsWith3Points) {
+                    // PMD Fix (CollapsibleIfStatements): Separate combined RTL and ticker checks into a single conditional.
+                    String points = "...";
+                    int pointsW = stringWidth(nativeFont, points);
+                    drawString(nativeGraphics, nativeFont, points, shiftText + x, y, textDecoration, fontHeight);
+                    clipRect(nativeGraphics, pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);
+                }
                 if (rtl) {
-                    if ((!isTickerRunning) && endsWith3Points) {
-                        String points = "...";
-                        int pointsW = stringWidth(nativeFont, points);
-                        drawString(nativeGraphics, nativeFont, points, shiftText + x, y, textDecoration, fontHeight);
-                        clipRect(nativeGraphics, pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);
-                    }
                     x = x - txtW + textSpaceW;
                 } else if (endsWith3Points) {
                     String points = "...";

@@ -35,6 +35,7 @@ import java.io.IOException;
  * @since 7.0
  */
 public interface RowExt extends Row {
-    public boolean wasNull() throws IOException;
-    
+    // PMD Fix (UnnecessaryModifier): Interface methods inherit public visibility.
+    boolean wasNull() throws IOException;
+
 }

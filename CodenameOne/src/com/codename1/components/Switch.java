@@ -772,8 +772,8 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 }
 
             }
+            // PMD Fix (UnnecessaryReturn): Removed redundant return at the end of the method.
             animationLock = false;
-            return;
         }
     };
     
@@ -836,6 +836,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         setValue(value, false);
     }
     
+    // PMD Fix (UnusedPrivateMethod): Removed the unused flip() helper and retained this setter as the single source of truth.
     private void setValue(boolean value, boolean fireEvent) {
         boolean orig = animationLock;
         animationLock = true;
@@ -850,10 +851,6 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
         repaint();
         animationLock = orig;
-    }
-
-    private void flip() {
-        setValue(!value);
     }
 
     /**

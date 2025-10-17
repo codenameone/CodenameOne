@@ -2873,7 +2873,8 @@ public final class GeneralPath implements Shape {
         int up = 0;
         int down = 0;
         boolean intersects = false;
-        for (int i = 2; i < bc; i += 4) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        // PMD Fix (AvoidBranchingStatementAsLastInLoop): Stop relying on a terminal break by guarding the loop with the intersects flag.
+        for (int i = 2; i < bc && !intersects; i += 4) {
             if (bound[i] < py1) {
                 up++;
                 continue;
@@ -2883,7 +2884,6 @@ public final class GeneralPath implements Shape {
                 continue;
             }
             intersects = true;
-            break;
         }
 
         if (intersects) {
@@ -2900,12 +2900,13 @@ public final class GeneralPath implements Shape {
             sortBound(bound, bc);
             boolean sign = bound[2] > py2;
             boolean crossing = false;
-            for (int i = 6; i < bc; i += 4) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
+            // PMD Fix (AvoidBranchingStatementAsLastInLoop): Guard the loop with the crossing flag instead of breaking at the end.
+            for (int i = 6; i < bc && !crossing; i += 4) {
                 boolean sign2 = bound[i] > py2;
                 if (sign != sign2 && bound[i + 1] != bound[i - 3]) {
                     crossing = true;
                     sign = sign2;
-                    break;
+                    continue;
                 }
                 sign = sign2;
             }

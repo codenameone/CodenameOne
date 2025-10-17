@@ -41,12 +41,13 @@ public interface Row {
 
     /**
      * Gets column value by index.
-     * 
+     *
      * @param index starts with zero
      * @return byte [] data
-     * @throws IOException 
+     * @throws IOException
      */
-    public byte[] getBlob(int index)throws IOException;
+    // PMD Fix (UnnecessaryModifier): Remove redundant public modifiers from interface methods.
+    byte[] getBlob(int index)throws IOException;
 
     /**
      * Gets column value by index.
@@ -55,7 +56,7 @@ public interface Row {
      * @return a double data from the database
      * @throws IOException 
      */
-    public double getDouble(int index)throws IOException;
+    double getDouble(int index)throws IOException;
 
     /**
      * Gets column value by index.
@@ -64,7 +65,7 @@ public interface Row {
      * @return a float data from the database
      * @throws IOException 
      */
-    public float getFloat(int index)throws IOException;
+    float getFloat(int index)throws IOException;
 
     /**
      * Gets column value by index.
@@ -73,7 +74,7 @@ public interface Row {
      * @return a int data from the database
      * @throws IOException 
      */
-    public int getInteger(int index)throws IOException;
+    int getInteger(int index)throws IOException;
 
     /**
      * Gets column value by index.
@@ -82,7 +83,7 @@ public interface Row {
      * @return a long data from the database
      * @throws IOException 
      */
-    public long getLong(int index)throws IOException;
+    long getLong(int index)throws IOException;
 
     /**
      * Gets column value by index.
@@ -91,7 +92,7 @@ public interface Row {
      * @return a short data from the database
      * @throws IOException 
      */
-    public short getShort(int index)throws IOException;
+    short getShort(int index)throws IOException;
 
     /**
      * Gets column value by index.
@@ -100,7 +101,7 @@ public interface Row {
      * @return a String data from the database
      * @throws IOException 
      */
-    public String getString(int index)throws IOException;
+    String getString(int index)throws IOException;
     
     
     

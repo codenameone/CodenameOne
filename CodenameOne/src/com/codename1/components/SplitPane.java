@@ -576,11 +576,6 @@ public class SplitPane extends Container {
         return getFixedInset(maxInset);
     }
     
-    private void setDividerInset(String inset) {
-        getDividerInset().setValueAsString(inset);
-        clampInset();
-    }
-    
     private Inset getAutoInset(LayeredLayoutConstraint cnst) {
         switch (orientation) {
             case VERTICAL_SPLIT:
@@ -616,6 +611,7 @@ public class SplitPane extends Container {
     
     
     
+    // PMD Fix (UnusedPrivateMethod): Removed unused setDividerInset helper.
     private void clampInset() {
         
         int px = getDividerInset().getAbsolutePixels(divider);
@@ -793,14 +789,14 @@ public class SplitPane extends Container {
             getFixedInset(preferredInset).copyTo(getDividerInset());
             clampInset();
             isCollapsed = false;
-            SplitPane.this.animateLayout(300);
-        } else if (isExpanded) {
-            // do nothing
-        } else {
+            // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+            animateLayout(300);
+        } else if (!isExpanded) {
             getFixedInset(maxInset).copyTo(getDividerInset());
             clampInset();
             isExpanded = true;
-            SplitPane.this.animateLayout(300);
+            // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+            animateLayout(300);
         }
     }
     
@@ -817,20 +813,22 @@ public class SplitPane extends Container {
      * @param force True to force it to collapse to minimum position (skipping preferred position if it is in expanded state).
      */
     public void collapse(boolean force) {
-        if (isCollapsed) {
-            // do nothing
-        } else if (isExpanded && !force) {
-            getFixedInset(preferredInset).copyTo(getDividerInset());
-            clampInset();
-            isExpanded = false;
-            SplitPane.this.animateLayout(300);
-        } else {
-            getFixedInset(minInset).copyTo(getDividerInset());
-            clampInset();
-            isCollapsed = true;
-            SplitPane.this.animateLayout(300);
+        if (!isCollapsed) {
+            if (isExpanded && !force) {
+                getFixedInset(preferredInset).copyTo(getDividerInset());
+                clampInset();
+                isExpanded = false;
+                // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+                animateLayout(300);
+            } else {
+                getFixedInset(minInset).copyTo(getDividerInset());
+                clampInset();
+                isCollapsed = true;
+                // PMD Fix (UselessQualifiedThis): Call animateLayout directly within the class scope.
+                animateLayout(300);
+            }
         }
-        
+
     }
     
     /**
