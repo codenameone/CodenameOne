@@ -348,83 +348,6 @@ class CSSElement extends HTMLElement {
     private static final int[] VERTICAL_ALIGN_VALS = {Component.TOP, Component.CENTER, Component.BOTTOM, -1, -1, -1};
     // Border style strings
     private static final String[] BORDER_STYLE_STRINGS = {CSS_NONE, "solid", "dotted", "dashed", "double", "groove", "ridge", "inset", "outset"};
-    /**
-     * An array containing the allowed strings for CSS attributes.
-     * Note that these strings are allowed in addition for the allowed values according to the attribute types.
-     * Also, unlike the allowed string in Element that are matched per type, here in CSSElement each line matches an attribute (and not its type).
-     * This is because of the great variance of allowed strings in CSS that are really per attribute and not per type.
-     */
-    private static final String[][] CSS_ALLOWED_STRINGS = {
-            null, //TYPE_COLOR, // CSS_BACKGROUND_COLOR
-            null, //TYPE_CSS_URL, //CSS_BACKGROUND_IMAGE
-            BG_REPEAT_STRINGS, //TYPE_NMTOKENS, //CSS_BACKGROUND_REPEAT
-            {"fixed", "scroll"}, //TYPE_NMTOKENS, //CSS_BACKGROUND_ATTACHMENT
-            {"left", CENTER_STR, "right"}, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_BACKGROUND_POSITION_X
-            {"top", CENTER_STR, "bottom"}, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_BACKGROUND_POSITION_Y
-            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_TOP_WIDTH
-            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_RIGHT_WIDTH
-            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_BOTTOM_WIDTH
-            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_LEFT_WIDTH
-            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_TOP_STYLE
-            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_RIGHT_STYLE
-            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_BOTTOM_STYLE
-            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_LEFT_STYLE
-            null, //TYPE_COLOR, //CSS_BORDER_TOP_COLOR
-            null, //TYPE_COLOR, // CSS_BORDER_RIGHT_COLOR
-            null, //TYPE_COLOR, // CSS_BORDER_BOTTOM_COLOR
-            null, //TYPE_COLOR, // CSS_BORDER_LEFT_COLOR
-            {"left", "right", CSS_NONE, "both"}, //TYPE_NMTOKENS, //CSS_CLEAR
-            null, //TYPE_COLOR, // CSS_COLOR
-            VERTICAL_ALIGN_STRINGS, //TYPE_NMTOKENS, //CSS_VERTICAL_ALIGN
-            {"inline", "block", "list-item", CSS_NONE, "-wap-marquee"}, //TYPE_NMTOKENS, //CSS_DISPLAY
-            {"left", "right", CSS_NONE}, //TYPE_NMTOKENS, //CSS_FLOAT
-            null, //TYPE_NMTOKENS, //CSS_FONT_FAMILY
-            FONT_SIZE_STRINGS, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_FONT_SIZE
-            FONT_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_FONT_STYLE
-            FONT_WEIGHT_STRINGS, //TYPE_NMTOKENS, //CSS_FONT_WEIGHT
-            {"normal", SMALL_CAPS_STRING}, //TYPE_NMTOKENS, //CSS_FONT_VARIANT
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_HEIGHT
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_WIDTH
-            {"hidden", "visible", "collapse"}, //TYPE_NMTOKENS, // CSS_VISIBILITY
-            {"normal", "pre", "nowrap"}, //TYPE_NMTOKENS, //CSS_WHITE_SPACE
-            null, //TYPE_CSS_URL, //CSS_LIST_STYLE_IMAGE
-            {"inside", "outside"}, //TYPE_NMTOKENS, //CSS_LIST_STYLE_POSITION
-            {CSS_NONE, "disc", "circle", "square", "decimal", "upper-alpha", "lower-alpha", "upper-roman", "lower-roman"}, //TYPE_NMTOKENS, //CSS_LIST_STYLE_TYPE
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_TOP
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_RIGHT
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_BOTTOM
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_LEFT
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_TOP
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_RIGHT
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_BOTTOM
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_LEFT
-            TEXT_ALIGN_STRINGS, //TYPE_ALIGN, //CSS_TEXT_ALIGN
-            {"underline", "line-through", CSS_NONE, "overline"}, //TYPE_NMTOKENS, //CSS_TEXT_DECORATION // 'blink' is not supported, as it is not supported in any major browser
-            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_TEXT_INDENT
-            {CSS_NONE, "uppercase", "lowercase", "capitalize"}, //TYPE_NMTOKENS, //CSS_TEXT_TRANSFORM
-            null, //TYPE_NMTOKENS, // CSS_WAP_ACCESSKEY
-            null, //TYPE_NMTOKENS, // CSS_WAP_INPUT_FORMAT
-            {"true", "false"}, //TYPE_BOOLEAN, // CSS_WAP_INPUT_REQUIRED
-            null, //TYPE_NMTOKENS, // baseurl (internal usage)
-            {"collapse", "separate"}, // CSS_BORDER_COLLAPSE
-            {"hide", "show"}, // CSS_EMPTY_CELLS
-            null,// CSS_BORDER_SPACING
-            {"bottom", "top"},// CSS_CAPTION_SIDE
-            null, // CSS_WORD_SPACING
-            {"normal"}, //CSS_LINE_HEIGHT
-            null, //CSS_MIN_WIDTH
-            null, //CSS_MAX_WIDTH
-            null, //CSS_MIN_HEIGHT
-            null, //CSS_MAX_HEIGHT
-            null, //CSS_QUOTES
-            BORDER_WIDTH_STRINGS, //CSS_OUTLINE_WIDTH
-            BORDER_STYLE_STRINGS, //CSS_OUTLINE_STYLE
-            null, //CSS_OUTLINE_COLOR
-            null, //CSS_CONTENT
-            null, //CSS_COUNTER_RESET
-            null, //CSS_COUNTER_INCREMENT
-            {"rtl", "ltr"},   //CSS_DIRECTION
-    };
     // Border width strings and their corresponding values
     private static final String[] BORDER_WIDTH_STRINGS = {"thin", "medium", "thick"};
     private static final int[] BORDER_WIDTH_VALS = {1, 3, 5};
@@ -529,6 +452,83 @@ class CSSElement extends HTMLElement {
      * A constant defining the offset in which the base CSS attribute relating to the TOP appears in the shorthand attribute index
      */
     private static final int CSS_TOP = 0;
+    /**
+     * An array containing the allowed strings for CSS attributes.
+     * Note that these strings are allowed in addition for the allowed values according to the attribute types.
+     * Also, unlike the allowed string in Element that are matched per type, here in CSSElement each line matches an attribute (and not its type).
+     * This is because of the great variance of allowed strings in CSS that are really per attribute and not per type.
+     */
+    private static final String[][] CSS_ALLOWED_STRINGS = {
+            null, //TYPE_COLOR, // CSS_BACKGROUND_COLOR
+            null, //TYPE_CSS_URL, //CSS_BACKGROUND_IMAGE
+            BG_REPEAT_STRINGS, //TYPE_NMTOKENS, //CSS_BACKGROUND_REPEAT
+            {"fixed", "scroll"}, //TYPE_NMTOKENS, //CSS_BACKGROUND_ATTACHMENT
+            {"left", CENTER_STR, "right"}, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_BACKGROUND_POSITION_X
+            {"top", CENTER_STR, "bottom"}, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_BACKGROUND_POSITION_Y
+            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_TOP_WIDTH
+            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_RIGHT_WIDTH
+            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_BOTTOM_WIDTH
+            BORDER_WIDTH_STRINGS, //TYPE_CSS_LENGTH, //CSS_BORDER_LEFT_WIDTH
+            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_TOP_STYLE
+            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_RIGHT_STYLE
+            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_BOTTOM_STYLE
+            BORDER_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_BORDER_LEFT_STYLE
+            null, //TYPE_COLOR, //CSS_BORDER_TOP_COLOR
+            null, //TYPE_COLOR, // CSS_BORDER_RIGHT_COLOR
+            null, //TYPE_COLOR, // CSS_BORDER_BOTTOM_COLOR
+            null, //TYPE_COLOR, // CSS_BORDER_LEFT_COLOR
+            {"left", "right", CSS_NONE, "both"}, //TYPE_NMTOKENS, //CSS_CLEAR
+            null, //TYPE_COLOR, // CSS_COLOR
+            VERTICAL_ALIGN_STRINGS, //TYPE_NMTOKENS, //CSS_VERTICAL_ALIGN
+            {"inline", "block", "list-item", CSS_NONE, "-wap-marquee"}, //TYPE_NMTOKENS, //CSS_DISPLAY
+            {"left", "right", CSS_NONE}, //TYPE_NMTOKENS, //CSS_FLOAT
+            null, //TYPE_NMTOKENS, //CSS_FONT_FAMILY
+            FONT_SIZE_STRINGS, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_FONT_SIZE
+            FONT_STYLE_STRINGS, //TYPE_NMTOKENS, //CSS_FONT_STYLE
+            FONT_WEIGHT_STRINGS, //TYPE_NMTOKENS, //CSS_FONT_WEIGHT
+            {"normal", SMALL_CAPS_STRING}, //TYPE_NMTOKENS, //CSS_FONT_VARIANT
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_HEIGHT
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_WIDTH
+            {"hidden", "visible", "collapse"}, //TYPE_NMTOKENS, // CSS_VISIBILITY
+            {"normal", "pre", "nowrap"}, //TYPE_NMTOKENS, //CSS_WHITE_SPACE
+            null, //TYPE_CSS_URL, //CSS_LIST_STYLE_IMAGE
+            {"inside", "outside"}, //TYPE_NMTOKENS, //CSS_LIST_STYLE_POSITION
+            {CSS_NONE, "disc", "circle", "square", "decimal", "upper-alpha", "lower-alpha", "upper-roman", "lower-roman"}, //TYPE_NMTOKENS, //CSS_LIST_STYLE_TYPE
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_TOP
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_RIGHT
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_BOTTOM
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_MARGIN_LEFT
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_TOP
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_RIGHT
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_BOTTOM
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_PADDING_LEFT
+            TEXT_ALIGN_STRINGS, //TYPE_ALIGN, //CSS_TEXT_ALIGN
+            {"underline", "line-through", CSS_NONE, "overline"}, //TYPE_NMTOKENS, //CSS_TEXT_DECORATION // 'blink' is not supported, as it is not supported in any major browser
+            null, //TYPE_CSS_LENGTH_OR_PERCENTAGE, //CSS_TEXT_INDENT
+            {CSS_NONE, "uppercase", "lowercase", "capitalize"}, //TYPE_NMTOKENS, //CSS_TEXT_TRANSFORM
+            null, //TYPE_NMTOKENS, // CSS_WAP_ACCESSKEY
+            null, //TYPE_NMTOKENS, // CSS_WAP_INPUT_FORMAT
+            {"true", "false"}, //TYPE_BOOLEAN, // CSS_WAP_INPUT_REQUIRED
+            null, //TYPE_NMTOKENS, // baseurl (internal usage)
+            {"collapse", "separate"}, // CSS_BORDER_COLLAPSE
+            {"hide", "show"}, // CSS_EMPTY_CELLS
+            null,// CSS_BORDER_SPACING
+            {"bottom", "top"},// CSS_CAPTION_SIDE
+            null, // CSS_WORD_SPACING
+            {"normal"}, //CSS_LINE_HEIGHT
+            null, //CSS_MIN_WIDTH
+            null, //CSS_MAX_WIDTH
+            null, //CSS_MIN_HEIGHT
+            null, //CSS_MAX_HEIGHT
+            null, //CSS_QUOTES
+            BORDER_WIDTH_STRINGS, //CSS_OUTLINE_WIDTH
+            BORDER_STYLE_STRINGS, //CSS_OUTLINE_STYLE
+            null, //CSS_OUTLINE_COLOR
+            null, //CSS_CONTENT
+            null, //CSS_COUNTER_RESET
+            null, //CSS_COUNTER_INCREMENT
+            {"rtl", "ltr"},   //CSS_DIRECTION
+    };
     /**
      * A constant defining the offset in which the base CSS attribute relating to the RIGHT appears in the shorthand attribute index
      */
