@@ -176,6 +176,35 @@ public class SimpleDateFormat extends DateFormat {
     private List<String> patternTokens;
 
     /**
+     * When set to {@code true}, month names provided by the underlying platform
+     * will be truncated to match the number of pattern characters. This guards
+     * against platforms that may return longer month names than expected for
+     * patterns such as {@code MMM}. The flag is {@code false} by default for
+     * backwards compatibility.
+     */
+    private static boolean restrictMonthNameLength;
+
+    /**
+     * Enables or disables truncating of localized month names so that they
+     * match the number of pattern characters that triggered their lookup.
+     *
+     * @param restrict {@code true} to truncate localized month names to the
+     * length requested by the pattern, {@code false} to keep the platform
+     * provided value as-is (default behaviour).
+     */
+    public static void setRestrictMonthNameLength(boolean restrict) {
+        restrictMonthNameLength = restrict;
+    }
+
+    /**
+     * @return {@code true} if localized month names should be truncated to the
+     * requested pattern length.
+     */
+    public static boolean isRestrictMonthNameLength() {
+        return restrictMonthNameLength;
+    }
+
+    /**
      * Construct a SimpleDateFormat with no pattern.
      */
     public SimpleDateFormat() {
@@ -348,9 +377,9 @@ public class SimpleDateFormat extends DateFormat {
                 case MONTH_LETTER:
                     v = calendar.get(Calendar.MONTH) - Calendar.JANUARY;
                     if (len > 3) {
-                        toAppendTo.append(L10NManager.getInstance().getLongMonthName(source));
+                        toAppendTo.append(applyMonthLengthRestriction(L10NManager.getInstance().getLongMonthName(source), len));
                     } else if (len == 3) {
-                        toAppendTo.append(L10NManager.getInstance().getShortMonthName(source));
+                        toAppendTo.append(applyMonthLengthRestriction(L10NManager.getInstance().getShortMonthName(source), len));
                     } else {
                         toAppendTo.append(leftPad(v + 1, len));
                     }
@@ -411,6 +440,13 @@ public class SimpleDateFormat extends DateFormat {
             }
         }
         return toAppendTo.toString();
+    }
+
+    private static String applyMonthLengthRestriction(String value, int len) {
+        if (restrictMonthNameLength && value != null && value.length() > len) {
+            return value.substring(0, len);
+        }
+        return value;
     }
 
     private String[] getTimeZoneDisplayNames(String id) {
