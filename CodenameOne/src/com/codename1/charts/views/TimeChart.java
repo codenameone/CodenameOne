@@ -26,6 +26,7 @@ import com.codename1.charts.compat.Paint;
 import com.codename1.charts.models.XYMultipleSeriesDataset;
 import com.codename1.charts.models.XYSeries;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.io.Log;
 import java.util.Calendar;
 import java.util.TimeZone;
 
@@ -146,8 +147,8 @@ public class TimeChart extends LineChart {
       try {
         format = new SimpleDateFormat(mDateFormat);
         return format;
-      } catch (Exception e) {
-        // do nothing here
+      } catch (Exception e) { // PMD Fix: EmptyCatchBlock log exception
+        Log.e(e);
       }
     }
     DateFormat format = SimpleDateFormat.getDateInstance(SimpleDateFormat.MEDIUM);

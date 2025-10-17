@@ -80,7 +80,7 @@ public class AudioRecorderComponent extends Container implements ActionSource {
     /**
      * Enum for tracking the recorder state.
      */
-    public static enum RecorderState {
+    public enum RecorderState { // PMD Fix: UnnecessaryModifier removed redundant static
         /**
          * The recorder is initializing.
          */

@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * An abstract renderer to be extended by the multiple series classes.
  */
-public class DefaultRenderer {
+public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused text font constant
   /** The chart title. */
   private String mChartTitle = "";
   /** The chart title text size. */
@@ -34,8 +34,6 @@ public class DefaultRenderer {
   public static final int BACKGROUND_COLOR = 0x0;
   /** The default color for text. */
   public static final int TEXT_COLOR = 0xEAEAEA;
-  /** A text font for regular text, like the chart labels. */
-  private static final Font REGULAR_TEXT_FONT = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
   /** The typeface name for the texts. */
   private int mTextTypefaceName = Font.FACE_SYSTEM;
   /** The typeface style for the texts. */

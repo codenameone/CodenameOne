@@ -42,6 +42,7 @@ import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint;
 import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint.Inset;
 import com.codename1.ui.plaf.Border;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -685,8 +686,9 @@ public class SplitPane extends Container {
      * @return 
      */
     public Component getBottomOrRightComponent() {
-        for (Component c : bottomOrRight) {
-            return c;
+        Iterator<Component> iterator = bottomOrRight.iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            return iterator.next();
         }
         return null;
     }
@@ -712,8 +714,9 @@ public class SplitPane extends Container {
      * @return 
      */
     public Component getTopOrLeftComponent() {
-        for (Component c : topOrLeft) {
-            return c;
+        Iterator<Component> iterator = topOrLeft.iterator(); // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        if (iterator.hasNext()) {
+            return iterator.next();
         }
         return null;
     }

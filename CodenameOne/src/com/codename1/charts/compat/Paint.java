@@ -34,11 +34,10 @@ import com.codename1.ui.geom.Rectangle2D;
  * @author shannah
  * @deprecated
  */
-public class Paint {
+public class Paint { // PMD Fix: UnusedPrivateField removed redundant antiAlias flag
 
     
     static Graphics g;
-    private boolean antiAlias;
     private Font typeface = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
     private int strokeCap = Cap.BUTT;
     private int strokeJoin = Join.BEVEL;
@@ -154,7 +153,7 @@ public class Paint {
     
 
     public void setAntiAlias(boolean antialiasing) {
-        this.antiAlias = antialiasing;
+        // No-op for compatibility.
     }
 
     public Font getTypeface() {
@@ -209,7 +208,7 @@ public class Paint {
 
     
     
-    public static enum Style {
+    public enum Style { // PMD Fix: UnnecessaryModifier removed redundant static
         FILL,
         FILL_AND_STROKE,
         STROKE

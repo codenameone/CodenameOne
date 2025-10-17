@@ -35,12 +35,12 @@ public interface CloudResponse<T> {
      * 
      * @param returnValue the return value of the metho
      */
-    public void onSuccess(T returnValue);
+    void onSuccess(T returnValue); // PMD Fix: UnnecessaryModifier removed
     
     /**
      * Invoked if there was a server error 
      * 
      * @param err the exception containing the error details
      */
-    public void onError(CloudException err);
+    void onError(CloudException err); // PMD Fix: UnnecessaryModifier removed
 }

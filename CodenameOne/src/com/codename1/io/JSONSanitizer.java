@@ -378,15 +378,9 @@ final class JSONSanitizer {
             // Look for a run of '.', [0-9], [a-zA-Z_$], [+-] which subsumes
             // all the above without including any JSON special characters
             // outside keyword and number.
-            int runEnd;
-            for (runEnd = i; runEnd < n; ++runEnd) {
-              char tch = jsonish.charAt(runEnd);
-              if (('a' <= tch && tch <= 'z') || ('0' <= tch && tch <= '9')
-                  || tch == '+' || tch == '-' || tch == '.'
-                  || ('A' <= tch && tch <= 'Z') || tch == '_' || tch == '$') {
-                continue;
-              }
-              break;
+            int runEnd = i;
+            while (runEnd < n && isIdentifierCharacter(jsonish.charAt(runEnd))) {
+              runEnd++;
             }
 
             if (runEnd == i) {
@@ -403,10 +397,8 @@ final class JSONSanitizer {
             if (!(isNumber || isKeyword)) {
               // We're going to have to quote the output.  Further expand to
               // include more of an unquoted token in a string.
-              for (; runEnd < n; ++runEnd) {
-                if (isJsonSpecialChar(runEnd)) {
-                  break;
-                }
+              while (runEnd < n && !isJsonSpecialChar(runEnd)) {
+                runEnd++;
               }
               if (runEnd < n && jsonish.charAt(runEnd) == '"') {
                 ++runEnd;
@@ -486,7 +478,7 @@ final class JSONSanitizer {
       }
 
       // Insert brackets to close unclosed content.
-      while (bracketDepth != 0) {
+      while (bracketDepth != 0) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
         sanitizedJson.append(isMap[--bracketDepth] ? '}' : ']');
       }
     }
@@ -1125,6 +1117,12 @@ final class JSONSanitizer {
     if ('0' <= ch && ch <= '9') { return true; }
     ch |= 32;
     return 'a' <= ch && ch <= 'f';
+  }
+
+  private static boolean isIdentifierCharacter(char tch) {
+    return ('a' <= tch && tch <= 'z') || ('0' <= tch && tch <= '9')
+        || tch == '+' || tch == '-' || tch == '.'
+        || ('A' <= tch && tch <= 'Z') || tch == '_' || tch == '$';
   }
 
   private boolean isJsonSpecialChar(int i) {

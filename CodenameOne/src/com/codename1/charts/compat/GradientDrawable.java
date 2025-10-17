@@ -39,7 +39,7 @@ public class GradientDrawable {
         this.colors = colors;
     }
     
-    public static enum Orientation {
+    public enum Orientation { // PMD Fix: UnnecessaryModifier removed redundant static
         BL_TR,
         BOTTOM_TOP,
         BR_TL,

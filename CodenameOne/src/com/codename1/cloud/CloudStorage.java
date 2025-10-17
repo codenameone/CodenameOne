@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Hashtable;
-import java.util.Vector;
 
 /**
  * The cloud storage class allows developers to use the Codename One cloud
@@ -55,7 +54,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-public class CloudStorage {
+public class CloudStorage { // PMD Fix: UnusedPrivateField removed pendingRefreshes cache
     /**
      * Return code for methods in this class indicating a successful operation
      */
@@ -145,8 +144,6 @@ public class CloudStorage {
      */
     public void refresh(CloudObject[] objects, CloudResponse<Integer> response) {
     }
-    
-    private Vector<CloudObject> pendingRefreshes;
     
     /**
      * Adds the given object to a set of refresh operations in which we don't

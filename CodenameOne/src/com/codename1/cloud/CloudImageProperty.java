@@ -42,7 +42,7 @@ import java.util.Hashtable;
  * @author Shai Almog
  * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
-public class CloudImageProperty implements CustomProperty {
+public class CloudImageProperty implements CustomProperty { // PMD Fix: UnnecessarySemicolon removed stray delimiter
     private static CacheMap cloudImageCache;
     private String idProperty;
     private EncodedImage placeholderImage;
@@ -85,7 +85,7 @@ public class CloudImageProperty implements CustomProperty {
             ConnectionRequest cr = new ConnectionRequest() {
                 private EncodedImage e;
                 protected void readResponse(InputStream input) throws IOException  {
-                    e = EncodedImage.create(input);;
+                    e = EncodedImage.create(input);
                     if(e.getWidth() != placeholderImage.getWidth() || e.getHeight() != placeholderImage.getHeight()) {
                         ImageIO io = ImageIO.getImageIO();
                         if(io != null) {

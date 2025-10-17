@@ -232,33 +232,29 @@ public class ImageViewer extends Component {
     }
     
     private void eagerLock() {
-        if(eagerLock) {
-            if(swipeableImages != null && swipeableImages.getSize() > 1) {
-                Image left = getImageLeft();
-                if(swipePlaceholder != null) {
-                    left.asyncLock(swipePlaceholder);
+        if(eagerLock && swipeableImages != null && swipeableImages.getSize() > 1) {
+            Image left = getImageLeft();
+            if (swipePlaceholder != null) { // PMD Fix: CollapsibleIfStatements consolidate placeholder check
+                left.asyncLock(swipePlaceholder);
+            } else {
+                left.lock();
+            }
+            if(swipeableImages.getSize() > 2) {
+                Image right = getImageRight();
+                if (swipePlaceholder != null) { // PMD Fix: CollapsibleIfStatements consolidate placeholder check
+                    right.asyncLock(swipePlaceholder);
                 } else {
-                    left.lock();
-                }            
-                if(swipeableImages.getSize() > 2) {
-                    Image right = getImageRight();
-                    if(swipePlaceholder != null) {
-                        right.asyncLock(swipePlaceholder);
-                    } else {
-                        right.lock();
-                    }            
+                    right.lock();
                 }
             }
-        }        
+        }
     }
-    
+
     private void eagerUnlock() {
-        if(eagerLock) {
-            if(swipeableImages != null && swipeableImages.getSize() > 1) {
-                getImageLeft().unlock();
-                getImageRight().unlock();
-            }
-        }        
+        if(eagerLock && swipeableImages != null && swipeableImages.getSize() > 1) {
+            getImageLeft().unlock();
+            getImageRight().unlock();
+        }
     }
 
     /**

@@ -16,6 +16,7 @@
 package com.codename1.charts.util;
 
 import com.codename1.l10n.ParseException;
+import com.codename1.io.Log;
 import java.util.ArrayList;
 import java.util.List;
 import com.codename1.util.MathUtil;
@@ -87,8 +88,8 @@ public class MathHelper {
         // this way, we avoid a label value like 0.4000000000000000001 instead
         // of 0.4
         z = FORMAT.parseDouble(FORMAT.format(z));
-      } catch (ParseException e) {
-        // do nothing here
+      } catch (ParseException e) { // PMD Fix: EmptyCatchBlock log exception
+        Log.e(e);
       }
       labels.add(z);
     }

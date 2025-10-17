@@ -171,7 +171,7 @@ public class MediaPlayer extends Container {
                 animateLayoutFade(300, 0);
             }
         }
-        if (video != null && usesNativeVideoControls()) {
+        if (video != null && usesNativeVideoControls()) { // PMD Fix: CollapsibleIfStatements merged nested native control check
             video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, true);
         }
     }
@@ -190,7 +190,7 @@ public class MediaPlayer extends Container {
                 animateLayoutFade(300, 0);
             }
         }
-        if (video != null && usesNativeVideoControls()) {
+        if (video != null && usesNativeVideoControls()) { // PMD Fix: CollapsibleIfStatements merged nested native control check
             video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, false);
         }
     }
@@ -256,10 +256,8 @@ public class MediaPlayer extends Container {
                     if(dur > 0) {
                         float pos = video.getTime();
                         int offset = (int)(pos / dur * 100.0f);
-                        if(offset > -1 && offset < 101) {
-                            if (progress != null) {
-                                progress.setProgress(offset);
-                            }
+                        if(offset > -1 && offset < 101 && progress != null) {
+                            progress.setProgress(offset);
                         }
                     }
                 }
@@ -437,12 +435,10 @@ public class MediaPlayer extends Container {
             progress.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     float dur = video.getDuration();
-                    if(dur > 0) {
-                        if (progress != null) {
-                            float pos = progress.getProgress(evt);
-                            int t = (int)(pos / 100.0f * dur);
-                            video.setTime(t);
-                        }
+                    if(dur > 0 && progress != null) {
+                        float pos = progress.getProgress(evt);
+                        int t = (int)(pos / 100.0f * dur);
+                        video.setTime(t);
                     }
                 }
             });
@@ -491,7 +487,7 @@ public class MediaPlayer extends Container {
             
             
             private void updateIconAndText() {
-                if (video != null && video.isPlaying()) {
+                if (video != null && video.isPlaying()) { // PMD Fix: CollapsibleIfStatements merged null/playing checks
                      if (getPauseIcon() != null) {
                         this.setIcon(getPauseIcon());
                     } else {
@@ -532,32 +528,30 @@ public class MediaPlayer extends Container {
         }else{
             play.setText("play");
         }
-        if(autoplay) {
-            if(video != null && !video.isPlaying()){
-                if (getPauseIcon() != null) {
-                    play.setIcon(getPauseIcon());
-                } else {
-                    play.setText("pause");
-                }
-                Timer t = new Timer();
-                t.schedule(new TimerTask() {
-                    public void run() {
-                        if (isInitialized()) {
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    if (video != null && !video.isPlaying() && isInitialized()) {
-                                        video.play();
-                                        checkProgressSlider();
-                                    }
-                                }
-                            });
-                        }
-                    }
-                        
-                }, 300l);
-                
-                //video.play();
+        if(autoplay && video != null && !video.isPlaying()) {
+            if (getPauseIcon() != null) {
+                play.setIcon(getPauseIcon());
+            } else {
+                play.setText("pause");
             }
+            Timer t = new Timer();
+            t.schedule(new TimerTask() {
+                public void run() {
+                    if (isInitialized()) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                if (video != null && !video.isPlaying() && isInitialized()) {
+                                    video.play();
+                                    checkProgressSlider();
+                                }
+                            }
+                        });
+                    }
+                }
+
+            }, 300l);
+
+            //video.play();
         }
         play.addActionListener(new ActionListener() {
 

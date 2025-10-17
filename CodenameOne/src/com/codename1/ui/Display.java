@@ -1177,20 +1177,16 @@ public final class Display extends CN1Constants {
         try {
             // when there is no current form the EDT is useful only
             // for features such as call serially
-            while(impl.getCurrentForm() == null) {
+            while (impl.getCurrentForm() == null) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
                 synchronized(lock){
-                    breakOut2:
-                    
                     if(shouldEDTSleep()) {
-                        while(pendingIdleSerialCalls.size() > 0) {
+                        if(!pendingIdleSerialCalls.isEmpty()) {
                             Runnable r = pendingIdleSerialCalls.get(0);
                             pendingIdleSerialCalls.remove(0);
                             callSerially(r);
-
-                            break breakOut2;
+                        } else {
+                            lock.wait();
                         }
-                        
-                        lock.wait();
                     }
 
                     // paint transition or intro animations and don't do anything else if such
@@ -1216,23 +1212,21 @@ public final class Display extends CN1Constants {
             }
         }
 
-        while(codenameOneRunning) {
+        while (codenameOneRunning) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
             try {
                 // wait indefinetly Lock surrounds the should method to prevent serial calls from
                 // getting "lost"
                  synchronized(lock){
-                    breakOut1:
-
                     if(shouldEDTSleep()) {
-                         while(pendingIdleSerialCalls.size() > 0) {
+                         if(!pendingIdleSerialCalls.isEmpty()) {
                             Runnable r = pendingIdleSerialCalls.get(0);
                             pendingIdleSerialCalls.remove(0);
                             callSerially(r);
-                            break breakOut1;
+                         } else {
+                            impl.edtIdle(true);
+                            lock.wait();
+                            impl.edtIdle(false);
                          }
-                         impl.edtIdle(true);
-                         lock.wait();
-                         impl.edtIdle(false);
                      }
                  }
                  

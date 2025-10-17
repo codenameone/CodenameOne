@@ -37,7 +37,7 @@ import java.io.InputStream;
  * 
  * @author Chen
  */
-public class InnerActive extends AdsService{
+public class InnerActive extends AdsService{ // PMD Fix: UnusedPrivateField removed obsolete field
     
     private final String REQUEST_URL = "http://m2m1.inner-active.com/simpleM2M/clientRequestHtmlAd";
 
@@ -50,9 +50,6 @@ public class InnerActive extends AdsService{
 
     //UDID/IMEI
     private String hid;
-
-    //client Id
-    private String cid;
 
     private boolean banner = true;
     

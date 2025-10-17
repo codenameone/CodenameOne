@@ -119,15 +119,13 @@ public class XYValueSeriesTransition extends SeriesTransition {
      */
     protected void update(int progress) {
         double dProgress = (double)progress;
-        int len = endVals.getItemCount();
+        int len = endVals.getItemCount(); // PMD Fix: UnusedLocalVariable removed unused endindex
         for (int i=0; i<len; i++){
             double x = endVals.getX(i);
             double y = endVals.getY(i);
             double val = endVals.getValue(i);
             int startIndex = startVals.getIndexForKey(x);
-            int endindex = i;
-            
-            
+
             double startY = startIndex == -1 ? 0.0 : startVals.getY(startIndex);
             double endY = y;
             double tweenY = startY + (endY-startY)*dProgress/100.0;

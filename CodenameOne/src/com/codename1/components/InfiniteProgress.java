@@ -227,10 +227,8 @@ public class InfiniteProgress extends Component {
      * @since 7.0
      */
     public boolean animate(boolean force) {
-        if (!force) {
-            if (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm()) {
-                return false;
-            }
+        if (!force && (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm())) { // PMD Fix: CollapsibleIfStatements merged visibility checks
+            return false;
         }
         // reduce repaint thrushing of the UI from the infinite progress
         boolean val = super.animate() || tick % tickCount == 0;
@@ -345,11 +343,11 @@ public class InfiniteProgress extends Component {
         if(animation instanceof FontImage) {
             rotated = animation.rotate(v);
         } else {
-            Integer angle = new Integer(v);
+            Integer angle = Integer.valueOf(v); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
             rotated = cache.get(angle);
             if(rotated == null) {
                 rotated = animation.rotate(v);
-                cache.put(v, rotated);
+                cache.put(angle, rotated);
             }
         }
         g.drawImage(rotated, getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());

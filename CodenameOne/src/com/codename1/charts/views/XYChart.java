@@ -623,33 +623,28 @@ public abstract class XYChart extends AbstractChart {
       float previousPointX = points.get(0);
       float previousPointY = points.get(1);
       for (int k = 0; k < points.size(); k += 2) {
-        if (k == 2) { // decide whether to display first two points' values or
-                      // not
-          if (Math.abs(points.get(2) - points.get(0)) > renderer.getDisplayChartValuesDistance()
-              || Math.abs(points.get(3) - points.get(1)) > renderer.getDisplayChartValuesDistance()) {
-            // first point
-            drawText(canvas, getLabel(renderer.getChartValuesFormat(), series.getY(startIndex)),
-                points.get(0), points.get(1) - renderer.getChartValuesSpacing(), paint, 0);
-            // second point
-            drawText(canvas,
-                getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + 1)),
-                points.get(2), points.get(3) - renderer.getChartValuesSpacing(), paint, 0);
+        if (k == 2 && (Math.abs(points.get(2) - points.get(0)) > renderer.getDisplayChartValuesDistance()
+            || Math.abs(points.get(3) - points.get(1)) > renderer.getDisplayChartValuesDistance())) { // PMD Fix: CollapsibleIfStatements combined nested checks
+          // first point
+          drawText(canvas, getLabel(renderer.getChartValuesFormat(), series.getY(startIndex)),
+              points.get(0), points.get(1) - renderer.getChartValuesSpacing(), paint, 0);
+          // second point
+          drawText(canvas,
+              getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + 1)),
+              points.get(2), points.get(3) - renderer.getChartValuesSpacing(), paint, 0);
 
-            previousPointX = points.get(2);
-            previousPointY = points.get(3);
-          }
-        } else if (k > 2) {
+          previousPointX = points.get(2);
+          previousPointY = points.get(3);
+        } else if (k > 2 && (Math.abs(points.get(k) - previousPointX) > renderer.getDisplayChartValuesDistance()
+            || Math.abs(points.get(k + 1) - previousPointY) > renderer
+                .getDisplayChartValuesDistance())) { // PMD Fix: CollapsibleIfStatements merged nested checks
           // compare current point's position with the previous point's, if they
           // are not too close, display
-          if (Math.abs(points.get(k) - previousPointX) > renderer.getDisplayChartValuesDistance()
-              || Math.abs(points.get(k + 1) - previousPointY) > renderer
-                  .getDisplayChartValuesDistance()) {
-            drawText(canvas,
-                getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + k / 2)),
-                points.get(k), points.get(k + 1) - renderer.getChartValuesSpacing(), paint, 0);
-            previousPointX = points.get(k);
-            previousPointY = points.get(k + 1);
-          }
+          drawText(canvas,
+              getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + k / 2)),
+              points.get(k), points.get(k + 1) - renderer.getChartValuesSpacing(), paint, 0);
+          previousPointX = points.get(k);
+          previousPointY = points.get(k + 1);
         }
       }
     } else { // if only one point, display it

@@ -84,14 +84,13 @@ public class XYSeries{
     mMaxX = MathHelper.NULL_VALUE;
     mMinY = MathHelper.NULL_VALUE;
     mMaxY = MathHelper.NULL_VALUE;
-    int length = getItemCount();
+    int length = getItemCount(); // PMD Fix: UnusedLocalVariable removed redundant loop index
     for (int k = 0; k < length; k++) {
       double x = getX(k);
       double y = getY(k);
       updateRange(x, y);
     }
     
-    int i=0;
   }
 
   /**

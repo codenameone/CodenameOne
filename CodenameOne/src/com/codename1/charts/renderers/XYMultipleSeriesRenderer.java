@@ -121,7 +121,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /** The rotate angle. */
     private int mAngle = 0;
 
-    private Orientation(int angle) {
+    Orientation(int angle) { // PMD Fix: UnnecessaryModifier removed implicit private keyword
       mAngle = angle;
     }
 
