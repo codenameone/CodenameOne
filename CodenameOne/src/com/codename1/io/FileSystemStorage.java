@@ -42,20 +42,17 @@ import java.util.TimerTask;
  * <p>
  * The sample below shows the {@code FileSystemStorage} as a tree:
  * </p>
- * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>            
+ * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
- * 
+ *
  * @author Shai Almog
  */
 public class FileSystemStorage {
-    private static FileSystemStorage INSTANCE = new FileSystemStorage();
-
     /**
      * Represents the type for the get root type method, this type generally represents the main
      * phone memory
      */
     public static final int ROOT_TYPE_MAINSTORAGE = 1;
-
     /**
      * Represents the type for the get root type method, this type generally represents an
      * SD card although due to variability in phone standards an SD card might be
@@ -65,12 +62,12 @@ public class FileSystemStorage {
      * detect that "E:" is not the actual SD card.
      */
     public static final int ROOT_TYPE_SDCARD = 2;
-
     /**
      * Returned for different types of root for which there is no specific knowledge one
      * way or the other.
      */
     public static final int ROOT_TYPE_UNKNOWN = 3;
+    private static FileSystemStorage INSTANCE = new FileSystemStorage();
 
     private FileSystemStorage() {
     }
@@ -144,7 +141,7 @@ public class FileSystemStorage {
     public void mkdir(String directory) {
         Util.getImplementation().mkdir(directory);
     }
-    
+
 
     /**
      * Deletes the specific file or empty directory.
@@ -156,21 +153,21 @@ public class FileSystemStorage {
     }
 
     /**
-     * Deletes the specific file or empty directory, if the platform supports a 
-     * delete on exit this method will activate it. Regardless it will retry 
+     * Deletes the specific file or empty directory, if the platform supports a
+     * delete on exit this method will activate it. Regardless it will retry
      * deleting (with delay) several times to allow streams time to close.
      *
-     * @param file file to delete
+     * @param file       file to delete
      * @param retryCount the number of times to retry
      */
     public void deleteRetry(final String file, final int retryCount) {
         System.gc();
         try {
             Util.getImplementation().deleteFile(file);
-        } catch(Throwable t) {
+        } catch (Throwable t) {
         }
-        if(Util.getImplementation().exists(file)) {
-            if(retryCount > 0)  {
+        if (Util.getImplementation().exists(file)) {
+            if (retryCount > 0) {
                 new Timer().schedule(new TimerTask() {
                     public void run() {
                         deleteRetry(file, retryCount - 1);
@@ -205,7 +202,7 @@ public class FileSystemStorage {
      * Toggles the hidden state of the file
      *
      * @param file file
-     * @param h hidden state
+     * @param h    hidden state
      */
     public void setHidden(String file, boolean h) {
         Util.getImplementation().setHidden(file, h);
@@ -215,14 +212,14 @@ public class FileSystemStorage {
      * Renames a file to the given name, expects the new name to be relative to the
      * current directory
      *
-     * @param file absolute file name
+     * @param file    absolute file name
      * @param newName relative new name
      */
     public void rename(String file, String newName) {
-        if(newName.indexOf('/') > -1) {
+        if (newName.indexOf('/') > -1) {
             throw new RuntimeException("Rename accepts only relative file names not full paths: " + newName);
         }
-        Util.getImplementation().rename(file, newName);        
+        Util.getImplementation().rename(file, newName);
     }
 
     /**
@@ -236,17 +233,18 @@ public class FileSystemStorage {
     }
 
     /**
-     * Returns the time that the file denoted by this abstract pathname was 
+     * Returns the time that the file denoted by this abstract pathname was
      * last modified.
-     * @return A long value representing the time the file was last modified, 
+     *
+     * @return A long value representing the time the file was last modified,
      * measured in milliseconds
      * @deprecated this API requires additional privacy permissions on iOS
-     *     and might cause problems with iOS submissions
-     */ 
+     * and might cause problems with iOS submissions
+     */
     public long getLastModified(String file) {
         return Util.getImplementation().getFileLastModified(file);
     }
-    
+
     /**
      * Indicates whether the given file is a directory
      *
@@ -268,7 +266,7 @@ public class FileSystemStorage {
 
     /**
      * Opens an output stream to the given file
-     * 
+     *
      * @param file the file
      * @return the output stream
      */
@@ -289,7 +287,7 @@ public class FileSystemStorage {
     /**
      * Opens an output stream to the given file
      *
-     * @param file the file
+     * @param file   the file
      * @param offset position in the file
      * @return the output stream
      */
@@ -299,41 +297,44 @@ public class FileSystemStorage {
 
     /**
      * <p>The application home directory is a "safe place" to store files for this application in a portable way.
-     * On some platforms such as Android  &amp; iOS this path may be visible only to the 
+     * On some platforms such as Android  &amp; iOS this path may be visible only to the
      * application itself, other apps won't have permission to access this path.<br>
      * The sample below uses the app home directory to save a file so we can share it using the {@link com.codename1.components.ShareButton}:</p>
-     * 
-     *  <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
-     * 
+     *
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     *
      * @return a writable directory that represent the application home directory
      */
-     public String getAppHomePath(){
-         return Util.getImplementation().getAppHomePath();
+    public String getAppHomePath() {
+        return Util.getImplementation().getAppHomePath();
     }
-     
-     /**
-      * Returns true if the device has a directory dedicated for "cache" files
-      * @return true if a caches style directory exists in this device type
-      */
-     public boolean hasCachesDir() {
-         return Util.getImplementation().hasCachesDir();
-     }
 
-     /**
-      * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
-      * is false
-      * @return file URL or null
-      */
-     public String getCachesDir() {
-         return Util.getImplementation().getCachesDir();
-     }
-     
-     /**
-      * Converts a file system path to a native path.
-      * @param path A file system path.
-      * @return The native path.
-      */
-     public String toNativePath(String path) {
-         return Util.getImplementation().toNativePath(path);
-     }
+    /**
+     * Returns true if the device has a directory dedicated for "cache" files
+     *
+     * @return true if a caches style directory exists in this device type
+     */
+    public boolean hasCachesDir() {
+        return Util.getImplementation().hasCachesDir();
+    }
+
+    /**
+     * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+     * is false
+     *
+     * @return file URL or null
+     */
+    public String getCachesDir() {
+        return Util.getImplementation().getCachesDir();
+    }
+
+    /**
+     * Converts a file system path to a native path.
+     *
+     * @param path A file system path.
+     * @return The native path.
+     */
+    public String toNativePath(String path) {
+        return Util.getImplementation().toNativePath(path);
+    }
 }

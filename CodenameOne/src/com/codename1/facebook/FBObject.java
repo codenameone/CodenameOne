@@ -27,13 +27,13 @@ import java.util.Hashtable;
 
 /**
  * This is a base class for all FaceBook Objects
- * 
+ *
  * @author Chen Fishbein
  */
 public class FBObject {
 
     private String id;
-    
+
     private String name;
 
     /**
@@ -44,16 +44,25 @@ public class FBObject {
 
     /**
      * This contructor initialize it's attributes from the given Hashtable
+     *
      * @param props an Hashtable which contains the Object data
      */
     public FBObject(Hashtable props) {
         init(props);
     }
 
-
+    /**
+     * Simple getter
+     *
+     * @return the facebook object id
+     */
+    public String getId() {
+        return id;
+    }
 
     /**
      * Simple setter
+     *
      * @param id the Object Id, each facebook element had an id
      */
     public void setId(String id) {
@@ -62,32 +71,24 @@ public class FBObject {
 
     /**
      * Simple getter
-     * 
-     * @return the facebook object id
-     */    
-    public String getId() {
-        return id;
-    }
-
-    /**
-     * Simple getter
-     * 
+     *
      * @return the FB Object name
      */
     public String getName() {
         return name;
     }
 
-    
+
     /**
      * copies the relevant values from the given hashtable
+     *
      * @param props an hashtable to copy from
      */
-    public void copy(Hashtable props){
+    public void copy(Hashtable props) {
         init(props);
     }
-  
-    private void init(Hashtable props){
+
+    private void init(Hashtable props) {
         id = (String) props.get("id");
         name = (String) props.get("name");
     }
@@ -96,7 +97,7 @@ public class FBObject {
      * {@inheritDoc}
      */
     public boolean equals(Object obj) {
-        return id.equals(((FBObject)obj).id);
+        return id.equals(((FBObject) obj).id);
     }
 
     /**
@@ -105,7 +106,6 @@ public class FBObject {
     public int hashCode() {
         return id.hashCode();
     }
-
 
 
 }

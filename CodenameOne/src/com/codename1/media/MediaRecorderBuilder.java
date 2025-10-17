@@ -6,42 +6,45 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.media;
 
 import com.codename1.ui.Display;
+
 import java.io.IOException;
 
 /**
- * A builder class to generate a Media recorder with specific settings.  
- * @author shannah 
+ * A builder class to generate a Media recorder with specific settings.
+ *
+ * @author shannah
  * @since 7.0
  */
 public class MediaRecorderBuilder {
-    private int audioChannels=1,
-            bitRate=64000,
-            samplingRate=44100;
+    private int audioChannels = 1,
+            bitRate = 64000,
+            samplingRate = 44100;
     private boolean redirectToAudioBuffer;
-    
-    
+
+
     private String mimeType = Display.getInstance().getAvailableRecordingMimeTypes()[0],
             path;
-    
+
     /**
      * Set the number of audio channels in the media recorder.  Default 1.
+     *
      * @param numChannels The number of audio channels in the media recorder.
      * @return Self for chaining
      */
@@ -49,10 +52,10 @@ public class MediaRecorderBuilder {
         this.audioChannels = numChannels;
         return this;
     }
-    
+
     /**
      * Sets the bit rate for the recorder.  Default 64000.
-     * 
+     *
      * @param bitRate The bit rate for the recorder.
      * @return Self for chaining.
      */
@@ -60,9 +63,10 @@ public class MediaRecorderBuilder {
         this.bitRate = bitRate;
         return this;
     }
-    
+
     /**
      * Sets the sampling rate for the recorder.  Default 44100
+     *
      * @param samplingRate The sample rate for the recorder.
      * @return Self for chaining.
      */
@@ -70,34 +74,37 @@ public class MediaRecorderBuilder {
         this.samplingRate = samplingRate;
         return this;
     }
-    
+
     /**
      * Sets the mimetype to use for encoding the audio file.
+     *
      * @param mimeType The mimetype to use for encoding the audio file.
      * @return Self for chaining.
-     * @see MediaManager#getAvailableRecordingMimeTypes() 
+     * @see MediaManager#getAvailableRecordingMimeTypes()
      */
     public MediaRecorderBuilder mimeType(String mimeType) {
         this.mimeType = mimeType;
         return this;
     }
-    
+
     /**
      * Sets the output path where the audio recording should be saved.
-     * @param path The output path where the recording should be saved as 
-     * a {@link com.codename1.io.FileSystemStorage} path
+     *
+     * @param path The output path where the recording should be saved as
+     *             a {@link com.codename1.io.FileSystemStorage} path
      * @return Self for chaining.
      */
     public MediaRecorderBuilder path(String path) {
         this.path = path;
         return this;
     }
-    
+
     /**
      * Set this flag to {@literal true} to redirect the microphone input to an audio buffer.
      * This is handy if you just want to capture the raw PCM data from the microphone.
+     *
      * @param redirect True to redirect output to an audio buffer.  The {@link #path(java.lang.String) }
-     * parameter would then be used as the path to the audio buffer instead of the output file.
+     *                 parameter would then be used as the path to the audio buffer instead of the output file.
      * @return Self for chaining.
      */
     public MediaRecorderBuilder redirectToAudioBuffer(boolean redirect) {
@@ -107,20 +114,22 @@ public class MediaRecorderBuilder {
 
     /**
      * Builds the MediaRecorder with the given settings.
+     *
      * @return
-     * @throws IOException 
+     * @throws IOException
      * @throws IllegalStateException If {@link #path(java.lang.String) } is not set.
      */
     public Media build() throws IOException {
         if (path == null) {
             throw new IllegalStateException("Must set path for MediaRecorderBuilder");
         }
-        
+
         return Display.getInstance().createMediaRecorder(this);
     }
 
     /**
      * Gets the current audio channels settings.
+     *
      * @return the audioChannels
      */
     public int getAudioChannels() {
@@ -129,6 +138,7 @@ public class MediaRecorderBuilder {
 
     /**
      * Gets the current bit rate.
+     *
      * @return the bitRate
      */
     public int getBitRate() {
@@ -137,17 +147,17 @@ public class MediaRecorderBuilder {
 
     /**
      * Gets the current sampling rate.
+     *
      * @return the samplingRate
-     * 
      */
     public int getSamplingRate() {
         return samplingRate;
     }
 
-    
 
     /**
      * Gets the current mimetype.
+     *
      * @return the mimeType
      */
     public String getMimeType() {
@@ -156,20 +166,22 @@ public class MediaRecorderBuilder {
 
     /**
      * Gets the current output path.
+     *
      * @return the path
      */
     public String getPath() {
         return path;
     }
-          
+
     /**
      * True if the media recorder should redirect output to an audio buffer instead
      * of a file.
-     * @return 
+     *
+     * @return
      */
     public boolean isRedirectToAudioBuffer() {
         return redirectToAudioBuffer;
     }
 
-    
+
 }

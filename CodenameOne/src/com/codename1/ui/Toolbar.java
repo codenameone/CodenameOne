@@ -6,26 +6,24 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui;
 
 import com.codename1.components.InteractionDialog;
 import com.codename1.io.Log;
-import com.codename1.l10n.L10NManager;
-import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -33,15 +31,14 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
-import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+
 import java.util.ArrayList;
 import java.util.Vector;
 
@@ -92,6 +89,84 @@ import java.util.Vector;
 public class Toolbar extends Container {
 
     /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     */
+    private static boolean enableSideMenuSwipe = true;
+    private static boolean permanentSideMenu;
+    /**
+     * Sets the side menu to "on-top" mode
+     */
+    private static boolean onTopSideMenu = true;
+    private static boolean globalToolbar;
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     */
+    private static boolean centeredDefault = true;
+    private Component titleComponent;
+    private ToolbarSideMenu sideMenu;
+    private Vector<Command> overflowCommands;
+    private Button menuButton;
+    private Command leftSideMenuCommand;
+    private Command rightSideMenuCommand;
+    private ScrollListener scrollListener;
+    private ActionListener releasedListener;
+    private boolean scrollOff = false;
+    private int initialY;
+    private int actualPaneInitialY;
+    private int actualPaneInitialH;
+    private Motion hideShowMotion;
+    private boolean showing;
+    private boolean layered = false;
+    private boolean initialized = false;
+    private InteractionDialog sidemenuDialog;
+    private InteractionDialog rightSidemenuDialog;
+    private boolean isPointerReleasedListenerAdded = false;
+    private boolean isPointerPressedListenerAdded = false;
+    private boolean isPointerDraggedListenerAdded = false;
+    private boolean rightSideMenuCmdsAlignedToLeft = false;
+    private Container permanentSideMenuContainer;
+    private Container permanentRightSideMenuContainer;
+    private Command searchCommand;
+    /**
+     * Component placed on the bottom (south) portion of the permanent/on-top
+     * side menu.
+     */
+    private Component sidemenuSouthComponent;
+    private Component rightSidemenuSouthComponent;
+    private float searchIconSize;
+    // Flag for the scrollChanged listener to prevent it from being re-entered.
+    private boolean entered;
+    private int lastNonZeroScrollDiff;
+
+    /**
+     * Empty Constructor
+     */
+    public Toolbar() {
+        setLayout(new BorderLayout());
+        if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
+            setUIID("Toolbar", "ToolbarLandscape");
+        } else {
+            setUIID("Toolbar");
+        }
+        sideMenu = new ToolbarSideMenu();
+        if (centeredDefault
+                && UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
+            setTitleCentered(true);
+        }
+    }
+
+    /**
+     * This constructor places the Toolbar on a different layer on top of the
+     * Content Pane.
+     *
+     * @param layered if true places the Toolbar on top of the Content Pane
+     */
+    public Toolbar(boolean layered) {
+        this();
+        this.layered = layered;
+    }
+
+    /**
      * Indicates whether the toolbar should be properly centered by default
      *
      * @return the centeredDefault
@@ -129,11 +204,7 @@ public class Toolbar extends Container {
 
     /**
      * Enables/Disables the side menu bar swipe, defaults to true
-     */
-    private static boolean enableSideMenuSwipe = true;
-
-    /**
-     * Enables/Disables the side menu bar swipe, defaults to true
+     *
      * @return the enableSideMenuSwipe
      */
     public static boolean isEnableSideMenuSwipe() {
@@ -142,105 +213,11 @@ public class Toolbar extends Container {
 
     /**
      * Enables/Disables the side menu bar swipe, defaults to true
+     *
      * @param aEnableSideMenuSwipe the enableSideMenuSwipe to set
      */
     public static void setEnableSideMenuSwipe(boolean aEnableSideMenuSwipe) {
         enableSideMenuSwipe = aEnableSideMenuSwipe;
-    }
-    
-    private Component titleComponent;
-
-    private ToolbarSideMenu sideMenu;
-
-    private Vector<Command> overflowCommands;
-
-    private Button menuButton;
-    private Command leftSideMenuCommand;
-    private Command rightSideMenuCommand;
-
-    private ScrollListener scrollListener;
-
-    private ActionListener releasedListener;
-
-    private boolean scrollOff = false;
-
-    private int initialY;
-
-    private int actualPaneInitialY;
-
-    private int actualPaneInitialH;
-
-    private Motion hideShowMotion;
-
-    private boolean showing;
-
-    private boolean layered = false;
-
-    private boolean initialized = false;
-
-    private static boolean permanentSideMenu;
-
-    /**
-     * Sets the side menu to "on-top" mode
-     */
-    private static boolean onTopSideMenu = true;
-
-    private InteractionDialog sidemenuDialog;
-    private InteractionDialog rightSidemenuDialog;
-    private boolean isPointerReleasedListenerAdded = false;
-    private boolean isPointerPressedListenerAdded = false;
-    private boolean isPointerDraggedListenerAdded = false;
-    private boolean rightSideMenuCmdsAlignedToLeft = false;
-
-    private Container permanentSideMenuContainer;
-    private Container permanentRightSideMenuContainer;
-
-    private static boolean globalToolbar;
-
-    /**
-     * Indicates whether the toolbar should be properly centered by default
-     */
-    private static boolean centeredDefault = true;
-
-    private Command searchCommand;
-
-    /**
-     * Component placed on the bottom (south) portion of the permanent/on-top
-     * side menu.
-     */
-    private Component sidemenuSouthComponent;
-    private Component rightSidemenuSouthComponent;
-    
-    private float searchIconSize;
-
-    /**
-     * Empty Constructor
-     */
-    public Toolbar() {
-        setLayout(new BorderLayout());
-        if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
-            setUIID("Toolbar", "ToolbarLandscape");
-        } else {
-            setUIID("Toolbar");
-        }
-        sideMenu = new ToolbarSideMenu();
-        if (centeredDefault
-                && UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
-            setTitleCentered(true);
-        }
-    }
-
-    /**
-     * Enables/disables the Toolbar for all the forms in the application. This
-     * flag can be flipped via the theme constant {@code globalToobarBool}.
-     * Notice that the name of this method might imply that one toolbar instance
-     * will be used for all forms which isn't the case, separate instances will
-     * be used for each form
-     *
-     * @param gt true to enable the toolbar globally
-     */
-    public static void setGlobalToolbar(boolean gt) {
-        globalToolbar = gt;
     }
 
     /**
@@ -257,14 +234,39 @@ public class Toolbar extends Container {
     }
 
     /**
-     * This constructor places the Toolbar on a different layer on top of the
-     * Content Pane.
+     * Enables/disables the Toolbar for all the forms in the application. This
+     * flag can be flipped via the theme constant {@code globalToobarBool}.
+     * Notice that the name of this method might imply that one toolbar instance
+     * will be used for all forms which isn't the case, separate instances will
+     * be used for each form
      *
-     * @param layered if true places the Toolbar on top of the Content Pane
+     * @param gt true to enable the toolbar globally
      */
-    public Toolbar(boolean layered) {
-        this();
-        this.layered = layered;
+    public static void setGlobalToolbar(boolean gt) {
+        globalToolbar = gt;
+    }
+
+    /**
+     * Creates a static side menu that doesn't fold instead of the standard
+     * sidemenu. This is common for tablet UI's where folding the side menu
+     * doesn't make as much sense.
+     *
+     * @return true if we will use a permanent sidemenu
+     */
+    public static boolean isPermanentSideMenu() {
+        return permanentSideMenu;
+    }
+
+    /**
+     * Creates a static side menu that doesn't fold instead of the standard
+     * sidemenu. This is common for tablet UI's where folding the side menu
+     * doesn't make as much sense.
+     *
+     * @param p true to have a permanent side menu
+     */
+    public static void setPermanentSideMenu(boolean p) {
+        permanentSideMenu = p;
+        onTopSideMenu = false;
     }
 
     /**
@@ -289,6 +291,15 @@ public class Toolbar extends Container {
     }
 
     /**
+     * Returns true if the title is centered via the layout
+     *
+     * @return true if the title is centered
+     */
+    public boolean isTitleCentered() {
+        return ((BorderLayout) getLayout()).getCenterBehavior() == BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
+    }
+
+    /**
      * Makes the title align to the center accurately by doing it at the layout
      * level which also takes into account right/left commands
      *
@@ -300,38 +311,6 @@ public class Toolbar extends Container {
         } else {
             ((BorderLayout) getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
         }
-    }
-
-    /**
-     * Returns true if the title is centered via the layout
-     *
-     * @return true if the title is centered
-     */
-    public boolean isTitleCentered() {
-        return ((BorderLayout) getLayout()).getCenterBehavior() == BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
-    }
-
-    /**
-     * Creates a static side menu that doesn't fold instead of the standard
-     * sidemenu. This is common for tablet UI's where folding the side menu
-     * doesn't make as much sense.
-     *
-     * @param p true to have a permanent side menu
-     */
-    public static void setPermanentSideMenu(boolean p) {
-        permanentSideMenu = p;
-        onTopSideMenu = false;
-    }
-
-    /**
-     * Creates a static side menu that doesn't fold instead of the standard
-     * sidemenu. This is common for tablet UI's where folding the side menu
-     * doesn't make as much sense.
-     *
-     * @return true if we will use a permanent sidemenu
-     */
-    public static boolean isPermanentSideMenu() {
-        return permanentSideMenu;
     }
 
     /**
@@ -353,7 +332,7 @@ public class Toolbar extends Container {
      */
     public boolean isSideMenuShowing() {
         return (sidemenuDialog != null && sidemenuDialog.isShowing()) ||
-            (rightSidemenuDialog != null && rightSidemenuDialog.isShowing());
+                (rightSidemenuDialog != null && rightSidemenuDialog.isShowing());
     }
 
     /**
@@ -366,7 +345,7 @@ public class Toolbar extends Container {
             showOnTopRightSidemenu(-1, false);
         }
     }
-    
+
     /**
      * Closes the current side menu
      */
@@ -416,6 +395,15 @@ public class Toolbar extends Container {
     }
 
     /**
+     * Returns the Toolbar title Component.
+     *
+     * @return the Toolbar title component
+     */
+    public Component getTitleComponent() {
+        return titleComponent;
+    }
+
+    /**
      * Sets the Toolbar title component. This method allow placing any component
      * in the Toolbar center instead of the regular Label. Can be used to place
      * a TextField to perform search operations
@@ -432,20 +420,11 @@ public class Toolbar extends Container {
     }
 
     /**
-     * Returns the Toolbar title Component.
-     *
-     * @return the Toolbar title component
-     */
-    public Component getTitleComponent() {
-        return titleComponent;
-    }
-
-    /**
      * Adds a Command to the overflow menu
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addCommandToOverflowMenu(String name, Image icon, final ActionListener ev) {
@@ -455,47 +434,11 @@ public class Toolbar extends Container {
     }
 
     /**
-     * The behavior of the back command in the title
-     */
-    public static enum BackCommandPolicy {
-        /**
-         * Show the back command always within the title bar on the left hand
-         * side
-         */
-        ALWAYS,
-        /**
-         * Show the back command always but shows it with the UIID standard UIID
-         */
-        AS_REGULAR_COMMAND,
-        /**
-         * Show the back command always as a back arrow image from the material
-         * design style
-         */
-        AS_ARROW,
-        /**
-         * Shows the back command only if the {@code backUsesTitleBool} theme
-         * constant is defined to true which is the case for iOS themes
-         */
-        ONLY_WHEN_USES_TITLE,
-        /**
-         * Shows the back command only if the {@code backUsesTitleBool} theme
-         * constant is defined to true on other platforms uses the left arrow
-         * material icon
-         */
-        WHEN_USES_TITLE_OTHERWISE_ARROW,
-        /**
-         * Never show the command in the title area and only set the back
-         * command to the toolbar
-         */
-        NEVER
-    }
-
-    /**
      * Sets the back command in the title bar to an arrow type and maps the back
      * command hardware key if applicable. This is functionally identical to {@code setBackCommand(title, Toolbar.BackCommandPolicy.AS_ARROW, listener);
      * }
      *
-     * @param title command title
+     * @param title    command title
      * @param listener action event for the back command
      * @return the created command
      */
@@ -520,8 +463,8 @@ public class Toolbar extends Container {
      * Sets the back command in the title bar and in the form, back command
      * behaves based on the given policy type
      *
-     * @param title command title
-     * @param policy the behavior of the back command in the title
+     * @param title    command title
+     * @param policy   the behavior of the back command in the title
      * @param listener action event for the back command
      * @return the created command
      */
@@ -535,8 +478,8 @@ public class Toolbar extends Container {
      * Sets the back command in the title bar and in the form, back command
      * behaves based on the given policy type
      *
-     * @param cmd the command
-     * @param policy the behavior of the back command in the title
+     * @param cmd      the command
+     * @param policy   the behavior of the back command in the title
      * @param iconSize the size of the back command icon in millimeters
      */
     public void setBackCommand(Command cmd, BackCommandPolicy policy, float iconSize) {
@@ -565,7 +508,7 @@ public class Toolbar extends Container {
                     addCommandToLeftBar(cmd);
                     break;
                 }
-            // we now internally fallback to as arrow...
+                // we now internally fallback to as arrow...
             case AS_ARROW:
                 cmd.setCommandName("");
                 if (!isRTL()) {
@@ -601,7 +544,7 @@ public class Toolbar extends Container {
      * Sets the back command in the title bar and in the form, back command
      * behaves based on the given policy type
      *
-     * @param cmd the command
+     * @param cmd    the command
      * @param policy the behavior of the back command in the title
      */
     public void setBackCommand(Command cmd, BackCommandPolicy policy) {
@@ -626,7 +569,7 @@ public class Toolbar extends Container {
      *
      * @param callback gets the search string callbacks
      * @param iconSize indicates the size of the icons used in the search/back
-     * in millimeters
+     *                 in millimeters
      */
     public void addSearchCommand(final ActionListener callback, final float iconSize) {
         searchIconSize = iconSize;
@@ -644,12 +587,12 @@ public class Toolbar extends Container {
     }
 
     /**
-     * Shows the search bar manually which is useful for use cases of popping 
+     * Shows the search bar manually which is useful for use cases of popping
      * up search from code
-     * 
+     *
      * @param callback gets the search string callbacks
      */
-    public void showSearchBar(final ActionListener callback) {        
+    public void showSearchBar(final ActionListener callback) {
         SearchBar s = new SearchBar(Toolbar.this, searchIconSize) {
 
             @Override
@@ -663,11 +606,11 @@ public class Toolbar extends Container {
         f.removeComponentFromForm(Toolbar.this);
         f.setToolbar(s);
         s.initSearchBar();
-        if(f == Display.INSTANCE.getCurrent()) {
+        if (f == Display.INSTANCE.getCurrent()) {
             f.animateLayout(100);
         }
     }
-    
+
     /**
      * Removes a previously installed search command
      */
@@ -724,14 +667,14 @@ public class Toolbar extends Container {
     public Iterable<Command> getOverflowCommands() {
         return overflowCommands;
     }
-    
+
     /**
      * Adds a Command to the left or right side navigation menu according to the
      * state of RTL.
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
@@ -743,7 +686,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addCommandToLeftSideMenu(String name, Image icon, final ActionListener ev) {
@@ -758,7 +701,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addCommandToRightSideMenu(String name, Image icon, final ActionListener ev) {
@@ -766,7 +709,7 @@ public class Toolbar extends Container {
         addCommandToRightSideMenu(cmd);
         return cmd;
     }
-    
+
     /**
      * Adds a Component to the left or right side navigation menu, according to
      * the state of RTL.
@@ -776,20 +719,19 @@ public class Toolbar extends Container {
     public void addComponentToSideMenu(Component cmp) {
         addComponentToLeftSideMenu(cmp);
     }
-    
+
     /**
      * This method is responsible to add a Component to the left or right side
      * navigation panel according to the state of RTL.
      *
      * @param menu the Menu Container that was created in the
-     * constructSideNavigationComponent() method
-     *
-     * @param cmp the Component to add to the side menu
+     *             constructSideNavigationComponent() method
+     * @param cmp  the Component to add to the side menu
      */
     protected void addComponentToSideMenu(Container menu, Component cmp) {
         sideMenu.addComponentToSideMenuImpl(menu, cmp);
     }
-    
+
     /**
      * Adds a Component to the left or right side navigation menu, according to
      * the state of RTL. The Component is added to the navigation menu and the
@@ -808,7 +750,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToLeftSideMenu(String name, char icon, final ActionListener ev) {
@@ -825,7 +767,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToRightSideMenu(String name, char icon, final ActionListener ev) {
@@ -834,7 +776,7 @@ public class Toolbar extends Container {
         addCommandToRightSideMenu(cmd);
         return cmd;
     }
-    
+
     /**
      * Adds a Command to the left or right side navigation menu (according to
      * the state of RTL) with a material design icon reference
@@ -843,13 +785,13 @@ public class Toolbar extends Container {
      * @param name the name/title of the command
      * @param icon the icon for the command
      * @param size size in millimeters for the icon
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
         return addMaterialCommandToLeftSideMenu(name, icon, size, ev);
     }
-    
+
     /**
      * Adds a Command to the left or right side navigation menu (according to
      * the state of RTL) with a material design icon reference
@@ -857,7 +799,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
@@ -871,7 +813,7 @@ public class Toolbar extends Container {
      * @param name the name/title of the command
      * @param icon the icon for the command
      * @param size size in millimeters for the icon
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToLeftSideMenu(String name, char icon, float size, final ActionListener ev) {
@@ -889,7 +831,7 @@ public class Toolbar extends Container {
      * @param name the name/title of the command
      * @param icon the icon for the command
      * @param size size in millimeters for the icon
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToRightSideMenu(String name, char icon, float size, final ActionListener ev) {
@@ -905,7 +847,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToRightBar(String name, char icon, final ActionListener ev) {
@@ -922,7 +864,7 @@ public class Toolbar extends Container {
      * @param name the name/title of the command
      * @param icon the icon for the command
      * @param size size of the icon in millimeters
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToRightBar(String name, char icon, float size, final ActionListener ev) {
@@ -947,7 +889,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToLeftBar(String name, char icon, final ActionListener ev) {
@@ -964,7 +906,7 @@ public class Toolbar extends Container {
      * @param name the name/title of the command
      * @param icon the icon for the command
      * @param size size in millimeters for the icon
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToLeftBar(String name, char icon, float size, final ActionListener ev) {
@@ -980,7 +922,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToOverflowMenu(String name, char icon, final ActionListener ev) {
@@ -997,7 +939,7 @@ public class Toolbar extends Container {
      * @param name the name/title of the command
      * @param icon the icon for the command
      * @param size size in millimeters for the icon
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToOverflowMenu(String name, char icon, float size, final ActionListener ev) {
@@ -1025,20 +967,20 @@ public class Toolbar extends Container {
     boolean isComponentInOnTopRightSidemenu(Component cmp) {
         if (cmp != null) {
             if (cmp == permanentRightSideMenuContainer || cmp == this
-                || cmp == rightSidemenuSouthComponent) {
+                    || cmp == rightSidemenuSouthComponent) {
                 return true;
             }
             while (cmp.getParent() != null) {
                 cmp = cmp.getParent();
                 if (cmp == permanentRightSideMenuContainer || cmp == this
-                    || cmp == rightSidemenuSouthComponent) {
+                        || cmp == rightSidemenuSouthComponent) {
                     return true;
                 }
             }
         }
         return false;
     }
-    
+
     /**
      * Adds a Command to the left or right side navigation menu according to the
      * state of RTL.
@@ -1067,8 +1009,8 @@ public class Toolbar extends Container {
     public void addCommandToRightSideMenu(Command cmd) {
         addCommandToSideMenu(cmd, false);
     }
-    
-    private void addCommandToSideMenu(Command cmd, boolean isLeft) {        
+
+    private void addCommandToSideMenu(Command cmd, boolean isLeft) {
         checkIfInitialized();
         if (permanentSideMenu) {
             if (isLeft) {
@@ -1179,7 +1121,7 @@ public class Toolbar extends Container {
     }
 
     private void constructOnTopSideMenu(boolean isLeft) {
-        
+
         if ((isLeft && sidemenuDialog == null) || (!isLeft && rightSidemenuDialog == null)) {
             if (isLeft) {
                 permanentSideMenuContainer = constructSideNavigationComponent();
@@ -1357,14 +1299,14 @@ public class Toolbar extends Container {
                             return;
                         }
                         if (sidemenuDialog != null) {
-                            if ((!isRTL() && evt.getX() > sidemenuDialog.getWidth()) || (isRTL() && evt.getX() < Display.getInstance().getDisplayWidth()- sidemenuDialog.getWidth())) {
-                                if(sidemenuDialog.isShowing() && !isRTL()) {
+                            if ((!isRTL() && evt.getX() > sidemenuDialog.getWidth()) || (isRTL() && evt.getX() < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth())) {
+                                if (sidemenuDialog.isShowing() && !isRTL()) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                                     evt.consume();
                                     closeSideMenu();
                                 }
                                 return;
-                            } 
+                            }
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$sidemenuActivated", null);
@@ -1502,34 +1444,37 @@ public class Toolbar extends Container {
             }
         }
     }
-    
+
     /**
-     * Allows runtime manipulation of the side menu button, notice this will 
+     * Allows runtime manipulation of the side menu button, notice this will
      * only work after the menu was created
+     *
      * @return a button or null if the menu isn't there yet
      */
     public Button getLeftSideMenuButton() {
         return findCommandComponent(leftSideMenuCommand);
     }
-    
+
     /**
-     * Allows runtime manipulation of the side menu button, notice this will 
+     * Allows runtime manipulation of the side menu button, notice this will
      * only work after the menu was created
+     *
      * @return a button or null if the menu isn't there yet
      */
     public Button getRightSideMenuButton() {
         return findCommandComponent(rightSideMenuCommand);
     }
-    
+
     /**
-     * Allows runtime manipulation of the overflow button, notice this will 
+     * Allows runtime manipulation of the overflow button, notice this will
      * only work after the menu was created
+     *
      * @return a button or null if the menu isn't there yet
      */
     public Button getOverflowButton() {
         return menuButton;
     }
-    
+
     private void constructOnTopSideMenu() {
         constructOnTopSideMenu(true);
     }
@@ -1538,8 +1483,6 @@ public class Toolbar extends Container {
         constructOnTopSideMenu(false);
     }
 
-    
-    
     void showOnTopSidemenu(final int draggedX, final boolean fromCurrent) {
         Form f = Display.getInstance().getCurrent();
         if (f != null) {
@@ -1551,21 +1494,24 @@ public class Toolbar extends Container {
                     public void run() {
                         showOnTopSidemenu(draggedX, fromCurrent);
                     }
-                    
+
                 });
                 return;
             } else {
                 // On iOS, if async editing is enabled, it is possible
                 // that the keyboard will be opened even if no component
                 // is currently being edited.  In such a case, we still need
-                // to close the keyboard.  This "hack" achieves that.  
+                // to close the keyboard.  This "hack" achieves that.
                 // It would *probably* work to just do this in every case,
                 // rather than first try to find the editing component and stop
-                // its editing - but I chose to do it this way to minimize 
+                // its editing - but I chose to do it this way to minimize
                 // changes in code path - since it already worked correctly on
                 // every platform except for iOS.
                 // Ref https://github.com/codenameone/CodenameOne/issues/2444
-                f.stopEditing(new Runnable() {public void run() {}});
+                f.stopEditing(new Runnable() {
+                    public void run() {
+                    }
+                });
             }
         }
         AnimationManager a = getAnimationManager();
@@ -1580,7 +1526,7 @@ public class Toolbar extends Container {
             });
         }
     }
-        
+
     void showOnTopSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
         int dw = Display.getInstance().getDisplayWidth();
@@ -1685,21 +1631,24 @@ public class Toolbar extends Container {
                     public void run() {
                         showOnTopRightSidemenu(draggedX, fromCurrent);
                     }
-                    
+
                 });
                 return;
             } else {
                 // On iOS, if async editing is enabled, it is possible
                 // that the keyboard will be opened even if no component
                 // is currently being edited.  In such a case, we still need
-                // to close the keyboard.  This "hack" achieves that.  
+                // to close the keyboard.  This "hack" achieves that.
                 // It would *probably* work to just do this in every case,
                 // rather than first try to find the editing component and stop
-                // its editing - but I chose to do it this way to minimize 
+                // its editing - but I chose to do it this way to minimize
                 // changes in code path - since it already worked correctly on
                 // every platform except for iOS.
                 // Ref https://github.com/codenameone/CodenameOne/issues/2444
-                f.stopEditing(new Runnable(){public void run(){}});
+                f.stopEditing(new Runnable() {
+                    public void run() {
+                    }
+                });
             }
         }
         AnimationManager a = getAnimationManager();
@@ -1713,9 +1662,9 @@ public class Toolbar extends Container {
 
             });
         }
-        
+
     }
-    
+
     void showOnTopRightSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
         int dw = Display.getInstance().getDisplayWidth();
@@ -1817,7 +1766,7 @@ public class Toolbar extends Container {
      * includes many components
      *
      * @param sidemenuSouthComponent the new component to place in the south or
-     * null to remove the current component
+     *                               null to remove the current component
      */
     public void setComponentToSideMenuSouth(Component sidemenuSouthComponent) {
         if (this.sidemenuSouthComponent != null) {
@@ -1847,7 +1796,7 @@ public class Toolbar extends Container {
      * includes many components
      *
      * @param sidemenuSouthComponent the new component to place in the south or
-     * null to remove the current component
+     *                               null to remove the current component
      */
     public void setComponentToRightSideMenuSouth(Component sidemenuSouthComponent) {
         if (this.rightSidemenuSouthComponent != null) {
@@ -2038,7 +1987,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addCommandToRightBar(String name, Image icon, final ActionListener ev) {
@@ -2049,13 +1998,13 @@ public class Toolbar extends Container {
 
     /**
      * Removes a Command from the MenuBar
-     * 
+     *
      * @param cmd Command to remove
      */
     public void removeCommand(Command cmd) {
         getMenuBar().removeCommand(cmd);
     }
-    
+
     /**
      * Adds a Command to the TitleArea on the right side.
      *
@@ -2073,7 +2022,7 @@ public class Toolbar extends Container {
      *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command addCommandToLeftBar(String name, Image icon, final ActionListener ev) {
@@ -2155,11 +2104,11 @@ public class Toolbar extends Container {
     }
 
     /*
-     * A Overflow Menu is implemented as a dialog, this method allows you to 
-     * override the dialog display in order to customize the dialog menu in 
+     * A Overflow Menu is implemented as a dialog, this method allows you to
+     * override the dialog display in order to customize the dialog menu in
      * various ways
-     * 
-     * @param menu a dialog containing Overflow Menu options that can be 
+     *
+     * @param menu a dialog containing Overflow Menu options that can be
      * customized
      * @return the command selected by the user in the dialog
      */
@@ -2254,7 +2203,7 @@ public class Toolbar extends Container {
             // check if its already added:
             if (((BorderLayout) getLayout()).getNorth() == null) {
                 Container bar = new Container();
-                if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+                if (getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
                     bar.setUIID("StatusBar", "StatusBarLandscape");
                 } else {
                     bar.setUIID("StatusBar");
@@ -2271,10 +2220,11 @@ public class Toolbar extends Container {
     /**
      * Reallocates vertical padding and margins to be all on top, so that bottom padding/margin
      * is zero, but the total padding/margin is the same.
-     *
+     * <p>
      * This is helpful for the status bar so that, when the padding is adjusted by the safeArea
      * we don't end up with extra padding at the bottom of the component, which would increase
      * the height of the status bar.
+     *
      * @param cmp
      */
     private void reallocateVerticalPaddingAndMarginsToTop(Component cmp) {
@@ -2294,7 +2244,6 @@ public class Toolbar extends Container {
         allStyles.setMarginBottom(0);
     }
 
-
     private void checkIfInitialized() {
         if (!initialized) {
             throw new IllegalStateException("Need to call "
@@ -2307,7 +2256,7 @@ public class Toolbar extends Container {
      * feature can only work if the Form contentPane is scrollableY
      *
      * @param scrollOff if true the Toolbar needs to scroll off the screen when
-     * the Form ContentPane is scrolled
+     *                  the Form ContentPane is scrolled
      */
     public void setScrollOffUponContentPane(boolean scrollOff) {
         if (initialized && !this.scrollOff && scrollOff) {
@@ -2321,7 +2270,7 @@ public class Toolbar extends Container {
      */
     public void hideToolbar() {
         showing = false;
-        if(Display.INSTANCE.getCurrent() != getComponentForm()) {
+        if (Display.INSTANCE.getCurrent() != getComponentForm()) {
             setVisible(false);
             setHidden(true);
             return;
@@ -2342,7 +2291,7 @@ public class Toolbar extends Container {
      */
     public void showToolbar() {
         showing = true;
-        if(!isVisible()) {
+        if (!isVisible()) {
             setVisible(true);
             setHidden(false);
             getComponentForm().animateLayout(200);
@@ -2385,9 +2334,6 @@ public class Toolbar extends Container {
         actualPaneInitialH = actualPane.getHeight();
     }
 
-    // Flag for the scrollChanged listener to prevent it from being re-entered.
-    private boolean entered;
-    private int lastNonZeroScrollDiff;
     private void bindScrollListener(boolean bind) {
         final Form f = getComponentForm();
         if (f != null) {
@@ -2396,10 +2342,10 @@ public class Toolbar extends Container {
             if (bind) {
                 initVars(actualPane);
                 scrollListener = new ScrollListener() {
-                    
+
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                         if (entered || contentPane.isTensileMotionInProgress()) return;
-                        
+
                         // When the content pane is resized, it may trigger a scroll event --
                         // we need to make sure that *that* scroll event doesn't trigger
                         // us - or we get unexpected results.
@@ -2420,14 +2366,14 @@ public class Toolbar extends Container {
                                 setY(toolbarNewY);
                                 if (!layered) {
                                     int oldY = actualPane.getY();
-                                    
+
                                     actualPane.setY(getHeight() + getY());
                                     boolean smooth = actualPane.isSmoothScrolling();
                                     actualPane.setSmoothScrolling(false);
                                     actualPane.setScrollY(scrollY - oldY + actualPane.getY());
                                     actualPane.setSmoothScrolling(smooth);
                                     actualPane.setHeight(f.getHeight() - getHeight() - getY());
-                                    
+
                                     actualPane.doLayout();
                                 }
                                 f.repaint();
@@ -2482,7 +2428,7 @@ public class Toolbar extends Container {
     protected Container constructSideNavigationComponent() {
         return sideMenu.constructSideNavigationPanel();
     }
-    
+
     /**
      * Creates an empty right side navigation panel.
      */
@@ -2494,9 +2440,8 @@ public class Toolbar extends Container {
      * This method responsible to add a Component to the left side navigation panel.
      *
      * @param menu the Menu Container that was created in the
-     * constructSideNavigationComponent() method
-     *
-     * @param cmp the Component to add to the side menu
+     *             constructSideNavigationComponent() method
+     * @param cmp  the Component to add to the side menu
      */
     protected void addComponentToLeftSideMenu(Container menu, Component cmp) {
         sideMenu.addComponentToSideMenuImpl(menu, cmp);
@@ -2507,9 +2452,8 @@ public class Toolbar extends Container {
      * panel.
      *
      * @param menu the Menu Container that was created in the
-     * constructSideNavigationComponent() method
-     *
-     * @param cmp the Component to add to the side menu
+     *             constructSideNavigationComponent() method
+     * @param cmp  the Component to add to the side menu
      */
     protected void addComponentToRightSideMenu(Container menu, Component cmp) {
         sideMenu.addComponentToSideMenuImpl(menu, cmp);
@@ -2566,6 +2510,58 @@ public class Toolbar extends Container {
         overflowCommands.remove(cmd);
     }
 
+    /**
+     * Normally on a right side menu the alignment should be "mirrored" in
+     * comparision with the left side menu, also for non-RTL languages: this
+     * method allows to change this default behaviour for non-RTL languages,
+     * forcing the alignment of the Commands of the right side menu to left.
+     * Note that for RTL languages this method does nothing. This method should
+     * be called before adding commands to the right side menu.
+     *
+     * @param toLeft false is the default, true changes the alignment.
+     */
+    public void setRightSideMenuCmdsAlignedToLeft(boolean toLeft) {
+        if (!isRTL()) {
+            rightSideMenuCmdsAlignedToLeft = toLeft;
+        }
+    }
+
+    /**
+     * The behavior of the back command in the title
+     */
+    public static enum BackCommandPolicy {
+        /**
+         * Show the back command always within the title bar on the left hand
+         * side
+         */
+        ALWAYS,
+        /**
+         * Show the back command always but shows it with the UIID standard UIID
+         */
+        AS_REGULAR_COMMAND,
+        /**
+         * Show the back command always as a back arrow image from the material
+         * design style
+         */
+        AS_ARROW,
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme
+         * constant is defined to true which is the case for iOS themes
+         */
+        ONLY_WHEN_USES_TITLE,
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme
+         * constant is defined to true on other platforms uses the left arrow
+         * material icon
+         */
+        WHEN_USES_TITLE_OTHERWISE_ARROW,
+        /**
+         * Never show the command in the title area and only set the back
+         * command to the toolbar
+         */
+        NEVER
+    }
+
     class ToolbarSideMenu extends SideMenuBar {
 
         @Override
@@ -2608,7 +2604,7 @@ public class Toolbar extends Container {
         protected void initMenuBar(Form parent) {
             Component ta = parent.getTitleArea();
             if (ta instanceof Container) {
-                ((Container)ta).setSafeArea(true);
+                ((Container) ta).setSafeArea(true);
             }
             parent.removeComponentFromForm(ta);
             super.initMenuBar(parent);
@@ -2653,7 +2649,7 @@ public class Toolbar extends Container {
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 UIManager uim = UIManager.getInstance();
                 Image i = (Image) uim.getThemeImageConstant("menuImage");
-                if(uim.getThemeConstant("overflowImageSize", null) != null) {
+                if (uim.getThemeConstant("overflowImageSize", null) != null) {
                     float size = 4.5f;
                     try {
                         size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
@@ -2668,7 +2664,7 @@ public class Toolbar extends Container {
                         sideMenu.showMenu();
                     }
                 });
-                if(i == null) {
+                if (i == null) {
                     menuButton.setMaterialIcon(FontImage.MATERIAL_MORE_VERT);
                 }
                 menuButton.putClientProperty("overflow", Boolean.TRUE);
@@ -2794,22 +2790,5 @@ public class Toolbar extends Container {
 
     }
 
-    /**
-     * Normally on a right side menu the alignment should be "mirrored" in
-     * comparision with the left side menu, also for non-RTL languages: this
-     * method allows to change this default behaviour for non-RTL languages,
-     * forcing the alignment of the Commands of the right side menu to left.
-     * Note that for RTL languages this method does nothing. This method should
-     * be called before adding commands to the right side menu.
-     *
-     * @param toLeft false is the default, true changes the alignment.
-     */
-    public void setRightSideMenuCmdsAlignedToLeft(boolean toLeft) {
-        if (!isRTL()) {
-            rightSideMenuCmdsAlignedToLeft = toLeft;
-        }
-    }
-    
-    
 
 }

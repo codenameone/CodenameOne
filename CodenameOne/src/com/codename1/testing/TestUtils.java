@@ -22,8 +22,8 @@
  */
 package com.codename1.testing;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.io.Storage;
-import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
@@ -38,12 +38,11 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.list.ContainerList;
-import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.spinner.GenericSpinner;
 import com.codename1.ui.util.ImageIO;
+
 import java.io.IOException;
 import java.util.ArrayList;
-import com.codename1.compat.java.util.Objects;
 
 /**
  * Various utility classes to automate UI testing
@@ -52,10 +51,13 @@ import com.codename1.compat.java.util.Objects;
  */
 public class TestUtils {
     private static boolean verbose;
-    private TestUtils() {}
+
+    private TestUtils() {
+    }
 
     /**
      * Activates/deactivates the verbose test mode
+     *
      * @param v true for verbosity
      */
     public static void setVerboseMode(boolean v) {
@@ -64,13 +66,14 @@ public class TestUtils {
 
     /**
      * Waits for the given number of milliseconds even if the waiting is on the EDT thread
+     *
      * @param millis the number of milliseconds to wait
      */
     public static void waitFor(final int millis) {
-        if(verbose) {
+        if (verbose) {
             log("waitFor(" + millis + ")");
         }
-        if(Display.getInstance().isEdt()) {
+        if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
                     try {
@@ -89,15 +92,16 @@ public class TestUtils {
 
     /**
      * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
      * @param componentName the name of the component to find
      * @return the component with the given name within the tree
      */
     public static Component findByName(String componentName) {
-        if(verbose) {
+        if (verbose) {
             log("findByName(" + componentName + ")");
         }
         Component c = findByName(Display.getInstance().getCurrent(), componentName);
-        if(c == null) {
+        if (c == null) {
             waitFor(30);
             return findByName(Display.getInstance().getCurrent(), componentName);
         }
@@ -106,8 +110,9 @@ public class TestUtils {
 
     /**
      * Selects the given offset in a list
+     *
      * @param listName the name of the list component
-     * @param offset the offset to select
+     * @param offset   the offset to select
      */
     public static void selectInList(String listName, int offset) {
         selectListOffset(findByName(listName), offset);
@@ -115,16 +120,16 @@ public class TestUtils {
 
     private static void selectListOffset(Component c, int offset) {
         assertBool(c != null, "List not found");
-        if(c instanceof List) {
-            ((List)c).setSelectedIndex(offset);
+        if (c instanceof List) {
+            ((List) c).setSelectedIndex(offset);
             return;
         }
-        if(c instanceof ContainerList) {
-            ((ContainerList)c).setSelectedIndex(offset);
+        if (c instanceof ContainerList) {
+            ((ContainerList) c).setSelectedIndex(offset);
             return;
         }
-        if(c instanceof GenericSpinner) {
-            ((GenericSpinner)c).getModel().setSelectedIndex(offset);
+        if (c instanceof GenericSpinner) {
+            ((GenericSpinner) c).getModel().setSelectedIndex(offset);
             return;
         }
         assertBool(false, "Unsupported list type: " + c.getName());
@@ -132,6 +137,7 @@ public class TestUtils {
 
     /**
      * Selects the given offset in a list
+     *
      * @param offset the offset to select
      */
     public static void selectInList(int[] path, int offset) {
@@ -140,23 +146,24 @@ public class TestUtils {
 
     /**
      * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
      * @param componentName the name of the component to find
      * @return the component with the given name within the tree
      */
     private static Component findByName(Container root, String componentName) {
-        if(verbose) {
+        if (verbose) {
             log("findByName(" + root + ", " + componentName + ")");
         }
         int count = root.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component c = root.getComponentAt(iter);
             String n = c.getName();
-            if(n != null && n.equals(componentName)) {
+            if (n != null && n.equals(componentName)) {
                 return c;
             }
-            if(c instanceof Container) {
-                c = findByName((Container)c, componentName);
-                if(c != null) {
+            if (c instanceof Container) {
+                c = findByName((Container) c, componentName);
+                if (c != null) {
                     return c;
                 }
             }
@@ -166,11 +173,12 @@ public class TestUtils {
 
     /**
      * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
      * @param text the text of the label/button
      * @return the component with the given label text within the tree
      */
     public static Label findLabelText(String text) {
-        if(verbose) {
+        if (verbose) {
             log("findLabelText(" + text + ")");
         }
         return findLabelText(Display.getInstance().getCurrent(), text);
@@ -179,32 +187,33 @@ public class TestUtils {
 
     /**
      * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
      * @param text the text of the label/button
      * @return the component with the given label text within the tree
      */
     private static Label findLabelText(Container root, String text) {
-        if(verbose) {
+        if (verbose) {
             log("findLabelText(" + root + ", " + text + ")");
         }
         int count = root.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component c = root.getComponentAt(iter);
-            if(c instanceof Label) {
-                String n = ((Label)c).getText();
-                if(n != null && n.equals(text)) {
-                    return (Label)c;
+            if (c instanceof Label) {
+                String n = ((Label) c).getText();
+                if (n != null && n.equals(text)) {
+                    return (Label) c;
                 }
-                
+
                 // will work for cases of upcase due to Android theme upcasing of buttons
-                n = (String)c.getClientProperty("cn1$origText");
-                if(n != null && n.equals(text)) {
-                    return (Label)c;
+                n = (String) c.getClientProperty("cn1$origText");
+                if (n != null && n.equals(text)) {
+                    return (Label) c;
                 }
                 continue;
             }
-            if(c instanceof Container) {
-                Label l = findLabelText((Container)c, text);
-                if(l != null) {
+            if (c instanceof Container) {
+                Label l = findLabelText((Container) c, text);
+                if (l != null) {
                     return l;
                 }
             }
@@ -214,13 +223,14 @@ public class TestUtils {
 
     /**
      * Clicks the button with the given label
+     *
      * @param text the text on the button
      */
     public static void clickButtonByLabel(String text) {
-        if(verbose) {
+        if (verbose) {
             log("clickButtonByLabel(" + text + ")");
         }
-        Button b = (Button)findLabelText(text);
+        Button b = (Button) findLabelText(text);
         waitFor(20);
         b.pressed();
         waitFor(20);
@@ -230,13 +240,14 @@ public class TestUtils {
 
     /**
      * Clicks the button with the given label
+     *
      * @param name the name of the button
      */
     public static void clickButtonByName(String name) {
-        if(verbose) {
+        if (verbose) {
             log("clickButtonByName(" + name + ")");
         }
-        Button b = (Button)findByName(name);
+        Button b = (Button) findByName(name);
         waitFor(20);
         b.pressed();
         waitFor(20);
@@ -245,14 +256,14 @@ public class TestUtils {
     }
 
     private static String toString(int[] p) {
-        if(p == null) {
+        if (p == null) {
             return "null";
         }
-        if(p.length == 0) {
+        if (p.length == 0) {
             return "{}";
         }
         String s = "{" + p[0];
-        for(int iter = 1 ; iter < p.length ; iter++) {
+        for (int iter = 1; iter < p.length; iter++) {
             s += ", " + p[iter];
 
         }
@@ -261,13 +272,14 @@ public class TestUtils {
 
     /**
      * Clicks the button with the given component path
+     *
      * @param path the path
      */
     public static void clickButtonByPath(int[] path) {
-        if(verbose) {
+        if (verbose) {
             log("clickButtonByPath(" + toString(path) + ")");
         }
-        Button b = (Button)getComponentByPath(path);
+        Button b = (Button) getComponentByPath(path);
         b.pressed();
         waitFor(10);
         b.released();
@@ -278,29 +290,30 @@ public class TestUtils {
      * Executes the back command for the current form, similarly to pressing the back button
      */
     public static void goBack() {
-        if(verbose) {
+        if (verbose) {
             log("goBack()");
         }
         Form f = Display.getInstance().getCurrent();
         Command c = f.getBackCommand();
         assertBool(c != null, "The current form doesn't have a back command at this moment! for form name " + f.getName());
-        f.dispatchCommand(c, new ActionEvent(c,ActionEvent.Type.Command));
+        f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));
         waitFor(20);
     }
 
     /**
      * Executes a menu command with the given name
+     *
      * @param name the name of the command
      */
     public static void clickMenuItem(String name) {
-        if(verbose) {
+        if (verbose) {
             log("clickMenuItem(" + name + ")");
         }
         Form f = Display.getInstance().getCurrent();
-        for(int iter = 0 ; iter < f.getCommandCount() ; iter++) {
+        for (int iter = 0; iter < f.getCommandCount(); iter++) {
             Command c = f.getCommand(iter);
-            if(name.equals(c.getCommandName())) {
-                f.dispatchCommand(c, new ActionEvent(c,ActionEvent.Type.Command));
+            if (name.equals(c.getCommandName())) {
+                f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));
                 return;
             }
         }
@@ -309,6 +322,7 @@ public class TestUtils {
 
     /**
      * Returns all the command objects from the toolbar in the order of left, right, overflow &amp; sidemenu
+     *
      * @return the set of commands
      */
     public static Command[] getToolbarCommands() {
@@ -323,36 +337,36 @@ public class TestUtils {
         result.toArray(carr);
         return carr;
     }
-    
+
     private static void addAllCommands(Iterable<Command> cs, ArrayList<Command> result) {
-        if(cs != null) {
-            for(Command c : cs) {
+        if (cs != null) {
+            for (Command c : cs) {
                 result.add(c);
             }
         }
     }
-    
+
     /**
      * Shows the sidemenu UI
      */
     public static void showSidemenu() {
         Form f = Display.getInstance().getCurrent();
         Toolbar tb = f.getToolbar();
-        if(tb != null) {
+        if (tb != null) {
             tb.openSideMenu();
         } else {
-            ((SideMenuBar)f.getMenuBar()).openMenu(null);
+            ((SideMenuBar) f.getMenuBar()).openMenu(null);
         }
     }
-    
+
     /**
      * Executes a command from the offset returned by {@link #getToolbarCommands()}
-     * 
+     *
      * @param offset the offset of the command we want to execute
      */
     public static void executeToolbarCommandAtOffset(final int offset) {
         Form f = Display.getInstance().getCurrent();
-        if(!Display.getInstance().isEdt()) {
+        if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     executeToolbarCommandAtOffset(offset);
@@ -363,13 +377,14 @@ public class TestUtils {
         Command cmd = getToolbarCommands()[offset];
         f.dispatchCommand(cmd, new ActionEvent(cmd));
     }
-    
+
     /**
      * Scrolls to show the component in case it is invisible currently
+     *
      * @param c the component
      */
     public static void ensureVisible(Component c) {
-        if(verbose) {
+        if (verbose) {
             log("ensureVisible(" + c + ")");
         }
         Form f = Display.getInstance().getCurrent();
@@ -378,10 +393,11 @@ public class TestUtils {
 
     /**
      * Scrolls to show the component in case it is invisible currently
+     *
      * @param componentName the component
      */
     public static void ensureVisible(String componentName) {
-        if(verbose) {
+        if (verbose) {
             log("ensureVisible(" + componentName + ")");
         }
         ensureVisible(findByName(componentName));
@@ -389,25 +405,27 @@ public class TestUtils {
 
     /**
      * Scrolls to show the component in case it is invisible currently
+     *
      * @param path the path to the component
      */
     public static void ensureVisible(int[] path) {
-        if(verbose) {
+        if (verbose) {
             log("ensureVisible(" + toString(path) + ")");
         }
         ensureVisible(getComponentByPath(path));
     }
-        
+
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
-     * @param title the title of the form to wait for
+     *
+     * @param title   the title of the form to wait for
      * @param timeout Timeout in ms.
      */
     public static void waitForFormTitle(final String title, final long timeout) {
-        if(verbose) {
+        if (verbose) {
             log("waitForFormTitle(" + title + ")");
         }
-        if(Display.getInstance().isEdt()) {
+        if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
                     waitForFormTitleImpl(title, timeout);
@@ -418,9 +436,10 @@ public class TestUtils {
         }
         waitFor(50);
     }
-    
+
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test.  Timeout is 90 seconds.
+     *
      * @param title the title of the form to wait for
      */
     public static void waitForFormTitle(final String title) {
@@ -428,23 +447,23 @@ public class TestUtils {
     }
 
     private static String getFormTitle(Form f) {
-        if(f.getToolbar() != null) {
+        if (f.getToolbar() != null) {
             Component c = f.getToolbar().getTitleComponent();
-            if(c instanceof Label) {
-                return ((Label)c).getText();
+            if (c instanceof Label) {
+                return ((Label) c).getText();
             }
             return null;
         } else {
             return f.getTitle();
         }
     }
-    
+
     private static void waitForFormTitleImpl(String title, long timeout) {
         long t = System.currentTimeMillis() + timeout;
-        while(!title.equals(getFormTitle(Display.getInstance().getCurrent()))) {
+        while (!title.equals(getFormTitle(Display.getInstance().getCurrent()))) {
             try {
                 Thread.sleep(50);
-                if(System.currentTimeMillis() > t) {
+                if (System.currentTimeMillis() > t) {
                     assertBool(false, "Waiting for form " + title + " timed out! Current form title is: " + Display.getInstance().getCurrent().getTitle());
                 }
             } catch (InterruptedException ex) {
@@ -454,14 +473,15 @@ public class TestUtils {
 
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
-     * @param name the name of the form to wait for
+     *
+     * @param name    the name of the form to wait for
      * @param timeout Timeout in ms
      */
     public static void waitForFormName(final String name, final long timeout) {
-        if(verbose) {
+        if (verbose) {
             log("waitForFormName(" + name + ")");
         }
-        if(Display.getInstance().isEdt()) {
+        if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
                     waitForFormNameImpl(name, timeout);
@@ -472,37 +492,39 @@ public class TestUtils {
         }
         waitFor(50);
     }
-    
+
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test.  Timeout is 90 seconds.
+     *
      * @param name the name of the form to wait for
      */
     public static void waitForFormName(final String name) {
         waitForFormName(name, 90000);
     }
-    
+
     private static void waitForFormNameImpl(String title, long timeout) {
         long t = System.currentTimeMillis() + timeout;
-        while(!title.equals(Display.getInstance().getCurrent().getName())) {
+        while (!title.equals(Display.getInstance().getCurrent().getName())) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException ex) {
             }
-            if(System.currentTimeMillis() > t) {
+            if (System.currentTimeMillis() > t) {
                 assertBool(false, "Waiting for form " + title + " timed out! Current form name is: " + Display.getInstance().getCurrent().getName());
             }
         }
     }
-    
+
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     *
      * @param timeout Timeout in milliseconds.
      */
     public static void waitForUnnamedForm(final long timeout) {
-        if(verbose) {
+        if (verbose) {
             log("waitForUnnamedForm()");
         }
-        if(Display.getInstance().isEdt()) {
+        if (Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
                     waitForUnnamedFormImpl(timeout);
@@ -513,23 +535,23 @@ public class TestUtils {
         }
         waitFor(50);
     }
-    
+
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
      */
     public static void waitForUnnamedForm() {
         waitForUnnamedForm(90000);
     }
-    
+
 
     private static void waitForUnnamedFormImpl(long timeout) {
         long t = System.currentTimeMillis() + timeout;
-        while(Display.getInstance().getCurrent().getName() != null) {
+        while (Display.getInstance().getCurrent().getName() != null) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException ex) {
             }
-            if(System.currentTimeMillis() > t) {
+            if (System.currentTimeMillis() > t) {
                 assertBool(false, "Waiting for form unnamed form timed out! Current form name is: " + Display.getInstance().getCurrent().getName());
             }
         }
@@ -552,12 +574,12 @@ public class TestUtils {
      * it isn't 100% identical.
      */
     public static boolean screenshotTest(String screenshotName) {
-        if(verbose) {
+        if (verbose) {
             log("screenshotTest(" + screenshotName + ")");
         }
         try {
             ImageIO io = ImageIO.getImageIO();
-            if(io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 log("screenshot test skipped due to no image IO support for PNG format");
                 return true;
             }
@@ -565,13 +587,13 @@ public class TestUtils {
             Image mute = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
             Display.getInstance().getCurrent().paintComponent(mute.getGraphics(), true);
             screenshotName = screenshotName + ".png";
-            if(Storage.getInstance().exists(screenshotName)) {
+            if (Storage.getInstance().exists(screenshotName)) {
                 int[] rgba = mute.getRGBCached();
                 Image orig = Image.createImage(Storage.getInstance().createInputStream(screenshotName));
                 int[] origRgba = orig.getRGBCached();
                 orig = null;
-                for(int iter = 0 ; iter < rgba.length ; iter++) {
-                    if(rgba[iter] != origRgba[iter]) {
+                for (int iter = 0; iter < rgba.length; iter++) {
+                    if (rgba[iter] != origRgba[iter]) {
                         log("screenshots do not match at offset " + iter + " saving additional image under " + screenshotName + ".fail");
                         io.save(mute, Storage.getInstance().createOutputStream(screenshotName + ".fail"), ImageIO.FORMAT_PNG, 1);
                         return false;
@@ -581,7 +603,7 @@ public class TestUtils {
                 io.save(mute, Storage.getInstance().createOutputStream(screenshotName), ImageIO.FORMAT_PNG, 1);
             }
             return true;
-        } catch(IOException err) {
+        } catch (IOException err) {
             log(err);
             return false;
         }
@@ -589,6 +611,7 @@ public class TestUtils {
 
     /**
      * Log to the test log
+     *
      * @param t the string to log
      */
     public static void log(String t) {
@@ -597,6 +620,7 @@ public class TestUtils {
 
     /**
      * Log to the test log
+     *
      * @param t exception to log
      */
     public static void log(Throwable t) {
@@ -606,10 +630,11 @@ public class TestUtils {
 
     /**
      * Simulates a device key press
+     *
      * @param keyCode the keycode
      */
     public static void keyPress(int keyCode) {
-        if(verbose) {
+        if (verbose) {
             log("keyPress(" + keyCode + ")");
         }
         Display.getInstance().getCurrent().keyPressed(keyCode);
@@ -618,10 +643,11 @@ public class TestUtils {
 
     /**
      * Simulates a device key release
+     *
      * @param keyCode the keycode
      */
     public static void keyRelease(int keyCode) {
-        if(verbose) {
+        if (verbose) {
             log("keyRelease(" + keyCode + ")");
         }
         Display.getInstance().getCurrent().keyReleased(keyCode);
@@ -630,10 +656,11 @@ public class TestUtils {
 
     /**
      * Simulates a game key press
+     *
      * @param gameKey the game key (arrows etc.)
      */
     public static void gameKeyPress(int gameKey) {
-        if(verbose) {
+        if (verbose) {
             log("gameKeyPress(" + gameKey + ")");
         }
         Display.getInstance().getCurrent().keyPressed(Display.getInstance().getKeyCode(gameKey));
@@ -642,10 +669,11 @@ public class TestUtils {
 
     /**
      * Simulates a game key release
+     *
      * @param gameKey the game key (arrows etc.)
      */
     public static void gameKeyRelease(int gameKey) {
-        if(verbose) {
+        if (verbose) {
             log("gameKeyRelease(" + gameKey + ")");
         }
         Display.getInstance().getCurrent().keyReleased(Display.getInstance().getKeyCode(gameKey));
@@ -656,27 +684,28 @@ public class TestUtils {
      * A component press on a given named component at x/y where x and y are <b>NOT pixels</b>
      * but rather a number between 0 to 1 representing the percentage within the component where the
      * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
-     * @param x the offset within the component as a number between 0 and 1
-     * @param y the offset within the component as a number between 0 and 1
+     *
+     * @param x             the offset within the component as a number between 0 and 1
+     * @param y             the offset within the component as a number between 0 and 1
      * @param componentName the name of the component
      */
     public static void pointerPress(float x, float y, String componentName) {
-        if(verbose) {
-            if(componentName == null) {
+        if (verbose) {
+            if (componentName == null) {
                 log("pointerPress(" + x + ", " + y + ", null)");
             } else {
                 log("pointerPress(" + x + ", " + y + ", " + componentName + ")");
             }
         }
         waitFor(20);
-        if(componentName != null) {
+        if (componentName != null) {
             Component c = findByName(componentName);
-            int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
-            int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
+            int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
+            int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
             Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
         } else {
-            Display.getInstance().getCurrent().pointerPressed((int)(x * Display.getInstance().getDisplayWidth()), 
-                    (int)(y * Display.getInstance().getDisplayHeight()));
+            Display.getInstance().getCurrent().pointerPressed((int) (x * Display.getInstance().getDisplayWidth()),
+                    (int) (y * Display.getInstance().getDisplayHeight()));
         }
         waitFor(10);
     }
@@ -685,17 +714,18 @@ public class TestUtils {
      * A component release on a given named component at x/y where x and y are <b>NOT pixels</b>
      * but rather a number between 0 to 1 representing the percentage within the component where the
      * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
-     * @param x the offset within the component as a number between 0 and 1
-     * @param y the offset within the component as a number between 0 and 1
+     *
+     * @param x             the offset within the component as a number between 0 and 1
+     * @param y             the offset within the component as a number between 0 and 1
      * @param componentName the name of the component
      */
     public static void pointerRelease(float x, float y, String componentName) {
-        if(verbose) {
+        if (verbose) {
             log("pointerRelease(" + x + ", " + y + ", " + componentName + ")");
         }
         Component c = findByName(componentName);
-        int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
+        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
+        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
         Display.getInstance().getCurrent().pointerReleased(actualX, actualY);
         waitFor(30);
     }
@@ -704,17 +734,18 @@ public class TestUtils {
      * A component drag on a given named component at x/y where x and y are <b>NOT pixels</b>
      * but rather a number between 0 to 1 representing the percentage within the component where the
      * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
-     * @param x the offset within the component as a number between 0 and 1
-     * @param y the offset within the component as a number between 0 and 1
+     *
+     * @param x             the offset within the component as a number between 0 and 1
+     * @param y             the offset within the component as a number between 0 and 1
      * @param componentName the name of the component
      */
     public static void pointerDrag(float x, float y, String componentName) {
-        if(verbose) {
+        if (verbose) {
             log("pointerDrag(" + x + ", " + y + ", " + componentName + ")");
         }
         Component c = findByName(componentName);
-        int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
+        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
+        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
         Display.getInstance().getCurrent().pointerDragged(actualX, actualY);
     }
 
@@ -722,17 +753,18 @@ public class TestUtils {
      * A component press on a given named component at x/y where x and y are <b>NOT pixels</b>
      * but rather a number between 0 to 1 representing the percentage within the component where the
      * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
-     * @param x the offset within the component as a number between 0 and 1
-     * @param y the offset within the component as a number between 0 and 1
+     *
+     * @param x    the offset within the component as a number between 0 and 1
+     * @param y    the offset within the component as a number between 0 and 1
      * @param path the path to the component
      */
     public static void pointerPress(float x, float y, int[] path) {
-        if(verbose) {
+        if (verbose) {
             log("pointerPress(" + x + ", " + y + ", " + toString(path) + ")");
         }
         Component c = getComponentByPath(path);
-        int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
+        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
+        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
         Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
         waitFor(10);
     }
@@ -741,17 +773,18 @@ public class TestUtils {
      * A component release on a given named component at x/y where x and y are <b>NOT pixels</b>
      * but rather a number between 0 to 1 representing the percentage within the component where the
      * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
-     * @param x the offset within the component as a number between 0 and 1
-     * @param y the offset within the component as a number between 0 and 1
+     *
+     * @param x    the offset within the component as a number between 0 and 1
+     * @param y    the offset within the component as a number between 0 and 1
      * @param path the path to the component
      */
     public static void pointerRelease(float x, float y, int[] path) {
-        if(verbose) {
+        if (verbose) {
             log("pointerRelease(" + x + ", " + y + ", " + toString(path) + ")");
         }
         Component c = getComponentByPath(path);
-        int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
+        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
+        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
         Display.getInstance().getCurrent().pointerReleased(actualX, actualY);
         waitFor(10);
     }
@@ -760,17 +793,18 @@ public class TestUtils {
      * A component drag on a given named component at x/y where x and y are <b>NOT pixels</b>
      * but rather a number between 0 to 1 representing the percentage within the component where the
      * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
-     * @param x the offset within the component as a number between 0 and 1
-     * @param y the offset within the component as a number between 0 and 1
+     *
+     * @param x    the offset within the component as a number between 0 and 1
+     * @param y    the offset within the component as a number between 0 and 1
      * @param path the path to the component
      */
     public static void pointerDrag(float x, float y, int[] path) {
-        if(verbose) {
+        if (verbose) {
             log("pointerDrag(" + x + ", " + y + ", " + toString(path) + ")");
         }
         Component c = getComponentByPath(path);
-        int actualX = c.getAbsoluteX() + (int)(x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int)(y * c.getHeight());
+        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
+        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
         Display.getInstance().getCurrent().pointerDragged(actualX, actualY);
     }
 
@@ -780,13 +814,14 @@ public class TestUtils {
      * of { 0, 3 } would mean that the first component within the Content pane (by
      * index) is a Container whose 3rd component (again by index) is the component we
      * want.
+     *
      * @param path an array
      * @return a component
      */
     public static Component getComponentByPath(int[] path) {
         Component current = Display.getInstance().getCurrent().getContentPane();
-        for(int iter = 0 ; iter < path.length ; iter++) {
-            current = ((Container)current).getComponentAt(path[iter]);
+        for (int iter = 0; iter < path.length; iter++) {
+            current = ((Container) current).getComponentAt(path[iter]);
         }
         return current;
     }
@@ -794,62 +829,66 @@ public class TestUtils {
 
     /**
      * Sets the text for the given component
+     *
      * @param name the name of the component
      * @param text the text to set
      */
     public static void setText(String name, String text) {
-        if(verbose) {
+        if (verbose) {
             log("setText(" + name + ", " + text + ")");
         }
         Component c = findByName(name);
-        if(c instanceof Label) {
-            ((Label)c).setText(text);
+        if (c instanceof Label) {
+            ((Label) c).setText(text);
             return;
         }
-        ((TextArea)c).setText(text);
+        ((TextArea) c).setText(text);
         Display.getInstance().onEditingComplete(c, text);
 
     }
 
     /**
      * Sets the text for the given component
+     *
      * @param path the path to the component
      * @param text the text to set
      */
     public static void setText(int[] path, String text) {
-        if(verbose) {
+        if (verbose) {
             log("setText(" + toString(path) + ", " + text + ")");
         }
         Component c = getComponentByPath(path);
-        if(c instanceof Label) {
-            ((Label)c).setText(text);
+        if (c instanceof Label) {
+            ((Label) c).setText(text);
             return;
         }
-        ((TextArea)c).setText(text);
+        ((TextArea) c).setText(text);
     }
 
     /**
      * Assertions allow for simpler test code
+     *
      * @param b must be true, otherwise an exception is thrown thus failing the test
      */
     public static void assertBool(boolean b) {
-        if(verbose) {
+        if (verbose) {
             log("assertBool(" + b + ")");
         }
-        if(!b) {
+        if (!b) {
             throw new RuntimeException();
         }
     }
 
     /**
      * Assertions allow for simpler test code
+     *
      * @param b must be true, otherwise an exception is thrown thus failing the test
      */
     public static void assertBool(boolean b, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertBool(" + b + ", " + errorMessage + ")");
         }
-        if(!b) {
+        if (!b) {
             log("Assert failed on: " + errorMessage);
             throw new RuntimeException(errorMessage);
         }
@@ -859,18 +898,19 @@ public class TestUtils {
      * An assertion that always fails a test.
      */
     public static void fail() {
-        if(verbose) {
+        if (verbose) {
             log("fail()");
         }
         assertBool(false);
     }
 
     /**
-     *  An assertion that always fails a test.
+     * An assertion that always fails a test.
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void fail(String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("fail(" + errorMessage + ")");
         }
         assertBool(false, errorMessage);
@@ -880,7 +920,7 @@ public class TestUtils {
      * Asserts that the given expression evaluates to true
      */
     public static void assertTrue(boolean value) {
-        if(verbose) {
+        if (verbose) {
             log("assertTrue(" + value + ")");
         }
         assertBool(value);
@@ -888,10 +928,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given expression evaluates to true
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertTrue(boolean value, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertTrue(" + value + ", " + errorMessage + ")");
         }
         assertBool(value, errorMessage);
@@ -901,7 +942,7 @@ public class TestUtils {
      * Asserts that the given expression evaluates to false
      */
     public static void assertFalse(boolean value) {
-        if(verbose) {
+        if (verbose) {
             log("assertFalse(" + value + ")");
         }
         assertBool(!value);
@@ -909,10 +950,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given expression evaluates to false
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertFalse(boolean value, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertFalse(" + value + ", " + errorMessage + ")");
         }
         assertBool(!value, errorMessage);
@@ -922,7 +964,7 @@ public class TestUtils {
      * Asserts that the given expression evaluates to null
      */
     public static void assertNull(Object object) {
-        if(verbose) {
+        if (verbose) {
             log("assertNull(" + object + ")");
         }
         assertBool(object == null);
@@ -930,10 +972,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given expression evaluates to null
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertNull(Object object, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNull(" + object + ", " + errorMessage + ")");
         }
         assertBool(object == null, errorMessage);
@@ -943,7 +986,7 @@ public class TestUtils {
      * Asserts that the given expression does not evaluate to null
      */
     public static void assertNotNull(Object object) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotNull(" + object + ")");
         }
         assertBool(object != null);
@@ -951,10 +994,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given expression does not evaluate to null
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertNotNull(Object object, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotNull(" + object + ", " + errorMessage + ")");
         }
         assertBool(object != null, errorMessage);
@@ -964,7 +1008,7 @@ public class TestUtils {
      * Asserts that the given parameters reference the same object
      */
     public static void assertSame(Object expected, Object actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertSame(" + expected + ", " + actual + ")");
         }
         assertBool(expected == actual);
@@ -972,10 +1016,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given parameters reference the same object
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertSame(Object expected, Object actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertSame(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         assertBool(expected == actual, errorMessage);
@@ -985,7 +1030,7 @@ public class TestUtils {
      * Asserts that the given parameters do not reference the same object
      */
     public static void assertNotSame(Object expected, Object actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotSame(" + expected + ", " + actual + ")");
         }
         assertBool(expected != actual);
@@ -993,17 +1038,18 @@ public class TestUtils {
 
     /**
      * Asserts that the given parameters do not reference the same object
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertNotSame(Object expected, Object actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotSame(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         assertBool(expected != actual, errorMessage);
     }
 
     private static void assertRelativeErrorExceeded(float expected, float actual, double minRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertRelativeErrorExceeded(" + expected + ", " + actual + ", " + minRelativeError + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
@@ -1013,8 +1059,8 @@ public class TestUtils {
     }
 
     private static void assertRelativeErrorExceeded(double expected, double actual, double minRelativeError) {
-        if(verbose) {
-            log("assertRelativeErrorExceeded("+ expected + ", " + actual + ", " + minRelativeError + ")");
+        if (verbose) {
+            log("assertRelativeErrorExceeded(" + expected + ", " + actual + ", " + minRelativeError + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
         if (relative_error < minRelativeError) {
@@ -1023,7 +1069,7 @@ public class TestUtils {
     }
 
     private static void assertRelativeErrorExceeded(float expected, float actual, double minRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertRelativeErrorExceeded(" + expected + ", " + actual + ", " + minRelativeError + ", " + errorMessage + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
@@ -1033,7 +1079,7 @@ public class TestUtils {
     }
 
     private static void assertRelativeErrorExceeded(double expected, double actual, double minRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertRelativeErrorExceeded(" + expected + ", " + actual + ", " + minRelativeError + ", " + errorMessage + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
@@ -1043,7 +1089,7 @@ public class TestUtils {
     }
 
     private static void assertRelativeErrorNotExceeded(float expected, float actual, double maxRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertRelativeErrorNotExceeded(" + expected + ", " + actual + ", " + maxRelativeError + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
@@ -1053,8 +1099,8 @@ public class TestUtils {
     }
 
     private static void assertRelativeErrorNotExceeded(double expected, double actual, double maxRelativeError) {
-        if(verbose) {
-            log("assertRelativeErrorNotExceeded("+ expected + ", " + actual + ", " + maxRelativeError + ")");
+        if (verbose) {
+            log("assertRelativeErrorNotExceeded(" + expected + ", " + actual + ", " + maxRelativeError + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
         if (relative_error > maxRelativeError) {
@@ -1063,7 +1109,7 @@ public class TestUtils {
     }
 
     private static void assertRelativeErrorNotExceeded(float expected, float actual, double maxRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertRelativeErrorNotExceeded(" + expected + ", " + actual + ", " + maxRelativeError + ", " + errorMessage + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
@@ -1073,7 +1119,7 @@ public class TestUtils {
     }
 
     private static void assertRelativeErrorNotExceeded(double expected, double actual, double maxRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertRelativeErrorNotExceeded(" + expected + ", " + actual + ", " + maxRelativeError + ", " + errorMessage + ")");
         }
         double relative_error = Math.abs((expected - actual) / actual) * 100;
@@ -1083,7 +1129,7 @@ public class TestUtils {
     }
 
     private static void assertErrorNotExceeded(double expected, double actual, double maxError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertErrorNotExceeded(" + expected + ", " + actual + ", " + maxError + ", " + errorMessage + ")");
         }
         double error = Math.abs((expected - actual));
@@ -1096,7 +1142,7 @@ public class TestUtils {
      * Asserts that the given bytes are equal
      */
     public static void assertEqual(byte expected, byte actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
         assertBool(expected == actual);
@@ -1104,10 +1150,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given bytes are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertEqual(byte expected, byte actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         assertBool(expected == actual, errorMessage);
@@ -1117,7 +1164,7 @@ public class TestUtils {
      * Asserts that the given shorts are equal
      */
     public static void assertEqual(short expected, short actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
         assertBool(expected == actual);
@@ -1125,10 +1172,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given shorts are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertEqual(short expected, short actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         assertBool(expected == actual, errorMessage);
@@ -1138,130 +1186,134 @@ public class TestUtils {
      * Asserts that the given ints are equal
      */
     public static void assertEqual(int expected, int actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
-        assertBool(expected == actual, "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(expected == actual, "Expected [" + expected + "], Actual [" + actual + "]");
     }
 
     /**
      * Asserts that the given ints are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertEqual(int expected, int actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected == actual, errorMessage+";" + "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(expected == actual, errorMessage + ";" + "Expected [" + expected + "], Actual [" + actual + "]");
     }
 
     /**
      * Asserts that the given longs are equal
      */
     public static void assertEqual(long expected, long actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
-        assertBool(expected == actual, "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(expected == actual, "Expected [" + expected + "], Actual [" + actual + "]");
     }
 
     /**
      * Asserts that the given longs are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertEqual(long expected, long actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected == actual, errorMessage + "; " + "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(expected == actual, errorMessage + "; " + "Expected [" + expected + "], Actual [" + actual + "]");
     }
 
     /**
      * Asserts that the given floats are equal
-     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      */
     public static void assertEqual(float expected, float actual, double maxRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, "Expected ["+expected+"], Actual ["+actual+"]");
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, "Expected [" + expected + "], Actual [" + actual + "]");
         }
     }
 
     /**
      * Asserts that the given floats are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertEqual(float expected, float actual, double maxRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + "; " + "Expected ["+expected+"], Actual ["+actual+"]");
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + "; " + "Expected [" + expected + "], Actual [" + actual + "]");
         }
     }
 
     /**
      * Asserts that the given doubles are equal
-     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      */
     public static void assertEqual(double expected, double actual, double maxRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, "Expected ["+expected+"], Actual ["+actual+"]");
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, "Expected [" + expected + "], Actual [" + actual + "]");
         }
     }
 
     /**
      * Asserts that the given doubles are equal
-     * @param expected Expected value
-     * @param actual Actual value
+     *
+     * @param expected      Expected value
+     * @param actual        Actual value
      * @param absoluteError is the maximum allowed error, a value of 1 represents a 1% error.
      * @since 8.0
      */
     public static void assertRange(double expected, double actual, double absoluteError) {
-        if(verbose) {
+        if (verbose) {
             log("assertRange(" + expected + ", " + actual + ")");
         }
         if (expected != actual) {
-            assertErrorNotExceeded(expected, actual, absoluteError, "Expected ["+expected+"], Actual ["+actual+"]");
+            assertErrorNotExceeded(expected, actual, absoluteError, "Expected [" + expected + "], Actual [" + actual + "]");
         }
     }
 
 
-
-
     /**
      * Asserts that the given doubles are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertEqual(double expected, double actual, double maxRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + "; " + "Expected [" + expected + "], Actual [" + actual + "]");
         }
     }
 
     /**
      * Asserts that the given doubles are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertRange(double expected, double actual, double maxAbsoluteError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertRange(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         if (expected != actual) {
-            assertErrorNotExceeded(expected, actual, maxAbsoluteError, errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
+            assertErrorNotExceeded(expected, actual, maxAbsoluteError, errorMessage + "; " + "Expected [" + expected + "], Actual [" + actual + "]");
         }
     }
 
@@ -1269,28 +1321,29 @@ public class TestUtils {
      * Asserts that the given objects are equal using the first object's .equal() method
      */
     public static void assertEqual(Object expected, Object actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
-        assertBool(Objects.equals(expected, actual), "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(Objects.equals(expected, actual), "Expected [" + expected + "], Actual [" + actual + "]");
     }
 
     /**
      * Asserts that the given objects are equal using the first object's .equal() method
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertEqual(Object expected, Object actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(Objects.equals(expected, actual), errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
+        assertBool(Objects.equals(expected, actual), errorMessage + "; " + "Expected [" + expected + "], Actual [" + actual + "]");
     }
 
     /**
      * Asserts that the given bytes are not equal
      */
     public static void assertNotEqual(byte expected, byte actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ")");
         }
         assertBool(expected != actual);
@@ -1298,10 +1351,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given bytes are not equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertNotEqual(byte expected, byte actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         assertBool(expected != actual, errorMessage);
@@ -1311,7 +1365,7 @@ public class TestUtils {
      * Asserts that the given shorts are not equal
      */
     public static void assertNotEqual(short expected, short actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ")");
         }
         assertBool(expected != actual);
@@ -1319,10 +1373,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given shorts are not equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertNotEqual(short expected, short actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         assertBool(expected != actual, errorMessage);
@@ -1332,7 +1387,7 @@ public class TestUtils {
      * Asserts that the given ints are not equal
      */
     public static void assertNotEqual(int expected, int actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ")");
         }
         assertBool(expected != actual);
@@ -1340,10 +1395,11 @@ public class TestUtils {
 
     /**
      * Asserts that the given ints are not equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertNotEqual(int expected, int actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         assertBool(expected != actual, errorMessage);
@@ -1353,63 +1409,62 @@ public class TestUtils {
      * Asserts that the given longs are not equal
      */
     public static void assertNotEqual(long expected, long actual, double minRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + minRelativeError + ")");
         }
         if (expected == actual) {
             assertBool(false);
-        }
-        else {
+        } else {
             assertRelativeErrorExceeded(expected, actual, minRelativeError);
         }
     }
 
     /**
      * Asserts that the given longs are not equal
+     *
      * @param minRelativeError is the minimum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertNotEqual(long expected, long actual, double minRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + minRelativeError + ", " + errorMessage + ")");
         }
         if (expected == actual) {
             TestUtils.assertBool(false, errorMessage);
-        }
-        else {
+        } else {
             assertRelativeErrorExceeded(expected, actual, minRelativeError, errorMessage);
         }
     }
 
     /**
      * Asserts that the given doubles are not equal
+     *
      * @param minRelativeError is the minimum allowed error, a value of 1 represents a 1% error.
      */
     public static void assertNotEqual(double expected, double actual, double minRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + minRelativeError + ")");
         }
         if (expected == actual) {
             TestUtils.assertBool(false);
-        }
-        else {
+        } else {
             assertRelativeErrorExceeded(expected, actual, minRelativeError);
         }
     }
 
     /**
      * Asserts that the given doubles are not equal
+     *
      * @param minRelativeError is the minimum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertNotEqual(double expected, double actual, double minRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + minRelativeError + ", " + errorMessage + ")");
         }
         if (expected == actual) {
             TestUtils.assertBool(false, errorMessage);
-        }
-        else {
+        } else {
             assertRelativeErrorExceeded(expected, actual, minRelativeError, errorMessage);
         }
     }
@@ -1418,25 +1473,26 @@ public class TestUtils {
      * Asserts that the given objects are not equal using the first object's .equal() method
      */
     public static void assertNotEqual(Object expected, Object actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ")");
         }
         if (Objects.equals(expected, actual)) {
-            TestUtils.fail("Assertion failed.  Expected not equal, but found that "+expected+" equals "+actual);
+            TestUtils.fail("Assertion failed.  Expected not equal, but found that " + expected + " equals " + actual);
         }
-        
+
     }
 
     /**
      * Asserts that the given objects are not equal using the first object's .equal() method
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertNotEqual(Object expected, Object actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertNotEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         if (Objects.equals(expected, actual)) {
-            TestUtils.fail("Assertion failed.  Expected not equal, but found that "+expected+" equals "+actual+".  "+errorMessage);
+            TestUtils.fail("Assertion failed.  Expected not equal, but found that " + expected + " equals " + actual + ".  " + errorMessage);
         }
     }
 
@@ -1445,7 +1501,7 @@ public class TestUtils {
      */
     private static String arrayToString(byte[] array) {
         StringBuilder result = new StringBuilder("[");
-        for(int index = 0; index < array.length - 1; ++index) {
+        for (int index = 0; index < array.length - 1; ++index) {
             result.append(array[index]).append(",");
         }
         if (array.length > 0) {
@@ -1460,7 +1516,7 @@ public class TestUtils {
      */
     private static String arrayToString(short[] array) {
         StringBuilder result = new StringBuilder("[");
-        for(int index = 0; index < array.length - 1; ++index) {
+        for (int index = 0; index < array.length - 1; ++index) {
             result.append(array[index]).append(",");
         }
         if (array.length > 0) {
@@ -1475,7 +1531,7 @@ public class TestUtils {
      */
     private static String arrayToString(int[] array) {
         StringBuilder result = new StringBuilder("[");
-        for(int index = 0; index < array.length - 1; ++index) {
+        for (int index = 0; index < array.length - 1; ++index) {
             result.append(array[index]).append(",");
         }
         if (array.length > 0) {
@@ -1490,7 +1546,7 @@ public class TestUtils {
      */
     private static String arrayToString(long[] array) {
         StringBuilder result = new StringBuilder("[");
-        for(int index = 0; index < array.length - 1; ++index) {
+        for (int index = 0; index < array.length - 1; ++index) {
             result.append(array[index]).append(",");
         }
         if (array.length > 0) {
@@ -1505,7 +1561,7 @@ public class TestUtils {
      */
     private static String arrayToString(float[] array) {
         StringBuilder result = new StringBuilder("[");
-        for(int index = 0; index < array.length - 1; ++index) {
+        for (int index = 0; index < array.length - 1; ++index) {
             result.append(array[index]).append(",");
         }
         if (array.length > 0) {
@@ -1520,7 +1576,7 @@ public class TestUtils {
      */
     private static String arrayToString(double[] array) {
         StringBuilder result = new StringBuilder("[");
-        for(int index = 0; index < array.length - 1; ++index) {
+        for (int index = 0; index < array.length - 1; ++index) {
             result.append(array[index]).append(",");
         }
         if (array.length > 0) {
@@ -1535,7 +1591,7 @@ public class TestUtils {
      */
     private static String arrayToString(Object[] array) {
         StringBuilder result = new StringBuilder("[");
-        for(int index = 0; index < array.length - 1; ++index) {
+        for (int index = 0; index < array.length - 1; ++index) {
             result.append(array[index]).append(",");
         }
         if (array.length > 0) {
@@ -1549,7 +1605,7 @@ public class TestUtils {
      * Asserts that the given byte arrays are equal
      */
     public static void assertArrayEqual(byte[] expected, byte[] actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ")");
         }
         if (expected.length != actual.length) {
@@ -1562,25 +1618,26 @@ public class TestUtils {
 
     /**
      * Asserts that the given byte arrays are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertArrayEqual(byte[] expected, byte[] actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ", " + errorMessage + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], errorMessage);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], errorMessage);
+        }
     }
 
     /**
      * Asserts that the given short arrays are equal
      */
     public static void assertArrayEqual(short[] expected, short[] actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ")");
         }
         if (expected.length != actual.length) {
@@ -1593,25 +1650,26 @@ public class TestUtils {
 
     /**
      * Asserts that the given short arrays are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertArrayEqual(short[] expected, short[] actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ", " + errorMessage + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], errorMessage);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], errorMessage);
+        }
     }
 
     /**
      * Asserts that the given int arrays are equal
      */
     public static void assertArrayEqual(int[] expected, int[] actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ")");
         }
         if (expected.length != actual.length) {
@@ -1624,148 +1682,156 @@ public class TestUtils {
 
     /**
      * Asserts that the given int arrays are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertArrayEqual(int[] expected, int[] actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ", " + errorMessage + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], errorMessage);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], errorMessage);
+        }
     }
 
     /**
      * Asserts that the given long arrays are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      */
     public static void assertArrayEqual(long[] expected, long[] actual, double maxRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], maxRelativeError);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], maxRelativeError);
+        }
     }
 
     /**
      * Asserts that the given long arrays are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertArrayEqual(long[] expected, long[] actual, double maxRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ", " + errorMessage + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);
+        }
     }
 
     /**
      * Asserts that the given float arrays are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      */
     public static void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], maxRelativeError);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], maxRelativeError);
+        }
     }
 
     /**
      * Asserts that the given double arrays are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ", " + errorMessage + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);
+        }
     }
 
     /**
      * Asserts that the given double arrays are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
      */
     public static void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], maxRelativeError);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], maxRelativeError);
+        }
     }
 
     /**
      * Asserts that the given double arrays are equal
+     *
      * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
-     * @param errorMessage is a string describing the failure
+     * @param errorMessage     is a string describing the failure
      */
     public static void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ", " + errorMessage + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);
+        }
     }
 
     /**
      * Asserts that the given object arrays are equal
      */
     public static void assertArrayEqual(Object[] expected, Object[] actual) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index]);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index]);
+        }
     }
 
     /**
      * Asserts that the given object arrays are equal
+     *
      * @param errorMessage is a string describing the failure
      */
     public static void assertArrayEqual(Object[] expected, Object[] actual, String errorMessage) {
-        if(verbose) {
+        if (verbose) {
             log("assertArrayEqual(" + arrayToString(expected) + ", " + arrayToString(actual) + ", " + errorMessage + ")");
         }
-      if (expected.length != actual.length) {
-        TestUtils.assertBool(false);
-      }
-      for (int index = 0; index < expected.length; ++index) {
-        assertEqual(expected[index], actual[index], errorMessage);
-      }
+        if (expected.length != actual.length) {
+            TestUtils.assertBool(false);
+        }
+        for (int index = 0; index < expected.length; ++index) {
+            assertEqual(expected[index], actual[index], errorMessage);
+        }
     }
 
     /**
@@ -1846,10 +1912,11 @@ public class TestUtils {
 
     /**
      * Verifies the current title is the same otherwise throws an exception
+     *
      * @param title the tile to verify
      */
     public static void assertTitle(String title) {
-        if(verbose) {
+        if (verbose) {
             log("assertTitle(" + title + ")");
         }
         assertBool(Display.getInstance().getCurrent().getTitle().equals(title), title);
@@ -1857,38 +1924,41 @@ public class TestUtils {
 
     /**
      * Asserts that we have a label with the given text baring the given name
+     *
      * @param name the name of the label
      * @param text the text of the label
      */
     public static void assertLabel(String name, String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertLabel(" + name + ", " + text + ")");
         }
-        Label l = (Label)findByName(name);
+        Label l = (Label) findByName(name);
         assertBool(l != null, "Null label" + text);
         assertBool(text == l.getText() || text.equals(l.getText()), name + " != " + text);
     }
 
     /**
      * Asserts that we have a label with the given text baring the given name
+     *
      * @param path the path of the label
      * @param text the text of the label
      */
     public static void assertLabel(int[] path, String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertLabel(" + toString(path) + ", " + text + ")");
         }
-        Label l = (Label)getComponentByPath(path);
+        Label l = (Label) getComponentByPath(path);
         assertBool(l != null, "Null label" + text);
         assertBool(text == l.getText() || text.equals(l.getText()), ("" + l.getText()) + " != " + text);
     }
 
     /**
      * Asserts that we have a label with the given text baring the given name
+     *
      * @param text the text of the label
      */
     public static void assertLabel(String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertLabel(" + text + ")");
         }
         Label l = findLabelText(text);
@@ -1897,81 +1967,87 @@ public class TestUtils {
 
     /**
      * Asserts that we have a TextArea with the given text and the given name
+     *
      * @param name the name of the TextArea
      * @param text the text of the TextArea
      */
     public static void assertTextArea(String name, String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertTextArea(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea)findByName(name);
+        TextArea l = (TextArea) findByName(name);
         assertBool(l != null, "Null area " + text);
         assertBool(l.getText().equals(text), "assertTextArea: " + l.getText() + " != " + text);
-}
+    }
 
     /**
      * Asserts that we have a TextArea with the a text contains the given text and with the given name
+     *
      * @param name the name of the TextArea
      * @param text the sequence to search for in the TextArea
      */
     public static void assertTextAreaContaining(String name, String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertTextAreaContaining(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea)findByName(name);
+        TextArea l = (TextArea) findByName(name);
         assertBool(l != null, "Null area " + text);
         assertBool(l.getText().indexOf(text) > -1, "assertTextArea: \"" + l.getText() + "\" is not containing: \"" + text + "\"");
-}
+    }
 
 
     /**
      * Asserts that we have a TextArea with the a text starting with the given text and with the given name
+     *
      * @param name the name of the TextArea
      * @param text the prefix to search for in the TextArea
      */
     public static void assertTextAreaStartingWith(String name, String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertTextAreaStartingWith(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea)findByName(name);
+        TextArea l = (TextArea) findByName(name);
         assertBool(l != null, "Null area " + text);
         assertBool(l.getText().startsWith(text), "assertTextArea: \"" + l.getText() + "\" is not starting with: \"" + text + "\"");
-}
+    }
 
     /**
      * Asserts that we have a TextArea with the a text ending with the given text and with the given name
+     *
      * @param name the name of the TextArea
      * @param text the suffix to search for in the TextArea
      */
     public static void assertTextAreaEndingWith(String name, String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertTextAreaEndingWith(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea)findByName(name);
+        TextArea l = (TextArea) findByName(name);
         assertBool(l != null, "Null area " + text);
         assertBool(l.getText().endsWith(text), "assertTextArea: \"" + l.getText() + "\" is not ending with: \"" + text + "\"");
-}
+    }
 
     /**
      * Asserts that we have a label with the given text baring the given name
+     *
      * @param path the path to the text area
      * @param text the text of the label
      */
     public static void assertTextArea(int[] path, String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertTextArea(" + toString(path) + ", " + text + ")");
         }
-        TextArea l = (TextArea)getComponentByPath(path);
+        TextArea l = (TextArea) getComponentByPath(path);
         assertBool(l != null, "Null area " + text);
         assertBool(l.getText().equals(text), "assertTextArea: " + l.getText() + " != " + text);
     }
 
     /**
      * Asserts that we have a label with the given text baring the given name
+     *
      * @param text the text of the label
      */
     public static void assertTextArea(String text) {
-        if(verbose) {
+        if (verbose) {
             log("assertTextArea(" + text + ")");
         }
         TextArea l = findTextAreaText(text);
@@ -1980,6 +2056,7 @@ public class TestUtils {
 
     /**
      * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
      * @param text the text of the label/button
      * @return the component with the given TextArea text within the tree
      */
@@ -1989,23 +2066,24 @@ public class TestUtils {
 
     /**
      * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
      * @param text the text of the label/button
      * @return the component with the given label text within the tree
      */
     private static TextArea findTextAreaText(Container root, String text) {
         int count = root.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component c = root.getComponentAt(iter);
-            if(c instanceof TextArea) {
-                String n = ((TextArea)c).getText();
-                if(n != null && n.equals(text)) {
-                    return (TextArea)c;
+            if (c instanceof TextArea) {
+                String n = ((TextArea) c).getText();
+                if (n != null && n.equals(text)) {
+                    return (TextArea) c;
                 }
                 continue;
             }
-            if(c instanceof Container) {
-                TextArea l = findTextAreaText((Container)c, text);
-                if(l != null) {
+            if (c instanceof Container) {
+                TextArea l = findTextAreaText((Container) c, text);
+                if (l != null) {
                     return l;
                 }
             }

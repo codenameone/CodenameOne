@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -27,6 +27,7 @@ import com.codename1.io.Util;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.ComponentAnimation.UIMutation;
 import com.codename1.ui.events.ScrollListener;
+
 import java.util.ArrayList;
 
 /**
@@ -41,39 +42,40 @@ public final class AnimationManager {
     private ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();
     private ArrayList<Runnable> postAnimations = new ArrayList<Runnable>();
     private ArrayList<UIMutation> uiMutations = new ArrayList<UIMutation>();
-    
+
     AnimationManager(Form parentForm) {
         this.parentForm = parentForm;
     }
-    
+
     /**
      * Returns true if an animation is currently in progress
+     *
      * @return true if an animation is currently in progress
      */
     public boolean isAnimating() {
         int size = anims.size();
-        if(size == 0) {
+        if (size == 0) {
             return false;
         }
-        if(size > 1) {
+        if (size > 1) {
             return true;
         }
         // special case where an animation finished but wasn't removed from the queue just yet...
         return anims.get(0).isInProgress();
     }
-    
+
     void updateAnimations() {
         uiMutations.clear();
-        if(anims.size() > 0) {
+        if (anims.size() > 0) {
             ComponentAnimation c = anims.get(0);
-            if(c.isInProgress()) {
+            if (c.isInProgress()) {
                 c.updateAnimationState();
             } else {
                 c.updateAnimationState();
                 anims.remove(c);
             }
         } else {
-            while(postAnimations.size() > 0) {
+            while (postAnimations.size() > 0) {
                 postAnimations.get(0).run();
                 postAnimations.remove(0);
             }
@@ -81,18 +83,19 @@ public final class AnimationManager {
     }
 
     void flush() {
-        while(anims.size() > 0) {
+        while (anims.size() > 0) {
             anims.get(0).flush();
             anims.remove(0);
         }
     }
-    
+
     /**
      * Adds a UIMutation to the animation manager.  If there are any current compatible
      * UIMutations in the animation queue, then this mutation will be added to that mutation.
      * Otherwise it will appended to the end of the queue to be run sequentially.
+     *
      * @param container The container that is being mutated.
-     * @param an The animation
+     * @param an        The animation
      * @see UIMutation
      * @since 7.0
      */
@@ -105,22 +108,24 @@ public final class AnimationManager {
         UIMutation mut = new UIMutation(container, an);
         uiMutations.add(mut);
         addAnimation(mut);
-        
+
     }
-    
+
     /**
      * Adds the animation to the end to the animation queue
+     *
      * @param an the animation object
      */
     public void addAnimation(ComponentAnimation an) {
         anims.add(an);
         Display.getInstance().notifyDisplay();
     }
-    
+
     /**
      * Adds the animation to the end of the animation queue and blocks the current thread until the animation
-     * completes 
-     * @param an the animation to perform 
+     * completes
+     *
+     * @param an the animation to perform
      */
     public void addAnimationAndBlock(final ComponentAnimation an) {
         final Object LOCK = new Object();
@@ -128,17 +133,18 @@ public final class AnimationManager {
         addAnimation(an);
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
-                while(an.isInProgress() && anims.contains(an)) {
+                while (an.isInProgress() && anims.contains(an)) {
                     Util.wait(LOCK, 50);
                 }
             }
         });
     }
 
-    
+
     /**
      * Adds the animation to the end to the animation queue
-     * @param an the animation object
+     *
+     * @param an       the animation object
      * @param callback invoked when the animation completes
      */
     public void addAnimation(ComponentAnimation an, Runnable callback) {
@@ -146,14 +152,15 @@ public final class AnimationManager {
         addAnimation(an);
         Display.getInstance().notifyDisplay();
     }
-    
+
     /**
      * Adds a UIMutation to the animation manager.  If there are any current compatible
      * UIMutations in the animation queue, then this mutation will be added to that mutation.
      * Otherwise it will appended to the end of the queue to be run sequentially.
+     *
      * @param container The container that is being mutated.
-     * @param an The animation
-     * @param callback A callback to be run on completion.
+     * @param an        The animation
+     * @param callback  A callback to be run on completion.
      * @see UIMutation
      * @since 7.0
      */
@@ -161,10 +168,11 @@ public final class AnimationManager {
         an.setOnCompletion(callback);
         addUIMutation(container, an);
     }
-    
+
     /**
      * Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
      * a big visual representation to a smaller title for easier navigation then back again when scrolling up
+     *
      * @param cna the animation to bind to the scroll event
      */
     public void onTitleScrollAnimation(final ComponentAnimation... cna) {
@@ -174,33 +182,35 @@ public final class AnimationManager {
     /**
      * Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
      * a big visual representation to a smaller title for easier navigation then back again when scrolling up
+     *
      * @param content the scrollable container representing the body
-     * @param cna the animation to bind to the scroll event
+     * @param cna     the animation to bind to the scroll event
      */
     public void onTitleScrollAnimation(Container content, final ComponentAnimation... cna) {
         content.addScrollListener(new ScrollListener() {
             boolean recursion = false;
+
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                if(recursion) {
+                if (recursion) {
                     return;
                 }
                 recursion = true;
-                if(scrollY >= 0) {
+                if (scrollY >= 0) {
                     boolean changed = false;
-                    for(ComponentAnimation c : cna) {
-                        if(scrollY < c.getMaxSteps()) {
+                    for (ComponentAnimation c : cna) {
+                        if (scrollY < c.getMaxSteps()) {
                             c.setStep(scrollY);
                             c.updateAnimationState();
                             changed = true;
                         } else {
-                            if(c.getStep() < c.getMaxSteps()) {
+                            if (c.getStep() < c.getMaxSteps()) {
                                 c.setStep(c.getMaxSteps());
                                 c.updateAnimationState();
                                 changed = true;
                             }
                         }
-                    } 
-                    if(changed) {
+                    }
+                    if (changed) {
                         parentForm.revalidate();
                     }
                 }
@@ -208,17 +218,18 @@ public final class AnimationManager {
             }
         });
     }
-    
+
     /**
      * Invokes the runnable when all animations have completed
+     *
      * @param r the runnable that will be invoked after the animations
      */
     public void flushAnimation(Runnable r) {
-        if(isAnimating()) {
+        if (isAnimating()) {
             postAnimations.add(r);
         } else {
             r.run();
         }
     }
-    
+
 }

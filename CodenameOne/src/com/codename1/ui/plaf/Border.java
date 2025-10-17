@@ -46,8 +46,6 @@ import com.codename1.ui.geom.Rectangle;
  * @author Shai Almog
  */
 public class Border {
-    private static Border defaultBorder = Border.createEtchedRaised(0x020202, 0xBBBBBB);
-    
     private static final int TYPE_EMPTY = 0;
     private static final int TYPE_LINE = 1;
     private static final int TYPE_ROUNDED = 2;
@@ -69,20 +67,18 @@ public class Border {
     private static final int TYPE_OUTSET = 18;
     private static final int TYPE_IMAGE_SCALED = 19;
     private static final int TYPE_UNDERLINE = 21;
-
+    private static final int TITLE_MARGIN = 10;
+    private static final int TITLE_SPACE = 5;
+    private static Border defaultBorder = Border.createEtchedRaised(0x020202, 0xBBBBBB);
+    private static Border empty;
     // variables are package protected for the benefit of the resource editor!
     int type;
     Image[] images;
-
-    private Image[] specialTile;
-    private Rectangle trackComponent;
-
     /**
      * Indicates whether theme colors should be used or whether colors are specified
      * in the border
      */
     boolean themeColors;
-    
     int colorA;
     int colorB;
     int colorC;
@@ -94,182 +90,39 @@ public class Border {
     boolean outline = true;
     Border pressedBorder;
     Border focusBorder;
-    Border [] compoundBorders;
+    Border[] compoundBorders;
     Border outerBorder; // A border added outside of this border (Used for CSS outline property, but can also be used for other purposes)
     String borderTitle; // border title, currently supported only for line borders
+    private Image[] specialTile;
+    private Rectangle trackComponent;
     private boolean paintOuterBorderFirst;
-    
-    private static final int TITLE_MARGIN = 10;
-    private static final int TITLE_SPACE = 5;
-
-
-    private static Border empty;
-    
     private boolean emptyType;
-    
+
     /**
      * Prevents usage of new operator, use the factory methods in the class or subclass
      * to create new border types.
      */
     protected Border() {
     }
-    
-    /**
-     * If a border is a horizontal image border it can be mirrored which is useful for an RTL scenario
-     * 
-     * @return the current border or a mirrored instance
-     */
-    public Border mirrorBorder() {
-        if(type == TYPE_IMAGE_HORIZONTAL) {
-            return createHorizonalImageBorder(images[1].mirror(), images[0].mirror(), images[2].mirror());
-        }
-        return this;
-    }
-
-    /**
-     * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
-     * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
-     * so it points at the center of the track component
-     *
-     * @param tileTop an image that will replace one of the tiles on the top if the track component is there
-     * @param tileBottom an image that will replace one of the tiles on the bottom if the track component is there
-     * @param tileLeft an image that will replace one of the tiles on the left if the track component is there
-     * @param tileRight an image that will replace one of the tiles on the right if the track component is there
-     * @param trackComponent the component that will be tracked for the positioning of the tile
-     */
-    public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Component trackComponent) {
-        specialTile = new Image[] {tileTop, tileBottom, tileLeft, tileRight};
-        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
-    }
-
-    /**
-     * The track component is an area to which an arrow based border should point at.
-     * It's assumed to be outside of the border region in absolute screen coordinates.
-     * 
-     * @return the rectangle to point at or null if this isn't an arrow border
-     */
-    protected Rectangle getTrackComponent() {
-        return trackComponent;
-    }
-
-    /**
-     * In the case of an arrow border the track component lets us track the position
-     * to which the border is pointing
-     * @param trackComponent the track component
-     */
-    public void setTrackComponent(Component trackComponent) {
-        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
-    }
-    
-
-    /**
-     * In the case of an arrow border the track component lets us track the position
-     * to which the border is pointing
-     * @param trackComponent the track component
-     */
-    public void setTrackComponent(Rectangle trackComponent) {
-        this.trackComponent = trackComponent;
-    }
-
-    /**
-     * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
-     * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
-     * so it points at the center of the track component
-     *
-     * @param tileTop an image that will replace one of the tiles on the top if the track component is there
-     * @param tileBottom an image that will replace one of the tiles on the bottom if the track component is there
-     * @param tileLeft an image that will replace one of the tiles on the left if the track component is there
-     * @param tileRight an image that will replace one of the tiles on the right if the track component is there
-     * @param trackComponent the component that will be tracked for the positioning of the tile
-     */
-    public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Rectangle trackComponent) {
-        specialTile = new Image[] {tileTop, tileBottom, tileLeft, tileRight};
-        this.trackComponent = trackComponent;
-    }
-
-    /**
-     * Cleans the tile tracking state allowing the garbage collector to pick up the component and the image data
-     */
-    public void clearImageBorderSpecialTile() {
-        specialTile = null;
-        trackComponent = null;
-    }
-
-    /**
-     * Ads a border that wraps this border
-     * 
-     * @param outer The outer border
-     */
-    public void addOuterBorder(Border outer) {
-        outerBorder=outer;
-    }
-
-    /**
-     * Returns the minimum size required to properly display this border, normally this
-     * is 0 but a border might deem itself undisplayable with too small a size e.g. for
-     * the case of an image border the minimum height would be top + bottom and the minimum
-     * width would be left+right
-     *
-     * @return 0 if not applicable or a dimension if it is.
-     */
-    public int getMinimumHeight() {
-        if(images != null) {
-            if(images.length < 4) {
-                if(type == TYPE_IMAGE_HORIZONTAL) {
-                    return images[0].getHeight();
-                } else {
-                    return images[0].getHeight() + images[1].getHeight();
-                }
-            }
-            Image topLeft = images[4];
-            Image bottomRight = images[7];
-            return topLeft.getHeight() + bottomRight.getHeight();
-        }
-        return 0;
-    }
-
-    /**
-     * Returns the minimum size required to properly display this border, normally this
-     * is 0 but a border might deem itself undisplayable with too small a size e.g. for
-     * the case of an image border the minimum height would be top + bottom and the minimum
-     * width would be left+right
-     *
-     * @return 0 if not applicable or a dimension if it is.
-     */
-    public int getMinimumWidth() {
-        if(images != null) {
-            if(images.length < 4) {
-                if(type == TYPE_IMAGE_HORIZONTAL) {
-                    return images[0].getWidth() + images[1].getWidth();
-                } else {
-                    return images[0].getWidth();
-                }
-            }
-            Image topLeft = images[4];
-            Image topRight = images[5];
-            return topLeft.getWidth() + topRight.getWidth();
-        }
-        return 0;
-    }
 
     /**
      * Returns an empty border, this is mostly useful for overriding components that
      * have a border by default
-     * 
+     *
      * @return a border than draws nothing
      * @deprecated use createEmpty instead
      */
     public static Border getEmpty() {
-        if(empty == null) {
+        if (empty == null) {
             empty = new Border();
         }
         return empty;
     }
-    
+
     /**
-     * Creates an empty border, this is useful where we don't want a border for a 
+     * Creates an empty border, this is useful where we don't want a border for a
      * component but want a focus border etc...
-     * 
+     *
      * @return a border than draws nothing
      */
     public static Border createEmpty() {
@@ -277,47 +130,40 @@ public class Border {
         b.emptyType = true;
         return b;
     }
-    
-    /**
-     * Indicates whether this is an empty border
-     * @return true if this is an empty border
-     */
-    public boolean isEmptyBorder() {
-        return emptyType;
-    }
-    
+
     /**
      * The given top/bottom/left/right images are tiled appropriately across the matching sides of the border and the corners are placed
      * as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
      *
      * <p>By default this border does not override background unless a background image is specified
-     * 
-     * @param top the image of the top line
-     * @param bottom the image of the bottom line
-     * @param left the image of the left line
-     * @param right the image of the right line
-     * @param topLeft the image of the top left corner
-     * @param topRight the image of the top right corner
-     * @param bottomLeft the image of the bottom left corner
+     *
+     * @param top         the image of the top line
+     * @param bottom      the image of the bottom line
+     * @param left        the image of the left line
+     * @param right       the image of the right line
+     * @param topLeft     the image of the top left corner
+     * @param topRight    the image of the top right corner
+     * @param bottomLeft  the image of the bottom left corner
      * @param bottomRight the image of the bottom right corner
-     * @param background the image of the background (optional)
+     * @param background  the image of the background (optional)
      * @return new border instance
      */
     public static Border createImageBorder(Image top, Image bottom, Image left, Image right, Image topLeft, Image topRight,
-        Image bottomLeft, Image bottomRight, Image background) {
+                                           Image bottomLeft, Image bottomRight, Image background) {
         Border b = new Border();
         b.type = TYPE_IMAGE;
-        b.images = new Image[] {top, bottom, left, right, topLeft, topRight, bottomLeft, 
-                        bottomRight, background};
+        b.images = new Image[]{top, bottom, left, right, topLeft, topRight, bottomLeft,
+                bottomRight, background};
         return b;
     }
-    
+
     /**
      * The given image is spliced into 9 pieces based on the provided top, right, bottom, and left insets, and the resulting
      * sub-images are used to form a 9-piece image border via {@link #createImageBorder(com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image) }
-     * 
+     *
      * <p>Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.</p>
-     * @param img The image to be used as a background image and spliced.
+     *
+     * @param img         The image to be used as a background image and spliced.
      * @param topInset
      * @param rightInset
      * @param bottomInset
@@ -325,19 +171,19 @@ public class Border {
      * @return A 9-piece image border.
      */
     public static Border createImageSplicedBorder(Image img, double topInset, double rightInset, double bottomInset, double leftInset) {
-        
+
         Border b = new Border();
         b.type = TYPE_IMAGE;
         int w = img.getWidth();
         int h = img.getHeight();
-        int topInsetPx = (int)Math.round(h * topInset);
-        int leftInsetPx = (int)Math.round(w * leftInset);
-        int rightInsetPx = (int)Math.round(w * rightInset);
-        int bottomInsetPx = (int)Math.round(h * bottomInset);
-        
+        int topInsetPx = (int) Math.round(h * topInset);
+        int leftInsetPx = (int) Math.round(w * leftInset);
+        int rightInsetPx = (int) Math.round(w * rightInset);
+        int bottomInsetPx = (int) Math.round(h * bottomInset);
+
         //We need to make sure that every splice has a positive width and height
         if (topInsetPx + bottomInsetPx >= h) {
-            bottomInsetPx = h - topInsetPx -1;
+            bottomInsetPx = h - topInsetPx - 1;
             if (bottomInsetPx < 1) {
                 bottomInsetPx = 1;
                 topInsetPx = h - bottomInsetPx - 1;
@@ -359,56 +205,56 @@ public class Border {
         Image bottomLeft = img.subImage(0, h - bottomInsetPx, leftInsetPx, bottomInsetPx, true);
         Image bottomRight = img.subImage(w - rightInsetPx, h - bottomInsetPx, rightInsetPx, bottomInsetPx, true);
         Image background = img.subImage(leftInsetPx, topInsetPx, w - leftInsetPx - rightInsetPx, h - topInsetPx - bottomInsetPx, true);
-        b.images = new Image[] {top, bottom, left, right, topLeft, topRight, bottomLeft,
-                        bottomRight, background};
+        b.images = new Image[]{top, bottom, left, right, topLeft, topRight, bottomLeft,
+                bottomRight, background};
         return b;
     }
-    
+
     /**
      * The given top/bottom/left/right images are scaled appropriately across the matching sides of the border and the corners are placed
      * as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
      *
      * <p>By default this border does not override background unless a background image is specified
      *
-     * @param top the image of the top line
-     * @param bottom the image of the bottom line
-     * @param left the image of the left line
-     * @param right the image of the right line
-     * @param topLeft the image of the top left corner
-     * @param topRight the image of the top right corner
-     * @param bottomLeft the image of the bottom left corner
+     * @param top         the image of the top line
+     * @param bottom      the image of the bottom line
+     * @param left        the image of the left line
+     * @param right       the image of the right line
+     * @param topLeft     the image of the top left corner
+     * @param topRight    the image of the top right corner
+     * @param bottomLeft  the image of the bottom left corner
      * @param bottomRight the image of the bottom right corner
-     * @param background the image of the background (optional)
+     * @param background  the image of the background (optional)
      * @return new border instance
      */
     public static Border createImageScaledBorder(Image top, Image bottom, Image left, Image right, Image topLeft, Image topRight,
-        Image bottomLeft, Image bottomRight, Image background) {
+                                                 Image bottomLeft, Image bottomRight, Image background) {
         Border b = new Border();
         b.type = TYPE_IMAGE_SCALED;
-        b.images = new Image[] {top, bottom, left, right, topLeft, topRight, bottomLeft,
-                        bottomRight, background};
+        b.images = new Image[]{top, bottom, left, right, topLeft, topRight, bottomLeft,
+                bottomRight, background};
         return b;
     }
 
     /**
      * This is an image border that can only grow horizontally
      *
-     * @param left the image of the left side
-     * @param right the image of the right side
+     * @param left   the image of the left side
+     * @param right  the image of the right side
      * @param center the image of the center
      * @return new border instance
      */
     public static Border createHorizonalImageBorder(Image left, Image right, Image center) {
         Border b = new Border();
         b.type = TYPE_IMAGE_HORIZONTAL;
-        b.images = new Image[] {left, right, center};
+        b.images = new Image[]{left, right, center};
         return b;
     }
 
     /**
      * This is an image border that can only grow vertically
      *
-     * @param top the image of the top
+     * @param top    the image of the top
      * @param bottom the image of the bottom
      * @param center the image of the center
      * @return new border instance
@@ -416,7 +262,7 @@ public class Border {
     public static Border createVerticalImageBorder(Image top, Image bottom, Image center) {
         Border b = new Border();
         b.type = TYPE_IMAGE_VERTICAL;
-        b.images = new Image[] {top, bottom, center};
+        b.images = new Image[]{top, bottom, center};
         return b;
     }
 
@@ -429,23 +275,23 @@ public class Border {
      * are rotated internally and this might save quite a bit of memory!
      * <p><b>The top and topLeft images must be square!</b> The width and height of these images
      * must be equal otherwise rotation won't work as you expect.
-     * 
-     * @param top the image of the top line
-     * @param topLeft the image of the top left corner
+     *
+     * @param top        the image of the top line
+     * @param topLeft    the image of the top left corner
      * @param background the image of the background (optional)
      * @return new border instance
      */
     public static Border createImageBorder(Image top, Image topLeft, Image background) {
         Border b = new Border();
         b.type = TYPE_IMAGE;
-        b.images = new Image[] {top, top.rotate(180), top.rotate(270), top.rotate(90), topLeft, topLeft.rotate(90), 
+        b.images = new Image[]{top, top.rotate(180), top.rotate(270), top.rotate(90), topLeft, topLeft.rotate(90),
                 topLeft.rotate(270), topLeft.rotate(180), background};
         return b;
     }
 
     /**
      * Creates a line border that uses the color of the component foreground for drawing
-     * 
+     *
      * @param thickness thickness of the border in pixels
      * @return new border instance
      */
@@ -460,7 +306,7 @@ public class Border {
 
     /**
      * Creates a line border that uses the color of the component foreground for drawing
-     * 
+     *
      * @param thickness thickness of the border in millimeters
      * @return new border instance
      */
@@ -472,13 +318,13 @@ public class Border {
         b.millimeters = true;
         return b;
     }
-    
+
     /**
      * Creates an underline border that uses the color of the component foreground for drawing
-     * 
-     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(int thickness)}
+     *
      * @param thickness thickness of the border in pixels
      * @return new border instance
+     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(int thickness)}
      */
     public static Border createUndelineBorder(int thickness) {
         Border b = new Border();
@@ -487,10 +333,10 @@ public class Border {
         b.thickness = thickness;
         return b;
     }
-    
+
     /**
      * Creates an underline border that uses the color of the component foreground for drawing
-     * 
+     *
      * @param thickness thickness of the border in pixels
      * @return new border instance
      */
@@ -504,10 +350,10 @@ public class Border {
 
     /**
      * Creates an underline border that uses the color of the component foreground for drawing
-     * 
-     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(float thickness)}
+     *
      * @param thickness thickness of the border in millimeters
      * @return new border instance
+     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(float thickness)}
      */
     public static Border createUndelineBorder(float thickness) {
         Border b = new Border();
@@ -517,10 +363,10 @@ public class Border {
         b.millimeters = true;
         return b;
     }
-    
+
     /**
      * Creates an underline border that uses the color of the component foreground for drawing
-     * 
+     *
      * @param thickness thickness of the border in millimeters
      * @return new border instance
      */
@@ -532,12 +378,12 @@ public class Border {
         b.millimeters = true;
         return b;
     }
-    
+
     /**
      * Creates an underline border that uses the given color
-     * 
+     *
      * @param thickness thickness of the border in pixels
-     * @param color the color
+     * @param color     the color
      * @return new border instance
      */
     public static Border createUnderlineBorder(int thickness, int color) {
@@ -551,9 +397,9 @@ public class Border {
 
     /**
      * Creates an underline border that uses the given color
-     * 
+     *
      * @param thickness thickness of the border in millimeters
-     * @param color the color
+     * @param color     the color
      * @return new border instance
      */
     public static Border createUnderlineBorder(float thickness, int color) {
@@ -565,15 +411,15 @@ public class Border {
         b.colorA = color;
         return b;
     }
-    
+
     /**
      * Creates a dotted border with the specified thickness and color
      *
      * @param thickness The border thickness in pixels
-     * @param color The border color
+     * @param color     The border color
      * @return The border
      */
-    public static Border createDottedBorder(int thickness,int color) {
+    public static Border createDottedBorder(int thickness, int color) {
         return createCSSBorder(TYPE_DOTTED, thickness, color);
     }
 
@@ -581,10 +427,10 @@ public class Border {
      * Creates a dashed border with the specified thickness and color
      *
      * @param thickness The border thickness in pixels
-     * @param color The border color
+     * @param color     The border color
      * @return The border
      */
-    public static Border createDashedBorder(int thickness,int color) {
+    public static Border createDashedBorder(int thickness, int color) {
         return createCSSBorder(TYPE_DASHED, thickness, color);
     }
 
@@ -592,10 +438,10 @@ public class Border {
      * Creates a double border with the specified thickness and color
      *
      * @param thickness The border thickness in pixels
-     * @param color The border color
+     * @param color     The border color
      * @return The border
      */
-    public static Border createDoubleBorder(int thickness,int color) {
+    public static Border createDoubleBorder(int thickness, int color) {
         return createCSSBorder(TYPE_DOUBLE, thickness, color);
     }
 
@@ -629,11 +475,9 @@ public class Border {
         return createCSSBorder(TYPE_DOUBLE, thickness);
     }
 
-
-
     /**
      * Creates an outset border with the specified thickness and theme colors
-     * 
+     *
      * @param thickness The border thickness in pixels
      * @return The border
      */
@@ -645,11 +489,11 @@ public class Border {
      * Creates an outset border with the specified thickness and color
      *
      * @param thickness The border thickness in pixels
-     * @param color The border color
+     * @param color     The border color
      * @return The border
      */
-    public static Border createOutsetBorder(int thickness,int color) {
-        return createCSSBorder(TYPE_OUTSET, thickness,color);
+    public static Border createOutsetBorder(int thickness, int color) {
+        return createCSSBorder(TYPE_OUTSET, thickness, color);
     }
 
     /**
@@ -666,11 +510,11 @@ public class Border {
      * Creates an inset border with the specified thickness and color
      *
      * @param thickness The border thickness in pixels
-     * @param color The border color
+     * @param color     The border color
      * @return The border
      */
-    public static Border createInsetBorder(int thickness,int color) {
-        return createCSSBorder(TYPE_INSET, thickness,color);
+    public static Border createInsetBorder(int thickness, int color) {
+        return createCSSBorder(TYPE_INSET, thickness, color);
     }
 
     /**
@@ -687,11 +531,11 @@ public class Border {
      * Creates a groove border with the specified thickness and color
      *
      * @param thickness The border thickness in pixels
-     * @param color The border color
+     * @param color     The border color
      * @return The border
      */
-    public static Border createGrooveBorder(int thickness,int color) {
-        return createCSSBorder(TYPE_GROOVE, thickness,color);
+    public static Border createGrooveBorder(int thickness, int color) {
+        return createCSSBorder(TYPE_GROOVE, thickness, color);
     }
 
     /**
@@ -708,15 +552,14 @@ public class Border {
      * Creates a ridge border with the specified thickness and color
      *
      * @param thickness The border thickness in pixels
-     * @param color The border color
+     * @param color     The border color
      * @return The border
      */
-    public static Border createRidgeBorder(int thickness,int color) {
-        return createCSSBorder(TYPE_RIDGE, thickness,color);
+    public static Border createRidgeBorder(int thickness, int color) {
+        return createCSSBorder(TYPE_RIDGE, thickness, color);
     }
 
-
-    private static Border createCSSBorder(int type,int thickness) {
+    private static Border createCSSBorder(int type, int thickness) {
         Border b = new Border();
         b.type = type;
         b.themeColors = true;
@@ -724,7 +567,7 @@ public class Border {
         return b;
     }
 
-    private static Border createCSSBorder(int type,int thickness,int color) {
+    private static Border createCSSBorder(int type, int thickness, int color) {
         Border b = new Border();
         b.type = type;
         b.colorA = color;
@@ -732,13 +575,11 @@ public class Border {
         return b;
     }
 
-
-
     /**
      * Creates a line border with the specified title
      *
      * @param thickness thickness of the border in pixels
-     * @param title The borders title
+     * @param title     The borders title
      * @return new border instance
      */
     public static Border createLineBorder(int thickness, String title) {
@@ -746,16 +587,16 @@ public class Border {
         b.type = TYPE_LINE;
         b.themeColors = true;
         b.thickness = thickness;
-        b.borderTitle=title;
+        b.borderTitle = title;
         return b;
     }
 
     /**
      * Creates a line border that uses the given color for the component
-     * 
+     *
      * @param thickness thickness of the border in pixels
-     * @param color the color for the border
-     * @param title The borders title
+     * @param color     the color for the border
+     * @param title     The borders title
      * @return new border instance
      */
     public static Border createLineBorder(int thickness, int color, String title) {
@@ -764,15 +605,15 @@ public class Border {
         b.themeColors = false;
         b.thickness = thickness;
         b.colorA = color;
-        b.borderTitle=title;
+        b.borderTitle = title;
         return b;
     }
 
     /**
      * Creates a line border that uses the given color for the component
-     * 
+     *
      * @param thickness thickness of the border in pixels
-     * @param color the color for the border
+     * @param color     the color for the border
      * @return new border instance
      */
     public static Border createLineBorder(int thickness, int color) {
@@ -786,9 +627,9 @@ public class Border {
 
     /**
      * Creates a line border that uses the given color for the component
-     * 
+     *
      * @param thickness thickness of the border in millimeters
-     * @param color the color for the border
+     * @param color     the color for the border
      * @return new border instance
      */
     public static Border createLineBorder(float thickness, int color) {
@@ -800,17 +641,17 @@ public class Border {
         b.colorA = color;
         return b;
     }
-    
+
     /**
      * Creates a rounded corner border that uses the color of the component foreground for drawing.
-     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round 
-     * borders can be low if used with either a bgImage or translucency! 
+     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+     * borders can be low if used with either a bgImage or translucency!
      * <p>This border overrides any painter used on the component and would ignor such a painter.
-     * 
-     * @param arcWidth the horizontal diameter of the arc at the four corners.
+     *
+     * @param arcWidth  the horizontal diameter of the arc at the four corners.
      * @param arcHeight the vertical diameter of the arc at the four corners.
      * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders 
+     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
      * which are faster, more portable and better looking
      */
     public static Border createRoundBorder(int arcWidth, int arcHeight) {
@@ -828,11 +669,11 @@ public class Border {
      * borders can be low if used with either a bgImage or translucency!
      * <p>This border overrides any painter used on the component and would ignor such a painter.
      *
-     * @param arcWidth the horizontal diameter of the arc at the four corners.
+     * @param arcWidth  the horizontal diameter of the arc at the four corners.
      * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @param outline whether the round rect border outline should be drawn
+     * @param outline   whether the round rect border outline should be drawn
      * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders 
+     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
      * which are faster, more portable and better looking
      */
     public static Border createRoundBorder(int arcWidth, int arcHeight, boolean outline) {
@@ -843,15 +684,15 @@ public class Border {
 
     /**
      * Creates a rounded border that uses the given color for the component.
-     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round 
-     * borders can be low if used with either a bgImage or translucency! 
+     * Due to technical issues (lack of shaped clipping) performance and memory overhead of round
+     * borders can be low if used with either a bgImage or translucency!
      * <p>This border overrides any painter used on the component and would ignor such a painter.
-     * 
-     * @param arcWidth the horizontal diameter of the arc at the four corners.
+     *
+     * @param arcWidth  the horizontal diameter of the arc at the four corners.
      * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @param color the color for the border
+     * @param color     the color for the border
      * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders 
+     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
      * which are faster, more portable and better looking
      */
     public static Border createRoundBorder(int arcWidth, int arcHeight, int color) {
@@ -863,19 +704,19 @@ public class Border {
         b.arcWidth = arcWidth;
         return b;
     }
-    
+
     /**
      * Creates a rounded border that uses the given color for the component.
      * Due to technical issues (lack of shaped clipping) performance and memory overhead of round
      * borders can be low if used with either a bgImage or translucency!
      * <p>This border overrides any painter used on the component and would ignor such a painter.
      *
-     * @param arcWidth the horizontal diameter of the arc at the four corners.
+     * @param arcWidth  the horizontal diameter of the arc at the four corners.
      * @param arcHeight the vertical diameter of the arc at the four corners.
-     * @param color the color for the border
-     * @param outline whether the round rect border outline should be drawn
+     * @param color     the color for the border
+     * @param outline   whether the round rect border outline should be drawn
      * @return new border instance
-     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders 
+     * @deprecated the performance of round rect borders is REALLY slow, we recommend people use image borders
      * which are faster, more portable and better looking
      */
     public static Border createRoundBorder(int arcWidth, int arcHeight, int color, boolean outline) {
@@ -887,7 +728,7 @@ public class Border {
     /**
      * Creates a lowered etched border with default colors, highlight is derived
      * from the component and shadow is a plain dark color
-     * 
+     *
      * @return new border instance
      */
     public static Border createEtchedLowered() {
@@ -899,9 +740,9 @@ public class Border {
 
     /**
      * Creates a raised etched border with the given colors
-     * 
+     *
      * @param highlight color RGB value
-     * @param shadow color RGB value
+     * @param shadow    color RGB value
      * @return new border instance
      */
     public static Border createEtchedLowered(int highlight, int shadow) {
@@ -913,11 +754,10 @@ public class Border {
         return b;
     }
 
-    
     /**
      * Creates a lowered etched border with default colors, highlight is derived
      * from the component and shadow is a plain dark color
-     * 
+     *
      * @return new border instance
      */
     public static Border createEtchedRaised() {
@@ -930,9 +770,9 @@ public class Border {
 
     /**
      * Creates a raised etched border with the given colors
-     * 
+     *
      * @param highlight color RGB value
-     * @param shadow color RGB value
+     * @param shadow    color RGB value
      * @return new border instance
      */
     public static Border createEtchedRaised(int highlight, int shadow) {
@@ -946,59 +786,17 @@ public class Border {
     }
 
     /**
-     * {{@inheritDoc}}
-     */
-    public boolean equals(Object obj) {
-        if (obj != null && obj.getClass() == getClass()) {
-            Border b = (Border)obj;
-
-            if ((b.type==TYPE_COMPOUND) && (type==TYPE_COMPOUND)) {
-                for(int i=Component.TOP;i<=Component.RIGHT;i++) {
-                    if (!isSame(compoundBorders[i], b.compoundBorders[i])) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-
-            boolean v = ((themeColors==b.themeColors) &&
-                (type==b.type) &&
-                (thickness==b.thickness) &&
-                (colorA==b.colorA) &&
-                (colorB==b.colorB) &&
-                (colorC==b.colorC) &&
-                (colorD==b.colorD) &&
-                (arcWidth==b.arcWidth) &&
-                (arcHeight==b.arcHeight) &&
-                (outline==b.outline) &&
-                (isSame(borderTitle, b.borderTitle)) &&
-                (isSame(outerBorder, b.outerBorder))
-                );
-            if(v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {
-                int ilen = images.length;
-                for(int iter = 0 ; iter < ilen ; iter++) {
-                    if(images[iter] != b.images[iter]) {
-                        return false;
-                    }
-                }
-            }
-            return v;
-        }
-        return false;
-    }
-
-    /**
      * Compares two object including the scenario one of them is null (thus avoiding equals pitfalls)
-     * 
+     *
      * @param obj1 The first object to compare
      * @param obj2 The second object to compare
      * @return true if the two object are equal (or both null), false otherwise
      */
-    private static boolean isSame(Object obj1,Object obj2) {
-        if (obj1==null) {
-            return (obj2==null);
-        } else if (obj2==null) {
-            return (obj1==null);
+    private static boolean isSame(Object obj1, Object obj2) {
+        if (obj1 == null) {
+            return (obj2 == null);
+        } else if (obj2 == null) {
+            return (obj1 == null);
         }
         return obj1.equals(obj2);
     }
@@ -1006,15 +804,16 @@ public class Border {
     /**
      * Creates a border that is comprised of multiple border types so one border type can be used on top
      * while another one can be used at the bottom. Notice that this doesn't work well with all border types (e.g. image borders)
-     * @param top the top border
+     *
+     * @param top    the top border
      * @param bottom the bottom border
-     * @param left the left border
-     * @param right the right border
+     * @param left   the left border
+     * @param right  the right border
      * @return a compound border
      */
     public static Border createCompoundBorder(Border top, Border bottom, Border left, Border right) {
 
-        if ((top != null && !top.isRectangleType()) || 
+        if ((top != null && !top.isRectangleType()) ||
                 (bottom != null && !bottom.isRectangleType()) ||
                 (left != null && !left.isRectangleType()) ||
                 (right != null && !right.isRectangleType())) {
@@ -1034,12 +833,12 @@ public class Border {
         b.compoundBorders[Component.RIGHT] = right;
 
         // Calculates the thickness of the entire border as the maximum of all 4 sides
-        b.thickness=0;
-        for(int i=Component.TOP;i<=Component.RIGHT;i++) {
-            if (b.compoundBorders[i]!=null) {
-                int sideThickness = (int)b.compoundBorders[i].thickness;
-                if (sideThickness>b.thickness) {
-                    b.thickness=sideThickness;
+        b.thickness = 0;
+        for (int i = Component.TOP; i <= Component.RIGHT; i++) {
+            if (b.compoundBorders[i] != null) {
+                int sideThickness = (int) b.compoundBorders[i].thickness;
+                if (sideThickness > b.thickness) {
+                    b.thickness = sideThickness;
                 }
             }
         }
@@ -1048,32 +847,9 @@ public class Border {
     }
 
     /**
-     * Returns true if installing this border will override the painting of the component background
-     * 
-     * @return true if this border replaces the painter
-     */
-    public boolean isBackgroundPainter() {
-        return type == TYPE_ROUNDED || type == TYPE_ROUNDED_PRESSED || type == TYPE_IMAGE
-                 || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED;
-    }
-
-    /**
-     * Returns true if this border type is a rectangle border.
-     *
-     * @return true if this border is rectangle
-     */
-    public boolean isRectangleType() {
-        return type == TYPE_LINE || type == TYPE_BEVEL_LOWERED ||
-                type == TYPE_BEVEL_RAISED || type == TYPE_ETCHED_LOWERED ||
-                type == TYPE_ETCHED_RAISED || type == TYPE_COMPOUND 
-                || type == TYPE_EMPTY || type==TYPE_DOTTED || type==TYPE_DASHED || type==TYPE_DOUBLE
-                || type == TYPE_OUTSET || type == TYPE_INSET || type == TYPE_GROOVE || type == TYPE_RIDGE;
-    }
-
-    /**
      * Creates a lowered bevel border with default colors, highlight is derived
      * from the component and shadow is a plain dark color
-     * 
+     *
      * @return new border instance
      */
     public static Border createBevelLowered() {
@@ -1086,15 +862,15 @@ public class Border {
 
     /**
      * Creates a raised bevel border with the given colors
-     * 
-     * @param highlightOuter  RGB of the outer edge of the highlight area
-     * @param highlightInner  RGB of the inner edge of the highlight area
-     * @param shadowOuter     RGB of the outer edge of the shadow area
-     * @param shadowInner     RGB of the inner edge of the shadow area
+     *
+     * @param highlightOuter RGB of the outer edge of the highlight area
+     * @param highlightInner RGB of the inner edge of the highlight area
+     * @param shadowOuter    RGB of the outer edge of the shadow area
+     * @param shadowInner    RGB of the inner edge of the shadow area
      * @return new border instance
      */
     public static Border createBevelLowered(int highlightOuter, int highlightInner,
-                        int shadowOuter, int shadowInner) {
+                                            int shadowOuter, int shadowInner) {
         Border b = new Border();
         b.type = TYPE_BEVEL_LOWERED;
         b.themeColors = false;
@@ -1106,11 +882,10 @@ public class Border {
         return b;
     }
 
-    
     /**
      * Creates a lowered bevel border with default colors, highlight is derived
      * from the component and shadow is a plain dark color
-     * 
+     *
      * @return new border instance
      */
     public static Border createBevelRaised() {
@@ -1123,15 +898,15 @@ public class Border {
 
     /**
      * Creates a raised bevel border with the given colors
-     * 
-     * @param highlightOuter  RGB of the outer edge of the highlight area
-     * @param highlightInner  RGB of the inner edge of the highlight area
-     * @param shadowOuter     RGB of the outer edge of the shadow area
-     * @param shadowInner     RGB of the inner edge of the shadow area
+     *
+     * @param highlightOuter RGB of the outer edge of the highlight area
+     * @param highlightInner RGB of the inner edge of the highlight area
+     * @param shadowOuter    RGB of the outer edge of the shadow area
+     * @param shadowInner    RGB of the inner edge of the shadow area
      * @return new border instance
      */
     public static Border createBevelRaised(int highlightOuter, int highlightInner,
-                        int shadowOuter, int shadowInner) {
+                                           int shadowOuter, int shadowInner) {
         Border b = new Border();
         b.type = TYPE_BEVEL_RAISED;
         b.themeColors = false;
@@ -1142,66 +917,298 @@ public class Border {
         b.thickness = 2;
         return b;
     }
-        
+
     /**
-     * Allows us to define a border that will act as the pressed version of this border
-     * 
-     * @param pressed a border that will be returned by the pressed version method
+     * Gets the default border to the given value
+     *
+     * @return the default border
      */
-    public void setPressedInstance(Border pressed) {
-        pressedBorder = pressed;
+    public static Border getDefaultBorder() {
+        return defaultBorder;
     }
-    
+
+    /**
+     * Sets the default border to the given value
+     *
+     * @param border new border value
+     */
+    public static void setDefaultBorder(Border border) {
+        defaultBorder = border;
+    }
+
+    /**
+     * If a border is a horizontal image border it can be mirrored which is useful for an RTL scenario
+     *
+     * @return the current border or a mirrored instance
+     */
+    public Border mirrorBorder() {
+        if (type == TYPE_IMAGE_HORIZONTAL) {
+            return createHorizonalImageBorder(images[1].mirror(), images[0].mirror(), images[2].mirror());
+        }
+        return this;
+    }
+
+    /**
+     * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
+     * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
+     * so it points at the center of the track component
+     *
+     * @param tileTop        an image that will replace one of the tiles on the top if the track component is there
+     * @param tileBottom     an image that will replace one of the tiles on the bottom if the track component is there
+     * @param tileLeft       an image that will replace one of the tiles on the left if the track component is there
+     * @param tileRight      an image that will replace one of the tiles on the right if the track component is there
+     * @param trackComponent the component that will be tracked for the positioning of the tile
+     */
+    public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Component trackComponent) {
+        specialTile = new Image[]{tileTop, tileBottom, tileLeft, tileRight};
+        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
+    }
+
+    /**
+     * The track component is an area to which an arrow based border should point at.
+     * It's assumed to be outside of the border region in absolute screen coordinates.
+     *
+     * @return the rectangle to point at or null if this isn't an arrow border
+     */
+    protected Rectangle getTrackComponent() {
+        return trackComponent;
+    }
+
+    /**
+     * In the case of an arrow border the track component lets us track the position
+     * to which the border is pointing
+     *
+     * @param trackComponent the track component
+     */
+    public void setTrackComponent(Component trackComponent) {
+        this.trackComponent = new Rectangle(trackComponent.getAbsoluteX(), trackComponent.getAbsoluteY(), trackComponent.getWidth(), trackComponent.getHeight());
+    }
+
+    /**
+     * In the case of an arrow border the track component lets us track the position
+     * to which the border is pointing
+     *
+     * @param trackComponent the track component
+     */
+    public void setTrackComponent(Rectangle trackComponent) {
+        this.trackComponent = trackComponent;
+    }
+
+    /**
+     * This method is designed mainly for the purpose of creating an arrow that will track a specific component using the image border
+     * the tile given would be an arrow like image just like the ones used for the top/bottom/left/right images. This image would be positioned
+     * so it points at the center of the track component
+     *
+     * @param tileTop        an image that will replace one of the tiles on the top if the track component is there
+     * @param tileBottom     an image that will replace one of the tiles on the bottom if the track component is there
+     * @param tileLeft       an image that will replace one of the tiles on the left if the track component is there
+     * @param tileRight      an image that will replace one of the tiles on the right if the track component is there
+     * @param trackComponent the component that will be tracked for the positioning of the tile
+     */
+    public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Rectangle trackComponent) {
+        specialTile = new Image[]{tileTop, tileBottom, tileLeft, tileRight};
+        this.trackComponent = trackComponent;
+    }
+
+    /**
+     * Cleans the tile tracking state allowing the garbage collector to pick up the component and the image data
+     */
+    public void clearImageBorderSpecialTile() {
+        specialTile = null;
+        trackComponent = null;
+    }
+
+    /**
+     * Ads a border that wraps this border
+     *
+     * @param outer The outer border
+     */
+    public void addOuterBorder(Border outer) {
+        outerBorder = outer;
+    }
+
+    /**
+     * Returns the minimum size required to properly display this border, normally this
+     * is 0 but a border might deem itself undisplayable with too small a size e.g. for
+     * the case of an image border the minimum height would be top + bottom and the minimum
+     * width would be left+right
+     *
+     * @return 0 if not applicable or a dimension if it is.
+     */
+    public int getMinimumHeight() {
+        if (images != null) {
+            if (images.length < 4) {
+                if (type == TYPE_IMAGE_HORIZONTAL) {
+                    return images[0].getHeight();
+                } else {
+                    return images[0].getHeight() + images[1].getHeight();
+                }
+            }
+            Image topLeft = images[4];
+            Image bottomRight = images[7];
+            return topLeft.getHeight() + bottomRight.getHeight();
+        }
+        return 0;
+    }
+
+    /**
+     * Returns the minimum size required to properly display this border, normally this
+     * is 0 but a border might deem itself undisplayable with too small a size e.g. for
+     * the case of an image border the minimum height would be top + bottom and the minimum
+     * width would be left+right
+     *
+     * @return 0 if not applicable or a dimension if it is.
+     */
+    public int getMinimumWidth() {
+        if (images != null) {
+            if (images.length < 4) {
+                if (type == TYPE_IMAGE_HORIZONTAL) {
+                    return images[0].getWidth() + images[1].getWidth();
+                } else {
+                    return images[0].getWidth();
+                }
+            }
+            Image topLeft = images[4];
+            Image topRight = images[5];
+            return topLeft.getWidth() + topRight.getWidth();
+        }
+        return 0;
+    }
+
+    /**
+     * Indicates whether this is an empty border
+     *
+     * @return true if this is an empty border
+     */
+    public boolean isEmptyBorder() {
+        return emptyType;
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public boolean equals(Object obj) {
+        if (obj != null && obj.getClass() == getClass()) {
+            Border b = (Border) obj;
+
+            if ((b.type == TYPE_COMPOUND) && (type == TYPE_COMPOUND)) {
+                for (int i = Component.TOP; i <= Component.RIGHT; i++) {
+                    if (!isSame(compoundBorders[i], b.compoundBorders[i])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            boolean v = ((themeColors == b.themeColors) &&
+                    (type == b.type) &&
+                    (thickness == b.thickness) &&
+                    (colorA == b.colorA) &&
+                    (colorB == b.colorB) &&
+                    (colorC == b.colorC) &&
+                    (colorD == b.colorD) &&
+                    (arcWidth == b.arcWidth) &&
+                    (arcHeight == b.arcHeight) &&
+                    (outline == b.outline) &&
+                    (isSame(borderTitle, b.borderTitle)) &&
+                    (isSame(outerBorder, b.outerBorder))
+            );
+            if (v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {
+                int ilen = images.length;
+                for (int iter = 0; iter < ilen; iter++) {
+                    if (images[iter] != b.images[iter]) {
+                        return false;
+                    }
+                }
+            }
+            return v;
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if installing this border will override the painting of the component background
+     *
+     * @return true if this border replaces the painter
+     */
+    public boolean isBackgroundPainter() {
+        return type == TYPE_ROUNDED || type == TYPE_ROUNDED_PRESSED || type == TYPE_IMAGE
+                || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED;
+    }
+
+    /**
+     * Returns true if this border type is a rectangle border.
+     *
+     * @return true if this border is rectangle
+     */
+    public boolean isRectangleType() {
+        return type == TYPE_LINE || type == TYPE_BEVEL_LOWERED ||
+                type == TYPE_BEVEL_RAISED || type == TYPE_ETCHED_LOWERED ||
+                type == TYPE_ETCHED_RAISED || type == TYPE_COMPOUND
+                || type == TYPE_EMPTY || type == TYPE_DOTTED || type == TYPE_DASHED || type == TYPE_DOUBLE
+                || type == TYPE_OUTSET || type == TYPE_INSET || type == TYPE_GROOVE || type == TYPE_RIDGE;
+    }
+
+    /**
+     * Returns the focused version of the border if one is installed
+     *
+     * @return a focused version of this border if one exists
+     * @deprecated use the getSelectedStyle() method in the component class
+     */
+    public Border getFocusedInstance() {
+        if (focusBorder != null) {
+            return focusBorder;
+        }
+        return this;
+    }
+
     /**
      * Allows us to define a border that will act as the focused version of this border
-     * 
+     *
      * @param focused a border that will be returned by the focused version method
      * @deprecated use the getSelectedStyle() method in the component class
      */
     public void setFocusedInstance(Border focused) {
         focusBorder = focused;
     }
-    
-    /**
-     * Returns the focused version of the border if one is installed
-     * 
-     * @return a focused version of this border if one exists
-     * @deprecated use the getSelectedStyle() method in the component class
-     */
-    public Border getFocusedInstance() {
-        if(focusBorder != null) {
-            return focusBorder;
-        }
-        return this;
-    }
+
     /**
      * Returns the pressed version of the border if one is set by the user
-     * 
+     *
      * @return the pressed instance of this border
      */
     public Border getPressedInstance() {
-        if(pressedBorder != null) {
+        if (pressedBorder != null) {
             return pressedBorder;
         }
         return this;
     }
-    
+
     /**
-     * When applied to buttons borders produce a version that reverses the effects 
+     * Allows us to define a border that will act as the pressed version of this border
+     *
+     * @param pressed a border that will be returned by the pressed version method
+     */
+    public void setPressedInstance(Border pressed) {
+        pressedBorder = pressed;
+    }
+
+    /**
+     * When applied to buttons borders produce a version that reverses the effects
      * of the border providing a pressed feel
-     * 
+     *
      * @return a border that will make the button feel pressed
      */
     public Border createPressedVersion() {
-        if(pressedBorder != null) {
+        if (pressedBorder != null) {
             return pressedBorder;
         }
-        switch(type) {
+        switch (type) {
             case TYPE_LINE:
-                if(millimeters) {
+                if (millimeters) {
                     return createLineBorder(thickness + 0.1f, colorA);
                 }
-                return createLineBorder((int)thickness + 1, colorA);
+                return createLineBorder((int) thickness + 1, colorA);
             case TYPE_ETCHED_LOWERED: {
                 Border b = createEtchedRaised(colorA, colorB);
                 b.themeColors = themeColors;
@@ -1236,12 +1243,12 @@ public class Border {
         }
         return this;
     }
-    
+
     /**
      * Has effect when the border demands responsibility for background painting
      * normally the painter will perform this work but in this case the border might
      * do it instead.
-     * 
+     *
      * @param g graphics context to draw onto
      * @param c component whose border should be drawn
      */
@@ -1252,10 +1259,10 @@ public class Border {
         int height = c.getHeight();
         if (outerBorder != null) {
             int ac;
-            if(millimeters) {
+            if (millimeters) {
                 ac = Display.getInstance().convertToPixels(thickness);
             } else {
-                ac = (int)thickness;
+                ac = (int) thickness;
             }
             if (paintOuterBorderFirst) {
                 outerBorder.paintBorderBackground(g, c);
@@ -1263,30 +1270,30 @@ public class Border {
             } else {
                 paintBorderBackground(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);
                 outerBorder.paintBorderBackground(g, c);
-           }
+            }
         } else {
             paintBorderBackground(g, x, y, width, height, c);
         }
     }
 
     private void setClipScaled(Graphics g, int x, int y, int w, int h) {
-        if(g.getScaleX() < 1) {
-            w = (int)(((float)w) / g.getScaleX());
+        if (g.getScaleX() < 1) {
+            w = (int) (((float) w) / g.getScaleX());
         }
-        if(g.getScaleY() < 1) {
-            h = (int)(((float)h) / g.getScaleY());
+        if (g.getScaleY() < 1) {
+            h = (int) (((float) h) / g.getScaleY());
         }
         g.setClip(x, y, w, h);
     }
-    
+
     private void paintBorderBackground(Graphics g, final int xParameter, final int yParameter,
-            final int widthParameter, final int heightParameter, Component c) {
+                                       final int widthParameter, final int heightParameter, Component c) {
         int originalColor = g.getColor();
         int x = xParameter;
         int y = yParameter;
         int width = widthParameter;
         int height = heightParameter;
-        switch(type) {
+        switch (type) {
             case TYPE_ROUNDED_PRESSED:
                 x++;
                 y++;
@@ -1298,14 +1305,14 @@ public class Border {
                 //height--;
                 // rounded is also responsible for drawing the background
                 Style s = c.getStyle();
-                if((s.getBgImage() != null && s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) ||
-                    s.getBackgroundType() > 1) {
+                if ((s.getBgImage() != null && s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) ||
+                        s.getBackgroundType() > 1) {
                     Object w = s.roundRectCache;
                     Image i = null;
-                    if(w != null) {
-                        i = (Image)Display.getInstance().extractHardRef(w);
+                    if (w != null) {
+                        i = (Image) Display.getInstance().extractHardRef(w);
                     }
-                    if(i != null && i.getWidth() == width && i.getHeight() == height) {
+                    if (i != null && i.getWidth() == width && i.getHeight() == height) {
                         g.drawImage(i, x, y);
                     } else {
                         // we need to draw a background image!
@@ -1316,22 +1323,22 @@ public class Border {
                         int[] rgb = i.getRGBCached();
                         int transColor = rgb[0];
                         int[] imageRGB;
-                        if(s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) {
+                        if (s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) {
                             imageRGB = s.getBgImage().scaled(width, height).getRGBCached();
                         } else {
                             Image bgPaint = ImageFactory.createImage(c, width, height, 0);
                             Painter p = s.getBgPainter();
 
                             // might occur during temporary conditions in the theme switching
-                            if(p == null) {
+                            if (p == null) {
                                 return;
                             }
                             p.paint(bgPaint.getGraphics(), new Rectangle(0, 0, width, height));
                             imageRGB = bgPaint.getRGB();
                         }
                         int rlen = rgb.length;
-                        for(int iter = 0 ; iter < rlen ; iter++) {
-                            if(rgb[iter] == transColor) {
+                        for (int iter = 0; iter < rlen; iter++) {
+                            if (rgb[iter] == transColor) {
                                 imageRGB[iter] = 0;
                             }
                         }
@@ -1344,24 +1351,24 @@ public class Border {
                     g.setColor(s.getBgColor());
 
                     // Its opaque much easier job!
-                    if(s.getBgTransparency() == ((byte)0xff)) {
-                        g.fillRoundRect(x, y , width, height, arcWidth, arcHeight);
+                    if (s.getBgTransparency() == ((byte) 0xff)) {
+                        g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
                     } else {
-                        if(g.isAlphaSupported()) {
+                        if (g.isAlphaSupported()) {
                             int alpha = g.getAlpha();
                             g.setAlpha(s.getBgTransparency() & 0xff);
-                            g.fillRoundRect(x, y , width, height, arcWidth, arcHeight);
+                            g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
                             g.setAlpha(alpha);
                         } else {
                             // if its transparent we don't need to do anything, if its
                             // translucent... well....
-                            if(s.getBgTransparency() != 0) {
+                            if (s.getBgTransparency() != 0) {
                                 Image i = ImageFactory.createImage(c, width, height, 0);
                                 int[] imageRgb;
-                                if(g.getColor() != 0xffffff) {
+                                if (g.getColor() != 0xffffff) {
                                     Graphics imageG = i.getGraphics();
                                     imageG.setColor(g.getColor());
-                                    imageG.fillRoundRect(0, 0 , width, height, arcWidth, arcHeight);
+                                    imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
                                     imageRgb = i.getRGBCached();
                                 } else {
                                     // background color is white we need to remove a different color
@@ -1370,31 +1377,31 @@ public class Border {
                                     imageG.setColor(0);
                                     imageG.fillRect(0, 0, width, height);
                                     imageG.setColor(g.getColor());
-                                    imageG.fillRoundRect(0, 0 , width, height, arcWidth, arcHeight);
+                                    imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
                                     imageRgb = i.getRGBCached();
                                 }
                                 int removeColor = imageRgb[0];
                                 int size = width * height;
                                 int alphaInt = ((s.getBgTransparency() & 0xff) << 24) & 0xff000000;
-                                for(int iter = 0 ; iter < size ; iter++) {
-                                    if(removeColor == imageRgb[iter]) {
-                                            imageRgb[iter] = 0;
-                                            continue;
+                                for (int iter = 0; iter < size; iter++) {
+                                    if (removeColor == imageRgb[iter]) {
+                                        imageRgb[iter] = 0;
+                                        continue;
                                     }
-                                    if((imageRgb[iter] & 0xff000000) != 0) {
+                                    if ((imageRgb[iter] & 0xff000000) != 0) {
                                         imageRgb[iter] = (imageRgb[iter] & 0xffffff) | alphaInt;
-                                    }   
+                                    }
                                 }
                                 g.drawImage(new RGBImage(imageRgb, width, height), x, y);
-                            } 
+                            }
                         }
                     }
-                    
+
                     g.setColor(foreground);
                 }
                 break;
             case TYPE_IMAGE: {
-                Image topLeft = images[4]; 
+                Image topLeft = images[4];
                 Image topRight = images[5];
                 Image bottomLeft = images[6];
                 Image center = images[8];
@@ -1402,18 +1409,20 @@ public class Border {
                 y += topLeft.getHeight();
                 height -= (topLeft.getHeight() + bottomLeft.getHeight());
                 width -= (topLeft.getWidth() + topRight.getWidth());
-                if(center != null){
+                if (center != null) {
                     g.tileImage(center, x, y, width, height);
                 }
-                Image top = images[0];  Image bottom = images[1];
-                Image left = images[2]; Image right = images[3];
+                Image top = images[0];
+                Image bottom = images[1];
+                Image left = images[2];
+                Image right = images[3];
                 Image bottomRight = images[7];
-                                
+
                 x = xParameter;
                 y = yParameter;
                 width = widthParameter;
                 height = heightParameter;
-                
+
                 g.drawImage(topLeft, x, y);
                 g.drawImage(bottomLeft, x, y + height - bottomLeft.getHeight());
                 g.drawImage(topRight, x + width - topRight.getWidth(), y);
@@ -1426,27 +1435,27 @@ public class Border {
                 int arrowPosition = 0;
 
                 // we need to draw an arrow on one of the sides
-                if(trackComponent != null && specialTile != null) {
+                if (trackComponent != null && specialTile != null) {
                     int cabsY = c.getAbsoluteY();
                     int trackY = trackComponent.getY();
                     int trackX = trackComponent.getX();
                     int cabsX = c.getAbsoluteX();
-                    if(cabsY >= trackY + trackComponent.getHeight()) {
+                    if (cabsY >= trackY + trackComponent.getHeight()) {
                         // we are below the component
                         arrowUpImage = specialTile[0];
                         arrowPosition = (trackX + trackComponent.getWidth() / 2) - cabsX - arrowUpImage.getWidth() / 2;
-                    } else {    
-                        if(cabsY + c.getHeight() <= trackY) {
+                    } else {
+                        if (cabsY + c.getHeight() <= trackY) {
                             // we are above the component
                             arrowDownImage = specialTile[1];
                             arrowPosition = (trackX + trackComponent.getWidth() / 2) - cabsX - arrowDownImage.getWidth() / 2;
-                        }  else {
-                            if(cabsX >= trackX + trackComponent.getWidth()) {
+                        } else {
+                            if (cabsX >= trackX + trackComponent.getWidth()) {
                                 // we are to the right of the component
                                 arrowLeftImage = specialTile[2];
                                 arrowPosition = (trackY + trackComponent.getHeight() / 2) - cabsY - arrowLeftImage.getHeight() / 2;
                             } else {
-                                if(cabsX + c.getWidth() <= trackX) {
+                                if (cabsX + c.getWidth() <= trackX) {
                                     // we are to the left of the component
                                     arrowRightImage = specialTile[3];
                                     arrowPosition = (trackY + trackComponent.getHeight() / 2) - cabsY - arrowRightImage.getHeight() / 2;
@@ -1460,7 +1469,7 @@ public class Border {
                 drawImageBorderLine(g, bottomLeft, bottomRight, bottom, x, y + height - bottom.getHeight(), width, arrowDownImage, arrowPosition, true);
                 drawImageBorderColumn(g, topLeft, bottomLeft, left, x, y, height, arrowLeftImage, arrowPosition, false);
                 drawImageBorderColumn(g, topRight, bottomRight, right, x + width - right.getWidth(), y, height, arrowRightImage, arrowPosition, true);
-                                
+
                 break;
             }
             case TYPE_IMAGE_SCALED: {
@@ -1478,13 +1487,15 @@ public class Border {
                 height -= (topLeft.getHeight() + bottomLeft.getHeight());
                 width -= (topLeft.getWidth() + topRight.getWidth());
                 g.clipRect(x, y, width, height);
-                if(center != null && width > 0 && height > 0){
+                if (center != null && width > 0 && height > 0) {
                     int centerWidth = center.getWidth();
                     int centerHeight = center.getHeight();
                     g.drawImage(center, x, y, width, height);
                 }
-                Image top = images[0];  Image bottom = images[1];
-                Image left = images[2]; Image right = images[3];
+                Image top = images[0];
+                Image bottom = images[1];
+                Image left = images[2];
+                Image right = images[3];
                 Image bottomRight = images[7];
 
                 g.setClip(clipX, clipY, clipWidth, clipHeight);
@@ -1513,9 +1524,9 @@ public class Border {
                 Image left = images[0];
                 Image right = images[1];
                 Image center = images[2];
-                Boolean centerAlignHBorderBool = c == null ? null : (Boolean)c.getClientProperty("@centerAlignHBorderBool");
+                Boolean centerAlignHBorderBool = c == null ? null : (Boolean) c.getClientProperty("@centerAlignHBorderBool");
                 boolean b = centerAlignHBorderBool == null ? false : centerAlignHBorderBool;
-                if(b || c.getUIManager().isThemeConstant("centerAlignHBorderBool", false)) {
+                if (b || c.getUIManager().isThemeConstant("centerAlignHBorderBool", false)) {
                     y += Math.max(0, height / 2 - center.getHeight() / 2);
                 }
 
@@ -1536,11 +1547,11 @@ public class Border {
         }
         g.setColor(originalColor);
     }
-    
+
     /**
      * Draws the border for the given component, this method is called before a call to
      * background painting is made.
-     * 
+     *
      * @param g graphics context to draw onto
      * @param c component whose border should be drawn
      */
@@ -1549,145 +1560,146 @@ public class Border {
         int y = c.getY();
         int width = c.getWidth();
         int height = c.getHeight();
-         if (outerBorder!=null) {
+        if (outerBorder != null) {
             int ac;
-            if(millimeters) {
+            if (millimeters) {
                 ac = Display.getInstance().convertToPixels(thickness);
             } else {
-                ac = (int)thickness;
+                ac = (int) thickness;
             }
-            if(paintOuterBorderFirst) {
+            if (paintOuterBorderFirst) {
                 outerBorder.paint(g, x, y, width, height, c);
-                paint(g, x+ac, y+ac, width-ac*2, height-ac*2, c);
+                paint(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);
             } else {
-                paint(g, x+ac, y+ac, width-ac*2, height-ac*2, c);
+                paint(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);
                 outerBorder.paint(g, x, y, width, height, c);
             }
         } else {
             paint(g, x, y, width, height, c);
         }
     }
-    
-    void paint(Graphics g,int x,int y,int width,int height,Component c) {
+
+    void paint(Graphics g, int x, int y, int width, int height, Component c) {
         int originalColor = g.getColor();
-        if(!themeColors) {
+        if (!themeColors) {
             g.setColor(colorA);
-        } 
+        }
         int ac = 1;
-        if(thickness > 0) {
-            if(millimeters) {
+        if (thickness > 0) {
+            if (millimeters) {
                 ac = Display.getInstance().convertToPixels(thickness);
             } else {
-                ac = (int)thickness;
+                ac = (int) thickness;
             }
         }
-        switch(type) {
-            case TYPE_LINE:                
-                if (borderTitle==null) {
-                    if(millimeters) {
+        switch (type) {
+            case TYPE_LINE:
+                if (borderTitle == null) {
+                    if (millimeters) {
                         g.drawRect(x, y, width, height, ac);
                     } else {
                         g.drawRect(x, y, width, height, ac);
                     }
                 } else {
-                    Font f=c.getStyle().getFont();
-                    int titleW=f.stringWidth(borderTitle);
-                    int topPad=c.getStyle().getPaddingTop();
-                    int topY=y+(topPad-ac)/2;
+                    Font f = c.getStyle().getFont();
+                    int titleW = f.stringWidth(borderTitle);
+                    int topPad = c.getStyle().getPaddingTop();
+                    int topY = y + (topPad - ac) / 2;
                     if (c.isRTL()) {
-                        g.fillRect(x+width-TITLE_MARGIN, topY, TITLE_MARGIN , ac); //top (segment before the title)
-                        g.fillRect(x, topY, width-(TITLE_MARGIN +titleW+TITLE_SPACE*2), ac); //top (segment after the title)
-                        g.drawString(borderTitle, x+width-(TITLE_MARGIN +titleW+TITLE_SPACE), y+(topPad-f.getHeight())/2);
+                        g.fillRect(x + width - TITLE_MARGIN, topY, TITLE_MARGIN, ac); //top (segment before the title)
+                        g.fillRect(x, topY, width - (TITLE_MARGIN + titleW + TITLE_SPACE * 2), ac); //top (segment after the title)
+                        g.drawString(borderTitle, x + width - (TITLE_MARGIN + titleW + TITLE_SPACE), y + (topPad - f.getHeight()) / 2);
                     } else {
-                        g.fillRect(x, topY, TITLE_MARGIN , ac); //top (segment before the title)
-                        g.fillRect(x+TITLE_MARGIN +titleW+TITLE_SPACE*2, topY, width-(TITLE_MARGIN +titleW+TITLE_SPACE*2), ac); //top (segment after the title)
-                        g.drawString(borderTitle, x+TITLE_MARGIN+TITLE_SPACE, y+(topPad-f.getHeight())/2);
+                        g.fillRect(x, topY, TITLE_MARGIN, ac); //top (segment before the title)
+                        g.fillRect(x + TITLE_MARGIN + titleW + TITLE_SPACE * 2, topY, width - (TITLE_MARGIN + titleW + TITLE_SPACE * 2), ac); //top (segment after the title)
+                        g.drawString(borderTitle, x + TITLE_MARGIN + TITLE_SPACE, y + (topPad - f.getHeight()) / 2);
                     }
 
-                    g.fillRect(x, y+height-ac, width, ac); //bottom
+                    g.fillRect(x, y + height - ac, width, ac); //bottom
                     g.fillRect(x, topY, ac, height); //left
-                    g.fillRect(x+width-ac, topY, ac, height); //right
-                    
+                    g.fillRect(x + width - ac, topY, ac, height); //right
+
                 }
                 break;
             case TYPE_DASHED:
             case TYPE_DOTTED:
-                int segWidth=ac;
-                if (type==TYPE_DASHED) {
-                    segWidth=ac*3;
+                int segWidth = ac;
+                if (type == TYPE_DASHED) {
+                    segWidth = ac * 3;
                 }
-                int ix=x;
-                for (;ix<x+width;ix+=segWidth*2) {
+                int ix = x;
+                for (; ix < x + width; ix += segWidth * 2) {
                     g.fillRect(ix, y, segWidth, ac);
-                    g.fillRect(ix, y+height-ac, segWidth, ac);
+                    g.fillRect(ix, y + height - ac, segWidth, ac);
                 }
-                if (ix-segWidth<x+width) { //fill in the gap if any
-                    g.fillRect(ix-segWidth, y, x+width-ix+segWidth, ac);
-                    g.fillRect(ix-segWidth, y+height-ac, x+width-ix+segWidth, ac);
+                if (ix - segWidth < x + width) { //fill in the gap if any
+                    g.fillRect(ix - segWidth, y, x + width - ix + segWidth, ac);
+                    g.fillRect(ix - segWidth, y + height - ac, x + width - ix + segWidth, ac);
                 }
 
-                int iy=y;
-                for (;iy<y+height;iy+=segWidth*2) {
+                int iy = y;
+                for (; iy < y + height; iy += segWidth * 2) {
                     g.fillRect(x, iy, ac, segWidth);
-                    g.fillRect(x+width-ac, iy, ac, segWidth);
+                    g.fillRect(x + width - ac, iy, ac, segWidth);
                 }
-                if (iy-segWidth<y+height) { //fill in the gap if any
-                    g.fillRect(x, iy-segWidth, ac, y+height-iy+segWidth);
-                    g.fillRect(x+width-ac, iy-segWidth, ac, y+height-iy+segWidth);
+                if (iy - segWidth < y + height) { //fill in the gap if any
+                    g.fillRect(x, iy - segWidth, ac, y + height - iy + segWidth);
+                    g.fillRect(x + width - ac, iy - segWidth, ac, y + height - iy + segWidth);
                 }
 
 
                 break;
             case TYPE_DOUBLE:
-                    width--;
-                    height--;
-                    for(int iter = 0 ; iter < ac ; iter++) {
-                        if ((iter*100/ac<=33) || (iter*100/ac>=66)) {
-                            g.drawRect(x + iter, y + iter, width, height);
-                        }
-                        width -= 2; height -= 2;
-                   }
-                    break;
+                width--;
+                height--;
+                for (int iter = 0; iter < ac; iter++) {
+                    if ((iter * 100 / ac <= 33) || (iter * 100 / ac >= 66)) {
+                        g.drawRect(x + iter, y + iter, width, height);
+                    }
+                    width -= 2;
+                    height -= 2;
+                }
+                break;
             case TYPE_INSET:
             case TYPE_OUTSET:
-                for(int i=0;i<ac;i++) {
-                    g.drawLine(x+i, y+i, x+i, y+height-i);
-                    g.drawLine(x+i, y+i, x+width-i, y+i);
+                for (int i = 0; i < ac; i++) {
+                    g.drawLine(x + i, y + i, x + i, y + height - i);
+                    g.drawLine(x + i, y + i, x + width - i, y + i);
                 }
 
-                if (type==TYPE_INSET) {
+                if (type == TYPE_INSET) {
                     g.lighterColor(50);
                 } else {
                     g.darkerColor(50);
                 }
-                for(int i=0;i<ac;i++) {
-                    g.drawLine(x+i, y+height-i, x+width-i, y+height-i);
-                    g.drawLine(x+width-i, y+i, x+width-i, y+height-i);
+                for (int i = 0; i < ac; i++) {
+                    g.drawLine(x + i, y + height - i, x + width - i, y + height - i);
+                    g.drawLine(x + width - i, y + i, x + width - i, y + height - i);
                 }
                 break;
             case TYPE_GROOVE:
             case TYPE_RIDGE:
-                for(int i=0;i<ac/2;i++) {
-                    g.drawLine(x+i, y+i, x+i, y+height-i);
-                    g.drawLine(x+i, y+i, x+width-i, y+i);
+                for (int i = 0; i < ac / 2; i++) {
+                    g.drawLine(x + i, y + i, x + i, y + height - i);
+                    g.drawLine(x + i, y + i, x + width - i, y + i);
                 }
-                for(int i=ac/2;i<ac;i++) {
-                    g.drawLine(x+i, y+height-i, x+width-i, y+height-i);
-                    g.drawLine(x+width-i, y+i, x+width-i, y+height-i);
+                for (int i = ac / 2; i < ac; i++) {
+                    g.drawLine(x + i, y + height - i, x + width - i, y + height - i);
+                    g.drawLine(x + width - i, y + i, x + width - i, y + height - i);
                 }
 
-                if (type==TYPE_GROOVE) {
+                if (type == TYPE_GROOVE) {
                     g.lighterColor(50);
                 } else {
                     g.darkerColor(50);
                 }
-                for(int i=0;i<ac/2;i++) {
-                    g.drawLine(x+i, y+height-i, x+width-i, y+height-i);
-                    g.drawLine(x+width-i, y+i, x+width-i, y+height-i);
+                for (int i = 0; i < ac / 2; i++) {
+                    g.drawLine(x + i, y + height - i, x + width - i, y + height - i);
+                    g.drawLine(x + width - i, y + i, x + width - i, y + height - i);
                 }
-                for(int i=ac/2;i<ac;i++) {
-                    g.drawLine(x+i, y+i, x+i, y+height-i);
-                    g.drawLine(x+i, y+i, x+width-i, y+i);
+                for (int i = ac / 2; i < ac; i++) {
+                    g.drawLine(x + i, y + i, x + i, y + height - i);
+                    g.drawLine(x + i, y + i, x + width - i, y + i);
                 }
                 break;
             case TYPE_ROUNDED_PRESSED:
@@ -1699,16 +1711,16 @@ public class Border {
                 width--;
                 height--;
 
-                if(outline) {
-                    g.drawRoundRect(x, y , width, height, arcWidth, arcHeight);
+                if (outline) {
+                    g.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
                 }
                 break;
             case TYPE_ETCHED_LOWERED:
             case TYPE_ETCHED_RAISED:
                 g.drawRect(x, y, width - 2, height - 2);
 
-                if(themeColors) {
-                    if(type == TYPE_ETCHED_LOWERED) {
+                if (themeColors) {
+                    if (type == TYPE_ETCHED_LOWERED) {
                         g.lighterColor(40);
                     } else {
                         g.darkerColor(40);
@@ -1716,14 +1728,14 @@ public class Border {
                 } else {
                     g.setColor(colorB);
                 }
-                g.drawLine(x + 1, y + height - 3, x + 1, y +1);
+                g.drawLine(x + 1, y + height - 3, x + 1, y + 1);
                 g.drawLine(x + 1, y + 1, x + width - 3, y + 1);
 
                 g.drawLine(x, y + height - 1, x + width - 1, y + height - 1);
                 g.drawLine(x + width - 1, y + height - 1, x + width - 1, y);
                 break;
             case TYPE_BEVEL_RAISED:
-                if(themeColors) {
+                if (themeColors) {
                     g.setColor(getBackgroundColor(c));
                     g.lighterColor(50);
                 } else {
@@ -1732,7 +1744,7 @@ public class Border {
                 g.drawLine(x, y, x, y + height - 2);
                 g.drawLine(x + 1, y, x + width - 2, y);
 
-                if(themeColors) {
+                if (themeColors) {
                     g.darkerColor(25);
                 } else {
                     g.setColor(colorB);
@@ -1740,7 +1752,7 @@ public class Border {
                 g.drawLine(x + 1, y + 1, x + 1, y + height - 3);
                 g.drawLine(x + 2, y + 1, x + width - 3, y + 1);
 
-                if(themeColors) {
+                if (themeColors) {
                     g.darkerColor(50);
                 } else {
                     g.setColor(colorC);
@@ -1748,7 +1760,7 @@ public class Border {
                 g.drawLine(x, y + height - 1, x + width - 1, y + height - 1);
                 g.drawLine(x + width - 1, y, x + width - 1, y + height - 2);
 
-                if(themeColors) {
+                if (themeColors) {
                     g.darkerColor(25);
                 } else {
                     g.setColor(colorD);
@@ -1759,8 +1771,8 @@ public class Border {
             case TYPE_UNDERLINE:
                 g.fillRect(x, y + height - ac - 1, width, ac);
                 break;
-            case TYPE_BEVEL_LOWERED: 
-                if(themeColors) {
+            case TYPE_BEVEL_LOWERED:
+                if (themeColors) {
                     g.setColor(getBackgroundColor(c));
                     g.darkerColor(50);
                 } else {
@@ -1769,7 +1781,7 @@ public class Border {
                 g.drawLine(x, y, x, y + height - 1);
                 g.drawLine(x + 1, y, x + width - 1, y);
 
-                if(themeColors) {
+                if (themeColors) {
                     g.lighterColor(25);
                 } else {
                     g.setColor(colorC);
@@ -1777,7 +1789,7 @@ public class Border {
                 g.drawLine(x + 1, y + 1, x + 1, y + height - 2);
                 g.drawLine(x + 2, y + 1, x + width - 2, y + 1);
 
-                if(themeColors) {
+                if (themeColors) {
                     g.lighterColor(50);
                 } else {
                     g.setColor(colorC);
@@ -1785,7 +1797,7 @@ public class Border {
                 g.drawLine(x + 1, y + height - 1, x + width - 1, y + height - 1);
                 g.drawLine(x + width - 1, y + 1, x + width - 1, y + height - 2);
 
-                if(themeColors) {
+                if (themeColors) {
                     g.lighterColor(25);
                 } else {
                     g.setColor(colorA);
@@ -1813,7 +1825,7 @@ public class Border {
                 if (top != null) {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
-                    topThickness = (int)top.thickness;
+                    topThickness = (int) top.thickness;
                     g.clipRect(x, y, width, topThickness);
                     top.paint(g, x, y, width, height, c); //top.paint(g, c);
                     restoreClip(g, clip);
@@ -1823,7 +1835,7 @@ public class Border {
                 if (bottom != null) {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
-                    bottomThickness = (int)bottom.thickness;
+                    bottomThickness = (int) bottom.thickness;
                     g.clipRect(x, y + height - bottomThickness, width, bottomThickness);
                     bottom.paint(g, x, y, width, height, c); //bottom.paint(g, c);
                     restoreClip(g, clip);
@@ -1834,7 +1846,7 @@ public class Border {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
                     g.clipRect(x, y + topThickness,
-                            (int)left.thickness,
+                            (int) left.thickness,
                             height - topThickness - bottomThickness);
                     left.paint(g, x, y, width, height, c); //left.paint(g, c);
                     restoreClip(g, clip);
@@ -1843,9 +1855,9 @@ public class Border {
                 if ((drawRight) && (right != null)) {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
-                    g.clipRect(x + width - (int)right.thickness,
+                    g.clipRect(x + width - (int) right.thickness,
                             y + topThickness,
-                            (int)right.thickness,
+                            (int) right.thickness,
                             height - topThickness - bottomThickness);
                     right.paint(g, x, y, width, height, c); //right.paint(g, c);
                     restoreClip(g, clip);
@@ -1874,24 +1886,24 @@ public class Border {
     /**
      * Utility method used to restore a previously saved clip area
      *
-     * @param g The graphics to apply the clip area on
+     * @param g    The graphics to apply the clip area on
      * @param rect A Rectangle representing the saved clip area
      */
-    private void restoreClip(Graphics g,Rectangle rect) {
+    private void restoreClip(Graphics g, Rectangle rect) {
         g.setClip(rect.getX(), rect.getY(), rect.getSize().getWidth(), rect.getSize().getHeight());
     }
 
     private int getBackgroundColor(Component c) {
         return c.getStyle().getBgColor();
     }
-    
+
     private void drawImageBorderLine(Graphics g, Image left, Image right, Image center, final int x, int y, int width, Image arrow, int imagePosition, boolean farEdge) {
-        if(width - right.getWidth() > 0) {
+        if (width - right.getWidth() > 0) {
             g.tileImage(center, x + left.getWidth(), y, width - right.getWidth() - left.getWidth(), center.getHeight());
-            if(arrow != null) {
+            if (arrow != null) {
                 imagePosition = Math.max(imagePosition, left.getWidth());
                 imagePosition = Math.min(imagePosition, width - arrow.getWidth() - right.getWidth());
-                if(farEdge) {
+                if (farEdge) {
                     g.drawImage(arrow, x + imagePosition, y + center.getHeight() - arrow.getHeight());
                 } else {
                     g.drawImage(arrow, x + imagePosition, y);
@@ -1901,23 +1913,23 @@ public class Border {
     }
 
     private void drawImageBorderColumn(Graphics g, Image top, Image bottom, Image center, int x, final int y, int height, Image arrow, int imagePosition, boolean farEdge) {
-        if(height - bottom.getHeight() > 0) {
+        if (height - bottom.getHeight() > 0) {
             g.tileImage(center, x, y + top.getHeight(), center.getWidth(), height - top.getHeight() - bottom.getHeight());
-            if(arrow != null) {
+            if (arrow != null) {
                 imagePosition = Math.max(imagePosition, top.getHeight());
                 imagePosition = Math.min(imagePosition, height - arrow.getHeight() - bottom.getHeight());
-                if(farEdge) {
+                if (farEdge) {
                     g.drawImage(arrow, x + center.getWidth() - arrow.getWidth(), y + imagePosition);
                 } else {
                     g.drawImage(arrow, x, y + imagePosition);
                 }
             }
-        } 
+        }
     }
 
     private void drawImageBorderLineScale(Graphics g, Image left, Image right, Image center, int x, int y, int width) {
         int currentWidth = width - right.getWidth() - left.getWidth();
-        if(currentWidth > 0) {
+        if (currentWidth > 0) {
             x += left.getWidth();
             g.drawImage(center, x, y, currentWidth, center.getHeight());
         }
@@ -1925,44 +1937,28 @@ public class Border {
 
     private void drawImageBorderColumnScale(Graphics g, Image top, Image bottom, Image center, int x, int y, int height) {
         int currentHeight = height - bottom.getHeight() - top.getHeight();
-        if(currentHeight > 0) {
+        if (currentHeight > 0) {
             y += top.getHeight();
             g.drawImage(center, x, y, center.getWidth(), currentHeight);
         }
     }
-    
-    /**
-     * Sets the default border to the given value
-     * 
-     * @param border new border value
-     */
-    public static void setDefaultBorder(Border border) {
-        defaultBorder = border;
-    }
-
-    /**
-     * Gets the default border to the given value
-     * 
-     * @return the default border
-     */
-    public static Border getDefaultBorder() {
-        return defaultBorder;
-    }
 
     /**
      * This method returns how thick is the border in pixels, notice this doesn't apply to most border types
+     *
      * @return the Border thickness
      */
     public int getThickness() {
-        if(millimeters) {
+        if (millimeters) {
             return Display.getInstance().convertToPixels(thickness);
         }
-        return (int)thickness;
+        return (int) thickness;
     }
 
     /**
      * This method returns sets the border thickness in pixels, notice this doesn't apply to most border types
-     * @param thickness  the Border thickness
+     *
+     * @param thickness the Border thickness
      */
     public void setThickness(int thickness) {
         this.thickness = thickness;
@@ -1970,18 +1966,20 @@ public class Border {
 
     /**
      * Allows toggling the order in which the outer and inner borders are painted for the Outer border type
-     * @param paintOuterBorderFirst whether the outside border should be painter first
-     */
-    public void setPaintOuterBorderFirst(boolean paintOuterBorderFirst) {
-        this.paintOuterBorderFirst = paintOuterBorderFirst;
-    }
-
-    /**
-     * Allows toggling the order in which the outer and inner borders are painted for the Outer border type
+     *
      * @return whether the outside border should be painter first
      */
     public boolean isPaintOuterBorderFirst() {
         return paintOuterBorderFirst;
+    }
+
+    /**
+     * Allows toggling the order in which the outer and inner borders are painted for the Outer border type
+     *
+     * @param paintOuterBorderFirst whether the outside border should be painter first
+     */
+    public void setPaintOuterBorderFirst(boolean paintOuterBorderFirst) {
+        this.paintOuterBorderFirst = paintOuterBorderFirst;
     }
 
     /**
@@ -2006,10 +2004,10 @@ public class Border {
      * This method may be invoked multiple times.
      */
     public void lock() {
-        if(images != null) {
+        if (images != null) {
             int ilen = images.length;
-            for(int iter = 0 ; iter < ilen ; iter++) {
-                if(images[iter] != null) {
+            for (int iter = 0; iter < ilen; iter++) {
+                if (images[iter] != null) {
                     images[iter].lock();
                 }
             }
@@ -2021,53 +2019,52 @@ public class Border {
      * This method may be invoked multiple times.
      */
     public void unlock() {
-        if(images != null) {
+        if (images != null) {
             int ilen = images.length;
-            for(int iter = 0 ; iter < ilen ; iter++) {
-                if(images[iter] != null) {
+            for (int iter = 0; iter < ilen; iter++) {
+                if (images[iter] != null) {
                     images[iter].unlock();
                 }
             }
         }
-    }    
-    
+    }
+
     /**
      * This method is for internal usage only!
      */
     public Object getProperty(String n) {
-        if(n.equals("ThemeColors")) {
-            if(themeColors) {
+        if (n.equals("ThemeColors")) {
+            if (themeColors) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(n.equals("Type")) {
+        if (n.equals("Type")) {
             return new Integer(type);
         }
-        if(n.equals("ColorA")) {
+        if (n.equals("ColorA")) {
             return new Integer(colorA);
         }
-        if(n.equals("ColorB")) {
+        if (n.equals("ColorB")) {
             return new Integer(colorB);
         }
-        if(n.equals("ColorC")) {
+        if (n.equals("ColorC")) {
             return new Integer(colorC);
         }
-        if(n.equals("ColorD")) {
+        if (n.equals("ColorD")) {
             return new Integer(colorD);
         }
-        if(n.equals("ArcWidth")) {
+        if (n.equals("ArcWidth")) {
             return new Integer(arcWidth);
         }
-        if(n.equals("ArcHeight")) {
+        if (n.equals("ArcHeight")) {
             return new Integer(arcHeight);
         }
-        if(n.equals("Images")) {
+        if (n.equals("Images")) {
             return images;
         }
         return null;
     }
-    
 
-    
+
 }

@@ -1,5 +1,5 @@
 package com.codename1.ui.layouts.mig;
-        
+
 /*
  * License (BSD):
  * ==============
@@ -50,68 +50,78 @@ import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.layouts.mig.ComponentWrapper;
-import com.codename1.ui.layouts.mig.ContainerWrapper;
-import com.codename1.ui.layouts.mig.LayoutUtil;
-import com.codename1.ui.layouts.mig.PlatformDefaults;
 import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.table.Table;
 
-import java.util.IdentityHashMap;
-
 /**
+ *
  */
-class CodenameOneMiGComponentWrapper implements ComponentWrapper
-{
-	private static boolean maxSet = false;
+class CodenameOneMiGComponentWrapper implements ComponentWrapper {
+    /**
+     * Property to use in LAF settings and as JComponent client property
+     * to specify the visual padding.
+     * <p>
+     */
+    private static final String VISUAL_PADDING_PROPERTY = com.codename1.ui.layouts.mig.PlatformDefaults.VISUAL_PADDING_PROPERTY;
+    /**
+     * Cache.
+     */
+    //private final static IdentityHashMap<FontMetrics, Point.Float> FM_MAP = new IdentityHashMap<FontMetrics, Point.Float>(4);
+    private final static Font SUBST_FONT = Font.getDefaultFont();
 
-	private static boolean vp = true;
+    /** Debug color for component bounds outline.
+     */
+    //private static final Color DB_COMP_OUTLINE = new Color(0, 0, 200);
+    private static boolean maxSet = false;
+    private static boolean vp = true;
+    private final Component c;
+    private int compType = TYPE_UNSET;
+    private Boolean bl = null;
+    private boolean prefCalled = false;
 
-	/** Debug color for component bounds outline.
-	 */
-	//private static final Color DB_COMP_OUTLINE = new Color(0, 0, 200);
+    public CodenameOneMiGComponentWrapper(Component c) {
+        this.c = c;
+    }
 
-	/** Property to use in LAF settings and as JComponent client property
-	 * to specify the visual padding.
-	 * <p>
-	 */
-	private static final String VISUAL_PADDING_PROPERTY = com.codename1.ui.layouts.mig.PlatformDefaults.VISUAL_PADDING_PROPERTY;
+    /**
+     * @deprecated Java 1.4 is not supported anymore
+     */
+    public static boolean isMaxSizeSetOn1_4() {
+        return maxSet;
+    }
 
-	private final Component c;
-	private int compType = TYPE_UNSET;
-	private Boolean bl = null;
-	private boolean prefCalled = false;
+    /**
+     * @deprecated Java 1.4 is not supported anymore
+     */
+    public static void setMaxSizeSetOn1_4(boolean b) {
+        maxSet = b;
+    }
 
-	public CodenameOneMiGComponentWrapper(Component c)
-	{
-		this.c = c;
-	}
+    public static boolean isVisualPaddingEnabled() {
+        return vp;
+    }
 
-	public final int getBaseline(int width, int height)
-	{
-		int baseLine = c.getBaseline(width < 0 ? c.getWidth() : width, height < 0 ? c.getHeight() : height);
-		if (baseLine != -1) {
-			int[] visPad = getVisualPadding();
-			if (visPad != null)
-				baseLine += (visPad[2] - visPad[0] + 1) / 2;
-		}
-		return baseLine;
-	}
+    public static void setVisualPaddingEnabled(boolean b) {
+        vp = b;
+    }
 
-	public final Object getComponent()
-	{
-		return c;
-	}
+    public final int getBaseline(int width, int height) {
+        int baseLine = c.getBaseline(width < 0 ? c.getWidth() : width, height < 0 ? c.getHeight() : height);
+        if (baseLine != -1) {
+            int[] visPad = getVisualPadding();
+            if (visPad != null)
+                baseLine += (visPad[2] - visPad[0] + 1) / 2;
+        }
+        return baseLine;
+    }
 
-	/** Cache.
-	 */
-	//private final static IdentityHashMap<FontMetrics, Point.Float> FM_MAP = new IdentityHashMap<FontMetrics, Point.Float>(4);
-	private final static Font SUBST_FONT = Font.getDefaultFont();
+    public final Object getComponent() {
+        return c;
+    }
 
-	public final float getPixelUnitFactor(boolean isHor)
-	{
-		switch (PlatformDefaults.getLogicalPixelBase()) {
-			case PlatformDefaults.BASE_FONT_SIZE:
+    public final float getPixelUnitFactor(boolean isHor) {
+        switch (PlatformDefaults.getLogicalPixelBase()) {
+            case PlatformDefaults.BASE_FONT_SIZE:
 				/*Font font = c.getFont();
 				FontMetrics fm = c.getFontMetrics(font != null ? font : SUBST_FONT);
 				Point.Float p = FM_MAP.get(fm);
@@ -121,184 +131,134 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper
 					FM_MAP.put(fm, p);
 				}
 				return isHor ? p.x : p.y;*/
-                            return isHor ? ((float)SUBST_FONT.charWidth('X')) /6f : ((float)SUBST_FONT.getHeight() / 13.27734375f);
+                return isHor ? ((float) SUBST_FONT.charWidth('X')) / 6f : ((float) SUBST_FONT.getHeight() / 13.27734375f);
 
-			case PlatformDefaults.BASE_SCALE_FACTOR:
+            case PlatformDefaults.BASE_SCALE_FACTOR:
 
-				Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();
-				if (s == null)
-					s = new Float(1.0f);
-				return s * (isHor ? getHorizontalScreenDPI() : getVerticalScreenDPI()) / (float) PlatformDefaults.getDefaultDPI();
+                Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();
+                if (s == null)
+                    s = new Float(1.0f);
+                return s * (isHor ? getHorizontalScreenDPI() : getVerticalScreenDPI()) / (float) PlatformDefaults.getDefaultDPI();
 
-			default:
-				return 1f;
-		}
-	}
-
-
-	public final int getX()
-	{
-		return c.getX();
-	}
-
-	public final int getY()
-	{
-		return c.getY();
-	}
-
-	public final int getHeight()
-	{
-		return c.getHeight();
-	}
-
-	public final int getWidth()
-	{
-		return c.getWidth();
-	}
-
-	public final int getScreenLocationX()
-	{
-            return 0;
-	}
-
-	public final int getScreenLocationY()
-	{
-            return 0;
-	}
-
-	public final int getMinimumHeight(int sz)
-	{
-		return c.getPreferredH();
-	}
-
-	public final int getMinimumWidth(int sz)
-	{
-		return c.getPreferredW();
-	}
-	public final int getPreferredHeight(int sz)
-	{
-		return c.getPreferredH();
-	}
-
-	public final int getPreferredWidth(int sz)
-	{
-		return c.getPreferredW();
-	}
-
-	public final int getMaximumHeight(int sz)
-	{
-            Container p = c.getParent();
-            if(p != null) {
-                int w = p.getHeight();
-                if(w > 10) {
-                    return w;
-                }
-            }
-            return Display.getInstance().getDisplayHeight();
-	}
-
-	public final int getMaximumWidth(int sz)
-	{
-            Container p = c.getParent();
-            if(p != null) {
-                int w = p.getWidth();
-                if(w > 10) {
-                    return w;
-                }
-            }
-            return Display.getInstance().getDisplayWidth();
-	}
-
-
-	private boolean isMaxSet(Component c)
-	{
-		return false;
-	}
-
-	public final ContainerWrapper getParent()
-	{
-                Container p = c.getParent();
-		return p != null ? new CodenameOneMiGContainerWrapper(p) : null;
-	}
-
-        public final int getHorizontalScreenDPI() {
-            return PlatformDefaults.getDefaultDPI();
+            default:
+                return 1f;
         }
+    }
 
-	public final int getVerticalScreenDPI()
-	{
-            return PlatformDefaults.getDefaultDPI();
-	}
+    public final int getX() {
+        return c.getX();
+    }
 
-	public final int getScreenWidth()
-	{
-            return Display.getInstance().getDisplayWidth();
-	}
+    public final int getY() {
+        return c.getY();
+    }
 
-	public final int getScreenHeight()
-	{
-            return Display.getInstance().getDisplayHeight();
-	}
+    public final int getHeight() {
+        return c.getHeight();
+    }
 
-	public final boolean hasBaseline()
-	{
-		return true;
-	}
+    public final int getWidth() {
+        return c.getWidth();
+    }
 
-	public final String getLinkId()
-	{
-		return c.getName();
-	}
+    public final int getScreenLocationX() {
+        return 0;
+    }
 
-	public final void setBounds(int x, int y, int width, int height)
-	{
-		c.setX(x);
-		c.setY(y);
-		c.setWidth(width);
-		c.setHeight(height);
-	}
+    public final int getScreenLocationY() {
+        return 0;
+    }
 
-	public boolean isVisible()
-	{
-		return c.isVisible();
-	}
+    public final int getMinimumHeight(int sz) {
+        return c.getPreferredH();
+    }
 
-	public final int[] getVisualPadding()
-	{
-                // TOOD, optimize this
-                        int[] padding = new int[] {c.getStyle().getMarginTop(), c.getStyle().getMarginLeftNoRTL(), 
-                            c.getStyle().getMarginBottom(), c.getStyle().getMarginRightNoRTL()};
-                        return padding;
-	}
+    public final int getMinimumWidth(int sz) {
+        return c.getPreferredW();
+    }
 
-	/**
-	 * @deprecated Java 1.4 is not supported anymore
-	 */
-	public static boolean isMaxSizeSetOn1_4()
-	{
-		return maxSet;
-	}
+    public final int getPreferredHeight(int sz) {
+        return c.getPreferredH();
+    }
 
-	/**
-	 * @deprecated Java 1.4 is not supported anymore
-	 */
-	public static void setMaxSizeSetOn1_4(boolean b)
-	{
-		maxSet = b;
-	}
+    public final int getPreferredWidth(int sz) {
+        return c.getPreferredW();
+    }
 
-	public static boolean isVisualPaddingEnabled()
-	{
-		return vp;
-	}
+    public final int getMaximumHeight(int sz) {
+        Container p = c.getParent();
+        if (p != null) {
+            int w = p.getHeight();
+            if (w > 10) {
+                return w;
+            }
+        }
+        return Display.getInstance().getDisplayHeight();
+    }
 
-	public static void setVisualPaddingEnabled(boolean b)
-	{
-		vp = b;
-	}
+    public final int getMaximumWidth(int sz) {
+        Container p = c.getParent();
+        if (p != null) {
+            int w = p.getWidth();
+            if (w > 10) {
+                return w;
+            }
+        }
+        return Display.getInstance().getDisplayWidth();
+    }
 
-	public final void paintDebugOutline(boolean showVisualPadding)
-	{
+    private boolean isMaxSet(Component c) {
+        return false;
+    }
+
+    public final ContainerWrapper getParent() {
+        Container p = c.getParent();
+        return p != null ? new CodenameOneMiGContainerWrapper(p) : null;
+    }
+
+    public final int getHorizontalScreenDPI() {
+        return PlatformDefaults.getDefaultDPI();
+    }
+
+    public final int getVerticalScreenDPI() {
+        return PlatformDefaults.getDefaultDPI();
+    }
+
+    public final int getScreenWidth() {
+        return Display.getInstance().getDisplayWidth();
+    }
+
+    public final int getScreenHeight() {
+        return Display.getInstance().getDisplayHeight();
+    }
+
+    public final boolean hasBaseline() {
+        return true;
+    }
+
+    public final String getLinkId() {
+        return c.getName();
+    }
+
+    public final void setBounds(int x, int y, int width, int height) {
+        c.setX(x);
+        c.setY(y);
+        c.setWidth(width);
+        c.setHeight(height);
+    }
+
+    public boolean isVisible() {
+        return c.isVisible();
+    }
+
+    public final int[] getVisualPadding() {
+        // TOOD, optimize this
+        int[] padding = new int[]{c.getStyle().getMarginTop(), c.getStyle().getMarginLeftNoRTL(),
+                c.getStyle().getMarginBottom(), c.getStyle().getMarginRightNoRTL()};
+        return padding;
+    }
+
+    public final void paintDebugOutline(boolean showVisualPadding) {
 		/*if (c.isShowing() == false)
 			return;
 
@@ -317,81 +277,75 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper
 				g.drawRect(padding[1], padding[0], (getWidth() - 1) - (padding[1] + padding[3]), (getHeight() - 1) - (padding[0] + padding[2]));
 			}
 		}*/
-	}
+    }
 
-	public int getComponentType(boolean disregardScrollPane)
-	{
-		if (compType == TYPE_UNSET)
-			compType = checkType(disregardScrollPane);
+    public int getComponentType(boolean disregardScrollPane) {
+        if (compType == TYPE_UNSET)
+            compType = checkType(disregardScrollPane);
 
-		return compType;
-	}
+        return compType;
+    }
 
-	public int getLayoutHashCode()
-	{
-		Dimension d = c.getPreferredSize();
-		int hash = (d.getWidth() << 10) + (d.getHeight() << 15);
+    public int getLayoutHashCode() {
+        Dimension d = c.getPreferredSize();
+        int hash = (d.getWidth() << 10) + (d.getHeight() << 15);
 
-		if (c.isVisible())
-			hash += 1324511;
+        if (c.isVisible())
+            hash += 1324511;
 
-		String id = getLinkId();
-		if (id != null)
-			hash += id.hashCode();
+        String id = getLinkId();
+        if (id != null)
+            hash += id.hashCode();
 
-		return hash;
-	}
+        return hash;
+    }
 
-	private int checkType(boolean disregardScrollPane)
-	{
-		Component c = this.c;
+    private int checkType(boolean disregardScrollPane) {
+        Component c = this.c;
 
-		if (c instanceof TextField) {
-			return TYPE_TEXT_FIELD;
-		} else if (c instanceof Label) {
-			return TYPE_LABEL;
-		} else if (c instanceof RadioButton || c instanceof CheckBox) {
-			return TYPE_CHECK_BOX;
-		} else if (c instanceof Button) {
-			return TYPE_BUTTON;
-		} else if (c instanceof ComboBox) {
-			return TYPE_COMBO_BOX;
-		} else if (c instanceof TextArea) {
-			return TYPE_TEXT_AREA;
-		} else if (c instanceof Container) {
-			return TYPE_PANEL;
-		} else if (c instanceof List) {
-			return TYPE_LIST;
-		} else if (c instanceof Table) {
-			return TYPE_TABLE;
-		} else if (c instanceof BaseSpinner) {
-			return TYPE_SPINNER;
-		} else if (c instanceof Tabs) {
-			return TYPE_TABBED_PANE;
-		} else if (c instanceof InfiniteProgress) {
-			return TYPE_PROGRESS_BAR;
-		} else if (c instanceof Slider) {
-			return TYPE_SLIDER;
-		} 
-                return TYPE_UNKNOWN;
-	}
+        if (c instanceof TextField) {
+            return TYPE_TEXT_FIELD;
+        } else if (c instanceof Label) {
+            return TYPE_LABEL;
+        } else if (c instanceof RadioButton || c instanceof CheckBox) {
+            return TYPE_CHECK_BOX;
+        } else if (c instanceof Button) {
+            return TYPE_BUTTON;
+        } else if (c instanceof ComboBox) {
+            return TYPE_COMBO_BOX;
+        } else if (c instanceof TextArea) {
+            return TYPE_TEXT_AREA;
+        } else if (c instanceof Container) {
+            return TYPE_PANEL;
+        } else if (c instanceof List) {
+            return TYPE_LIST;
+        } else if (c instanceof Table) {
+            return TYPE_TABLE;
+        } else if (c instanceof BaseSpinner) {
+            return TYPE_SPINNER;
+        } else if (c instanceof Tabs) {
+            return TYPE_TABBED_PANE;
+        } else if (c instanceof InfiniteProgress) {
+            return TYPE_PROGRESS_BAR;
+        } else if (c instanceof Slider) {
+            return TYPE_SLIDER;
+        }
+        return TYPE_UNKNOWN;
+    }
 
-	public final int hashCode()
-	{
-		return getComponent().hashCode();
-	}
+    public final int hashCode() {
+        return getComponent().hashCode();
+    }
 
-	public final boolean equals(Object o)
-	{
-		if (o instanceof ComponentWrapper == false)
-			return false;
+    public final boolean equals(Object o) {
+        if (o instanceof ComponentWrapper == false)
+            return false;
 
-		return c.equals(((ComponentWrapper) o).getComponent());
-	}
+        return c.equals(((ComponentWrapper) o).getComponent());
+    }
 
-	public int getContentBias()
-	{
-		return c instanceof TextArea || (Boolean.TRUE.equals(((Component)c).getClientProperty("migLayout.dynamicAspectRatio"))) ? LayoutUtil.HORIZONTAL : -1;
-	}
+    public int getContentBias() {
+        return c instanceof TextArea || (Boolean.TRUE.equals(((Component) c).getClientProperty("migLayout.dynamicAspectRatio"))) ? LayoutUtil.HORIZONTAL : -1;
+    }
 }
 

@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui.validation;
@@ -35,9 +35,10 @@ public class NumericConstraint implements Constraint {
 
     /**
      * Creates a new numeric constraint
-     * @param dec whether the number is decimal or integer, true for decimal
-     * @param minimum the minimal value to a number or Double.NaN for no minimum value
-     * @param maximum the maximum value to a number or Double.NaN for no minimum value
+     *
+     * @param dec          whether the number is decimal or integer, true for decimal
+     * @param minimum      the minimal value to a number or Double.NaN for no minimum value
+     * @param maximum      the maximum value to a number or Double.NaN for no minimum value
      * @param errorMessage the default error message if the constraint fails
      */
     public NumericConstraint(boolean dec, double minimum, double maximum, String errorMessage) {
@@ -50,29 +51,30 @@ public class NumericConstraint implements Constraint {
 
     /**
      * Creates a new numeric constraint
+     *
      * @param dec whether the number is decimal or integer, true for decimal
      */
     public NumericConstraint(boolean dec) {
         this(dec, Integer.MIN_VALUE, Integer.MAX_VALUE, null);
     }
-    
+
     /**
      * {@inheritDoc}
      */
     @Override
     public boolean isValid(Object value) {
-        if(value != null) {
+        if (value != null) {
             String s = value.toString();
-            if(!dec) {
+            if (!dec) {
                 try {
                     return checkRange(Integer.parseInt(s));
-                } catch(NumberFormatException e) {
+                } catch (NumberFormatException e) {
                     return false;
                 }
             }
             try {
                 return checkRange(Double.parseDouble(s));
-            } catch(NumberFormatException e) {
+            } catch (NumberFormatException e) {
                 return false;
             }
         }
@@ -80,36 +82,36 @@ public class NumericConstraint implements Constraint {
     }
 
     private boolean checkRange(double v) {
-        if(minimum != Double.NaN) {
-            if(maximum != Double.NaN) {
+        if (minimum != Double.NaN) {
+            if (maximum != Double.NaN) {
                 return v >= minimum && v <= maximum;
             }
             return v >= minimum;
         } else {
-            if(maximum != Double.NaN) {
+            if (maximum != Double.NaN) {
                 return v <= maximum;
             }
-        }        
+        }
         return true;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     @Override
     public String getDefaultFailMessage() {
-        if(errorMessage == null) {
+        if (errorMessage == null) {
             String round = "";
-            if(!dec) {
+            if (!dec) {
                 round = "round ";
-            } 
-            if(minimum != Double.NaN) {
-                if(maximum != Double.NaN) {
+            }
+            if (minimum != Double.NaN) {
+                if (maximum != Double.NaN) {
                     return "The value must be a valid " + round + "number between " + minimum + " and " + maximum;
                 }
-                return "The value must be a valid "  + round + "number larger than " + minimum;
-            }  else {
-                if(maximum != Double.NaN) {
+                return "The value must be a valid " + round + "number larger than " + minimum;
+            } else {
+                if (maximum != Double.NaN) {
                     return "The value must be a valid " + round + "number larger than " + maximum;
                 }
             }

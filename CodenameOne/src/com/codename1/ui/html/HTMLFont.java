@@ -24,6 +24,7 @@
 package com.codename1.ui.html;
 
 import com.codename1.ui.Font;
+
 import java.util.Vector;
 
 /**
@@ -38,6 +39,36 @@ import java.util.Vector;
  */
 class HTMLFont {
 
+    static final int BOLD = 0;
+    static final int ITALIC = 1;
+    static final int BIG = 2;
+    static final int SMALL = 3;
+    private static final char TOKEN = '.';
+    static Vector SPECIAL_FONT_TAGS = new Vector();
+    /**
+     * The following tags are tags that mainly define the style of their content, and one of the things they can change is the font
+     */
+    static private int[] SPECIAL_FONT_TAGS_ID = {
+            HTMLElement.TAG_EM, HTMLElement.TAG_STRONG,
+            HTMLElement.TAG_DFN, HTMLElement.TAG_CODE,
+            HTMLElement.TAG_SAMP, HTMLElement.TAG_KBD,
+            HTMLElement.TAG_VAR, HTMLElement.TAG_CITE,
+            HTMLElement.TAG_H1, HTMLElement.TAG_H2,
+            HTMLElement.TAG_H3, HTMLElement.TAG_H4,
+            HTMLElement.TAG_H5, HTMLElement.TAG_H6,
+            HTMLElement.TAG_TT
+    };
+
+    /**
+     * The static segment sets up the SPECIAL_FONT_TAGS vector with values from the SPECIAL_FONT_TAGS_ID array.
+     * This vector is used for lookup later on.
+     */
+    static {
+        for (int i = 0; i < SPECIAL_FONT_TAGS_ID.length; i++) {
+            SPECIAL_FONT_TAGS.addElement(HTMLElement.TAG_NAMES[SPECIAL_FONT_TAGS_ID[i]]);
+        }
+    }
+
     boolean systemFont;
     Font font;
     String family;
@@ -46,115 +77,81 @@ class HTMLFont {
     boolean bold;
     boolean italic;
     String tagFont;
-    
-    static final int BOLD = 0;
-    static final int ITALIC = 1;
-    static final int BIG = 2;
-    static final int SMALL = 3;
-    
     private HTMLFont[] counterpartFonts = new HTMLFont[4];
 
     /**
-     * The following tags are tags that mainly define the style of their content, and one of the things they can change is the font
-     * 
-     */
-    static private int[] SPECIAL_FONT_TAGS_ID = {
-        HTMLElement.TAG_EM,    HTMLElement.TAG_STRONG,
-        HTMLElement.TAG_DFN, HTMLElement.TAG_CODE,
-        HTMLElement.TAG_SAMP, HTMLElement.TAG_KBD,
-        HTMLElement.TAG_VAR, HTMLElement.TAG_CITE,
-        HTMLElement.TAG_H1, HTMLElement.TAG_H2,
-        HTMLElement.TAG_H3, HTMLElement.TAG_H4,
-        HTMLElement.TAG_H5, HTMLElement.TAG_H6,
-        HTMLElement.TAG_TT
-    };
-
-    private static final char TOKEN = '.';
-    static Vector SPECIAL_FONT_TAGS = new Vector();
-
-    /**
-     * The static segment sets up the SPECIAL_FONT_TAGS vector with values from the SPECIAL_FONT_TAGS_ID array.
-     * This vector is used for lookup later on.
-     */
-    static {
-        for(int i=0;i<SPECIAL_FONT_TAGS_ID.length;i++) {
-            SPECIAL_FONT_TAGS.addElement(HTMLElement.TAG_NAMES[SPECIAL_FONT_TAGS_ID[i]]);
-        }
-    }
-
-    /**
-     * Constructs the HTMLFont 
-     * 
+     * Constructs the HTMLFont
+     *
      * @param fontKey The key for this font (See class definition)
-     * @param font The actual Codename One font object (Can be either system or bitmap font)
+     * @param font    The actual Codename One font object (Can be either system or bitmap font)
      */
-    HTMLFont(String fontKey,Font font) {
-        this.font=font;
-        systemFont=(font.getCharset()==null); // A systemfont has no "supported" charset
+    HTMLFont(String fontKey, Font font) {
+        this.font = font;
+        systemFont = (font.getCharset() == null); // A systemfont has no "supported" charset
 
         if (isSystemFont()) {
-            bold=((font.getStyle() & Font.STYLE_BOLD)!=0);
-            italic=((font.getStyle() & Font.STYLE_ITALIC)!=0);
-            size=font.getSize();
-            if (font.getFace()==Font.FACE_SYSTEM) {
-                family="system";
-            } else if (font.getFace()==Font.FACE_MONOSPACE) {
-                family="monospace";
-            } else if (font.getFace()==Font.FACE_PROPORTIONAL) {
-                family="proportional";
+            bold = ((font.getStyle() & Font.STYLE_BOLD) != 0);
+            italic = ((font.getStyle() & Font.STYLE_ITALIC) != 0);
+            size = font.getSize();
+            if (font.getFace() == Font.FACE_SYSTEM) {
+                family = "system";
+            } else if (font.getFace() == Font.FACE_MONOSPACE) {
+                family = "monospace";
+            } else if (font.getFace() == Font.FACE_PROPORTIONAL) {
+                family = "proportional";
             }
         } else { //bitmap font
-            if (fontKey!=null) { //fontKey can be null in the case this is a default font (Though even then it is recommended to provide a font key so the engine can use this font in other cases)
-                boolean sufficientInfo=false;
-                int lastIndex=0;
+            if (fontKey != null) { //fontKey can be null in the case this is a default font (Though even then it is recommended to provide a font key so the engine can use this font in other cases)
+                boolean sufficientInfo = false;
+                int lastIndex = 0;
                 if (!fontKey.endsWith(".")) {
-                    fontKey+='.';
+                    fontKey += '.';
                 }
-                int index=fontKey.indexOf(TOKEN);
-                while(index!=-1) {
-                    String str=fontKey.substring(lastIndex, index);
+                int index = fontKey.indexOf(TOKEN);
+                while (index != -1) {
+                    String str = fontKey.substring(lastIndex, index);
                     try {
-                        int num=Integer.parseInt(str);
-                        size=num;
+                        int num = Integer.parseInt(str);
+                        size = num;
                     } catch (NumberFormatException nfe) {
                         if (str.equalsIgnoreCase("bold")) {
-                           bold=true;
-                         } else if (str.equalsIgnoreCase("italic")) {
-                            italic=true;
+                            bold = true;
+                        } else if (str.equalsIgnoreCase("italic")) {
+                            italic = true;
                         } else if (str.equalsIgnoreCase("plain")) {
                             // do nothing, but don't save as a family
                         } else if (SPECIAL_FONT_TAGS.contains(str)) {
                             HTMLComponent.fonts.put(str, this);
-                            sufficientInfo=true;
+                            sufficientInfo = true;
                         } else {
-                            family=str.toLowerCase();
-                            sufficientInfo=true;
+                            family = str.toLowerCase();
+                            sufficientInfo = true;
                         }
 
                     }
-                    lastIndex=index+1;
-                    index=fontKey.indexOf(TOKEN,lastIndex);
+                    lastIndex = index + 1;
+                    index = fontKey.indexOf(TOKEN, lastIndex);
                 }
                 if (!sufficientInfo) {
-                    System.out.println("WARNING: Font was added with key '"+fontKey+"' which doesn't contain info on the font's family or attributes it to a special tag. The font will probably be unusable by the font engine.");
+                    System.out.println("WARNING: Font was added with key '" + fontKey + "' which doesn't contain info on the font's family or attributes it to a special tag. The font will probably be unusable by the font engine.");
                 }
             }
         }
 
         if (bold) {
-            style+=Font.STYLE_BOLD;
-            counterpartFonts[BOLD]=this;
+            style += Font.STYLE_BOLD;
+            counterpartFonts[BOLD] = this;
         }
         if (italic) {
-            style+=Font.STYLE_ITALIC;
-            counterpartFonts[ITALIC]=this;
+            style += Font.STYLE_ITALIC;
+            counterpartFonts[ITALIC] = this;
         }
 
         if (isSystemFont()) {
-            if (size==Font.SIZE_LARGE) {
-                counterpartFonts[BIG]=this;
-            } else if (size==Font.SIZE_SMALL) {
-                counterpartFonts[SMALL]=this;
+            if (size == Font.SIZE_LARGE) {
+                counterpartFonts[BIG] = this;
+            } else if (size == Font.SIZE_SMALL) {
+                counterpartFonts[SMALL] = this;
             }
         }
 
@@ -180,7 +177,7 @@ class HTMLFont {
 
     /**
      * Checks if this is an Italic font
-     * 
+     *
      * @return true if the font is italic, false otherwise
      */
     boolean isItalic() {
@@ -189,17 +186,21 @@ class HTMLFont {
 
     /**
      * Checks if the given font is the counterpart of the current form in the sense of the given attribute
-     * 
+     *
      * @param attribute The attribute, can be one of BOLD, ITALIC, BIG or SMALL
-     * @param font The font to check
+     * @param font      The font to check
      * @return true if the font is a counterpart, false otherwise
      */
-    boolean isCounterpart(int attribute,HTMLFont font) {
-        switch(attribute) {
-            case BOLD: return isBoldCounterpart(font);
-            case ITALIC: return isItalicCounterpart(font);
-            case BIG: return isBigCounterpart(font);
-            case SMALL: return isSmallCounterpart(font);
+    boolean isCounterpart(int attribute, HTMLFont font) {
+        switch (attribute) {
+            case BOLD:
+                return isBoldCounterpart(font);
+            case ITALIC:
+                return isItalicCounterpart(font);
+            case BIG:
+                return isBigCounterpart(font);
+            case SMALL:
+                return isSmallCounterpart(font);
             default:
                 return false;
         }
@@ -207,26 +208,26 @@ class HTMLFont {
 
     /**
      * Utility method that first checks that neither font family is null and then compares them
-     * 
+     *
      * @param font The other font to check
      * @return true if the family of the compared font and this font are identical (and both are not null), false otherwise
      */
     boolean isSameFamily(HTMLFont font) {
-        return ((family!=null) && (font.getFamily()!=null) && (family.equals(font.getFamily())));
+        return ((family != null) && (font.getFamily() != null) && (family.equals(font.getFamily())));
     }
 
 
     /**
      * Checks if the specified font is a big counterpart of this font.
-     * 
+     *
      * @param font The font to check
      * @return true if this is a big couterpart, false otherwise
      */
     private boolean isBigCounterpart(HTMLFont font) {
-        if (size<=font.getSize()) {
+        if (size <= font.getSize()) {
             return false;
         }
-        return  (isSameFamily(font) && (style==font.getStyle()));
+        return (isSameFamily(font) && (style == font.getStyle()));
     }
 
     /**
@@ -236,10 +237,10 @@ class HTMLFont {
      * @return true if this is a small couterpart, false otherwise
      */
     private boolean isSmallCounterpart(HTMLFont font) {
-        if (size>=font.getSize()) {
+        if (size >= font.getSize()) {
             return false;
         }
-        return  (isSameFamily(font) && (style==font.getStyle()));
+        return (isSameFamily(font) && (style == font.getStyle()));
     }
 
     /**
@@ -253,7 +254,7 @@ class HTMLFont {
         if (!bold) {
             return false;
         }
-        return  ((size==font.getSize()) && (isSameFamily(font)) && (italic==font.isItalic()));
+        return ((size == font.getSize()) && (isSameFamily(font)) && (italic == font.isItalic()));
     }
 
     /**
@@ -266,13 +267,13 @@ class HTMLFont {
         if (!italic) {
             return false;
         }
-        return  ((size==font.getSize()) && (isSameFamily(font)) && (bold==font.isBold()));
+        return ((size == font.getSize()) && (isSameFamily(font)) && (bold == font.isBold()));
     }
 
 
     /**
      * Returns the font family (i.e. Arial, Times New Roman)
-     * 
+     *
      * @return the string describing this font family
      */
     String getFamily() {
@@ -281,7 +282,7 @@ class HTMLFont {
 
     /**
      * Returns the Codename One font wrapped in this HTMLFont
-     * 
+     *
      * @return the Codename One font wrapped in this HTMLFont
      */
     Font getFont() {
@@ -297,23 +298,23 @@ class HTMLFont {
      * @return the counterpart font for this font in the given attribute
      */
     HTMLFont getCounterpartFont(int attribute) {
-        if ((systemFont) && (counterpartFonts[attribute]==null)) { //Note that bold counterpart for a bold font is already set as the font itself in the constructor and so on for all attributes
-            switch(attribute) {
+        if ((systemFont) && (counterpartFonts[attribute] == null)) { //Note that bold counterpart for a bold font is already set as the font itself in the constructor and so on for all attributes
+            switch (attribute) {
                 case BOLD:
-                    counterpartFonts[attribute]=new HTMLFont(null, Font.createSystemFont(font.getFace(), style+Font.STYLE_BOLD, size));
+                    counterpartFonts[attribute] = new HTMLFont(null, Font.createSystemFont(font.getFace(), style + Font.STYLE_BOLD, size));
                     break;
                 case ITALIC:
-                    counterpartFonts[attribute]=new HTMLFont(null, Font.createSystemFont(font.getFace(), style+Font.STYLE_ITALIC, size));
+                    counterpartFonts[attribute] = new HTMLFont(null, Font.createSystemFont(font.getFace(), style + Font.STYLE_ITALIC, size));
                     break;
                 case BIG:
                     //If current form's size is medium then the big counterpart is large, if it's small then medium
-                    int counterpartSize=(size==Font.SIZE_SMALL)?Font.SIZE_MEDIUM:Font.SIZE_LARGE;
-                    counterpartFonts[attribute]=new HTMLFont(null, Font.createSystemFont(font.getFace(), style, counterpartSize));
+                    int counterpartSize = (size == Font.SIZE_SMALL) ? Font.SIZE_MEDIUM : Font.SIZE_LARGE;
+                    counterpartFonts[attribute] = new HTMLFont(null, Font.createSystemFont(font.getFace(), style, counterpartSize));
                     break;
                 case SMALL:
                     //If current form's size is medium then the small counterpart is small, if it's large then medium
-                    counterpartSize=(size==Font.SIZE_LARGE)?Font.SIZE_MEDIUM:Font.SIZE_SMALL;
-                    counterpartFonts[attribute]=new HTMLFont(null, Font.createSystemFont(font.getFace(), style, counterpartSize));
+                    counterpartSize = (size == Font.SIZE_LARGE) ? Font.SIZE_MEDIUM : Font.SIZE_SMALL;
+                    counterpartFonts[attribute] = new HTMLFont(null, Font.createSystemFont(font.getFace(), style, counterpartSize));
                     break;
             }
         }
@@ -323,13 +324,12 @@ class HTMLFont {
     /**
      * Sets the specified font as the counterpart of this font in the given attribute
      *
-     * @param attribute The attribute in which the specified font is the counterpart of this font.
+     * @param attribute       The attribute in which the specified font is the counterpart of this font.
      * @param counterpartFont The counter part font
      */
-    void setCounterpartFont(int attribute,HTMLFont counterpartFont) {
-        counterpartFonts[attribute]=counterpartFont;
+    void setCounterpartFont(int attribute, HTMLFont counterpartFont) {
+        counterpartFonts[attribute] = counterpartFont;
     }
-
 
 
     // font "interface" methods
@@ -364,7 +364,7 @@ class HTMLFont {
 
     /**
      * Returns the style of the font
-     * 
+     *
      * @return STYLE_PLAIN, STYLE_BOLD or STYLE_ITALIC or STYLE_BOLD | STYLE_ITALIC
      */
     int getStyle() {
@@ -374,7 +374,7 @@ class HTMLFont {
     /**
      * Returns the font size. For system fonts this would be either SIZE_SMALL, SIZE_MEDIUM or SIZE_LARGE.
      * For bitmap font this would be the exact size as defined in the font key.
-     * 
+     *
      * @return the font size
      */
     int getSize() {
@@ -388,7 +388,7 @@ class HTMLFont {
      */
     int getSizeInPixels() {
         if (systemFont) {
-            return font.getHeight()-2; //estimation - usually a font's hright is bigger in a few pixels than the size
+            return font.getHeight() - 2; //estimation - usually a font's hright is bigger in a few pixels than the size
         } else {
             return size;
         }

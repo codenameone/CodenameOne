@@ -28,14 +28,13 @@ package com.codename1.util.regex;
  * @author <a href="mailto:gholam@xtra.co.nz>Michael McCallum</a>
  * @version $Id: RESyntaxException.java 518156 2007-03-14 14:31:26Z vgritsenko $
  */
-public class RESyntaxException extends RuntimeException
-{
+public class RESyntaxException extends RuntimeException {
     /**
      * Constructor.
+     *
      * @param s Further description of the syntax error
      */
-    public RESyntaxException(String s)
-    {
+    public RESyntaxException(String s) {
         super("Syntax error: " + s);
     }
 }

@@ -23,30 +23,33 @@ package com.codename1.util;
  */
 class TConversion {
 
-    /** Just to denote that this class can't be instantiated */
-    private TConversion() {}
-
     /**
      * Holds the maximal exponent for each radix, so that radix<sup>digitFitInInt[radix]</sup>
      * fit in an {@code int} (32 bits).
      */
-    static final int[] digitFitInInt = { -1, -1, 31, 19, 15, 13, 11, 11, 10, 9, 9, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7,
-            7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5 };
-
+    static final int[] digitFitInInt = {-1, -1, 31, 19, 15, 13, 11, 11, 10, 9, 9, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7,
+            7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5};
     /**
      * bigRadices values are precomputed maximal powers of radices (integer
      * numbers from 2 to 36) that fit into unsigned int (32 bits). bigRadices[0] =
      * 2 ^ 31, bigRadices[8] = 10 ^ 9, etc.
      */
 
-    static final int bigRadices[] = { -2147483648, 1162261467, 1073741824, 1220703125, 362797056, 1977326743,
+    static final int bigRadices[] = {-2147483648, 1162261467, 1073741824, 1220703125, 362797056, 1977326743,
             1073741824, 387420489, 1000000000, 214358881, 429981696, 815730721, 1475789056, 170859375, 268435456,
             410338673, 612220032, 893871739, 1280000000, 1801088541, 113379904, 148035889, 191102976, 244140625,
             308915776, 387420489, 481890304, 594823321, 729000000, 887503681, 1073741824, 1291467969, 1544804416,
-            1838265625, 60466176 };
+            1838265625, 60466176};
 
+    /**
+     * Just to denote that this class can't be instantiated
+     */
+    private TConversion() {
+    }
 
-    /** @see TBigInteger#toString(int) */
+    /**
+     * @see TBigInteger#toString(int)
+     */
     static String bigInteger2String(TBigInteger val, int radix) {
         int sign = val.sign;
         int numberLength = val.numberLength;
@@ -63,7 +66,7 @@ class TConversion {
             }
             return Long.toString(v, radix);
         }
-        if (radix == 10 || radix < Character.MIN_RADIX  || radix > Character.MAX_RADIX) {
+        if (radix == 10 || radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
             return val.toString();
         }
         double bitsForRadixDigit;
@@ -193,7 +196,8 @@ class TConversion {
             int temp[] = new int[numberLength];
             int tempLen = numberLength;
             System.arraycopy(digits, 0, temp, 0, tempLen);
-            BIG_LOOP: while (true) {
+            BIG_LOOP:
+            while (true) {
                 // divide the array of digits by bigRadix and convert
                 // remainders
                 // to characters collecting them in the char array
@@ -284,21 +288,28 @@ class TConversion {
         int currentChar;
         char result[];
         boolean negNumber = value < 0;
-        if(negNumber) {
+        if (negNumber) {
             value = -value;
         }
         if (value == 0) {
             switch (scale) {
-                case 0: return "0";
-                case 1: return "0.0";
-                case 2: return "0.00";
-                case 3: return "0.000";
-                case 4: return "0.0000";
-                case 5: return "0.00000";
-                case 6: return "0.000000";
+                case 0:
+                    return "0";
+                case 1:
+                    return "0.0";
+                case 2:
+                    return "0.00";
+                case 3:
+                    return "0.000";
+                case 4:
+                    return "0.0000";
+                case 5:
+                    return "0.00000";
+                case 6:
+                    return "0.000000";
                 default:
                     StringBuilder result1 = new StringBuilder();
-                    if (scale  < 0) {
+                    if (scale < 0) {
                         result1.append("0E+");
                     } else {
                         result1.append("0E");
@@ -313,7 +324,7 @@ class TConversion {
         // +1 - one char for sign if needed.
         // +7 - For "special case 2" (see below) we have 7 free chars for
         //  inserting necessary scaled digits.
-        result = new char[resLengthInChars+1];
+        result = new char[resLengthInChars + 1];
         //  Allocated [resLengthInChars+1] characters.
         // a free latest character may be used for "special case 1" (see below)
         currentChar = resLengthInChars;
@@ -324,7 +335,7 @@ class TConversion {
             result[--currentChar] = (char) (0x0030 + (prev - v * 10));
         } while (v != 0);
 
-        long exponent = (long)resLengthInChars - (long)currentChar - scale - 1L;
+        long exponent = (long) resLengthInChars - (long) currentChar - scale - 1L;
         if (scale == 0) {
             if (negNumber) {
                 result[--currentChar] = '-';
@@ -334,8 +345,8 @@ class TConversion {
         if (scale > 0 && exponent >= -6) {
             if (exponent >= 0) {
                 // special case 1
-                int insertPoint = currentChar + (int)exponent;
-                for(int j = resLengthInChars - 1; j >= insertPoint; j--) {
+                int insertPoint = currentChar + (int) exponent;
+                for (int j = resLengthInChars - 1; j >= insertPoint; j--) {
                     result[j + 1] = result[j];
                 }
                 result[++insertPoint] = '.';
@@ -364,7 +375,7 @@ class TConversion {
         if (endPoint - startPoint >= 1) {
             result1.append(result[currentChar]);
             result1.append('.');
-            result1.append(result, currentChar+1, resLengthInChars - currentChar-1);
+            result1.append(result, currentChar + 1, resLengthInChars - currentChar - 1);
         } else {
             result1.append(result, currentChar, resLengthInChars - currentChar);
         }
@@ -399,7 +410,9 @@ class TConversion {
         return (rem << 32) | (quot & 0xFFFFFFFFL);
     }
 
-    /** @see TBigInteger#doubleValue() */
+    /**
+     * @see TBigInteger#doubleValue()
+     */
     static double bigInteger2Double(TBigInteger val) {
         // val.bitLength() < 64
         if ((val.numberLength < 2) || ((val.numberLength == 2) && (val.digits[1] > 0))) {

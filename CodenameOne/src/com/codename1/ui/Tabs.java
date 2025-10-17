@@ -59,24 +59,22 @@ import com.codename1.ui.util.EventDispatcher;
  * <p>A simple {@code Tabs} sample looks a bit like this:</p>
  * <script src="https://gist.github.com/codenameone/ba27124a0a25e685b123.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-tabs.png" alt="Simple usage of Tabs" />
- * 
+ * <p>
  * The <code>Tabs</code> allows swiping on the X-axis (by default) but also on the Y-axis (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):
  * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
- * 
- * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the 
+ *
+ * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the
  * form and swiping is used to move between pages:</p>
  * <script src="https://gist.github.com/codenameone/e981c3f91f98f1515987.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe1.png" alt="Tabs carousel page 1" />
  * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe2.png" alt="Tabs carousel page 2" />
- * 
  *
  * @author Chen Fishbein
- *
  */
 public class Tabs extends Container {
     private Container contentPane = new Container(new TabsLayout());
     private boolean eagerSwipeMode;
-    
+
     /**
      * Where the tabs are placed.
      */
@@ -86,7 +84,7 @@ public class Tabs extends Container {
     private Component selectedTab;
     private boolean swipeActivated = true;
     private boolean swipeOnXAxis = true;
-    
+
     private ActionListener press, drag, release;
     private Motion slideToDestMotion;
     private int initialX = -1;
@@ -96,7 +94,7 @@ public class Tabs extends Container {
     private boolean dragStarted = false;
     private int activeComponent = 0;
     private int active = 0;
-    
+
     private EventDispatcher focusListeners;
     private EventDispatcher selectionListener;
     private TabFocusListener focusListener;
@@ -109,7 +107,12 @@ public class Tabs extends Container {
     private Style originalTabsContainerUnselected, originalTabsContainerSelected;
     private String tabUIID = "Tab";
     private boolean animateTabSelection = true;
-    
+    // A flag that is used internally to temporarily override the output of the
+    // shouldBlockSideSwipe method, so that we don't block our own side swipes.
+    private boolean doNotBlockSideSwipe;
+    private boolean blockSwipe;
+    private boolean riskySwipe;
+
     /**
      * Creates an empty <code>TabbedPane</code> with a default
      * tab placement of <code>Component.TOP</code>.
@@ -117,6 +120,7 @@ public class Tabs extends Container {
     public Tabs() {
         this(-1);
     }
+
 
     /**
      * Creates an empty <code>TabbedPane</code> with the specified tab placement
@@ -135,30 +139,26 @@ public class Tabs extends Container {
         tabsContainer.setUIID("TabsContainer");
         tabsContainer.setScrollVisible(false);
         tabsContainer.getStyle().setMargin(0, 0, 0, 0);
-        if(tabP == -1){
+        if (tabP == -1) {
             setTabPlacement(tabPlacement);
-        }else{
+        } else {
             setTabPlacement(tabP);
         }
         press = new SwipeListener(SwipeListener.PRESS);
         drag = new SwipeListener(SwipeListener.DRAG);
         release = new SwipeListener(SwipeListener.RELEASE);
         setUIID("Tabs");
-        BorderLayout bd = (BorderLayout)super.getLayout();
-        if(bd != null) {
-            if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
+        BorderLayout bd = (BorderLayout) super.getLayout();
+        if (bd != null) {
+            if (UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);
             } else {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
         }
-        
+
     }
 
-    // A flag that is used internally to temporarily override the output of the
-    // shouldBlockSideSwipe method, so that we don't block our own side swipes.
-    private boolean doNotBlockSideSwipe;
-    
     @Override
     protected boolean shouldBlockSideSwipe() {
         if (doNotBlockSideSwipe) {
@@ -166,21 +166,20 @@ public class Tabs extends Container {
         }
         return isSwipeActivated();
     }
-    
-    
+
     private void checkTabsCanBeSeen() {
-        if(UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
-            for(int iter = 0 ; iter < getTabCount() ; iter++) {
+        if (UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
+            for (int iter = 0; iter < getTabCount(); iter++) {
                 Component c = getTabComponentAt(iter);
-                if(c.isScrollableY()) {
-                    if(c.getStyle().getPaddingBottom() < tabsContainer.getPreferredH()) {
+                if (c.isScrollableY()) {
+                    if (c.getStyle().getPaddingBottom() < tabsContainer.getPreferredH()) {
                         c.getStyle().setPadding(BOTTOM, tabsContainer.getPreferredH());
                     }
                 }
             }
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -190,10 +189,10 @@ public class Tabs extends Container {
         tabsFillRows = manager.isThemeConstant("tabsFillRowsBool", false);
         tabsGridLayout = manager.isThemeConstant("tabsGridBool", false);
         changeTabOnFocus = manager.isThemeConstant("changeTabOnFocusBool", false);
-        BorderLayout bd = (BorderLayout)super.getLayout();
-        if(bd != null) {
-            if(manager.isThemeConstant("tabsOnTopBool", false)) {
-                if(bd.getCenterBehavior() != BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW) {
+        BorderLayout bd = (BorderLayout) super.getLayout();
+        if (bd != null) {
+            if (manager.isThemeConstant("tabsOnTopBool", false)) {
+                if (bd.getCenterBehavior() != BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW) {
                     bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);
                     checkTabsCanBeSeen();
                 }
@@ -201,23 +200,23 @@ public class Tabs extends Container {
                 bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             }
         }
-        changeTabContainerStyleOnFocus =  manager.isThemeConstant("changeTabContainerStyleOnFocusBool", false);
-        if(tabPlace != -1){
+        changeTabContainerStyleOnFocus = manager.isThemeConstant("changeTabContainerStyleOnFocusBool", false);
+        if (tabPlace != -1) {
             tabPlacement = tabPlace;
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
         Form frm = getComponentForm();
-        if(frm != null) {
+        if (frm != null) {
             frm.registerAnimatedInternal(this);
-            if(changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
+            if (changeTabContainerStyleOnFocus && Display.getInstance().shouldRenderSelection()) {
                 Component f = getComponentForm().getFocused();
-                if(f != null && f.getParent() == tabsContainer) {
+                if (f != null && f.getParent() == tabsContainer) {
                     initTabsContainerStyle();
                     tabsContainer.setUnselectedStyle(originalTabsContainerSelected);
                     tabsContainer.repaint();
@@ -298,7 +297,7 @@ public class Tabs extends Container {
                 }
             }
             if (slideToDestMotion.isFinished()) {
-                for (int i = 0; i < contentPane.getComponentCount() ; i++) {
+                for (int i = 0; i < contentPane.getComponentCount(); i++) {
                     Component component = contentPane.getComponentAt(i);
                     component.paintLockRelease();
                 }
@@ -322,6 +321,30 @@ public class Tabs extends Container {
     }
 
     /**
+     * Invokes set text position on the given tab, the tab should be a toggle button radio by default but
+     * can be anything
+     *
+     * @param tabComponent the component representing the tab
+     * @param textPosition the text position
+     */
+    protected void setTextPosition(Component tabComponent, int textPosition) {
+        ((Button) tabComponent).setTextPosition(textPosition);
+    }
+
+    /**
+     * Returns The position of the text relative to the icon
+     *
+     * @return The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
+     * @see #LEFT
+     * @see #RIGHT
+     * @see #BOTTOM
+     * @see #TOP
+     */
+    public int getTabTextPosition() {
+        return textPosition;
+    }
+
+    /**
      * Sets the position of the text relative to the icon if exists
      *
      * @param textPosition alignment value (LEFT, RIGHT, BOTTOM or TOP)
@@ -335,33 +358,593 @@ public class Tabs extends Container {
             throw new IllegalArgumentException("Text position can't be set to " + textPosition);
         }
         this.textPosition = textPosition;
-        for(int iter = 0 ; iter < getTabCount() ; iter++) {
+        for (int iter = 0; iter < getTabCount(); iter++) {
             setTextPosition(tabsContainer.getComponentAt(iter), textPosition);
         }
     }
 
     /**
-     * Invokes set text position on the given tab, the tab should be a toggle button radio by default but
-     * can be anything
-     * @param tabComponent the component representing the tab
-     * @param textPosition  the text position
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      the icon to be displayed in this tab
+     * @param component the component to be displayed when this tab is clicked
+     * @see #insertTab
+     * @see #removeTabAt
      */
-    protected void setTextPosition(Component tabComponent, int textPosition) {
-        ((Button)tabComponent).setTextPosition(textPosition);
+    public void addTab(String title, Image icon, Component component) {
+        insertTab(title, icon, component, tabsContainer.getComponentCount());
     }
-    
 
     /**
-     * Returns The position of the text relative to the icon
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
      *
-     * @return The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
-     * @see #LEFT
-     * @see #RIGHT
-     * @see #BOTTOM
-     * @see #TOP
+     * @param title       the title to be displayed in this tab
+     * @param icon        the icon to be displayed in this tab
+     * @param pressedIcon the icon shown when the tab is selected
+     * @param component   the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     * @see #insertTab
+     * @see #removeTabAt
      */
-    public int getTabTextPosition(){
-        return textPosition;
+    public Tabs addTab(String title, Image icon, Image pressedIcon, Component component) {
+        int index = tabsContainer.getComponentCount();
+        insertTab(title, icon, component, index);
+        setTabSelectedIcon(index, pressedIcon);
+        return this;
+    }
+
+    /**
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title        the title to be displayed in this tab
+     * @param materialIcon one of the material design icon constants from {@link com.codename1.ui.FontImage}
+     * @param iconSize     icon size in millimeters
+     * @param component    the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
+        insertTab(title, materialIcon, FontImage.getMaterialDesignFont(), iconSize, component,
+                tabsContainer.getComponentCount());
+        return this;
+    }
+
+    /**
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      an icon from the font
+     * @param font      the font for the icon
+     * @param iconSize  icon size in millimeters
+     * @param component the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, char icon, Font font, float iconSize, Component component) {
+        int index = tabsContainer.getComponentCount();
+        insertTab(title, icon, font, iconSize, component, index);
+        return this;
+    }
+
+    /**
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and no <code>icon</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param component the component to be displayed when this tab is clicked
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public void addTab(String title, Component component) {
+        insertTab(title, null, component, tabsContainer.getComponentCount());
+    }
+
+    /**
+     * Adds a <code>component</code>
+     * represented by a <code>button</code>.
+     * Cover method for <code>insertTab</code>.
+     * The Button styling will be associated with "Tab" UIID.
+     *
+     * @param tab       represents the tab on top
+     * @param component the component to be displayed when this tab is clicked
+     * @see #insertTab
+     * @see #removeTabAt
+     * @deprecated should use radio button as an argument
+     */
+    public void addTab(Button tab, Component component) {
+        insertTab(tab, component, tabsContainer.getComponentCount());
+    }
+
+    private Component createTabImpl(RadioButton b) {
+        radioGroup.add(b);
+        b.setToggle(true);
+        b.setTextPosition(BOTTOM);
+        if (radioGroup.getButtonCount() == 1) {
+            b.setSelected(true);
+        }
+        if (textPosition != -1) {
+            b.setTextPosition(textPosition);
+        }
+
+        if (b.getIcon() == null && !getUIManager().isThemeConstant("TabEnableAutoImageBool", true)) {
+            Image d = getUIManager().getThemeImageConstant("TabUnselectedImage");
+            if (d != null) {
+                b.setIcon(d);
+                d = getUIManager().getThemeImageConstant("TabSelectedImage");
+                if (d != null) {
+                    b.setRolloverIcon(d);
+                    b.setPressedIcon(d);
+                }
+            }
+        }
+        return b;
+    }
+
+    /**
+     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
+     *
+     * @param title the title of the tab
+     * @param icon  an icon from the font
+     * @param font  the font for the icon
+     * @return component instance
+     */
+    protected Component createTab(String title, Font font, char icon, float size) {
+        RadioButton b = new RadioButton(title != null ? title : "");
+        FontImage.setIcon(b, font, icon, size);
+        createTabImpl(b);
+        return b;
+    }
+
+    /**
+     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
+     *
+     * @param title the title of the tab
+     * @param icon  the icon of the tab
+     * @return component instance
+     */
+    protected Component createTab(String title, Image icon) {
+        RadioButton b = new RadioButton(title != null ? title : "", icon);
+        createTabImpl(b);
+        return b;
+    }
+
+    /**
+     * Inserts a <code>component</code>, at <code>index</code>,
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which may be <code>null</code>.
+     * Uses java.util.Vector internally, see <code>insertElementAt</code>
+     * for details of insertion conventions.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      the icon to be displayed in this tab
+     * @param component The component to be displayed when this tab is clicked.
+     * @param index     the position to insert this new tab
+     * @see #addTab
+     * @see #removeTabAt
+     */
+    public void insertTab(String title, Image icon, Component component,
+                          int index) {
+        Component b = createTab(title != null ? title : "", icon);
+        insertTab(b, component, index);
+    }
+
+    /**
+     * Inserts a <code>component</code>, at <code>index</code>,
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which may be <code>null</code>.
+     * Uses java.util.Vector internally, see <code>insertElementAt</code>
+     * for details of insertion conventions.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      an icon from the font
+     * @param font      the font for the icon
+     * @param component The component to be displayed when this tab is clicked.
+     * @param index     the position to insert this new tab
+     * @see #addTab
+     * @see #removeTabAt
+     */
+    public void insertTab(String title, char icon, Font font, float iconSize, Component component,
+                          int index) {
+        Component b = createTab(title != null ? title : "", font, icon, iconSize);
+        insertTab(b, component, index);
+    }
+
+    /**
+     * Inserts a <code>component</code>, at <code>index</code>,
+     * represented by a <code>button</code>
+     * Uses java.util.Vector internally, see <code>insertElementAt</code>
+     * for details of insertion conventions.
+     * The Button styling will be associated with "Tab" UIID.
+     *
+     * @param tab       represents the tab on top
+     * @param component The component to be displayed when this tab is clicked.
+     * @param index     the position to insert this new tab
+     * @see #addTab
+     * @see #removeTabAt
+     * @deprecated should use radio button as an argument
+     */
+    public void insertTab(Component tab, Component component,
+                          int index) {
+        checkIndex(index);
+        if (component == null) {
+            return;
+        }
+        final Component b = tab;
+        if (tabUIID != null) {
+            b.setUIID(tabUIID);
+        }
+
+        b.addFocusListener(focusListener);
+
+        bindTabActionListener(b, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+
+                if (selectedTab != null) {
+                    if (tabUIID != null) {
+                        selectedTab.setUIID(tabUIID);
+                    }
+                    if (!animateTabSelection) {
+                        selectedTab.setShouldCalcPreferredSize(true);
+                        selectedTab.repaint();
+                    }
+                    int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);
+
+                    // this might happen if a tab was removed
+                    if (previousSelectedIndex != -1) {
+                        Component previousContent = contentPane.getComponentAt(previousSelectedIndex);
+                        if (previousContent instanceof Container) {
+                            ((Container) previousContent).setBlockFocus(true);
+                        }
+                    }
+                }
+                if (active != tabsContainer.getComponentIndex(b)) {
+                    active = tabsContainer.getComponentIndex(b);
+                    Component content = contentPane.getComponentAt(active);
+                    if (content instanceof Container) {
+                        ((Container) content).setBlockFocus(false);
+                    }
+                    setSelectedIndex(active, animateTabSelection);
+                    initTabsFocus();
+                    selectedTab = b;
+                    if (!animateTabSelection) {
+                        selectedTab.setShouldCalcPreferredSize(true);
+                        tabsContainer.revalidateLater();
+                    }
+                    tabsContainer.scrollComponentToVisible(selectedTab);
+                }
+            }
+        });
+
+        if (component instanceof Container) {
+            ((Container) component).setBlockFocus(true);
+        }
+
+        tabsContainer.addComponent(index, b);
+        contentPane.addComponent(index, component);
+        setTabsLayout(tabPlacement);
+        if (tabsContainer.getComponentCount() == 1) {
+            selectedTab = tabsContainer.getComponentAt(0);
+            if (component instanceof Container) {
+                ((Container) component).setBlockFocus(false);
+            }
+            initTabsFocus();
+        }
+        checkTabsCanBeSeen();
+    }
+
+    /**
+     * Binds an action listener to the tab component. this method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @param l   the listener
+     */
+    protected void bindTabActionListener(Component tab, ActionListener l) {
+        ((Button) tab).addActionListener(l);
+    }
+
+    /**
+     * Updates the information about the tab details
+     *
+     * @param title the title to be displayed in this tab
+     * @param icon  the icon to be displayed in this tab
+     * @param index the position to insert this new tab
+     */
+    public void setTabTitle(String title, Image icon, int index) {
+        checkIndex(index);
+        setTabTitle(tabsContainer.getComponentAt(index), title, icon);
+    }
+
+    /**
+     * Updates the tabs title . This method should be used when overriding
+     * createTab
+     *
+     * @param tab   the tab component
+     * @param title the title
+     * @param icon  the new icon
+     */
+    protected void setTabTitle(Component tab, String title, Image icon) {
+        Button b = (Button) tab;
+        b.setText(title);
+        b.setIcon(icon);
+    }
+
+    /**
+     * Returns the title of the tab at the given index
+     *
+     * @param index index for the tab
+     * @return label of the tab at the given index
+     */
+    public String getTabTitle(int index) {
+        checkIndex(index);
+        return getTabTitle(tabsContainer.getComponentAt(index));
+    }
+
+    /**
+     * Returns the title of the tab component. This method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @return label of the tab
+     */
+    protected String getTabTitle(Component tab) {
+        return ((Button) tab).getText();
+    }
+
+    /**
+     * Returns the icon of the tab component. This method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @return icon of the tab
+     */
+    protected Image getTabIcon(Component tab) {
+        return ((Button) tab).getIcon();
+    }
+
+    /**
+     * Returns the icon of the tab at the given index
+     *
+     * @param index index for the tab
+     * @return icon of the tab at the given index
+     */
+    public Image getTabIcon(int index) {
+        checkIndex(index);
+        return getTabIcon(tabsContainer.getComponentAt(index));
+    }
+
+    /**
+     * Returns the selected icon of the tab component. This method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @return icon of the tab
+     */
+    protected Image getTabSelectedIcon(Component tab) {
+        return ((Button) tab).getPressedIcon();
+    }
+
+    /**
+     * Returns the icon of the tab at the given index
+     *
+     * @param index index for the tab
+     * @return icon of the tab at the given index
+     */
+    public Image getTabSelectedIcon(int index) {
+        checkIndex(index);
+        return getTabSelectedIcon(tabsContainer.getComponentAt(index));
+    }
+
+    /**
+     * Sets the selected icon of the tab at the given index
+     *
+     * @param index index for the tab
+     * @param icon  of the tab at the given index
+     */
+    public void setTabSelectedIcon(int index, Image icon) {
+        checkIndex(index);
+        setTabSelectedIcon(tabsContainer.getComponentAt(index), icon);
+    }
+
+    /**
+     * Sets the selected icon of the tab. This method should be used when overriding
+     * createTab
+     *
+     * @param tab  the tab component
+     * @param icon of the tab
+     */
+    protected void setTabSelectedIcon(Component tab, Image icon) {
+        ((Button) tab).setPressedIcon(icon);
+    }
+
+    /**
+     * Removes the tab at <code>index</code>.
+     * After the component associated with <code>index</code> is removed,
+     * its visibility is reset to true to ensure it will be visible
+     * if added to other containers.
+     *
+     * @param index the index of the tab to be removed
+     * @throws IndexOutOfBoundsException if index is out of range
+     *                                   (index < 0 || index >= tab count)
+     * @see #addTab
+     * @see #insertTab
+     */
+    public void removeTabAt(int index) {
+        checkIndex(index);
+        int act = activeComponent - 1;
+        act = Math.max(act, 0);
+        setSelectedIndex(act);
+        Component key = tabsContainer.getComponentAt(index);
+        tabsContainer.removeComponent(key);
+        Component content = contentPane.getComponentAt(index);
+        contentPane.removeComponent(content);
+        setTabsLayout(tabPlacement);
+    }
+
+    /**
+     * Returns the tab at <code>index</code>.
+     *
+     * @param index the index of the tab to be removed
+     * @return the component at the given tab location
+     * @throws IndexOutOfBoundsException if index is out of range
+     *                                   (index < 0 || index >= tab count)
+     * @see #addTab
+     * @see #insertTab
+     */
+    public Component getTabComponentAt(int index) {
+        checkIndex(index);
+        return contentPane.getComponentAt(index);
+    }
+
+    private void checkIndex(int index) {
+        if (index < 0 || index > tabsContainer.getComponentCount()) {
+            throw new IndexOutOfBoundsException("Index: " + index);
+        }
+    }
+
+    /**
+     * Returns the index of the tab for the specified component.
+     * Returns -1 if there is no tab for this component.
+     *
+     * @param component the component for the tab
+     * @return the first tab which matches this component, or -1
+     * if there is no tab for this component
+     */
+    public int indexOfComponent(Component component) {
+        return contentPane.getComponentIndex(component);
+    }
+
+    /**
+     * Returns the number of tabs in this <code>tabbedpane</code>.
+     *
+     * @return an integer specifying the number of tabbed pages
+     */
+    public int getTabCount() {
+        return tabsContainer.getComponentCount();
+    }
+
+    /**
+     * Returns the currently selected index for this tabbedpane.
+     * Returns -1 if there is no currently selected tab.
+     *
+     * @return the index of the selected tab
+     */
+    public int getSelectedIndex() {
+        if (tabsContainer != null) {
+            return activeComponent;
+        }
+        return -1;
+    }
+
+    /**
+     * Sets the selected index for this tabbedpane. The index must be a valid
+     * tab index.
+     *
+     * @param index the index to be selected
+     * @throws IndexOutOfBoundsException if index is out of range
+     *                                   (index < 0 || index >= tab count)
+     */
+    public void setSelectedIndex(int index) {
+        setSelectedIndex(index, false);
+    }
+
+    /**
+     * Returns the component associated with the tab at the given index
+     *
+     * @return the component is now showing in the tabbed pane
+     */
+    public Component getSelectedComponent() {
+        int i = getSelectedIndex();
+        if (i == -1) {
+            return null;
+        }
+        return getTabComponentAt(i);
+    }
+
+    /**
+     * Adds a focus listener to the tabs buttons
+     *
+     * @param listener FocusListener
+     * @deprecated use addSelectionListener instead
+     */
+    public void addTabsFocusListener(FocusListener listener) {
+        if (focusListeners == null) {
+            focusListeners = new EventDispatcher();
+        }
+        focusListeners.addListener(listener);
+    }
+
+    /**
+     * Removes a foucs Listener from the tabs buttons
+     *
+     * @param listener FocusListener
+     * @deprecated use addSelectionListener instead
+     */
+    public void removeTabsFocusListener(FocusListener listener) {
+        if (focusListeners != null) {
+            focusListeners.removeListener(listener);
+        }
+    }
+
+    /**
+     * Adds a selection listener to the tabs.
+     *
+     * @param listener SelectionListener
+     */
+    public void addSelectionListener(SelectionListener listener) {
+        if (selectionListener == null) {
+            selectionListener = new EventDispatcher();
+        }
+        selectionListener.addListener(listener);
+    }
+
+    /**
+     * Removes a selection Listener from the tabs
+     *
+     * @param listener SelectionListener
+     */
+    public void removeSelectionListener(SelectionListener listener) {
+        if (selectionListener != null) {
+            selectionListener.removeListener(listener);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+        String className = getClass().getName();
+        className = className.substring(className.lastIndexOf('.') + 1);
+        return className + "[x=" + getX() + " y=" + getY() + " width=" +
+                getWidth() + " height=" + getHeight() + ", tab placement = " +
+                tabPlacement + ", tab count = " + getTabCount() +
+                ", selected index = " + getSelectedIndex() + "]";
+    }
+
+    /**
+     * Returns the placement of the tabs for this tabbedpane.
+     *
+     * @return the tab placement value
+     * @see #setTabPlacement
+     */
+    public int getTabPlacement() {
+        return tabPlacement;
     }
 
     /**
@@ -408,593 +991,11 @@ public class Tabs extends Container {
     }
 
     /**
-     * Adds a <code>component</code>
-     * represented by a <code>title</code> and/or <code>icon</code>,
-     * either of which can be <code>null</code>.
-     * Cover method for <code>insertTab</code>.
-     *
-     * @param title the title to be displayed in this tab
-     * @param icon the icon to be displayed in this tab
-     * @param component the component to be displayed when this tab is clicked
-     *
-     * @see #insertTab
-     * @see #removeTabAt
-     */
-    public void addTab(String title, Image icon, Component component) {
-        insertTab(title, icon, component, tabsContainer.getComponentCount());
-    }
-
-    /**
-     * Adds a <code>component</code>
-     * represented by a <code>title</code> and/or <code>icon</code>,
-     * either of which can be <code>null</code>.
-     * Cover method for <code>insertTab</code>.
-     *
-     * @param title the title to be displayed in this tab
-     * @param icon the icon to be displayed in this tab
-     * @param pressedIcon the icon shown when the tab is selected
-     * @param component the component to be displayed when this tab is clicked
-     * @return this so these calls can be chained
-     *
-     * @see #insertTab
-     * @see #removeTabAt
-     */
-    public Tabs addTab(String title, Image icon, Image pressedIcon, Component component) {
-        int index = tabsContainer.getComponentCount();
-        insertTab(title, icon, component, index);
-        setTabSelectedIcon(index, pressedIcon);
-        return this;
-    }
-    
-    /**
-     * Adds a <code>component</code>
-     * represented by a <code>title</code> and/or <code>icon</code>,
-     * either of which can be <code>null</code>.
-     * Cover method for <code>insertTab</code>.
-     *
-     * @param title the title to be displayed in this tab
-     * @param materialIcon one of the material design icon constants from {@link com.codename1.ui.FontImage}
-     * @param iconSize icon size in millimeters 
-     * @param component the component to be displayed when this tab is clicked
-     * @return this so these calls can be chained
-     *
-     * @see #insertTab
-     * @see #removeTabAt
-     */
-    public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
-        insertTab(title, materialIcon, FontImage.getMaterialDesignFont(), iconSize, component,
-                tabsContainer.getComponentCount());
-        return this;
-    }
-    
-    /**
-     * Adds a <code>component</code>
-     * represented by a <code>title</code> and/or <code>icon</code>,
-     * either of which can be <code>null</code>.
-     * Cover method for <code>insertTab</code>.
-     *
-     * @param title the title to be displayed in this tab
-     * @param icon an icon from the font
-     * @param font the font for the icon
-     * @param iconSize icon size in millimeters 
-     * @param component the component to be displayed when this tab is clicked
-     * @return this so these calls can be chained
-     *
-     * @see #insertTab
-     * @see #removeTabAt
-     */
-    public Tabs addTab(String title, char icon, Font font, float iconSize, Component component) {
-        int index = tabsContainer.getComponentCount();
-        insertTab(title, icon, font, iconSize, component, index);
-        return this;
-    }
-
-    /**
-     * Adds a <code>component</code>
-     * represented by a <code>title</code> and no <code>icon</code>.
-     * Cover method for <code>insertTab</code>.
-     *
-     * @param title the title to be displayed in this tab
-     * @param component the component to be displayed when this tab is clicked
-     *
-     * @see #insertTab
-     * @see #removeTabAt
-     */
-    public void addTab(String title, Component component) {
-        insertTab(title, null, component, tabsContainer.getComponentCount());
-    }
-    
-    /**
-     * Adds a <code>component</code>
-     * represented by a <code>button</code>.
-     * Cover method for <code>insertTab</code>.
-     * The Button styling will be associated with "Tab" UIID.
-     *
-     * @param tab represents the tab on top
-     * @param component the component to be displayed when this tab is clicked
-     *
-     * @see #insertTab
-     * @see #removeTabAt
-     * @deprecated should use radio button as an argument
-     */
-    public void addTab(Button tab, Component component) {
-        insertTab(tab, component, tabsContainer.getComponentCount());
-    }
-
-    private Component createTabImpl(RadioButton b) {
-        radioGroup.add(b);
-        b.setToggle(true);
-        b.setTextPosition(BOTTOM);
-        if(radioGroup.getButtonCount() == 1) {
-            b.setSelected(true);
-        }
-        if(textPosition != -1) {
-            b.setTextPosition(textPosition);
-        }
-
-        if(b.getIcon() == null && !getUIManager().isThemeConstant("TabEnableAutoImageBool", true)) {
-            Image d = getUIManager().getThemeImageConstant("TabUnselectedImage");
-            if(d != null) {
-                b.setIcon(d);
-                d = getUIManager().getThemeImageConstant("TabSelectedImage");
-                if(d != null) {
-                    b.setRolloverIcon(d);
-                    b.setPressedIcon(d);
-                }
-            }
-        }
-        return b;
-    }
-    /**
-     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
-     * @param title the title of the tab
-     * @param icon an icon from the font
-     * @param font the font for the icon
-     * @return component instance
-     */
-    protected Component createTab(String title, Font font, char icon, float size) {
-        RadioButton b = new RadioButton(title != null ? title : "");
-        FontImage.setIcon(b,font, icon, size);
-        createTabImpl(b);
-        return b;
-    }
-    
-    /**
-     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
-     * @param title the title of the tab
-     * @param icon the icon of the tab
-     * @return component instance
-     */
-    protected Component createTab(String title, Image icon) {
-        RadioButton b = new RadioButton(title != null ? title : "", icon);
-         createTabImpl(b);
-        return b;
-    }
-    
-    /**
-     * Inserts a <code>component</code>, at <code>index</code>,
-     * represented by a <code>title</code> and/or <code>icon</code>,
-     * either of which may be <code>null</code>.
-     * Uses java.util.Vector internally, see <code>insertElementAt</code>
-     * for details of insertion conventions.
-     *
-     * @param title the title to be displayed in this tab
-     * @param icon the icon to be displayed in this tab
-     * @param component The component to be displayed when this tab is clicked.
-     * @param index the position to insert this new tab
-     *
-     * @see #addTab
-     * @see #removeTabAt
-     */
-    public void insertTab(String title, Image icon, Component component,
-            int index) {
-        Component b = createTab(title != null ? title : "", icon);
-        insertTab(b, component, index);
-    }
-
- /**
-     * Inserts a <code>component</code>, at <code>index</code>,
-     * represented by a <code>title</code> and/or <code>icon</code>,
-     * either of which may be <code>null</code>.
-     * Uses java.util.Vector internally, see <code>insertElementAt</code>
-     * for details of insertion conventions.
-     *
-     * @param title the title to be displayed in this tab
-     * @param icon an icon from the font
-     * @param font the font for the icon
-     * @param component The component to be displayed when this tab is clicked.
-     * @param index the position to insert this new tab
-     *
-     * @see #addTab
-     * @see #removeTabAt
-     */
-    public void insertTab(String title, char icon, Font font, float iconSize, Component component,
-            int index) {
-        Component b = createTab(title != null ? title : "", font, icon, iconSize);
-        insertTab(b, component, index);
-    }
-
-    /**
-     * Inserts a <code>component</code>, at <code>index</code>,
-     * represented by a <code>button</code>
-     * Uses java.util.Vector internally, see <code>insertElementAt</code>
-     * for details of insertion conventions.
-     * The Button styling will be associated with "Tab" UIID.
-     *
-     * @param tab represents the tab on top
-     * @param component The component to be displayed when this tab is clicked.
-     * @param index the position to insert this new tab
-     *
-     * @see #addTab
-     * @see #removeTabAt
-     * @deprecated should use radio button as an argument
-     */
-    public void insertTab(Component tab, Component component,
-            int index) {
-        checkIndex(index);
-        if (component == null) {
-            return;
-        }
-        final Component b = tab;
-        if(tabUIID != null) {
-            b.setUIID(tabUIID);
-        }
-
-        b.addFocusListener(focusListener);
-        
-        bindTabActionListener(b, new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-
-                if(selectedTab != null){
-                    if(tabUIID != null) {
-                        selectedTab.setUIID(tabUIID);
-                    }
-                    if(!animateTabSelection) {
-                        selectedTab.setShouldCalcPreferredSize(true);
-                        selectedTab.repaint();
-                    }
-                    int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);
-                    
-                    // this might happen if a tab was removed
-                    if(previousSelectedIndex != -1) {
-                        Component previousContent = contentPane.getComponentAt(previousSelectedIndex);
-                        if (previousContent instanceof Container) {
-                            ((Container) previousContent).setBlockFocus(true);
-                        }
-                    }
-                }
-                if (active != tabsContainer.getComponentIndex(b)) {
-                    active = tabsContainer.getComponentIndex(b);                
-                    Component content = contentPane.getComponentAt(active);
-                    if (content instanceof Container) {
-                        ((Container) content).setBlockFocus(false);
-                    }
-                    setSelectedIndex(active, animateTabSelection);
-                    initTabsFocus();
-                    selectedTab = b;
-                    if(!animateTabSelection) {
-                        selectedTab.setShouldCalcPreferredSize(true);
-                        tabsContainer.revalidateLater();
-                    }
-                    tabsContainer.scrollComponentToVisible(selectedTab);
-                }
-            }
-        });
-
-        if (component instanceof Container) {
-            ((Container) component).setBlockFocus(true);
-        }
-
-        tabsContainer.addComponent(index, b);
-        contentPane.addComponent(index, component);
-        setTabsLayout(tabPlacement);
-        if (tabsContainer.getComponentCount() == 1) {
-            selectedTab = tabsContainer.getComponentAt(0);
-            if (component instanceof Container) {
-                ((Container) component).setBlockFocus(false);
-            }
-            initTabsFocus();
-        }
-        checkTabsCanBeSeen();
-    }
-
-    /**
-     * Binds an action listener to the tab component. this method should be used when overriding
-     * createTab
-     * @param tab the tab component
-     * @param l the listener
-     */
-    protected void bindTabActionListener(Component tab, ActionListener l) {
-        ((Button)tab).addActionListener(l);
-    }
-    
-    /**
-     * Updates the information about the tab details
-     *
-     * @param title the title to be displayed in this tab
-     * @param icon the icon to be displayed in this tab
-     * @param index the position to insert this new tab
-     */
-    public void setTabTitle(String title, Image icon, int index) {
-        checkIndex(index);
-        setTabTitle(tabsContainer.getComponentAt(index), title, icon);
-    }
-
-    /**
-     * Updates the tabs title . This method should be used when overriding
-     * createTab
-     * @param tab the tab component
-     * @param title the title
-     * @param icon  the new icon
-     */
-    protected void setTabTitle(Component tab, String title, Image icon) {
-        Button b = (Button)tab;
-        b.setText(title);
-        b.setIcon(icon);
-    }
-    
-    /**
-     * Returns the title of the tab at the given index
-     * 
-     * @param index index for the tab
-     * @return label of the tab at the given index
-     */
-    public String getTabTitle(int index) {
-        checkIndex(index);
-        return getTabTitle(tabsContainer.getComponentAt(index));
-    }
-
-    /**
-     * Returns the title of the tab component. This method should be used when overriding
-     * createTab
-     * 
-     * @param tab the tab component
-     * @return label of the tab 
-     */
-    protected String getTabTitle(Component tab) {
-        return ((Button)tab).getText();
-    }    
-
-    /**
-     * Returns the icon of the tab component. This method should be used when overriding
-     * createTab
-     * 
-     * @param tab the tab component
-     * @return icon of the tab 
-     */
-    protected Image getTabIcon(Component tab) {
-        return ((Button)tab).getIcon();
-    }    
-    
-    /**
-     * Returns the icon of the tab at the given index
-     *
-     * @param index index for the tab
-     * @return icon of the tab at the given index
-     */
-    public Image getTabIcon(int index) {
-        checkIndex(index);
-        return getTabIcon(tabsContainer.getComponentAt(index));
-    }
-
-    /**
-     * Returns the selected icon of the tab component. This method should be used when overriding
-     * createTab
-     * 
-     * @param tab the tab component
-     * @return icon of the tab 
-     */
-    protected Image getTabSelectedIcon(Component tab) {
-        return ((Button)tab).getPressedIcon();
-    }    
-    
-
-    /**
-     * Returns the icon of the tab at the given index
-     *
-     * @param index index for the tab
-     * @return icon of the tab at the given index
-     */
-    public Image getTabSelectedIcon(int index) {
-        checkIndex(index);
-        return getTabSelectedIcon(tabsContainer.getComponentAt(index));
-    }
-
-    /**
-     * Sets the selected icon of the tab at the given index
-     *
-     * @param index index for the tab
-     * @param icon of the tab at the given index
-     */
-    public void setTabSelectedIcon(int index, Image icon) {
-        checkIndex(index);
-        setTabSelectedIcon(tabsContainer.getComponentAt(index), icon);
-    }
-
-    /**
-     * Sets the selected icon of the tab. This method should be used when overriding
-     * createTab
-     *
-     * @param tab the tab component
-     * @param icon of the tab 
-     */
-    protected void setTabSelectedIcon(Component tab, Image icon) {
-        ((Button)tab).setPressedIcon(icon);
-    }
-
-    /**
-     * Removes the tab at <code>index</code>.
-     * After the component associated with <code>index</code> is removed,
-     * its visibility is reset to true to ensure it will be visible
-     * if added to other containers.
-     * @param index the index of the tab to be removed
-     * @exception IndexOutOfBoundsException if index is out of range
-     *            (index < 0 || index >= tab count)
-     *
-     * @see #addTab
-     * @see #insertTab
-     */
-    public void removeTabAt(int index) {
-        checkIndex(index);
-        int act = activeComponent - 1;
-        act = Math.max(act, 0);
-        setSelectedIndex(act);
-        Component key = tabsContainer.getComponentAt(index);
-        tabsContainer.removeComponent(key);
-        Component content = contentPane.getComponentAt(index);
-        contentPane.removeComponent(content);
-        setTabsLayout(tabPlacement);
-    }
-
-    /**
-     * Returns the tab at <code>index</code>.
-     *
-     * @param index the index of the tab to be removed
-     * @exception IndexOutOfBoundsException if index is out of range
-     *            (index < 0 || index >= tab count)
-     * @return the component at the given tab location
-     * @see #addTab
-     * @see #insertTab
-     */
-    public Component getTabComponentAt(int index) {
-        checkIndex(index);
-        return contentPane.getComponentAt(index);
-    }
-
-    private void checkIndex(int index) {
-        if (index < 0 || index > tabsContainer.getComponentCount()) {
-            throw new IndexOutOfBoundsException("Index: " + index);
-        }
-    }
-
-    /**
-     * Returns the index of the tab for the specified component.
-     * Returns -1 if there is no tab for this component.
-     *
-     * @param component the component for the tab
-     * @return the first tab which matches this component, or -1
-     *		if there is no tab for this component
-     */
-    public int indexOfComponent(Component component) {
-        return contentPane.getComponentIndex(component);
-    }
-
-    /**
-     * Returns the number of tabs in this <code>tabbedpane</code>.
-     *
-     * @return an integer specifying the number of tabbed pages
-     */
-    public int getTabCount() {
-        return tabsContainer.getComponentCount();
-    }
-
-    /**
-     * Returns the currently selected index for this tabbedpane.
-     * Returns -1 if there is no currently selected tab.
-     *
-     * @return the index of the selected tab
-     */
-    public int getSelectedIndex() {
-        if(tabsContainer != null){
-            return activeComponent;
-        }
-        return -1;
-    }
-
-    /**
-     * Returns the component associated with the tab at the given index
-     *
-     * @return the component is now showing in the tabbed pane
-     */
-    public Component getSelectedComponent() {
-        int i = getSelectedIndex();
-        if(i == -1) {
-            return null;
-        }
-        return getTabComponentAt(i);
-    }
-
-    /**
-     * Adds a focus listener to the tabs buttons
-     * 
-     * @deprecated use addSelectionListener instead
-     * @param listener FocusListener
-     */
-    public void addTabsFocusListener(FocusListener listener){
-        if(focusListeners == null){
-            focusListeners = new EventDispatcher();
-        }
-        focusListeners.addListener(listener);
-    }
-    
-    
-     
-    /**
-     * Removes a foucs Listener from the tabs buttons
-     * 
-     * @deprecated use addSelectionListener instead
-     * @param listener FocusListener
-     */
-    public void removeTabsFocusListener(FocusListener listener){
-        if(focusListeners != null){
-            focusListeners.removeListener(listener);
-        }
-    }
-    
-    /**
-     * Adds a selection listener to the tabs.
-     * 
-     * @param listener SelectionListener
-     */
-    public void addSelectionListener(SelectionListener listener){
-        if(selectionListener == null){
-            selectionListener = new EventDispatcher();
-        }
-        selectionListener.addListener(listener);
-    }
-    
-    
-     
-    /**
-     * Removes a selection Listener from the tabs
-     * 
-     * @param listener SelectionListener
-     */
-    public void removeSelectionListener(SelectionListener listener){
-        if(selectionListener != null){
-            selectionListener.removeListener(listener);
-        }
-    }
-    
-
-    /**
-     * {@inheritDoc}
-     */
-    public String toString() {
-        String className = getClass().getName();
-        className = className.substring(className.lastIndexOf('.') + 1);
-        return className + "[x=" + getX() + " y=" + getY() + " width=" +
-                getWidth() + " height=" + getHeight() + ", tab placement = " +
-                tabPlacement + ", tab count = " + getTabCount() +
-                ", selected index = " + getSelectedIndex() + "]";
-    }
-
-    /**
-     * Returns the placement of the tabs for this tabbedpane.
-     *
-     * @return the tab placement value
-     * @see #setTabPlacement
-     */
-    public int getTabPlacement() {
-        return tabPlacement;
-    }
-
-    /**
      * This method retrieves the Tabs content pane
      *
      * @return the content pane Container
      */
-    public Container getContentPane(){
+    public Container getContentPane() {
         return contentPane;
     }
 
@@ -1003,26 +1004,27 @@ public class Tabs extends Container {
      *
      * @return the Tabs Container
      */
-    public Container getTabsContainer(){
+    public Container getTabsContainer() {
         return tabsContainer;
     }
 
     /**
-     * Sets the currently selected index in the tabs component 
-     * @param index the index for the tab starting with tab 0. 
+     * Sets the currently selected index in the tabs component
+     *
+     * @param index           the index for the tab starting with tab 0.
      * @param slideToSelected true to animate the transition to the new selection
-     * false to just move immediately
+     *                        false to just move immediately
      */
-    public void setSelectedIndex(int index, boolean slideToSelected) {        
+    public void setSelectedIndex(int index, boolean slideToSelected) {
         if (index < 0 || index >= tabsContainer.getComponentCount()) {
-            throw new IndexOutOfBoundsException("Index: "+index+", Tab count: "+tabsContainer.getComponentCount());
+            throw new IndexOutOfBoundsException("Index: " + index + ", Tab count: " + tabsContainer.getComponentCount());
         }
-        if(index == activeComponent){
+        if (index == activeComponent) {
             return;
         }
-        
+
         Form form = getComponentForm();
-        if(slideToSelected && form != null){
+        if (slideToSelected && form != null) {
             int end;
             int start;
             if (swipeOnXAxis) {
@@ -1036,54 +1038,44 @@ public class Tabs extends Container {
             slideToDestMotion.start();
             form.registerAnimatedInternal(Tabs.this);
             active = index;
-        }else{
-            if(selectionListener != null){
+        } else {
+            if (selectionListener != null) {
                 selectionListener.fireSelectionEvent(activeComponent, index);
             }
             activeComponent = index;
             selectTab(tabsContainer.getComponentAt(index));
             int offset = 0;
-            for(Component c : contentPane) {
+            for (Component c : contentPane) {
                 c.setLightweightMode(offset != index);
                 offset++;
             }
             revalidateLater();
         }
     }
-    
+
     /**
      * Invoked to select a specific tab, this method should be overriden for subclasses overriding createTab
+     *
      * @param tab the tab
      */
     protected void selectTab(Component tab) {
-            Button b = (Button)tab;
-            b.fireClicked();
-            b.requestFocus();        
-    }
-    
-    /**
-     * Sets the selected index for this tabbedpane. The index must be a valid
-     * tab index.
-     * @param index the index to be selected
-     * @throws IndexOutOfBoundsException if index is out of range
-     * (index < 0 || index >= tab count)
-     */
-    public void setSelectedIndex(int index) {        
-        setSelectedIndex(index, false);
+        Button b = (Button) tab;
+        b.fireClicked();
+        b.requestFocus();
     }
 
     /**
      * Hide the tabs bar
      */
-    public void hideTabs(){
+    public void hideTabs() {
         removeComponent(tabsContainer);
         revalidateLater();
     }
-    
+
     /**
      * Show the tabs bar if it was hidden
      */
-    public void showTabs(){
+    public void showTabs() {
         int tp = tabPlacement;
         tabPlacement = -1;
         setTabPlacement(tp);
@@ -1106,12 +1098,12 @@ public class Tabs extends Container {
      * @param swipeActivated
      */
     public void setSwipeActivated(boolean swipeActivated) {
-        if(this.swipeActivated != swipeActivated) {
+        if (this.swipeActivated != swipeActivated) {
             this.swipeActivated = swipeActivated;
-            if(isInitialized()) {
+            if (isInitialized()) {
                 Form form = this.getComponentForm();
                 if (form != null) {
-                    if(swipeActivated) {
+                    if (swipeActivated) {
                         form.addPointerPressedListener(press);
                         form.addPointerReleasedListener(release);
                         form.addPointerDraggedListener(drag);
@@ -1125,7 +1117,7 @@ public class Tabs extends Container {
         }
     }
 
-    private void initTabsFocus(){
+    private void initTabsFocus() {
         for (int i = 0; i < tabsContainer.getComponentCount(); i++) {
             initTabFocus(tabsContainer.getComponentAt(i), contentPane.getComponentAt(activeComponent));
         }
@@ -1146,6 +1138,7 @@ public class Tabs extends Container {
 
     /**
      * Indicates that a tab should change when the focus changes without the user physically pressing a button
+     *
      * @return the changeTabOnFocus
      */
     public boolean isChangeTabOnFocus() {
@@ -1154,6 +1147,7 @@ public class Tabs extends Container {
 
     /**
      * Indicates that a tab should change when the focus changes without the user physically pressing a button
+     *
      * @param changeTabOnFocus the changeTabOnFocus to set
      */
     public void setChangeTabOnFocus(boolean changeTabOnFocus) {
@@ -1163,6 +1157,7 @@ public class Tabs extends Container {
     /**
      * Indicates that the tabs container should have its style changed to the selected style when one of the tabs has focus
      * this allows incorporating it into the theme of the application
+     *
      * @return the changeTabContainerStyleOnFocus
      */
     public boolean isChangeTabContainerStyleOnFocus() {
@@ -1172,21 +1167,23 @@ public class Tabs extends Container {
     /**
      * Indicates that the tabs container should have its style changed to the selected style when one of the tabs has focus
      * this allows incorporating it into the theme of the application
+     *
      * @param changeTabContainerStyleOnFocus the changeTabContainerStyleOnFocus to set
      */
     public void setChangeTabContainerStyleOnFocus(boolean changeTabContainerStyleOnFocus) {
         this.changeTabContainerStyleOnFocus = changeTabContainerStyleOnFocus;
     }
-    
+
     /**
-     * This method allows setting the Tabs content pane spacing (right and left), 
-     * This can be used to create an effect where the selected tab is smaller 
+     * This method allows setting the Tabs content pane spacing (right and left),
+     * This can be used to create an effect where the selected tab is smaller
      * and the right and left tabs are visible on the sides
+     *
      * @param tabsGap the gap on the sides of the content in pixels, the value must
-     * be positive.
+     *                be positive.
      */
-    public void setTabsContentGap(int tabsGap){
-        if(tabsGap < 0){
+    public void setTabsContentGap(int tabsGap) {
+        if (tabsGap < 0) {
             throw new IllegalArgumentException("gap must be positive");
         }
         this.tabsGap = tabsGap;
@@ -1194,13 +1191,13 @@ public class Tabs extends Container {
 
     private void setTabsLayout(int tabPlacement) {
         if (tabPlacement == TOP || tabPlacement == BOTTOM) {
-            if(tabsFillRows) {
+            if (tabsFillRows) {
                 FlowLayout f = new FlowLayout();
                 f.setFillRows(true);
                 tabsContainer.setLayout(f);
             } else {
-                if(tabsGridLayout) {
-                    tabsContainer.setLayout(new GridLayout(1, Math.max(1 ,getTabCount())));
+                if (tabsGridLayout) {
+                    tabsContainer.setLayout(new GridLayout(1, Math.max(1, getTabCount())));
                 } else {
                     tabsContainer.setLayout(new BoxLayout(BoxLayout.X_AXIS));
                 }
@@ -1208,11 +1205,11 @@ public class Tabs extends Container {
             tabsContainer.setScrollableX(true);
             tabsContainer.setScrollableY(false);
         } else {// LEFT Or RIGHT
-                if(tabsGridLayout) {
-                    tabsContainer.setLayout(new GridLayout(Math.max(1 ,getTabCount()), 1));
-                } else {
-                    tabsContainer.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-                }
+            if (tabsGridLayout) {
+                tabsContainer.setLayout(new GridLayout(Math.max(1, getTabCount()), 1));
+            } else {
+                tabsContainer.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+            }
             tabsContainer.setScrollableX(false);
             tabsContainer.setScrollableY(true);
         }
@@ -1220,6 +1217,7 @@ public class Tabs extends Container {
 
     /**
      * The UIID for a tab component which defaults to Tab
+     *
      * @return the tabUIID
      */
     public String getTabUIID() {
@@ -1228,15 +1226,15 @@ public class Tabs extends Container {
 
     /**
      * <p>The UIID for a tab button which defaults to Tab.
-     * Tab buttons used to have two separate styles for selected and unselected. This was later consolidated so 
-     * the tabs behave as a single toggle button (radio button) however one thing that remained is a call to 
+     * Tab buttons used to have two separate styles for selected and unselected. This was later consolidated so
+     * the tabs behave as a single toggle button (radio button) however one thing that remained is a call to
      * <code>setUIID</code> that is implicitly made to restore the original "Tab" style. </p>
-     * 
+     *
      * <p>Effectively Tabs invokes the <code>setUIID</code> call on the Tab switch so if you want to manipulate
      * the tab UIID manually (have one red and one green tab) this is a problem.</>.
-     * <p>To enable such code add all the tabs then just just invoke <code>setTabUIID(null)</code> to disable 
+     * <p>To enable such code add all the tabs then just just invoke <code>setTabUIID(null)</code> to disable
      * this behavior.</p>
-     * 
+     *
      * @param tabUIID the tabUIID to set
      */
     public void setTabUIID(String tabUIID) {
@@ -1246,6 +1244,7 @@ public class Tabs extends Container {
     /**
      * Allows marking tabs as swipe "eager" which instantly triggers swipe on movement
      * rather than threshold the swipe.
+     *
      * @return the eagerSwipeMode
      */
     public boolean isEagerSwipeMode() {
@@ -1255,6 +1254,7 @@ public class Tabs extends Container {
     /**
      * Allows marking tabs as swipe "eager" which instantly triggers swipe on movement
      * rather than threshold the swipe.
+     *
      * @param eagerSwipeMode the eagerSwipeMode to set
      */
     public void setEagerSwipeMode(boolean eagerSwipeMode) {
@@ -1263,6 +1263,7 @@ public class Tabs extends Container {
 
     /**
      * Indicates whether clicking on a tab button should result in an animation to the selected tab or an immediate switch
+     *
      * @return the animateTabSelection
      */
     public boolean isAnimateTabSelection() {
@@ -1271,21 +1272,157 @@ public class Tabs extends Container {
 
     /**
      * Indicates whether clicking on a tab button should result in an animation to the selected tab or an immediate switch
+     *
      * @param animateTabSelection the animateTabSelection to set
      */
     public void setAnimateTabSelection(boolean animateTabSelection) {
         this.animateTabSelection = animateTabSelection;
     }
 
+    void initTabsContainerStyle() {
+        if (originalTabsContainerSelected == null) {
+            originalTabsContainerSelected = tabsContainer.getSelectedStyle();
+            originalTabsContainerUnselected = tabsContainer.getUnselectedStyle();
+        }
+    }
 
-    class TabsLayout extends Layout{
+    /**
+     * Allows developers to customize the motion object for the slide effect
+     * to provide a linear slide effect. You can use the {@code tabsSlideSpeedInt}
+     * theme constant to define the time in milliseconds between releasing the swiped
+     * tab and reaching the next tab. This currently defaults to 200.
+     *
+     * @param start start position
+     * @param end   end position for the motion
+     * @return the motion object
+     */
+    protected Motion createTabSlideMotion(int start, int end) {
+        return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant("tabsSlideSpeedInt", 200));
+    }
+
+    /**
+     * Returns <code>true</code> if the swipe is on the X-Axis, <code>false</code> if the swipe is on the Y-Axis.
+     *
+     * @return swipe direction flag
+     */
+    public boolean isSwipeOnXAxis() {
+        return swipeOnXAxis;
+    }
+
+    /**
+     * <p>
+     * It defaults to <code>true</code>; you can set it to <code>false</code> for use cases like the
+     * one discussed here:
+     * <a href="https://new.reddit.com/r/cn1/comments/quq7yo/realize_a_set_of_containers_that_are_browsable/">Realize
+     * a set of Containers that are browsable with a finger, like a deck of
+     * cards</a>
+     * </p>Example of usage (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):</p>
+     * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
+     *
+     * @param b <code>true</code> to set the swipe on the X-Axis, <code>false</code> to set the swipe on the Y-Axis
+     * @since 8.0
+     */
+    public void setSwipeOnXAxis(boolean b) {
+        if (swipeOnXAxis != b) {
+            swipeOnXAxis = b;
+            contentPane.setShouldCalcPreferredSize(true);
+            revalidateLater();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+        return new String[]{"titles", "icons", "selectedIcons"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+        return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArrayClass(),
+                com.codename1.impl.CodenameOneImplementation.getImageArrayClass(),
+                com.codename1.impl.CodenameOneImplementation.getImageArrayClass()};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[]{"String[]", "Image[]", "Image[]"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+        if (name.equals("titles")) {
+            String[] t = new String[getTabCount()];
+            for (int iter = 0; iter < t.length; iter++) {
+                t[iter] = getTabTitle(iter);
+            }
+            return t;
+        }
+        if (name.equals("icons")) {
+            Image[] t = new Image[getTabCount()];
+            for (int iter = 0; iter < t.length; iter++) {
+                t[iter] = getTabIcon(iter);
+            }
+            return t;
+        }
+        if (name.equals("selectedIcons")) {
+            Image[] t = new Image[getTabCount()];
+            for (int iter = 0; iter < t.length; iter++) {
+                t[iter] = getTabSelectedIcon(iter);
+            }
+            return t;
+        }
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+        if (name.equals("titles")) {
+            String[] t = (String[]) value;
+            for (int iter = 0; iter < Math.min(getTabCount(), t.length); iter++) {
+                setTabTitle(t[iter], getTabIcon(iter), iter);
+            }
+            return null;
+        }
+        if (name.equals("icons")) {
+            Image[] t = (Image[]) value;
+            if (t == null) {
+                for (int iter = 0; iter < getTabCount(); iter++) {
+                    setTabTitle(getTabTitle(iter), null, iter);
+                }
+            } else {
+                for (int iter = 0; iter < Math.min(getTabCount(), t.length); iter++) {
+                    setTabTitle(getTabTitle(iter), t[iter], iter);
+                }
+            }
+            return null;
+        }
+        if (name.equals("selectedIcons")) {
+            Image[] t = (Image[]) value;
+            for (int iter = 0; iter < Math.min(getTabCount(), t.length); iter++) {
+                setTabSelectedIcon(iter, t[iter]);
+            }
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+
+    class TabsLayout extends Layout {
 
         public void layoutContainer(Container parent) {
             final int size = parent.getComponentCount();
-           
-            int tabWidth = parent.getWidth() - tabsGap*2;
-            int tabHeight = parent.getHeight() - tabsGap*2;
-            
+
+            int tabWidth = parent.getWidth() - tabsGap * 2;
+            int tabHeight = parent.getHeight() - tabsGap * 2;
+
             if (swipeOnXAxis) {
                 for (int i = 0; i < size; i++) {
                     int xOffset;
@@ -1325,7 +1462,7 @@ public class Tabs extends Container {
             dim.setHeight(parent.getHeight() + parent.getStyle().getPaddingTop()
                     + parent.getStyle().getPaddingBottom());
             int compCount = contentPane.getComponentCount();
-            for(int iter = 0 ; iter < compCount ; iter++) {
+            for (int iter = 0; iter < compCount; iter++) {
                 Dimension d = contentPane.getComponentAt(iter).getPreferredSizeWithMargin();
                 dim.setWidth(Math.max(d.getWidth(), dim.getWidth()));
                 dim.setHeight(Math.max(d.getHeight(), dim.getHeight()));
@@ -1334,26 +1471,19 @@ public class Tabs extends Container {
         }
     }
 
-    void initTabsContainerStyle() {
-        if(originalTabsContainerSelected == null) {
-            originalTabsContainerSelected = tabsContainer.getSelectedStyle();
-            originalTabsContainerUnselected = tabsContainer.getUnselectedStyle();
-        }
-    }
-    
-    class TabFocusListener implements FocusListener{
+    class TabFocusListener implements FocusListener {
 
         public void focusGained(Component cmp) {
-            if(focusListeners != null){
+            if (focusListeners != null) {
                 focusListeners.fireFocus(cmp);
             }
-            if(Display.getInstance().shouldRenderSelection()) {
-                if(isChangeTabOnFocus()) {
-                    if(!((Button)cmp).isSelected()) {
-                        ((Button)cmp).fireClicked();
+            if (Display.getInstance().shouldRenderSelection()) {
+                if (isChangeTabOnFocus()) {
+                    if (!((Button) cmp).isSelected()) {
+                        ((Button) cmp).fireClicked();
                     }
                 }
-                if(changeTabContainerStyleOnFocus) {
+                if (changeTabContainerStyleOnFocus) {
                     initTabsContainerStyle();
                     tabsContainer.setUnselectedStyle(originalTabsContainerSelected);
                     tabsContainer.repaint();
@@ -1363,79 +1493,34 @@ public class Tabs extends Container {
 
 
         public void focusLost(Component cmp) {
-            if(focusListeners != null){
+            if (focusListeners != null) {
                 focusListeners.fireFocus(cmp);
             }
-            if(changeTabContainerStyleOnFocus) {
+            if (changeTabContainerStyleOnFocus) {
                 initTabsContainerStyle();
                 tabsContainer.setUnselectedStyle(originalTabsContainerUnselected);
                 tabsContainer.repaint();
             }
         }
-    
-    }
-    
-    /**
-     * Allows developers to customize the motion object for the slide effect
-     * to provide a linear slide effect. You can use the {@code tabsSlideSpeedInt} 
-     * theme constant to define the time in milliseconds between releasing the swiped
-     * tab and reaching the next tab. This currently defaults to 200.
-     * @param start start position
-     * @param end end position for the motion
-     * @return the motion object
-     */
-    protected Motion createTabSlideMotion(int start, int end) {
-        return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant("tabsSlideSpeedInt", 200));
-    }
-    
-    /**
-     * <p>
-     * It defaults to <code>true</code>; you can set it to <code>false</code> for use cases like the
-     * one discussed here:
-     * <a href="https://new.reddit.com/r/cn1/comments/quq7yo/realize_a_set_of_containers_that_are_browsable/">Realize
-     * a set of Containers that are browsable with a finger, like a deck of
-     * cards</a>
-     * </p>Example of usage (<a href="https://youtu.be/9CxqFGOYAU0">demo video</a>):</p>
-     * <script src="https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js"></script>
-     *
-     * @param b <code>true</code> to set the swipe on the X-Axis, <code>false</code> to set the swipe on the Y-Axis
-     * @since 8.0
-     */
-    public void setSwipeOnXAxis(boolean b) {
-        if (swipeOnXAxis != b) {
-            swipeOnXAxis = b;
-            contentPane.setShouldCalcPreferredSize(true);
-            revalidateLater();
-        }
+
     }
 
-    /**
-     * Returns <code>true</code> if the swipe is on the X-Axis, <code>false</code> if the swipe is on the Y-Axis.
-     * @return swipe direction flag
-     */
-    public boolean isSwipeOnXAxis() {
-        return swipeOnXAxis;
-    }
-    
-    private boolean blockSwipe;
-    private boolean riskySwipe;
-    class SwipeListener implements ActionListener{
+    class SwipeListener implements ActionListener {
 
         private final static int PRESS = 0;
         private final static int DRAG = 1;
         private final static int RELEASE = 2;
         private final int type;
-        
+
 
         public SwipeListener(int type) {
             this.type = type;
         }
 
 
-
         public void actionPerformed(ActionEvent evt) {
-            
-            if (getComponentCount() == 0 || !swipeActivated ||slideToDestMotion != null) {
+
+            if (getComponentCount() == 0 || !swipeActivated || slideToDestMotion != null) {
                 return;
             }
             final int x = evt.getX();
@@ -1446,11 +1531,11 @@ public class Tabs extends Container {
                     riskySwipe = false;
                     if (!isEventBlockedByHigherComponent(evt) && contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
-                        if(testCmp != null && testCmp != contentPane) {
+                        if (testCmp != null && testCmp != contentPane) {
                             doNotBlockSideSwipe = true;
                             try {
-                                while(testCmp != null && testCmp != contentPane) {
-                                    if(testCmp.shouldBlockSideSwipe()) {
+                                while (testCmp != null && testCmp != contentPane) {
+                                    if (testCmp.shouldBlockSideSwipe()) {
                                         lastX = -1;
                                         lastY = -1;
                                         initialX = -1;
@@ -1458,7 +1543,7 @@ public class Tabs extends Container {
                                         blockSwipe = true;
                                         return;
                                     }
-                                    if(testCmp.isScrollable()) {
+                                    if (testCmp.isScrollable()) {
                                         if (swipeOnXAxis) {
                                             if (testCmp.isScrollableX()) {
                                                 // we need to block swipe since the user is trying to scroll a component
@@ -1508,18 +1593,18 @@ public class Tabs extends Container {
                     break;
                 }
                 case DRAG: {
-                    if(blockSwipe) {
+                    if (blockSwipe) {
                         return;
                     }
                     if (!dragStarted) {
-                        if(isEagerSwipeMode()) {
+                        if (isEagerSwipeMode()) {
                             dragStarted = true;
                         } else {
-                            if(riskySwipe) {
-                                if(swipeOnXAxis && Math.abs(x - initialX) < Math.abs(y - initialY)) {
+                            if (riskySwipe) {
+                                if (swipeOnXAxis && Math.abs(x - initialX) < Math.abs(y - initialY)) {
                                     return;
                                 }
-                                if(!swipeOnXAxis && Math.abs(x - initialX) > Math.abs(y - initialY)) {
+                                if (!swipeOnXAxis && Math.abs(x - initialX) > Math.abs(y - initialY)) {
                                     return;
                                 }
                                 // give heavier weight when we have two axis swipe
@@ -1536,9 +1621,9 @@ public class Tabs extends Container {
                                 } else {
                                     dragStarted = Math.abs(y - initialY) > (contentPane.getHeight() / 8);
                                 }
-                                if(dragStarted && swipeOnXAxis) {
+                                if (dragStarted && swipeOnXAxis) {
                                     int diff = x - initialX;
-                                    if(shouldBlockSideSwipeLeft() && diff < 0 ||
+                                    if (shouldBlockSideSwipeLeft() && diff < 0 ||
                                             shouldBlockSideSwipeRight() && diff > 0) {
                                         lastX = -1;
                                         initialX = -1;
@@ -1552,7 +1637,7 @@ public class Tabs extends Container {
                                 parent.clearComponentsAwaitingRelease();
                             }
                         }
-                    } 
+                    }
                     if (swipeOnXAxis && initialX != -1 && contentPane.contains(x, y)) {
                         int diffX = x - lastX;
                         if (diffX != 0 && dragStarted) {
@@ -1584,19 +1669,19 @@ public class Tabs extends Container {
                     break;
                 }
                 case RELEASE: {
-                    if(changeTabContainerStyleOnFocus) {
+                    if (changeTabContainerStyleOnFocus) {
                         initTabsContainerStyle();
                         tabsContainer.setUnselectedStyle(originalTabsContainerUnselected);
                         tabsContainer.repaint();
                     }
-                    if(blockSwipe) {
+                    if (blockSwipe) {
                         return;
                     }
                     if (swipeOnXAxis && initialX != -1) {
                         int diff = x - initialX;
                         if (diff != 0 && dragStarted) {
                             if (Math.abs(diff) > contentPane.getWidth() / 6) {
-                                if(isRTL()) {
+                                if (isRTL()) {
                                     diff *= -1;
                                 }
                                 if (diff > 0) {
@@ -1676,91 +1761,5 @@ public class Tabs extends Container {
 
             return true;
         }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public String[] getPropertyNames() {
-        return new String[] {"titles", "icons", "selectedIcons"};
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Class[] getPropertyTypes() {
-       return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), 
-           com.codename1.impl.CodenameOneImplementation.getImageArrayClass(), 
-           com.codename1.impl.CodenameOneImplementation.getImageArrayClass()};
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public String[] getPropertyTypeNames() {
-        return new String[] {"String[]", "Image[]", "Image[]"};
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Object getPropertyValue(String name) {
-        if(name.equals("titles")) {
-            String[] t = new String[getTabCount()];
-            for(int iter = 0 ; iter < t.length ; iter++) {
-                t[iter] = getTabTitle(iter);
-            }
-            return t;
-        }
-        if(name.equals("icons")) {
-            Image[] t = new Image[getTabCount()];
-            for(int iter = 0 ; iter < t.length ; iter++) {
-                t[iter] = getTabIcon(iter);
-            }
-            return t;
-        }
-        if(name.equals("selectedIcons")) {
-            Image[] t = new Image[getTabCount()];
-            for(int iter = 0 ; iter < t.length ; iter++) {
-                t[iter] = getTabSelectedIcon(iter);
-            }
-            return t;
-        }
-        return null;
-    }
-
-
-    /**
-     * {@inheritDoc}
-     */
-    public String setPropertyValue(String name, Object value) {
-        if(name.equals("titles")) {
-            String[] t = (String[])value;
-            for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
-                setTabTitle(t[iter], getTabIcon(iter), iter);
-            }
-            return null;
-        }
-        if(name.equals("icons")) {
-            Image[] t = (Image[])value;
-            if(t == null) {
-                for(int iter = 0 ; iter < getTabCount() ; iter++) {
-                    setTabTitle(getTabTitle(iter), null, iter);
-                }
-            } else {
-                for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
-                    setTabTitle(getTabTitle(iter), t[iter], iter);
-                }
-            }
-            return null;
-        }
-        if(name.equals("selectedIcons")) {
-            Image[] t = (Image[])value;
-            for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
-                setTabSelectedIcon(iter, t[iter]);
-            }
-            return null;
-        }
-        return super.setPropertyValue(name, value);
     }
 }

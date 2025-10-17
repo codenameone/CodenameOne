@@ -31,37 +31,38 @@ import com.codename1.ui.RGBImage;
 import com.codename1.ui.animations.Motion;
 
 /**
- * Static utility class useful for simple visual effects that don't quite fit 
+ * Static utility class useful for simple visual effects that don't quite fit
  * anywhere else in the core API.
  *
  * @author Shai Almog
  */
 public class Effects {
-    private Effects() {}
+    private Effects() {
+    }
 
     /**
      * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
-     * 
+     *
      * @param source image to add the reflection effect to
      * @return new image with a reflection effect for the source image
      */
     public static Image reflectionImage(Image source) {
         return reflectionImage(source, 0.5f, 120);
     }
-    
+
     /**
      * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
-     * 
-     * @param source image to add the reflection effect to
+     *
+     * @param source      image to add the reflection effect to
      * @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
-     * height of the image, 0.75f will create a 3 quarter height mirror etc.
-     * @param alphaRatio starting point for the alpha value in the mirror, this should be a number between 0 - 255
-     * (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
-     * opaque use 255. A recommended value would be between 128 to 90.
+     *                    height of the image, 0.75f will create a 3 quarter height mirror etc.
+     * @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
+     *                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+     *                    opaque use 255. A recommended value would be between 128 to 90.
      * @return new image with a reflection effect for the source image
      */
     public static Image reflectionImage(Image source, float mirrorRatio, int alphaRatio) {
@@ -73,26 +74,26 @@ public class Effects {
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
      *
-     * @param source image to add the reflection effect to
+     * @param source      image to add the reflection effect to
      * @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
-     * height of the image, 0.75f will create a 3 quarter height mirror etc.
-     * @param alphaRatio starting point for the alpha value in the mirror, this should be a number between 0 - 255
-     * (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
-     * opaque use 255. A recommended value would be between 128 to 90.
-     * @param spacing the distance in pixels between the image and its reflection
+     *                    height of the image, 0.75f will create a 3 quarter height mirror etc.
+     * @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
+     *                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+     *                    opaque use 255. A recommended value would be between 128 to 90.
+     * @param spacing     the distance in pixels between the image and its reflection
      * @return new image with a reflection effect for the source image
      */
     public static Image reflectionImage(Image source, float mirrorRatio, int alphaRatio, int spacing) {
         int w = source.getWidth();
         int h = source.getHeight();
-        int mirrorHeight = ((int)(h  * mirrorRatio)) * w;
+        int mirrorHeight = ((int) (h * mirrorRatio)) * w;
 
         // create an array big enough to hold the mirror data
-        RGBImage rgbImg = new RGBImage(new int[w * (h + spacing) + mirrorHeight], w, h + ((int)(h  * mirrorRatio) + spacing));
+        RGBImage rgbImg = new RGBImage(new int[w * (h + spacing) + mirrorHeight], w, h + ((int) (h * mirrorRatio) + spacing));
         source.toRGB(rgbImg, 0, 0, 0, 0, w, h);
         int[] imageData = rgbImg.getRGB();
         int ilen = imageData.length;
-        for(int iter = 0 ; iter < mirrorHeight ; iter++) {
+        for (int iter = 0; iter < mirrorHeight; iter++) {
             int sourcePos = w * h - iter - 1;
             int off = iter % w;
             off = w - off + iter - off;
@@ -100,8 +101,8 @@ public class Effects {
             int color = imageData[sourcePos];
 
             // if the color is not transparent
-            if((color & 0xff000000) != 0 && mirrorPos < ilen) {
-                int alpha = (int)(alphaRatio * ((float)mirrorHeight - iter) / ((float)mirrorHeight));
+            if ((color & 0xff000000) != 0 && mirrorPos < ilen) {
+                int alpha = (int) (alphaRatio * ((float) mirrorHeight - iter) / ((float) mirrorHeight));
                 imageData[mirrorPos] = (imageData[sourcePos] & 0xffffff) | ((alpha << 24) & 0xff000000);
             }
         }
@@ -117,7 +118,7 @@ public class Effects {
      * effect. This can be solved by invoking revalidate before the call to this method only the
      * first time around!
      *
-     * @param c the component to grow/shrink, its size must be different from its preferred size
+     * @param c        the component to grow/shrink, its size must be different from its preferred size
      * @param duration the duration in milliseconds for the grow/shrink animation
      * @deprecated use Component.growShrink instead
      */
@@ -128,22 +129,23 @@ public class Effects {
     /**
      * Skews an image in a faux perspective transform on the vertical axis, this is effectively a fast scale
      * algorithm that both shrinks the image vertically and reduces the width
-     * @param topScaleRatio the amount by which the top portion should be scaled where 1.0 means none
+     *
+     * @param topScaleRatio    the amount by which the top portion should be scaled where 1.0 means none
      * @param bottomScaleRatio the amount by which the bottom portion should be scaled where 1.0 means none
-     * @param verticalShrink the scale ratio for the image height where 1.0 means none
+     * @param verticalShrink   the scale ratio for the image height where 1.0 means none
      * @return the perspective translated image
      */
     public static Image verticalPerspective(Image i, float topScaleRatio, float bottomScaleRatio, float verticalShrink) {
         int[] imageData = i.getRGB();
         int sourceWidth = i.getWidth();
         int sourceHeight = i.getHeight();
-        int destinationWidth = (int)(Math.max(topScaleRatio, bottomScaleRatio) * sourceWidth);
-        int destinationHeight = (int)(verticalShrink * sourceHeight);
+        int destinationWidth = (int) (Math.max(topScaleRatio, bottomScaleRatio) * sourceWidth);
+        int destinationHeight = (int) (verticalShrink * sourceHeight);
         int[] destinationArray = new int[destinationWidth * destinationHeight];
-        
+
         // faster than math.min
         float diff;
-        if(bottomScaleRatio < topScaleRatio) {
+        if (bottomScaleRatio < topScaleRatio) {
             float smaller = bottomScaleRatio;
             float larger = topScaleRatio;
             diff = smaller - larger;
@@ -152,81 +154,81 @@ public class Effects {
             float smaller = topScaleRatio;
             diff = larger - smaller;
         }
-        
-        if(destinationWidth > sourceWidth) {
-            for(int y = 0 ; y < destinationHeight ; y++) {
-                float positionY = ((float)y) / ((float)destinationHeight - 1);
-                int sourceY = (int)((float)(sourceHeight - 1) * positionY);
+
+        if (destinationWidth > sourceWidth) {
+            for (int y = 0; y < destinationHeight; y++) {
+                float positionY = ((float) y) / ((float) destinationHeight - 1);
+                int sourceY = (int) ((float) (sourceHeight - 1) * positionY);
                 float currentRowRatio = (topScaleRatio + (diff * positionY)) / bottomScaleRatio;
                 //int minX = (int)(((float)destinationWidth - sourceWidth) / 2.0f * currentRowRatio);
-                int minX = (int)(((float)destinationWidth) * (1 - currentRowRatio));
+                int minX = (int) (((float) destinationWidth) * (1 - currentRowRatio));
                 int maxX = destinationWidth - minX;
                 float distance = maxX - minX;
-                for(int x = minX ; x < maxX ; x++) {
-                    int sourceX = (int)(((float)sourceWidth) * (((float)x - minX) / distance));
+                for (int x = minX; x < maxX; x++) {
+                    int sourceX = (int) (((float) sourceWidth) * (((float) x - minX) / distance));
                     destinationArray[x + y * destinationWidth] = imageData[sourceY * sourceWidth + sourceX];
                 }
             }
         } else {
-            for(int y = 0 ; y < destinationHeight ; y++) {
-                float positionY = ((float)y) / ((float)destinationHeight);
-                int sourceY = (int)((float)sourceHeight * positionY);
+            for (int y = 0; y < destinationHeight; y++) {
+                float positionY = ((float) y) / ((float) destinationHeight);
+                int sourceY = (int) ((float) sourceHeight * positionY);
                 float currentRowRatio = topScaleRatio + (diff * positionY);
-                int minX = (int)(((float)destinationWidth) * (1 - currentRowRatio));
+                int minX = (int) (((float) destinationWidth) * (1 - currentRowRatio));
                 int maxX = destinationWidth - minX;
                 float distance = maxX - minX;
-                for(int x = minX ; x < maxX ; x++) {
-                    int sourceX = (int)(((float)sourceWidth) * (((float)x - minX) / distance));
+                for (int x = minX; x < maxX; x++) {
+                    int sourceX = (int) (((float) sourceWidth) * (((float) x - minX) / distance));
                     destinationArray[x + y * destinationWidth] = imageData[sourceY * sourceWidth + sourceX];
                 }
             }
         }
-        
+
         return Image.createImage(destinationArray, destinationWidth, destinationHeight);
     }
-    
-    
+
+
     /**
      * Create a blur image from the given image.
      * The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
-     * 
-     * @param image the image to blur
+     *
+     * @param image  the image to blur
      * @param radius the radius to be used in the algorithm
-     */ 
-    public static Image gaussianBlurImage(Image image, float radius){
+     */
+    public static Image gaussianBlurImage(Image image, float radius) {
         return Display.getInstance().gaussianBlurImage(image, radius);
     }
-    
+
     /**
      * Returns true if gaussian blur is supported on this platform
-     * 
+     *
      * @return true if gaussian blur is supported.
-     */ 
-    public static boolean isGaussianBlurSupported(){
-        return Display.getInstance().isGaussianBlurSupported();        
+     */
+    public static boolean isGaussianBlurSupported() {
+        return Display.getInstance().isGaussianBlurSupported();
     }
-    
+
     /**
      * Generates a shadow for the source image and returns a new larger image containing the shadow
-     * 
-     * @param source the source image for whom the shadow should be generated
+     *
+     * @param source     the source image for whom the shadow should be generated
      * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
-     * @param opacity the opacity of the shadow between 0 - 1 where 1 is completely opaque
-     * @param xDistance the distance on the x axis from the main image body in pixels e.g. a negative value will represent a lightsource from the right (shadow on the left)
-     * @param yDistance the distance on the y axis from the main image body in pixels e.g. a negative value will represent a lightsource from the bottom (shadow on top)
+     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @param xDistance  the distance on the x axis from the main image body in pixels e.g. a negative value will represent a lightsource from the right (shadow on the left)
+     * @param yDistance  the distance on the y axis from the main image body in pixels e.g. a negative value will represent a lightsource from the bottom (shadow on top)
      * @return a new image whose size incorporates x/yDistance
      */
     public static Image dropshadow(Image source, int blurRadius, float opacity, int xDistance, int yDistance) {
         Image s = dropshadow(source, blurRadius, opacity);
         Image n = Image.createImage(source.getWidth() + Math.abs(xDistance), source.getHeight() + Math.abs(yDistance), 0);
         Graphics g = n.getGraphics();
-        int shadowX = 0, imageX = 0, shadowY = 0, imageY  = 0;
-        if(xDistance < 0) {
+        int shadowX = 0, imageX = 0, shadowY = 0, imageY = 0;
+        if (xDistance < 0) {
             imageX = xDistance * -1;
         } else {
             shadowX = xDistance;
         }
-        if(yDistance < 0) {
+        if (yDistance < 0) {
             imageY = yDistance * -1;
         } else {
             shadowY = yDistance;
@@ -237,60 +239,60 @@ public class Effects {
     }
 
     /**
-     * Generates a shadow for the source image and returns either the shadow itself or the image merged with the 
+     * Generates a shadow for the source image and returns either the shadow itself or the image merged with the
      * shadow.
-     * 
-     * @param source the source image for whom the shadow should be generated
+     *
+     * @param source     the source image for whom the shadow should be generated
      * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
-     * @param opacity the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
      * @return an image containing the shadow for source
      */
     public static Image dropshadow(Image source, int blurRadius, float opacity) {
         int[] rgb = source.getRGB();
-        for(int iter = 0 ; iter < rgb.length ; iter++) {
+        for (int iter = 0; iter < rgb.length; iter++) {
             float f = rgb[iter] & 0xff000000;
             f *= opacity;
-            rgb[iter] = (int)f;
+            rgb[iter] = (int) f;
         }
         Image shadow = Image.createImage(rgb, source.getWidth(), source.getHeight());
-        if(Display.getInstance().isGaussianBlurSupported()) {
+        if (Display.getInstance().isGaussianBlurSupported()) {
             shadow = Display.getInstance().gaussianBlurImage(shadow, blurRadius);
         }
         return shadow;
-                
+
     }
 
     /**
      * Generates a square shadow and returns it
-     * 
-     * @param width the width of the shadow image
-     * @param height the height of the shadow image
+     *
+     * @param width      the width of the shadow image
+     * @param height     the height of the shadow image
      * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
-     * @param opacity the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
      * @return an image containing the shadow for source
      */
     public static Image squareShadow(int width, int height, int blurRadius, float opacity) {
-        
-        Image img = Image.createImage(width + blurRadius *2, height + blurRadius * 2, 0 );
+
+        Image img = Image.createImage(width + blurRadius * 2, height + blurRadius * 2, 0);
         Graphics g = img.getGraphics();
-        int destAlpha = (int)(opacity * 255.0);
+        int destAlpha = (int) (opacity * 255.0);
         g.setColor(0);
-        
-        if(Display.getInstance().isGaussianBlurSupported()) {
+
+        if (Display.getInstance().isGaussianBlurSupported()) {
             // Note:  This is not exactly the same as the result when we don't have gaussian blur
             // But it looks better.
-            g.setAlpha(Math.min(destAlpha*2, 255));
-            g.fillRect(blurRadius-1, blurRadius-1, width+2, height+2);
+            g.setAlpha(Math.min(destAlpha * 2, 255));
+            g.fillRect(blurRadius - 1, blurRadius - 1, width + 2, height + 2);
             img = Display.getInstance().gaussianBlurImage(img, blurRadius);
         } else {
             Motion lin = Motion.createLinearMotion(0, destAlpha, blurRadius);
             // draw a gradient of sort for the shadow
-            for(int iter = blurRadius - 1 ; iter >= 0 ; iter--) {            
+            for (int iter = blurRadius - 1; iter >= 0; iter--) {
                 lin.setCurrentMotionTime(iter);
-                g.setAlpha(Math.max(0, (int)(lin.getValue() * iter/(blurRadius-1f))));
-                g.drawRect(iter, iter, width + (blurRadius-iter) * 2, height + (blurRadius-iter) * 2);
+                g.setAlpha(Math.max(0, (int) (lin.getValue() * iter / (blurRadius - 1f))));
+                g.drawRect(iter, iter, width + (blurRadius - iter) * 2, height + (blurRadius - iter) * 2);
             }
         }
-        return img;                
+        return img;
     }
 }

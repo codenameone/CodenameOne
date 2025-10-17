@@ -56,7 +56,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * Returns false, default tests run in their own thread.
-     *
+     * <p>
      * {@inheritDoc}
      */
     public boolean shouldExecuteOnEDT() {
@@ -65,6 +65,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertBool(boolean b) {
@@ -73,6 +74,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertBool(boolean b, String errorMessage) {
@@ -81,6 +83,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void fail() {
@@ -89,6 +92,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void fail(String errorMessage) {
@@ -97,6 +101,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertTrue(boolean value) {
@@ -105,6 +110,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertTrue(boolean value, String errorMessage) {
@@ -113,6 +119,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertFalse(boolean value) {
@@ -121,6 +128,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertFalse(boolean value, String errorMessage) {
@@ -129,6 +137,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNull(Object object) {
@@ -137,6 +146,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNull(Object object, String errorMessage) {
@@ -145,6 +155,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotNull(Object object) {
@@ -153,6 +164,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotNull(Object object, String errorMessage) {
@@ -161,6 +173,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertSame(Object expected, Object actual) {
@@ -169,6 +182,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertSame(Object expected, Object actual, String errorMessage) {
@@ -177,6 +191,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotSame(Object expected, Object actual) {
@@ -185,6 +200,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotSame(Object expected, Object actual, String errorMessage) {
@@ -193,6 +209,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(byte expected, byte actual) {
@@ -201,6 +218,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(byte expected, byte actual, String errorMessage) {
@@ -209,6 +227,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(short expected, short actual) {
@@ -217,6 +236,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(short expected, short actual, String errorMessage) {
@@ -225,6 +245,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(int expected, int actual) {
@@ -233,6 +254,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(int expected, int actual, String errorMessage) {
@@ -241,6 +263,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(long expected, long actual) {
@@ -249,6 +272,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(long expected, long actual, String errorMessage) {
@@ -257,6 +281,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(float expected, float actual, double maxRelativeError) {
@@ -265,6 +290,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(float expected, float actual, double maxRelativeError, String errorMessage) {
@@ -273,6 +299,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(double expected, double actual, double maxRelativeError) {
@@ -297,6 +324,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(double expected, double actual, double maxRelativeError, String errorMessage) {
@@ -305,6 +333,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(Object expected, Object actual) {
@@ -313,6 +342,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertEqual(Object expected, Object actual, String errorMessage) {
@@ -321,6 +351,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(byte expected, byte actual) {
@@ -329,6 +360,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(byte expected, byte actual, String errorMessage) {
@@ -337,6 +369,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(short expected, short actual) {
@@ -345,6 +378,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(short expected, short actual, String errorMessage) {
@@ -353,6 +387,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(int expected, int actual) {
@@ -361,6 +396,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(int expected, int actual, String errorMessage) {
@@ -369,6 +405,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(long expected, long actual) {
@@ -377,6 +414,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(long expected, long actual, String errorMessage) {
@@ -385,6 +423,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(float expected, float actual, double minRelativeError) {
@@ -393,6 +432,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(float expected, float actual, double minRelativeError, String errorMessage) {
@@ -401,6 +441,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(double expected, double actual, double minRelativeError) {
@@ -409,6 +450,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(double expected, double actual, double minRelativeError, String errorMessage) {
@@ -417,6 +459,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(Object expected, Object actual) {
@@ -425,6 +468,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertNotEqual(Object expected, Object actual, String errorMessage) {
@@ -433,6 +477,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(byte[] expected, byte[] actual) {
@@ -441,6 +486,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(byte[] expected, byte[] actual, String errorMessage) {
@@ -449,6 +495,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(short[] expected, short[] actual) {
@@ -457,6 +504,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(short[] expected, short[] actual, String errorMessage) {
@@ -465,6 +513,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(int[] expected, int[] actual) {
@@ -473,6 +522,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(int[] expected, int[] actual, String errorMessage) {
@@ -481,6 +531,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(long[] expected, long[] actual, long maxRelativeError) {
@@ -489,6 +540,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(long[] expected, long[] actual, long maxRelativeError, String errorMessage) {
@@ -497,6 +549,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError) {
@@ -505,6 +558,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError, String errorMessage) {
@@ -513,6 +567,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError) {
@@ -521,6 +576,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError, String errorMessage) {
@@ -529,6 +585,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(Object[] expected, Object[] actual) {
@@ -537,6 +594,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertArrayEqual(Object[] expected, Object[] actual, String errorMessage) {
@@ -581,6 +639,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void waitFor(final int millis) {
@@ -589,6 +648,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public Component findByName(String componentName) {
@@ -597,6 +657,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public Label findLabelText(String text) {
@@ -605,6 +666,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void clickButtonByLabel(String text) {
@@ -613,6 +675,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void clickButtonByName(String name) {
@@ -621,6 +684,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void clickButtonByPath(int[] path) {
@@ -629,6 +693,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void goBack() {
@@ -637,6 +702,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void clickMenuItem(String name) {
@@ -645,6 +711,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void ensureVisible(Component c) {
@@ -653,6 +720,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void ensureVisible(int[] c) {
@@ -661,6 +729,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void ensureVisible(String c) {
@@ -669,21 +738,23 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void waitForFormTitle(final String title) {
         TestUtils.waitForFormTitle(title);
     }
-    
+
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
      */
     public void waitForUnnamedForm() {
         TestUtils.waitForUnnamedForm();
     }
-    
+
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void waitForFormName(final String name) {
@@ -692,6 +763,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void log(String t) {
@@ -700,6 +772,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void log(Throwable t) {
@@ -708,6 +781,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public boolean screenshotTest(String screenshotName) {
@@ -716,6 +790,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void keyPress(int keyCode) {
@@ -724,6 +799,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void keyRelease(int keyCode) {
@@ -732,6 +808,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void gameKeyPress(int gameKey) {
@@ -740,6 +817,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void gameKeyRelease(int gameKey) {
@@ -748,6 +826,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void pointerPress(float x, float y, String componentName) {
@@ -756,6 +835,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void pointerRelease(float x, float y, String componentName) {
@@ -764,6 +844,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void pointerDrag(float x, float y, String componentName) {
@@ -772,6 +853,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void pointerPress(float x, float y, int[] path) {
@@ -780,6 +862,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void pointerRelease(float x, float y, int[] path) {
@@ -788,6 +871,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void pointerDrag(float x, float y, int[] path) {
@@ -796,6 +880,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public Component getComponentByPath(int[] path) {
@@ -804,6 +889,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void setText(String name, String text) {
@@ -812,6 +898,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void setText(int[] path, String text) {
@@ -821,6 +908,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertTitle(String title) {
@@ -829,6 +917,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertLabel(String name, String text) {
@@ -837,6 +926,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertLabel(String text) {
@@ -845,6 +935,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertLabel(int[] path, String text) {
@@ -853,6 +944,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertTextArea(String name, String text) {
@@ -861,6 +953,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertTextArea(int[] path, String text) {
@@ -869,6 +962,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void assertTextArea(String text) {
@@ -877,6 +971,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public TextArea findTextAreaText(String text) {
@@ -885,6 +980,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void setVerboseMode(boolean v) {
@@ -893,6 +989,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void selectInList(String listName, int offset) {
@@ -902,6 +999,7 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * This method just invokes the test utils method, it is here for convenience
+     *
      * @see TestUtils
      */
     public void selectInList(int[] path, int offset) {
@@ -911,25 +1009,26 @@ public abstract class AbstractTest implements UnitTest {
 
     /**
      * Returns all the command objects from the toolbar in the order of left, right, overflow &amp; sidemenu
+     *
      * @return the set of commands
      */
     public Command[] getToolbarCommands() {
         return TestUtils.getToolbarCommands();
     }
-    
+
     /**
      * Executes a command from the offset returned by {@link #getToolbarCommands()}
-     * 
+     *
      * @param offset the offset of the command we want to execute
      */
     public void executeToolbarCommandAtOffset(int offset) {
         TestUtils.executeToolbarCommandAtOffset(offset);
     }
-    
+
     /**
      * Shows the sidemenu UI
      */
     public void showSidemenu() {
         TestUtils.showSidemenu();
-    }    
+    }
 }

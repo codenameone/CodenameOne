@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui.spinner;
@@ -36,19 +36,19 @@ public class NumericSpinner extends BaseSpinner {
     private double max = 1000;
     private double value = 0;
     private double step = 1;
-    
+
     /**
      * Default constructor
      */
     public NumericSpinner() {
         setLayout(new BorderLayout());
     }
-    
+
     /**
      * Default constructor
      */
     void initSpinner() {
-        if(spin == null) {
+        if (spin == null) {
             spin = createSpinner();
             addComponent(BorderLayout.CENTER, spin);
         }
@@ -60,6 +60,7 @@ public class NumericSpinner extends BaseSpinner {
 
     /**
      * The minimum value for the spinner
+     *
      * @return the min
      */
     public double getMin() {
@@ -68,20 +69,22 @@ public class NumericSpinner extends BaseSpinner {
 
     /**
      * The minimum value for the spinner
+     *
      * @param min the min to set
      */
     public void setMin(double min) {
         this.min = min;
-        if(min > value) {
+        if (min > value) {
             value = min;
         }
-        if(spin != null) {
+        if (spin != null) {
             spin.setModel(new SpinnerNumberModel(min, max, value, step));
         }
     }
 
     /**
      * The maximum value for the spinner
+     *
      * @return the max
      */
     public double getMax() {
@@ -90,42 +93,46 @@ public class NumericSpinner extends BaseSpinner {
 
     /**
      * The maximum value for the spinner
+     *
      * @param max the max to set
      */
     public void setMax(double max) {
         this.max = max;
-        if(max < value) {
+        if (max < value) {
             value = max;
         }
-        if(spin != null) {
+        if (spin != null) {
             spin.setModel(new SpinnerNumberModel(min, max, value, step));
         }
     }
 
     /**
      * The value for the spinner
+     *
      * @return the value
      */
     public double getValue() {
-        if(spin != null) {
-            return ((Double)((SpinnerNumberModel)spin.getModel()).getValue()).doubleValue();
+        if (spin != null) {
+            return ((Double) ((SpinnerNumberModel) spin.getModel()).getValue()).doubleValue();
         }
         return value;
     }
 
     /**
      * The value for the spinner
+     *
      * @param value the value to set
      */
     public void setValue(double value) {
         this.value = value;
-        if(spin != null) {
-            ((SpinnerNumberModel)spin.getModel()).setValue(new Double(value));
+        if (spin != null) {
+            ((SpinnerNumberModel) spin.getModel()).setValue(new Double(value));
         }
     }
 
     /**
      * Step for spinner gap
+     *
      * @return the step
      */
     public double getStep() {
@@ -134,50 +141,51 @@ public class NumericSpinner extends BaseSpinner {
 
     /**
      * Step for spinner gap
+     *
      * @param step the step to set
      */
     public void setStep(double step) {
         this.step = step;
-        if(spin != null) {
+        if (spin != null) {
             spin.setModel(new SpinnerNumberModel(min, max, value, step));
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"min", "max", "value", "step"};
+        return new String[]{"min", "max", "value", "step"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {Double.class, Double.class, Double.class, Double.class};
+        return new Class[]{Double.class, Double.class, Double.class, Double.class};
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"double", "double", "double", "double", "double"};
+        return new String[]{"double", "double", "double", "double", "double"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("min")) {
+        if (name.equals("min")) {
             return new Double(min);
         }
-        if(name.equals("max")) {
+        if (name.equals("max")) {
             return new Double(max);
         }
-        if(name.equals("value")) {
+        if (name.equals("value")) {
             return new Double(getValue());
         }
-        if(name.equals("step")) {
+        if (name.equals("step")) {
             return new Double(step);
         }
         return null;
@@ -187,22 +195,22 @@ public class NumericSpinner extends BaseSpinner {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("min")) {
+        if (name.equals("min")) {
             setMin(Double.parseDouble(value.toString()));
             return null;
         }
-        if(name.equals("max")) {
+        if (name.equals("max")) {
             setMax(Double.parseDouble(value.toString()));
             return null;
         }
-        if(name.equals("value")) {
+        if (name.equals("value")) {
             setValue(Double.parseDouble(value.toString()));
             return null;
         }
-        if(name.equals("step")) {
+        if (name.equals("step")) {
             setStep(Double.parseDouble(value.toString()));
             return null;
         }
         return super.setPropertyValue(name, value);
-    }    
+    }
 }

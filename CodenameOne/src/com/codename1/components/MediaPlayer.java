@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
@@ -41,20 +41,20 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.UITimer;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * <p>Video playback component with control buttons for back, play/pause and 
+ * <p>Video playback component with control buttons for back, play/pause and
  * forward buttons. In the simulator those controls are implemented locally but on the
  * device the native playback controls are used.
  * </p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
- * 
  */
 public class MediaPlayer extends Container {
     private Image playIcon;
@@ -64,21 +64,21 @@ public class MediaPlayer extends Container {
     private Image maxIcon;
     private Container buttonsBar;
     private boolean hideNativeVideoControls;
-    private boolean showControls=true;
+    private boolean showControls = true;
     private Runnable loopOnCompletion;
     private Slider progress;
     private UITimer progressUpdater;
-    
+
     /**
      * Shows the buttons on top of the video
      */
     private boolean onTopMode = true;
-    
+
     /**
      * Shows video position bar as a slider
      */
     private boolean seekBar = true;
-    
+
     /**
      * UIID for the seekBar slider
      */
@@ -88,16 +88,16 @@ public class MediaPlayer extends Container {
      * Includes a maximize icon in the bar to show the native player
      */
     private boolean maximize = true;
-    
+
     private boolean userSetIcons = false;
     private Media video;
     private String dataSource;
-    
+
     private String pendingDataURI;
     private boolean autoplay;
     private boolean loop;
     //private Runnable onCompletion;
-    
+
     /**
      * Empty constructor
      */
@@ -108,14 +108,38 @@ public class MediaPlayer extends Container {
         backIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_REWIND, "Button", 3);
         maxIcon = FontImage.createMaterial(FontImage.MATERIAL_FULLSCREEN, "Button", 3);
     }
-    
+
+    /**
+     * Empty constructor
+     */
+    public MediaPlayer(Media video) {
+        this();
+        this.video = video;
+        updateLoopOnCompletionHandler();
+        //initUI();
+    }
+
+    /**
+     * On platforms that include native video player controls (Android and iOS), this indicates whether
+     * these controls should be hidden for this media player.
+     *
+     * @return {@literal true} if native video player controls should be hidden.
+     * @see Display#isNativeVideoPlayerControlsIncluded()
+     * @see #setHideNativeVideoControls(boolean)
+     * @see #usesNativeVideoControls()
+     */
+    public boolean isHideNativeVideoControls() {
+        return hideNativeVideoControls;
+    }
+
     /**
      * On platforms that include native video player controls (Android and iOS), this allows you
      * to hide those controls.
+     *
      * @param hideNativeControls Set {@literal true} to hide the native video controls for this player.
-     * @see Display#isNativeVideoPlayerControlsIncluded() 
-     * @see #setHideNativeVideoControls(boolean) 
-     * @see #usesNativeVideoControls() 
+     * @see Display#isNativeVideoPlayerControlsIncluded()
+     * @see #setHideNativeVideoControls(boolean)
+     * @see #usesNativeVideoControls()
      */
     public void setHideNativeVideoControls(boolean hideNativeControls) {
         this.hideNativeVideoControls = hideNativeControls;
@@ -123,39 +147,28 @@ public class MediaPlayer extends Container {
             video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, !hideNativeControls && showControls);
         }
     }
-    
-    /**
-     * On platforms that include native video player controls (Android and iOS), this indicates whether
-     * these controls should be hidden for this media player.
-     * @return {@literal true} if native video player controls should be hidden.
-     * @see Display#isNativeVideoPlayerControlsIncluded() 
-     * @see #setHideNativeVideoControls(boolean) 
-     * @see #usesNativeVideoControls() 
-     */
-    public boolean isHideNativeVideoControls() {
-        return hideNativeVideoControls;
-    }
-    
+
     /**
      * Checks to see if this player uses native video controls.  For this to be {@literal true},
      * the platform must support native video controls (iOS and Android) (See {@link Display#isNativeVideoPlayerControlsIncluded() }
      * to find out if current platform supports this; <strong>AND</strong> {@link #isHideNativeVideoControls() }
      * must be false.
-     * 
+     *
      * <p>Note: on IOS, the controls won't display until the video's {@link Media#prepare() }
      * is called.  This will happen automatically if {@link #isAutoplay() } is true, or if {@link Media#play() }
      * is called.</p>
+     *
      * @return True if this player uses native video controls.
-     * @see #isHideNativeVideoControls() 
-     * @see #setHideNativeVideoControls(boolean) 
-     * @see Display#isNativeVideoPlayerControlsIncluded() 
+     * @see #isHideNativeVideoControls()
+     * @see #setHideNativeVideoControls(boolean)
+     * @see Display#isNativeVideoPlayerControlsIncluded()
      */
     public boolean usesNativeVideoControls() {
         return Display.getInstance().isNativeVideoPlayerControlsIncluded() && !hideNativeVideoControls;
     }
-    
+
     /**
-     * Shows the controls for this media player.  If the player is set to use 
+     * Shows the controls for this media player.  If the player is set to use
      * native controls, then this will show the native controls.  Otherwise it
      * shows the lightweight controls.
      * <p>Note: on IOS, the controls won't display until the video's {@link Media#prepare() }
@@ -175,10 +188,10 @@ public class MediaPlayer extends Container {
             video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, true);
         }
     }
-    
+
     /**
-     * Hides the controls for this media player.  If the player is set to use native 
-     * controls, then this will hide the native controls.  Otherwise it hides the 
+     * Hides the controls for this media player.  If the player is set to use native
+     * controls, then this will hide the native controls.  Otherwise it hides the
      * lightweight controls.
      */
     public void hideControls() {
@@ -194,53 +207,44 @@ public class MediaPlayer extends Container {
             video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, false);
         }
     }
-    
-    /**
-     * Empty constructor
-     */
-    public MediaPlayer(Media video) {
-        this();
-        this.video = video;
-        updateLoopOnCompletionHandler();
-        //initUI();
-    }
-    
+
     /**
      * Returns the Media Object of this MediaPlayer
-     * @return 
+     *
+     * @return
      */
-    public Media getMedia(){
+    public Media getMedia() {
         return video;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     protected void initComponent() {
-        if(userSetIcons){
+        if (userSetIcons) {
             Image play = UIManager.getInstance().getThemeImageConstant("mediaPlayImage");
-            if(play != null){
+            if (play != null) {
                 playIcon = play;
             }
             Image pause = UIManager.getInstance().getThemeImageConstant("mediaPauseImage");
-            if(pause != null){
+            if (pause != null) {
                 pauseIcon = pause;
-            }            
+            }
             Image back = UIManager.getInstance().getThemeImageConstant("mediaBackImage");
-            if(back != null){
+            if (back != null) {
                 backIcon = back;
             }
             Image fwd = UIManager.getInstance().getThemeImageConstant("mediaFwdImage");
-            if(fwd != null){
+            if (fwd != null) {
                 fwdIcon = fwd;
             }
             Image max = UIManager.getInstance().getThemeImageConstant("mediaMaxImage");
-            if(max != null){
+            if (max != null) {
                 maxIcon = max;
             }
-            
+
         }
-        if(pendingDataURI != null) {
+        if (pendingDataURI != null) {
             setDataSource(pendingDataURI);
             pendingDataURI = null;
         }
@@ -248,105 +252,70 @@ public class MediaPlayer extends Container {
     }
 
     private void checkProgressSlider() {
-        if(progressUpdater == null) {
+        if (progressUpdater == null) {
             progressUpdater = UITimer.timer(50, true, getComponentForm(),
-                new Runnable() {
-                public void run() {
-                    float dur = video.getDuration();
-                    if(dur > 0) {
-                        float pos = video.getTime();
-                        int offset = (int)(pos / dur * 100.0f);
-                        if(offset > -1 && offset < 101 && progress != null) {
-                            progress.setProgress(offset);
+                    new Runnable() {
+                        public void run() {
+                            float dur = video.getDuration();
+                            if (dur > 0) {
+                                float pos = video.getTime();
+                                int offset = (int) (pos / dur * 100.0f);
+                                if (offset > -1 && offset < 101 && progress != null) {
+                                    progress.setProgress(offset);
+                                }
+                            }
                         }
-                    }
-                }
-            });
+                    });
         }
     }
-    
+
     private void stopProgressSlider() {
-        if(progressUpdater != null) {
+        if (progressUpdater != null) {
             progressUpdater.cancel();
             progressUpdater = null;
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     @Override
     protected void deinitialize() {
         super.deinitialize();
-        if(video != null && video.isPlaying()){
+        if (video != null && video.isPlaying()) {
             video.pause();
             stopProgressSlider();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
-        if(video == null && dataSource == null) {
+        if (video == null && dataSource == null) {
             return new Dimension(240, 320);
         }
         return super.calcPreferredSize();
     }
 
     /**
-     * Sets the back Button Icon
-     * @param backIcon 
-     */
-    public void setBackIcon(Image backIcon) {
-        this.backIcon = backIcon;
-        userSetIcons = true;
-    }
-
-    /**
-     * Sets the forward Button Icon
-     * @param fwdIcon 
-     */
-    public void setFwdIcon(Image fwdIcon) {
-        this.fwdIcon = fwdIcon;
-        userSetIcons = true;
-    }
-
-
-    /**
      * Sets the maximize Button Icon
-     * @param maxIcon 
+     *
+     * @param maxIcon
      */
-    public void setMaxIcon(Image maxIcon ) {
-        this.maxIcon = maxIcon ;
+    public void setMaxIcon(Image maxIcon) {
+        this.maxIcon = maxIcon;
         userSetIcons = true;
     }
 
-    /**
-     * Sets the pause Button Icon
-     * @param pauseIcon 
-     */
-    public void setPauseIcon(Image pauseIcon) {
-        this.pauseIcon = pauseIcon;
-        userSetIcons = true;
-    }
-
-    /**
-     * Sets the play Button Icon
-     * @param playIcon 
-     */
-    public void setPlayIcon(Image playIcon) {
-        this.playIcon = playIcon;
-        userSetIcons = true;
-    }
-    
     /**
      * Sets the data source of this video player
+     *
      * @param uri the uri of the media can start with file://, http:// (can also
-     * use rtsp:// although may not be supported on all target platforms)
+     *            use rtsp:// although may not be supported on all target platforms)
      * @throws IOException if creation of media from the given URI has failed
      */
-    public void setDataSource(String uri, Runnable onCompletion) throws IOException{
+    public void setDataSource(String uri, Runnable onCompletion) throws IOException {
         dataSource = uri;
         video = MediaManager.createMedia(uri, true, onCompletion);
         updateLoopOnCompletionHandler();
@@ -354,51 +323,53 @@ public class MediaPlayer extends Container {
             initUI();
         }
     }
-    
+
     /**
      * Convenience JavaBean method, see other version of this method
+     *
+     * @return the data source uri
+     */
+    public String getDataSource() {
+        if (!isInitialized() && dataSource == null) {
+            return pendingDataURI;
+        }
+        return dataSource;
+    }
+
+    /**
+     * Convenience JavaBean method, see other version of this method
+     *
      * @param uri the URL for the media
      */
     public void setDataSource(final String uri) {
-        if(!isInitialized()) {
+        if (!isInitialized()) {
             pendingDataURI = uri;
             return;
         }
-        if(dataSource == null || !dataSource.equals(uri)) {
+        if (dataSource == null || !dataSource.equals(uri)) {
             Display.getInstance().startThread(new Runnable() {
                 public void run() {
                     try {
                         setDataSource(uri, null);
-                    } catch(Throwable t) {
+                    } catch (Throwable t) {
                         Log.e(t);
                     }
                 }
             }, "Media Thread").start();
         }
     }
-    
-    /**
-     * Convenience JavaBean method, see other version of this method
-     * 
-     * @return the data source uri
-     */
-    public String getDataSource() {
-        if(!isInitialized() && dataSource == null) {
-            return pendingDataURI;
-        }        
-        return dataSource;
-    }
-    
+
     /**
      * Sets the data source of this video player
-     * @param is the stream containing the media data
+     *
+     * @param is       the stream containing the media data
      * @param mimeType the type of the data in the stream
      * @throws java.io.IOException if the creation of the Media has failed
      */
-    public void setDataSource(InputStream is, String mimeType, Runnable onCompletion) throws IOException{
-        
+    public void setDataSource(InputStream is, String mimeType, Runnable onCompletion) throws IOException {
+
         video = MediaManager.createMedia(is, mimeType, onCompletion);
-        
+
         updateLoopOnCompletionHandler();
         if (isInitialized()) {
             initUI();
@@ -407,37 +378,37 @@ public class MediaPlayer extends Container {
 
     private void initUI() {
         removeAll();
-        if(onTopMode) {
-            setLayout(new LayeredLayout());        
+        if (onTopMode) {
+            setLayout(new LayeredLayout());
         } else {
-            setLayout(new BorderLayout());        
+            setLayout(new BorderLayout());
         }
-        
-        if(video != null && video.getVideoComponent() != null){
+
+        if (video != null && video.getVideoComponent() != null) {
             Component videoComponent = video.getVideoComponent();
             if (videoComponent != null) {
                 videoComponent.setUIID("Container");
-                if(onTopMode) {
-                    addComponent(videoComponent);        
+                if (onTopMode) {
+                    addComponent(videoComponent);
                 } else {
-                    addComponent(BorderLayout.CENTER, videoComponent);        
+                    addComponent(BorderLayout.CENTER, videoComponent);
                 }
             }
         }
-        
-        
-        if(seekBar) {
+
+
+        if (seekBar) {
             buttonsBar = new Container(new BorderLayout());
             progress = new Slider();
             progress.setEditable(true);
-            buttonsBar.addComponent(BorderLayout.CENTER, 
-                FlowLayout.encloseCenterMiddle(progress));
+            buttonsBar.addComponent(BorderLayout.CENTER,
+                    FlowLayout.encloseCenterMiddle(progress));
             progress.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     float dur = video.getDuration();
-                    if(dur > 0 && progress != null) {
+                    if (dur > 0 && progress != null) {
                         float pos = progress.getProgress(evt);
-                        int t = (int)(pos / 100.0f * dur);
+                        int t = (int) (pos / 100.0f * dur);
                         video.setTime(t);
                     }
                 }
@@ -445,7 +416,7 @@ public class MediaPlayer extends Container {
         } else {
             buttonsBar = new Container(new FlowLayout(Container.CENTER));
         }
-        if(onTopMode) {
+        if (onTopMode) {
             addComponent(BorderLayout.south(buttonsBar));
         } else {
             addComponent(BorderLayout.SOUTH, buttonsBar);
@@ -454,59 +425,59 @@ public class MediaPlayer extends Container {
             buttonsBar.setVisible(false);
             buttonsBar.setHidden(true);
         }
-        
-        if(!seekBar) {
+
+        if (!seekBar) {
             Button back = new Button();
             back.setUIID("MediaPlayerBack");
-            if(backIcon != null){
+            if (backIcon != null) {
                 back.setIcon(backIcon);
-            }else{
+            } else {
                 back.setText("Back");
             }
             buttonsBar.addComponent(back);
             back.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
-                    if(video == null){
+                    if (video == null) {
                         return;
                     }
                     int t = video.getTime();
                     video.setTime(t - 2);
                 }
-            });        
+            });
         }
-        
+
         final Button play = new Button() {
-            
+
             private ActionListener<AsyncMedia.MediaStateChangeEvent> stateChangeListener = new ActionListener<AsyncMedia.MediaStateChangeEvent>() {
                 @Override
                 public void actionPerformed(AsyncMedia.MediaStateChangeEvent evt) {
                     updateIconAndText();
                 }
             };
-            
-            
+
+
             private void updateIconAndText() {
                 if (video != null && video.isPlaying()) { // PMD Fix: CollapsibleIfStatements merged null/playing checks
-                     if (getPauseIcon() != null) {
+                    if (getPauseIcon() != null) {
                         this.setIcon(getPauseIcon());
                     } else {
                         this.setText("pause");
                     }
                 } else {
-                    if(playIcon != null){
+                    if (playIcon != null) {
                         this.setIcon(playIcon);
-                    }else{
+                    } else {
                         this.setText("play");
                     }
                 }
             }
-            
+
             @Override
             protected void initComponent() {
                 super.initComponent();
                 updateIconAndText();
-                
+
                 if (video != null) {
                     MediaManager.getAsyncMedia(video).addMediaStateChangeListener(stateChangeListener);
                 }
@@ -519,16 +490,16 @@ public class MediaPlayer extends Container {
                 }
                 super.deinitialize();
             }
-            
-            
+
+
         };
         play.setUIID("MediaPlayerPlay");
-        if(playIcon != null){
+        if (playIcon != null) {
             play.setIcon(playIcon);
-        }else{
+        } else {
             play.setText("play");
         }
-        if(autoplay && video != null && !video.isPlaying()) {
+        if (autoplay && video != null && !video.isPlaying()) {
             if (getPauseIcon() != null) {
                 play.setIcon(getPauseIcon());
             } else {
@@ -556,10 +527,10 @@ public class MediaPlayer extends Container {
         play.addActionListener(new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                if(video == null){
+                if (video == null) {
                     return;
                 }
-                if(!video.isPlaying()){
+                if (!video.isPlaying()) {
                     video.play();
                     checkProgressSlider();
                     play.setUIID("MediaPlayerPause");
@@ -569,7 +540,7 @@ public class MediaPlayer extends Container {
                         play.setText("pause");
                     }
                     play.repaint();
-                }else{
+                } else {
                     video.pause();
                     stopProgressSlider();
                     play.setUIID("MediaPlayerPlay");
@@ -601,19 +572,19 @@ public class MediaPlayer extends Container {
                 }
             }
         });
-        if(seekBar) {
+        if (seekBar) {
             buttonsBar.addComponent(BorderLayout.WEST, play);
         } else {
             buttonsBar.addComponent(play);
         }
 
-        //if(video == null || !video.isNativePlayerMode()){        
-        if(!seekBar) {
+        //if(video == null || !video.isNativePlayerMode()){
+        if (!seekBar) {
             Button fwd = new Button();
             fwd.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
-                    if(video == null){
+                    if (video == null) {
                         return;
                     }
                     int t = video.getTime();
@@ -621,79 +592,76 @@ public class MediaPlayer extends Container {
                 }
             });
             fwd.setUIID("MediaPlayerFwd");
-            if(fwdIcon != null){
+            if (fwdIcon != null) {
                 fwd.setIcon(fwdIcon);
-            }else{
+            } else {
                 fwd.setText("fwd");
             }
-            buttonsBar.addComponent(fwd);           
+            buttonsBar.addComponent(fwd);
         }
-        
-        if(maximize && video != null && video.isVideo()) {
+
+        if (maximize && video != null && video.isVideo()) {
             Button max = new Button();
             max.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    if(video == null){
+                    if (video == null) {
                         return;
                     }
                     video.setNativePlayerMode(true);
                 }
             });
             max.setUIID("MediaPlayerMax");
-            if(maxIcon != null){
+            if (maxIcon != null) {
                 max.setIcon(maxIcon);
-            }else{
+            } else {
                 max.setText("max");
             }
-            if(seekBar) {
+            if (seekBar) {
                 buttonsBar.addComponent(BorderLayout.EAST, max);
             } else {
                 buttonsBar.addComponent(max);
             }
         }
         //}
-        if(isInitialized()) {
+        if (isInitialized()) {
             revalidate();
         }
     }
 
-    
     public void run() {
     }
-
-    
 
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"backIcon", "forwardIcon", "pauseIcon", "playIcon", "dataSource"};
+        return new String[]{"backIcon", "forwardIcon", "pauseIcon", "playIcon", "dataSource"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {Image.class, Image.class, Image.class, Image.class, String.class};
+        return new Class[]{Image.class, Image.class, Image.class, Image.class, String.class};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("backIcon")) {
+        if (name.equals("backIcon")) {
             return getBackIcon();
         }
-        if(name.equals("forwardIcon")) {
+        if (name.equals("forwardIcon")) {
             return getFwdIcon();
         }
-        if(name.equals("playIcon")) {
+        if (name.equals("playIcon")) {
             return getPlayIcon();
         }
-        if(name.equals("pauseIcon")) {
+        if (name.equals("pauseIcon")) {
             return getPauseIcon();
         }
-        if(name.equals("dataSource")) {
+        if (name.equals("dataSource")) {
             return getDataSource();
         }
         return super.getPropertyValue(name);
@@ -703,24 +671,24 @@ public class MediaPlayer extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("backIcon")) {
-            this.backIcon = (Image)value;
+        if (name.equals("backIcon")) {
+            this.backIcon = (Image) value;
             return null;
         }
-        if(name.equals("forwardIcon")) {
-            this.fwdIcon = (Image)value;
+        if (name.equals("forwardIcon")) {
+            this.fwdIcon = (Image) value;
             return null;
         }
-        if(name.equals("playIcon")) {
-            this.playIcon = (Image)value;
+        if (name.equals("playIcon")) {
+            this.playIcon = (Image) value;
             return null;
         }
-        if(name.equals("pauseIcon")) {
-            this.pauseIcon = (Image)value;
+        if (name.equals("pauseIcon")) {
+            this.pauseIcon = (Image) value;
             return null;
         }
-        if(name.equals("dataSource")) {
-            setDataSource((String)value);
+        if (name.equals("dataSource")) {
+            setDataSource((String) value);
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -734,10 +702,30 @@ public class MediaPlayer extends Container {
     }
 
     /**
+     * Sets the play Button Icon
+     *
+     * @param playIcon
+     */
+    public void setPlayIcon(Image playIcon) {
+        this.playIcon = playIcon;
+        userSetIcons = true;
+    }
+
+    /**
      * @return the pauseIcon
      */
     public Image getPauseIcon() {
         return pauseIcon;
+    }
+
+    /**
+     * Sets the pause Button Icon
+     *
+     * @param pauseIcon
+     */
+    public void setPauseIcon(Image pauseIcon) {
+        this.pauseIcon = pauseIcon;
+        userSetIcons = true;
     }
 
     /**
@@ -748,6 +736,16 @@ public class MediaPlayer extends Container {
     }
 
     /**
+     * Sets the back Button Icon
+     *
+     * @param backIcon
+     */
+    public void setBackIcon(Image backIcon) {
+        this.backIcon = backIcon;
+        userSetIcons = true;
+    }
+
+    /**
      * @return the fwdIcon
      */
     public Image getFwdIcon() {
@@ -755,7 +753,18 @@ public class MediaPlayer extends Container {
     }
 
     /**
+     * Sets the forward Button Icon
+     *
+     * @param fwdIcon
+     */
+    public void setFwdIcon(Image fwdIcon) {
+        this.fwdIcon = fwdIcon;
+        userSetIcons = true;
+    }
+
+    /**
      * Sets playback to start automatically
+     *
      * @return the autoplay
      */
     public boolean isAutoplay() {
@@ -764,6 +773,7 @@ public class MediaPlayer extends Container {
 
     /**
      * Sets playback to start automatically
+     *
      * @param autoplay the autoplay to set
      */
     public void setAutoplay(boolean autoplay) {
@@ -772,10 +782,23 @@ public class MediaPlayer extends Container {
 
     /**
      * Sets playback to loop
+     *
      * @return the loop
      */
     public boolean isLoop() {
         return loop;
+    }
+
+    /**
+     * Sets playback to loop
+     *
+     * @param loop the loop to set
+     */
+    public void setLoop(boolean loop) {
+        if (loop != this.loop) {
+            this.loop = loop;
+            updateLoopOnCompletionHandler();
+        }
     }
 
     private void updateLoopOnCompletionHandler() {
@@ -801,17 +824,6 @@ public class MediaPlayer extends Container {
             }
         }
     }
-    
-    /**
-     * Sets playback to loop
-     * @param loop the loop to set
-     */
-    public void setLoop(boolean loop) {
-        if (loop != this.loop) {
-            this.loop = loop;
-            updateLoopOnCompletionHandler();
-        }
-    }
 
     /*
     class CompletionWrapper implements Runnable {
@@ -832,6 +844,7 @@ public class MediaPlayer extends Container {
 
     /**
      * Shows the buttons on top of the video
+     *
      * @return the onTopMode
      */
     public boolean isOnTopMode() {
@@ -840,6 +853,7 @@ public class MediaPlayer extends Container {
 
     /**
      * Shows the buttons on top of the video
+     *
      * @param onTopMode the onTopMode to set
      */
     public void setOnTopMode(boolean onTopMode) {
@@ -848,6 +862,7 @@ public class MediaPlayer extends Container {
 
     /**
      * Shows video position bar as a slider
+     *
      * @return the seekBar
      */
     public boolean isSeekBar() {
@@ -856,6 +871,7 @@ public class MediaPlayer extends Container {
 
     /**
      * Shows video position bar as a slider
+     *
      * @param seekBar the seekBar to set
      */
     public void setSeekBar(boolean seekBar) {
@@ -864,6 +880,7 @@ public class MediaPlayer extends Container {
 
     /**
      * UIID for the seekBar slider
+     *
      * @return the seekBarUIID
      */
     public String getSeekBarUIID() {
@@ -872,6 +889,7 @@ public class MediaPlayer extends Container {
 
     /**
      * UIID for the seekBar slider
+     *
      * @param seekBarUIID the seekBarUIID to set
      */
     public void setSeekBarUIID(String seekBarUIID) {
@@ -880,6 +898,7 @@ public class MediaPlayer extends Container {
 
     /**
      * Includes a maximize icon in the bar to show the native player
+     *
      * @return the maximize
      */
     public boolean isMaximize() {
@@ -888,6 +907,7 @@ public class MediaPlayer extends Container {
 
     /**
      * Includes a maximize icon in the bar to show the native player
+     *
      * @param maximize the maximize to set
      */
     public void setMaximize(boolean maximize) {

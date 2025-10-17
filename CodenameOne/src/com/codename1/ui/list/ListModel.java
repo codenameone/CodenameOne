@@ -29,88 +29,97 @@ import com.codename1.ui.events.SelectionListener;
 /**
  * <p>Represents the data structure of the list, thus allowing a list to
  * represent any potential data source by referencing different implementations of this
- * interface, <b>notice</b> that 
+ * interface, <b>notice</b> that
  * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
  * discourage usage of lists</a>.. E.g. a list model can be implemented in such a way that it retrieves data
  * directly from storage (although caching would be recommended).</p>
- * <p>It is the responsibility of the list to notify observers (specifically the view 
+ * <p>It is the responsibility of the list to notify observers (specifically the view
  * {@link com.codename1.ui.List} of any changes to its state (items removed/added/changed etc.)
  * thus the data would get updated on the view.</p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/5161090bcb3684a542ac.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-millionbooks.png" alt="Million books list model" />
- * 
-  * <p>
+ *
+ * <p>
  * A {@code ListModel} can be used in conjunction with an {@link com.codename1.components.ImageViewer}
  * to fetch images dynamically into the view:
  * </p>
  * <script src="https://gist.github.com/codenameone/305c3f5426b0e2e80833.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" alt="Image viewer with dynamic URL fetching model" />
- * 
-* @author Chen Fishbein
+ *
+ * @author Chen Fishbein
  */
 public interface ListModel<T> {
-    
+
     /**
      * Returns the item at the given offset
+     *
      * @param index an index into this list
      * @return the item at the specified index
      */
     public T getItemAt(int index);
-    
+
     /**
      * Returns the number of items in the list
+     *
      * @return the number of items in the list
      */
     public int getSize();
-    
+
     /**
      * Returns the selected list offset
-     * 
+     *
      * @return the selected list index
      */
     public int getSelectedIndex();
 
     /**
      * Sets the selected list offset can be set to -1 to clear selection
+     *
      * @param index an index into this list
      */
     public void setSelectedIndex(int index);
-    
+
     /**
      * Invoked to indicate interest in future change events
+     *
      * @param l a data changed listener
      */
     public void addDataChangedListener(DataChangedListener l);
-    
+
     /**
      * Invoked to indicate no further interest in future change events
-     * @param l a data changed listener 
+     *
+     * @param l a data changed listener
      */
     public void removeDataChangedListener(DataChangedListener l);
-    
+
     /**
      * Invoked to indicate interest in future selection events
+     *
      * @param l a selection listener
      */
     public void addSelectionListener(SelectionListener l);
-    
+
     /**
      * Invoked to indicate no further interest in future selection events
+     *
      * @param l a selection listener
      */
     public void removeSelectionListener(SelectionListener l);
-    
+
     /**
      * Adds the specified item to the end of this list.
      * An optional operation for mutable lists, it can throw an unsupported operation
      * exception if a list model is not mutable.
+     *
      * @param item the item to be added
      */
     public void addItem(T item);
-    
+
     /**
      * Removes the item at the specified position in this list.
+     *
      * @param index the index of the item to removed
      */
     public void removeItem(int index);

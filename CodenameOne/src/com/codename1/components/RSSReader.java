@@ -25,26 +25,27 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.services.ImageDownloadService;
+import com.codename1.io.services.RSSService;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
-import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.io.NetworkEvent;
-import com.codename1.io.NetworkManager;
-import com.codename1.io.services.ImageDownloadService;
-import com.codename1.io.services.RSSService;
-import com.codename1.ui.Image;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.GenericListCellRenderer;
-import com.codename1.ui.TextArea;
+
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -56,6 +57,13 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class RSSReader extends List {
+    private static final Hashtable MORE = new Hashtable();
+
+    static {
+        MORE.put("title", "More");
+        MORE.put("details", "Fetch More Elements");
+    }
+
     private Vector existingData;
     private String url = "https://codenameone.blogspot.com/feeds/posts/default?alt=rss";
     private RSSService service;
@@ -65,12 +73,6 @@ public class RSSReader extends List {
     private String progressTitle = "Fetching RSS";
     private boolean displayProgressPercentage = true;
     private Image iconPlaceholder;
-    private static final Hashtable MORE = new Hashtable();
-    static {
-        MORE.put("title", "More");
-        MORE.put("details", "Fetch More Elements");
-    }
-
     private boolean designMode;
 
     /**
@@ -96,7 +98,7 @@ public class RSSReader extends List {
 
     /**
      * Set the description for the "more" request
-     * 
+     *
      * @param d the description
      */
     public static void setMoreDescription(String d) {
@@ -105,7 +107,7 @@ public class RSSReader extends List {
 
     /**
      * Set the title for the "more" request
-     * 
+     *
      * @param t new title
      */
     public static void setMoreTitle(String t) {
@@ -125,7 +127,7 @@ public class RSSReader extends List {
         description.setUIID("RSSDescription");
         description.setScrollVisible(false);
         entries.addComponent(description);
-        if(iconPlaceholder != null) {
+        if (iconPlaceholder != null) {
             Container wrap = new Container(new BorderLayout());
             wrap.addComponent(BorderLayout.CENTER, entries);
             Label icon = new Label();
@@ -139,26 +141,17 @@ public class RSSReader extends List {
     }
 
     /**
-     * The URL of the RSS stream
-     *
-     * @param url The URL of the RSS stream
-     */
-    public void setURL(String url) {
-        this.url = url;
-    }
-
-    /**
      * Send the request to the server, will only work once. This is called implicitly
      * when the list is initialized
      */
     public void sendRequest() {
-        if(service == null) {
+        if (service == null) {
             service = new RSSService(url, limit);
-            if(iconPlaceholder != null) {
+            if (iconPlaceholder != null) {
                 service.setIconPlaceholder(iconPlaceholder);
             }
             service.addResponseListener(new EventHandler());
-            if(blockList) {
+            if (blockList) {
                 Progress p = new Progress(progressTitle, service, displayProgressPercentage);
                 p.setAutoShow(true);
                 p.setDisposeOnCompletion(true);
@@ -173,7 +166,7 @@ public class RSSReader extends List {
      */
     protected void initComponent() {
         super.initComponent();
-        if(designMode) {
+        if (designMode) {
             setHint("RSS Data Will Show Here");
         } else {
             sendRequest();
@@ -183,10 +176,19 @@ public class RSSReader extends List {
     /**
      * The URL of the RSS stream
      *
-     * @return The URL of the RSS stream 
+     * @return The URL of the RSS stream
      */
     public String getURL() {
         return url;
+    }
+
+    /**
+     * The URL of the RSS stream
+     *
+     * @param url The URL of the RSS stream
+     */
+    public void setURL(String url) {
+        this.url = url;
     }
 
     /**
@@ -201,54 +203,44 @@ public class RSSReader extends List {
      */
     public void setIconPlaceholder(Image iconPlaceholder) {
         this.iconPlaceholder = iconPlaceholder;
-        if(service != null) {
+        if (service != null) {
             service.setIconPlaceholder(iconPlaceholder);
         }
         setRenderer(new GenericListCellRenderer(createRendererContainer(), createRendererContainer()));
     }
 
-    class Listener implements ActionListener {
-        private String url;
-        public Listener(String url) {
-            this.url = url;
-        }
-        public void actionPerformed(ActionEvent evt) {
-            Display.getInstance().execute(url);
-        }
-    }
-    
     void updateComponentValues(Container root, Hashtable h) {
         int c = root.getComponentCount();
-        for(int iter = 0 ; iter < c ; iter++) {
+        for (int iter = 0; iter < c; iter++) {
             Component current = root.getComponentAt(iter);
-            
+
             // the comparison assumes that other container subclases are really just
             // custom components e.g. tree, table and HTMLComponent as well as third party
             // subclasses
-            if(current.getClass() == com.codename1.ui.Container.class ||
+            if (current.getClass() == com.codename1.ui.Container.class ||
                     current.getClass() == com.codename1.ui.Tabs.class) {
-                updateComponentValues((Container)current, h);
+                updateComponentValues((Container) current, h);
                 continue;
             }
             String n = current.getName();
-            if(n != null) {
-                String val = (String)h.get(n);
-                if(val != null) {
-                    if(current instanceof Button) {
-                        final String url = (String)val;
-                        ((Button)current).addActionListener(new Listener(url));
+            if (n != null) {
+                String val = (String) h.get(n);
+                if (val != null) {
+                    if (current instanceof Button) {
+                        final String url = (String) val;
+                        ((Button) current).addActionListener(new Listener(url));
                         continue;
                     }
-                    if(current instanceof Label) {
-                        ((Label)current).setText(val);
+                    if (current instanceof Label) {
+                        ((Label) current).setText(val);
                         continue;
                     }
-                    if(current instanceof TextArea) {
-                        ((TextArea)current).setText(val);
+                    if (current instanceof TextArea) {
+                        ((TextArea) current).setText(val);
                         continue;
                     }
-                    if(current instanceof WebBrowser) {
-                        ((WebBrowser)current).setPage(val, null);
+                    if (current instanceof WebBrowser) {
+                        ((WebBrowser) current).setPage(val, null);
                         continue;
                     }
                 }
@@ -256,17 +248,6 @@ public class RSSReader extends List {
         }
     }
 
-    class BackCommand extends Command {
-        private Form sourceForm;
-        public BackCommand(Form sourceForm) {
-            super("Back");
-            this.sourceForm = sourceForm;
-        }
-        public void actionPerformed(ActionEvent ev) {
-            sourceForm.showBack();
-        }        
-    }
-    
     /**
      * Shows a form containing the RSS entry
      *
@@ -274,26 +255,26 @@ public class RSSReader extends List {
      */
     protected void showRSSEntry(Hashtable h) {
         Form newForm = null;
-        if(targetContainer != null) {
-            if(targetContainer instanceof Form) {
-                newForm = (Form)targetContainer;
+        if (targetContainer != null) {
+            if (targetContainer instanceof Form) {
+                newForm = (Form) targetContainer;
             } else {
-                newForm = new Form((String)h.get("title"));
+                newForm = new Form((String) h.get("title"));
                 newForm.setLayout(new BorderLayout());
                 newForm.addComponent(BorderLayout.CENTER, targetContainer);
             }
             updateComponentValues(newForm, h);
         } else {
-            newForm = new Form((String)h.get("title"));
+            newForm = new Form((String) h.get("title"));
             newForm.setScrollable(false);
             WebBrowser c = new WebBrowser();
-            String s = (String)h.get("description");
+            String s = (String) h.get("description");
             s = "<html><body>" + s + "</body></html>";
             c.setPage(s, null);
             newForm.setLayout(new BorderLayout());
             newForm.addComponent(BorderLayout.CENTER, c);
         }
-        if(addBackToTaget) {
+        if (addBackToTaget) {
             final Form sourceForm = Display.getInstance().getCurrent();
             Command back = new BackCommand(sourceForm);
             newForm.addCommand(back);
@@ -304,6 +285,7 @@ public class RSSReader extends List {
 
     /**
      * Places a limit on the number of RSS entries requested from the server
+     *
      * @return the limit
      */
     public int getLimit() {
@@ -312,7 +294,7 @@ public class RSSReader extends List {
 
     /**
      * Places a limit on the number of RSS entries requested from the server
-     * 
+     *
      * @param limit the limit to set
      */
     public void setLimit(int limit) {
@@ -323,51 +305,51 @@ public class RSSReader extends List {
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"limit", "url", "blockList", "progressTitle", "displayProgressPercentage", "target"};
+        return new String[]{"limit", "url", "blockList", "progressTitle", "displayProgressPercentage", "target"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {Integer.class, String.class, Boolean.class, String.class, Boolean.class, Container.class};
+        return new Class[]{Integer.class, String.class, Boolean.class, String.class, Boolean.class, Container.class};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("limit")) {
+        if (name.equals("limit")) {
             return Integer.valueOf(limit); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
-        if(name.equals("url")) {
+        if (name.equals("url")) {
             return url;
         }
-        if(name.equals("blockList")) {
-            if(blockList) {
+        if (name.equals("blockList")) {
+            if (blockList) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(name.equals("progressTitle")) {
+        if (name.equals("progressTitle")) {
             return progressTitle;
         }
-        if(name.equals("displayProgressPercentage")) {
-            if(displayProgressPercentage) {
+        if (name.equals("displayProgressPercentage")) {
+            if (displayProgressPercentage) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(name.equals("target")) {
+        if (name.equals("target")) {
             return targetContainer;
         }
-        if(name.equals("$designMode")) {
-            if(designMode) {
+        if (name.equals("$designMode")) {
+            if (designMode) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        
+
         return null;
     }
 
@@ -375,32 +357,32 @@ public class RSSReader extends List {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("limit")) {
-            limit = ((Integer)value).intValue();
+        if (name.equals("limit")) {
+            limit = ((Integer) value).intValue();
             return null;
         }
-        if(name.equals("url")) {
-            url = (String)value;
+        if (name.equals("url")) {
+            url = (String) value;
             return null;
         }
-        if(name.equals("blockList")) {
-            blockList = ((Boolean)value).booleanValue();
+        if (name.equals("blockList")) {
+            blockList = ((Boolean) value).booleanValue();
             return null;
         }
-        if(name.equals("progressTitle")) {
-            progressTitle = (String)value;
+        if (name.equals("progressTitle")) {
+            progressTitle = (String) value;
             return null;
         }
-        if(name.equals("displayProgressPercentage")) {
-            displayProgressPercentage = ((Boolean)value).booleanValue();
+        if (name.equals("displayProgressPercentage")) {
+            displayProgressPercentage = ((Boolean) value).booleanValue();
             return null;
         }
-        if(name.equals("target")) {
-            targetContainer = (Container)value;
+        if (name.equals("target")) {
+            targetContainer = (Container) value;
             return null;
         }
-        if(name.equals("$designMode")) {
-            designMode = ((Boolean)value).booleanValue();
+        if (name.equals("$designMode")) {
+            designMode = ((Boolean) value).booleanValue();
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -437,6 +419,7 @@ public class RSSReader extends List {
     /**
      * The form/container to which the RSS will navigate when clicking a RSS
      * entry
+     *
      * @return the targetContainer
      */
     public Container getTargetContainer() {
@@ -446,6 +429,7 @@ public class RSSReader extends List {
     /**
      * The form/container to which the RSS will navigate when clicking a RSS
      * entry
+     *
      * @param targetContainer the targetContainer to set
      */
     public void setTargetContainer(Container targetContainer) {
@@ -454,6 +438,7 @@ public class RSSReader extends List {
 
     /**
      * Indicates whether a back command should be added implicitly to the target container
+     *
      * @return the addBackToTaget
      */
     public boolean isAddBackToTaget() {
@@ -462,63 +447,89 @@ public class RSSReader extends List {
 
     /**
      * Indicates whether a back command should be added implicitly to the target container
+     *
      * @param addBackToTaget the addBackToTaget to set
      */
     public void setAddBackToTaget(boolean addBackToTaget) {
         this.addBackToTaget = addBackToTaget;
     }
 
+    class Listener implements ActionListener {
+        private String url;
+
+        public Listener(String url) {
+            this.url = url;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            Display.getInstance().execute(url);
+        }
+    }
+
+    class BackCommand extends Command {
+        private Form sourceForm;
+
+        public BackCommand(Form sourceForm) {
+            super("Back");
+            this.sourceForm = sourceForm;
+        }
+
+        public void actionPerformed(ActionEvent ev) {
+            sourceForm.showBack();
+        }
+    }
 
     class EventHandler implements ActionListener {
         private void downloadImage(Hashtable h, int offset) {
-            if(iconPlaceholder != null) { 
-                String url = (String)h.get("thumb");
-                if(url != null) {
+            if (iconPlaceholder != null) {
+                String url = (String) h.get("thumb");
+                if (url != null) {
                     ImageDownloadService.createImageToStorage(url, RSSReader.this, getModel(), offset, "icon", url.replace('/', '_').replace(':', '_'), iconPlaceholder, ConnectionRequest.PRIORITY_REDUNDANT);
                 }
             }
         }
-        public void actionPerformed(ActionEvent evt) {
-            if(evt instanceof NetworkEvent) {
-                waitingForResponseLock = false;
-                NetworkEvent e = (NetworkEvent)evt;
-                Vector v = (Vector)e.getMetaData();
-                RSSService s = (RSSService)e.getConnectionRequest();
 
-                if(existingData != null) {
+        public void actionPerformed(ActionEvent evt) {
+            if (evt instanceof NetworkEvent) {
+                waitingForResponseLock = false;
+                NetworkEvent e = (NetworkEvent) evt;
+                Vector v = (Vector) e.getMetaData();
+                RSSService s = (RSSService) e.getConnectionRequest();
+
+                if (existingData != null) {
                     existingData.removeElement(MORE);
-                    for(int iter = 0 ; iter < v.size() ; iter++) {
-                        Hashtable h = (Hashtable)v.elementAt(iter);
+                    for (int iter = 0; iter < v.size(); iter++) {
+                        Hashtable h = (Hashtable) v.elementAt(iter);
                         existingData.addElement(h);
                     }
                 } else {
                     existingData = v;
                 }
 
-                if(s.hasMore()) {
+                if (s.hasMore()) {
                     v.addElement(MORE);
                 }
 
                 setModel(new DefaultListModel(existingData));
 
-                for(int iter = 0 ; iter < existingData.size() ; iter++) {
-                    Hashtable h = (Hashtable)existingData.elementAt(iter);
+                for (int iter = 0; iter < existingData.size(); iter++) {
+                    Hashtable h = (Hashtable) existingData.elementAt(iter);
                     Object icn = h.get("icon");
-                    if(icn != null && icn == iconPlaceholder) {
+                    if (icn != null && icn == iconPlaceholder) {
                         downloadImage(h, iter);
                     }
                 }
                 return;
             }
 
-            Hashtable sel = (Hashtable)getSelectedItem();
-            if(sel == MORE) {
-                if(waitingForResponseLock) {
+            Hashtable sel = (Hashtable) getSelectedItem();
+            if (sel == MORE) {
+                if (waitingForResponseLock) {
                     return;
                 }
                 waitingForResponseLock = true;
                 service = new RSSService(url, limit, existingData.size() - 1);
-                if(iconPlaceholder != null) {
+                if (iconPlaceholder != null) {
                     service.setIconPlaceholder(iconPlaceholder);
                 }
                 service.addResponseListener(new EventHandler());

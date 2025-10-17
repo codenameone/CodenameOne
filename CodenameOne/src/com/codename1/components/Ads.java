@@ -6,25 +6,24 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
 
 import com.codename1.ads.AdsService;
 import com.codename1.io.ConnectionRequest;
-import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -32,28 +31,27 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
-import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.html.IOCallback;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.html.HTMLCallback;
 import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.html.HTMLElement;
+import com.codename1.ui.html.IOCallback;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.plaf.UIManager;
-import java.io.IOException;
+
 import java.util.Vector;
 
 /**
- * This is an Ads Component, this Component can displays banner/text ads on a 
+ * This is an Ads Component, this Component can displays banner/text ads on a
  * Form.
  * This is a generic Ads Component that can support different type of Ads Network
  * Services, at the Moment Codename One supports innerActive ads, to gain an appId
- * please refer to 
+ * please refer to
  * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
- * 
+ *
  * @author Chen
  * @deprecated we recommend developers check out newer ad options in the cn1lib section of the Codename One website
  */
@@ -80,7 +78,7 @@ public class Ads extends Container implements HTMLCallback {
     public Ads() {
         setUIID("Ads");
         setLayout(new BorderLayout());
-        
+
         // special case for iOS. It seems the ad component can inadvertedly steal focus from 
         // the text field being edited thus blocking the hiding of the lightweight text.
         // I'm guessing this can affect Android too in some cases
@@ -90,22 +88,22 @@ public class Ads extends Container implements HTMLCallback {
         filler.getStyle().setBgTransparency(0);
         addComponent(BorderLayout.CENTER, filler);
     }
-    
+
     /**
      * Simple constructor to create an Ad Component
-     * @param appId unique identifier of the app, to gain an appId please refer to 
-     * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+     *
+     * @param appId unique identifier of the app, to gain an appId please refer to
+     *              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
      */
     public Ads(String appId) {
         this(appId, true);
     }
 
     /**
-     * 
-     * @param appId unique identifier of the app, to gain an appId please refer to 
-     * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+     * @param appId     unique identifier of the app, to gain an appId please refer to
+     *                  http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
      * @param refreshAd if true this Component will refresh the Ad every 60 seconds,
-     * if false no refresh will occur
+     *                  if false no refresh will occur
      */
     public Ads(String appId, boolean refreshAd) {
         this();
@@ -118,7 +116,7 @@ public class Ads extends Container implements HTMLCallback {
      * {@inheritDoc}
      */
     public void initComponent() {
-        if(service != null) {
+        if (service != null) {
             service.initialize(this);
             service.addResponseListener(new ActionListener() {
 
@@ -127,11 +125,11 @@ public class Ads extends Container implements HTMLCallback {
                     setAd(a);
                 }
             });
-            
+
             if (refreshAd) {
                 getComponentForm().registerAnimated(this);
-            }else{
-                requestAd();            
+            } else {
+                requestAd();
             }
         }
     }
@@ -144,8 +142,7 @@ public class Ads extends Container implements HTMLCallback {
             getComponentForm().deregisterAnimated(this);
         }
     }
-    
-    
+
 
     private void requestAd() {
         service.requestAd();
@@ -207,6 +204,7 @@ public class Ads extends Container implements HTMLCallback {
 
     /**
      * HTML ad received from the server
+     *
      * @return the ad
      */
     public String getAd() {
@@ -215,6 +213,7 @@ public class Ads extends Container implements HTMLCallback {
 
     /**
      * HTML ad received from the server
+     *
      * @param ad the ad to set
      */
     public void setAd(String ad) {
@@ -363,47 +362,28 @@ public class Ads extends Container implements HTMLCallback {
 
     /**
      * {@inheritDoc}
-     */ 
+     */
     public void setHeight(int height) {
-        float percent = ((float)height/(float)Display.getInstance().getDisplayHeight());
+        float percent = ((float) height / (float) Display.getInstance().getDisplayHeight());
         percent *= 100;
         //if the banner height is more then 25% it's a bad ad we need to 
         //remove it.
-        if(percent > 25){
+        if (percent > 25) {
             removeAll();
             Label filler = new Label(" ");
             filler.setPreferredSize(new Dimension(400, 2));
             filler.getStyle().setBgTransparency(0);
             addComponent(BorderLayout.CENTER, filler);
             revalidate();
-        }else{
+        } else {
             super.setHeight(height);
         }
     }
 
-    
-    
     /**
-     * Simple setter of the unique identifier of the app on the ads service 
-     * network, no need to manually use this the createAdsService uses this.
-     * 
-     * @param appId unique identifier of the app, to gain an appId please refer to 
-     * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
-     */
-    public void setAppID(String appId) {
-        this.appId = appId;
-        if(service == null) {
-            service = AdsService.createAdsService();
-            if(isInitialized()) {
-                initComponent();
-            }
-        }
-    }
-
-    /**
-     * Simple getter of the unique identifier of the app on the ads service 
+     * Simple getter of the unique identifier of the app on the ads service
      * network.
-     * 
+     *
      * @return the app unique identifier.
      */
     public String getAppID() {
@@ -411,8 +391,53 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
+     * Simple setter of the unique identifier of the app on the ads service
+     * network, no need to manually use this the createAdsService uses this.
+     *
+     * @param appId unique identifier of the app, to gain an appId please refer to
+     *              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+     */
+    public void setAppID(String appId) {
+        this.appId = appId;
+        if (service == null) {
+            service = AdsService.createAdsService();
+            if (isInitialized()) {
+                initComponent();
+            }
+        }
+    }
+
+    /**
+     * Users age
+     *
+     * @return the user age
+     */
+    public String getAge() {
+        return age;
+    }
+
+    /**
+     * Sets the users age
+     *
+     * @param age
+     */
+    public void setAge(String age) {
+        this.age = age;
+    }
+
+    /**
+     * The user gender can be: M/m, F/f, Male, Female.
+     *
+     * @return
+     */
+    public String getGender() {
+        return gender;
+    }
+
+    /**
      * Sets Gender if applicable can be one of the following:
      * 'F', 'f', 'M', 'm', 'Female', 'female', 'Male', 'male'
+     *
      * @param gender
      */
     public void setGender(String gender) {
@@ -421,6 +446,16 @@ public class Ads extends Container implements HTMLCallback {
 
     /**
      * Keywords relevant to this user specific session
+     *
+     * @return
+     */
+    public String[] getKeywords() {
+        return keywords;
+    }
+
+    /**
+     * Keywords relevant to this user specific session
+     *
      * @param keywords
      */
     public void setKeywords(String[] keywords) {
@@ -428,47 +463,8 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Users age
-     * @return the user age
-     */
-    public String getAge() {
-        return age;
-    }
-
-    /**
-     * The user gender can be: M/m, F/f, Male, Female.
-     * @return 
-     */
-    public String getGender() {
-        return gender;
-    }
-
-    /**
-     * Keywords relevant to this user specific session
-     * @return 
-     */
-    public String[] getKeywords() {
-        return keywords;
-    }
-
-    /**
-     * Sets the users age
-     * @param age 
-     */
-    public void setAge(String age) {
-        this.age = age;
-    }
-
-    /**
      * Category is a single word description of the application.
-     * @param category 
-     */
-    public void setCategory(String category) {
-        this.category = category;
-    }
-
-    /**
-     * Category is a single word description of the application.
+     *
      * @return a single word description of the application.
      */
     public String getCategory() {
@@ -476,24 +472,34 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * Location string is a comma separated list of country, state/province, city
-     * For example: US, NY, NY
-     * @param location 
+     * Category is a single word description of the application.
+     *
+     * @param category
      */
-    public void setLocation(String location) {
-        this.location = location;
+    public void setCategory(String category) {
+        this.category = category;
     }
 
     /**
      * Location string is a comma separated list of country, state/province, city
      * For example: US, NY, NY
-     * @return 
+     *
+     * @return
      */
     public String getLocation() {
         return location;
     }
-    
-    
+
+    /**
+     * Location string is a comma separated list of country, state/province, city
+     * For example: US, NY, NY
+     *
+     * @param location
+     */
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -513,7 +519,7 @@ public class Ads extends Container implements HTMLCallback {
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"String", "int", "String", "String", "String", "String", "String[]"};
+        return new String[]{"String", "int", "String", "String", "String", "String", "String[]"};
     }
 
     /**

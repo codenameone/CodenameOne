@@ -38,10 +38,10 @@ import com.codename1.ui.events.ActionEvent;
  * <p>Events that require a synchronous return value should call the {@link #setPluginEventResponse(Object)} method
  * with the return value.  {@link #setPluginEventResponse(Object)} calls {@link #consume()}, so you do not need
  * to call both of these methods.</p>
- * @param <T> The type of the response to the event. If the event does not require a response, this should be {@link Void}.
  *
- * @since 8.0
+ * @param <T> The type of the response to the event. If the event does not require a response, this should be {@link Void}.
  * @author Steve Hannah
+ * @since 8.0
  */
 public abstract class PluginEvent<T> extends ActionEvent {
 
@@ -49,29 +49,32 @@ public abstract class PluginEvent<T> extends ActionEvent {
 
     /**
      * Creates a new plugin event with the given source and type.
+     *
      * @param source The source of the event.  May be null.
-     * @param type The type of the event.  All PluginEvent classes should have a corresponding enum type in the
-     *             {@link Type} enum.
+     * @param type   The type of the event.  All PluginEvent classes should have a corresponding enum type in the
+     *               {@link Type} enum.
      */
     public PluginEvent(Object source, Type type) {
         super(source, type);
     }
 
     /**
+     * Gets the response to the event.  This will be null if the event has not been consumed.
+     *
+     * @return The result of processing the event.
+     */
+    public T getPluginEventResponse() {
+        return pluginEventResponse;
+    }
+
+    /**
      * Sets the return value of processing the event.  This method calls {@link #consume()}, so you don't need to
      * call both to consume the event and set the response.
+     *
      * @param response
      */
     public void setPluginEventResponse(T response) {
         this.consume();
         this.pluginEventResponse = response;
-    }
-
-    /**
-     * Gets the response to the event.  This will be null if the event has not been consumed.
-     * @return The result of processing the event.
-     */
-    public T getPluginEventResponse() {
-        return pluginEventResponse;
     }
 }

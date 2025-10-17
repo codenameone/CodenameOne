@@ -36,9 +36,9 @@ import com.codename1.ui.geom.Rectangle;
  * @author Shai Almog
  */
 public final class Timeline extends Image implements Animation, Painter {
+    AnimationObject[] animations;
     private int time;
     private int duration;
-    AnimationObject[] animations;
     private Dimension size;
     private Dimension scaledTo;
     private long currentTime = -1;
@@ -59,25 +59,44 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
+     * Create a new timeline animation
+     *
+     * @param duration   the duration of the animation in milliseconds
+     * @param animations the animation objects that are part of this timeline
+     * @param size       size of the animation in virtual pixels, if the size differs the animation would be
+     *                   scaled on the fly
+     * @return the new timeline instance
+     */
+    public static Timeline createTimeline(int duration, AnimationObject[] animations, Dimension size) {
+        if (duration <= 0) {
+            throw new IllegalArgumentException("Illegal duration " + duration);
+        }
+        Timeline t = new Timeline();
+        t.duration = duration;
+        t.animations = animations;
+        t.size = size;
+        return t;
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void lock() {
-        if(animations != null) {
+        if (animations != null) {
             int alen = animations.length;
-            for(int iter = 0 ; iter < alen ; iter++) {
+            for (int iter = 0; iter < alen; iter++) {
                 animations[iter].lock();
             }
         }
     }
 
-
     /**
      * {@inheritDoc}
      */
     public void unlock() {
-        if(animations != null) {
+        if (animations != null) {
             int alen = animations.length;
-            for(int iter = 0 ; iter < alen ; iter++) {
+            for (int iter = 0; iter < alen; iter++) {
                 animations[iter].unlock();
             }
         }
@@ -100,28 +119,8 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * Create a new timeline animation
-     *
-     * @param duration the duration of the animation in milliseconds
-     * @param animations the animation objects that are part of this timeline
-     * @param size size of the animation in virtual pixels, if the size differs the animation would be
-     * scaled on the fly
-     * @return the new timeline instance
-     */
-    public static Timeline createTimeline(int duration, AnimationObject[] animations, Dimension size) {
-        if(duration <= 0) {
-            throw new IllegalArgumentException("Illegal duration " + duration);
-        }
-        Timeline t = new Timeline();
-        t.duration = duration;
-        t.animations = animations;
-        t.size = size;
-        return t;
-    }
-
-    /**
      * Adds an animation object to show using this timeline
-     * 
+     *
      * @param o animation object featured in this timeline
      */
     public void addAnimation(AnimationObject o) {
@@ -132,26 +131,26 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * Set the time of the timeline
-     *
-     * @param time the time of the timeline in ms starting from 0
-     */
-    public void setTime(int time) {
-        if(!pause) {
-            if(time >= 0 && time <= duration) {
-                this.time = time;
-                currentTime = System.currentTimeMillis();
-            }
-        }
-    }
-
-    /**
      * Returns the time of the timeline
      *
      * @return the time of the timeline in ms starting from 0
      */
     public int getTime() {
         return time;
+    }
+
+    /**
+     * Set the time of the timeline
+     *
+     * @param time the time of the timeline in ms starting from 0
+     */
+    public void setTime(int time) {
+        if (!pause) {
+            if (time >= 0 && time <= duration) {
+                this.time = time;
+                currentTime = System.currentTimeMillis();
+            }
+        }
     }
 
     /**
@@ -165,18 +164,18 @@ public final class Timeline extends Image implements Animation, Painter {
      * {@inheritDoc}
      */
     public boolean animate() {
-        if(!pause) {
-            if(currentTime < 0) {
+        if (!pause) {
+            if (currentTime < 0) {
                 currentTime = System.currentTimeMillis();
                 setTime(0);
                 return true;
             } else {
                 long newCurrentTime = System.currentTimeMillis();
-                if(newCurrentTime - currentTime >= animationDelay) {
-                    int newTime = (int)(time + (newCurrentTime - currentTime));
+                if (newCurrentTime - currentTime >= animationDelay) {
+                    int newTime = (int) (time + (newCurrentTime - currentTime));
                     currentTime = newCurrentTime;
-                    if(newTime > duration) {
-                        if(!loop) {
+                    if (newTime > duration) {
+                        if (!loop) {
                             return false;
                         }
                         newTime = 0;
@@ -202,22 +201,22 @@ public final class Timeline extends Image implements Animation, Painter {
     public void paint(Graphics g, Rectangle rect) {
         float scaleX = 1;
         float scaleY = 1;
-        if(rect != null) {
-            scaleX = ((float)rect.getSize().getWidth()) / ((float)size.getWidth());
-            scaleY = ((float)rect.getSize().getHeight()) / ((float)size.getHeight());
+        if (rect != null) {
+            scaleX = ((float) rect.getSize().getWidth()) / ((float) size.getWidth());
+            scaleY = ((float) rect.getSize().getHeight()) / ((float) size.getHeight());
         }
         paintScaled(g, scaleX, scaleY);
     }
 
     private void paintScaled(Graphics g, float scaleX, float scaleY) {
         int alen = animations.length;
-        for(int iter = 0 ; iter < alen ; iter++) {
+        for (int iter = 0; iter < alen; iter++) {
             int s = animations[iter].getStartTime();
-            if(s > -1 && s > time) {
+            if (s > -1 && s > time) {
                 continue;
             }
             int e = animations[iter].getEndTime();
-            if(e > -1 && e < time) {
+            if (e > -1 && e < time) {
                 continue;
             }
             animations[iter].setTime(time);
@@ -252,9 +251,9 @@ public final class Timeline extends Image implements Animation, Painter {
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         g.translate(x, y);
-        if(scaledTo != null) {
-            float scaleX = ((float)scaledTo.getWidth()) / ((float)size.getWidth());
-            float scaleY = ((float)scaledTo.getHeight()) / ((float)size.getHeight());
+        if (scaledTo != null) {
+            float scaleX = ((float) scaledTo.getWidth()) / ((float) size.getWidth());
+            float scaleY = ((float) scaledTo.getHeight()) / ((float) size.getHeight());
             paintScaled(g, scaleX, scaleY);
         } else {
             paint(g);
@@ -267,17 +266,17 @@ public final class Timeline extends Image implements Animation, Painter {
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         g.translate(x, y);
-        float scaleX = ((float)w) / ((float)size.getWidth());
-        float scaleY = ((float)h) / ((float)size.getHeight());
+        float scaleX = ((float) w) / ((float) size.getWidth());
+        float scaleY = ((float) h) / ((float) size.getHeight());
         paintScaled(g, scaleX, scaleY);
         g.translate(-x, -y);
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public int getWidth() {
-        if(scaledTo != null) {
+        if (scaledTo != null) {
             return scaledTo.getWidth();
         }
         return size.getWidth();
@@ -287,7 +286,7 @@ public final class Timeline extends Image implements Animation, Painter {
      * {@inheritDoc}
      */
     public int getHeight() {
-        if(scaledTo != null) {
+        if (scaledTo != null) {
             return scaledTo.getHeight();
         }
         return size.getHeight();
@@ -375,24 +374,24 @@ public final class Timeline extends Image implements Animation, Painter {
      */
     public AnimationObject getAnimationAt(int x, int y) {
         int alen = animations.length;
-        for(int iter = 0 ; iter < alen ; iter++) {
+        for (int iter = 0; iter < alen; iter++) {
             float scaleX = 1;
             float scaleY = 1;
-            if(scaledTo != null) {
-                scaleX = ((float)scaledTo.getWidth()) / ((float)size.getWidth());
-                scaleY = ((float)scaledTo.getHeight()) / ((float)size.getHeight());
+            if (scaledTo != null) {
+                scaleX = ((float) scaledTo.getWidth()) / ((float) size.getWidth());
+                scaleY = ((float) scaledTo.getHeight()) / ((float) size.getHeight());
             }
-            int w = (int)(animations[iter].getWidth() * scaleX);
-            int h = (int)(animations[iter].getHeight() * scaleY);
-            int ax = (int)(animations[iter].getX() * scaleX);
-            int ay = (int)(animations[iter].getY() * scaleY);
-            if(Rectangle.intersects(ax, ay, w, h, x, y, 1, 1)) {
+            int w = (int) (animations[iter].getWidth() * scaleX);
+            int h = (int) (animations[iter].getHeight() * scaleY);
+            int ax = (int) (animations[iter].getX() * scaleX);
+            int ay = (int) (animations[iter].getY() * scaleY);
+            if (Rectangle.intersects(ax, ay, w, h, x, y, 1, 1)) {
                 // we now need to check if the pixel at that position is not transparent
                 int[] rgb = animations[iter].getImage().scaled(w, h).getRGB();
                 int relativeX = x - ax;
                 int relativeY = y - ay;
                 int offset = relativeX + (relativeY * h);
-                if(offset >= 0 && offset < rgb.length && (rgb[offset] & 0xff000000) != 0) {
+                if (offset >= 0 && offset < rgb.length && (rgb[offset] & 0xff000000) != 0) {
                     return animations[iter];
                 }
             }

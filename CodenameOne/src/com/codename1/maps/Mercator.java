@@ -23,7 +23,7 @@ import com.codename1.util.MathUtil;
 
 /**
  * Represents a Mercator projection http://en.wikipedia.org/wiki/Mercator_projection
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public class Mercator extends Projection {
@@ -40,9 +40,10 @@ public class Mercator extends Projection {
 
     /**
      * Create a projected Mercator Coord from the given coordinate
-     * @param latitude to project
+     *
+     * @param latitude  to project
      * @param longitude to project
-     * @return a projected Mercator 
+     * @return a projected Mercator
      */
     public static Coord forwardMercator(double latitude, double longitude) {
         double x = longitude * SIZE / 180;
@@ -52,7 +53,8 @@ public class Mercator extends Projection {
 
     /**
      * Create a unprojected Coord(Latitude, Longitude) from the projected Coord
-     * @param latitude projected latitude
+     *
+     * @param latitude  projected latitude
      * @param longitude projected longitude
      * @return unprojected Coord
      */
@@ -65,11 +67,12 @@ public class Mercator extends Projection {
 
     /**
      * Create a projected Mercator Coord from the given coordinate
+     *
      * @param wgs84 coordinate to project
      * @return projected Mercator Coord
      */
     public Coord fromWGS84(Coord wgs84) {
-        if(wgs84.isProjected()){
+        if (wgs84.isProjected()) {
             return wgs84;
         }
         return forwardMercator(wgs84.getLatitude(), wgs84.getLongitude());
@@ -77,11 +80,12 @@ public class Mercator extends Projection {
 
     /**
      * Create a Coord(Latitude, Longitude) from the projected Coord
+     *
      * @param wgs84 projected Coord
      * @return unprojected Latitude, Longitude
      */
     public Coord toWGS84(Coord projection) {
-        if(!projection.isProjected()){
+        if (!projection.isProjected()) {
             return projection;
         }
         return inverseMercator(projection.getLatitude(), projection.getLongitude());

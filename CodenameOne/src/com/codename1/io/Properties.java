@@ -17,12 +17,12 @@
 package com.codename1.io;
 
 import com.codename1.util.CaseInsensitiveOrder;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.PrintStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
@@ -32,7 +32,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -54,14 +53,13 @@ import java.util.Set;
  */
 public class Properties extends HashMap<String, String> {
 
+    private static final int NONE = 0, SLASH = 1, UNICODE = 2, CONTINUE = 3,
+            KEY_DONE = 4, IGNORE = 5;
     /**
      * The default values for keys not found in this {@code Properties}
      * instance.
      */
     protected Properties defaults;
-
-    private static final int NONE = 0, SLASH = 1, UNICODE = 2, CONTINUE = 3,
-            KEY_DONE = 4, IGNORE = 5;
 
     /**
      * Constructs a new {@code Properties} object.
@@ -73,8 +71,7 @@ public class Properties extends HashMap<String, String> {
      * Constructs a new {@code Properties} object using the specified default
      * {@code Properties}.
      *
-     * @param properties
-     *            the default {@code Properties}.
+     * @param properties the default {@code Properties}.
      */
     public Properties(Properties properties) {
         defaults = properties;
@@ -90,33 +87,33 @@ public class Properties extends HashMap<String, String> {
         for (; i < slen; i++) {
             char ch = string.charAt(i);
             switch (ch) {
-            case '\t':
-                buffer.append("\\t");
-                break;
-            case '\n':
-                buffer.append("\\n");
-                break;
-            case '\f':
-                buffer.append("\\f");
-                break;
-            case '\r':
-                buffer.append("\\r");
-                break;
-            default:
-                if ("\\#!=:".indexOf(ch) >= 0 || (key && ch == ' ')) {
-                    buffer.append('\\');
-                }
-                if (ch >= ' ' && ch <= '~') {
-                    buffer.append(ch);
-                } else {
-                    String hex = Integer.toHexString(ch);
-                    buffer.append("\\u");
-                    int hlen = hex.length();
-                    for (int j = 0; j < 4 - hlen; j++) {
-                        buffer.append("0");
+                case '\t':
+                    buffer.append("\\t");
+                    break;
+                case '\n':
+                    buffer.append("\\n");
+                    break;
+                case '\f':
+                    buffer.append("\\f");
+                    break;
+                case '\r':
+                    buffer.append("\\r");
+                    break;
+                default:
+                    if ("\\#!=:".indexOf(ch) >= 0 || (key && ch == ' ')) {
+                        buffer.append('\\');
                     }
-                    buffer.append(hex);
-                }
+                    if (ch >= ' ' && ch <= '~') {
+                        buffer.append(ch);
+                    } else {
+                        String hex = Integer.toHexString(ch);
+                        buffer.append("\\u");
+                        int hlen = hex.length();
+                        for (int j = 0; j < 4 - hlen; j++) {
+                            buffer.append("0");
+                        }
+                        buffer.append(hex);
+                    }
             }
         }
     }
@@ -126,8 +123,7 @@ public class Properties extends HashMap<String, String> {
      * found, the default {@code Properties} are checked. If the property is not
      * found in the default {@code Properties}, {@code null} is returned.
      *
-     * @param name
-     *            the name of the property to find.
+     * @param name the name of the property to find.
      * @return the named property value, or {@code null} if it can't be found.
      */
     public String getProperty(String name) {
@@ -145,10 +141,8 @@ public class Properties extends HashMap<String, String> {
      * found in the default {@code Properties}, it returns the specified
      * default.
      *
-     * @param name
-     *            the name of the property to find.
-     * @param defaultValue
-     *            the default value.
+     * @param name         the name of the property to find.
+     * @param defaultValue the default value.
      * @return the named property value.
      */
     public String getProperty(String name, String defaultValue) {
@@ -245,84 +239,84 @@ public class Properties extends HashMap<String, String> {
             if (mode == SLASH) {
                 mode = NONE;
                 switch (nextChar) {
-                case '\r':
-                    mode = CONTINUE; // Look for a following \n
-                    continue;
-                case '\n':
-                    mode = IGNORE; // Ignore whitespace on the next line
-                    continue;
-                case 'b':
-                    nextChar = '\b';
-                    break;
-                case 'f':
-                    nextChar = '\f';
-                    break;
-                case 'n':
-                    nextChar = '\n';
-                    break;
-                case 'r':
-                    nextChar = '\r';
-                    break;
-                case 't':
-                    nextChar = '\t';
-                    break;
-                case 'u':
-                    mode = UNICODE;
-                    unicode = count = 0;
-                    continue;
+                    case '\r':
+                        mode = CONTINUE; // Look for a following \n
+                        continue;
+                    case '\n':
+                        mode = IGNORE; // Ignore whitespace on the next line
+                        continue;
+                    case 'b':
+                        nextChar = '\b';
+                        break;
+                    case 'f':
+                        nextChar = '\f';
+                        break;
+                    case 'n':
+                        nextChar = '\n';
+                        break;
+                    case 'r':
+                        nextChar = '\r';
+                        break;
+                    case 't':
+                        nextChar = '\t';
+                        break;
+                    case 'u':
+                        mode = UNICODE;
+                        unicode = count = 0;
+                        continue;
                 }
             } else {
                 switch (nextChar) {
-                case '#':
-                case '!':
-                    if (firstChar) {
-                        while (true) {
-                            intVal = br.read();
-                            if (intVal == -1) {
-                                break;
+                    case '#':
+                    case '!':
+                        if (firstChar) {
+                            while (true) {
+                                intVal = br.read();
+                                if (intVal == -1) {
+                                    break;
+                                }
+                                nextChar = (char) intVal;
+                                if (nextChar == '\r' || nextChar == '\n') {
+                                    break;
+                                }
                             }
-                            nextChar = (char) intVal;
-                            if (nextChar == '\r' || nextChar == '\n') {
-                                break;
-                            }
+                            continue;
                         }
+                        break;
+                    case '\n':
+                        if (mode == CONTINUE) { // Part of a \r\n sequence
+                            mode = IGNORE; // Ignore whitespace on the next line
+                            continue;
+                        }
+                        // fall into the next case
+                    case '\r':
+                        mode = NONE;
+                        firstChar = true;
+                        if (offset > 0 || (offset == 0 && keyLength == 0)) {
+                            if (keyLength == -1) {
+                                keyLength = offset;
+                            }
+                            String temp = new String(buf, 0, offset);
+                            put(temp.substring(0, keyLength), temp
+                                    .substring(keyLength));
+                        }
+                        keyLength = -1;
+                        offset = 0;
                         continue;
-                    }
-                    break;
-                case '\n':
-                    if (mode == CONTINUE) { // Part of a \r\n sequence
-                        mode = IGNORE; // Ignore whitespace on the next line
-                        continue;
-                    }
-                    // fall into the next case
-                case '\r':
-                    mode = NONE;
-                    firstChar = true;
-                    if (offset > 0 || (offset == 0 && keyLength == 0)) {
-                        if (keyLength == -1) {
+                    case '\\':
+                        if (mode == KEY_DONE) {
                             keyLength = offset;
                         }
-                        String temp = new String(buf, 0, offset);
-                        put(temp.substring(0, keyLength), temp
-                                .substring(keyLength));
-                    }
-                    keyLength = -1;
-                    offset = 0;
-                    continue;
-                case '\\':
-                    if (mode == KEY_DONE) {
-                        keyLength = offset;
-                    }
-                    mode = SLASH;
-                    continue;
-                case ':':
-                case '=':
-                    if (keyLength == -1) { // if parsing the key
-                        mode = NONE;
-                        keyLength = offset;
+                        mode = SLASH;
                         continue;
-                    }
-                    break;
+                    case ':':
+                    case '=':
+                        if (keyLength == -1) { // if parsing the key
+                            mode = NONE;
+                            keyLength = offset;
+                            continue;
+                        }
+                        break;
                 }
                 if (nextChar == ' ' || nextChar == '\n' || nextChar == '\r' || nextChar == '\t') {
                     if (mode == CONTINUE) {
@@ -410,13 +404,13 @@ public class Properties extends HashMap<String, String> {
      * from this method is suitable for being read by the
      * {@link #load(InputStream)} method.
      *
-     * @param out the {@code OutputStream} to write to.
+     * @param out     the {@code OutputStream} to write to.
      * @param comment the comment to add at the beginning.
      * @throws ClassCastException if the key or value of a mapping is not a
-     *                String.
+     *                            String.
      * @deprecated This method ignores any {@code IOException} thrown while
-     *             writing -- use {@link #store} instead for better exception
-     *             handling.
+     * writing -- use {@link #store} instead for better exception
+     * handling.
      */
     @Deprecated
     public void save(OutputStream out, String comment) {
@@ -430,10 +424,8 @@ public class Properties extends HashMap<String, String> {
      * Maps the specified key to the specified value. If the key already exists,
      * the old value is replaced. The key and value cannot be {@code null}.
      *
-     * @param name
-     *            the key.
-     * @param value
-     *            the value.
+     * @param name  the key.
+     * @param value the value.
      * @return the old value mapped to the key, or {@code null}.
      */
     public Object setProperty(String name, String value) {
@@ -444,7 +436,7 @@ public class Properties extends HashMap<String, String> {
      * Stores properties to the specified {@code OutputStream}, using ISO-8859-1.
      * See "<a href="#character_encoding">Character Encoding</a>".
      *
-     * @param out the {@code OutputStream}
+     * @param out     the {@code OutputStream}
      * @param comment an optional comment to be written, or null
      * @throws IOException
      * @throws ClassCastException if a key or value is not a string
@@ -457,7 +449,7 @@ public class Properties extends HashMap<String, String> {
      * Stores the mappings in this {@code Properties} object to {@code out},
      * putting the specified comment at the beginning.
      *
-     * @param writer the {@code Writer}
+     * @param writer  the {@code Writer}
      * @param comment an optional comment to be written, or null
      * @throws IOException
      * @throws ClassCastException if a key or value is not a string

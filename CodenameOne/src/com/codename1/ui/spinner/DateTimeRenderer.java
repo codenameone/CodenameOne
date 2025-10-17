@@ -26,7 +26,7 @@ package com.codename1.ui.spinner;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.List;
-import com.codename1.ui.list.DefaultListCellRenderer;
+
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Map;
@@ -40,12 +40,12 @@ import java.util.Map;
  */
 class DateTimeRenderer extends SpinnerRenderer<Object> {
     static final String[] MONTHS = {
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     };
     static final String[] DAYS = {
-        "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+            "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
     };
-    
+
     private boolean markToday;
     private String originalUIID;
     private boolean date;
@@ -54,26 +54,14 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
     private boolean twentyFourHours;
     private boolean showSeconds;
 
-    void setType(int type) {
-        this.type = type;
-    }
-    
     private DateTimeRenderer() {
-    }
-
-    boolean isShowSeconds() {
-        return showSeconds;
-    }
-    
-    void setMarkToday(boolean markToday, long today) {
-        this.markToday = markToday;
     }
 
     /**
      * Construct a time renderer
      *
      * @param twentyFourHours show the value as 24 hour values or AM/PM
-     * @param showSeconds show the value of the seconds as well or hide it
+     * @param showSeconds     show the value of the seconds as well or hide it
      */
     public static DateTimeRenderer createTimeRenderer(boolean twentyFourHours, boolean showSeconds) {
         DateTimeRenderer d = new DateTimeRenderer();
@@ -86,7 +74,7 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
      * Constructs a date renderer
      *
      * @param separatorChar char separating the entries within the renderer such as /, - etc.
-     * @param format the date, one of the constant values in this class
+     * @param format        the date, one of the constant values in this class
      */
     public static DateTimeRenderer createDateRenderer(char separatorChar, int format) {
         DateTimeRenderer d = new DateTimeRenderer();
@@ -96,8 +84,20 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
         return d;
     }
 
+    void setType(int type) {
+        this.type = type;
+    }
+
+    boolean isShowSeconds() {
+        return showSeconds;
+    }
+
+    void setMarkToday(boolean markToday, long today) {
+        this.markToday = markToday;
+    }
+
     private String twoDigits(int i) {
-        if(i < 10) {
+        if (i < 10) {
             return "0" + i;
         }
         return "" + i;
@@ -107,39 +107,39 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
      * {@inheritDoc}
      */
     public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
-        if(value instanceof String) {
+        if (value instanceof String) {
             // rendering prototype
             return super.getListCellRendererComponent(list, value, index, isSelected);
         }
-        if(date) {
-            Date d = (Date)value;
-            if(markToday) {
+        if (date) {
+            Date d = (Date) value;
+            if (markToday) {
                 Calendar cl = Calendar.getInstance();
                 cl.setTime(new Date());
                 int dm = cl.get(Calendar.DAY_OF_MONTH);
                 int m = cl.get(Calendar.MONTH);
                 int year = cl.get(Calendar.YEAR);
                 cl.setTime(d);
-                if(dm == cl.get(Calendar.DAY_OF_MONTH) && year == cl.get(Calendar.YEAR) && m == cl.get(Calendar.MONTH)) {
-                    if(originalUIID == null) {
+                if (dm == cl.get(Calendar.DAY_OF_MONTH) && year == cl.get(Calendar.YEAR) && m == cl.get(Calendar.MONTH)) {
+                    if (originalUIID == null) {
                         originalUIID = getUIID();
                         setUIID("TODAY");
                         return super.getListCellRendererComponent(list, "Today", index, isSelected);
                     }
                 } else {
-                    if(originalUIID != null) {
+                    if (originalUIID != null) {
                         setUIID(originalUIID);
                         originalUIID = null;
                     }
                 }
-            } 
-            
+            }
+
             Calendar c = Calendar.getInstance();
             c.setTime(d);
             int day = c.get(Calendar.DAY_OF_MONTH);
             int month = c.get(Calendar.MONTH) + 1;
             int year = c.get(Calendar.YEAR);
-            switch(type) {
+            switch (type) {
                 case Spinner.DATE_FORMAT_DD_MM_YYYY:
                     value = twoDigits(day) + separatorChar + twoDigits(month) + separatorChar + year;
                     break;
@@ -160,24 +160,24 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
                     break;
             }
         } else {
-            int v = ((Integer)value).intValue();
+            int v = ((Integer) value).intValue();
             int seconds = v % 60;
             v /= 60;
             int minutes = v % 60;
             v /= 60;
             int hours;
             String amPm = "";
-            if(twentyFourHours) {
+            if (twentyFourHours) {
                 hours = v % 24;
             } else {
                 hours = v % 12;
-                if(v >= 12) {
+                if (v >= 12) {
                     amPm = "PM";
                 } else {
                     amPm = "AM";
                 }
             }
-            if(showSeconds) {
+            if (showSeconds) {
                 value = twoDigits(hours) + ":" + twoDigits(minutes) + ":" + twoDigits(seconds) + amPm;
             } else {
                 value = twoDigits(hours) + ":" + twoDigits(minutes) + amPm;
@@ -185,7 +185,7 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
         }
         return super.getListCellRendererComponent(list, value, index, isSelected);
     }
-    
+
     private String getLocalizedMonth(int i) {
         Map<String, String> t = getUIManager().getBundle();
         String text = MONTHS[i];
@@ -209,7 +209,7 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
         }
         return text;
     }
-    
+
     /**
      * @return the twentyFourHours
      */

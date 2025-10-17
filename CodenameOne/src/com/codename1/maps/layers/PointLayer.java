@@ -21,38 +21,39 @@ package com.codename1.maps.layers;
 
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
-import com.codename1.ui.geom.Point;
 import com.codename1.maps.Tile;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.geom.Point;
 
 /**
  * Do not use this layer directly, you need to add this layer into a PointsLayer class
  * instance in order for it to work as expected!
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
-public class PointLayer extends Coord implements Layer{
+public class PointLayer extends Coord implements Layer {
 
     private final String name;
     private Image icon;
     private boolean displayName;
-    
+
     /**
      * Creates a Point Layer.
-     * 
+     *
      * @param position the position of the Point
-     * @param getName the getName of the Point
-     * @param icon icon of the Point
+     * @param getName  the getName of the Point
+     * @param icon     icon of the Point
      */
     public PointLayer(Coord position, String name, Image icon) {
         super(position);
         this.name = name;
         this.icon = icon;
     }
-    
+
     /**
      * Gets the Point name
+     *
      * @return the Point name
      */
     public String getName() {
@@ -61,6 +62,7 @@ public class PointLayer extends Coord implements Layer{
 
     /**
      * Gets the point Icon
+     *
      * @return the point Icon
      */
     public Image getIcon() {
@@ -69,7 +71,8 @@ public class PointLayer extends Coord implements Layer{
 
     /**
      * Sets the display icon
-     * @param icon 
+     *
+     * @param icon
      */
     public void setIcon(Image icon) {
         this.icon = icon;
@@ -77,13 +80,13 @@ public class PointLayer extends Coord implements Layer{
 
     /**
      * This method declares if the point name should be displayed
-     * 
-     * @param displayName 
+     *
+     * @param displayName
      */
-    public void setDisplayName(boolean displayName){
+    public void setDisplayName(boolean displayName) {
         this.displayName = displayName;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -97,7 +100,7 @@ public class PointLayer extends Coord implements Layer{
         }
         int x = pos.getX() - width / 2;
         int y = pos.getY() - height / 2;
-        
+
         if (icon == null) {
             g.fillRect(x, y, width, height);
         } else {
@@ -121,6 +124,6 @@ public class PointLayer extends Coord implements Layer{
     public BoundingBox boundingBox() {
         return null;
     }
-    
-    
+
+
 }

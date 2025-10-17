@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui.spinner;
@@ -33,21 +33,20 @@ import com.codename1.ui.plaf.UIManager;
 
 /**
  * A duration Spinner widget  Used by the Picker in lightweight mode.
+ *
  * @author Steve Hannah
  */
 class DurationSpinner3D extends Container implements InternalPickerWidget {
-    public static final int FIELD_YEAR=0;
-    public static final int FIELD_MONTH=1;
-    public static final int FIELD_DAY=2;
-    public static final int FIELD_HOUR=4;
-    public static final int FIELD_MINUTE=8;
-    public static final int FIELD_SECOND=16;
-    public static final int FIELD_MILLISECOND=32;
-    
-    private Spinner3D days, hours, minutes, seconds, milliseconds;
+    public static final int FIELD_YEAR = 0;
+    public static final int FIELD_MONTH = 1;
+    public static final int FIELD_DAY = 2;
+    public static final int FIELD_HOUR = 4;
+    public static final int FIELD_MINUTE = 8;
+    public static final int FIELD_SECOND = 16;
+    public static final int FIELD_MILLISECOND = 32;
     private final boolean includeDays, includeHours, includeMinutes, includeSeconds, includeMilliseconds;
-
     private final int minuteStep;
+    private Spinner3D days, hours, minutes, seconds, milliseconds;
 
     public DurationSpinner3D(int fields) {
         this(fields, 5);
@@ -63,14 +62,14 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
         this.minuteStep = minuteStep;
         init();
     }
-    
+
     private void init() {
         setLayout(new BorderLayout());
         Container wrapper = new Container(new LayeredLayout());
-        
+
         Container box = new Container(BoxLayout.x());
         UIManager uim = UIManager.getInstance();
-        
+
         Style s = null;
 
         if (includeDays) {
@@ -90,7 +89,7 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
             box.add(new Label(uim.localize("hour", "hour")));
         }
         if (includeMinutes) {
-            minutes = Spinner3D.create(0, includeHours ? 59 : 1000, 0,  minuteStep);
+            minutes = Spinner3D.create(0, includeHours ? 59 : 1000, 0, minuteStep);
             minutes.setPreferredW(new Label("000", "Spinner3DRow").getPreferredW());
             s = Style.createProxyStyle(minutes.getRowStyle(), minutes.getSelectedRowStyle());
             s.setAlignment(Component.RIGHT);
@@ -113,47 +112,11 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
             box.add(milliseconds);
             box.add(new Label("ms", "ms"));
         }
-        
+
         wrapper.add(box);
-        LayeredLayout ll = (LayeredLayout)wrapper.getLayout();
+        LayeredLayout ll = (LayeredLayout) wrapper.getLayout();
         ll.setInsets(box, "0 auto 0 auto");
         add(BorderLayout.CENTER, wrapper);
-    }
-
-    @Override
-    public void setValue(Object value) {
-        long l = (Long)value;
-        if (days != null) {
-            long DAY = (1000l * 60l * 60l * 24l);
-            long numDays = l / DAY;
-            days.setValue((int)numDays);
-            l -= DAY * numDays;
-        }
-        
-        if (hours != null) {
-            long HOUR = (1000l * 60l * 60l);
-            long numHours = l / HOUR;
-            hours.setValue((int)numHours);
-            l -= HOUR * numHours;
-        }
-        
-        if (minutes != null) {
-            long MINUTE = (1000l * 60l);
-            long numMinutes = l / MINUTE;
-            minutes.setValue((int)numMinutes);
-            l -= MINUTE * numMinutes;
-        }
-        
-        if (seconds != null) {
-            long SECOND = (1000l);
-            long numSeconds = l / SECOND;
-            seconds.setValue((int)numSeconds);
-            l -= SECOND * numSeconds;
-        }
-        
-        if (milliseconds != null) {
-            milliseconds.setValue((int)l);
-        }
     }
 
     @Override
@@ -161,32 +124,68 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
         long l = 0l;
         if (days != null) {
             long DAY = (1000l * 60l * 60l * 24l);
-            long numDays = ((Integer)days.getValue()).intValue();
+            long numDays = ((Integer) days.getValue()).intValue();
             l += DAY * numDays;
         }
-        
+
         if (hours != null) {
             long HOUR = (1000l * 60l * 60l);
-            long numHours = ((Integer)hours.getValue()).intValue();
+            long numHours = ((Integer) hours.getValue()).intValue();
             l += HOUR * numHours;
         }
-        
+
         if (minutes != null) {
             long MINUTE = (1000l * 60l);
-            long numMinutes = ((Integer)minutes.getValue()).intValue();
-            
+            long numMinutes = ((Integer) minutes.getValue()).intValue();
+
             l += MINUTE * numMinutes;
         }
-        
+
         if (seconds != null) {
             long SECOND = (1000l);
-            long numSeconds = ((Integer)seconds.getValue()).intValue();
+            long numSeconds = ((Integer) seconds.getValue()).intValue();
             l += SECOND * numSeconds;
         }
-        
+
         if (milliseconds != null) {
-            l += ((Integer)milliseconds.getValue());
+            l += ((Integer) milliseconds.getValue());
         }
         return l;
+    }
+
+    @Override
+    public void setValue(Object value) {
+        long l = (Long) value;
+        if (days != null) {
+            long DAY = (1000l * 60l * 60l * 24l);
+            long numDays = l / DAY;
+            days.setValue((int) numDays);
+            l -= DAY * numDays;
+        }
+
+        if (hours != null) {
+            long HOUR = (1000l * 60l * 60l);
+            long numHours = l / HOUR;
+            hours.setValue((int) numHours);
+            l -= HOUR * numHours;
+        }
+
+        if (minutes != null) {
+            long MINUTE = (1000l * 60l);
+            long numMinutes = l / MINUTE;
+            minutes.setValue((int) numMinutes);
+            l -= MINUTE * numMinutes;
+        }
+
+        if (seconds != null) {
+            long SECOND = (1000l);
+            long numSeconds = l / SECOND;
+            seconds.setValue((int) numSeconds);
+            l -= SECOND * numSeconds;
+        }
+
+        if (milliseconds != null) {
+            milliseconds.setValue((int) l);
+        }
     }
 }

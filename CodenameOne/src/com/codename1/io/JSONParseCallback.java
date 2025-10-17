@@ -58,16 +58,18 @@ public interface JSONParseCallback {
 
     /**
      * Submits a numeric token from the JSON data
+     *
      * @param tok the token value
      */
     public void numericToken(double tok);
 
     /**
      * Submits a boolean token from the JSON data
+     *
      * @param tok the token value
      */
     public void booleanToken(boolean tok);
-    
+
     /**
      * Submits a numeric token from the JSON data
      */
@@ -77,14 +79,14 @@ public interface JSONParseCallback {
      * This method is called when a string key/value pair is detected within the json
      * it is essentially redundant when following string/numeric token.
      *
-     * @param key the key
+     * @param key   the key
      * @param value a string value
      */
     public void keyValue(String key, String value);
 
     /**
      * This method indicates to the Parser if this Callback is still alive
-     * 
+     *
      * @return true if the Callback is still interested to get the JSON parse
      * events from the JSONParser
      */

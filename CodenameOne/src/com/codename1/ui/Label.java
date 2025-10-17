@@ -31,7 +31,8 @@ import com.codename1.ui.TextSelection.Spans;
 import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.geom.*;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
@@ -48,11 +49,21 @@ import com.codename1.ui.util.EventDispatcher;
  * <script src="https://gist.github.com/codenameone/3bfd03a497bc09700128.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-label-text-position.png" alt="Label text positioning" />
  *
- *
  * @author Chen Fishbein
  */
 public class Label extends Component implements IconHolder, TextHolder {
 
+    private static int defaultGap = 2;
+    private static boolean defaultTickerEnabled = true;
+    private boolean iconChangeListenerInstalled;
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     */
+    private boolean legacyRenderer;
+    private String text = "";
+    private TextSelectionSupport textSelectionSupport;
+    private boolean textSelectionEnabled;
+    private Image icon;
     private final ActionListener iconChangeListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
@@ -62,35 +73,13 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
 
     };
-    private boolean iconChangeListenerInstalled;
-
-    /**
-     * Fallback to the old default look and feel renderer for cases where compatibility is essential
-     */
-    private boolean legacyRenderer;
-    private String text = "";
-
-    private TextSelectionSupport textSelectionSupport;
-    private boolean textSelectionEnabled;
-
-
-    private Image icon;
     private Image maskedIcon;
-
     private Component iconStyleComponent;
-
     private int valign = BOTTOM;
-
     private int textPosition = RIGHT;
-
-    private static int defaultGap = 2;
-
     private int gap = defaultGap;
-
     private int shiftText = 0;
-
     private boolean tickerRunning = false;
-    private static boolean defaultTickerEnabled = true;
     private boolean tickerEnabled = defaultTickerEnabled;
 
     private long tickerStartTime;
@@ -122,6 +111,9 @@ public class Label extends Component implements IconHolder, TextHolder {
     private float fontIconSize = -1;
     private String badgeText;
     private Component badgeStyleComponent;
+    // workaround for potential infinite recursion situation https://github.com/codenameone/CodenameOne/commit/54a4092003b0ee5631c05250824a6466b84e757f#commitcomment-24244448
+    private boolean autoSizeLaidOutLock;
+    private Span span;
 
     /**
      * Constructs a new label with the specified string of text, left justified.
@@ -152,27 +144,6 @@ public class Label extends Component implements IconHolder, TextHolder {
         setUIID(uiid);
     }
 
-    // workaround for potential infinite recursion situation https://github.com/codenameone/CodenameOne/commit/54a4092003b0ee5631c05250824a6466b84e757f#commitcomment-24244448
-    private boolean autoSizeLaidOutLock;
-
-    /**
-     * {@inheritDoc}
-     * This is overriden for auto size mode
-     */
-    @Override
-    protected void laidOut() {
-        if(autoSizeLaidOutLock) {
-            return;
-        }
-        autoSizeLaidOutLock = true;
-        super.laidOut();
-        if(autoSizeMode) {
-            initAutoResize();
-        }
-        autoSizeLaidOutLock = false;
-    }
-
-
 
     /**
      * Construct an empty label
@@ -190,7 +161,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     public Label(Image icon) {
         this("");
         this.icon = icon;
-        if(icon != null && icon.requiresDrawImage()) {
+        if (icon != null && icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
@@ -206,7 +177,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     public Label(Image icon, String uiid) {
         this("", uiid);
         this.icon = icon;
-        if(icon != null && icon.requiresDrawImage()) {
+        if (icon != null && icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
@@ -222,7 +193,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     public Label(String text, Image icon, String uiid) {
         this(text, uiid);
         this.icon = icon;
-        if(icon != null && icon.requiresDrawImage()) {
+        if (icon != null && icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
@@ -237,10 +208,76 @@ public class Label extends Component implements IconHolder, TextHolder {
     public Label(String text, Image icon) {
         this(text);
         this.icon = icon;
-        if(icon != null && icon.requiresDrawImage()) {
+        if (icon != null && icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
+
+    /**
+     * Returns the default gap in pixels between the icon/text to the Label boundaries
+     *
+     * @return the gap in pixels between the icon/text to the Label boundaries
+     */
+    public static int getDefaultGap() {
+        return defaultGap;
+    }
+
+    /**
+     * Set the default gap in pixels between the icon/text to the Label boundaries
+     *
+     * @param gap the gap in pixels
+     */
+    public static void setDefaultGap(int gap) {
+        defaultGap = gap;
+    }
+
+    /**
+     * Allows disabling/enabling tickers globally
+     *
+     * @return the defaultTickerEnabled
+     */
+    public static boolean isDefaultTickerEnabled() {
+        return defaultTickerEnabled;
+    }
+
+    /**
+     * Allows disabling/enabling tickers globally
+     *
+     * @param aDefaultTickerEnabled the defaultTickerEnabled to set
+     */
+    public static void setDefaultTickerEnabled(boolean aDefaultTickerEnabled) {
+        defaultTickerEnabled = aDefaultTickerEnabled;
+    }
+
+    /**
+     * {@inheritDoc}
+     * This is overriden for auto size mode
+     */
+    @Override
+    protected void laidOut() {
+        if (autoSizeLaidOutLock) {
+            return;
+        }
+        autoSizeLaidOutLock = true;
+        super.laidOut();
+        if (autoSizeMode) {
+            initAutoResize();
+        }
+        autoSizeLaidOutLock = false;
+    }
+
+    /**
+     * Gets the text to be used in a badge on this label.
+     *
+     * @return the badge text to be used on this label.  May return if no text is set.
+     * @see #setBadgeText(java.lang.String)
+     * @see #setBadgeUIID(java.lang.String)
+     * @see #getBadgeStyleComponent()
+     * @since 7.0
+     */
+    public String getBadgeText() {
+        return badgeText;
     }
 
     /**
@@ -250,26 +287,14 @@ public class Label extends Component implements IconHolder, TextHolder {
      * the "Badge" UIID, which, by default, uses white text on a red round border background.
      *
      * @param badgeText The text to include in the badge.   null or empty strings will result in the
-     * badge not being rendered.
-     * @since 7.0
+     *                  badge not being rendered.
      * @see #getBadgeText()
      * @see #getBadgeStyleComponent()
      * @see #setBadgeUIID(java.lang.String)
+     * @since 7.0
      */
     public void setBadgeText(String badgeText) {
         this.badgeText = badgeText;
-    }
-
-    /**
-     * Gets the text to be used in a badge on this label.
-     * @return the badge text to be used on this label.  May return if no text is set.
-     * @since 7.0
-     * @see #setBadgeText(java.lang.String)
-     * @see #setBadgeUIID(java.lang.String)
-     * @see #getBadgeStyleComponent()
-     */
-    public String getBadgeText() {
-        return badgeText;
     }
 
     /**
@@ -277,9 +302,9 @@ public class Label extends Component implements IconHolder, TextHolder {
      * the "Badge" UIID, which rendered 1.5mm white text on a red round border.
      *
      * @param badgeUIID The UIID to use for the badge.
-     * @since 7.0
      * @see #setBadgeText(java.lang.String)
      * @see #getBadgeStyleComponent()
+     * @since 7.0
      */
     public void setBadgeUIID(String badgeUIID) {
         if (badgeStyleComponent == null) {
@@ -291,33 +316,22 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * Gets a component that can be used for the style of the badge.
+     *
      * @return The component whose style can be used to style the badge.  May return null if none set.
-     * @since 7.0
      * @see #setBadgeText(java.lang.String)
      * @see #setBadgeUIID(java.lang.String)
      * @see #getBadgeText()
+     * @since 7.0
      */
     public Component getBadgeStyleComponent() {
         return badgeStyleComponent;
     }
 
     /**
-     * Sets a UIID to be used for the material icon style.
-     * @param uiid The uiid to use for the material icon style.
-     * @since 7.0
-     */
-    public void setIconUIID(String uiid) {
-        if (iconStyleComponent == null || !uiid.equals(iconStyleComponent.getUIID())) {
-            iconStyleComponent = new Component() {
-            };
-            iconStyleComponent.setUIID(uiid);
-        }
-    }
-
-    /**
      * Gets the component that should be used for styling material the material icon.  If {@link #setIconUIID(java.lang.String) } has been used
      * to set a custom UIID for the icon, then this will return a component with that UIID.  Otherwise this will just return this component
      * itself.
+     *
      * @return The component to use for styling the material icon.
      * @since 7.0
      */
@@ -329,7 +343,54 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
+     *
+     * @param c one of the constants from the font
+     */
+    public void setFontIcon(Font font, char c) {
+        FontImage.setFontIcon(this, font, c);
+        fontIconSize = -1;
+        this.font = font;
+        fontIcon = c;
+    }
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
+     *
+     * @param c    one of the constants from {@link com.codename1.ui.FontImage}
+     * @param size the size of the icon in millimeters
+     */
+    public void setMaterialIcon(char c, float size) {
+        FontImage.setMaterialIcon(this, c, size);
+        materialIconSize = size;
+        materialIcon = c;
+    }
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
+     *
+     * @param c    one of the constants from the font
+     * @param size the size of the icon in millimeters
+     */
+    public void setFontIcon(Font font, char c, float size) {
+        FontImage.setFontIcon(this, font, c, size);
+        fontIconSize = size;
+        this.font = font;
+        fontIcon = c;
+    }
+
+    /**
+     * Returns the material icon assigned to this component or 0 if not applicable
+     *
+     * @return the material icon
+     */
+    public char getMaterialIcon() {
+        return materialIcon;
+    }
+
+    /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
+     *
      * @param c one of the constants from {@link com.codename1.ui.FontImage}
      */
     public void setMaterialIcon(char c) {
@@ -339,14 +400,12 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
-     * @param c one of the constants from the font
+     * Returns the font icon assigned to this component or 0 if not applicable
+     *
+     * @return the material icon
      */
-    public void setFontIcon(Font font, char c) {
-        FontImage.setFontIcon(this, font, c);
-        fontIconSize = -1;
-        this.font = font;
-        fontIcon = c;
+    public char getFontIcon() {
+        return fontIcon;
     }
 
     /**
@@ -372,47 +431,9 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
-     * @param c one of the constants from {@link com.codename1.ui.FontImage}
-     * @param size the size of the icon in millimeters
-     */
-    public void setMaterialIcon(char c, float size) {
-        FontImage.setMaterialIcon(this, c, size);
-        materialIconSize = size;
-        materialIcon = c;
-    }
-
-    /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
-     * @param c one of the constants from the font
-     * @param size the size of the icon in millimeters
-     */
-    public void setFontIcon(Font font, char c, float size) {
-        FontImage.setFontIcon(this, font, c, size);
-        fontIconSize = size;
-        this.font = font;
-        fontIcon = c;
-    }
-
-    /**
-     * Returns the material icon assigned to this component or 0 if not applicable
-     * @return the material icon
-     */
-    public char getMaterialIcon() {
-        return materialIcon;
-    }
-
-    /**
-     * Returns the font icon assigned to this component or 0 if not applicable
-     * @return the material icon
-     */
-    public char getFontIcon() {
-        return fontIcon;
-    }
-
-    /**
      * Returns the material icon size assigned to this component or 0/-1 if
      * not applicable
+     *
      * @return the material icon size
      */
     public float getMaterialIconSize() {
@@ -422,6 +443,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * Returns the icon size assigned to this component or 0/-1 if
      * not applicable
+     *
      * @return the icon size
      */
     public float getFontIconSize() {
@@ -430,6 +452,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * Returns the font for the icon font or null if not font set
+     *
      * @return the material icon size
      */
     public Font getIconFont() {
@@ -440,7 +463,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public int getBaselineResizeBehavior() {
-        switch(valign) {
+        switch (valign) {
             case TOP:
                 return BRB_CONSTANT_ASCENT;
             case BOTTOM:
@@ -456,8 +479,8 @@ public class Label extends Component implements IconHolder, TextHolder {
         Style s = getStyle();
         Font f = s.getFont();
 
-        int innerHeight = height-s.getVerticalPadding();
-        return s.getPaddingTop()+(innerHeight-f.getHeight())/2+f.getAscent();
+        int innerHeight = height - s.getVerticalPadding();
+        return s.getPaddingTop() + (innerHeight - f.getHeight()) / 2 + f.getAscent();
     }
 
     /**
@@ -473,9 +496,9 @@ public class Label extends Component implements IconHolder, TextHolder {
             }
         }
 
-        if(materialIcon != 0) {
+        if (materialIcon != 0) {
             FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
-        } else if(fontIcon != 0) {
+        } else if (fontIcon != 0) {
             FontImage.setFontIcon(this, font, fontIcon, fontIconSize);
         }
     }
@@ -486,37 +509,22 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        if(materialIcon != 0) {
+        if (materialIcon != 0) {
             FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
-        } else if(fontIcon != 0) {
-            FontImage.setFontIcon(this, font,fontIcon, fontIconSize);
+        } else if (fontIcon != 0) {
+            FontImage.setFontIcon(this, font, fontIcon, fontIconSize);
         }
     }
 
-    /**
-     * Sets the Label text
-     *
-     * @param text the string that the label presents.
-     */
-    public void setText(String text){
-        widthAtLastCheck = -1;
-        this.text = text;
-        localize();
-        stringWidthUnselected = -1;
-        setShouldCalcPreferredSize(true);
-        repaint();
-    }
-
-
     private void localize() {
-        if(shouldLocalize) {
-            this.text =  getUIManager().localize(text, text);
+        if (shouldLocalize) {
+            this.text = getUIManager().localize(text, text);
         }
     }
 
     @Override
     protected void initLaf(UIManager uim) {
-        if(uim == getUIManager() && isInitialized()){
+        if (uim == getUIManager() && isInitialized()) {
             return;
         }
         super.initLaf(uim);
@@ -525,9 +533,9 @@ public class Label extends Component implements IconHolder, TextHolder {
             String iconUiid = uim.getIconUIIDFor(uiid);
             if (iconUiid != null) {
                 setIconUIID(iconUiid);
-                if(materialIcon != 0) {
+                if (materialIcon != 0) {
                     FontImage.setMaterialIcon(this, materialIcon, materialIconSize);
-                } else if(fontIcon != 0) {
+                } else if (fontIcon != 0) {
                     FontImage.setFontIcon(this, font, fontIcon, fontIconSize);
                 }
             }
@@ -541,21 +549,21 @@ public class Label extends Component implements IconHolder, TextHolder {
         super.initComponentImpl();
         UIManager manager = getUIManager();
         LookAndFeel lf = manager.getLookAndFeel();
-        if(hasFocus()) {
-            if(lf instanceof DefaultLookAndFeel) {
-                ((DefaultLookAndFeel)lf).focusGained(this);
+        if (hasFocus()) {
+            if (lf instanceof DefaultLookAndFeel) {
+                ((DefaultLookAndFeel) lf).focusGained(this);
             }
         }
         // solves the case of a user starting a ticker before adding the component
         // into the container
-        if(isTickerEnabled() && isTickerRunning() && !isCellRenderer()) {
+        if (isTickerEnabled() && isTickerRunning() && !isCellRenderer()) {
             getComponentForm().registerAnimatedInternal(this);
         }
         checkAnimation();
-        if(maskName != null && mask == null) {
+        if (maskName != null && mask == null) {
             setMask(UIManager.getInstance().getThemeMaskConstant(maskName));
         }
-        if(getIcon() != null) {
+        if (getIcon() != null) {
             if (!iconChangeListenerInstalled) {
                 getIcon().addActionListener(iconChangeListener);
                 iconChangeListenerInstalled = true;
@@ -564,32 +572,65 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
     }
 
-
-
     /**
      * {@inheritDoc}
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
         Form f = getComponentForm();
-        if(f != null) {
+        if (f != null) {
             f.deregisterAnimated(this);
         }
 
-        if(getIcon() != null) {
+        if (getIcon() != null) {
             getIcon().removeActionListener(iconChangeListener);
             getIcon().unlock();
         }
     }
-
 
     /**
      * Returns the label text
      *
      * @return the label text
      */
-    public String getText(){
+    public String getText() {
         return text;
+    }
+
+    /**
+     * Sets the Label text
+     *
+     * @param text the string that the label presents.
+     */
+    public void setText(String text) {
+        widthAtLastCheck = -1;
+        this.text = text;
+        localize();
+        stringWidthUnselected = -1;
+        setShouldCalcPreferredSize(true);
+        repaint();
+    }
+
+    void checkAnimation() {
+        super.checkAnimation();
+        if (icon != null && icon.isAnimation()) {
+            Form parent = getComponentForm();
+            if (parent != null) {
+                // animations are always running so the internal animation isn't
+                // good enough. We never want to stop this sort of animation
+                parent.registerAnimated(this);
+            }
+        }
+    }
+
+    /**
+     * Returns the labels icon
+     *
+     * @return the labels icon
+     */
+    @Override
+    public Image getIcon() {
+        return icon;
     }
 
     /**
@@ -598,8 +639,8 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @param icon the image that the label presents.
      */
     @Override
-    public void setIcon(Image icon){
-        if(this.icon == icon) {
+    public void setIcon(Image icon) {
+        if (this.icon == icon) {
             return;
         }
         if (this.icon != null) {
@@ -607,12 +648,12 @@ public class Label extends Component implements IconHolder, TextHolder {
             iconChangeListenerInstalled = false;
         }
         widthAtLastCheck = -1;
-        if(icon != null) {
-            if(icon.requiresDrawImage()) {
+        if (icon != null) {
+            if (icon.requiresDrawImage()) {
                 legacyRenderer = true;
             }
 
-            if(mask != null) {
+            if (mask != null) {
                 maskedIcon = icon.applyMaskAutoScale(mask);
             }
         }
@@ -628,40 +669,20 @@ public class Label extends Component implements IconHolder, TextHolder {
         repaint();
     }
 
-    void checkAnimation() {
-        super.checkAnimation();
-        if(icon != null && icon.isAnimation()) {
-            Form parent = getComponentForm();
-            if(parent != null) {
-                // animations are always running so the internal animation isn't
-                // good enough. We never want to stop this sort of animation
-                parent.registerAnimated(this);
-            }
-        }
-    }
-
     /**
-     * Returns the labels icon
+     * Returns the vertical alignment of the Label, this will only work when the icon
+     * is in the side of the text and not above or below it.
+     * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
+     * only work when there is an icon</strong>
      *
-     * @return the labels icon
-     */
-    @Override
-    public Image getIcon(){
-        return icon;
-    }
-
-    /**
-     * Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
-     *
-     * @param align alignment value
+     * @return the vertical alignment of the Label one of: CENTER, TOP, BOTTOM, BASELINE
      * @see #CENTER
-     * @see #LEFT
-     * @see #RIGHT
-     * @deprecated use Style.setAlignment instead
+     * @see #TOP
+     * @see #BOTTOM
+     * @see #BASELINE
      */
-    public void setAlignment(int align){
-        getSelectedStyle().setAlignment(align);
-        getUnselectedStyle().setAlignment(align);
+    public int getVerticalAlignment() {
+        return valign;
     }
 
     /**
@@ -676,26 +697,10 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @see #BASELINE
      */
     public void setVerticalAlignment(int valign) {
-        if(valign != CENTER && valign != TOP && valign != BOTTOM && valign != BASELINE){
+        if (valign != CENTER && valign != TOP && valign != BOTTOM && valign != BASELINE) {
             throw new IllegalArgumentException("Alignment can't be set to " + valign);
         }
         this.valign = valign;
-    }
-
-    /**
-     * Returns the vertical alignment of the Label, this will only work when the icon
-     * is in the side of the text and not above or below it.
-     * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
-     * only work when there is an icon</strong>
-     *
-     * @return the vertical alignment of the Label one of: CENTER, TOP, BOTTOM, BASELINE
-     * @see #CENTER
-     * @see #TOP
-     * @see #BOTTOM
-     * @see #BASELINE
-     */
-    public int getVerticalAlignment(){
-        return valign;
     }
 
     /**
@@ -707,8 +712,36 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @see #RIGHT
      * @deprecated use Style.getAlignment instead
      */
-    public int getAlignment(){
+    public int getAlignment() {
         return getStyle().getAlignment();
+    }
+
+    /**
+     * Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
+     *
+     * @param align alignment value
+     * @see #CENTER
+     * @see #LEFT
+     * @see #RIGHT
+     * @deprecated use Style.setAlignment instead
+     */
+    public void setAlignment(int align) {
+        getSelectedStyle().setAlignment(align);
+        getUnselectedStyle().setAlignment(align);
+    }
+
+    /**
+     * Returns The position of the text relative to the icon
+     *
+     * @return The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
+     * @see #LEFT
+     * @see #RIGHT
+     * @see #BOTTOM
+     * @see #TOP
+     */
+    @Override
+    public int getTextPosition() {
+        return textPosition;
     }
 
     /**
@@ -728,19 +761,14 @@ public class Label extends Component implements IconHolder, TextHolder {
         this.textPosition = textPosition;
     }
 
-
     /**
-     * Returns The position of the text relative to the icon
+     * Returns the gap in pixels between the icon/text to the Label boundaries
      *
-     * @return The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
-     * @see #LEFT
-     * @see #RIGHT
-     * @see #BOTTOM
-     * @see #TOP
+     * @return the gap in pixels between the icon/text to the Label boundaries
      */
     @Override
-    public int getTextPosition(){
-        return textPosition;
+    public int getGap() {
+        return gap;
     }
 
     /**
@@ -753,47 +781,17 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
-     * Returns the gap in pixels between the icon/text to the Label boundaries
-     *
-     * @return the gap in pixels between the icon/text to the Label boundaries
-     */
-    @Override
-    public int getGap() {
-        return gap;
-    }
-
-    /**
-     * Set the default gap in pixels between the icon/text to the Label boundaries
-     *
-     * @param gap the gap in pixels
-     */
-    public static void setDefaultGap(int gap) {
-        defaultGap = gap;
-    }
-
-    /**
-     * Returns the default gap in pixels between the icon/text to the Label boundaries
-     *
-     * @return the gap in pixels between the icon/text to the Label boundaries
-     */
-    public static int getDefaultGap() {
-        return defaultGap;
-    }
-
-    /**
      * {@inheritDoc}
      */
     protected String paramString() {
-        return super.paramString() + ", text = " +getText() + ", gap = " + gap;
+        return super.paramString() + ", text = " + getText() + ", gap = " + gap;
     }
-
-
 
     /**
      * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        if(legacyRenderer || (badgeText != null && badgeText.length() > 0)) {
+        if (legacyRenderer || (badgeText != null && badgeText.length() > 0)) {
             initAutoResize();
             getUIManager().getLookAndFeel().drawLabel(g, this);
             return;
@@ -805,11 +803,11 @@ public class Label extends Component implements IconHolder, TextHolder {
         initAutoResize();
         Object icn = null;
         Image i = getIconFromState();
-        if(i != null) {
+        if (i != null) {
             icn = i.getImage();
         } else {
             // optimize away a common usage pattern for drawing the background only
-            if(text == null || text.equals("") || text.equals(" ")) {
+            if (text == null || text.equals("") || text.equals(" ")) {
                 return;
             }
         }
@@ -821,20 +819,12 @@ public class Label extends Component implements IconHolder, TextHolder {
         Style s = getStyle();
         Font f = s.getFont();
         String t = text;
-        if(text == null) {
+        if (text == null) {
             t = "";
         }
         Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, t,
                 icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText,
                 endsWith3Points, valign);
-    }
-
-    /**
-     * Allows us to limit the maximum size for the autosize mode
-     * @param maxSize the maximum font size in millimeters
-     */
-    public void setMaxAutoSize(float maxSize) {
-        maxAutoSize = maxSize;
     }
 
     /**
@@ -847,11 +837,12 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
-     * Allows us to limit the minimum size for the autosize mode
-     * @param minSize the minimum font size in millimeters
+     * Allows us to limit the maximum size for the autosize mode
+     *
+     * @param maxSize the maximum font size in millimeters
      */
-    public void setMinAutoSize(float minSize) {
-        minAutoSize = minSize;
+    public void setMaxAutoSize(float maxSize) {
+        maxAutoSize = maxSize;
     }
 
     /**
@@ -863,23 +854,32 @@ public class Label extends Component implements IconHolder, TextHolder {
         return minAutoSize;
     }
 
+    /**
+     * Allows us to limit the minimum size for the autosize mode
+     *
+     * @param minSize the minimum font size in millimeters
+     */
+    public void setMinAutoSize(float minSize) {
+        minAutoSize = minSize;
+    }
+
     void initAutoResize() {
-        if(autoSizeMode) {
+        if (autoSizeMode) {
             Style s = getUnselectedStyle();
             int p = s.getHorizontalPadding();
             int w = getWidth();
-            if(w > p + 10) {
-                if(originalFont == null) {
+            if (w > p + 10) {
+                if (originalFont == null) {
                     originalFont = s.getFont();
                 } else {
-                    if(w == widthAtLastCheck) {
+                    if (w == widthAtLastCheck) {
                         return;
                     }
                 }
 
                 Font currentFont = getUnselectedStyle().getFont();
                 float fontSize = currentFont.getPixelSize();
-                if(fontSize < 1) {
+                if (fontSize < 1) {
                     Log.p("Autosize disabled probably because component wasn't using native fonts for UIID: " + getUIID());
                     autoSizeMode = false;
                     return;
@@ -888,9 +888,9 @@ public class Label extends Component implements IconHolder, TextHolder {
                 autoSizeMode = false;
                 int currentWidth = calcPreferredSize().getWidth();
                 int maxSizePixel = Display.getInstance().convertToPixels(maxAutoSize);
-                while(currentWidth < w) {
+                while (currentWidth < w) {
                     fontSize++;
-                    if(fontSize >= maxSizePixel) {
+                    if (fontSize >= maxSizePixel) {
                         fontSize = maxSizePixel;
                         currentFont = currentFont.derive(maxSizePixel, currentFont.getStyle());
                         getAllStyles().setFont(currentFont);
@@ -902,9 +902,9 @@ public class Label extends Component implements IconHolder, TextHolder {
                     currentWidth = calcPreferredSize().getWidth();
                 }
                 int minSizePixel = Display.getInstance().convertToPixels(minAutoSize);
-                while(currentWidth > w) {
+                while (currentWidth > w) {
                     fontSize--;
-                    if(fontSize <= minSizePixel) {
+                    if (fontSize <= minSizePixel) {
                         fontSize = minSizePixel;
                         currentFont = currentFont.derive(minSizePixel, currentFont.getStyle());
                         getAllStyles().setFont(currentFont);
@@ -923,13 +923,13 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * {@inheritDoc}
      */
-    protected Dimension calcPreferredSize(){
+    protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
     }
 
     /**
      * Simple getter to return how many pixels to shift the text inside the Label
-
+     *
      * @return number of pixels to shift
      */
     public int getShiftText() {
@@ -953,7 +953,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @return true if a ticker should start running
      */
     public boolean shouldTickerStart() {
-        if(!tickerEnabled){
+        if (!tickerEnabled) {
             return false;
         }
         Style style = getStyle();
@@ -987,17 +987,17 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * This method will start the text ticker
      *
-     * @param delay the delay in millisecods between animation intervals
+     * @param delay       the delay in millisecods between animation intervals
      * @param rightToLeft if true move the text to the left
      */
-    public void startTicker(long delay, boolean rightToLeft){
+    public void startTicker(long delay, boolean rightToLeft) {
         //return if ticker is not enabled
-        if(!tickerEnabled){
+        if (!tickerEnabled) {
             return;
         }
-        if(!isCellRenderer()){
+        if (!isCellRenderer()) {
             Form parent = getComponentForm();
-            if(parent != null) {
+            if (parent != null) {
                 parent.registerAnimatedInternal(this);
             }
         }
@@ -1013,7 +1013,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * Stops the text ticker
      */
-    public void stopTicker(){
+    public void stopTicker() {
         tickerRunning = false;
         setShiftText(0);
         deregisterAnimatedInternal();
@@ -1023,7 +1023,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     void tryDeregisterAnimated() {
-        if(tickerEnabled || tickerRunning) {
+        if (tickerEnabled || tickerRunning) {
             return;
         }
         super.tryDeregisterAnimated();
@@ -1039,16 +1039,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
-     * Sets the Label to allow ticking of the text.
-     * By default is true
-     *
-     * @param tickerEnabled
-     */
-    public void setTickerEnabled(boolean tickerEnabled) {
-        this.tickerEnabled = tickerEnabled;
-    }
-
-    /**
      * This method return true if the ticker is enabled on this Label
      *
      * @return tickerEnabled
@@ -1058,13 +1048,13 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
-     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
-     * points at the end. By default this is set to {@code false} for faster performance.
+     * Sets the Label to allow ticking of the text.
+     * By default is true
      *
-     * @param endsWith3Points true if text should add "..." at the end
+     * @param tickerEnabled
      */
-    public void setEndsWith3Points(boolean endsWith3Points){
-        this.endsWith3Points = endsWith3Points;
+    public void setTickerEnabled(boolean tickerEnabled) {
+        this.tickerEnabled = tickerEnabled;
     }
 
     /**
@@ -1077,7 +1067,15 @@ public class Label extends Component implements IconHolder, TextHolder {
         return endsWith3Points;
     }
 
-
+    /**
+     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
+     * points at the end. By default this is set to {@code false} for faster performance.
+     *
+     * @param endsWith3Points true if text should add "..." at the end
+     */
+    public void setEndsWith3Points(boolean endsWith3Points) {
+        this.endsWith3Points = endsWith3Points;
+    }
 
     /**
      * {@inheritDoc}
@@ -1087,16 +1085,16 @@ public class Label extends Component implements IconHolder, TextHolder {
             return false;
         }
         boolean animateTicker = false;
-        if(tickerRunning && tickerStartTime + tickerDelay < System.currentTimeMillis()){
+        if (tickerRunning && tickerStartTime + tickerDelay < System.currentTimeMillis()) {
             tickerStartTime = System.currentTimeMillis();
-            if(rightToLeft){
+            if (rightToLeft) {
                 shiftText -= Display.getInstance().convertToPixels(shiftMillimeters);
-                if(shiftText + getStringWidth(getStyle().getFont()) < 0) {
+                if (shiftText + getStringWidth(getStyle().getFont()) < 0) {
                     shiftText = getStringWidth(getStyle().getFont());
                 }
-            }else{
+            } else {
                 shiftText += Display.getInstance().convertToPixels(shiftMillimeters);
-                if(getStringWidth(getStyle().getFont()) - shiftText < 0) {
+                if (getStringWidth(getStyle().getFont()) - shiftText < 0) {
                     shiftText = -getStringWidth(getStyle().getFont());
                 }
             }
@@ -1105,35 +1103,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         // if we have an animated icon then just let it do its thing...
         boolean val = icon != null && icon.isAnimation() && icon.animate();
         boolean parent = super.animate();
-        return  val || parent || animateTicker;
-    }
-
-    /**
-     * Allows disabling/enabling tickers globally
-     *
-     * @return the defaultTickerEnabled
-     */
-    public static boolean isDefaultTickerEnabled() {
-        return defaultTickerEnabled;
-    }
-
-    /**
-     * Allows disabling/enabling tickers globally
-     * @param aDefaultTickerEnabled the defaultTickerEnabled to set
-     */
-    public static void setDefaultTickerEnabled(boolean aDefaultTickerEnabled) {
-        defaultTickerEnabled = aDefaultTickerEnabled;
-    }
-
-
-    /**
-     * A mask image can be applied to the label (see the image mask method for details)
-     * which allows for things like rounded image appearance etc.
-     *
-     * @param mask the mask returned from the image object
-     */
-    public void setMask(Object mask) {
-        this.mask = mask;
+        return val || parent || animateTicker;
     }
 
     /**
@@ -1146,7 +1116,18 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
+     * A mask image can be applied to the label (see the image mask method for details)
+     * which allows for things like rounded image appearance etc.
+     *
+     * @param mask the mask returned from the image object
+     */
+    public void setMask(Object mask) {
+        this.mask = mask;
+    }
+
+    /**
      * Determines the name of the mask from the image constants thus allowing the mask to be applied from the theme
+     *
      * @return the maskName
      */
     public String getMaskName() {
@@ -1155,6 +1136,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * Determines the name of the mask from the image constants thus allowing the mask to be applied from the theme
+     *
      * @param maskName the maskName to set
      */
     public void setMaskName(String maskName) {
@@ -1167,28 +1149,28 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"maskName"};
+        return new String[]{"maskName"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-        return new Class[] { String.class };
+        return new Class[]{String.class};
     }
 
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"String"};
+        return new String[]{"String"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("maskName")) {
+        if (name.equals("maskName")) {
             return getMaskName();
         }
         return null;
@@ -1198,8 +1180,8 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("maskName")) {
-            setMaskName((String)value);
+        if (name.equals("maskName")) {
+            setMaskName((String) value);
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -1207,14 +1189,15 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * If a mask is applied returns the icon with a mask, otherwise returns the icon
+     *
      * @return the icon masked or otherwise
      */
     public Image getMaskedIcon() {
-        if(maskedIcon != null) {
+        if (maskedIcon != null) {
             return maskedIcon;
         }
-        if(mask != null) {
-            if(icon != null) {
+        if (mask != null) {
+            if (icon != null) {
                 maskedIcon = icon.applyMaskAutoScale(mask);
                 return maskedIcon;
             }
@@ -1226,22 +1209,22 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
-        return new String[] {"text"};
+        return new String[]{"text"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
-        return new Class[] {String.class};
+        return new Class[]{String.class};
     }
 
     /**
      * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
-        if(prop.equals("text")) {
-            if(textBindListeners == null) {
+        if (prop.equals("text")) {
+            if (textBindListeners == null) {
                 textBindListeners = new EventDispatcher();
             }
             textBindListeners.addListener(target);
@@ -1254,12 +1237,12 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
-        if(prop.equals("text")) {
-            if(textBindListeners == null) {
+        if (prop.equals("text")) {
+            if (textBindListeners == null) {
                 return;
             }
             textBindListeners.removeListener(target);
-            if(!textBindListeners.hasListeners()) {
+            if (!textBindListeners.hasListeners()) {
                 textBindListeners = null;
             }
             return;
@@ -1271,7 +1254,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
-        if(prop.equals("text")) {
+        if (prop.equals("text")) {
             return getText();
         }
         return super.getBoundPropertyValue(prop);
@@ -1281,8 +1264,8 @@ public class Label extends Component implements IconHolder, TextHolder {
      * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
-        if(prop.equals("text")) {
-            setText((String)value);
+        if (prop.equals("text")) {
+            setText((String) value);
             return;
         }
         super.setBoundPropertyValue(prop, value);
@@ -1292,6 +1275,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * Indicates if text should be localized when set to the label, by default
      * all text is localized so this allows disabling automatic localization for
      * a specific label.
+     *
      * @return the shouldLocalize value
      */
     public boolean isShouldLocalize() {
@@ -1302,6 +1286,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * Indicates if text should be localized when set to the label, by default
      * all text is localized so this allows disabling automatic localization for
      * a specific label.
+     *
      * @param shouldLocalize the shouldLocalize to set
      */
     public void setShouldLocalize(boolean shouldLocalize) {
@@ -1315,16 +1300,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @deprecated Use {@link #getShiftMillimetersF() }
      */
     public int getShiftMillimeters() {
-        return (int)Math.round(shiftMillimeters);
-    }
-
-    /**
-     * Returns the number of millimeters that should be shifted in tickering as a float.
-     * @return
-     * @since 7.0
-     */
-    public float getShiftMillimetersF() {
-        return shiftMillimeters;
+        return (int) Math.round(shiftMillimeters);
     }
 
     /**
@@ -1347,8 +1323,19 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
+     * Returns the number of millimeters that should be shifted in tickering as a float.
+     *
+     * @return
+     * @since 7.0
+     */
+    public float getShiftMillimetersF() {
+        return shiftMillimeters;
+    }
+
+    /**
      * By default labels and subclasses become 0 sized when they are blank even ignoring their padding
      * setting this to true makes the padding take effect even in a blank field.
+     *
      * @return the showEvenIfBlank
      */
     public boolean isShowEvenIfBlank() {
@@ -1358,6 +1345,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * By default labels and subclasses become 0 sized when they are blank even ignoring their padding
      * setting this to true makes the padding take effect even in a blank field.
+     *
      * @param showEvenIfBlank the showEvenIfBlank to set
      */
     public void setShowEvenIfBlank(boolean showEvenIfBlank) {
@@ -1366,13 +1354,14 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * This method is equivalent to label.getStyle().getFont().stringWidth(label.getText()) but its faster
+     *
      * @param fnt the font is passed as an optimization to save a call to getStyle
      * @return the string width
      */
     public int getStringWidth(Font fnt) {
-        if(isUnselectedStyle) {
+        if (isUnselectedStyle) {
             // very optimized way to get the string width of a label for the common unselected case in larger lists
-            if(stringWidthUnselected < 0) {
+            if (stringWidthUnselected < 0) {
                 stringWidthUnselected = fnt.stringWidth(text);
             }
             return stringWidthUnselected;
@@ -1382,6 +1371,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     *
      * @return the legacyRenderer
      */
     public boolean isLegacyRenderer() {
@@ -1390,6 +1380,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     *
      * @param legacyRenderer the legacyRenderer to set
      */
     public void setLegacyRenderer(boolean legacyRenderer) {
@@ -1419,6 +1410,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
      * a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+     *
      * @return the autoSizeMode
      */
     public boolean isAutoSizeMode() {
@@ -1428,6 +1420,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /**
      * Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
      * a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+     *
      * @param autoSizeMode the autoSizeMode to set
      */
     public void setAutoSizeMode(boolean autoSizeMode) {
@@ -1435,8 +1428,22 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
+     * Returns true if text selection is enabled on this label.  Default is {@literal false}.  To enable text selection,
+     * you must enable text selection on the Form with {@link Form#getTextSelection() } and {@link TextSelection#setEnabled(boolean) },
+     * and also ensure that the label's text selection is enabled via {@link #setTextSelectionEnabled(boolean) }.
+     *
+     * @return
+     * @see #setTextSelectionEnabled(boolean)
+     * @since 7.0
+     */
+    public boolean isTextSelectionEnabled() {
+        return textSelectionEnabled;
+    }
+
+    /**
      * Enables text selection on this label.  Text selection must also be enabled on the Form in order to
      * text selection to be activated.
+     *
      * @param enabled
      * @see #setTextSelectionEnabled(boolean)
      * @see Form#getTextSelection()
@@ -1450,19 +1457,6 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
     }
 
-    /**
-     * Returns true if text selection is enabled on this label.  Default is {@literal false}.  To enable text selection,
-     * you must enable text selection on the Form with {@link Form#getTextSelection() } and {@link TextSelection#setEnabled(boolean) },
-     * and also ensure that the label's text selection is enabled via {@link #setTextSelectionEnabled(boolean) }.
-     * @return
-     * @see #setTextSelectionEnabled(boolean)
-     * @since 7.0
-     */
-    public boolean isTextSelectionEnabled() {
-        return textSelectionEnabled;
-    }
-
-    private Span span;
     public TextSelectionSupport getTextSelectionSupport() {
         if (textSelectionSupport == null) {
             textSelectionSupport = new TextSelectionSupport() {
@@ -1505,11 +1499,11 @@ public class Label extends Component implements IconHolder, TextHolder {
                     }
 
                     int startPos = charAtPoint.getPosition();
-                    int endPos = charAtPoint.getPosition()+1;
+                    int endPos = charAtPoint.getPosition() + 1;
                     String dividers = " \t\r\n-.;";
 
                     while (startPos > span.first().getPosition()) {
-                        if (dividers.indexOf(Label.this.getText().substring(startPos, startPos+1)) < 0) {
+                        if (dividers.indexOf(Label.this.getText().substring(startPos, startPos + 1)) < 0) {
                             startPos--;
                         } else {
                             if (startPos < span.last().getPosition()) {
@@ -1519,8 +1513,8 @@ public class Label extends Component implements IconHolder, TextHolder {
                         }
                     }
 
-                    while (endPos < span.last().getPosition()+1) {
-                        if (dividers.indexOf(Label.this.getText().substring(endPos-1, endPos))<0) {
+                    while (endPos < span.last().getPosition() + 1) {
+                        if (dividers.indexOf(Label.this.getText().substring(endPos - 1, endPos)) < 0) {
                             endPos++;
                         } else {
                             if (endPos > span.first().getPosition()) {
@@ -1529,7 +1523,7 @@ public class Label extends Component implements IconHolder, TextHolder {
                             break;
                         }
                     }
-                    System.out.println("Text is ["+getText().substring(startPos, endPos)+"]");
+                    System.out.println("Text is [" + getText().substring(startPos, endPos) + "]");
                     return span.subspan(startPos, endPos);
                 }
 
@@ -1537,7 +1531,7 @@ public class Label extends Component implements IconHolder, TextHolder {
                 public String getTextForSpan(TextSelection sel, Span span) {
                     int offset = span.getStartPos();
                     offset = Math.max(0, offset);
-                    offset = Math.min(getText().length()-1, offset);
+                    offset = Math.min(getText().length() - 1, offset);
                     int end = span.getEndPos();
                     end = Math.min(getText().length(), end);
                     return getText().substring(offset, end);
@@ -1547,7 +1541,7 @@ public class Label extends Component implements IconHolder, TextHolder {
             };
         }
         return textSelectionSupport;
-    };
+    }
 
     @Override
     public String getIconUIID() {
@@ -1555,6 +1549,22 @@ public class Label extends Component implements IconHolder, TextHolder {
             return iconStyleComponent.getUIID();
         }
         return getUIID();
+    }
+
+    ;
+
+    /**
+     * Sets a UIID to be used for the material icon style.
+     *
+     * @param uiid The uiid to use for the material icon style.
+     * @since 7.0
+     */
+    public void setIconUIID(String uiid) {
+        if (iconStyleComponent == null || !uiid.equals(iconStyleComponent.getUIID())) {
+            iconStyleComponent = new Component() {
+            };
+            iconStyleComponent.setUIID(uiid);
+        }
     }
 
 }

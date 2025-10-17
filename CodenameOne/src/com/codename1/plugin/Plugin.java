@@ -30,8 +30,8 @@ import com.codename1.ui.events.ActionListener;
  * runtime via {@link PluginSupport#registerPlugin(Plugin)}.  Thereafter it will be given an opportunity to
  * override core functionality by processing plugin events that it is interested in.
  *
- * @since 8.0
  * @author Steve Hannah
+ * @since 8.0
  */
 public interface Plugin extends ActionListener<PluginEvent> {
 }

@@ -19,25 +19,24 @@
  */
 package com.codename1.maps.layers;
 
-import com.codename1.util.MathUtil;
-import com.codename1.ui.Graphics;
 import com.codename1.maps.Coord;
 import com.codename1.maps.Mercator;
 import com.codename1.maps.Projection;
-import com.codename1.ui.geom.Point;
-import com.codename1.maps.providers.MapProvider;
 import com.codename1.maps.Tile;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Point;
+import com.codename1.util.MathUtil;
 
 /**
  * This class is responsible for painting arrows that indicates direction
  * of walk on map.
- * 
+ *
  * @author Michal Koperski
  */
 public class ArrowLinesLayer extends LinesLayer {
 
-    private int arrowSegmentLength = 60;
     private final int minArrowSementLength = 20;
+    private int arrowSegmentLength = 60;
     private int arrowWidth = 5;
     private int arrowHeight = 10;
 
@@ -65,6 +64,7 @@ public class ArrowLinesLayer extends LinesLayer {
     /**
      * Paints arrows on each segment. arrowSegmentLength decides how many
      * arrows will be on each segment.
+     *
      * @param g
      * @param segment
      * @param tile
@@ -86,19 +86,19 @@ public class ArrowLinesLayer extends LinesLayer {
                     double div = 1.0 / noOfSegments;
                     drawArrow(g, new Point(s.getX(), s.getY()),
                             new Point((int) (div * e.getX() + s.getX() * (1 - div)),
-                            (int) (div * e.getY() + s.getY() * (1 - div))));
+                                    (int) (div * e.getY() + s.getY() * (1 - div))));
                 } else if (j == noOfSegments) {
                     double div = (noOfSegments - 1) / (noOfSegments * 1.0);
                     drawArrow(g, new Point((int) (div * e.getX() + s.getX() * (1 - div)),
-                            (int) (div * e.getY() + s.getY() * (1 - div))),
+                                    (int) (div * e.getY() + s.getY() * (1 - div))),
                             new Point(e.getX(), e.getY()));
                 } else {
                     double div = ((j - 1) * 1.0) / noOfSegments;
                     double div2 = (j * 1.0) / noOfSegments;
                     drawArrow(g, new Point((int) (div * e.getX() + s.getX() * (1 - div)),
-                            (int) (div * e.getY() + s.getY() * (1 - div))),
+                                    (int) (div * e.getY() + s.getY() * (1 - div))),
                             new Point((int) (div2 * e.getX() + s.getX() * (1 - div2)),
-                            (int) (div2 * e.getY() + s.getY() * (1 - div2))));
+                                    (int) (div2 * e.getY() + s.getY() * (1 - div2))));
                 }
             }
         }
@@ -107,8 +107,9 @@ public class ArrowLinesLayer extends LinesLayer {
     /**
      * This method clones arrowHead object which represents arrow and translate
      * it to position on the map.
+     *
      * @param g Graphics Object to paint on
-     * @param s starting Point 
+     * @param s starting Point
      * @param e ending Point
      */
     private void drawArrow(Graphics g, Point s, Point e) {
@@ -136,6 +137,7 @@ public class ArrowLinesLayer extends LinesLayer {
 
     /**
      * Returns the arrow height in pixels
+     *
      * @return the arrow height
      */
     public int getArrowHeight() {
@@ -144,8 +146,8 @@ public class ArrowLinesLayer extends LinesLayer {
 
     /**
      * Sets the arrow height
-     * 
-     * @param arrowHeight 
+     *
+     * @param arrowHeight
      */
     public void setArrowHeight(int arrowHeight) {
         this.arrowHeight = arrowHeight;
@@ -153,6 +155,7 @@ public class ArrowLinesLayer extends LinesLayer {
 
     /**
      * Gets the arrow segment length
+     *
      * @return segment length
      */
     public int getArrowSegmentLength() {
@@ -161,7 +164,7 @@ public class ArrowLinesLayer extends LinesLayer {
 
     /**
      * Sets the arrow segment length
-     * 
+     *
      * @param arrowSegmentLength to set
      */
     public void setArrowSegmentLength(int arrowSegmentLength) {
@@ -170,6 +173,7 @@ public class ArrowLinesLayer extends LinesLayer {
 
     /**
      * Gets the arrow width in pixels
+     *
      * @return the arrow width
      */
     public int getArrowWidth() {
@@ -178,6 +182,7 @@ public class ArrowLinesLayer extends LinesLayer {
 
     /**
      * Sets the arrow width
+     *
      * @param arrowWidth to set
      */
     public void setArrowWidth(int arrowWidth) {
@@ -212,7 +217,7 @@ public class ArrowLinesLayer extends LinesLayer {
         }
 
         public void rotate(double aDir) {
-            int nlen =  _nodes.length;
+            int nlen = _nodes.length;
             for (int i = 0; i < nlen; i++) {
                 _nodes[i] = new Point(rotateX(_nodes[i].getX(), _nodes[i].getY(), aDir),
                         rotateY(_nodes[i].getX(), _nodes[i].getY(), aDir));

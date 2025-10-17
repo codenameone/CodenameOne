@@ -24,9 +24,10 @@
 
 package com.codename1.components;
 
-import com.codename1.ui.EncodedImage;
 import com.codename1.io.Storage;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -41,33 +42,11 @@ public class StorageImage extends EncodedImage {
     private byte[] data;
     private Object weak;
 
-    
+
     private StorageImage(String fileName, int w, int h, boolean keep) {
         super(w, h);
         this.fileName = fileName;
         this.keep = keep;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public byte[] getImageData() {
-        if(data != null) {
-            return data;
-        }
-        if(weak != null) {
-            byte[] d = (byte[])Display.getInstance().extractHardRef(weak);
-            if(d != null) {
-                return d;
-            }
-        }
-        byte[] imageData = (byte[])Storage.getInstance().readObject(fileName);
-        if(keep) {
-            data = imageData;
-        } else {
-            weak = Display.getInstance().createSoftWeakRef(imageData);
-        }
-        return imageData;
     }
 
     /**
@@ -76,13 +55,13 @@ public class StorageImage extends EncodedImage {
      * files.
      *
      * @param fileName the name of the storage file
-     * @param data the data
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param data     the data
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
      * @return image that will load the file seamlessly or null if the storage failed
      */
     public static StorageImage create(String fileName, byte[] data, int width, int height) {
-        if(Storage.getInstance().writeObject(fileName, data)){
+        if (Storage.getInstance().writeObject(fileName, data)) {
             return new StorageImage(fileName, width, height, true);
         }
         return null;
@@ -94,14 +73,14 @@ public class StorageImage extends EncodedImage {
      * files.
      *
      * @param fileName the name of the storage file
-     * @param data the data
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
-     * @param keep if set to true keeps the file in RAM once loaded
+     * @param data     the data
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param keep     if set to true keeps the file in RAM once loaded
      * @return image that will load the file seamlessly or null if the storage failed
      */
     public static StorageImage create(String fileName, byte[] data, int width, int height, boolean keep) {
-        if(Storage.getInstance().writeObject(fileName, data)){
+        if (Storage.getInstance().writeObject(fileName, data)) {
             return new StorageImage(fileName, width, height, keep);
         }
         return null;
@@ -113,9 +92,9 @@ public class StorageImage extends EncodedImage {
      * files.
      *
      * @param fileName the name of the storage file
-     * @param data the stream to cache
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param data     the stream to cache
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
      * @return image that will load the file seamlessly
      */
     public static StorageImage create(String fileName, InputStream data, int width, int height) throws IOException {
@@ -129,14 +108,13 @@ public class StorageImage extends EncodedImage {
      * files.
      *
      * @param fileName the name of the storage file
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
      * @return image that will load the file seamlessly
      */
     public static StorageImage create(String fileName, int width, int height) {
         return new StorageImage(fileName, width, height, true);
     }
-
 
     /**
      * Creates an encoded image that maps to a storage file thus allowing to
@@ -144,12 +122,34 @@ public class StorageImage extends EncodedImage {
      * files.
      *
      * @param fileName the name of the storage file
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
-     * @param keep if set to true keeps the file in RAM once loaded
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param keep     if set to true keeps the file in RAM once loaded
      * @return image that will load the file seamlessly
      */
     public static StorageImage create(String fileName, int width, int height, boolean keep) {
         return new StorageImage(fileName, width, height, keep);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public byte[] getImageData() {
+        if (data != null) {
+            return data;
+        }
+        if (weak != null) {
+            byte[] d = (byte[]) Display.getInstance().extractHardRef(weak);
+            if (d != null) {
+                return d;
+            }
+        }
+        byte[] imageData = (byte[]) Storage.getInstance().readObject(fileName);
+        if (keep) {
+            data = imageData;
+        } else {
+            weak = Display.getInstance().createSoftWeakRef(imageData);
+        }
+        return imageData;
     }
 }

@@ -35,11 +35,15 @@ package com.codename1.util;
  */
 class TBitLevel {
 
-    /** Just to denote that this class can't be instantiated. */
+    /**
+     * Just to denote that this class can't be instantiated.
+     */
     private TBitLevel() {
     }
 
-    /** @see TBigInteger#bitLength() */
+    /**
+     * @see TBigInteger#bitLength()
+     */
     static int bitLength(TBigInteger val) {
         if (val.sign == 0) {
             return 0;
@@ -86,8 +90,10 @@ class TBitLevel {
         }
         return 32 - n - 1;
     }
-    
-    /** @see TBigInteger#bitCount() */
+
+    /**
+     * @see TBigInteger#bitCount()
+     */
     static int bitCount(TBigInteger val) {
         int bCount = 0;
 
@@ -124,8 +130,7 @@ class TBitLevel {
     /**
      * Check if there are 1s in the lowest bits of this BigInteger
      *
-     * @param numberOfBits
-     *            the number of the lowest bits to check
+     * @param numberOfBits the number of the lowest bits to check
      * @return false if all bits are 0s, true otherwise
      */
     static boolean nonZeroDroppedBits(int numberOfBits, int digits[]) {
@@ -139,7 +144,9 @@ class TBitLevel {
         return ((i != intCount) || (digits[i] << (32 - bitCount) != 0));
     }
 
-    /** @see TBigInteger#shiftLeft(int) */
+    /**
+     * @see TBigInteger#shiftLeft(int)
+     */
     static TBigInteger shiftLeft(TBigInteger source, int count) {
         int intCount = count >> 5;
         count &= 31; // %= 32
@@ -169,14 +176,10 @@ class TBitLevel {
      * Abstractly shifts left an array of integers in little endian (i.e. shift
      * it right). Total shift distance in bits is intCount * 32 + count
      *
-     * @param result
-     *            the destination array
-     * @param source
-     *            the source array
-     * @param intCount
-     *            the shift distance in integers
-     * @param count
-     *            an additional shift distance in bits
+     * @param result   the destination array
+     * @param source   the source array
+     * @param intCount the shift distance in integers
+     * @param count    an additional shift distance in bits
      */
     static void shiftLeft(int result[], int source[], int intCount, int count) {
         if (count == 0) {
@@ -200,17 +203,14 @@ class TBitLevel {
      * Shifts the source digits left one bit, creating a value whose magnitude
      * is doubled.
      *
-     * @param result
-     *            an array of digits that will hold the computed result when
-     *            this method returns. The size of this array is
-     *            {@code srcLen + 1}, and the format is the same as
-     *            {@link TBigInteger#digits}.
-     * @param source
-     *            the array of digits to shift left, in the same format as
-     *            {@link TBigInteger#digits}.
-     * @param srcLen
-     *            the length of {@code source}; may be less than
-     *            {@code source.length}
+     * @param result an array of digits that will hold the computed result when
+     *               this method returns. The size of this array is
+     *               {@code srcLen + 1}, and the format is the same as
+     *               {@link TBigInteger#digits}.
+     * @param source the array of digits to shift left, in the same format as
+     *               {@link TBigInteger#digits}.
+     * @param srcLen the length of {@code source}; may be less than
+     *               {@code source.length}
      */
     static void shiftLeftOneBit(int result[], int source[], int srcLen) {
         int carry = 0;
@@ -234,7 +234,9 @@ class TBitLevel {
         return result;
     }
 
-    /** @see TBigInteger#shiftRight(int) */
+    /**
+     * @see TBigInteger#shiftRight(int)
+     */
     static TBigInteger shiftRight(TBigInteger source, int count) {
         int intCount = count >> 5; // count of integers
         count &= 31; // count of remaining bits
@@ -296,16 +298,11 @@ class TBitLevel {
      * Shifts right an array of integers. Total shift distance in bits is
      * intCount * 32 + count.
      *
-     * @param result
-     *            the destination array
-     * @param resultLen
-     *            the destination array's length
-     * @param source
-     *            the source array
-     * @param intCount
-     *            the number of elements to be shifted
-     * @param count
-     *            the number of bits to be shifted
+     * @param result    the destination array
+     * @param resultLen the destination array's length
+     * @param source    the source array
+     * @param intCount  the number of elements to be shifted
+     * @param count     the number of bits to be shifted
      * @return dropped bit's are all zero (i.e. remaider is zero)
      */
     static boolean shiftRight(int result[], int resultLen, int source[], int intCount, int count) {
@@ -335,11 +332,9 @@ class TBitLevel {
      * Performs a flipBit on the BigInteger, returning a BigInteger with the the
      * specified bit flipped.
      *
-     * @param intCount
-     *            : the index of the element of the digits array where the
-     *            operation will be performed
-     * @param bitNumber
-     *            : the bit's position in the intCount element
+     * @param intCount  : the index of the element of the digits array where the
+     *                  operation will be performed
+     * @param bitNumber : the bit's position in the intCount element
      */
     static TBigInteger flipBit(TBigInteger val, int n) {
         int resSign = (val.sign == 0) ? 1 : val.sign;

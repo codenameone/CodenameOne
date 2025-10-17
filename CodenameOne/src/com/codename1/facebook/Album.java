@@ -27,7 +27,7 @@ import java.util.Hashtable;
 
 /**
  * This class represents a Facebook Photo Object
- *  http://developers.facebook.com/docs/reference/api/album
+ * http://developers.facebook.com/docs/reference/api/album
  *
  * @author Chen Fishbein
  */
@@ -61,6 +61,7 @@ public class Album extends FBObject {
 
     /**
      * Gets number of photos in this album
+     *
      * @return count
      */
     public int getCount() {
@@ -69,6 +70,7 @@ public class Album extends FBObject {
 
     /**
      * Gets the cover photos url of this album
+     *
      * @return cover_photo
      */
     public String getCover_photo() {
@@ -77,6 +79,7 @@ public class Album extends FBObject {
 
     /**
      * Gets created_time
+     *
      * @return created_time
      */
     public String getCreated_time() {
@@ -85,6 +88,7 @@ public class Album extends FBObject {
 
     /**
      * Gets description
+     *
      * @return description
      */
     public String getDescription() {
@@ -93,6 +97,7 @@ public class Album extends FBObject {
 
     /**
      * Gets the from User
+     *
      * @return from
      */
     public User getFrom() {
@@ -101,6 +106,7 @@ public class Album extends FBObject {
 
     /**
      * Gets the link
+     *
      * @return link
      */
     public String getLink() {
@@ -109,6 +115,7 @@ public class Album extends FBObject {
 
     /**
      * Gets the location
+     *
      * @return location
      */
     public String getLocation() {
@@ -117,6 +124,7 @@ public class Album extends FBObject {
 
     /**
      * Gets the privacy
+     *
      * @return privacy
      */
     public String getPrivacy() {
@@ -125,6 +133,7 @@ public class Album extends FBObject {
 
     /**
      * Gets the type
+     *
      * @return type
      */
     public String getType() {
@@ -133,6 +142,7 @@ public class Album extends FBObject {
 
     /**
      * Gets the updated_time
+     *
      * @return updated_time
      */
     public String getUpdated_time() {
@@ -141,9 +151,10 @@ public class Album extends FBObject {
 
     /**
      * copies the relevant values from the given hashtable
+     *
      * @param props an hashtable to copy from
      */
-    public void copy(Hashtable props){
+    public void copy(Hashtable props) {
         super.copy(props);
         init(props);
     }

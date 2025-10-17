@@ -6,31 +6,33 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
 package com.codename1.ui.util;
 
 import com.codename1.ui.Display;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Helper weak hash map substitute 
+ * Helper weak hash map substitute
+ *
  * @author Shai Almog
  */
 public class WeakHashMap<K, V> implements Map<K, V> {
@@ -74,7 +76,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     @Override
     public V get(Object key) {
         Object o = map.get(key);
-        if(o == null) {
+        if (o == null) {
             return null;
         }
         return (V) Display.getInstance().extractHardRef(o);
@@ -95,7 +97,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     @Override
     public V remove(Object key) {
         Object o = map.remove(key);
-        if(o == null) {
+        if (o == null) {
             return null;
         }
         return (V) Display.getInstance().extractHardRef(o);
@@ -106,7 +108,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
      */
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
-        for(K o : m.keySet()) {
+        for (K o : m.keySet()) {
             put(o, m.get(o));
         }
     }
@@ -141,5 +143,5 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     @Override
     public Set<Entry<K, V>> entrySet() {
         throw new RuntimeException();
-    }    
+    }
 }

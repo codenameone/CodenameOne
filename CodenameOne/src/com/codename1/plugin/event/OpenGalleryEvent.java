@@ -27,8 +27,8 @@ import com.codename1.ui.events.ActionListener;
 /**
  * Event triggered when {@link Display#openGallery(com.codename1.ui.events.ActionListener, int)} is called.
  *
- * @since 8.0
  * @author Steve Hannah
+ * @since 8.0
  */
 public class OpenGalleryEvent extends PluginEvent<Void> {
     private ActionListener response;
@@ -43,9 +43,10 @@ public class OpenGalleryEvent extends PluginEvent<Void> {
 
     /**
      * Gets the response listener that will be called when the gallery is closed.
+     *
      * @return The response listener.
-     * @since 8.0
      * @see Display#openGallery(com.codename1.ui.events.ActionListener, int)
+     * @since 8.0
      */
     public ActionListener getResponse() {
         return response;
@@ -53,9 +54,10 @@ public class OpenGalleryEvent extends PluginEvent<Void> {
 
     /**
      * Gets the type of gallery to open.
+     *
      * @return The type of gallery to open.
-     * @since 8.0
      * @see Display#openGallery(com.codename1.ui.events.ActionListener, int)
+     * @since 8.0
      */
     public int getType() {
         return type;

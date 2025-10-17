@@ -24,73 +24,80 @@
 package com.codename1.io.rest;
 
 /**
- * This class is used to create the Http RequestBuilder(get/post/head/options/delete/put) 
+ * This class is used to create the Http RequestBuilder(get/post/head/options/delete/put)
  *
  * @author Chen Fishbein
  */
 public class Rest {
-    
-	/**
-         * Creates a GET request builder
-         * @param url The request URL
-         * @return RequestBuilder instance
-         */
-        public static RequestBuilder get(String url) {
-		return new RequestBuilder("GET", url);
-	}
 
-	/**
-         * Creates a HEAD request builder
-         * @param url The request URL
-         * @return RequestBuilder instance
-         */
-        public static RequestBuilder head(String url) {
-		return new RequestBuilder("HEAD", url);
-	}
+    /**
+     * Creates a GET request builder
+     *
+     * @param url The request URL
+     * @return RequestBuilder instance
+     */
+    public static RequestBuilder get(String url) {
+        return new RequestBuilder("GET", url);
+    }
 
-	/**
-         * Creates a PATCH request builder
-         * @param url The request URL
-         * @return RequestBuilder instance
-         */
-         public static RequestBuilder patch(String url) {
-		return new RequestBuilder("PATCH", url);
-	}
+    /**
+     * Creates a HEAD request builder
+     *
+     * @param url The request URL
+     * @return RequestBuilder instance
+     */
+    public static RequestBuilder head(String url) {
+        return new RequestBuilder("HEAD", url);
+    }
 
-	/**
-         * Creates a OPTIONS request builder
-         * @param url The request URL
-         * @return RequestBuilder instance
-         */
-	public static RequestBuilder options(String url) {
-		return new RequestBuilder("OPTIONS", url);
-	}
+    /**
+     * Creates a PATCH request builder
+     *
+     * @param url The request URL
+     * @return RequestBuilder instance
+     */
+    public static RequestBuilder patch(String url) {
+        return new RequestBuilder("PATCH", url);
+    }
 
-	/**
-         * Creates a POST request builder
-         * @param url The request URL
-         * @return RequestBuilder instance
-         */
-	public static RequestBuilder post(String url) {
-		return new RequestBuilder("POST", url);
-	}
+    /**
+     * Creates a OPTIONS request builder
+     *
+     * @param url The request URL
+     * @return RequestBuilder instance
+     */
+    public static RequestBuilder options(String url) {
+        return new RequestBuilder("OPTIONS", url);
+    }
 
-	/**
-         * Creates a DELETE request builder
-         * @param url The request URL
-         * @return RequestBuilder instance
-         */
-	public static RequestBuilder delete(String url) {
-		return new RequestBuilder("DELETE", url);
-	}
+    /**
+     * Creates a POST request builder
+     *
+     * @param url The request URL
+     * @return RequestBuilder instance
+     */
+    public static RequestBuilder post(String url) {
+        return new RequestBuilder("POST", url);
+    }
 
-	/**
-         * Creates a PUT request builder
-         * @param url The request URL
-         * @return RequestBuilder instance
-         */
-	public static RequestBuilder put(String url) {
-		return new RequestBuilder("PUT", url);
-	}
-    
+    /**
+     * Creates a DELETE request builder
+     *
+     * @param url The request URL
+     * @return RequestBuilder instance
+     */
+    public static RequestBuilder delete(String url) {
+        return new RequestBuilder("DELETE", url);
+    }
+
+    /**
+     * Creates a PUT request builder
+     *
+     * @param url The request URL
+     * @return RequestBuilder instance
+     */
+    public static RequestBuilder put(String url) {
+        return new RequestBuilder("PUT", url);
+    }
+
 }

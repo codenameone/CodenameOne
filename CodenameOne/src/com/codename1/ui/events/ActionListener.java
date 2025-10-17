@@ -25,18 +25,18 @@ package com.codename1.ui.events;
 
 /**
  * Event callback interface invoked when a component action occurs
- * 
+ *
  * @param <T> subclass of ActionEvent e..g {@link com.codename1.io.NetworkEvent}
  * @author Chen Fishbein
  */
 public interface ActionListener<T extends ActionEvent> {
-    
+
     /**
      * Invoked when an action occurred on a component
-     * 
+     *
      * @param evt event object describing the source of the action as well as
-     * its trigger
+     *            its trigger
      */
     public void actionPerformed(T evt);
-    
+
 }

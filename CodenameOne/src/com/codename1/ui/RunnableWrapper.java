@@ -24,11 +24,10 @@
 package com.codename1.ui;
 
 import java.util.ArrayList;
-import java.util.Vector;
 
 /**
  * Class used by callSeriallyAndWait and invokeAndBlock and form to save code size
- * 
+ *
  * @author Shai Almog
  */
 class RunnableWrapper implements Runnable {
@@ -52,37 +51,49 @@ class RunnableWrapper implements Runnable {
         this.paint = paint;
         this.reverse = reverse;
     }
-    
+
     public RunnableWrapper(Runnable internal, int type) {
         this.internal = internal;
         this.type = type;
+    }
+
+    static void pushToThreadPool(Runnable r) {
+        if (availableThreads == 0 && threadCount < maxThreadCount) {
+            threadCount++;
+            Thread poolThread = Display.getInstance().startThread(new RunnableWrapper(null, 4), "invokeAndBlock" + threadCount);
+            poolThread.start();
+        }
+        synchronized (THREADPOOL_LOCK) {
+            threadPool.add(r);
+            THREADPOOL_LOCK.notify();
+        }
     }
 
     public RuntimeException getErr() {
         return err;
     }
 
-    public void setDone(boolean done) {
-        this.done = done;
-    }
-    
     public boolean isDone() {
         return done;
     }
 
+    public void setDone(boolean done) {
+        this.done = done;
+    }
+
     public void run() {
-        if(parentForm != null) {
+        if (parentForm != null) {
             // set current form uses this portion to make sure all set current operations
             // occur on the EDT
-            if(paint == null) {
+            if (paint == null) {
                 Display.getInstance().setCurrent(parentForm, reverse);
                 return;
             }
-            
-            Dialog dlg = (Dialog)parentForm;
+
+            Dialog dlg = (Dialog) parentForm;
             while (!dlg.isDisposed()) {
                 try {
-                    synchronized(Display.lock) {
+                    synchronized (Display.lock) {
                         Display.lock.wait(40);
                     }
                 } catch (InterruptedException ex) {
@@ -90,24 +101,24 @@ class RunnableWrapper implements Runnable {
             }
             parentForm.getStyle().setBgPainter(paint);
         } else {
-            switch(type) {
-                case 0: 
+            switch (type) {
+                case 0:
                     internal.run();
                     done = true;
-                    synchronized(Display.lock) {
+                    synchronized (Display.lock) {
                         Display.lock.notify();
                     }
                     break;
                 case 1:
                     try {
                         internal.run();
-                    } catch(RuntimeException ex) {
+                    } catch (RuntimeException ex) {
                         this.err = ex;
                     }
                     break;
                 case 2:
-                    while(!done) {
-                        synchronized(Display.lock) {
+                    while (!done) {
+                        synchronized (Display.lock) {
                             try {
                                 Display.lock.wait(10);
                             } catch (InterruptedException ex) {
@@ -120,10 +131,10 @@ class RunnableWrapper implements Runnable {
                     Display.getInstance().mainEDTLoop();
                     break;
                 case 4:
-                    while(!Display.getInstance().codenameOneExited) {
+                    while (!Display.getInstance().codenameOneExited) {
                         Runnable r = null;
-                        synchronized(THREADPOOL_LOCK) {
-                            if(threadPool.size() > 0) {
+                        synchronized (THREADPOOL_LOCK) {
+                            if (threadPool.size() > 0) {
                                 r = threadPool.get(0);
                                 threadPool.remove(0);
                             } else {
@@ -136,24 +147,12 @@ class RunnableWrapper implements Runnable {
                                 }
                             }
                         }
-                        if(r != null) {
+                        if (r != null) {
                             r.run();
                         }
                     }
             }
         }
         done = true;
-    }
-
-    static void pushToThreadPool(Runnable r) {
-        if(availableThreads == 0 && threadCount < maxThreadCount) {
-            threadCount++;
-            Thread poolThread = Display.getInstance().startThread(new RunnableWrapper(null, 4), "invokeAndBlock" + threadCount);
-            poolThread.start();
-        }
-        synchronized(THREADPOOL_LOCK) {
-            threadPool.add(r);
-            THREADPOOL_LOCK.notify();
-        }
     }
 }

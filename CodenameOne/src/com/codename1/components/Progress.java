@@ -23,6 +23,9 @@
  */
 package com.codename1.components;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
@@ -31,9 +34,6 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.io.ConnectionRequest;
-import com.codename1.io.NetworkEvent;
-import com.codename1.io.NetworkManager;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -47,11 +47,12 @@ public class Progress extends Dialog implements ActionListener {
     private ConnectionRequest request;
     private boolean disposeOnCompletion;
     private boolean autoShow;
+    private boolean showing;
 
     /**
      * Binds the progress UI to the completion of this request
      *
-     * @param title the title of the progress dialog
+     * @param title   the title of the progress dialog
      * @param request the network request pending
      */
     public Progress(String title, ConnectionRequest request) {
@@ -61,8 +62,8 @@ public class Progress extends Dialog implements ActionListener {
     /**
      * Binds the progress UI to the completion of this request
      *
-     * @param title the title of the progress dialog
-     * @param request the network request pending
+     * @param title          the title of the progress dialog
+     * @param request        the network request pending
      * @param showPercentage shows percentage on the progress bar
      */
     public Progress(String title, ConnectionRequest request, boolean showPercentage) {
@@ -74,7 +75,7 @@ public class Progress extends Dialog implements ActionListener {
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         addComponent(b);
         Command cancel = new Command(UIManager.getInstance().localize("cancel", "Cancel"));
-        if(Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() < 2) {
+        if (Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() < 2) {
             // if this is a touch screen device or a blackberry use a centered button
             Button btn = new Button(cancel);
             Container cnt = new Container(new FlowLayout(CENTER));
@@ -93,10 +94,10 @@ public class Progress extends Dialog implements ActionListener {
      * {@inheritDoc}
      */
     protected void actionCommand(Command cmd) {
-        if(Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() < 2) {
-            for(int iter = 0 ; iter < getComponentCount() ; iter++) {
+        if (Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() < 2) {
+            for (int iter = 0; iter < getComponentCount(); iter++) {
                 Component c = getComponentAt(iter);
-                if(c instanceof Button) {
+                if (c instanceof Button) {
                     c.setEnabled(false);
                 }
             }
@@ -117,7 +118,7 @@ public class Progress extends Dialog implements ActionListener {
         showing = false;
         autoShow = false;
     }
-    
+
     /**
      * @return the disposeOnCompletion
      */
@@ -132,23 +133,21 @@ public class Progress extends Dialog implements ActionListener {
         this.disposeOnCompletion = disposeOnCompletion;
     }
 
-    private boolean showing;
-    
     /**
      * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt) {
-         NetworkEvent ev = (NetworkEvent)evt;
-         if(ev.getConnectionRequest() == request) {
-             if(disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
-                 dispose();
-                 return;
-             }
-             if(autoShow && !showing) {
-                 showing = true;
-                 showModeless();
-             }
-         }
+        NetworkEvent ev = (NetworkEvent) evt;
+        if (ev.getConnectionRequest() == request) {
+            if (disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                dispose();
+                return;
+            }
+            if (autoShow && !showing) {
+                showing = true;
+                showModeless();
+            }
+        }
     }
 
     /**
@@ -162,6 +161,7 @@ public class Progress extends Dialog implements ActionListener {
 
     /**
      * Shows the progress automatically when the request processing is started
+     *
      * @param autoShow the autoShow to set
      */
     public void setAutoShow(boolean autoShow) {

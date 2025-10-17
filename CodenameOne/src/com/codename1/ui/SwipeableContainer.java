@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui;
@@ -31,24 +31,23 @@ import com.codename1.ui.util.EventDispatcher;
 
 /**
  * <p>{@code SwipeableContainer} allows us to side swipe a component and expose underlying configuration
- * within it. This is useful for editing, ranking of elements within a set of components e.g. in the 
+ * within it. This is useful for editing, ranking of elements within a set of components e.g. in the
  * sample code below we use a ranking widget and swiping to expose the elements:
  * </p>
  * <script src="https://gist.github.com/codenameone/d1c091a171fe97fdeb5f.js"></script>
  * <img src="https://www.codenameone.com/img/thumb/components-swipablecontainer.png" alt="Swipeable Container">
- * 
+ *
  * @author Chen
  */
 public class SwipeableContainer extends Container {
 
+    private final EventDispatcher dispatcher = new EventDispatcher();
     private Container bottomLeftWrapper;
     private Container bottomRightWrapper;
     private Container topWrapper;
-
     private boolean open = false;
     private boolean openedToRight = false;
     private boolean openedToLeft = false;
-
     private Motion openCloseMotion;
     private boolean swipeActivated = true;
     private SwipeListener press, drag, release;
@@ -58,13 +57,12 @@ public class SwipeableContainer extends Container {
     private boolean waitForRelease;
     private SwipeableContainer previouslyOpened;
 
-    private final EventDispatcher dispatcher = new EventDispatcher();
     /**
      * Simple Constructor
-     * 
-     * @param bottomLeft the Component below the top, this Component is exposed 
-     * when dragging the top to the right
-     * @param top the component on top.
+     *
+     * @param bottomLeft the Component below the top, this Component is exposed
+     *                   when dragging the top to the right
+     * @param top        the component on top.
      */
     public SwipeableContainer(Component bottomLeft, Component top) {
         this(bottomLeft, null, top);
@@ -72,23 +70,23 @@ public class SwipeableContainer extends Container {
 
     /**
      * Simple Constructor
-     * 
-     * @param bottomLeft the Component below the top, this Component is exposed 
-     * when dragging the top to the right
-     * @param bottomRight the Component below the top, this Component is exposed 
-     * when dragging the top to the Left
-     * @param top the component on top.
-     */ 
+     *
+     * @param bottomLeft  the Component below the top, this Component is exposed
+     *                    when dragging the top to the right
+     * @param bottomRight the Component below the top, this Component is exposed
+     *                    when dragging the top to the Left
+     * @param top         the component on top.
+     */
     public SwipeableContainer(Component bottomLeft, Component bottomRight, Component top) {
         setLayout(new LayeredLayout());
         bottomLeftWrapper = new Container(new BorderLayout());
-        if(bottomLeft != null){
+        if (bottomLeft != null) {
             bottomLeftWrapper.addComponent(BorderLayout.WEST, bottomLeft);
             bottomLeftWrapper.setVisible(false);
         }
 
         bottomRightWrapper = new Container(new BorderLayout());
-        if(bottomRight != null){
+        if (bottomRight != null) {
             bottomRightWrapper.addComponent(BorderLayout.EAST, bottomRight);
             bottomRightWrapper.setVisible(false);
         }
@@ -134,21 +132,21 @@ public class SwipeableContainer extends Container {
     /**
      * This method will open the top Component to the right if there is a Component
      * to expose on the left.
-     */ 
+     */
     public void openToRight() {
         if (open || openedToRight) {
             return;
         }
-        if(bottomLeftWrapper.getComponentCount() == 0){
+        if (bottomLeftWrapper.getComponentCount() == 0) {
             return;
         }
         Component bottom = bottomLeftWrapper.getComponentAt(0);
-        
-        if(bottomRightWrapper.getComponentCount() > 0){
+
+        if (bottomRightWrapper.getComponentCount() > 0) {
             bottomRightWrapper.setVisible(false);
         }
         bottomLeftWrapper.setVisible(true);
-        
+
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(topX, bottom.getWidth(), 300);
         getComponentForm().registerAnimated(this);
@@ -160,21 +158,21 @@ public class SwipeableContainer extends Container {
     /**
      * This method will open the top Component to the left if there is a Component
      * to expose on the right.
-     */ 
+     */
     public void openToLeft() {
         if (open || openedToLeft) {
             return;
         }
-        if(bottomRightWrapper.getComponentCount() == 0){
+        if (bottomRightWrapper.getComponentCount() == 0) {
             return;
         }
         Component bottom = bottomRightWrapper.getComponentAt(0);
-        
-        if(bottomLeftWrapper.getComponentCount() > 0){
+
+        if (bottomLeftWrapper.getComponentCount() > 0) {
             bottomLeftWrapper.setVisible(false);
         }
         bottomRightWrapper.setVisible(true);
-        
+
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(-topX, bottom.getWidth(), 300);
         getComponentForm().registerAnimated(this);
@@ -185,13 +183,13 @@ public class SwipeableContainer extends Container {
 
     /**
      * Close the top component if it is currently opened.
-     */ 
+     */
     public void close() {
         if (!open) {
             return;
         }
         Form f = getComponentForm();
-        if(f != null) {
+        if (f != null) {
             if (openedToRight) {
                 int topX = topWrapper.getX();
                 openCloseMotion = Motion.createSplineMotion(topX, 0, 300);
@@ -229,13 +227,13 @@ public class SwipeableContainer extends Container {
             if (finished) {
                 //getComponentForm().deregisterAnimated(this);
                 openCloseMotion = null;
-                if(!open){
+                if (!open) {
                     bottomRightWrapper.setVisible(false);
                     bottomLeftWrapper.setVisible(false);
                     openedToLeft = false;
                     openedToRight = false;
-                }else{
-                    dispatcher.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Swipe));                
+                } else {
+                    dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Swipe));
                 }
             }
             return !finished;
@@ -244,36 +242,36 @@ public class SwipeableContainer extends Container {
     }
 
     /**
-     * disable/enable dragging of the top Component
-     */ 
-    public void setSwipeActivated(boolean swipeActivated) {
-        this.swipeActivated = swipeActivated;
-    }
-
-    /**
      * Returns true if swipe is activated
-     */ 
+     */
     public boolean isSwipeActivated() {
         return swipeActivated;
     }
 
     /**
+     * disable/enable dragging of the top Component
+     */
+    public void setSwipeActivated(boolean swipeActivated) {
+        this.swipeActivated = swipeActivated;
+    }
+
+    /**
      * Returns true if the top Component is currently opened
-     */ 
+     */
     public boolean isOpen() {
         return open && (openedToRight || openedToLeft);
     }
 
     /**
      * Returns true if the top Component is opened to the right side
-     */ 
+     */
     public boolean isOpenedToRight() {
         return openedToRight;
     }
 
     /**
      * Returns true if the top Component is opened to the left side
-     */ 
+     */
     public boolean isOpenedToLeft() {
         return openedToLeft;
     }
@@ -285,27 +283,54 @@ public class SwipeableContainer extends Container {
         topWrapper.setX(x);
     }
 
-    
 
     /**
-     * Adds a listener to the SwipeableContainer which will cause an event to 
+     * Adds a listener to the SwipeableContainer which will cause an event to
      * dispatch once the SwipeableContainer is fully opened
-     * 
+     *
      * @param l implementation of the action listener interface
      */
-    public void addSwipeOpenListener(ActionListener l){
+    public void addSwipeOpenListener(ActionListener l) {
         dispatcher.addListener(l);
     }
-    
+
     /**
      * Removes the given listener from the SwipeableContainer
-     * 
+     *
      * @param l implementation of the action listener interface
      */
-    public void removeSwipeOpenListener(ActionListener l){
+    public void removeSwipeOpenListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
-    
+
+    /**
+     * returns a previously opened SwipeableContainer that should be
+     * automatically closed when starting to open this one. Called as soon as
+     * this Swipeable starts opening. One approach is to override this method to
+     * return a previously opened SwipeableContainer Can be overridden to return
+     * a SwipeableContainer stored outside this container.
+     *
+     * @return an already open SwipeableContainer that will be closed when
+     * opening this one, or null if none
+     */
+    public SwipeableContainer getPreviouslyOpened() {
+        return previouslyOpened;
+    }
+
+    /**
+     * set a previously open SwipeableContainer, it will be closed as soon as
+     * the user starts swiping this one. Be aware that with a long list of
+     * Swipeable containers it may be a better approach to store the previously
+     * opened outside the list and simply override getPreviouslyOpened to return
+     * it
+     *
+     * @param previouslyOpened an already open SwipeableContainer that will be
+     *                         closed if this one is opened
+     */
+    public void setPreviouslyOpened(SwipeableContainer previouslyOpened) {
+        this.previouslyOpened = previouslyOpened;
+    }
+
     class SwipeListener implements ActionListener {
 
         private final static int PRESS = 0;
@@ -318,14 +343,14 @@ public class SwipeableContainer extends Container {
         }
 
         private void dragInitiatedRecursive(Container cnt) {
-            for(Component c : cnt) {
-                if(c instanceof Container) {
-                    dragInitiatedRecursive((Container)c);
+            for (Component c : cnt) {
+                if (c instanceof Container) {
+                    dragInitiatedRecursive((Container) c);
                 }
                 c.dragInitiated();
             }
         }
-        
+
         public void actionPerformed(ActionEvent evt) {
             if (getComponentCount() == 0 || !swipeActivated || animate()) {
                 return;
@@ -336,7 +361,7 @@ public class SwipeableContainer extends Container {
             if (f == null) {
                 return;
             }
-            Component cmp = f.getComponentAt(x, y); 
+            Component cmp = f.getComponentAt(x, y);
             if (!waitForRelease && !contains(cmp)) {
                 return;
             }
@@ -345,7 +370,7 @@ public class SwipeableContainer extends Container {
             }
             Component bottomL;
             int bottomLeftW = 0;
-            if(bottomLeftWrapper.getComponentCount() > 0){
+            if (bottomLeftWrapper.getComponentCount() > 0) {
                 bottomL = bottomLeftWrapper.getComponentAt(0);
                 bottomLeftW = bottomL.getWidth();
             }
@@ -353,10 +378,10 @@ public class SwipeableContainer extends Container {
             Component bottomR;
             int bottomRightW = 0;
             int bottomRightX = topWrapper.getWidth();
-            if(bottomRightWrapper.getComponentCount() > 0){
+            if (bottomRightWrapper.getComponentCount() > 0) {
                 bottomR = bottomRightWrapper.getComponentAt(0);
                 bottomRightW = bottomR.getWidth();
-                bottomRightX = bottomR.getX();            
+                bottomRightX = bottomR.getX();
             }
 
             switch (type) {
@@ -382,8 +407,8 @@ public class SwipeableContainer extends Container {
                     }
                     Component top = topWrapper.getComponentAt(0);
                     top.dragInitiated();
-                    if(top instanceof Container && top.getLeadComponent() == null) {
-                        dragInitiatedRecursive((Container)top);
+                    if (top instanceof Container && top.getLeadComponent() == null) {
+                        dragInitiatedRecursive((Container) top);
                     }
 
                     if (initialX != -1) {
@@ -392,25 +417,25 @@ public class SwipeableContainer extends Container {
                         }
                         int diff = x - initialX;
                         int val = 0;
-                        if(!isOpen()){
+                        if (!isOpen()) {
                             val = Math.min(diff, bottomLeftW);
                             val = Math.max(val, -bottomRightW);
                         }
-                        if(openedToRight){
+                        if (openedToRight) {
                             val = Math.min(diff, 0);
-                            val = Math.max(val, -bottomLeftW+1);
-                        }else if(openedToLeft){
+                            val = Math.max(val, -bottomLeftW + 1);
+                        } else if (openedToLeft) {
                             val = Math.max(diff, 0);
-                            val = Math.min(val, bottomRightW-1);
+                            val = Math.min(val, bottomRightW - 1);
                         }
-                        
+
                         topWrapper.setX(topX + val);
-                        if(topWrapper.getX()>0){
+                        if (topWrapper.getX() > 0) {
                             bottomRightWrapper.setVisible(false);
-                            bottomLeftWrapper.setVisible(true);                            
-                        }else{
+                            bottomLeftWrapper.setVisible(true);
+                        } else {
                             bottomRightWrapper.setVisible(true);
-                            bottomLeftWrapper.setVisible(false);                                                    
+                            bottomLeftWrapper.setVisible(false);
                         }
                         repaint();
                     }
@@ -420,28 +445,28 @@ public class SwipeableContainer extends Container {
                     if (waitForRelease) {
                         initialX = -1;
                         //if (!isOpen()) {
-                            int topX = topWrapper.getX();
-                            //it's opened to the right
-                            if (topX > 0) {
-                                if (Display.getInstance().getDragSpeed(false) < 0) {
-                                    open = false;
-                                    openedToRight = false;
-                                    openToRight();
-                                } else {
-                                    open = true;
-                                    close();
-                                }
-                            } else if (topX < 0) { //check explicitly if opened to the left
-                                if (Display.getInstance().getDragSpeed(false) > 0) {
-                                    open = false;
-                                    openedToLeft = false;
-                                    openToLeft();
-                                } else {
-                                    open = true;
-                                    close();
-                                }
-
+                        int topX = topWrapper.getX();
+                        //it's opened to the right
+                        if (topX > 0) {
+                            if (Display.getInstance().getDragSpeed(false) < 0) {
+                                open = false;
+                                openedToRight = false;
+                                openToRight();
+                            } else {
+                                open = true;
+                                close();
                             }
+                        } else if (topX < 0) { //check explicitly if opened to the left
+                            if (Display.getInstance().getDragSpeed(false) > 0) {
+                                open = false;
+                                openedToLeft = false;
+                                openToLeft();
+                            } else {
+                                open = true;
+                                close();
+                            }
+
+                        }
                         //}
                         waitForRelease = false;
                     }
@@ -449,34 +474,6 @@ public class SwipeableContainer extends Container {
                 }
             }
         }
-    }
-    
-        /**
-     * returns a previously opened SwipeableContainer that should be
-     * automatically closed when starting to open this one. Called as soon as
-     * this Swipeable starts opening. One approach is to override this method to
-     * return a previously opened SwipeableContainer Can be overridden to return
-     * a SwipeableContainer stored outside this container.
-     *
-     * @return an already open SwipeableContainer that will be closed when
-     * opening this one, or null if none
-     */
-    public SwipeableContainer getPreviouslyOpened() {
-        return previouslyOpened;
-    }
-
-    /**
-     * set a previously open SwipeableContainer, it will be closed as soon as
-     * the user starts swiping this one. Be aware that with a long list of
-     * Swipeable containers it may be a better approach to store the previously
-     * opened outside the list and simply override getPreviouslyOpened to return
-     * it
-     *
-     * @param previouslyOpened an already open SwipeableContainer that will be
-     * closed if this one is opened
-     */
-    public void setPreviouslyOpened(SwipeableContainer previouslyOpened) {
-        this.previouslyOpened = previouslyOpened;
     }
 
 }

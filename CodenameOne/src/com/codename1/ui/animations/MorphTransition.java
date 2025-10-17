@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -29,6 +29,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
+
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -45,17 +46,49 @@ public class MorphTransition extends Transition {
     private CC[] fromToComponents;
     private Motion animationMotion;
     private boolean finished;
-    
-    private MorphTransition() {}
+
+    private MorphTransition() {
+    }
+
+    /**
+     * Creates a transition with the given duration, this transition should be modified with the
+     * builder methods such as morph
+     *
+     * @param duration the duration of the transition
+     * @return a new Morph transition instance
+     */
+    public static MorphTransition create(int duration) {
+        MorphTransition mt = new MorphTransition();
+        mt.duration = duration;
+        return mt;
+    }
+
+    private static Component findByName(Container root, String componentName) {
+        int count = root.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            Component c = root.getComponentAt(iter);
+            String n = c.getName();
+            if (n != null && n.equals(componentName)) {
+                return c;
+            }
+            if (c instanceof Container) {
+                c = findByName((Container) c, componentName);
+                if (c != null) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
 
     /**
      * {@inheritDoc}
      */
-    public Transition copy(boolean reverse){
+    public Transition copy(boolean reverse) {
         MorphTransition m = create(duration);
-        if(reverse) {
+        if (reverse) {
             Iterator<String> keyIterator = fromTo.keySet().iterator();
-            while(keyIterator.hasNext()) {
+            while (keyIterator.hasNext()) {
                 String k = keyIterator.next();
                 String v = fromTo.get(k);
                 m.fromTo.put(v, k);
@@ -65,22 +98,11 @@ public class MorphTransition extends Transition {
         }
         return m;
     }
-    
+
     /**
-     * Creates a transition with the given duration, this transition should be modified with the 
-     * builder methods such as morph
-     * @param duration the duration of the transition
-     * @return a new Morph transition instance
-     */
-    public static MorphTransition create(int duration) {
-        MorphTransition mt = new MorphTransition();
-        mt.duration = duration;
-        return mt;
-    }
-    
-    /**
-     * Morphs the component with the given source name in the source container hierarchy 
+     * Morphs the component with the given source name in the source container hierarchy
      * to the component with the same name in the destination hierarchy
+     *
      * @param cmp the compoennt name
      * @return this so morph operations can be chained as MorphTransition t = MorphTransition.create(300).morph("a").("c");
      */
@@ -90,8 +112,9 @@ public class MorphTransition extends Transition {
     }
 
     /**
-     * Morphs the component with the given source name in the source container hierarchy 
+     * Morphs the component with the given source name in the source container hierarchy
      * to the component with the given name in the destination hierarchy
+     *
      * @param source
      * @param to
      * @return this so morph operations can be chained as MorphTransition t = MorphTransition.create(300).morph("a", "b").("c", "d");
@@ -107,8 +130,8 @@ public class MorphTransition extends Transition {
     public final void initTransition() {
         animationMotion = Motion.createEaseInOutMotion(0, 255, duration);
         animationMotion.start();
-        Container s = (Container)getSource();
-        Container d = (Container)getDestination();
+        Container s = (Container) getSource();
+        Container d = (Container) getDestination();
 
         Iterator<String> keyIterator = fromTo.keySet().iterator();
         int size = fromTo.size();
@@ -116,12 +139,12 @@ public class MorphTransition extends Transition {
         Form destForm = d.getComponentForm();
         destForm.forceRevalidate();
         Form sourceForm = s.getComponentForm();
-        for(int iter = 0 ; iter < size ; iter++) {
+        for (int iter = 0; iter < size; iter++) {
             String k = keyIterator.next();
             String v = fromTo.get(k);
             Component sourceCmp = findByName(s, k);
-            Component  destCmp = findByName(d, v);
-            if(sourceCmp == null || destCmp == null) {
+            Component destCmp = findByName(d, v);
+            if (sourceCmp == null || destCmp == null) {
                 continue;
             }
             CC cc = new CC(sourceCmp, destCmp, sourceForm, destForm);
@@ -136,7 +159,7 @@ public class MorphTransition extends Transition {
             cc.placeholderDest.setPreferredSize(new Dimension(cc.dest.getWidth(), cc.dest.getHeight()));
             destParent.replace(cc.dest, cc.placeholderDest, null);
             destForm.getLayeredPane().addComponent(cc.dest);
-            
+
             cc.placeholderSrc = new Label();
             cc.placeholderSrc.setVisible(false);
             cc.placeholderSrc.setX(cc.source.getX());
@@ -144,7 +167,7 @@ public class MorphTransition extends Transition {
             cc.placeholderSrc.setWidth(cc.source.getWidth());
             cc.placeholderSrc.setHeight(cc.source.getHeight());
             cc.placeholderSrc.setPreferredSize(new Dimension(cc.source.getWidth(), cc.source.getHeight()));
-            
+
             cc.originalContainer = cc.source.getParent();
             cc.originalConstraint = cc.originalContainer.getLayout().getComponentConstraint(cc.source);
             cc.originalOffset = cc.originalContainer.getComponentIndex(cc.source);
@@ -153,36 +176,18 @@ public class MorphTransition extends Transition {
         }
     }
 
-    private static Component findByName(Container root, String componentName) {
-        int count = root.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
-            Component c = root.getComponentAt(iter);
-            String n = c.getName();
-            if(n != null && n.equals(componentName)) {
-                return c;
-            }
-            if(c instanceof Container) {
-                c = findByName((Container)c, componentName);
-                if(c != null) {
-                    return c;
-                }
-            }
-        }
-        return null;
-    }
-    
     /**
      * {@inheritDoc}
      */
     public boolean animate() {
-        if(!finished) {
+        if (!finished) {
             // animate one last time
-            if(animationMotion.isFinished()) {
+            if (animationMotion.isFinished()) {
                 finished = true;
-                
+
                 // restore forms to orignial states
-                for(CC c : fromToComponents) {
-                    if(c == null) {
+                for (CC c : fromToComponents) {
+                    if (c == null) {
                         continue;
                     }
                     Container p = c.placeholderDest.getParent();
@@ -191,16 +196,16 @@ public class MorphTransition extends Transition {
 
                     p = c.placeholderSrc.getParent();
                     c.source.getParent().removeComponent(c.source);
-                    p.replace(c.placeholderSrc, c.source, null);                    
+                    p.replace(c.placeholderSrc, c.source, null);
                 }
-                
+
                 // remove potential memory leak
                 fromToComponents = null;
-                
+
                 return true;
             }
-            for(CC c : fromToComponents) {
-                if(c == null) {
+            for (CC c : fromToComponents) {
+                if (c == null) {
                     continue;
                 }
                 int x = c.xMotion.getValue();
@@ -229,7 +234,7 @@ public class MorphTransition extends Transition {
     public void paint(Graphics g) {
         int oldAlpha = g.getAlpha();
         int alpha = animationMotion.getValue();
-        if(alpha < 255) {
+        if (alpha < 255) {
             g.setAlpha(255 - alpha);
             getSource().paintComponent(g);
 
@@ -243,8 +248,19 @@ public class MorphTransition extends Transition {
             getDestination().paintComponent(g);
         }
     }
-    
+
     class CC {
+        Component source;
+        Component dest;
+        Label placeholderSrc;
+        Label placeholderDest;
+        Motion xMotion;
+        Motion yMotion;
+        Motion wMotion;
+        Motion hMotion;
+        Object originalConstraint;
+        Container originalContainer;
+        int originalOffset;
         public CC(Component source, Component dest, Form sourceForm, Form destForm) {
             this.source = source;
             this.dest = dest;
@@ -257,28 +273,16 @@ public class MorphTransition extends Transition {
             wMotion = Motion.createEaseInOutMotion(source.getWidth(), dest.getWidth(), duration);
             wMotion.start();
         }
-        
-        Component source;
-        Component dest;
-        Label placeholderSrc;
-        Label placeholderDest;
-        Motion xMotion;
-        Motion yMotion;
-        Motion wMotion;
-        Motion hMotion;
-        Object originalConstraint;
-        Container originalContainer;
-        int originalOffset;
-        
-        private int positionRelativeToScreen(Component cmp, boolean yAxis){
+
+        private int positionRelativeToScreen(Component cmp, boolean yAxis) {
             int retVal = 0;
-            if(yAxis){
+            if (yAxis) {
                 int titleHeight = cmp.getComponentForm().getContentPane().getAbsoluteY();
                 retVal = cmp.getAbsoluteY() - titleHeight;
-            }else{
+            } else {
                 retVal = cmp.getAbsoluteX();
             }
-            
+
             return retVal;
         }
     }

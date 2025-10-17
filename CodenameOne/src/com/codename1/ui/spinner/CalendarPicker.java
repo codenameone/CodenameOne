@@ -6,54 +6,56 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui.spinner;
 
 import com.codename1.ui.Container;
 import com.codename1.ui.layouts.BorderLayout;
+
 import java.util.Date;
 
 /**
  * A Calendar Picker widget.  Used by the picker.
+ *
  * @author Steve Hannah
  */
 class CalendarPicker extends Container implements InternalPickerWidget {
     private com.codename1.ui.Calendar calendar;
-    
+
     public CalendarPicker() {
         init();
     }
-    
+
     private void init() {
         setLayout(new BorderLayout());
         calendar = new com.codename1.ui.Calendar();
         add(BorderLayout.CENTER, calendar);
-        
-    }
 
-    @Override
-    public void setValue(Object value) {
-        Date dt = (Date)value;
-        calendar.setDate(dt);
-        
     }
 
     @Override
     public Object getValue() {
         return calendar.getDate();
     }
-    
+
+    @Override
+    public void setValue(Object value) {
+        Date dt = (Date) value;
+        calendar.setDate(dt);
+
+    }
+
 }

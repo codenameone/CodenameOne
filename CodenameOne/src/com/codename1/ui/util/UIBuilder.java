@@ -24,8 +24,6 @@
 package com.codename1.ui.util;
 
 import com.codename1.analytics.AnalyticsService;
-import com.codename1.io.Externalizable;
-import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
@@ -62,11 +60,10 @@ import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.table.TableLayout;
 import com.codename1.util.LazyValue;
+
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
@@ -103,17 +100,7 @@ public class UIBuilder { //implements Externalizable {
      * A key in the form state hashtable used in the back command navigation
      */
     public static final String FORM_STATE_KEY_SELECTION = "$sel";
-
-    /**
-     * A key in the form state hashtable used in the back command navigation
-     */
-    private static final String FORM_STATE_KEY_CONTAINER = "$cnt";
-
-    private static Hashtable componentRegistry;
-
     public static final int BACK_COMMAND_ID = 99999999;
-    private static boolean blockAnalytics;
-
     static final String COMMAND_ACTION = "$COMMAND_ACTION$";
     static final String COMMAND_ARGUMENTS = "$COMMAND_ARGUMENTS$";
     static final String TYPE_KEY = "$TYPE_NAME$";
@@ -151,7 +138,6 @@ public class UIBuilder { //implements Externalizable {
     static final int PROPERTY_NEXT_FORM = 35;
     static final int PROPERTY_RADIO_GROUP = 36;
     static final int PROPERTY_SELECTED = 37;
-
     static final int PROPERTY_LIST_ITEMS_LEGACY = 29;
     static final int PROPERTY_LIST_ITEMS = 38;
     static final int PROPERTY_LIST_RENDERER = 39;
@@ -191,26 +177,43 @@ public class UIBuilder { //implements Externalizable {
     static final int PROPERTY_SNAP_TO_GRID = 72;
     static final int PROPERTY_FLATTEN = 73;
     static final int PROPERTY_DISPOSE_WHEN_POINTER_OUT = 74;
-
     static final int PROPERTY_CLOUD_BOUND_PROPERTY = 75;
     static final int PROPERTY_CLOUD_DESTINATION_PROPERTY = 76;
-
     static final int PROPERTY_CLIENT_PROPERTIES = 77;
-    
     static final int LAYOUT_BOX_X = 5002;
     static final int LAYOUT_BOX_Y = 5003;
     static final int LAYOUT_GRID = 5006;
     static final int LAYOUT_TABLE = 5007;
-
     static final int LAYOUT_BORDER_LEGACY = 5001;
     static final int LAYOUT_BORDER_ANOTHER_LEGACY = 5008;
     static final int LAYOUT_BORDER = 5010;
     static final int LAYOUT_FLOW_LEGACY = 5004;
     static final int LAYOUT_FLOW = 5009;
     static final int LAYOUT_LAYERED = 5011;
+    /**
+     * A key in the form state hashtable used in the back command navigation
+     */
+    private static final String FORM_STATE_KEY_CONTAINER = "$cnt";
+    // used by the resource editor
+    static boolean ignorBaseForm;
+    private static Hashtable componentRegistry;
+    private static boolean blockAnalytics;
+    Vector baseFormNavigationStack = new Vector();
+    private String resourceFilePath;
+    private Resources resourceFile;
+    private Hashtable localCommandListeners;
+    private EventDispatcher globalCommandListeners;
+    private Hashtable localComponentListeners;
+    private boolean keepResourcesInRam = Display.getInstance().getProperty("cacheResFile", "false").equals("true");
+    private Vector backCommands;
+    /**
+     * When reaching the home form the navigation stack is cleared
+     */
+    private String homeForm;
 
     /**
      * Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+     *
      * @return the blockAnalytics
      */
     public static boolean isBlockAnalytics() {
@@ -219,32 +222,15 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * Enables blocking analytics in the UIBuilder, this is useful for the designer tool.
+     *
      * @param aBlockAnalytics the blockAnalytics to set
      */
     public static void setBlockAnalytics(boolean aBlockAnalytics) {
         blockAnalytics = aBlockAnalytics;
     }
 
-    private String resourceFilePath;
-    private Resources resourceFile;
-    private Hashtable localCommandListeners;
-    private EventDispatcher globalCommandListeners;
-    private Hashtable localComponentListeners;
-    private boolean keepResourcesInRam = Display.getInstance().getProperty("cacheResFile", "false").equals("true");
-
-    // used by the resource editor
-    static boolean ignorBaseForm;
-
-    Vector baseFormNavigationStack = new Vector();
-    private Vector backCommands;
-
-    /**
-     * When reaching the home form the navigation stack is cleared
-     */
-    private String homeForm;
-
     static Hashtable getComponentRegistry() {
-        if(componentRegistry == null) {
+        if (componentRegistry == null) {
             componentRegistry = new Hashtable();
             componentRegistry.put("Button", Button.class);
             componentRegistry.put("Calendar", com.codename1.ui.Calendar.class);
@@ -266,18 +252,17 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * Seamlessly inserts a back command to all the forms
-     * 
-     * @param back true to automatically add a back command
+     * This method  allows the UIBuilder to package a smaller portion of Codename One into the JAR
+     * and add support for additional 3rd party components to the GUI builder. Components
+     * must be registered using their UIID name, by default all the content of com.codename1.ui is
+     * registered however subpackages and 3rd party components are not.
+     * Registration is essential for obfuscation to work properly!
+     *
+     * @param name the name of the component (UIID)
+     * @param cmp  the class for the given component
      */
-    public void setBackCommandEnabled(boolean back) {
-        if(back) {
-            if(baseFormNavigationStack == null) {
-                baseFormNavigationStack = new Vector();
-            }
-        } else {
-            baseFormNavigationStack = null;
-        }
+    public static void registerCustomComponent(String name, Class cmp) {
+        getComponentRegistry().put(name, cmp);
     }
 
     /**
@@ -285,51 +270,53 @@ public class UIBuilder { //implements Externalizable {
      * want to go back to a form in the middle of the navigation stack.
      */
     protected void popNavigationStack() {
-        if(baseFormNavigationStack != null && baseFormNavigationStack.size() > 0) {
+        if (baseFormNavigationStack != null && baseFormNavigationStack.size() > 0) {
             baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);
         }
     }
-    
+
     /**
      * Pops the navigation stack until it finds form name and the back button will match form name
      * if form name isn't in the stack this method will fail
+     *
      * @param formName the name of the form to navigate back to.
      */
     protected void setBackDestination(String formName) {
-        if(baseFormNavigationStack != null) {
-            while(baseFormNavigationStack.size() > 0) {
-                Hashtable h = (Hashtable)baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
-                if(formName.equalsIgnoreCase((String)h.get(FORM_STATE_KEY_NAME))) {
+        if (baseFormNavigationStack != null) {
+            while (baseFormNavigationStack.size() > 0) {
+                Hashtable h = (Hashtable) baseFormNavigationStack.elementAt(baseFormNavigationStack.size() - 1);
+                if (formName.equalsIgnoreCase((String) h.get(FORM_STATE_KEY_NAME))) {
                     break;
                 }
                 baseFormNavigationStack.removeElementAt(baseFormNavigationStack.size() - 1);
             }
         }
     }
-    
+
     /**
-     * Useful method for logging form navigation, it returns a string representing the navigation state which 
+     * Useful method for logging form navigation, it returns a string representing the navigation state which
      * can be used to analyze crash reports
+     *
      * @return A string representing form states
      */
     protected String formNavigationStackDebug() {
-        if(baseFormNavigationStack != null) {
+        if (baseFormNavigationStack != null) {
             return baseFormNavigationStack.toString();
         }
         return "Null navigation stack";
     }
-    
+
     private Vector getFormNavigationStackForComponent(Component c) {
-        if(baseFormNavigationStack == null) {
+        if (baseFormNavigationStack == null) {
             return null;
         }
-        if(c == null) {
+        if (c == null) {
             return baseFormNavigationStack;
         }
         Component root = getRootAncestor(c);
-        if(root.getParent() instanceof EmbeddedContainer) {
-            Vector nav = (Vector)root.getParent().getClientProperty("$baseNav");
-            if(nav == null) {
+        if (root.getParent() instanceof EmbeddedContainer) {
+            Vector nav = (Vector) root.getParent().getClientProperty("$baseNav");
+            if (nav == null) {
                 nav = new Vector();
                 root.getParent().putClientProperty("$baseNav", nav);
             }
@@ -348,41 +335,43 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * This method  allows the UIBuilder to package a smaller portion of Codename One into the JAR
-     * and add support for additional 3rd party components to the GUI builder. Components
-     * must be registered using their UIID name, by default all the content of com.codename1.ui is
-     * registered however subpackages and 3rd party components are not.
-     * Registration is essential for obfuscation to work properly!
+     * Seamlessly inserts a back command to all the forms
      *
-     * @param name the name of the component (UIID)
-     * @param cmp the class for the given component
+     * @param back true to automatically add a back command
      */
-    public static void registerCustomComponent(String name, Class cmp) {
-        getComponentRegistry().put(name, cmp);
+    public void setBackCommandEnabled(boolean back) {
+        if (back) {
+            if (baseFormNavigationStack == null) {
+                baseFormNavigationStack = new Vector();
+            }
+        } else {
+            baseFormNavigationStack = null;
+        }
     }
 
     /**
-     * Invokes the analytics service if it is enabled and if 
-     * @param page the page visited
-     * @param referrer  the source page
+     * Invokes the analytics service if it is enabled and if
+     *
+     * @param page     the page visited
+     * @param referrer the source page
      */
     protected void analyticsCallback(String page, String referrer) {
-        if(!isBlockAnalytics() && AnalyticsService.isEnabled()) {
+        if (!isBlockAnalytics() && AnalyticsService.isEnabled()) {
             AnalyticsService.visit(page, referrer);
         }
     }
-    
+
     /**
      * Creates the container defined under the given name in the res file
      *
-     * @param resPath the path to the res file containing the UI widget
+     * @param resPath      the path to the res file containing the UI widget
      * @param resourceName the name of the widget in the res file
      * @return a Codename One container instance
      */
     public Container createContainer(String resPath, String resourceName) {
-        if(this.resourceFilePath == null || (!this.resourceFilePath.equals(resPath))) {
+        if (this.resourceFilePath == null || (!this.resourceFilePath.equals(resPath))) {
             resourceFile = null;
-        } 
+        }
         setResourceFilePath(resPath);
         return createContainer(fetchResourceFile(), resourceName);
     }
@@ -390,7 +379,7 @@ public class UIBuilder { //implements Externalizable {
     /**
      * Creates the container defined under the given name in the res file
      *
-     * @param res the res file containing the UI widget
+     * @param res          the res file containing the UI widget
      * @param resourceName the name of the widget in the res file
      * @return a Codename One container instance
      */
@@ -401,24 +390,24 @@ public class UIBuilder { //implements Externalizable {
     Container createContainer(Resources res, String resourceName, EmbeddedContainer parentContainer) {
         onCreateRoot(resourceName);
         InputStream source = res.getUi(resourceName);
-        if(source == null) {
+        if (source == null) {
             throw new RuntimeException("Resource doesn't exist within the current resource object: " + resourceName);
         }
         DataInputStream in = new DataInputStream(source);
         try {
             Hashtable h = null;
-            if(localComponentListeners != null) {
-                h = (Hashtable)localComponentListeners.get(resourceName);
+            if (localComponentListeners != null) {
+                h = (Hashtable) localComponentListeners.get(resourceName);
             }
-            Container c = (Container)createComponent(in, null, null, res, h, parentContainer);
+            Container c = (Container) createComponent(in, null, null, res, h, parentContainer);
             c.setName(resourceName);
             postCreateComponents(in, c, res);
 
             // try to be smart about initializing the home form
-            if(homeForm == null) {
-                if(c instanceof Form) {
-                    String nextForm = (String)c.getClientProperty("%next_form%");
-                    if(nextForm != null) {
+            if (homeForm == null) {
+                if (c instanceof Form) {
+                    String nextForm = (String) c.getClientProperty("%next_form%");
+                    if (nextForm != null) {
                         homeForm = nextForm;
                     } else {
                         homeForm = resourceName;
@@ -440,7 +429,7 @@ public class UIBuilder { //implements Externalizable {
         String rollover = null;
         String pressed = null;
         String disabled = null;
-        if(!legacy) {
+        if (!legacy) {
             rollover = in.readUTF();
             pressed = in.readUTF();
             disabled = in.readUTF();
@@ -448,54 +437,54 @@ public class UIBuilder { //implements Externalizable {
         int commandId = in.readInt();
         String commandAction = in.readUTF();
         String commandArgument = "";
-        if(commandAction.equals("$Execute")) {
+        if (commandAction.equals("$Execute")) {
             commandArgument = in.readUTF();
         }
         boolean isBack = in.readBoolean();
         Command cmd = createCommandImpl(commandName, res.getImage(commandImageName), commandId, commandAction, isBack, commandArgument);
-        if(rollover != null && rollover.length() > 0) {
+        if (rollover != null && rollover.length() > 0) {
             cmd.setRolloverIcon(res.getImage(rollover));
         }
-        if(pressed != null && pressed.length() > 0) {
+        if (pressed != null && pressed.length() > 0) {
             cmd.setPressedIcon(res.getImage(pressed));
         }
-        if(disabled != null && disabled.length() > 0) {
+        if (disabled != null && disabled.length() > 0) {
             cmd.setPressedIcon(res.getImage(pressed));
         }
-        if(isBack) {
+        if (isBack) {
             Form f = c.getComponentForm();
-            if(f != null) {
+            if (f != null) {
                 setBackCommand(f, cmd);
             } else {
-                if(backCommands == null) {
+                if (backCommands == null) {
                     backCommands = new Vector();
                 }
                 backCommands.addElement(cmd);
             }
         }
         Button btn;
-        if(c instanceof Container) {
-            btn = (Button)((Container)c).getLeadComponent();
+        if (c instanceof Container) {
+            btn = (Button) ((Container) c).getLeadComponent();
         } else {
-            btn = ((Button)c);
+            btn = ((Button) c);
         }
         boolean e = btn.isEnabled();
         btn.setCommand(cmd);
-        
+
         // special case since setting the command implicitly gets the enabled state from the command
-        if(!e) {
+        if (!e) {
             btn.setEnabled(false);
         }
 
         // prevent duplicate action handling only in the case of a component form
         // the embeded component doesn't have a global command listener since it has
         // no menu
-        if(c.getComponentForm() != null) {
+        if (c.getComponentForm() != null) {
             btn.removeActionListener(getFormListenerInstance(parent, null));
         }
         cmd.putClientProperty(COMMAND_ARGUMENTS, commandArgument);
         cmd.putClientProperty(COMMAND_ACTION, commandAction);
-        if(commandAction.length() > 0 && resourceFilePath == null || isKeepResourcesInRam()) {
+        if (commandAction.length() > 0 && resourceFilePath == null || isKeepResourcesInRam()) {
             resourceFile = res;
         }
     }
@@ -509,15 +498,15 @@ public class UIBuilder { //implements Externalizable {
         // finds the component whose properties need to update
         String name = in.readUTF();
         Component lastComponent = null;
-        while(name.length() > 0) {
-            if(lastComponent == null || !lastComponent.getName().equals(name)) {
+        while (name.length() > 0) {
+            if (lastComponent == null || !lastComponent.getName().equals(name)) {
                 lastComponent = findByName(name, parent);
             }
             Component c = lastComponent;
             int property = in.readInt();
             modifyingProperty(c, property);
 
-            switch(property) {
+            switch (property) {
                 case PROPERTY_COMMAND_LEGACY: {
                     readCommand(in, c, parent, res, true);
                     break;
@@ -527,10 +516,10 @@ public class UIBuilder { //implements Externalizable {
                     break;
                 }
                 case PROPERTY_LABEL_FOR:
-                    c.setLabelForComponent((Label)findByName(in.readUTF(), parent));
+                    c.setLabelForComponent((Label) findByName(in.readUTF(), parent));
                     break;
                 case PROPERTY_LEAD_COMPONENT:
-                    ((Container)c).setLeadComponent(findByName(in.readUTF(), parent));
+                    ((Container) c).setLeadComponent(findByName(in.readUTF(), parent));
                     break;
                 case PROPERTY_NEXT_FOCUS_UP:
                     c.setNextFocusUp(findByName(in.readUTF(), parent));
@@ -552,16 +541,16 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * Finds the given component by its name
-     * 
-     * @param name the name of the component as defined in the resource editor
+     *
+     * @param name          the name of the component as defined in the resource editor
      * @param rootComponent the root container
      * @return the component matching the given name or null if its not found
      */
     public Component findByName(String name, Component rootComponent) {
-        Component c = (Component)rootComponent.getClientProperty("%" + name + "%");
-        if(c == null) {
+        Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
+        if (c == null) {
             Container newRoot = getRootAncestor(rootComponent);
-            if(newRoot != null && rootComponent != newRoot) {
+            if (newRoot != null && rootComponent != newRoot) {
                 return findByName(name, newRoot);
             }
         }
@@ -570,16 +559,16 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * Finds the given component by its name
-     * 
-     * @param name the name of the component as defined in the resource editor
+     *
+     * @param name          the name of the component as defined in the resource editor
      * @param rootComponent the root container
      * @return the component matching the given name or null if its not found
      */
     public Component findByName(String name, Container rootComponent) {
-        Component c = (Component)rootComponent.getClientProperty("%" + name + "%");
-        if(c == null) {
+        Component c = (Component) rootComponent.getClientProperty("%" + name + "%");
+        if (c == null) {
             Container newRoot = getRootAncestor(rootComponent);
-            if(newRoot != null && rootComponent != newRoot) {
+            if (newRoot != null && rootComponent != newRoot) {
                 return findByName(name, newRoot);
             }
         }
@@ -591,9 +580,9 @@ public class UIBuilder { //implements Externalizable {
      * type is a shorthand for the component name and not the full name of the class.
      * By default this method returns null which indicates Codename One should try to reolve the component
      * on its own.
-     * 
+     *
      * @param componentType the type of the component from the UI builder
-     * @param cls assumed component class based on the component registry
+     * @param cls           assumed component class based on the component registry
      * @return a new component instance or null
      */
     protected Component createComponentInstance(String componentType, Class cls) {
@@ -611,55 +600,55 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * Binds the given listener object to the component, this works seamlessly for 
+     * Binds the given listener object to the component, this works seamlessly for
      * common Codename One events but might be an issue with custom components and custom
      * listener types so this method can be overloaded to add support for such cases.
      *
-     * @param cmp the component to bind the listener to
+     * @param cmp      the component to bind the listener to
      * @param listener the listener object
      */
     protected void bindListenerToComponent(Component cmp, Object listener) {
-        if(cmp instanceof Container) {
-            cmp = ((Container)cmp).getLeadComponent();
+        if (cmp instanceof Container) {
+            cmp = ((Container) cmp).getLeadComponent();
         }
-        if(listener instanceof FocusListener) {
-            cmp.addFocusListener((FocusListener)listener);
+        if (listener instanceof FocusListener) {
+            cmp.addFocusListener((FocusListener) listener);
             return;
         }
-        if(listener instanceof ActionListener) {
-            if(cmp instanceof Button) {
-                ((Button)cmp).addActionListener((ActionListener)listener);
+        if (listener instanceof ActionListener) {
+            if (cmp instanceof Button) {
+                ((Button) cmp).addActionListener((ActionListener) listener);
                 return;
             }
-            if(cmp instanceof List) {
-                ((List)cmp).addActionListener((ActionListener)listener);
+            if (cmp instanceof List) {
+                ((List) cmp).addActionListener((ActionListener) listener);
                 return;
             }
-            if(cmp instanceof ContainerList) {
-                ((ContainerList)cmp).addActionListener((ActionListener)listener);
+            if (cmp instanceof ContainerList) {
+                ((ContainerList) cmp).addActionListener((ActionListener) listener);
                 return;
             }
-            if(cmp instanceof com.codename1.ui.Calendar) {
-                ((com.codename1.ui.Calendar)cmp).addActionListener((ActionListener)listener);
+            if (cmp instanceof com.codename1.ui.Calendar) {
+                ((com.codename1.ui.Calendar) cmp).addActionListener((ActionListener) listener);
                 return;
             }
-            ((TextArea)cmp).addActionListener((ActionListener)listener);
+            ((TextArea) cmp).addActionListener((ActionListener) listener);
             return;
         }
-        if(listener instanceof DataChangedListener) {
-            if(cmp instanceof TextField) {
-                ((TextField)cmp).addDataChangedListener((DataChangedListener)listener);
+        if (listener instanceof DataChangedListener) {
+            if (cmp instanceof TextField) {
+                ((TextField) cmp).addDataChangedListener((DataChangedListener) listener);
                 return;
             }
-            ((Slider)cmp).addDataChangedListener((DataChangedListener)listener);
+            ((Slider) cmp).addDataChangedListener((DataChangedListener) listener);
             return;
         }
-        if(listener instanceof SelectionListener) {
-            if(cmp instanceof List) {
-                ((List)cmp).addSelectionListener((SelectionListener)listener);
+        if (listener instanceof SelectionListener) {
+            if (cmp instanceof List) {
+                ((List) cmp).addSelectionListener((SelectionListener) listener);
                 return;
             }
-            ((Slider)cmp).addDataChangedListener((DataChangedListener)listener);
+            ((Slider) cmp).addDataChangedListener((DataChangedListener) listener);
             return;
         }
     }
@@ -669,14 +658,14 @@ public class UIBuilder { //implements Externalizable {
 
     private Container findEmptyContainer(Container c) {
         int count = c.getComponentCount();
-        if(count == 0) {
+        if (count == 0) {
             return c;
         }
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component x = c.getComponentAt(iter);
-            if(x instanceof Container) {
-                Container current = findEmptyContainer((Container)x);
-                if(current != null) {
+            if (x instanceof Container) {
+                Container current = findEmptyContainer((Container) x);
+                if (current != null) {
                     return current;
                 }
             }
@@ -686,7 +675,7 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * Allows a subclass to set the list model for the given component
-     * 
+     *
      * @param cmp the list whose model may be set
      * @return true if a model was set by this method
      */
@@ -696,7 +685,7 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * Allows a subclass to set the list model for the given component
-     * 
+     *
      * @param cmp the list whose model may be set
      * @return true if a model was set by this method
      */
@@ -710,51 +699,51 @@ public class UIBuilder { //implements Externalizable {
         final Command[] commands = new Command[commandCount];
         final String[] commandArguments = new String[commandCount];
         boolean hasAction = false;
-        for(int iter = 0 ; iter < commandCount ; iter++) {
+        for (int iter = 0; iter < commandCount; iter++) {
             String commandName = in.readUTF();
             String commandImageName = in.readUTF();
             String rollover = null;
             String pressed = null;
             String disabled = null;
-            if(!legacy) {
+            if (!legacy) {
                 rollover = in.readUTF();
                 pressed = in.readUTF();
                 disabled = in.readUTF();
             }
             int commandId = in.readInt();
             commandActions[iter] = in.readUTF();
-            if(commandActions[iter].length() > 0) {
+            if (commandActions[iter].length() > 0) {
                 hasAction = true;
             }
             boolean isBack = in.readBoolean();
             commandArguments[iter] = "";
-            if(commandActions[iter].equals("$Execute")) {
+            if (commandActions[iter].equals("$Execute")) {
                 commandArguments[iter] = in.readUTF();
             }
             commands[iter] = createCommandImpl(commandName, res.getImage(commandImageName), commandId, commandActions[iter], isBack, commandArguments[iter]);
-            if(rollover != null && rollover.length() > 0) {
+            if (rollover != null && rollover.length() > 0) {
                 commands[iter].setRolloverIcon(res.getImage(rollover));
             }
-            if(pressed != null && pressed.length() > 0) {
+            if (pressed != null && pressed.length() > 0) {
                 commands[iter].setPressedIcon(res.getImage(pressed));
             }
-            if(disabled != null && disabled.length() > 0) {
+            if (disabled != null && disabled.length() > 0) {
                 commands[iter].setPressedIcon(res.getImage(pressed));
             }
-            if(isBack) {
-                setBackCommand(((Form)cmp), commands[iter]);
+            if (isBack) {
+                setBackCommand(((Form) cmp), commands[iter]);
             }
             // trigger listener creation if this is the only command in the form
-            getFormListenerInstance(((Form)cmp), null);
+            getFormListenerInstance(((Form) cmp), null);
 
-            ((Form)cmp).addCommand(commands[iter]);
+            ((Form) cmp).addCommand(commands[iter]);
         }
-        if(hasAction) {
-            for(int iter = 0 ; iter < commands.length ; iter++) {
+        if (hasAction) {
+            for (int iter = 0; iter < commands.length; iter++) {
                 commands[iter].putClientProperty(COMMAND_ARGUMENTS, commandArguments[iter]);
                 commands[iter].putClientProperty(COMMAND_ACTION, commandActions[iter]);
             }
-            if(resourceFilePath == null || isKeepResourcesInRam()) {
+            if (resourceFilePath == null || isKeepResourcesInRam()) {
                 resourceFile = res;
             }
         }
@@ -763,8 +752,8 @@ public class UIBuilder { //implements Externalizable {
     private Object[] readObjectArrayForListModel(DataInputStream in, Resources res) throws IOException {
         Object[] elements = new Object[in.readInt()];
         int elen = elements.length;
-        for(int iter = 0 ; iter < elen ; iter++) {
-            switch(in.readByte()) {
+        for (int iter = 0; iter < elen; iter++) {
+            switch (in.readByte()) {
                 case 1: // String
                     elements[iter] = in.readUTF();
                     break;
@@ -772,14 +761,14 @@ public class UIBuilder { //implements Externalizable {
                     int hashSize = in.readInt();
                     Hashtable val = new Hashtable();
                     elements[iter] = val;
-                    for(int i = 0 ; i < hashSize ; i++) {
+                    for (int i = 0; i < hashSize; i++) {
                         int type = in.readInt();
-                        if(type == 1) { // String
+                        if (type == 1) { // String
                             String key = in.readUTF();
                             Object value = in.readUTF();
-                            if(key.equals("$navigation")) {
-                                Command cmd = createCommandImpl((String)value, null, -1, (String)value, false, "");
-                                cmd.putClientProperty(COMMAND_ACTION, (String)value);
+                            if (key.equals("$navigation")) {
+                                Command cmd = createCommandImpl((String) value, null, -1, (String) value, false, "");
+                                cmd.putClientProperty(COMMAND_ACTION, (String) value);
                                 value = cmd;
                             }
                             val.put(key, value);
@@ -797,7 +786,7 @@ public class UIBuilder { //implements Externalizable {
         int rendererComponentCount = in.readByte();
         String f = in.readUTF();
         String s = in.readUTF();
-        if(rendererComponentCount == 2) {
+        if (rendererComponentCount == 2) {
             Component selected = createContainer(res, f);
             Component unselected = createContainer(res, s);
             GenericListCellRenderer g = new GenericListCellRenderer(selected, unselected);
@@ -813,47 +802,47 @@ public class UIBuilder { //implements Externalizable {
             return g;
         }
     }
-    
+
     private Object readCustomPropertyValue(DataInputStream in, Class type, String typeName, Resources res, String name) throws IOException {
-        if(type == String.class) {
+        if (type == String.class) {
             return in.readUTF();
         }
 
-        if(typeName != null) {
-            if("String[]".equals(typeName)) {
+        if (typeName != null) {
+            if ("String[]".equals(typeName)) {
                 String[] result = new String[in.readInt()];
-                for(int i = 0 ; i < result.length ; i++) {
+                for (int i = 0; i < result.length; i++) {
                     result[i] = in.readUTF();
                 }
                 return result;
             }
         } else {
-            if(type == com.codename1.impl.CodenameOneImplementation.getStringArrayClass()) {
+            if (type == com.codename1.impl.CodenameOneImplementation.getStringArrayClass()) {
                 String[] result = new String[in.readInt()];
-                for(int i = 0 ; i < result.length ; i++) {
+                for (int i = 0; i < result.length; i++) {
                     result[i] = in.readUTF();
                 }
                 return result;
             }
         }
 
-        if(typeName != null) {
-            if("String[][]".equals(typeName)) {
+        if (typeName != null) {
+            if ("String[][]".equals(typeName)) {
                 String[][] result = new String[in.readInt()][];
-                for(int i = 0 ; i < result.length ; i++) {
+                for (int i = 0; i < result.length; i++) {
                     result[i] = new String[in.readInt()];
-                    for(int j = 0 ; j < result[i].length ; j++) {
+                    for (int j = 0; j < result[i].length; j++) {
                         result[i][j] = in.readUTF();
                     }
                 }
                 return result;
             }
         } else {
-            if(type == com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()) {
+            if (type == com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()) {
                 String[][] result = new String[in.readInt()][];
-                for(int i = 0 ; i < result.length ; i++) {
+                for (int i = 0; i < result.length; i++) {
                     result[i] = new String[in.readInt()];
-                    for(int j = 0 ; j < result[i].length ; j++) {
+                    for (int j = 0; j < result[i].length; j++) {
                         result[i][j] = in.readUTF();
                     }
                 }
@@ -861,83 +850,83 @@ public class UIBuilder { //implements Externalizable {
             }
         }
 
-        if(type == Integer.class) {
+        if (type == Integer.class) {
             return new Integer(in.readInt());
         }
 
-        if(type == Long.class) {
+        if (type == Long.class) {
             return new Long(in.readLong());
         }
 
-        if(type == Double.class) {
+        if (type == Double.class) {
             return new Double(in.readDouble());
         }
 
-        if(type == Float.class) {
+        if (type == Float.class) {
             return new Float(in.readFloat());
         }
 
-        if(type == Byte.class) {
+        if (type == Byte.class) {
             return new Byte(in.readByte());
         }
 
-        if(type == Boolean.class) {
-            if(in.readBoolean()) {
+        if (type == Boolean.class) {
+            if (in.readBoolean()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
 
-        if(typeName != null) {
-            if("Image[]".equals(typeName)) {
+        if (typeName != null) {
+            if ("Image[]".equals(typeName)) {
                 Image[] result = new Image[in.readInt()];
-                for(int i = 0 ; i < result.length ; i++) {
+                for (int i = 0; i < result.length; i++) {
                     result[i] = res.getImage(in.readUTF());
                 }
                 return result;
             }
         } else {
-            if(type == com.codename1.impl.CodenameOneImplementation.getImageArrayClass()) {
+            if (type == com.codename1.impl.CodenameOneImplementation.getImageArrayClass()) {
                 Image[] result = new Image[in.readInt()];
-                for(int i = 0 ; i < result.length ; i++) {
+                for (int i = 0; i < result.length; i++) {
                     result[i] = res.getImage(in.readUTF());
                 }
                 return result;
             }
         }
 
-        if(type == Image.class) {
+        if (type == Image.class) {
             return res.getImage(in.readUTF());
         }
-        
-        if(type == Container.class) {
+
+        if (type == Container.class) {
             // resource might have been removed we need to fail gracefully
             String[] uiNames = res.getUIResourceNames();
             String currentName = in.readUTF();
             int ulen = uiNames.length;
-            for(int iter = 0 ; iter < ulen ; iter++) {
-                if(uiNames[iter].equals(currentName)) {
+            for (int iter = 0; iter < ulen; iter++) {
+                if (uiNames[iter].equals(currentName)) {
                     return createContainer(res, currentName);
                 }
             }
             return null;
         }
 
-        if(type == CellRenderer.class) {
+        if (type == CellRenderer.class) {
             return readRendererer(res, in);
         }
 
-        if(type.isArray()) {
+        if (type.isArray()) {
             return readObjectArrayForListModel(in, res);
         }
-        
-        if(type == Date.class) {
+
+        if (type == Date.class) {
             boolean b = in.readBoolean();
-            if(b) {
+            if (b) {
                 return new Date(in.readInt());
             }
         }
-        
+
         return new Character(in.readChar());
     }
 
@@ -946,24 +935,24 @@ public class UIBuilder { //implements Externalizable {
         int property = in.readInt();
 
         // special case for the base form
-        if(property == PROPERTY_BASE_FORM) {
+        if (property == PROPERTY_BASE_FORM) {
             String baseFormName = name;
             initBaseForm(baseFormName);
-            if(!ignorBaseForm) {
-                Form base = (Form)createContainer(res, baseFormName);
-                Container destination = (Container)findByName("destination", base);
-                
+            if (!ignorBaseForm) {
+                Form base = (Form) createContainer(res, baseFormName);
+                Container destination = (Container) findByName("destination", base);
+
                 // try finding an appropriate empty container if no "fixed" destination is defined
-                if(destination == null) {
+                if (destination == null) {
                     destination = findEmptyContainer(base.getContentPane());
-                    if(destination == null) {
+                    if (destination == null) {
                         System.out.println("Couldn't find appropriate 'destination' container in base form: " + baseFormName);
                         return null;
                     }
                 }
                 root = base;
                 Component cmp = createComponent(in, destination, root, res, componentListeners, embedded);
-                if(destination.getLayout() instanceof BorderLayout) {
+                if (destination.getLayout() instanceof BorderLayout) {
                     destination.addComponent(BorderLayout.CENTER, cmp);
                 } else {
                     destination.addComponent(cmp);
@@ -976,12 +965,12 @@ public class UIBuilder { //implements Externalizable {
         }
         Component cmp = createComponentType(name);
 
-        if(componentListeners != null) {
+        if (componentListeners != null) {
             Object listeners = componentListeners.get(name);
-            if(listeners != null) {
-                if(listeners instanceof Vector) {
-                    Vector v = (Vector)listeners;
-                    for(int iter = 0 ; iter < v.size() ; iter++) {
+            if (listeners != null) {
+                if (listeners instanceof Vector) {
+                    Vector v = (Vector) listeners;
+                    for (int iter = 0; iter < v.size(); iter++) {
                         bindListenerToComponent(cmp, v.elementAt(iter));
                     }
                 } else {
@@ -991,75 +980,75 @@ public class UIBuilder { //implements Externalizable {
         }
 
         Component actualLead = cmp;
-        if(actualLead instanceof Container) {
-            Container cnt = (Container)actualLead;
+        if (actualLead instanceof Container) {
+            Container cnt = (Container) actualLead;
             actualLead = cnt.getLeadComponent();
-            if(actualLead == null) {
+            if (actualLead == null) {
                 actualLead = cmp;
             }
         }
-        if(actualLead instanceof Button) {
+        if (actualLead instanceof Button) {
             ActionListener l = getFormListenerInstance(root, embedded);
-            if(l != null) {
-                ((Button)actualLead).addActionListener(l);
+            if (l != null) {
+                ((Button) actualLead).addActionListener(l);
             }
         } else {
-            if(actualLead instanceof TextArea) {
+            if (actualLead instanceof TextArea) {
                 ActionListener l = getFormListenerInstance(root, embedded);
-                if(l != null) {
-                    ((TextArea)actualLead).addActionListener(l);
+                if (l != null) {
+                    ((TextArea) actualLead).addActionListener(l);
                 }
             } else {
-                if(actualLead instanceof List) {
+                if (actualLead instanceof List) {
                     ActionListener l = getFormListenerInstance(root, embedded);
-                    if(l != null) {
-                        ((List)actualLead).addActionListener(l);
+                    if (l != null) {
+                        ((List) actualLead).addActionListener(l);
                     }
                 } else {
-                    if(actualLead instanceof ContainerList) {
+                    if (actualLead instanceof ContainerList) {
                         ActionListener l = getFormListenerInstance(root, embedded);
-                        if(l != null) {
-                            ((ContainerList)actualLead).addActionListener(l);
+                        if (l != null) {
+                            ((ContainerList) actualLead).addActionListener(l);
                         }
                     } else {
-                        if(actualLead instanceof com.codename1.ui.Calendar) {
+                        if (actualLead instanceof com.codename1.ui.Calendar) {
                             ActionListener l = getFormListenerInstance(root, embedded);
-                            if(l != null) {
-                                ((com.codename1.ui.Calendar)actualLead).addActionListener(l);
+                            if (l != null) {
+                                ((com.codename1.ui.Calendar) actualLead).addActionListener(l);
                             }
-                        }                    
+                        }
                     }
                 }
             }
         }
 
         cmp.putClientProperty(TYPE_KEY, name);
-        if(root == null) {
-            root = (Container)cmp;
+        if (root == null) {
+            root = (Container) cmp;
         }
-        while(property != -1) {
+        while (property != -1) {
             modifyingProperty(cmp, property);
-            switch(property) {
+            switch (property) {
                 case PROPERTY_CUSTOM:
                     String customPropertyName = in.readUTF();
                     modifyingCustomProperty(cmp, customPropertyName);
                     boolean isNull = in.readBoolean();
-                    if(isNull) {
+                    if (isNull) {
                         cmp.setPropertyValue(customPropertyName, null);
                         break;
                     }
                     boolean cl = cmp instanceof ContainerList;
                     String[] propertyNames = cmp.getPropertyNames();
-                    for(int iter = 0 ; iter < propertyNames.length ; iter++) {
-                        if(propertyNames[iter].equals(customPropertyName)) {
+                    for (int iter = 0; iter < propertyNames.length; iter++) {
+                        if (propertyNames[iter].equals(customPropertyName)) {
                             Class type = cmp.getPropertyTypes()[iter];
                             String[] typeNames = cmp.getPropertyTypeNames();
                             String typeName = null;
-                            if(typeNames != null && typeNames.length > iter) {
+                            if (typeNames != null && typeNames.length > iter) {
                                 typeName = typeNames[iter];
                             }
                             Object value = readCustomPropertyValue(in, type, typeName, res, propertyNames[iter]);
-                            if(cl && customPropertyName.equals("ListItems") && setListModel((ContainerList)cmp)) {
+                            if (cl && customPropertyName.equals("ListItems") && setListModel((ContainerList) cmp)) {
                                 break;
                             }
                             cmp.setPropertyValue(customPropertyName, value);
@@ -1070,14 +1059,14 @@ public class UIBuilder { //implements Externalizable {
 
                 case PROPERTY_EMBED:
                     root.putClientProperty(EMBEDDED_FORM_FLAG, "");
-                    ((EmbeddedContainer)cmp).setEmbed(in.readUTF());
-                    Container embed = createContainer(res, ((EmbeddedContainer)cmp).getEmbed(), (EmbeddedContainer)cmp);
-                    if(embed != null) {
-                        if(embed instanceof Form) {
-                            embed = formToContainer((Form)embed);
+                    ((EmbeddedContainer) cmp).setEmbed(in.readUTF());
+                    Container embed = createContainer(res, ((EmbeddedContainer) cmp).getEmbed(), (EmbeddedContainer) cmp);
+                    if (embed != null) {
+                        if (embed instanceof Form) {
+                            embed = formToContainer((Form) embed);
                         }
-                        ((EmbeddedContainer)cmp).addComponent(BorderLayout.CENTER, embed);
-                        
+                        ((EmbeddedContainer) cmp).addComponent(BorderLayout.CENTER, embed);
+
                         // this isn't exactly the "right thing" but its the best we can do to make all
                         // use cases work
                         beforeShowContainer(embed);
@@ -1086,28 +1075,28 @@ public class UIBuilder { //implements Externalizable {
                     break;
 
                 case PROPERTY_TOGGLE_BUTTON:
-                    ((Button)cmp).setToggle(in.readBoolean());
+                    ((Button) cmp).setToggle(in.readBoolean());
                     break;
 
                 case PROPERTY_RADIO_GROUP:
-                    ((RadioButton)cmp).setGroup(in.readUTF());
+                    ((RadioButton) cmp).setGroup(in.readUTF());
                     break;
 
                 case PROPERTY_SELECTED:
                     boolean isSelected = in.readBoolean();
-                    if(cmp instanceof RadioButton) {
-                        ((RadioButton)cmp).setSelected(isSelected);
+                    if (cmp instanceof RadioButton) {
+                        ((RadioButton) cmp).setSelected(isSelected);
                     } else {
-                        ((CheckBox)cmp).setSelected(isSelected);
+                        ((CheckBox) cmp).setSelected(isSelected);
                     }
                     break;
 
                 case PROPERTY_SCROLLABLE_X:
-                    ((Container)cmp).setScrollableX(in.readBoolean());
+                    ((Container) cmp).setScrollableX(in.readBoolean());
                     break;
 
                 case PROPERTY_SCROLLABLE_Y:
-                    ((Container)cmp).setScrollableY(in.readBoolean());
+                    ((Container) cmp).setScrollableY(in.readBoolean());
                     break;
 
                 case PROPERTY_TENSILE_DRAG_ENABLED:
@@ -1127,60 +1116,60 @@ public class UIBuilder { //implements Externalizable {
                     break;
 
                 case PROPERTY_TEXT:
-                    if(cmp instanceof Label) {
-                        ((Label)cmp).setText(in.readUTF());
+                    if (cmp instanceof Label) {
+                        ((Label) cmp).setText(in.readUTF());
                     } else {
-                        ((TextArea)cmp).setText(in.readUTF());
+                        ((TextArea) cmp).setText(in.readUTF());
                     }
                     break;
 
                 case PROPERTY_TEXT_MAX_LENGTH:
-                    ((TextArea)cmp).setMaxSize(in.readInt());
+                    ((TextArea) cmp).setMaxSize(in.readInt());
                     break;
 
                 case PROPERTY_TEXT_CONSTRAINT:
-                    ((TextArea)cmp).setConstraint(in.readInt());
-                    if(cmp instanceof TextField) {
-                        int cons = ((TextArea)cmp).getConstraint();
-                        if((cons & TextArea.NUMERIC) == TextArea.NUMERIC) {
-                            ((TextField)cmp).setInputModeOrder(new String[]{"123"});
+                    ((TextArea) cmp).setConstraint(in.readInt());
+                    if (cmp instanceof TextField) {
+                        int cons = ((TextArea) cmp).getConstraint();
+                        if ((cons & TextArea.NUMERIC) == TextArea.NUMERIC) {
+                            ((TextField) cmp).setInputModeOrder(new String[]{"123"});
                         }
                     }
                     break;
 
                 case PROPERTY_ALIGNMENT:
-                    if(cmp instanceof Label) {
-                        ((Label)cmp).setAlignment(in.readInt());
+                    if (cmp instanceof Label) {
+                        ((Label) cmp).setAlignment(in.readInt());
                     } else {
-                        ((TextArea)cmp).setAlignment(in.readInt());
+                        ((TextArea) cmp).setAlignment(in.readInt());
                     }
                     break;
 
                 case PROPERTY_TEXT_AREA_GROW:
-                    ((TextArea)cmp).setGrowByContent(in.readBoolean());
+                    ((TextArea) cmp).setGrowByContent(in.readBoolean());
                     break;
 
                 case PROPERTY_LAYOUT:
                     Layout layout = null;
-                    switch(in.readShort()) {
+                    switch (in.readShort()) {
                         case LAYOUT_BORDER_LEGACY:
                             layout = new BorderLayout();
                             break;
                         case LAYOUT_BORDER_ANOTHER_LEGACY: {
                             BorderLayout b = new BorderLayout();
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.NORTH, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.EAST, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.WEST, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.SOUTH, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.CENTER, in.readUTF());
                             }
                             layout = b;
@@ -1188,19 +1177,19 @@ public class UIBuilder { //implements Externalizable {
                         }
                         case LAYOUT_BORDER: {
                             BorderLayout b = new BorderLayout();
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.NORTH, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.EAST, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.WEST, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.SOUTH, in.readUTF());
                             }
-                            if(in.readBoolean()) {
+                            if (in.readBoolean()) {
                                 b.defineLandscapeSwap(BorderLayout.CENTER, in.readUTF());
                             }
                             b.setAbsoluteCenter(in.readBoolean());
@@ -1233,15 +1222,15 @@ public class UIBuilder { //implements Externalizable {
                             layout = new TableLayout(in.readInt(), in.readInt());
                             break;
                     }
-                    ((Container)cmp).setLayout(layout);
+                    ((Container) cmp).setLayout(layout);
                     break;
 
                 case PROPERTY_TAB_PLACEMENT:
-                    ((Tabs)cmp).setTabPlacement(in.readInt());
+                    ((Tabs) cmp).setTabPlacement(in.readInt());
                     break;
 
                 case PROPERTY_TAB_TEXT_POSITION:
-                    ((Tabs)cmp).setTabTextPosition(in.readInt());
+                    ((Tabs) cmp).setTabTextPosition(in.readInt());
                     break;
 
                 case PROPERTY_PREFERRED_WIDTH:
@@ -1257,25 +1246,25 @@ public class UIBuilder { //implements Externalizable {
                     break;
 
                 case PROPERTY_DIALOG_UIID:
-                    ((Dialog)cmp).setDialogUIID(in.readUTF());
+                    ((Dialog) cmp).setDialogUIID(in.readUTF());
                     break;
 
                 case PROPERTY_DISPOSE_WHEN_POINTER_OUT:
-                    ((Dialog)cmp).setDisposeWhenPointerOutOfBounds(in.readBoolean());
+                    ((Dialog) cmp).setDisposeWhenPointerOutOfBounds(in.readBoolean());
                     break;
-                    
+
                 case PROPERTY_CLOUD_BOUND_PROPERTY:
                     cmp.setCloudBoundProperty(in.readUTF());
                     break;
-                    
+
                 case PROPERTY_CLOUD_DESTINATION_PROPERTY:
                     cmp.setCloudDestinationProperty(in.readUTF());
                     break;
 
                 case PROPERTY_DIALOG_POSITION:
                     String pos = in.readUTF();
-                    if(pos.length() > 0) {
-                        ((Dialog)cmp).setDialogPosition(pos);
+                    if (pos.length() > 0) {
+                        ((Dialog) cmp).setDialogPosition(pos);
                     }
                     break;
 
@@ -1292,46 +1281,46 @@ public class UIBuilder { //implements Externalizable {
                     break;
 
                 case PROPERTY_ICON:
-                    ((Label)cmp).setIcon(res.getImage(in.readUTF()));
+                    ((Label) cmp).setIcon(res.getImage(in.readUTF()));
                     break;
 
                 case PROPERTY_ROLLOVER_ICON:
-                    ((Button)cmp).setRolloverIcon(res.getImage(in.readUTF()));
+                    ((Button) cmp).setRolloverIcon(res.getImage(in.readUTF()));
                     break;
 
                 case PROPERTY_PRESSED_ICON:
-                    ((Button)cmp).setPressedIcon(res.getImage(in.readUTF()));
+                    ((Button) cmp).setPressedIcon(res.getImage(in.readUTF()));
                     break;
 
                 case PROPERTY_DISABLED_ICON:
-                    ((Button)cmp).setDisabledIcon(res.getImage(in.readUTF()));
+                    ((Button) cmp).setDisabledIcon(res.getImage(in.readUTF()));
                     break;
 
                 case PROPERTY_GAP:
-                    ((Label)cmp).setGap(in.readInt());
+                    ((Label) cmp).setGap(in.readInt());
                     break;
 
                 case PROPERTY_VERTICAL_ALIGNMENT:
-                    if(cmp instanceof TextArea) {
-                        ((TextArea)cmp).setVerticalAlignment(in.readInt());
+                    if (cmp instanceof TextArea) {
+                        ((TextArea) cmp).setVerticalAlignment(in.readInt());
                     } else {
-                        ((Label)cmp).setVerticalAlignment(in.readInt());
+                        ((Label) cmp).setVerticalAlignment(in.readInt());
                     }
                     break;
 
                 case PROPERTY_TEXT_POSITION:
-                    ((Label)cmp).setTextPosition(in.readInt());
+                    ((Label) cmp).setTextPosition(in.readInt());
                     break;
-                    
+
                 case PROPERTY_CLIENT_PROPERTIES:
                     int count = in.readInt();
                     StringBuilder sb = new StringBuilder();
-                    for(int iter = 0 ; iter < count ; iter++) {
+                    for (int iter = 0; iter < count; iter++) {
                         String k = in.readUTF();
                         String v = in.readUTF();
                         cmp.putClientProperty(k, v);
                         sb.append(k);
-                        if(iter < count - 1) {
+                        if (iter < count - 1) {
                             sb.append(",");
                         }
                     }
@@ -1345,10 +1334,10 @@ public class UIBuilder { //implements Externalizable {
                     break;
 
                 case PROPERTY_LAYOUT_CONSTRAINT:
-                    if(parent.getLayout() instanceof BorderLayout) {
+                    if (parent.getLayout() instanceof BorderLayout) {
                         cmp.putClientProperty("layoutConstraint", in.readUTF());
                     } else {
-                        TableLayout tl = (TableLayout)parent.getLayout();
+                        TableLayout tl = (TableLayout) parent.getLayout();
                         TableLayout.Constraint con = tl.createConstraint(in.readInt(), in.readInt());
                         con.setHeightPercentage(in.readInt());
                         con.setWidthPercentage(in.readInt());
@@ -1361,88 +1350,88 @@ public class UIBuilder { //implements Externalizable {
                     break;
 
                 case PROPERTY_TITLE:
-                    ((Form)cmp).setTitle(in.readUTF());
+                    ((Form) cmp).setTitle(in.readUTF());
                     break;
 
                 case PROPERTY_COMPONENTS:
                     int componentCount = in.readInt();
-                    if(cmp instanceof Tabs) {
-                        for(int iter = 0 ; iter < componentCount ; iter++) {
+                    if (cmp instanceof Tabs) {
+                        for (int iter = 0; iter < componentCount; iter++) {
                             String tab = in.readUTF();
-                            Component child = createComponent(in, (Container)cmp, root, res, componentListeners, embedded);
-                            ((Tabs)cmp).addTab(tab, child);
+                            Component child = createComponent(in, (Container) cmp, root, res, componentListeners, embedded);
+                            ((Tabs) cmp).addTab(tab, child);
                         }
                     } else {
-                        for(int iter = 0 ; iter < componentCount ; iter++) {
-                            Component child = createComponent(in, (Container)cmp, root, res, componentListeners, embedded);
+                        for (int iter = 0; iter < componentCount; iter++) {
+                            Component child = createComponent(in, (Container) cmp, root, res, componentListeners, embedded);
                             Object con = child.getClientProperty("layoutConstraint");
-                            if(con != null) {
-                                ((Container)cmp).addComponent(con, child);
+                            if (con != null) {
+                                ((Container) cmp).addComponent(con, child);
                             } else {
-                                ((Container)cmp).addComponent(child);
+                                ((Container) cmp).addComponent(child);
                             }
                         }
                     }
                     break;
 
                 case PROPERTY_COLUMNS:
-                    ((TextArea)cmp).setColumns(in.readInt());
+                    ((TextArea) cmp).setColumns(in.readInt());
                     break;
 
                 case PROPERTY_ROWS:
-                    ((TextArea)cmp).setRows(in.readInt());
+                    ((TextArea) cmp).setRows(in.readInt());
                     break;
 
                 case PROPERTY_HINT:
-                    if(cmp instanceof List) {
-                        ((List)cmp).setHint(in.readUTF());
+                    if (cmp instanceof List) {
+                        ((List) cmp).setHint(in.readUTF());
                     } else {
-                        ((TextArea)cmp).setHint(in.readUTF());
+                        ((TextArea) cmp).setHint(in.readUTF());
                     }
                     break;
 
                 case PROPERTY_HINT_ICON:
-                    if(cmp instanceof List) {
-                        ((List)cmp).setHintIcon(res.getImage(in.readUTF()));
+                    if (cmp instanceof List) {
+                        ((List) cmp).setHintIcon(res.getImage(in.readUTF()));
                     } else {
-                        ((TextArea)cmp).setHintIcon(res.getImage(in.readUTF()));
+                        ((TextArea) cmp).setHintIcon(res.getImage(in.readUTF()));
                     }
                     break;
 
                 case PROPERTY_ITEM_GAP:
-                    ((List)cmp).setItemGap(in.readInt());
+                    ((List) cmp).setItemGap(in.readInt());
                     break;
 
                 case PROPERTY_LIST_FIXED:
-                    ((List)cmp).setFixedSelection(in.readInt());
+                    ((List) cmp).setFixedSelection(in.readInt());
                     break;
 
                 case PROPERTY_LIST_ORIENTATION:
-                    ((List)cmp).setOrientation(in.readInt());
+                    ((List) cmp).setOrientation(in.readInt());
                     break;
 
                 case PROPERTY_LIST_ITEMS_LEGACY:
                     String[] items = new String[in.readInt()];
-                    for(int iter = 0 ; iter < items.length ; iter++) {
+                    for (int iter = 0; iter < items.length; iter++) {
                         items[iter] = in.readUTF();
                     }
-                    if(!setListModel(((List)cmp))) {
-                        ((List)cmp).setModel(new DefaultListModel((Object[])items));
+                    if (!setListModel(((List) cmp))) {
+                        ((List) cmp).setModel(new DefaultListModel((Object[]) items));
                     }
                     break;
 
                 case PROPERTY_LIST_ITEMS:
                     Object[] elements = readObjectArrayForListModel(in, res);
-                    if(!setListModel(((List)cmp))) {
-                        ((List)cmp).setModel(new DefaultListModel(elements));
+                    if (!setListModel(((List) cmp))) {
+                        ((List) cmp).setModel(new DefaultListModel(elements));
                     }
                     break;
 
                 case PROPERTY_LIST_RENDERER:
-                    if(cmp instanceof ContainerList) {
-                        ((ContainerList)cmp).setRenderer(readRendererer(res, in));
+                    if (cmp instanceof ContainerList) {
+                        ((ContainerList) cmp).setRenderer(readRendererer(res, in));
                     } else {
-                        ((List)cmp).setRenderer(readRendererer(res, in));
+                        ((List) cmp).setRenderer(readRendererer(res, in));
                     }
                     break;
 
@@ -1454,57 +1443,57 @@ public class UIBuilder { //implements Externalizable {
                 case PROPERTY_COMMANDS:
                     readCommands(in, cmp, res, false);
                     break;
-                    
+
                 case PROPERTY_COMMANDS_LEGACY:
                     readCommands(in, cmp, res, true);
                     break;
-                    
+
                 case PROPERTY_CYCLIC_FOCUS:
-                    ((Form)cmp).setCyclicFocus(in.readBoolean());
+                    ((Form) cmp).setCyclicFocus(in.readBoolean());
                     break;
-                    
+
                 case PROPERTY_RTL:
                     cmp.setRTL(in.readBoolean());
                     break;
 
                 case PROPERTY_SLIDER_THUMB:
-                    ((Slider)cmp).setThumbImage(res.getImage(in.readUTF()));
+                    ((Slider) cmp).setThumbImage(res.getImage(in.readUTF()));
                     break;
 
                 case PROPERTY_INFINITE:
-                    ((Slider)cmp).setInfinite(in.readBoolean());
+                    ((Slider) cmp).setInfinite(in.readBoolean());
                     break;
 
                 case PROPERTY_PROGRESS:
-                    ((Slider)cmp).setProgress(in.readInt());
+                    ((Slider) cmp).setProgress(in.readInt());
                     break;
 
                 case PROPERTY_VERTICAL:
-                    ((Slider)cmp).setVertical(in.readBoolean());
+                    ((Slider) cmp).setVertical(in.readBoolean());
                     break;
 
                 case PROPERTY_EDITABLE:
-                    if(cmp instanceof TextArea) {
-                        ((TextArea)cmp).setEditable(in.readBoolean());
+                    if (cmp instanceof TextArea) {
+                        ((TextArea) cmp).setEditable(in.readBoolean());
                     } else {
-                        ((Slider)cmp).setEditable(in.readBoolean());
+                        ((Slider) cmp).setEditable(in.readBoolean());
                     }
                     break;
 
                 case PROPERTY_INCREMENTS:
-                    ((Slider)cmp).setIncrements(in.readInt());
+                    ((Slider) cmp).setIncrements(in.readInt());
                     break;
 
                 case PROPERTY_RENDER_PERCENTAGE_ON_TOP:
-                    ((Slider)cmp).setRenderPercentageOnTop(in.readBoolean());
+                    ((Slider) cmp).setRenderPercentageOnTop(in.readBoolean());
                     break;
 
                 case PROPERTY_MAX_VALUE:
-                    ((Slider)cmp).setMaxValue(in.readInt());
+                    ((Slider) cmp).setMaxValue(in.readInt());
                     break;
 
                 case PROPERTY_MIN_VALUE:
-                    ((Slider)cmp).setMinValue(in.readInt());
+                    ((Slider) cmp).setMinValue(in.readInt());
                     break;
             }
 
@@ -1516,20 +1505,20 @@ public class UIBuilder { //implements Externalizable {
 
     void setNextForm(Component cmp, String nextForm, Resources res, Container root) {
         cmp.putClientProperty("%next_form%", nextForm);
-        if(resourceFilePath == null || isKeepResourcesInRam()) {
+        if (resourceFilePath == null || isKeepResourcesInRam()) {
             resourceFile = res;
         }
-        ((Form)root).addShowListener(new FormListener((Form)root, nextForm));
+        ((Form) root).addShowListener(new FormListener((Form) root, nextForm));
     }
 
     Component createComponentType(String name) throws IllegalAccessException, InstantiationException, RuntimeException {
-        Class c = (Class)getComponentRegistry().get(name);
+        Class c = (Class) getComponentRegistry().get(name);
         Component cmp = createComponentInstance(name, c);
-        if(cmp == null) {
-            if(c == null) {
+        if (cmp == null) {
+            if (c == null) {
                 throw new RuntimeException("Component not found use UIBuilder.registerCustomComponent(" + name + ", class);");
             }
-            cmp = (Component)c.newInstance();
+            cmp = (Component) c.newInstance();
         }
         return cmp;
     }
@@ -1541,15 +1530,15 @@ public class UIBuilder { //implements Externalizable {
     // for internal use in the resource editor
     void modifyingCustomProperty(Component c, String name) {
     }
-    
+
     /**
      * Creates a command instance. This method is invoked by the loading code and
      * can be overriden to create a subclass of the Command class.
      *
      * @param commandName the label on the command
-     * @param icon the icon for the command
-     * @param commandId the id of the command
-     * @param action the action assigned to the command if such an action is defined
+     * @param icon        the icon for the command
+     * @param commandId   the id of the command
+     * @param action      the action assigned to the command if such an action is defined
      * @return a new command instance
      */
     protected Command createCommand(String commandName, Image icon, int commandId, String action) {
@@ -1575,11 +1564,11 @@ public class UIBuilder { //implements Externalizable {
                 return resourceFile;
             }
             String p = getResourceFilePath();
-            if(p.indexOf('.') > -1) {
+            if (p.indexOf('.') > -1) {
                 return Resources.open(p);
             }
             Resources res = Resources.openLayered(p);
-            if(isKeepResourcesInRam()) {
+            if (isKeepResourcesInRam()) {
                 resourceFile = res;
             }
             return res;
@@ -1602,23 +1591,23 @@ public class UIBuilder { //implements Externalizable {
     /**
      * Allows the navigation code to avoid storing the resource file and lets the GC
      * remove it from memory when its not in use
-     * 
+     *
      * @param resourceFilePath the resourceFilePath to set
      */
     public void setResourceFilePath(String resourceFilePath) {
         this.resourceFilePath = resourceFilePath;
-        if(resourceFilePath != null) {
+        if (resourceFilePath != null) {
             resourceFile = null;
         }
     }
 
     /**
      * Sets the resource file if keep in rum or no path is defined
-     * 
+     *
      * @param res the resource file
      */
     protected void setResourceFile(Resources res) {
-        if(keepResourcesInRam || resourceFilePath == null) {
+        if (keepResourcesInRam || resourceFilePath == null) {
             this.resourceFile = res;
         }
     }
@@ -1626,8 +1615,8 @@ public class UIBuilder { //implements Externalizable {
     /**
      * Invoked to process a given command before naviation or any other internal
      * processing occurs. The event can be consumed to prevent further processing.
-     * 
-     * @param ev the action event source of the command
+     *
+     * @param ev  the action event source of the command
      * @param cmd the command to process
      */
     protected void processCommand(ActionEvent ev, Command cmd) {
@@ -1635,20 +1624,20 @@ public class UIBuilder { //implements Externalizable {
 
     private void processCommandImpl(ActionEvent ev, Command cmd) {
         processCommand(ev, cmd);
-        if(ev.isConsumed()) {
+        if (ev.isConsumed()) {
             return;
         }
-        if(globalCommandListeners != null) {
+        if (globalCommandListeners != null) {
             globalCommandListeners.fireActionEvent(ev);
-            if(ev.isConsumed()) {
+            if (ev.isConsumed()) {
                 return;
             }
         }
 
-        if(localCommandListeners != null) {
+        if (localCommandListeners != null) {
             Form f = Display.getInstance().getCurrent();
-            EventDispatcher e = (EventDispatcher)localCommandListeners.get(f.getName());
-            if(e != null) {
+            EventDispatcher e = (EventDispatcher) localCommandListeners.get(f.getName());
+            if (e != null) {
                 e.fireActionEvent(ev);
             }
         }
@@ -1660,7 +1649,7 @@ public class UIBuilder { //implements Externalizable {
      * @param l the listener to bind
      */
     public void addCommandListener(ActionListener l) {
-        if(globalCommandListeners == null) {
+        if (globalCommandListeners == null) {
             globalCommandListeners = new EventDispatcher();
         }
         globalCommandListeners.addListener(l);
@@ -1672,7 +1661,7 @@ public class UIBuilder { //implements Externalizable {
      * @param l the listener to remove
      */
     public void removeCommandListener(ActionListener l) {
-        if(globalCommandListeners == null) {
+        if (globalCommandListeners == null) {
             return;
         }
         globalCommandListeners.removeListener(l);
@@ -1683,31 +1672,31 @@ public class UIBuilder { //implements Externalizable {
      * Notice that this method is only effective before the form was created and would do
      * nothing for an existing form
      *
-     * @param formName the name of the form to which the listener should be bound
+     * @param formName      the name of the form to which the listener should be bound
      * @param componentName the name of the component to bind to
-     * @param listener the listener to bind, common listener types are supported
+     * @param listener      the listener to bind, common listener types are supported
      */
     public void addComponentListener(String formName, String componentName, Object listener) {
-        if(localComponentListeners == null) {
+        if (localComponentListeners == null) {
             localComponentListeners = new Hashtable();
             Hashtable formListeners = new Hashtable();
             formListeners.put(componentName, listener);
             localComponentListeners.put(formName, formListeners);
             return;
         }
-        Hashtable formListeners = (Hashtable)localComponentListeners.get(formName);
-        if(formListeners == null) {
+        Hashtable formListeners = (Hashtable) localComponentListeners.get(formName);
+        if (formListeners == null) {
             formListeners = new Hashtable();
             formListeners.put(componentName, listener);
             localComponentListeners.put(formName, formListeners);
             return;
         }
         Object currentListeners = formListeners.get(componentName);
-        if(currentListeners == null) {
+        if (currentListeners == null) {
             formListeners.put(componentName, listener);
         } else {
-            if(currentListeners instanceof Vector) {
-                ((Vector)currentListeners).addElement(listener);
+            if (currentListeners instanceof Vector) {
+                ((Vector) currentListeners).addElement(listener);
             } else {
                 Vector v = new Vector();
                 v.addElement(currentListeners);
@@ -1720,25 +1709,25 @@ public class UIBuilder { //implements Externalizable {
     /**
      * Removes a component listener bound to a specific component
      *
-     * @param formName the name of the form 
-     * @param componentName the name of the component 
-     * @param listener the listener instance
+     * @param formName      the name of the form
+     * @param componentName the name of the component
+     * @param listener      the listener instance
      */
     public void removeComponentListener(String formName, String componentName, Object listener) {
-        if(localComponentListeners == null) {
+        if (localComponentListeners == null) {
             return;
         }
-        Hashtable formListeners = (Hashtable)localComponentListeners.get(formName);
-        if(formListeners == null) {
+        Hashtable formListeners = (Hashtable) localComponentListeners.get(formName);
+        if (formListeners == null) {
             return;
         }
         Object currentListeners = formListeners.get(componentName);
-        if(currentListeners == null) {
+        if (currentListeners == null) {
             return;
         } else {
-            if(currentListeners instanceof Vector) {
-                ((Vector)currentListeners).removeElement(listener);
-                if(((Vector)currentListeners).size() == 0) {
+            if (currentListeners instanceof Vector) {
+                ((Vector) currentListeners).removeElement(listener);
+                if (((Vector) currentListeners).size() == 0) {
                     formListeners.remove(componentName);
                 }
             } else {
@@ -1749,16 +1738,16 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * Adds a command listener to be invoked for commands on a specific form
-     * 
+     *
      * @param formName the name of the form to which the listener should be bound
-     * @param l the listener to bind
+     * @param l        the listener to bind
      */
     public void addCommandListener(String formName, ActionListener l) {
-        if(localCommandListeners == null) {
+        if (localCommandListeners == null) {
             localCommandListeners = new Hashtable();
         }
-        EventDispatcher d = (EventDispatcher)localCommandListeners.get(formName);
-        if(d == null) {
+        EventDispatcher d = (EventDispatcher) localCommandListeners.get(formName);
+        if (d == null) {
             d = new EventDispatcher();
             localCommandListeners.put(formName, d);
         }
@@ -1769,14 +1758,14 @@ public class UIBuilder { //implements Externalizable {
      * Removes a command listener on a specific form
      *
      * @param formName the name of the form
-     * @param l the listener to remove
+     * @param l        the listener to remove
      */
     public void removeCommandListener(String formName, ActionListener l) {
-        if(localCommandListeners == null) {
+        if (localCommandListeners == null) {
             return;
         }
-        EventDispatcher d = (EventDispatcher)localCommandListeners.get(formName);
-        if(d == null) {
+        EventDispatcher d = (EventDispatcher) localCommandListeners.get(formName);
+        if (d == null) {
             return;
         }
         d.removeListener(l);
@@ -1784,18 +1773,18 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * This method is invoked for every component to which an action event listener can be bound
-     * and delivers the event data for the given component seamlessly. 
-     * 
-     * @param c the component broadcasting the event
-     * @param event the event meta data 
+     * and delivers the event data for the given component seamlessly.
+     *
+     * @param c     the component broadcasting the event
+     * @param event the event meta data
      */
     protected void handleComponentAction(Component c, ActionEvent event) {
     }
 
     private FormListener getFormListenerInstance(Component cmp, EmbeddedContainer embedded) {
-        if(embedded != null) {
-            FormListener fc = (FormListener)embedded.getClientProperty("!FormListener!");
-            if(fc != null) {
+        if (embedded != null) {
+            FormListener fc = (FormListener) embedded.getClientProperty("!FormListener!");
+            if (fc != null) {
                 return fc;
             }
             fc = new FormListener();
@@ -1803,11 +1792,11 @@ public class UIBuilder { //implements Externalizable {
             return fc;
         }
         Form f = cmp.getComponentForm();
-        if(f == null) {
+        if (f == null) {
             return null;
         }
-        FormListener fc = (FormListener)f.getClientProperty("!FormListener!");
-        if(fc != null) {
+        FormListener fc = (FormListener) f.getClientProperty("!FormListener!");
+        if (fc != null) {
             return fc;
         }
         fc = new FormListener();
@@ -1822,33 +1811,33 @@ public class UIBuilder { //implements Externalizable {
      * should occur in the background. To finish the processing of the operation within the
      * EDT one should override the postAsyncCommand() method.
      *
-     * @param cmd the command requiring background processing
+     * @param cmd         the command requiring background processing
      * @param sourceEvent the triggering event
      */
     protected void asyncCommandProcess(Command cmd, ActionEvent sourceEvent) {
     }
 
     /**
-     * This method is invoked in conjunction with asyncCommandProcess after the 
+     * This method is invoked in conjunction with asyncCommandProcess after the
      * command was handled asynchronously on the separate thread. Here Codename One
      * code can be execute to update the UI with the results from the separate thread.
-     * 
-     * @param cmd the command
+     *
+     * @param cmd         the command
      * @param sourceEvent the source event
      */
     protected void postAsyncCommand(Command cmd, ActionEvent sourceEvent) {
     }
 
     /**
-     * <b>Warning:</b> this method is invoked on a separate thread. 
+     * <b>Warning:</b> this method is invoked on a separate thread.
      * This method is invoked when a next form property is defined, this property
      * indicates a background process for a form of a transitional nature should
      * take place (e.g. splash screen, IO etc.) after which the next form should be shown.
      * After this method completes the next form is shown.
-     * 
+     *
      * @param f the form for which the background thread was constructed, notice
-     * that most methods are not threadsafe and one should use callSerially* in this
-     * method when mutating the form.
+     *          that most methods are not threadsafe and one should use callSerially* in this
+     *          method when mutating the form.
      * @return if false is returned from this method navigation should not proceed
      * to that given form
      */
@@ -1876,17 +1865,17 @@ public class UIBuilder { //implements Externalizable {
         Component c = f.getFocused();
         Hashtable h = new Hashtable();
         // can happen if we navigate away from a form that was shown without the GUI builder
-        if(f.getName() != null) {
+        if (f.getName() != null) {
             h.put(FORM_STATE_KEY_NAME, f.getName());
         }
-        if(c != null) {
-            if(c instanceof List) {
-                h.put(FORM_STATE_KEY_SELECTION, new Integer(((List)c).getSelectedIndex()));
+        if (c != null) {
+            if (c instanceof List) {
+                h.put(FORM_STATE_KEY_SELECTION, new Integer(((List) c).getSelectedIndex()));
             }
-            if(c.getName() != null) {
+            if (c.getName() != null) {
                 h.put(FORM_STATE_KEY_FOCUS, c.getName());
             }
-            if(f.getTitle() != null) {
+            if (f.getTitle() != null) {
                 h.put(FORM_STATE_KEY_TITLE, f.getTitle());
             }
         }
@@ -1899,27 +1888,27 @@ public class UIBuilder { //implements Externalizable {
      * as it moves between forms. However, some components aren't recognized by Codename One
      * by default to enable smaller executable size. This method can be overriden to enable
      * storing the state of custom components
-     * 
-     * @param c the component whose state should be restored
+     *
+     * @param c           the component whose state should be restored
      * @param destination the hashtable containing the state
      */
     protected void restoreComponentState(Component c, Hashtable destination) {
-        if(shouldAutoStoreState()) {
+        if (shouldAutoStoreState()) {
             Enumeration e = destination.keys();
-            while(e.hasMoreElements()) {
-                String currentKey = (String)e.nextElement();
+            while (e.hasMoreElements()) {
+                String currentKey = (String) e.nextElement();
                 Component cmp = findByName(currentKey, c);
-                if(cmp != null) {
+                if (cmp != null) {
                     Object value = destination.get(currentKey);
-                    if(value instanceof Integer) {
-                        if(cmp instanceof List) {
-                            ((List)cmp).setSelectedIndex(((Integer)value).intValue());
+                    if (value instanceof Integer) {
+                        if (cmp instanceof List) {
+                            ((List) cmp).setSelectedIndex(((Integer) value).intValue());
                             continue;
                         }
-                        if(cmp instanceof Tabs) {
-                            int val = ((Integer)value).intValue();
-                            Tabs t = (Tabs)cmp;
-                            if(t.getTabCount() > val) {
+                        if (cmp instanceof Tabs) {
+                            int val = ((Integer) value).intValue();
+                            Tabs t = (Tabs) cmp;
+                            if (t.getTabCount() > val) {
                                 t.setSelectedIndex(val);
                             }
                             continue;
@@ -1930,63 +1919,64 @@ public class UIBuilder { //implements Externalizable {
             }
         }
     }
-    
+
     /**
      * By default Codename One stores the states of components in the navigation graph
      * as it moves between forms. However, some components aren't recognized by Codename One
      * by default to enable smaller executable size. This method can be overriden to enable
      * storing the state of custom components
-     * 
-     * @param c the component whose state should be stored
+     *
+     * @param c           the component whose state should be stored
      * @param destination the destination hashtable
      */
     protected void storeComponentState(Component c, Hashtable destination) {
-        if(shouldAutoStoreState()) {
+        if (shouldAutoStoreState()) {
             storeComponentStateImpl(c, destination);
         }
     }
-        
+
     private void storeComponentStateImpl(Component c, Hashtable destination) {
-        if(c.getName() == null || destination.containsKey(c.getName()) || c.getClientProperty("CN1IgnoreStore") != null) {
+        if (c.getName() == null || destination.containsKey(c.getName()) || c.getClientProperty("CN1IgnoreStore") != null) {
             return;
         }
-        if(c instanceof Tabs) {
-            destination.put(c.getName(), new Integer(((Tabs)c).getSelectedIndex()));
+        if (c instanceof Tabs) {
+            destination.put(c.getName(), new Integer(((Tabs) c).getSelectedIndex()));
         }
-        if(c instanceof Container) {
-            Container cnt = (Container)c;
+        if (c instanceof Container) {
+            Container cnt = (Container) c;
             int count = cnt.getComponentCount();
-            for(int iter = 0 ; iter < count ; iter++) {
+            for (int iter = 0; iter < count; iter++) {
                 storeComponentStateImpl(cnt.getComponentAt(iter), destination);
             }
             return;
         }
-        if(c instanceof List) {
-            destination.put(c.getName(), new Integer(((List)c).getSelectedIndex()));
+        if (c instanceof List) {
+            destination.put(c.getName(), new Integer(((List) c).getSelectedIndex()));
             return;
         }
         Object o = c.getComponentState();
-        if(o != null) {
+        if (o != null) {
             destination.put(c.getName(), o);
         }
     }
-    
+
     /**
      * Indicates whether the UIBuilder should try storing states for forms on its own
      * by seeking lists, tabs and other statefull elements and keeping their selection
+     *
      * @return true to handle state automatically, false otherwise
      */
     protected boolean shouldAutoStoreState() {
         return true;
     }
-    
+
     /**
      * Sets the state of the current form to which we are returing as part
      * of the navigation logic. When a back command is pressed this form
      * state should be restored, it was obtained via getFormState.
      * The default implementation of this method restores focus and list selection.
      *
-     * @param f the form whose state should be preserved
+     * @param f     the form whose state should be preserved
      * @param state arbitrary state object
      */
     protected void setFormState(Form f, Hashtable state) {
@@ -1994,8 +1984,8 @@ public class UIBuilder { //implements Externalizable {
     }
 
     private boolean isParentOf(Container cnt, Component c) {
-        while(c != null) {
-            if(c == cnt) {
+        while (c != null) {
+            if (c == cnt) {
                 return true;
             }
             c = c.getParent();
@@ -2006,23 +1996,24 @@ public class UIBuilder { //implements Externalizable {
     /**
      * This method is the container navigation equivalent of getFormState() see
      * that method for details.
+     *
      * @param cnt the container
      * @return the state
      */
     protected Hashtable getContainerState(Container cnt) {
         Component c = null;
         Form parentForm = cnt.getComponentForm();
-        if(parentForm != null) {
+        if (parentForm != null) {
             c = parentForm.getFocused();
         }
         Hashtable h = new Hashtable();
         h.put(FORM_STATE_KEY_NAME, cnt.getName());
         h.put(FORM_STATE_KEY_CONTAINER, "");
-        if(c != null && isParentOf(cnt, c)) {
-            if(c instanceof List) {
-                h.put(FORM_STATE_KEY_SELECTION, new Integer(((List)c).getSelectedIndex()));
+        if (c != null && isParentOf(cnt, c)) {
+            if (c instanceof List) {
+                h.put(FORM_STATE_KEY_SELECTION, new Integer(((List) c).getSelectedIndex()));
             }
-            if(c.getName() != null) {
+            if (c.getName() != null) {
                 h.put(FORM_STATE_KEY_FOCUS, c.getName());
             }
             return h;
@@ -2032,19 +2023,19 @@ public class UIBuilder { //implements Externalizable {
     }
 
     private void setContainerStateImpl(Container cnt, Hashtable state) {
-        if(state != null) {
+        if (state != null) {
             restoreComponentState(cnt, state);
-            String cmpName = (String)state.get(FORM_STATE_KEY_FOCUS);
-            if(cmpName == null) {
+            String cmpName = (String) state.get(FORM_STATE_KEY_FOCUS);
+            if (cmpName == null) {
                 return;
             }
             Component c = findByName(cmpName, cnt);
-            if(c != null) {
+            if (c != null) {
                 c.requestFocus();
-                if(c instanceof List) {
-                    Integer i = (Integer)state.get(FORM_STATE_KEY_SELECTION);
-                    if(i != null) {
-                        ((List)c).setSelectedIndex(i.intValue());
+                if (c instanceof List) {
+                    Integer i = (Integer) state.get(FORM_STATE_KEY_SELECTION);
+                    if (i != null) {
+                        ((List) c).setSelectedIndex(i.intValue());
                     }
                 }
             }
@@ -2054,8 +2045,8 @@ public class UIBuilder { //implements Externalizable {
     /**
      * This method is the container navigation equivalent of setFormState() see
      * that method for details.
-     * 
-     * @param cnt the container
+     *
+     * @param cnt   the container
      * @param state the state
      */
     protected void setContainerState(Container cnt, Hashtable state) {
@@ -2064,6 +2055,7 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * When reaching the home form the navigation stack is cleared
+     *
      * @return the homeForm
      */
     public String getHomeForm() {
@@ -2072,6 +2064,7 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * When reaching the home form the navigation stack is cleared
+     *
      * @param homeForm the homeForm to set
      */
     public void setHomeForm(String homeForm) {
@@ -2093,22 +2086,22 @@ public class UIBuilder { //implements Externalizable {
      * a previous form.
      *
      * @param sourceComponent the component that triggered the back command which effectively
-     * allows us to find the EmbeddedContainer for a case of container navigation. Null
-     * can be used if not applicable.
+     *                        allows us to find the EmbeddedContainer for a case of container navigation. Null
+     *                        can be used if not applicable.
      */
     public void back(Component sourceComponent) {
         Vector formNavigationStack = getFormNavigationStackForComponent(sourceComponent);
-        if(formNavigationStack != null && formNavigationStack.size() > 0) {
-            Hashtable h = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1);
-            if(h.containsKey(FORM_STATE_KEY_CONTAINER)) {
+        if (formNavigationStack != null && formNavigationStack.size() > 0) {
+            Hashtable h = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
+            if (h.containsKey(FORM_STATE_KEY_CONTAINER)) {
                 Form currentForm = Display.getInstance().getCurrent();
-                if(currentForm != null) {
+                if (currentForm != null) {
                     exitForm(currentForm);
                 }
             }
-            String formName = (String)h.get(FORM_STATE_KEY_NAME);
-            if(!h.containsKey(FORM_STATE_KEY_CONTAINER)) {
-                Form f = (Form)createContainer(fetchResourceFile(), formName);
+            String formName = (String) h.get(FORM_STATE_KEY_NAME);
+            if (!h.containsKey(FORM_STATE_KEY_CONTAINER)) {
+                Form f = (Form) createContainer(fetchResourceFile(), formName);
                 initBackForm(f);
                 onBackNavigation();
                 beforeShow(f);
@@ -2122,63 +2115,65 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * Returns the name of the previous form
+     *
      * @param f the current form
      * @return the name of the previous form
      */
     String getPreviousFormName(Form f) {
         Vector formNavigationStack = getFormNavigationStackForComponent(f);
-        if(formNavigationStack != null && formNavigationStack.size() > 0) {
-            Hashtable h = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1);
-            return (String)h.get(FORM_STATE_KEY_NAME);
+        if (formNavigationStack != null && formNavigationStack.size() > 0) {
+            Hashtable h = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
+            return (String) h.get(FORM_STATE_KEY_NAME);
         }
         return null;
     }
-    
+
     /**
      * Returns the text for the back command string. This can be controlled in the theme by the "backUsesTitleBool" constant
-     * 
+     *
      * @param previousFormTitle the title of the previous form
      * @return the string for the back command inserted implicitly
      */
     protected String getBackCommandText(String previousFormTitle) {
-        if(UIManager.getInstance().isThemeConstant("backUsesTitleBool", false)) {
-            if(previousFormTitle == null || previousFormTitle.equals("") || previousFormTitle.equals(" ")) {
+        if (UIManager.getInstance().isThemeConstant("backUsesTitleBool", false)) {
+            if (previousFormTitle == null || previousFormTitle.equals("") || previousFormTitle.equals(" ")) {
                 return "Back";
             }
             return previousFormTitle;
         }
         return "Back";
     }
-    
+
     /**
      * Invoked internally to set the back command on the form, this method allows subclasses
      * to change the behavior of back command adding or disable it
-     * @param f the form
-     * @param backCommand the back command 
+     *
+     * @param f           the form
+     * @param backCommand the back command
      */
     protected void setBackCommand(Form f, Command backCommand) {
-        if(f.getToolbar() != null) {
+        if (f.getToolbar() != null) {
             f.getToolbar().setBackCommand(backCommand);
         } else {
-            if(shouldAddBackCommandToMenu()) {
+            if (shouldAddBackCommandToMenu()) {
                 f.addCommand(backCommand, f.getCommandCount());
             }
             f.setBackCommand(backCommand);
         }
     }
-    
+
     private void initBackForm(Form f) {
         Vector formNavigationStack = baseFormNavigationStack;
-        if(formNavigationStack != null && formNavigationStack.size() > 0) {
-            setFormState(f, (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1));
+        if (formNavigationStack != null && formNavigationStack.size() > 0) {
+            setFormState(f, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));
             formNavigationStack.removeElementAt(formNavigationStack.size() - 1);
-            if(formNavigationStack.size() > 0) {
-                Hashtable previous = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1);
-                String commandAction = (String)previous.get(FORM_STATE_KEY_NAME);
-                Command backCommand = createCommandImpl(getBackCommandText((String)previous.get(FORM_STATE_KEY_TITLE)), null,
+            if (formNavigationStack.size() > 0) {
+                Hashtable previous = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
+                String commandAction = (String) previous.get(FORM_STATE_KEY_NAME);
+                Command backCommand = createCommandImpl(getBackCommandText((String) previous.get(FORM_STATE_KEY_TITLE)), null,
                         BACK_COMMAND_ID, commandAction, true, "");
                 setBackCommand(f, backCommand);
-                
+
                 // trigger listener creation if this is the only command in the form
                 getFormListenerInstance(f, null);
 
@@ -2189,12 +2184,12 @@ public class UIBuilder { //implements Externalizable {
     }
 
     private void initBackContainer(Container cnt, Form destForm, Vector formNavigationStack) {
-        setContainerState(cnt, (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1));
+        setContainerState(cnt, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));
         formNavigationStack.removeElementAt(formNavigationStack.size() - 1);
-        if(formNavigationStack.size() > 0) {
-            Hashtable previous = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1);
-            String commandAction = (String)previous.get(FORM_STATE_KEY_NAME);
-            Command backCommand = createCommandImpl(getBackCommandText((String)previous.get(FORM_STATE_KEY_TITLE)), null,
+        if (formNavigationStack.size() > 0) {
+            Hashtable previous = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1);
+            String commandAction = (String) previous.get(FORM_STATE_KEY_NAME);
+            Command backCommand = createCommandImpl(getBackCommandText((String) previous.get(FORM_STATE_KEY_TITLE)), null,
                     BACK_COMMAND_ID, commandAction, true, "");
             setBackCommand(destForm, backCommand);
             backCommand.putClientProperty(COMMAND_ARGUMENTS, "");
@@ -2210,8 +2205,8 @@ public class UIBuilder { //implements Externalizable {
      * Notice that container navigation (none-form) doesn't support the back() method
      * or the form stack. However a command marked as back command will be respected.
      *
-     * @param resourceName the name of the resource for the form to show
-     * @param sourceCommand the command of the resource (may be null)
+     * @param resourceName    the name of the resource for the form to show
+     * @param sourceCommand   the command of the resource (may be null)
      * @param sourceComponent the component that activated the show (may be null)
      * @return the container thats being shown, notice that you can still manipulate
      * some states of the container before it actually appears
@@ -2224,11 +2219,11 @@ public class UIBuilder { //implements Externalizable {
     /**
      * Useful tool to refresh the current state of a container shown using show container
      * without pushing another instance to the back stack
-     * 
+     *
      * @param cnt the container thats embedded into the application
      */
     public void reloadContainer(Component cnt) {
-        Container newCnt = createContainer(fetchResourceFile(), cnt.getName(), (EmbeddedContainer)cnt.getParent());
+        Container newCnt = createContainer(fetchResourceFile(), cnt.getName(), (EmbeddedContainer) cnt.getParent());
         beforeShowContainer(newCnt);
         cnt.getParent().replace(cnt, newCnt, null);
         postShowContainer(newCnt);
@@ -2241,23 +2236,23 @@ public class UIBuilder { //implements Externalizable {
      */
     public void reloadForm() {
         Form currentForm = Display.getInstance().getCurrent();
-        Command backCommand = currentForm.getBackCommand(); 
-        Form newForm = (Form)createContainer(fetchResourceFile(), currentForm.getName());
+        Command backCommand = currentForm.getBackCommand();
+        Form newForm = (Form) createContainer(fetchResourceFile(), currentForm.getName());
         newForm.setSourceCommand(currentForm.getSourceCommand());
         if (backCommand != null) {
             setBackCommand(newForm, backCommand);
 
             // trigger listener creation if this is the only command in the form
             getFormListenerInstance(newForm, null);
-            
-            for(int iter = 0 ; iter < currentForm.getCommandCount() ; iter++) {
-                if(backCommand == currentForm.getCommand(iter)) {
+
+            for (int iter = 0; iter < currentForm.getCommandCount(); iter++) {
+                if (backCommand == currentForm.getCommand(iter)) {
                     newForm.addCommand(backCommand, newForm.getCommandCount());
                     break;
                 }
             }
         }
-        
+
         beforeShow(newForm);
         Transition tin = newForm.getTransitionInAnimator();
         Transition tout = newForm.getTransitionOutAnimator();
@@ -2273,28 +2268,28 @@ public class UIBuilder { //implements Externalizable {
     }
 
     private Container showContainerImpl(String resourceName, Command sourceCommand, Component sourceComponent, boolean forceBack) {
-        if(sourceComponent != null) {
+        if (sourceComponent != null) {
             Form currentForm = sourceComponent.getComponentForm();
 
             // avoid the overhead of searching if no embedding is used
-            if(currentForm.getClientProperty(EMBEDDED_FORM_FLAG) != null) {
+            if (currentForm.getClientProperty(EMBEDDED_FORM_FLAG) != null) {
                 Container destContainer = sourceComponent.getParent();
-                while(!(destContainer instanceof EmbeddedContainer || destContainer instanceof Form)) {
+                while (!(destContainer instanceof EmbeddedContainer || destContainer instanceof Form)) {
                     // race condition, container was already removed by someone else
-                    if(destContainer == null) {
+                    if (destContainer == null) {
                         return null;
                     }
                     destContainer = destContainer.getParent();
                 }
-                if(destContainer instanceof EmbeddedContainer) {
-                    Container cnt = createContainer(fetchResourceFile(), resourceName, (EmbeddedContainer)destContainer);
-                    if(cnt instanceof Form) {
+                if (destContainer instanceof EmbeddedContainer) {
+                    Container cnt = createContainer(fetchResourceFile(), resourceName, (EmbeddedContainer) destContainer);
+                    if (cnt instanceof Form) {
                         //Form f = (Form)cnt;
                         //cnt = formToContainer(f);
-                        showForm((Form)cnt, sourceCommand, sourceComponent);
+                        showForm((Form) cnt, sourceCommand, sourceComponent);
                         return cnt;
                     }
-                    
+
                     Component fromCmp = destContainer.getComponentAt(0);
 
                     // This seems to be no longer necessary now that we have the replaceAndWait version that drops events
@@ -2303,12 +2298,12 @@ public class UIBuilder { //implements Externalizable {
 
                     boolean isBack = forceBack;
                     Transition t = fromCmp.getUIManager().getLookAndFeel().getDefaultFormTransitionOut();
-                    if(forceBack) {
+                    if (forceBack) {
                         initBackContainer(cnt, destContainer.getComponentForm(), getFormNavigationStackForComponent(sourceComponent));
                         t = t.copy(true);
                     } else {
-                        if(sourceCommand != null) {
-                            if(t != null && backCommands != null && backCommands.contains(sourceCommand) || Display.getInstance().getCurrent().getBackCommand() == sourceCommand) {
+                        if (sourceCommand != null) {
+                            if (t != null && backCommands != null && backCommands.contains(sourceCommand) || Display.getInstance().getCurrent().getBackCommand() == sourceCommand) {
                                 isBack = true;
                                 t = t.copy(true);
                             }
@@ -2318,10 +2313,10 @@ public class UIBuilder { //implements Externalizable {
                     // create a back command if supported
                     String commandAction = cnt.getName();
                     Vector formNavigationStack = getFormNavigationStackForComponent(fromCmp);
-                    if(formNavigationStack != null && !isBack && allowBackTo(commandAction) && !isSameBackDestination((Container)fromCmp, cnt)) {
+                    if (formNavigationStack != null && !isBack && allowBackTo(commandAction) && !isSameBackDestination((Container) fromCmp, cnt)) {
                         // trigger listener creation if this is the only command in the form
                         getFormListenerInstance(destContainer.getComponentForm(), null);
-                        formNavigationStack.addElement(getContainerState((com.codename1.ui.Container)fromCmp));
+                        formNavigationStack.addElement(getContainerState((com.codename1.ui.Container) fromCmp));
                     }
 
                     beforeShowContainer(cnt);
@@ -2330,14 +2325,14 @@ public class UIBuilder { //implements Externalizable {
                     return cnt;
                 } else {
                     Container cnt = createContainer(fetchResourceFile(), resourceName);
-                    showForm((Form)cnt, sourceCommand, sourceComponent);
+                    showForm((Form) cnt, sourceCommand, sourceComponent);
                     return cnt;
                 }
             }
         }
         Container cnt = createContainer(fetchResourceFile(), resourceName);
-        if(cnt instanceof Form) {
-            showForm((Form)cnt, sourceCommand, sourceComponent);
+        if (cnt instanceof Form) {
+            showForm((Form) cnt, sourceCommand, sourceComponent);
         } else {
             Form f = new Form();
             f.setLayout(new BorderLayout());
@@ -2350,16 +2345,16 @@ public class UIBuilder { //implements Externalizable {
 
     Container formToContainer(Form f) {
         Container cnt = new Container(f.getContentPane().getLayout());
-        if(f.getContentPane().getLayout() instanceof BorderLayout ||
+        if (f.getContentPane().getLayout() instanceof BorderLayout ||
                 f.getContentPane().getLayout() instanceof TableLayout) {
-            while(f.getContentPane().getComponentCount() > 0) {
+            while (f.getContentPane().getComponentCount() > 0) {
                 Component src = f.getContentPane().getComponentAt(0);
                 Object o = f.getContentPane().getLayout().getComponentConstraint(src);
                 f.getContentPane().removeComponent(src);
                 cnt.addComponent(o, src);
             }
         } else {
-            while(f.getContentPane().getComponentCount() > 0) {
+            while (f.getContentPane().getComponentCount() > 0) {
                 Component src = f.getContentPane().getComponentAt(0);
                 f.getContentPane().removeComponent(src);
                 cnt.addComponent(src);
@@ -2367,10 +2362,11 @@ public class UIBuilder { //implements Externalizable {
         }
         return cnt;
     }
-    
+
 
     /**
      * This is useful for swipe back navigation behavior
+     *
      * @param f the form from which we should go back
      * @return a lazy value that will return the back form
      */
@@ -2378,10 +2374,10 @@ public class UIBuilder { //implements Externalizable {
         Vector formNavigationStack = baseFormNavigationStack;
         Hashtable p = null;
         Command cmd = null;
-        if(formNavigationStack.size() > 1) {
-            p = (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 2);
-            String backTitle = getBackCommandText((String)p.get(FORM_STATE_KEY_TITLE));
-            String commandAction = (String)p.get(FORM_STATE_KEY_NAME);
+        if (formNavigationStack.size() > 1) {
+            p = (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 2);
+            String backTitle = getBackCommandText((String) p.get(FORM_STATE_KEY_TITLE));
+            String commandAction = (String) p.get(FORM_STATE_KEY_NAME);
             cmd = createCommandImpl(backTitle, null,
                     BACK_COMMAND_ID, commandAction, true, "");
             cmd.putClientProperty(COMMAND_ARGUMENTS, "");
@@ -2393,35 +2389,35 @@ public class UIBuilder { //implements Externalizable {
 
     Form createForm(Form f) {
         Form currentForm = Display.getInstance().getCurrent();
-        if(currentForm != null && currentForm instanceof Dialog) {
-            ((Dialog)Display.getInstance().getCurrent()).dispose();
+        if (currentForm != null && currentForm instanceof Dialog) {
+            ((Dialog) Display.getInstance().getCurrent()).dispose();
             currentForm = Display.getInstance().getCurrent();
         }
         Vector formNavigationStack = baseFormNavigationStack;
-        if(formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
-            if(currentForm != null) {
-                String nextForm = (String)f.getClientProperty("%next_form%");
+        if (formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
+            if (currentForm != null) {
+                String nextForm = (String) f.getClientProperty("%next_form%");
 
                 // we are in the sidemenu view we should really be using the parent form
-                SideMenuBar b = (SideMenuBar)currentForm.getClientProperty("cn1$sideMenuParent");
-                if(b != null) {
+                SideMenuBar b = (SideMenuBar) currentForm.getClientProperty("cn1$sideMenuParent");
+                if (b != null) {
                     currentForm = b.getParentForm();
                 }
 
                 // don't add back commands to transitional forms
-                if(nextForm == null) {
+                if (nextForm == null) {
                     String commandAction = currentForm.getName();
-                    if(allowBackTo(commandAction) && f.getBackCommand() == null) {
+                    if (allowBackTo(commandAction) && f.getBackCommand() == null) {
                         Command backCommand;
-                        if(isSameBackDestination(currentForm, f)) {
+                        if (isSameBackDestination(currentForm, f)) {
                             backCommand = currentForm.getBackCommand();
                         } else {
                             backCommand = createCommandImpl(getBackCommandText(currentForm.getTitle()), null,
-                                BACK_COMMAND_ID, commandAction, true, "");
+                                    BACK_COMMAND_ID, commandAction, true, "");
                             backCommand.putClientProperty(COMMAND_ARGUMENTS, "");
                             backCommand.putClientProperty(COMMAND_ACTION, commandAction);
                         }
-                        if(backCommand != null) {
+                        if (backCommand != null) {
                             setBackCommand(f, backCommand);
                         }
 
@@ -2434,23 +2430,23 @@ public class UIBuilder { //implements Externalizable {
         }
         return f;
     }
-    
+
     private void showForm(Form f, Command sourceCommand, Component sourceComponent) {
         Form currentForm = Display.getInstance().getCurrent();
-        if(currentForm != null && currentForm instanceof Dialog) {
-            ((Dialog)Display.getInstance().getCurrent()).dispose();
+        if (currentForm != null && currentForm instanceof Dialog) {
+            ((Dialog) Display.getInstance().getCurrent()).dispose();
             currentForm = Display.getInstance().getCurrent();
         }
         Vector formNavigationStack = baseFormNavigationStack;
-        if(sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) {
-            if(currentForm != null) {
+        if (sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) {
+            if (currentForm != null) {
                 exitForm(currentForm);
             }
-            if(formNavigationStack != null && formNavigationStack.size() > 0) {
+            if (formNavigationStack != null && formNavigationStack.size() > 0) {
                 String name = f.getName();
-                if(name != null && name.equals(homeForm)) {
-                    if(formNavigationStack.size() > 0) {
-                        setFormState(f, (Hashtable)formNavigationStack.elementAt(formNavigationStack.size() - 1));
+                if (name != null && name.equals(homeForm)) {
+                    if (formNavigationStack.size() > 0) {
+                        setFormState(f, (Hashtable) formNavigationStack.elementAt(formNavigationStack.size() - 1));
                     }
                     formNavigationStack.clear();
                 } else {
@@ -2462,33 +2458,33 @@ public class UIBuilder { //implements Externalizable {
             f.showBack();
             postShowImpl(f);
         } else {
-            if(currentForm != null) {
+            if (currentForm != null) {
                 exitForm(currentForm);
             }
-            if(formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
-                if(currentForm != null) {
-                    String nextForm = (String)f.getClientProperty("%next_form%");
-                    
+            if (formNavigationStack != null && !(f instanceof Dialog) && !f.getName().equals(homeForm)) {
+                if (currentForm != null) {
+                    String nextForm = (String) f.getClientProperty("%next_form%");
+
                     // we are in the sidemenu view we should really be using the parent form
-                    SideMenuBar b = (SideMenuBar)currentForm.getClientProperty("cn1$sideMenuParent");
-                    if(b != null) {
+                    SideMenuBar b = (SideMenuBar) currentForm.getClientProperty("cn1$sideMenuParent");
+                    if (b != null) {
                         currentForm = b.getParentForm();
                     }
-                    
+
                     // don't add back commands to transitional forms
-                    if(nextForm == null) {
+                    if (nextForm == null) {
                         String commandAction = currentForm.getName();
-                        if(allowBackTo(commandAction) && f.getBackCommand() == null) {
+                        if (allowBackTo(commandAction) && f.getBackCommand() == null) {
                             Command backCommand;
-                            if(isSameBackDestination(currentForm, f)) {
+                            if (isSameBackDestination(currentForm, f)) {
                                 backCommand = currentForm.getBackCommand();
                             } else {
                                 backCommand = createCommandImpl(getBackCommandText(currentForm.getTitle()), null,
-                                    BACK_COMMAND_ID, commandAction, true, "");
+                                        BACK_COMMAND_ID, commandAction, true, "");
                                 backCommand.putClientProperty(COMMAND_ARGUMENTS, "");
                                 backCommand.putClientProperty(COMMAND_ACTION, commandAction);
                             }
-                            if(backCommand != null) {
+                            if (backCommand != null) {
                                 setBackCommand(f, backCommand);
                             }
 
@@ -2499,9 +2495,9 @@ public class UIBuilder { //implements Externalizable {
                     }
                 }
             }
-            if(f instanceof Dialog) {
+            if (f instanceof Dialog) {
                 beforeShow(f, sourceCommand);
-                if(sourceComponent != null) {
+                if (sourceComponent != null) {
                     // we are cheating with the post show here since we are using a modal
                     // dialog to prevent the "double clicking button" problem by using
                     // a modal dialog
@@ -2511,7 +2507,7 @@ public class UIBuilder { //implements Externalizable {
                     sourceComponent.setEnabled(true);
                     exitForm(f);
                 } else {
-                    ((Dialog)f).showModeless();
+                    ((Dialog) f).showModeless();
                     postShowImpl(f);
                 }
             } else {
@@ -2538,30 +2534,30 @@ public class UIBuilder { //implements Externalizable {
      * back command to return to the previous container/form but rather to the one before
      * source. A good example would be a "refresh" command or a toggle button that changes
      * the form state.
-     * 
-     * @param source the form or container we are leaving
+     *
+     * @param source      the form or container we are leaving
      * @param destination the container or form we are navigating to
      * @return false if we want a standard back button to source, true if we want to use
      * the same back button as the one in source
      */
     protected boolean isSameBackDestination(Container source, Container destination) {
-        return source.getName() == null || destination.getName() == null || 
+        return source.getName() == null || destination.getName() == null ||
                 source.getName().equals(destination.getName());
     }
 
     /**
-     * This method is equivalent to the internal navigation behavior, it adds 
+     * This method is equivalent to the internal navigation behavior, it adds
      * functionality such as the back command into the given form resource and
      * shows it. If the source command is the back command the showBack() method
      * will run.
-     * 
-     * @param resourceName the name of the resource for the form to show
+     *
+     * @param resourceName  the name of the resource for the form to show
      * @param sourceCommand the command of the resource (may be null)
      * @return the form thats being shown, notice that you can still manipulate
      * some states of the form before it actually appears
      */
     public Form showForm(String resourceName, Command sourceCommand) {
-        Form f = (Form)createContainer(fetchResourceFile(), resourceName);
+        Form f = (Form) createContainer(fetchResourceFile(), resourceName);
         showForm(f, sourceCommand, null);
         return f;
     }
@@ -2583,9 +2579,8 @@ public class UIBuilder { //implements Externalizable {
      */
     protected void beforeShow(Form f) {
     }
-    
-    
-    
+
+
     private void beforeShow(Form f, Command sourceCommand) {
         if (sourceCommand != null) {
             f.setSourceCommand(sourceCommand);
@@ -2595,12 +2590,12 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * This callback is invoked to indicate that the upcoming form is shown as part of a "back" navigation.
-     * This is useful for the case of a breadcrumb UI where the navigation stack is shown at the top of the 
+     * This is useful for the case of a breadcrumb UI where the navigation stack is shown at the top of the
      * UI, in that case this method can be used to pop out the breadcrumb stack.
      */
     protected void onBackNavigation() {
     }
-    
+
     /**
      * This method allows binding an action that should occur immediately after showing the given
      * form
@@ -2615,12 +2610,13 @@ public class UIBuilder { //implements Externalizable {
     /**
      * Back commands are set implicitly (see allowBackTo to disable that), this method allows subclasses
      * to disable the behavior where the back command is also added to the menu (not just set to the back button).
-     * @return 
+     *
+     * @return
      */
     protected boolean shouldAddBackCommandToMenu() {
         return true;
     }
-    
+
     /**
      * This method allows binding an action that should occur immediately after showing the given
      * form
@@ -2651,7 +2647,7 @@ public class UIBuilder { //implements Externalizable {
     /**
      * This method allows binding logic that should occur before creating the root object
      * e.g. a case where a created form needs data fetched for it.
-     * 
+     *
      * @param rootName the name of the root to be created from the resource file
      */
     protected void onCreateRoot(String rootName) {
@@ -2676,7 +2672,7 @@ public class UIBuilder { //implements Externalizable {
      * of constantly fetching the res file from the jar whenever moving between forms.
      * This can be toggled in the properties (e.g. jad) using the flag: cacheResFile (true/false)
      * which defaults to false.
-     * 
+     *
      * @param keepResourcesInRam the keepResourcesInRam to set
      */
     public void setKeepResourcesInRam(boolean keepResourcesInRam) {
@@ -2686,18 +2682,18 @@ public class UIBuilder { //implements Externalizable {
     /**
      * Returns either the parent form or the component below the embedded container
      * above c.
-     * 
+     *
      * @param c the component whose root ancestor we should find
      * @return the root
      */
-    protected Container getRootAncestor(Component c)  {
-        while(c.getParent() != null && !(c.getParent() instanceof EmbeddedContainer)) {
+    protected Container getRootAncestor(Component c) {
+        while (c.getParent() != null && !(c.getParent() instanceof EmbeddedContainer)) {
             c = c.getParent();
         }
-        if(!(c instanceof Container)) {
+        if (!(c instanceof Container)) {
             return null;
         }
-        return (Container)c;
+        return (Container) c;
     }
 
     /**
@@ -2726,7 +2722,7 @@ public class UIBuilder { //implements Externalizable {
         }
         return false;
     }*/
-    
+
     /**
      * {@inheritDoc}
      */
@@ -2738,13 +2734,13 @@ public class UIBuilder { //implements Externalizable {
 
     /**
      * This method is called on externalization of the state machine and allows developers to persist their own data
-     * 
+     *
      * @param out output stream
      * @throws IOException if an error occurred
      */
     //protected void externalizeUserState(DataOutputStream out) throws IOException {
     //}
-    
+
     /**
      * This method is called on loading of a state machine and allows the developers to load custom state machine data,
      * notice that the version isn't passed into this method since the version of the UIBuilder persistence logic
@@ -2754,7 +2750,7 @@ public class UIBuilder { //implements Externalizable {
      */
     //protected void internalizeUserState(DataInputStream in) throws IOException {
     //}
-    
+
     /**
      * {@inheritDoc}
      */
@@ -2792,7 +2788,7 @@ public class UIBuilder { //implements Externalizable {
         }
 
         private void waitForForm(Form f) {
-            while(Display.getInstance().getCurrent() != f) {
+            while (Display.getInstance().getCurrent() != f) {
                 try {
                     Thread.sleep(5);
                 } catch (InterruptedException ex) {
@@ -2804,8 +2800,8 @@ public class UIBuilder { //implements Externalizable {
         }
 
         public void run() {
-            if(currentAction != null) {
-                if(Display.getInstance().isEdt()) {
+            if (currentAction != null) {
+                if (Display.getInstance().isEdt()) {
                     postAsyncCommand(currentAction, currentActionEvent);
                 } else {
                     asyncCommandProcess(currentAction, currentActionEvent);
@@ -2814,16 +2810,16 @@ public class UIBuilder { //implements Externalizable {
                     waitForForm(destForm);
                 }
             } else {
-                if(Display.getInstance().isEdt()) {
-                    if(Display.getInstance().getCurrent() != null) {
+                if (Display.getInstance().isEdt()) {
+                    if (Display.getInstance().getCurrent() != null) {
                         exitForm(Display.getInstance().getCurrent());
                     }
-                    Form f = (Form)createContainer(fetchResourceFile(), nextForm);
+                    Form f = (Form) createContainer(fetchResourceFile(), nextForm);
                     beforeShow(f, currentAction);
                     f.show();
                     postShowImpl(f);
                 } else {
-                    if(processBackground(destForm)) {
+                    if (processBackground(destForm)) {
                         waitForForm(destForm);
                     }
                 }
@@ -2832,53 +2828,53 @@ public class UIBuilder { //implements Externalizable {
 
         public void actionPerformed(ActionEvent evt) {
             Command cmd = evt.getCommand();
-            if(cmd == null) {
+            if (cmd == null) {
                 // this is a show listener we should spawn the background thread
-                if(evt.getSource() instanceof Form) {
+                if (evt.getSource() instanceof Form) {
                     // prevent a dialog from triggerring the background processing again
-                    ((Form)evt.getSource()).removeShowListener(this);
+                    ((Form) evt.getSource()).removeShowListener(this);
                     Display.getInstance().startThread(this, "UIBuilder Async").start();
                     return;
                 }
 
-                handleComponentAction((Component)evt.getSource(), evt);
+                handleComponentAction((Component) evt.getSource(), evt);
                 return;
             }
 
             processCommandImpl(evt, cmd);
-            if(evt.isConsumed()) {
+            if (evt.isConsumed()) {
                 return;
             }
-            String action = (String)cmd.getClientProperty(COMMAND_ACTION);
-            if(action != null && action.length() > 0) {
-                if(action.equals("$Minimize")) {
+            String action = (String) cmd.getClientProperty(COMMAND_ACTION);
+            if (action != null && action.length() > 0) {
+                if (action.equals("$Minimize")) {
                     Display.getInstance().minimizeApplication();
                     return;
                 }
-                if(action.equals("$Exit")) {
+                if (action.equals("$Exit")) {
                     Display.getInstance().exitApplication();
                     return;
                 }
-                if(action.equals("$Execute")) {
-                    Display.getInstance().execute((String)cmd.getClientProperty(COMMAND_ARGUMENTS));
+                if (action.equals("$Execute")) {
+                    Display.getInstance().execute((String) cmd.getClientProperty(COMMAND_ARGUMENTS));
                     return;
                 }
-                if(action.equals("$Back")) {
+                if (action.equals("$Back")) {
                     back(evt.getComponent());
                     return;
                 }
 
-                if(action.startsWith("!")) {
+                if (action.startsWith("!")) {
                     action = action.substring(1);
                     Form currentForm = Display.getInstance().getCurrent();
-                    if(currentForm != null) {
+                    if (currentForm != null) {
                         exitForm(currentForm);
                     }
                     int pos = action.indexOf(';');
                     String firstScreen = action.substring(0, pos);
                     String nextScreen = action.substring(pos + 1, action.length());
-                    Form f = (Form)createContainer(fetchResourceFile(), firstScreen);
-                    if(Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                    Form f = (Form) createContainer(fetchResourceFile(), firstScreen);
+                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) {
                         onBackNavigation();
                         beforeShow(f);
                         f.showBack();
@@ -2891,14 +2887,14 @@ public class UIBuilder { //implements Externalizable {
                     return;
                 }
 
-                if(action.startsWith("@")) {
+                if (action.startsWith("@")) {
                     action = action.substring(1);
                     Form currentForm = Display.getInstance().getCurrent();
-                    if(currentForm != null) {
+                    if (currentForm != null) {
                         exitForm(currentForm);
                     }
-                    Form f = (Form)createContainer(fetchResourceFile(), action);
-                    if(Display.getInstance().getCurrent().getBackCommand() == cmd) {
+                    Form f = (Form) createContainer(fetchResourceFile(), action);
+                    if (Display.getInstance().getCurrent().getBackCommand() == cmd) {
                         onBackNavigation();
                         beforeShow(f);
                         f.showBack();
@@ -2923,16 +2919,19 @@ class LazyValueC implements LazyValue<Form> {
     private Form f;
     private Command backCommand;
     private UIBuilder parent;
+
     public LazyValueC(Form f, Hashtable h, Command backCommand, UIBuilder parent) {
         this.h = h;
         this.f = f;
         this.backCommand = backCommand;
         this.parent = parent;
     }
+
     public Form get(Object... args) {
         String n = parent.getPreviousFormName(f);
-        final Form f = parent.createForm((Form)parent.createContainer(parent.fetchResourceFile(), n));;
-        if(h != null) {
+        final Form f = parent.createForm((Form) parent.createContainer(parent.fetchResourceFile(), n));
+        ;
+        if (h != null) {
             parent.setFormState(f, h);
             parent.setBackCommand(f, backCommand);
         }

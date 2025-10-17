@@ -17,7 +17,6 @@
 package com.codename1.util.regex;
 
 /**
- *
  * @author Nikolay Neizvesny
  */
 public class RECharacter {
@@ -50,7 +49,72 @@ public class RECharacter {
     public static final byte CURRENCY_SYMBOL = 26;
     public static final byte MODIFIER_SYMBOL = 27;
     public static final byte OTHER_SYMBOL = 28;
-    
+    //#ifdef RE_UNICODE
+//#     private static final char[] CHAR_CLASSES_SPACE_INDEX = {
+//#         0, 1329, 2305, 3713, 3840, 4096, 4256, 6400, 6912, 7424, 7678, 8400, 9216,
+//#         9280, 9312, 9985, 11264, 11776, 11904, 12272, 12784, 19893, 40891, 40960,
+//#         42752, 43008, 43072, 44032, 55203, 55296, 56191, 56319, 57343, 63743,
+//#         64256, 64467, 65008
+//#     };
+//#     private static byte[][] CHAR_CLASSES;
+//#
+//#     static {
+//#         CHAR_CLASSES = new byte[CHAR_CLASSES_SPACE_INDEX.length][];
+//#         CHAR_CLASSES[0] = CharacterClassMap1.CHAR_CLASSES_0;
+//#         CHAR_CLASSES[1] = CharacterClassMap1.CHAR_CLASSES_1;
+//#         CHAR_CLASSES[2] = CharacterClassMap1.CHAR_CLASSES_2;
+//#         CHAR_CLASSES[3] = CharacterClassMap1.CHAR_CLASSES_3;
+//#         CHAR_CLASSES[4] = CharacterClassMap1.CHAR_CLASSES_4;
+//#         CHAR_CLASSES[5] = CharacterClassMap1.CHAR_CLASSES_5;
+//#         CHAR_CLASSES[6] = CharacterClassMap2.CHAR_CLASSES_6;
+//#         CHAR_CLASSES[7] = CharacterClassMap2.CHAR_CLASSES_7;
+//#         CHAR_CLASSES[8] = CharacterClassMap2.CHAR_CLASSES_8;
+//#         CHAR_CLASSES[9] = CharacterClassMap2.CHAR_CLASSES_9;
+//#         CHAR_CLASSES[10] = CharacterClassMap2.CHAR_CLASSES_10;
+//#         CHAR_CLASSES[11] = CharacterClassMap2.CHAR_CLASSES_11;
+//#         CHAR_CLASSES[12] = CharacterClassMap2.CHAR_CLASSES_12;
+//#         CHAR_CLASSES[13] = CharacterClassMap2.CHAR_CLASSES_13;
+//#         CHAR_CLASSES[14] = CharacterClassMap2.CHAR_CLASSES_14;
+//#         CHAR_CLASSES[15] = CharacterClassMap3.CHAR_CLASSES_15;
+//#         CHAR_CLASSES[16] = CharacterClassMap3.CHAR_CLASSES_16;
+//#         CHAR_CLASSES[17] = CharacterClassMap3.CHAR_CLASSES_17;
+//#         CHAR_CLASSES[18] = CharacterClassMap3.CHAR_CLASSES_18;
+//#         CHAR_CLASSES[19] = CharacterClassMap3.CHAR_CLASSES_19;
+//#         CHAR_CLASSES[20] = CharacterClassMap3.CHAR_CLASSES_20;
+//#         CHAR_CLASSES[21] = CharacterClassMap3.CHAR_CLASSES_21;
+//#         CHAR_CLASSES[22] = CharacterClassMap3.CHAR_CLASSES_22;
+//#         CHAR_CLASSES[23] = CharacterClassMap3.CHAR_CLASSES_23;
+//#         CHAR_CLASSES[24] = CharacterClassMap3.CHAR_CLASSES_24;
+//#         CHAR_CLASSES[25] = CharacterClassMap3.CHAR_CLASSES_25;
+//#         CHAR_CLASSES[26] = CharacterClassMap3.CHAR_CLASSES_26;
+//#         CHAR_CLASSES[27] = CharacterClassMap3.CHAR_CLASSES_27;
+//#         CHAR_CLASSES[28] = CharacterClassMap3.CHAR_CLASSES_28;
+//#         CHAR_CLASSES[29] = CharacterClassMap3.CHAR_CLASSES_29;
+//#         CHAR_CLASSES[30] = CharacterClassMap3.CHAR_CLASSES_30;
+//#         CHAR_CLASSES[31] = CharacterClassMap3.CHAR_CLASSES_31;
+//#         CHAR_CLASSES[32] = CharacterClassMap3.CHAR_CLASSES_32;
+//#         CHAR_CLASSES[33] = CharacterClassMap3.CHAR_CLASSES_33;
+//#         CHAR_CLASSES[34] = CharacterClassMap3.CHAR_CLASSES_34;
+//#         CHAR_CLASSES[35] = CharacterClassMap4.CHAR_CLASSES_35;
+//#         CHAR_CLASSES[36] = CharacterClassMap4.CHAR_CLASSES_36;
+//#     }
+//#else
+    static final byte[] CHAR_CLASSES = {
+            15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+            15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 12, 23, 23, 23,
+            25, 23, 23, 23, 20, 21, 23, 24, 23, 19, 23, 23, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+            9, 23, 23, 24, 24, 24, 23, 23, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 20, 23, 21, 26, 22, 26, 2, 2, 2, 2, 2,
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 20, 24, 21,
+            24, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+            15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 12, 23,
+            25, 25, 25, 25, 27, 27, 26, 27, 2, 28, 24, 16, 27, 26, 27, 24, 11, 11, 26,
+            2, 27, 23, 26, 11, 2, 29, 11, 11, 11, 23, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 24, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 24, 2, 2, 2,
+            2, 2, 2, 2, 2
+    };
+
     public static char toLowerCase(char c) {
 //#ifdef RE_UNICODE
 //#         for (int i = 0; i < CharacterCaseMap.CAPITAL_TO_SMALL_INDEX.length; i++) {
@@ -138,72 +202,6 @@ public class RECharacter {
 //#endif
         return UNASSIGNED;
     }
-
-//#ifdef RE_UNICODE
-//#     private static final char[] CHAR_CLASSES_SPACE_INDEX = {
-//#         0, 1329, 2305, 3713, 3840, 4096, 4256, 6400, 6912, 7424, 7678, 8400, 9216,
-//#         9280, 9312, 9985, 11264, 11776, 11904, 12272, 12784, 19893, 40891, 40960,
-//#         42752, 43008, 43072, 44032, 55203, 55296, 56191, 56319, 57343, 63743,
-//#         64256, 64467, 65008
-//#     };
-//#     private static byte[][] CHAR_CLASSES;
-//# 
-//#     static {
-//#         CHAR_CLASSES = new byte[CHAR_CLASSES_SPACE_INDEX.length][];
-//#         CHAR_CLASSES[0] = CharacterClassMap1.CHAR_CLASSES_0;
-//#         CHAR_CLASSES[1] = CharacterClassMap1.CHAR_CLASSES_1;
-//#         CHAR_CLASSES[2] = CharacterClassMap1.CHAR_CLASSES_2;
-//#         CHAR_CLASSES[3] = CharacterClassMap1.CHAR_CLASSES_3;
-//#         CHAR_CLASSES[4] = CharacterClassMap1.CHAR_CLASSES_4;
-//#         CHAR_CLASSES[5] = CharacterClassMap1.CHAR_CLASSES_5;
-//#         CHAR_CLASSES[6] = CharacterClassMap2.CHAR_CLASSES_6;
-//#         CHAR_CLASSES[7] = CharacterClassMap2.CHAR_CLASSES_7;
-//#         CHAR_CLASSES[8] = CharacterClassMap2.CHAR_CLASSES_8;
-//#         CHAR_CLASSES[9] = CharacterClassMap2.CHAR_CLASSES_9;
-//#         CHAR_CLASSES[10] = CharacterClassMap2.CHAR_CLASSES_10;
-//#         CHAR_CLASSES[11] = CharacterClassMap2.CHAR_CLASSES_11;
-//#         CHAR_CLASSES[12] = CharacterClassMap2.CHAR_CLASSES_12;
-//#         CHAR_CLASSES[13] = CharacterClassMap2.CHAR_CLASSES_13;
-//#         CHAR_CLASSES[14] = CharacterClassMap2.CHAR_CLASSES_14;
-//#         CHAR_CLASSES[15] = CharacterClassMap3.CHAR_CLASSES_15;
-//#         CHAR_CLASSES[16] = CharacterClassMap3.CHAR_CLASSES_16;
-//#         CHAR_CLASSES[17] = CharacterClassMap3.CHAR_CLASSES_17;
-//#         CHAR_CLASSES[18] = CharacterClassMap3.CHAR_CLASSES_18;
-//#         CHAR_CLASSES[19] = CharacterClassMap3.CHAR_CLASSES_19;
-//#         CHAR_CLASSES[20] = CharacterClassMap3.CHAR_CLASSES_20;
-//#         CHAR_CLASSES[21] = CharacterClassMap3.CHAR_CLASSES_21;
-//#         CHAR_CLASSES[22] = CharacterClassMap3.CHAR_CLASSES_22;
-//#         CHAR_CLASSES[23] = CharacterClassMap3.CHAR_CLASSES_23;
-//#         CHAR_CLASSES[24] = CharacterClassMap3.CHAR_CLASSES_24;
-//#         CHAR_CLASSES[25] = CharacterClassMap3.CHAR_CLASSES_25;
-//#         CHAR_CLASSES[26] = CharacterClassMap3.CHAR_CLASSES_26;
-//#         CHAR_CLASSES[27] = CharacterClassMap3.CHAR_CLASSES_27;
-//#         CHAR_CLASSES[28] = CharacterClassMap3.CHAR_CLASSES_28;
-//#         CHAR_CLASSES[29] = CharacterClassMap3.CHAR_CLASSES_29;
-//#         CHAR_CLASSES[30] = CharacterClassMap3.CHAR_CLASSES_30;
-//#         CHAR_CLASSES[31] = CharacterClassMap3.CHAR_CLASSES_31;
-//#         CHAR_CLASSES[32] = CharacterClassMap3.CHAR_CLASSES_32;
-//#         CHAR_CLASSES[33] = CharacterClassMap3.CHAR_CLASSES_33;
-//#         CHAR_CLASSES[34] = CharacterClassMap3.CHAR_CLASSES_34;
-//#         CHAR_CLASSES[35] = CharacterClassMap4.CHAR_CLASSES_35;
-//#         CHAR_CLASSES[36] = CharacterClassMap4.CHAR_CLASSES_36;
-//#     }
-//#else
-    static final byte[] CHAR_CLASSES = {
-        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 12, 23, 23, 23,
-        25, 23, 23, 23, 20, 21, 23, 24, 23, 19, 23, 23, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 23, 23, 24, 24, 24, 23, 23, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 20, 23, 21, 26, 22, 26, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 20, 24, 21,
-        24, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 12, 23,
-        25, 25, 25, 25, 27, 27, 26, 27, 2, 28, 24, 16, 27, 26, 27, 24, 11, 11, 26,
-        2, 27, 23, 26, 11, 2, 29, 11, 11, 11, 23, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 24, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 24, 2, 2, 2,
-        2, 2, 2, 2, 2
-    };
 //#endif
 
 }

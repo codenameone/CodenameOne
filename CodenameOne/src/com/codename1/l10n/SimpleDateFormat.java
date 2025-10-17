@@ -6,24 +6,24 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.l10n;
 
 import com.codename1.util.DateUtil;
-import java.util.Arrays;
+
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -36,7 +36,7 @@ import java.util.Vector;
  * <br /><br />
  * To localize the formatted dates, see the discussion
  * <a href="https://stackoverflow.com/questions/57874534/format-a-localized-date-in-codename-one">Format a localized date
- * in Codename One</a>. 
+ * in Codename One</a>.
  *
  * @author Eric Coolman
  */
@@ -161,21 +161,6 @@ public class SimpleDateFormat extends DateFormat {
     private static final int DAY_OF_WEEK_IN_MONTH = 8;
     private static final int DAY_OF_YEAR = 6;
     /**
-     * Localisation sensitive symbols used for handling text components.
-     */
-    private DateFormatSymbols dateFormatSymbols;
-
-    /**
-     * The user-supplied pattern
-     */
-    private String pattern;
-
-    /**
-     * The parsed pattern
-     */
-    private List<String> patternTokens;
-
-    /**
      * When set to {@code true}, month names provided by the underlying platform
      * will be truncated to match the number of pattern characters. This guards
      * against platforms that may return longer month names than expected for
@@ -183,26 +168,18 @@ public class SimpleDateFormat extends DateFormat {
      * backwards compatibility.
      */
     private static boolean restrictMonthNameLength;
-
     /**
-     * Enables or disables truncating of localized month names so that they
-     * match the number of pattern characters that triggered their lookup.
-     *
-     * @param restrict {@code true} to truncate localized month names to the
-     * length requested by the pattern, {@code false} to keep the platform
-     * provided value as-is (default behaviour).
+     * Localisation sensitive symbols used for handling text components.
      */
-    public static void setRestrictMonthNameLength(boolean restrict) {
-        restrictMonthNameLength = restrict;
-    }
-
+    private DateFormatSymbols dateFormatSymbols;
     /**
-     * @return {@code true} if localized month names should be truncated to the
-     * requested pattern length.
+     * The user-supplied pattern
      */
-    public static boolean isRestrictMonthNameLength() {
-        return restrictMonthNameLength;
-    }
+    private String pattern;
+    /**
+     * The parsed pattern
+     */
+    private List<String> patternTokens;
 
     /**
      * Construct a SimpleDateFormat with no pattern.
@@ -219,6 +196,33 @@ public class SimpleDateFormat extends DateFormat {
     public SimpleDateFormat(String pattern) {
         super();
         this.pattern = pattern;
+    }
+
+    /**
+     * @return {@code true} if localized month names should be truncated to the
+     * requested pattern length.
+     */
+    public static boolean isRestrictMonthNameLength() {
+        return restrictMonthNameLength;
+    }
+
+    /**
+     * Enables or disables truncating of localized month names so that they
+     * match the number of pattern characters that triggered their lookup.
+     *
+     * @param restrict {@code true} to truncate localized month names to the
+     *                 length requested by the pattern, {@code false} to keep the platform
+     *                 provided value as-is (default behaviour).
+     */
+    public static void setRestrictMonthNameLength(boolean restrict) {
+        restrictMonthNameLength = restrict;
+    }
+
+    private static String applyMonthLengthRestriction(String value, int len) {
+        if (restrictMonthNameLength && value != null && value.length() > len) {
+            return value.substring(0, len);
+        }
+        return value;
     }
 
     /**
@@ -278,7 +282,7 @@ public class SimpleDateFormat extends DateFormat {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#clone()
      */
     @Override
@@ -290,7 +294,7 @@ public class SimpleDateFormat extends DateFormat {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.text.DateFormat#format(java.util.Date)
      */
     @Override
@@ -300,7 +304,7 @@ public class SimpleDateFormat extends DateFormat {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.text.DateFormat#format(java.util.Date, java.lang.StringBuffer)
      */
     @Override
@@ -309,9 +313,9 @@ public class SimpleDateFormat extends DateFormat {
         String out = format(source, sb);
         toAppendTo.append(sb.toString());
         return toAppendTo.toString();
-        
+
     }
-    
+
     @Override
     String format(Date source, StringBuilder toAppendTo) {
         if (pattern == null) {
@@ -442,13 +446,6 @@ public class SimpleDateFormat extends DateFormat {
         return toAppendTo.toString();
     }
 
-    private static String applyMonthLengthRestriction(String value, int len) {
-        if (restrictMonthNameLength && value != null && value.length() > len) {
-            return value.substring(0, len);
-        }
-        return value;
-    }
-
     private String[] getTimeZoneDisplayNames(String id) {
         for (String zoneStrings[] : getDateFormatSymbols().getZoneStrings()) {
             if (zoneStrings[DateFormatSymbols.ZONE_ID].equalsIgnoreCase(id)) {
@@ -467,7 +464,7 @@ public class SimpleDateFormat extends DateFormat {
     }
 
     /**
-     * Parses text from a string to produce a Date. 
+     * Parses text from a string to produce a Date.
      */
     @Override
     public Date parse(String source) throws ParseException {
@@ -498,7 +495,7 @@ public class SimpleDateFormat extends DateFormat {
                 case LITERAL_LETTER:
                     s = readLiteral(source, startIndex, token);
                     if (!s.equalsIgnoreCase(token)) {
-                        throw new ParseException("Unparseable string "+source, startIndex);
+                        throw new ParseException("Unparseable string " + source, startIndex);
                     }
                     break;
                 case AMPM_LETTER:
@@ -521,7 +518,7 @@ public class SimpleDateFormat extends DateFormat {
                     s = readTimeZone(source, startIndex);
                     TimeZoneResult res = new TimeZoneResult();
                     if (s == null || (v = parseTimeZone(s, startIndex, res)) == -1) {
-                    
+
                         throwInvalid("timezone", startIndex);
                     }
                     if (res != null) {
@@ -582,7 +579,7 @@ public class SimpleDateFormat extends DateFormat {
                 startIndex += s.length();
             }
         }
-        
+
         TimeZone localTimezone = Calendar.getInstance().getTimeZone();
         calendar.getTime(); // this seems to be necessary to calculate the time before changing the timzezone
         calendar.setTimeZone(localTimezone);
@@ -590,7 +587,7 @@ public class SimpleDateFormat extends DateFormat {
             calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) + pmMinutes);
         }
         long rawOffset = localTimezone.getRawOffset();
-        int rawOffsetMinutes = (int)(rawOffset / MILLIS_TO_MINUTES);
+        int rawOffsetMinutes = (int) (rawOffset / MILLIS_TO_MINUTES);
         int localDSTOffset = getLocalDSTOffset(calendar);
         if (tzMinutes != -1) {
             tzMinutes = -rawOffsetMinutes - tzMinutes;
@@ -601,7 +598,7 @@ public class SimpleDateFormat extends DateFormat {
                 tzDstOffset = getDSTOffset(tzCalendar);
             }
             tzMinutes = tzMinutes - (localDSTOffset - tzDstOffset);
-            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - tzMinutes);  
+            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - tzMinutes);
         }
         calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - rawOffsetMinutes - localDSTOffset);
         return calendar.getTime();
@@ -613,10 +610,10 @@ public class SimpleDateFormat extends DateFormat {
      *
      * @param source as a string.
      * @param offset the offset of original timestamp where marker started, for
-     * error reporting.
+     *               error reporting.
      * @return hour.
      * @throws ParseException if the source could not be parsed. See http
-     * ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+     *                        ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
      */
     int parseHour(String source, char patternChar, int offset) throws ParseException {
         int min = 0;
@@ -637,9 +634,9 @@ public class SimpleDateFormat extends DateFormat {
     /**
      * Utility method to keep parsing errors consistent.
      *
-     * @param name name of the element being parsed when error occurred.
+     * @param name   name of the element being parsed when error occurred.
      * @param offset offset within the original timestamp where named element
-     * beings.
+     *               beings.
      */
     int throwInvalid(String name, int offset) throws ParseException {
         throw new ParseException("Invalid " + name + " value", offset);
@@ -649,8 +646,8 @@ public class SimpleDateFormat extends DateFormat {
      * Parse a numeric value, validating against given min/max constraints.
      *
      * @param source as a string.
-     * @param ofs the offset of original timestamp where number starts, for
-     * error reporting.
+     * @param ofs    the offset of original timestamp where number starts, for
+     *               error reporting.
      * @return numeric value as an int
      * @throws ParseException if the source could not be parsed.
      */
@@ -683,7 +680,7 @@ public class SimpleDateFormat extends DateFormat {
         int rawOffset = localTimezone.getRawOffset() / MILLIS_TO_MINUTES;
         return getOffsetInMinutes(source, localTimezone) - rawOffset;
     }
-    
+
     int getDSTOffset(Calendar source) {
         TimeZone timeZone = source.getTimeZone();
         int rawOffset = timeZone.getRawOffset() / MILLIS_TO_MINUTES;
@@ -731,7 +728,7 @@ public class SimpleDateFormat extends DateFormat {
      * Read an unparsable text string.
      *
      * @param source full timestamp
-     * @param ofs offset within timestamp where text starts
+     * @param ofs    offset within timestamp where text starts
      * @return the text
      */
     String readLiteral(String source, int ofs, String token) {
@@ -741,11 +738,11 @@ public class SimpleDateFormat extends DateFormat {
     /**
      * Read the number. Does not attempt to parse.
      *
-     * @param source full timestamp
-     * @param ofs offset within timestamp where number starts
-     * @param token the token currently being parsed
+     * @param source   full timestamp
+     * @param ofs      offset within timestamp where number starts
+     * @param token    the token currently being parsed
      * @param adjacent true if the number is adjacent to next field with no
-     * literal separator.
+     *                 literal separator.
      * @return the number as a string, or null if could not read.
      * @see #parseNumber(String, int, String, int, int)
      */
@@ -776,11 +773,11 @@ public class SimpleDateFormat extends DateFormat {
      * details of this algorithm.
      *
      * @param source year as a string.
-     * @param ofs the offset of original timestamp where marker started, for
-     * error reporting.
+     * @param ofs    the offset of original timestamp where marker started, for
+     *               error reporting.
      * @return full year.
      * @throws ParseException if the source could not be parsed. See http
-     * ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+     *                        ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
      */
     int parseYear(String source, String token, int ofs) throws ParseException {
         int year = parseNumber(source, ofs, "year", -1, -1);
@@ -802,7 +799,7 @@ public class SimpleDateFormat extends DateFormat {
      * Read the day of week string. Does not attempt to parse.
      *
      * @param source full timestamp
-     * @param ofs offset within timestamp where day of week starts
+     * @param ofs    offset within timestamp where day of week starts
      * @return the day of week as a string, or null if could not read.
      */
     String readDayOfWeek(String source, int ofs) {
@@ -825,7 +822,7 @@ public class SimpleDateFormat extends DateFormat {
                 return readSubstring(source, ofs, ofs + weekday.length());
             }
         }
-        if(ds.isLocalized()) {
+        if (ds.isLocalized()) {
             ds.setLocalized(false);
             String s = readDayOfWeek(source, ofs);
             ds.setLocalized(true);
@@ -838,7 +835,7 @@ public class SimpleDateFormat extends DateFormat {
      * Read the am/pm marker string. Does not attempt to parse.
      *
      * @param source full timestamp
-     * @param ofs offset within timestamp where marker starts
+     * @param ofs    offset within timestamp where marker starts
      * @return the marker as a string, or null if could not read.
      * @see #parseAmPmMarker(String, int)
      */
@@ -863,7 +860,7 @@ public class SimpleDateFormat extends DateFormat {
                 return readSubstring(source, ofs, ofs + 1);
             }
         }
-        if(ds.isLocalized()) {
+        if (ds.isLocalized()) {
             ds.setLocalized(false);
             String s = readAmPmMarker(source, ofs);
             ds.setLocalized(true);
@@ -877,11 +874,11 @@ public class SimpleDateFormat extends DateFormat {
      * defined in DateFormatSymbols, or the first character of the marker name.
      *
      * @param source month as a string.
-     * @param ofs the offset of original timestamp where marker started, for
-     * error reporting.
+     * @param ofs    the offset of original timestamp where marker started, for
+     *               error reporting.
      * @return Calendar.AM or Calendar.PM
-     * @see DateFormatSymbols
      * @throws ParseException if the source could not be parsed.
+     * @see DateFormatSymbols
      */
     int parseAmPmMarker(String source, int ofs) throws ParseException {
         DateFormatSymbols ds = getDateFormatSymbols();
@@ -899,7 +896,7 @@ public class SimpleDateFormat extends DateFormat {
         if (ch == markers[1].charAt(0)) {
             return Calendar.PM;
         }
-        if(ds.isLocalized()) {
+        if (ds.isLocalized()) {
             ds.setLocalized(false);
             int i = parseAmPmMarker(source, ofs);
             ds.setLocalized(true);
@@ -912,7 +909,7 @@ public class SimpleDateFormat extends DateFormat {
      * Read the month string. Does not attempt to parse.
      *
      * @param source full timestamp
-     * @param ofs offset within timestamp where month starts
+     * @param ofs    offset within timestamp where month starts
      * @return the month as a string, or null if could not read.
      * @see #parseMonth(String, int)
      */
@@ -944,7 +941,7 @@ public class SimpleDateFormat extends DateFormat {
                 return readSubstring(source, ofs, ofs + month.length());
             }
         }
-        if(ds.isLocalized()) {
+        if (ds.isLocalized()) {
             ds.setLocalized(false);
             String s = readMonth(source, ofs, token, adjacent);
             ds.setLocalized(true);
@@ -958,12 +955,12 @@ public class SimpleDateFormat extends DateFormat {
      * value can be numeric (1-12), a shortform or longform month name as
      * defined in DateFormatSymbols.
      *
-     * @param month as a string.
+     * @param month  as a string.
      * @param offset the offset of original timestamp where month started, for
-     * error reporting.
+     *               error reporting.
      * @return month as an offset from Calendar.JANUARY.
-     * @see DateFormatSymbols
      * @throws ParseException if the source could not be parsed.
+     * @see DateFormatSymbols
      */
     int parseMonth(String month, int offset) throws ParseException {
         if (month == null) {
@@ -987,7 +984,7 @@ public class SimpleDateFormat extends DateFormat {
                 return i + Calendar.JANUARY;
             }
         }
-        if(ds.isLocalized()) {
+        if (ds.isLocalized()) {
             ds.setLocalized(false);
             int i = 0;
             try {
@@ -997,7 +994,7 @@ public class SimpleDateFormat extends DateFormat {
             }
             return i;
         }
-        
+
         return throwInvalid("month", offset);
     }
 
@@ -1005,7 +1002,7 @@ public class SimpleDateFormat extends DateFormat {
      * Read the timezone string. Does not attempt to parse.
      *
      * @param source full timestamp
-     * @param ofs offset within timestamp where timezone starts
+     * @param ofs    offset within timestamp where timezone starts
      * @return the timezone as a string or null if error reading.
      * @see #parseTimeZone(String, int)
      */
@@ -1047,7 +1044,7 @@ public class SimpleDateFormat extends DateFormat {
                 }
             }
         }
-        if(ds.isLocalized()) {
+        if (ds.isLocalized()) {
             ds.setLocalized(false);
             String s = readTimeZone(source, ofs);
             ds.setLocalized(true);
@@ -1056,18 +1053,14 @@ public class SimpleDateFormat extends DateFormat {
         return null;
     }
 
-    private static class TimeZoneResult {
-        TimeZone timeZone;
-    }
-    
     /**
      * Parse the timezone to an offset from GMT in minutes. The source can be
      * RFC-822 (ie. -0400), ISO8601 (ie. GMT+08:50), or TimeZone ID (ie. PDT,
      * America/New_York, etc). This method does not adjust for DST.
      *
      * @param source source timezone.
-     * @param ofs the offset of original timestamp where month started, for
-     * error reporting.
+     * @param ofs    the offset of original timestamp where month started, for
+     *               error reporting.
      * @return offset from GMT in minutes.
      * @throws ParseException if the source could not be parsed.
      */
@@ -1076,7 +1069,7 @@ public class SimpleDateFormat extends DateFormat {
             throwInvalid("timezone", ofs);
         }
         char tzSign = source.charAt(0);
-        if(tzSign == 'z' || tzSign == 'Z') {
+        if (tzSign == 'z' || tzSign == 'Z') {
             return 0;
         }
         // handle RFC822 style GMT offset (-0500)
@@ -1085,7 +1078,7 @@ public class SimpleDateFormat extends DateFormat {
             if (source == null) {
                 throwInvalid("timezone", ofs);
             }
-			// set the index to point to divider between hours
+            // set the index to point to divider between hours
             // and minutes. Hour can be one or two digits, minutes
             // is always 2 digits.
             int index = 2;
@@ -1130,8 +1123,8 @@ public class SimpleDateFormat extends DateFormat {
                 }
             }
         }
-        
-        if(ds.isLocalized()) {
+
+        if (ds.isLocalized()) {
             ds.setLocalized(false);
             int i = 0;
             try {
@@ -1141,7 +1134,7 @@ public class SimpleDateFormat extends DateFormat {
             }
             return i;
         }
-        
+
         return throwInvalid("timezone", ofs);
     }
 
@@ -1149,7 +1142,7 @@ public class SimpleDateFormat extends DateFormat {
      * Attempt to find the end of a field if the length is not known.
      *
      * @param source the full source timestamp
-     * @param ofs index of where current field starts.
+     * @param ofs    index of where current field starts.
      * @return the index of the end of field, or -1 if couldn't determine.
      */
     int findEndText(String source, int ofs) {
@@ -1178,7 +1171,7 @@ public class SimpleDateFormat extends DateFormat {
 
     /**
      * Parse the date pattern.
-     *
+     * <p>
      * The list will contain each token of the pattern. The first character of
      * the token contains the pattern component type, or wildcard (*) for
      * literal patterns.
@@ -1205,7 +1198,7 @@ public class SimpleDateFormat extends DateFormat {
                 i = n;
                 continue;
             }
-			// Any invalid non-alpha characters are treated as literal text.
+            // Any invalid non-alpha characters are treated as literal text.
             // invalid alpha characters are illegal.
             boolean isValid = PATTERN_LETTERS.indexOf(ch) != -1;
             if (isValid == false) {
@@ -1241,5 +1234,9 @@ public class SimpleDateFormat extends DateFormat {
             tokens.add(tmp.charAt(0) + tmp);
         }
         return tokens;
+    }
+
+    private static class TimeZoneResult {
+        TimeZone timeZone;
     }
 }

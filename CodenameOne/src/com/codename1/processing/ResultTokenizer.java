@@ -38,45 +38,59 @@ Derivative Revision History:
 
 package com.codename1.processing;
 
-import java.util.Enumeration;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 
 /**
  * Internal class, do not use.
- * 
+ * <p>
  * Used internally by Result class apply() methods, this converts a path expression into a List of string tokens.
  *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
- * 
  */
 class ResultTokenizer {
-    
+
     private final String expression;
     private final int length;
-    
-    private int pos;
     boolean predicate;
-    
+    private int pos;
+
     ResultTokenizer(final String expr) {
         if (expr == null) {
             throw new IllegalArgumentException("path cannot be null");
         }
-        
+
         expression = expr;
         length = expression.length();
         pos = 0;
         predicate = false;
     }
-    
+
+    static boolean isSubscript(final char ch) {
+        switch (ch) {
+            case Result.ARRAY_START:
+            case Result.ARRAY_END:
+                return true;
+        }
+        return false;
+    }
+
+    static boolean isSeparator(final char ch) {
+        return (ch == Result.SEPARATOR);
+    }
+
+    static boolean isDelimiter(final char ch) {
+        return isSubscript(ch) || isSeparator(ch);
+    }
+
     List tokenize(Map namespaceAliases) {
         final List tokens = new Vector();
         String tok;
         int i;
         for (pos = 0, tok = next(); !"".equals(tok); tok = next()) {
             if (namespaceAliases != null && ((i = tok.indexOf(':')) != -1)) {
-                String mapto = (String)namespaceAliases.get(tok.substring(0, i));
+                String mapto = (String) namespaceAliases.get(tok.substring(0, i));
                 if (mapto != null) {
                     tok = mapto + tok.substring(i);
                 }
@@ -85,75 +99,75 @@ class ResultTokenizer {
         }
         return tokens;
     }
-    
+
     /**
-     * Handle the predicate expression within outermost brackets.  
+     * Handle the predicate expression within outermost brackets.
      * This allows us to nest predicate expressions.  For example:
-     * 
+     *
      * <code>
      * /result/address_component[/type[position() < 5]='locality']/long_name
      * </code>
-     * The nested predicate in the above statement is 
-     * 
+     * The nested predicate in the above statement is
+     *
      * <code>
-     * /type[position() < 5]='locality'  
+     * /type[position() < 5]='locality'
      * </code>
-     * 
+     * <p>
      * which is applied against the address_component node.
-     * 
+     *
      * @param sbuf
      * @return full predicate expression
      */
     private String getPredicate(StringBuffer sbuf) {
-    	int stack = 1;
+        int stack = 1;
 
-    	for (int i = pos; i < length; i++) {
-    		final char ch = expression.charAt(i);
-    		if (isSubscript(ch)) {
-            	if (ch == Result.ARRAY_START) {
-            		stack++;
-            	} else {
-            		stack--;
-            	}
+        for (int i = pos; i < length; i++) {
+            final char ch = expression.charAt(i);
+            if (isSubscript(ch)) {
+                if (ch == Result.ARRAY_START) {
+                    stack++;
+                } else {
+                    stack--;
+                }
             }
-        	if (stack == 0) {
-        		pos = i;
-        		predicate = false;
-        		break;
-        	} else {
-        		sbuf.append(ch);
-        	}
+            if (stack == 0) {
+                pos = i;
+                predicate = false;
+                break;
+            } else {
+                sbuf.append(ch);
+            }
         }
-    	return sbuf.toString();
+        return sbuf.toString();
     }
 
     private String next() {
         final StringBuffer sbuf = new StringBuffer();
-        
+
         if (pos >= length) {
             return sbuf.toString();
         }
         if (predicate) {
-        	return getPredicate(sbuf);
+            return getPredicate(sbuf);
         }
         final char del = expression.charAt(pos);
         if (isDelimiter(del)) {
-        	// next token will be handled by
-        	// getPredicate() instead of next().
-        	if (del == Result.ARRAY_START) {
-        		predicate = true;
-        	} else if (isSeparator(del)) {
-                while (isSeparator(expression.charAt(pos+1))) {
-                	// handle 'decendants' token
-                	sbuf.append(del);
-                	pos++;
+            // next token will be handled by
+            // getPredicate() instead of next().
+            if (del == Result.ARRAY_START) {
+                predicate = true;
+            } else if (isSeparator(del)) {
+                while (isSeparator(expression.charAt(pos + 1))) {
+                    // handle 'decendants' token
+                    sbuf.append(del);
+                    pos++;
                 }
-        	}
-    		pos++;
-    		sbuf.append(del);
-    		return sbuf.toString();
+            }
+            pos++;
+            sbuf.append(del);
+            return sbuf.toString();
         }
-        
+
         for (int i = pos; i < length; i++) {
             final char ch = expression.charAt(i);
             if (isDelimiter(ch)) {
@@ -166,22 +180,5 @@ class ResultTokenizer {
 
         pos = length;
         return sbuf.toString();
-    }
-
-    static boolean isSubscript(final char ch) {
-        switch (ch) {
-            case Result.ARRAY_START:
-            case Result.ARRAY_END:
-                return true;
-        }
-        return false;
-    }
-    
-    static boolean isSeparator(final char ch) {
-    	return (ch == Result.SEPARATOR);
-    }
-    
-    static boolean isDelimiter(final char ch) {
-    	return isSubscript(ch) || isSeparator(ch);
     }
 }

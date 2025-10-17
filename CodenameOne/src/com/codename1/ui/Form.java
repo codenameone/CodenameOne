@@ -54,53 +54,70 @@ import java.util.ListIterator;
 import java.util.Set;
 
 /**
- *<p> Top level component that serves as the root for the UI, this {@link Container}
- * subclass works in concert with the {@link Toolbar} to create menus. By default a 
+ * <p> Top level component that serves as the root for the UI, this {@link Container}
+ * subclass works in concert with the {@link Toolbar} to create menus. By default a
  * forms main content area (the content pane) is scrollable on the Y axis and has a {@link com.codename1.ui.layouts.FlowLayout} as is the default.</p>
  *
  * <p>Form contains a title bar area which in newer application is replaced by the {@link Toolbar}.
- * Calling {@link #add(com.codename1.ui.Component)} or all similar methods  on the {@code Form} 
+ * Calling {@link #add(com.codename1.ui.Component)} or all similar methods  on the {@code Form}
  * delegates to the contentPane so calling {@code form.add(cmp)} is equivalent to
  * {@code form.getContentPane().add(cmp)}. Normally this shouldn't matter, however in some cases such as
  * animation we need to use the content pane directly e.g. {@code form.getContentPane().animateLayout(200)}
  * will work whereas {@code form.animateLayout(200)} will fail. </p>
- * 
+ *
  * @author Chen Fishbein
  */
 public class Form extends Container {
-    private Command sourceCommand;
-    private boolean globalAnimationLock;
+    private static final String Z_INDEX_PROP = "cn1$_zIndex";
     static int activePeerCount;
-    private Painter glassPane;
-    private Container layeredPane;
-    private Container formLayeredPane;
-    private final Container contentPane;
-    Container titleArea = new Container(new BorderLayout());
-    private Label title = new Label("", "Title");
-    private MenuBar menuBar;
-    private Component dragged;
-    private boolean enableCursors;
     static Motion rippleMotion;
     static Component rippleComponent;
     static int rippleX;
     static int rippleY;
-    private TextSelection textSelection;
-    
-    private ArrayList<Component> componentsAwaitingRelease;
-    
-    private VirtualInputDevice currentInputDevice;
-    
-    private AnimationManager animMananger = new AnimationManager(this);
-    
+    /**
+     * Used by the combo box to block some default Codename One behaviors
+     */
+    static boolean comboLock;
+    private final Container contentPane;
+    /**
+     * Rectangle storing the safe area on the form.
+     */
+    private final Rectangle safeArea = new Rectangle();
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
      */
     protected boolean focusScrolling;
+    Container titleArea = new Container(new BorderLayout());
     /**
-     * Used by the combo box to block some default Codename One behaviors
+     * Indicates that this form should be tinted when painted
      */
-    static boolean comboLock;
+    boolean tint;
+    EventDispatcher showListener;
+    int initialPressX;
+    int initialPressY;
+    /**
+     * A flag that enables/disables the behaviour that revalidate() on any container
+     * will trigger a revalidate() in its parent form.  Not sure why we do this
+     * but this flag turns off this behaviour.  Hopefully we can default this
+     * to "Off" eventually.
+     * <p>
+     * Used in {@link Container#revalidate() }.
+     */
+    boolean revalidateFromRoot = "true".equals(CN.getProperty("Form.revalidateFromRoot", "true"));
+    private Command sourceCommand;
+    private boolean globalAnimationLock;
+    private Painter glassPane;
+    private Container layeredPane;
+    private Container formLayeredPane;
+    private Label title = new Label("", "Title");
+    private MenuBar menuBar;
+    private Component dragged;
+    private boolean enableCursors;
+    private TextSelection textSelection;
+    private ArrayList<Component> componentsAwaitingRelease;
+    private VirtualInputDevice currentInputDevice;
+    private AnimationManager animMananger = new AnimationManager(this);
     /**
      * Contains a list of components that would like to animate their state
      */
@@ -112,18 +129,16 @@ public class Form extends Container {
     //private FormSwitcher formSwitcher;
     private Component focused;
     private ArrayList<Component> mediaComponents;
-    
     private boolean bottomPaddingMode;
-    
     /**
      * This member allows us to define an animation that will draw the transition for
-     * entering this form. A transition is an animation that would occur when 
+     * entering this form. A transition is an animation that would occur when
      * switching from one form to another.
      */
     private Transition transitionInAnimator;
     /**
      * This member allows us to define an animation that will draw the transition for
-     * exiting this form. A transition is an animation that would occur when 
+     * exiting this form. A transition is an animation that would occur when
      * switching from one form to another.
      */
     private Transition transitionOutAnimator;
@@ -137,19 +152,15 @@ public class Form extends Container {
      */
     private Form previousForm;
     /**
-     * Indicates that this form should be tinted when painted
-     */
-    boolean tint;
-    /**
      * Default color for the screen tint when a dialog or a menu is shown
      */
     private int tintColor;
     /**
-     * Listeners for key release events 
+     * Listeners for key release events
      */
     private HashMap<Integer, ArrayList<ActionListener>> keyListeners;
     /**
-     * Listeners for game key release events 
+     * Listeners for game key release events
      */
     private HashMap<Integer, ArrayList<ActionListener>> gameKeyListeners;
     /**
@@ -157,22 +168,42 @@ public class Form extends Container {
      */
     private boolean cyclicFocus = true;
     private int tactileTouchDuration;
-    EventDispatcher showListener;
-    int initialPressX;
-    int initialPressY;
     private EventDispatcher orientationListener;
-    private EventDispatcher sizeChangedListener;   
+    private EventDispatcher sizeChangedListener;
     private EventDispatcher pasteListener;
     private UIManager uiManager;
     private Component stickyDrag;
     private boolean dragStopFlag;
     private Toolbar toolbar;
-    
     /**
      * A text component that will receive focus and start editing immediately as the form is shown
      */
     private TextArea editOnShow;
-            
+    /**
+     * A queue of containers that are scheduled to be revalidated before the next
+     * paint.  Use {@link Container#revalidateLater() } to add to this queue.  The
+     * queue the queue is flushed in {@link #flushRevalidateQueue() }
+     */
+    private Set<Container> pendingRevalidateQueue = new HashSet<Container>();
+    /**
+     * A temporary container used in {@link #flushRevalidateQueue() } for the list
+     * of containers that are being revalidated.  This should not be used outside
+     * of {@link #flushRevalidateQueue() }
+     */
+    private ArrayList<Container> revalidateQueue = new ArrayList<Container>();
+    private int overrideInvisibleAreaUnderVKB = -1;
+    /**
+     * A flag indicating if the safe area may be dirty, and needs to be recaculated.
+     *
+     * @see #getSafeArea()
+     */
+    private boolean safeAreaDirty = true;
+    private boolean pointerPressedAgainDuringDrag;
+    private Component pressedCmp;
+    private Rectangle pressedCmpAbsBounds = new Rectangle();
+    private Object currentPointerPress;
+    private boolean inInternalPaint;
+
     /**
      * Default constructor creates a simple form
      */
@@ -182,7 +213,7 @@ public class Form extends Container {
 
     /**
      * Constructor that accepts a layout
-     * 
+     *
      * @param contentPaneLayout the layout for the content pane
      */
     public Form(Layout contentPaneLayout) {
@@ -209,7 +240,7 @@ public class Form extends Container {
         addComponentToForm(BorderLayout.CENTER, contentPane);
 
         initAdPadding(d);
-        
+
         contentPane.setUIID("ContentPane");
         contentPane.setScrollableY(true);
 
@@ -218,7 +249,7 @@ public class Form extends Container {
         }
 
         initTitleBarStatus();
-        
+
         // hardcoded, anything else is just pointless...
         formStyle.setBgTransparency(0xFF);
 
@@ -226,32 +257,61 @@ public class Form extends Container {
     }
 
     /**
+     * Sets the title after invoking the constructor
+     *
+     * @param title the form title
+     */
+    public Form(String title) {
+        this();
+        setTitle(title);
+//        this.title.setText(title);
+    }
+
+    /**
+     * Sets the title after invoking the constructor
+     *
+     * @param title             the form title
+     * @param contentPaneLayout the layout for the content pane
+     */
+    public Form(String title, Layout contentPaneLayout) {
+        this(contentPaneLayout);
+        setTitle(title);
+    }
+
+    static int getInvisibleAreaUnderVKB(Form f) {
+        if (f == null) {
+            return 0;
+        }
+        return f.getInvisibleAreaUnderVKB();
+    }
+
+    /**
      * <p>Enabling "layoutOnPaint" behaviour.  Setting this flag to true will cause
      * this form and all of its containers to lay themselves out whenever they are painted.
      * This carries a performance penalty.</p>
-     * 
-     * <p>Historical Note: "layoutOnPaint" behaviour has been "on" since the original commit 
+     *
+     * <p>Historical Note: "layoutOnPaint" behaviour has been "on" since the original commit
      * to Google code in 2012, but it isn't clear, now, why it was necessary.  It was likely
      * to fix an edge case in certain layouts that is no longer relevant.  As of 7.0, we are
      * disabling this behaviour by default because it carries such performance penalties, but allowing
      * developers to opt-in to it using this method.</p>
-     * 
+     *
      * @param allow Whether to allow layoutOnPaint behaviour in this this form and it's containers.
-     * @since 7.0</p>
+     * @since 7.0</ p>
      */
     @Override
     public void setAllowEnableLayoutOnPaint(boolean allow) {
         super.setAllowEnableLayoutOnPaint(allow);
     }
-    
+
     /**
      * Adds a listener to be notified when the user has initiated a paste event.  This will primarily
      * occur only on desktop devices which allow the user to initiate a paste outside
      * the UI of the app itself, either using a key code (Command/Ctrl V), or a menu (Edit &gt; Paste).
-     * 
+     *
      * <p>The event will be fired after the paste action has updated the clipboard contents, so you can
      * access the clipboard contents via {@link Display#getPasteDataFromClipboard() }.</p>
-     * 
+     *
      * @param l Listener registered to receive paste events.
      * @since 7.0
      */
@@ -261,12 +321,13 @@ public class Form extends Container {
         }
         pasteListener.addListener(l);
     }
-    
+
     /**
      * Removes listener from being notified when the user has initiated a paste event.
+     *
      * @param l Listener to unregister to receive paste events.
+     * @see #addPasteListener(com.codename1.ui.events.ActionListener)
      * @since 7.0
-     * @see #addPasteListener(com.codename1.ui.events.ActionListener) 
      */
     public void removePasteListener(ActionListener l) {
         if (pasteListener == null) {
@@ -274,41 +335,18 @@ public class Form extends Container {
         }
         pasteListener.removeListener(l);
     }
-    
-    /**
-     * A queue of containers that are scheduled to be revalidated before the next 
-     * paint.  Use {@link Container#revalidateLater() } to add to this queue.  The 
-     * queue the queue is flushed in {@link #flushRevalidateQueue() }
-     */
-    private Set<Container> pendingRevalidateQueue = new HashSet<Container>();
-    
-    /**
-     * A temporary container used in {@link #flushRevalidateQueue() } for the list
-     * of containers that are being revalidated.  This should not be used outside
-     * of {@link #flushRevalidateQueue() }
-     */
-    private ArrayList<Container> revalidateQueue = new ArrayList<Container>();
-    
-    /**
-     * A flag that enables/disables the behaviour that revalidate() on any container
-     * will trigger a revalidate() in its parent form.  Not sure why we do this
-     * but this flag turns off this behaviour.  Hopefully we can default this 
-     * to "Off" eventually.
-     * 
-     * Used in {@link Container#revalidate() }.
-     */
-    boolean revalidateFromRoot = "true".equals(CN.getProperty("Form.revalidateFromRoot", "true"));
-    
+
     /**
      * Adds a container to the revalidation queue to be revalidated before the next
      * paint.
+     *
      * @param cnt The container to schedule for revalidation
      */
     void revalidateLater(Container cnt) {
         if (!pendingRevalidateQueue.contains(cnt)) {
             // It doesn't need to be in queue more than once.
             Iterator<Container> it = pendingRevalidateQueue.iterator();
-            
+
             // Iterate through the existing queue to make sure that this container
             // isn't already scheduled to be revalidated.
             while (it.hasNext()) {
@@ -322,51 +360,54 @@ public class Form extends Container {
                     // as it will be covered by a revalidate of cnt
                     it.remove();
                 }
-                
+
             }
             pendingRevalidateQueue.add(cnt);
         }
     }
-    
+
     /**
-     * Removes a container from the revalidation queue.  This is called from 
+     * Removes a container from the revalidation queue.  This is called from
      * {@link Container#revalidate() }.
+     *
      * @param cnt The container to remove from the queue.
      */
     void removeFromRevalidateQueue(Container cnt) {
         pendingRevalidateQueue.remove(cnt);
     }
-    
+
     void flushRevalidateQueue() {
-        
+
         if (!pendingRevalidateQueue.isEmpty()) {
             revalidateQueue.addAll(pendingRevalidateQueue);
             pendingRevalidateQueue.clear();
             int len = revalidateQueue.size();
-            for (int i=0; i<len; i++) {
+            for (int i = 0; i < len; i++) {
                 Container cnt = revalidateQueue.get(i);
                 cnt.revalidateWithAnimationSafetyInternal(false);
             }
             revalidateQueue.clear();
-            
+
         }
     }
-    
+
     /**
      * Fires a paste event to the paste listeners.  For internal use.
+     *
      * @param l The paste event.  Includes no useful data currently.
+     * @see #addPasteListener(com.codename1.ui.events.ActionListener)
+     * @see #removePasteListener(com.codename1.ui.events.ActionListener)
      * @since 7.0
-     * @see #addPasteListener(com.codename1.ui.events.ActionListener) 
-     * @see #removePasteListener(com.codename1.ui.events.ActionListener) 
      */
     public void dispatchPaste(ActionEvent l) {
         if (pasteListener != null) {
             pasteListener.fireActionEvent(l);
         }
     }
-    
+
     /**
      * Gets TextSelection support for this form.
+     *
      * @return The text selection support for this form.
      * @since 7.0
      */
@@ -376,54 +417,69 @@ public class Form extends Container {
         }
         return textSelection;
     }
-    
+
     /**
-     * Checks if custom cursors are enabled on this form.  They are turned off by default since 
+     * Checks if custom cursors are enabled on this form.  They are turned off by default since
      * they incur some overhead.
+     *
      * @return True if cursors are enabled on this form.
-     * @see #setEnableCursors(boolean) 
-     * @see Component#setCursor(int) 
+     * @see #setEnableCursors(boolean)
+     * @see Component#setCursor(int)
      */
     public boolean isEnableCursors() {
         return enableCursors;
     }
-    
+
     /**
      * Enable or disable custom cursors on this form.  They are turned off by default since they incur some overhead.
+     *
      * @param e True to enable cursors.  False to disable them.
-     * @see Component#setCursor(int) 
+     * @see Component#setCursor(int)
      */
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
     }
-    
-    /**
-     * Sets the source command that was used to navigate to this form.  This can be used
-     * to pass context information to the form.
-     * @param sourceCommand The source command. 
-     * @since 7.0
-     */
-    public void setSourceCommand(Command sourceCommand) {
-        this.sourceCommand = sourceCommand;
-    }
-    
+
     /**
      * Gets the source command that was used to navigate to this form.  This can be used
      * to pass context information to the form.
-     * @return The source command. 
+     *
+     * @return The source command.
      * @since 7.0
      */
     public Command getSourceCommand() {
         return sourceCommand;
     }
-    
+
+    /**
+     * Sets the source command that was used to navigate to this form.  This can be used
+     * to pass context information to the form.
+     *
+     * @param sourceCommand The source command.
+     * @since 7.0
+     */
+    public void setSourceCommand(Command sourceCommand) {
+        this.sourceCommand = sourceCommand;
+    }
+
+    /**
+     * Returns the current virtual input device in the form.
+     *
+     * @return The current input device in the form.
+     * @see #setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
+     */
+    public VirtualInputDevice getCurrentInputDevice() {
+        return currentInputDevice;
+    }
+
     /**
      * Sets the current virtual input device for the form.  This will execute the {@link VirtualInputDevice#close() }
      * method of the current input device, and then set {@literal device} as the new current input device.
-     * 
+     *
      * <p>Some examples of virtual input devices are the Picker widget and the virtual keyboard.</p>
+     *
      * @param device
-     * @throws Exception 
+     * @throws Exception
      */
     public void setCurrentInputDevice(VirtualInputDevice device) throws Exception {
         if (currentInputDevice != null) {
@@ -431,47 +487,26 @@ public class Form extends Container {
         }
         currentInputDevice = device;
     }
-    
-    /**
-     * Returns the current virtual input device in the form.
-     * 
-     * @return The current input device in the form.
-     * @see #setCurrentInputDevice(com.codename1.ui.VirtualInputDevice) 
-     */
-    public VirtualInputDevice getCurrentInputDevice() {
-        return currentInputDevice;
-    }
-    
-    
-    
+
     /**
      * Allows subclasses to disable the global toolbar for a specific form by overriding this method
      */
     protected void initGlobalToolbar() {
-        if(Toolbar.isGlobalToolbar()) {
+        if (Toolbar.isGlobalToolbar()) {
             setToolbar(new Toolbar());
         }
     }
 
-    static int getInvisibleAreaUnderVKB(Form f) {
-        if(f == null) {
-            return 0;
-        }
-        return f.getInvisibleAreaUnderVKB();
-    }
-
-    private int overrideInvisibleAreaUnderVKB = -1;
-
     /**
      * Overrides the invisible area under the virtual keyboard with a given value.  This is used by lightweight components
      * to simulate the virtual keyboard, so that they will respect {@link #setFormBottomPaddingEditingMode(boolean)}.
-     * 
+     *
      * <p><strong>Warning:</strong> This setting is generally for internal use only, and should only be used if you know what you are doing.
      * After setting this value to a non-negative value, it will override the "real" area under the VKB if the read VKB is shown.
      * </p>
-     * 
+     *
      * <p>To reset this after the lightweight component is hidden, set the value to {@literal -1}.</p>
-     * 
+     *
      * @param invisibleAreaUnderVKB The area hidden by the VKB in pixels.
      * @since 8.0
      */
@@ -479,16 +514,15 @@ public class Form extends Container {
         overrideInvisibleAreaUnderVKB = invisibleAreaUnderVKB;
     }
 
-
     /**
-     * In some virtual keyboard implementations (notably iOS) this value is used to determine the height of 
+     * In some virtual keyboard implementations (notably iOS) this value is used to determine the height of
      * the virtual keyboard
-     * 
+     *
      * @return height in pixels of the virtual keyboard
-     * @see #setOverrideInvisibleAreaUnderVKB(int) 
+     * @see #setOverrideInvisibleAreaUnderVKB(int)
      */
     public int getInvisibleAreaUnderVKB() {
-        if(bottomPaddingMode) {
+        if (bottomPaddingMode) {
             return 0;
         }
         if (overrideInvisibleAreaUnderVKB >= 0) {
@@ -496,63 +530,52 @@ public class Form extends Container {
         }
         return Display.impl.getInvisibleAreaUnderVKB();
     }
-        
+
     /**
      * Returns the animation manager instance responsible for this form, this can be used to track/queue
      * animations
-     * 
+     *
      * @return the animation manager
      */
     public AnimationManager getAnimationManager() {
         return animMananger;
     }
-    
+
     /**
      * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
      * possible when working with text fields that aren't in a scrollable container.
-     * @param b true to enable false to disable
-     */
-    public void setFormBottomPaddingEditingMode(boolean b) {
-        bottomPaddingMode = b;
-    }
-    
-    /**
-     * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
-     * possible when working with text fields that aren't in a scrollable container.
-     * 
+     *
      * @return true when this mode is enabled
      */
     public boolean isFormBottomPaddingEditingMode() {
         return bottomPaddingMode;
     }
-    
+
     /**
-     * A flag indicating if the safe area may be dirty, and needs to be recaculated.
-     * @see #getSafeArea() 
+     * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
+     * possible when working with text fields that aren't in a scrollable container.
+     *
+     * @param b true to enable false to disable
      */
-    private boolean safeAreaDirty = true;
-    
-    /**
-     * Rectangle storing the safe area on the form.
-     */
-    private final Rectangle safeArea = new Rectangle();
-    
-   
-    
+    public void setFormBottomPaddingEditingMode(boolean b) {
+        bottomPaddingMode = b;
+    }
+
     /**
      * This method returns a rectangle defining the "safe" area of the display, which excludes
      * areas on the screen that are covered by notches, task bars, rounded corners, etc.
-     * 
+     *
      * <p>This feature was primarily added to deal with the task bar on the iPhone X, which
      * is displayed on the screen near the bottom edge, and can interfere with components
      * that are laid out at the bottom of the screen.</p>
-     * 
+     *
      * <p>Most platforms will simply return a Rectangle with bounds (0, 0, displayWidth, displayHeight).  iPhone X
      * will return a rectangle that excludes the notch, and task bar regions.</p>
+     *
      * @return The safe area on which to draw.
-     * @see CodenameOneImplementation#getDisplaySafeArea(com.codename1.ui.geom.Rectangle) 
-     * @see Container#setSafeArea(boolean) 
-     * @see Container#isSafeArea() 
+     * @see CodenameOneImplementation#getDisplaySafeArea(com.codename1.ui.geom.Rectangle)
+     * @see Container#setSafeArea(boolean)
+     * @see Container#isSafeArea()
      * @since 7.0
      */
     public Rectangle getSafeArea() {
@@ -562,43 +585,45 @@ public class Form extends Container {
         }
         return safeArea;
     }
-    
+
     void initAdPadding(Display d) {
         // this is injected automatically by the implementation in case of ads
         String adPaddingBottom = d.getProperty("adPaddingBottom", null);
-        if(adPaddingBottom != null && adPaddingBottom.length() > 0) {
+        if (adPaddingBottom != null && adPaddingBottom.length() > 0) {
             Container pad = new Container();
             int dim = Integer.parseInt(adPaddingBottom);
             dim = d.convertToPixels(dim, true);
-            if(Display.getInstance().isTablet()) {
+            if (Display.getInstance().isTablet()) {
                 dim *= 2;
             }
             pad.setPreferredSize(new Dimension(dim, dim));
             addComponentToForm(BorderLayout.SOUTH, pad);
-        }        
+        }
     }
-    
+
     /**
      * This method returns the value of the theme constant {@code paintsTitleBarBool} and it is
      * invoked internally in the code. You can override this method to toggle the appearance of the status
      * bar on a per-form basis
+     *
      * @return the value of the {@code paintsTitleBarBool} theme constant
      */
     protected boolean shouldPaintStatusBar() {
         return getUIManager().isThemeConstant("paintsTitleBarBool", false);
     }
-    
+
     /**
      * Subclasses can override this method to control the creation of the status bar component.
      * Notice that this method will only be invoked if the paintsTitleBarBool theme constant is true
      * which it is on iOS by default
+     *
      * @return a Component that represents the status bar if the OS requires status bar spacing
      */
     protected Component createStatusBar() {
-        if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+        if (getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
             Button bar = new Button();
             bar.setShowEvenIfBlank(true);
-            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+            if (getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
                 bar.setUIID("StatusBar", "StatusBarLandscape");
             } else {
                 bar.setUIID("StatusBar");
@@ -607,7 +632,7 @@ public class Form extends Container {
 
                 public void actionPerformed(ActionEvent evt) {
                     Component c = findScrollableChild(getContentPane());
-                    if(c != null) {
+                    if (c != null) {
                         c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
                     }
                 }
@@ -615,7 +640,7 @@ public class Form extends Container {
             return bar;
         } else {
             Container bar = new Container();
-            if(getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
+            if (getUIManager().isThemeConstant("landscapeTitleUiidBool", false)) {
                 bar.setUIID("StatusBar", "StatusBarLandscape");
             } else {
                 bar.setUIID("StatusBar");
@@ -623,14 +648,14 @@ public class Form extends Container {
             return bar;
         }
     }
-    
+
     /**
      * Here so dialogs can disable this
      */
     void initTitleBarStatus() {
-        if(shouldPaintStatusBar()) {
+        if (shouldPaintStatusBar()) {
             // check if its already added:
-            if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
+            if (((BorderLayout) titleArea.getLayout()).getNorth() == null) {
                 titleArea.addComponent(BorderLayout.NORTH, createStatusBar());
                 titleArea.revalidateLater();
             }
@@ -638,25 +663,25 @@ public class Form extends Container {
     }
 
     Component findScrollableChild(Container c) {
-        if(c.isScrollableY()) {
+        if (c.isScrollableY()) {
             return c;
         }
         int count = c.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component comp = c.getComponentAt(iter);
-            if(comp.isScrollableY()) {
+            if (comp.isScrollableY()) {
                 return comp;
             }
-            if(comp instanceof Container) {
-                Component chld = findScrollableChild((Container)comp);
-                if(chld != null) {
+            if (comp instanceof Container) {
+                Component chld = findScrollableChild((Container) comp);
+                if (chld != null) {
                     return chld;
                 }
             }
         }
         return null;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -665,33 +690,42 @@ public class Form extends Container {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public void setAlwaysTensile(boolean alwaysTensile) {
+        getContentPane().setAlwaysTensile(alwaysTensile);
+    }
+
+    /**
      * Allows grabbing a flag that is used by convention to indicate that you are running an exclusive animation.
      * This is used by some code to prevent collision between optional animation
-     * 
+     *
      * @return whether the lock was acquired or not
      * @deprecated this is effectively invalidated by the newer animation framework
      */
     public boolean grabAnimationLock() {
-        if(globalAnimationLock) {
+        if (globalAnimationLock) {
             return false;
         }
         globalAnimationLock = true;
         return true;
     }
-    
+
     /**
      * Invoke this to release the animation lock that was grabbed in grabAnimationLock
+     *
      * @deprecated this is effectively invalidated by the newer animation framework
      */
     public void releaseAnimationLock() {
         globalAnimationLock = false;
     }
-    
+
     /**
      * Returns the component on this form that is currently being edited, or null
      * if no component is currently being edited.
+     *
      * @return The currently edited component on this form.
-     * @see Component#isEditing() 
+     * @see Component#isEditing()
      */
     public Component findCurrentlyEditingComponent() {
         return ComponentSelector.select("*", this).filter(new Filter() {
@@ -700,27 +734,20 @@ public class Form extends Container {
             public boolean filter(Component c) {
                 return c.isEditing();
             }
-            
+
         }).asComponent();
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public void setAlwaysTensile(boolean alwaysTensile) {
-        getContentPane().setAlwaysTensile(alwaysTensile);
     }
 
     /**
-     * Title area manipulation might break with future changes to Codename One and might 
+     * Title area manipulation might break with future changes to Codename One and might
      * damage themeing/functionality of the Codename One application in some platforms
-     * 
+     *
      * @return the container containing the title
-     * @deprecated this method was exposed to allow some hacks, you are advised not to use it. 
+     * @deprecated this method was exposed to allow some hacks, you are advised not to use it.
      * There are some alternatives such as command behavior (thru Display or the theme constants)
      */
     public Container getTitleArea() {
-        if(toolbar != null && toolbar.getParent() != null){
+        if (toolbar != null && toolbar.getParent() != null) {
             return toolbar;
         }
         return titleArea;
@@ -741,7 +768,7 @@ public class Form extends Container {
 
     /**
      * This listener would be invoked when show is completed
-     * 
+     *
      * @param l listener
      */
     public void addShowListener(ActionListener l) {
@@ -754,7 +781,7 @@ public class Form extends Container {
     /**
      * Removes the show listener
      *
-     * @param l the listener 
+     * @param l the listener
      */
     public void removeShowListener(ActionListener l) {
         if (showListener == null) {
@@ -762,12 +789,12 @@ public class Form extends Container {
         }
         showListener.removeListener(l);
     }
-    
+
     /**
      * Removes all Show Listeners from this Form
-     */ 
-    public void removeAllShowListeners(){
-        if(showListener != null){
+     */
+    public void removeAllShowListeners() {
+        if (showListener != null) {
             showListener.getListenerCollection().clear();
             showListener = null;
         }
@@ -820,7 +847,7 @@ public class Form extends Container {
         }
         sizeChangedListener.removeListener(l);
     }
-    
+
     /**
      * This method is only invoked when the underlying canvas for the form is hidden
      * this method isn't called for form based events and is generally usable for
@@ -853,24 +880,26 @@ public class Form extends Container {
 
     /**
      * Causes the display safe area to be recalculated the next time the form list laid out.
+     *
+     * @see #getSafeArea()
      * @since 7.0
-     * @see #getSafeArea() 
      */
     public void setSafeAreaChanged() {
         safeAreaDirty = true;
     }
-    
+
     /**
      * This method is only invoked when the underlying canvas for the form gets
      * a size changed event.
      * This method will trigger a relayout of the Form.
      * This method will get the callback only if this Form is the Current Form
+     *
      * @param w the new width of the Form
      * @param h the new height of the Form
      */
     void sizeChangedInternal(int w, int h) {
         int oldWidth = getWidth();
-        int oldHeight = getHeight();        
+        int oldHeight = getHeight();
         sizeChanged(w, h);
         Style formStyle = getStyle();
         w = w - (formStyle.getHorizontalMargins());
@@ -885,18 +914,18 @@ public class Form extends Container {
             scrollComponentToVisible(focused);
             Component.setDisableSmoothScrolling(false);
         }
-        
-        if(oldWidth != w && oldHeight != h){
+
+        if (oldWidth != w && oldHeight != h) {
             if (orientationListener != null) {
-                orientationListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.OrientationChange));
+                orientationListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.OrientationChange));
             }
             boolean a = getContentPane().onOrientationChange();
-            if(getToolbar() != null) {
-                if(getToolbar().onOrientationChange() || a) {
+            if (getToolbar() != null) {
+                if (getToolbar().onOrientationChange() || a) {
                     forceRevalidate();
                 }
             } else {
-                if(a) {
+                if (a) {
                     forceRevalidate();
                 }
             }
@@ -904,30 +933,9 @@ public class Form extends Container {
         if (sizeChangedListener != null) {
             sizeChangedListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.SizeChange, w, h));
         }
-        
+
         repaint();
         revalidate();
-    }
-
-    /**
-     * <p>Allows a developer that doesn't derive from the form to draw on top of the 
-     * form regardless of underlying changes or animations. This is useful for
-     * watermarks or special effects (such as tinting) it is also useful for generic
-     * drawing of validation errors etc... A glass pane is generally 
-     * transparent or translucent and allows the the UI below to be seen.</p>
-     * <p>
-     * The example shows a glasspane running on top of a field to show a validation hint,
-     * notice that for real world usage you should probably look into {@link com.codename1.ui.validation.Validator}
-     * </p>
-     * <script src="https://gist.github.com/codenameone/f5b83373088600b19610.js"></script>
-     * <img src="https://www.codenameone.com/img/developer-guide/graphics-glasspane.png" alt="Sample of glasspane" />
-     * 
-     * @param glassPane a new glass pane to install. It is generally recommended to
-     * use a painter chain if more than one painter is required.
-     */
-    public void setGlassPane(Painter glassPane) {
-        this.glassPane = glassPane;
-        repaint();
     }
 
     /**
@@ -935,13 +943,14 @@ public class Form extends Container {
      * we expect people to drag and never actually "press" in which case we
      * can instantly start dragging making perceived performance faster. This
      * is invoked by the implementation code to optimize drag start behavior
+     *
      * @param x x location for the touch
-     * @param y y location for the touch 
+     * @param y y location for the touch
      * @return true if the touch is in a region specifically designated as a "drag region"
      * @deprecated this method was replaced by getDragRegionStatus
      */
     public boolean isDragRegion(int x, int y) {
-        if(getMenuBar().isDragRegion(x, y)) {
+        if (getMenuBar().isDragRegion(x, y)) {
             return true;
         }
         if (formLayeredPane != null && formLayeredPane.isDragRegion(x, y)) {
@@ -954,45 +963,46 @@ public class Form extends Container {
         }
         return c != null && c.isDragRegion(x, y);
     }
-    
+
     /**
      * Indicates if the section within the X/Y area is a "drag region" where
      * we expect people to drag or press in which case we
      * can instantly start dragging making perceived performance faster. This
      * is invoked by the implementation code to optimize drag start behavior
+     *
      * @param x x location for the touch
-     * @param y y location for the touch 
+     * @param y y location for the touch
      * @return one of the DRAG_REGION_* values
      */
     public int getDragRegionStatus(int x, int y) {
         int menuBarDrag = getMenuBar().getDragRegionStatus(x, y);
-        if(menuBarDrag != DRAG_REGION_NOT_DRAGGABLE) {
+        if (menuBarDrag != DRAG_REGION_NOT_DRAGGABLE) {
             return menuBarDrag;
         }
-        int formLayeredPaneDrag = formLayeredPane != null ? 
-                formLayeredPane.getDragRegionStatus(x, y) : 
+        int formLayeredPaneDrag = formLayeredPane != null ?
+                formLayeredPane.getDragRegionStatus(x, y) :
                 DRAG_REGION_NOT_DRAGGABLE;
         if (formLayeredPaneDrag != DRAG_REGION_NOT_DRAGGABLE) {
             return formLayeredPaneDrag;
         }
         Container actual = getActualPane();
-        
+
         // no idea how this can happen
-        if(actual != null) {
+        if (actual != null) {
             Component c = actual.getComponentAt(x, y);
             while (c != null && c.isIgnorePointerEvents()) {
                 c = c.getParent();
             }
-            if(c != null) {
+            if (c != null) {
                 return c.getDragRegionStatus(x, y);
             }
-            if(isScrollable()) {
+            if (isScrollable()) {
                 return DRAG_REGION_LIKELY_DRAG_Y;
             }
         }
         return DRAG_REGION_NOT_DRAGGABLE;
     }
-    
+
     /**
      * This method can be overriden by a component to draw on top of itself or its children
      * after the component or the children finished drawing in a similar way to the glass
@@ -1022,10 +1032,10 @@ public class Form extends Container {
     }
 
     /**
-     * <p>Allows a developer that doesn't derive from the form to draw on top of the 
+     * <p>Allows a developer that doesn't derive from the form to draw on top of the
      * form regardless of underlying changes or animations. This is useful for
      * watermarks or special effects (such as tinting) it is also useful for generic
-     * drawing of validation errors etc... A glass pane is generally 
+     * drawing of validation errors etc... A glass pane is generally
      * transparent or translucent and allows the the UI below to be seen.</p>
      * <p>
      * The example shows a glasspane running on top of a field to show a validation hint,
@@ -1033,27 +1043,38 @@ public class Form extends Container {
      * </p>
      * <script src="https://gist.github.com/codenameone/f5b83373088600b19610.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/graphics-glasspane.png" alt="Sample of glasspane" />
-     * 
+     *
      * @return the instance of the glass pane for this form
-     * @see com.codename1.ui.painter.PainterChain#installGlassPane(Form, com.codename1.ui.Painter) 
+     * @see com.codename1.ui.painter.PainterChain#installGlassPane(Form, com.codename1.ui.Painter)
      */
     public Painter getGlassPane() {
         return glassPane;
     }
 
     /**
-     * Sets the style of the title programmatically
-     * 
-     * @param s new style
-     * @deprecated this method doesn't take into consideration multiple styles
+     * <p>Allows a developer that doesn't derive from the form to draw on top of the
+     * form regardless of underlying changes or animations. This is useful for
+     * watermarks or special effects (such as tinting) it is also useful for generic
+     * drawing of validation errors etc... A glass pane is generally
+     * transparent or translucent and allows the the UI below to be seen.</p>
+     * <p>
+     * The example shows a glasspane running on top of a field to show a validation hint,
+     * notice that for real world usage you should probably look into {@link com.codename1.ui.validation.Validator}
+     * </p>
+     * <script src="https://gist.github.com/codenameone/f5b83373088600b19610.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-glasspane.png" alt="Sample of glasspane" />
+     *
+     * @param glassPane a new glass pane to install. It is generally recommended to
+     *                  use a painter chain if more than one painter is required.
      */
-    public void setTitleStyle(Style s) {
-        title.setUnselectedStyle(s);
+    public void setGlassPane(Painter glassPane) {
+        this.glassPane = glassPane;
+        repaint();
     }
 
     /**
      * Allows modifying the title attributes beyond style (e.g. setting icon/alignment etc.)
-     * 
+     *
      * @return the component representing the title for the form
      */
     public Label getTitleComponent() {
@@ -1078,7 +1099,7 @@ public class Form extends Container {
      * for title entering
      *
      * @param title new title component
-     * @param t transition for title replacement
+     * @param t     transition for title replacement
      */
     public void setTitleComponent(Label title, Transition t) {
         titleArea.replace(this.title, title, t);
@@ -1087,8 +1108,8 @@ public class Form extends Container {
 
     /**
      * Add a key listener to the given keycode for a callback when the key is released
-     * 
-     * @param keyCode code on which to send the event
+     *
+     * @param keyCode  code on which to send the event
      * @param listener listener to invoke when the key code released.
      */
     public void addKeyListener(int keyCode, ActionListener listener) {
@@ -1099,9 +1120,9 @@ public class Form extends Container {
     }
 
     /**
-     * Removes a key listener from the given keycode 
-     * 
-     * @param keyCode code on which the event is sent
+     * Removes a key listener from the given keycode
+     *
+     * @param keyCode  code on which the event is sent
      * @param listener listener instance to remove
      */
     public void removeKeyListener(int keyCode, ActionListener listener) {
@@ -1112,9 +1133,9 @@ public class Form extends Container {
     }
 
     /**
-     * Removes a game key listener from the given game keycode 
-     * 
-     * @param keyCode code on which the event is sent
+     * Removes a game key listener from the given game keycode
+     *
+     * @param keyCode  code on which the event is sent
      * @param listener listener instance to remove
      */
     public void removeGameKeyListener(int keyCode, ActionListener listener) {
@@ -1157,10 +1178,10 @@ public class Form extends Container {
     }
 
     /**
-     * Add a game key listener to the given gamekey for a callback when the 
+     * Add a game key listener to the given gamekey for a callback when the
      * key is released
-     * 
-     * @param keyCode code on which to send the event
+     *
+     * @param keyCode  code on which to send the event
      * @param listener listener to invoke when the key code released.
      */
     public void addGameKeyListener(int keyCode, ActionListener listener) {
@@ -1172,7 +1193,7 @@ public class Form extends Container {
 
     /**
      * Returns the number of buttons on the menu bar for use with getSoftButton()
-     * 
+     *
      * @return the number of softbuttons
      */
     public int getSoftButtonCount() {
@@ -1184,7 +1205,7 @@ public class Form extends Container {
      * attributes and behavior programmatically rather than by using the command API.
      * Notice that this API behavior is fragile since the button mapped to a particular
      * offset might change based on the command API
-     * 
+     *
      * @param offset the offest of the softbutton
      * @return a button that can be manipulated
      */
@@ -1194,7 +1215,7 @@ public class Form extends Container {
 
     /**
      * Returns the style of the menu
-     * 
+     *
      * @return the style of the menu
      */
     public Style getMenuStyle() {
@@ -1203,7 +1224,7 @@ public class Form extends Container {
 
     /**
      * Returns the style of the title
-     * 
+     *
      * @return the style of the title
      */
     public Style getTitleStyle() {
@@ -1211,10 +1232,24 @@ public class Form extends Container {
     }
 
     /**
+     * Sets the style of the title programmatically
+     *
+     * @param s new style
+     * @deprecated this method doesn't take into consideration multiple styles
+     */
+    public void setTitleStyle(Style s) {
+        title.setUnselectedStyle(s);
+    }
+
+    /**
      * Allows the display to skip the menu dialog if that is the current form
      */
     Form getPreviousForm() {
         return previousForm;
+    }
+
+    void setPreviousForm(Form previousForm) {
+        this.previousForm = previousForm;
     }
 
     /**
@@ -1241,13 +1276,6 @@ public class Form extends Container {
     }
 
     /**
-     * Sets the current dragged Component
-     */
-    void setDraggedComponent(Component dragged) {
-        this.dragged = LeadUtil.leadParentImpl(dragged);
-    }
-    
-    /**
      * Gets the current dragged Component
      */
     Component getDraggedComponent() {
@@ -1255,11 +1283,18 @@ public class Form extends Container {
     }
 
     /**
+     * Sets the current dragged Component
+     */
+    void setDraggedComponent(Component dragged) {
+        this.dragged = LeadUtil.leadParentImpl(dragged);
+    }
+
+    /**
      * Returns true if the given dest component is in the column of the source component
      */
     private boolean isInSameColumn(Component source, Component dest) {
         // workaround for NPE
-        if(source == null || dest == null) {
+        if (source == null || dest == null) {
             return false;
         }
         return Rectangle.intersects(source.getAbsoluteX(), 0,
@@ -1280,18 +1315,7 @@ public class Form extends Container {
      * Default command is invoked when a user presses fire, this functionality works
      * well in some situations but might collide with elements such as navigation
      * and combo boxes. Use with caution.
-     * 
-     * @param defaultCommand the command to treat as default
-     */
-    public void setDefaultCommand(Command defaultCommand) {
-        menuBar.setDefaultCommand(defaultCommand);
-    }
-
-    /**
-     * Default command is invoked when a user presses fire, this functionality works
-     * well in some situations but might collide with elements such as navigation
-     * and combo boxes. Use with caution.
-     * 
+     *
      * @return the command to treat as default
      */
     public Command getDefaultCommand() {
@@ -1299,21 +1323,21 @@ public class Form extends Container {
     }
 
     /**
-     * Indicates the command that is defined as the clear command in this form.
-     * A clear command can be used both to map to a "clear" hardware button 
-     * if such a button exists.
-     * 
-     * @param clearCommand the command to treat as the clear Command
+     * Default command is invoked when a user presses fire, this functionality works
+     * well in some situations but might collide with elements such as navigation
+     * and combo boxes. Use with caution.
+     *
+     * @param defaultCommand the command to treat as default
      */
-    public void setClearCommand(Command clearCommand) {
-        menuBar.setClearCommand(clearCommand);
+    public void setDefaultCommand(Command defaultCommand) {
+        menuBar.setDefaultCommand(defaultCommand);
     }
 
     /**
      * Indicates the command that is defined as the clear command in this form.
-     * A clear command can be used both to map to a "clear" hardware button 
+     * A clear command can be used both to map to a "clear" hardware button
      * if such a button exists.
-     * 
+     *
      * @return the command to treat as the clear Command
      */
     public Command getClearCommand() {
@@ -1321,24 +1345,23 @@ public class Form extends Container {
     }
 
     /**
-     * Indicates the command that is defined as the back command out of this form.
-     * A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
-     * and by elements such as transitions etc. to change the behavior based on 
-     * direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
-     * 
-     * @param backCommand the command to treat as the back Command
+     * Indicates the command that is defined as the clear command in this form.
+     * A clear command can be used both to map to a "clear" hardware button
+     * if such a button exists.
+     *
+     * @param clearCommand the command to treat as the clear Command
      */
-    public void setBackCommand(Command backCommand) {
-        menuBar.setBackCommand(backCommand);
+    public void setClearCommand(Command clearCommand) {
+        menuBar.setClearCommand(clearCommand);
     }
 
     /**
      * Shorthand for {@link #setBackCommand(com.codename1.ui.Command)} that
      * dynamically creates the command using {@link com.codename1.ui.Command#create(java.lang.String, com.codename1.ui.Image, com.codename1.ui.events.ActionListener)}.
-     * 
+     *
      * @param name the name/title of the command
      * @param icon the icon for the command
-     * @param ev the even handler
+     * @param ev   the even handler
      * @return a newly created Command instance
      */
     public Command setBackCommand(String name, Image icon, ActionListener ev) {
@@ -1350,9 +1373,9 @@ public class Form extends Container {
     /**
      * Indicates the command that is defined as the back command out of this form.
      * A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
-     * and by elements such as transitions etc. to change the behavior based on 
+     * and by elements such as transitions etc. to change the behavior based on
      * direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
-     * 
+     *
      * @return the command to treat as the back Command
      */
     public Command getBackCommand() {
@@ -1360,66 +1383,57 @@ public class Form extends Container {
     }
 
     /**
-     * Sets the title after invoking the constructor
-     * 
-     * @param title the form title
+     * Indicates the command that is defined as the back command out of this form.
+     * A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
+     * and by elements such as transitions etc. to change the behavior based on
+     * direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
+     *
+     * @param backCommand the command to treat as the back Command
      */
-    public Form(String title) {
-        this();
-        setTitle(title);
-//        this.title.setText(title);
-    }
-
-    /**
-     * Sets the title after invoking the constructor
-     * 
-     * @param title the form title
-     * @param contentPaneLayout the layout for the content pane
-     */
-    public Form(String title, Layout contentPaneLayout) {
-        this(contentPaneLayout);
-        setTitle(title);
+    public void setBackCommand(Command backCommand) {
+        menuBar.setBackCommand(backCommand);
     }
 
     /**
      * This method returns the Content pane instance
-     * 
+     *
      * @return a content pane instance
      */
     public Container getContentPane() {
         return contentPane;
     }
-    
+
     /**
      * This method returns the layered pane of the Form, the layered pane is laid
      * on top of the content pane and is created lazily upon calling this method the layer
      * will be created. This is equivalent to getLayeredPane(null, false).
-     * 
+     *
      * @return the LayeredPane
-     */ 
+     */
     public Container getLayeredPane() {
         return getLayeredPane(null, false);
     }
-    
+
     /**
      * Returns the layered pane for the class and if one doesn't exist a new one is created dynamically and returned
-     * @param c the class with which this layered pane is associated, null for the global layered pane which
-     * is always on the bottom
+     *
+     * @param c   the class with which this layered pane is associated, null for the global layered pane which
+     *            is always on the bottom
      * @param top if created this indicates whether the layered pane should be added on top or bottom
      * @return the layered pane instance
      */
     public Container getLayeredPane(Class c, boolean top) {
         Container layeredPaneImpl = getLayeredPaneImpl();
-        if(c == null) {
+        if (c == null) {
             // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
             // over layeredPaneImpl because the latter won't find components while an animation
             // is in progress.... We could end up adding a whole bunch of layered panes
             // by accident
-             for(Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
-                 if(cmp.getClientProperty("cn1$_cls") == null) {
-                     return (Container)cmp;
-                 }
-             } 
+            for (Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
+                if (cmp.getClientProperty("cn1$_cls") == null) {
+                    return (Container) cmp;
+                }
+            }
         }
         String n = c.getName();
         // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
@@ -1427,18 +1441,18 @@ public class Form extends Container {
         // is in progress.... We could end up adding a whole bunch of layered panes
         // by accident
         java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
-        for(Component cmp : children) {
-            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
-                return (Container)cmp;
+        for (Component cmp : children) {
+            if (n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container) cmp;
             }
-        } 
-        
+        }
+
         Container cnt = new Container();
         int zIndex = 0;
-        int componentCount =  children.size();
-        if(top) {
+        int componentCount = children.size();
+        if (top) {
             if (componentCount > 0) {
-                Integer z = (Integer)children.get(componentCount-1).getClientProperty(Z_INDEX_PROP);
+                Integer z = (Integer) children.get(componentCount - 1).getClientProperty(Z_INDEX_PROP);
                 if (z != null) {
                     zIndex = z.intValue();
                 }
@@ -1447,41 +1461,40 @@ public class Form extends Container {
         } else {
             if (componentCount > 0) {
                 if (componentCount > 0) {
-                    Integer z = (Integer)children.get(0).getClientProperty(Z_INDEX_PROP);
+                    Integer z = (Integer) children.get(0).getClientProperty(Z_INDEX_PROP);
                     if (z != null) {
                         zIndex = z.intValue();
                     }
                 }
             }
-            layeredPaneImpl.addComponent(0, cnt);            
+            layeredPaneImpl.addComponent(0, cnt);
         }
         cnt.putClientProperty("cn1$_cls", n);
         cnt.putClientProperty(Z_INDEX_PROP, zIndex);
         return cnt;
     }
-    
-    private static final String Z_INDEX_PROP = "cn1$_zIndex";
-    
+
     /**
      * Returns the layered pane for the class and if one doesn't exist a new one is created dynamically and returned
-     * @param c the class with which this layered pane is associated, null for the global layered pane which
-     * is always on the bottom
+     *
+     * @param c      the class with which this layered pane is associated, null for the global layered pane which
+     *               is always on the bottom
      * @param zIndex if created this indicates the zIndex at which the pane is placed.  Higher z values in front of lower z values.
      * @return the layered pane instance
      */
     public Container getLayeredPane(Class c, int zIndex) {
         Container layeredPaneImpl = getLayeredPaneImpl();
-        
-        if(c == null) {
+
+        if (c == null) {
             // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
             // over layeredPaneImpl because the latter won't find components while an animation
             // is in progress.... We could end up adding a whole bunch of layered panes
             // by accident
-             for(Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
-                 if(cmp.getClientProperty("cn1$_cls") == null) {
-                     return (Container)cmp;
-                 }
-             } 
+            for (Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
+                if (cmp.getClientProperty("cn1$_cls") == null) {
+                    return (Container) cmp;
+                }
+            }
         }
         String n = c.getName();
         // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
@@ -1489,52 +1502,53 @@ public class Form extends Container {
         // is in progress.... We could end up adding a whole bunch of layered panes
         // by accident
         java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
-        for(Component cmp : children) {
-            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
-                return (Container)cmp;
+        for (Component cmp : children) {
+            if (n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container) cmp;
             }
-        } 
-        
+        }
+
         Container cnt = new Container();
         cnt.putClientProperty(Z_INDEX_PROP, zIndex);
         int len = children.size();
         int insertIndex = -1;
-        
-        for (int i=0; i<len; i++) {
+
+        for (int i = 0; i < len; i++) {
             Component cmp = children.get(i);
-            Integer cmpZIndex = (Integer)cmp.getClientProperty(Z_INDEX_PROP);
+            Integer cmpZIndex = (Integer) cmp.getClientProperty(Z_INDEX_PROP);
             int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();
             if (cmpZ >= zIndex) {
                 insertIndex = i;
                 break;
             }
         }
-        
-        if(insertIndex == -1) {
+
+        if (insertIndex == -1) {
             layeredPaneImpl.add(cnt);
         } else {
-            layeredPaneImpl.addComponent(insertIndex, cnt);            
+            layeredPaneImpl.addComponent(insertIndex, cnt);
         }
         cnt.putClientProperty("cn1$_cls", n);
         return cnt;
     }
 
     /**
-     * Returns the layered pane for the class and if one doesn't exist a new one is created 
+     * Returns the layered pane for the class and if one doesn't exist a new one is created
      * dynamically and returned. This version of the method returns a layered pane on the whole
      * form
-     * @param c the class with which this layered pane is associated, null for the global layered pane which
-     * is always on the bottom
+     *
+     * @param c   the class with which this layered pane is associated, null for the global layered pane which
+     *            is always on the bottom
      * @param top if created this indicates whether the layered pane should be added on top or bottom
      * @return the layered pane instance
      */
     public Container getFormLayeredPane(Class c, boolean top) {
-        if(formLayeredPane == null) {
+        if (formLayeredPane == null) {
             formLayeredPane = new Container(new LayeredLayout()) {
                 @Override
                 protected void paintBackground(Graphics g) {
-                    if(getComponentCount() > 0) {
-                        if(isVisible()) {
+                    if (getComponentCount() > 0) {
+                        if (isVisible()) {
                             setVisible(false);
                             Form.this.paint(g);
                             setVisible(true);
@@ -1552,76 +1566,78 @@ public class Form extends Container {
             formLayeredPane.setHeight(getHeight());
             formLayeredPane.setShouldLayout(false);
         }
-        if(c == null) {
+        if (c == null) {
             // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
             // over layeredPaneImpl because the latter won't find components while an animation
             // is in progress.... We could end up adding a whole bunch of layered panes
             // by accident
-             for(Component cmp : formLayeredPane.getChildrenAsList(true)) {
-                 if(cmp.getClientProperty("cn1$_cls") == null) {
-                     return (Container)cmp;
-                 }
-             }
-             
-             Container cnt = new Container();
-             cnt.setWidth(getWidth());
-             cnt.setHeight(getHeight());
-             cnt.setShouldLayout(false);
-             cnt.setName("FormLayer: " + c.getName());
-             formLayeredPane.add(cnt);
-             return cnt;
+            for (Component cmp : formLayeredPane.getChildrenAsList(true)) {
+                if (cmp.getClientProperty("cn1$_cls") == null) {
+                    return (Container) cmp;
+                }
+            }
+
+            Container cnt = new Container();
+            cnt.setWidth(getWidth());
+            cnt.setHeight(getHeight());
+            cnt.setShouldLayout(false);
+            cnt.setName("FormLayer: " + c.getName());
+            formLayeredPane.add(cnt);
+            return cnt;
         }
         String n = c.getName();
         // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
         // over layeredPaneImpl because the latter won't find components while an animation
         // is in progress.... We could end up adding a whole bunch of layered panes
         // by accident
-        for(Component cmp : formLayeredPane.getChildrenAsList(true)) {
-            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
-                return (Container)cmp;
+        for (Component cmp : formLayeredPane.getChildrenAsList(true)) {
+            if (n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container) cmp;
             }
-        } 
+        }
         Container cnt = new Container();
         cnt.setWidth(getWidth());
         cnt.setHeight(getHeight());
         cnt.setShouldLayout(false);
         cnt.setName("FormLayer: " + c.getName());
-        if(top) {
+        if (top) {
             formLayeredPane.add(cnt);
         } else {
-            formLayeredPane.addComponent(0, cnt);            
+            formLayeredPane.addComponent(0, cnt);
         }
         cnt.putClientProperty("cn1$_cls", n);
         return cnt;
     }
-    
+
     /**
      * Gets the layered pane of the container without trying to create it.  If {@link #getLayeredPane() }
-     * hasn't been called yet for the form, then the layered pane will be {@literal null}.  
+     * hasn't been called yet for the form, then the layered pane will be {@literal null}.
+     *
      * @return The layered pane if it's been created - or null.
      */
     protected Container getLayeredPaneIfExists() {
         return layeredPane;
     }
-    
+
     /**
      * Gets the form layered pane of the container without trying to create it.  If {@link #getFormLayeredPane(java.lang.Class, boolean)  }
-     * hasn't been called yet for the form, then the layered pane will be {@literal null}.  
+     * hasn't been called yet for the form, then the layered pane will be {@literal null}.
+     *
      * @return The layered pane if it's been created - or null.
      */
     protected Container getFormLayeredPaneIfExists() {
         return formLayeredPane;
     }
-    
+
     /**
      * This method returns the layered pane of the Form, the layered pane is laid
      * on top of the content pane and is created lazily upon calling this method the layer
      * will be created.
-     * 
+     *
      * @return the LayeredPane
-     */ 
+     */
     private Container getLayeredPaneImpl() {
-        if(layeredPane == null){
+        if (layeredPane == null) {
             layeredPane = new Container(new LayeredLayout());
             Container parent = contentPane.wrapInLayeredPane();
             // adds the global layered pane
@@ -1631,18 +1647,19 @@ public class Form extends Container {
         }
         return layeredPane;
     }
-    
-    Container getActualPane(){
-        if(layeredPane != null){
+
+    Container getActualPane() {
+        if (layeredPane != null) {
             return layeredPane.getParent();
         } else {
             return contentPane;
         }
     }
-    
+
     /**
      * Gets the actual pane, but first checks to see if the provided overlay
      * responds to events at the provided absolute x and y coordinates.
+     *
      * @param overlay
      * @param x
      * @param y
@@ -1655,40 +1672,29 @@ public class Form extends Container {
         }
         // the first part fixes https://github.com/codenameone/CodenameOne/issues/2560
         // the second part fixes a regression caused by this when we place an overlay
-        // on top of the toolbar. This happens in the Uber clone app when trying to 
+        // on top of the toolbar. This happens in the Uber clone app when trying to
         // go back from the "Where To" menu
-        if (menuBar != null && menuBar.contains(x, y) && !getToolbar().contains(x, y)) {   
+        if (menuBar != null && menuBar.contains(x, y) && !getToolbar().contains(x, y)) {
             return menuBar;
         }
         return getActualPane();
     }
-    
 
     /**
      * Removes all Components from the Content Pane
      */
     public void removeAll() {
-        contentPane.removeAll();        
+        contentPane.removeAll();
     }
 
     /**
      * Sets the background image to show behind the form
-     * 
+     *
      * @param bgImage the background image
      * @deprecated Use the style directly
      */
     public void setBgImage(Image bgImage) {
         getStyle().setBgImage(bgImage);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void setLayout(Layout layout) {
-        if(layout instanceof BorderLayout) {
-            setScrollable(false);
-        }
-        contentPane.setLayout(layout);
     }
 
     void updateIcsIconCommandBehavior() {
@@ -1707,12 +1713,13 @@ public class Form extends Container {
 
     /**
      * Stops any active editing on the form.  Closes keyboard if it is opened.
+     *
      * @param onFinish Callback to run on finish.
      */
     @Override
     public void stopEditing(Runnable onFinish) {
         Display.getInstance().stopEditing(this, onFinish);
-        
+
     }
 
     @Override
@@ -1720,24 +1727,37 @@ public class Form extends Container {
         return Display.getInstance().isTextEditing(this);
     }
 
-    
-    
-    
+    /**
+     * Returns the Form title text
+     *
+     * @return returns the form title
+     */
+    public String getTitle() {
+        if (toolbar != null) {
+            Component cmp = toolbar.getTitleComponent();
+            if (cmp instanceof Label) {
+                return ((Label) cmp).getText();
+            }
+            return null;
+        }
+        return title.getText();
+    }
+
     /**
      * Sets the Form title to the given text
-     * 
+     *
      * @param title the form title
      */
     public void setTitle(String title) {
-        if(toolbar != null){
+        if (toolbar != null) {
             toolbar.setTitle(title);
             return;
         }
-            
+
         this.title.setText(title);
 
         if (!Display.getInstance().isNativeTitle()) {
-            updateIcsIconCommandBehavior(); 
+            updateIcsIconCommandBehavior();
             if (isInitialized() && this.title.isTickerEnabled()) {
                 int b = Display.getInstance().getCommandBehavior();
                 if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
@@ -1752,36 +1772,20 @@ public class Form extends Container {
                     }
                 }
             }
-        }else{
-            if(super.contains(titleArea)){
+        } else {
+            if (super.contains(titleArea)) {
                 removeComponentFromForm(titleArea);
             }
             //if the Form is already displayed refresh the title
-            if(Display.getInstance().getCurrent() == this){
+            if (Display.getInstance().getCurrent() == this) {
                 Display.getInstance().refreshNativeTitle();
             }
         }
     }
 
     /**
-     * Returns the Form title text
-     * 
-     * @return returns the form title
-     */
-    public String getTitle() {
-        if(toolbar != null) {
-            Component cmp = toolbar.getTitleComponent();
-            if(cmp instanceof Label) {
-                return ((Label)cmp).getText();
-            }
-            return null;
-        }
-        return title.getText();
-    }
-
-    /**
      * Adds Component to the Form's Content Pane
-     * 
+     *
      * @param cmp the added param
      */
     public void addComponent(Component cmp) {
@@ -1804,7 +1808,7 @@ public class Form extends Container {
 
     /**
      * Adds Component to the Form's Content Pane
-     * 
+     *
      * @param cmp the added param
      */
     public void addComponent(int index, Component cmp) {
@@ -1827,7 +1831,7 @@ public class Form extends Container {
 
     /**
      * Removes a component from the Form's Content Pane
-     * 
+     *
      * @param cmp the component to be removed
      */
     public void removeComponent(Component cmp) {
@@ -1859,7 +1863,7 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void animateHierarchyFadeAndWait(int duration,
-        int startingOpacity) {
+                                            int startingOpacity) {
         contentPane.animateHierarchyFadeAndWait(duration, startingOpacity);
     }
 
@@ -1904,8 +1908,7 @@ public class Form extends Container {
     public void animateUnlayoutAndWait(int duration, int opacity) {
         contentPane.animateUnlayoutAndWait(duration, opacity);
     }
-    
-    
+
     final void addComponentToForm(Object constraints, Component cmp) {
         super.addComponent(constraints, cmp);
     }
@@ -1915,9 +1918,9 @@ public class Form extends Container {
     }
 
     /**
-     * Registering media component to this Form, that like to receive 
+     * Registering media component to this Form, that like to receive
      * animation events
-     * 
+     *
      * @param mediaCmp the Form media component to be registered
      */
     void registerMediaComponent(Component mediaCmp) {
@@ -1931,7 +1934,7 @@ public class Form extends Container {
 
     /**
      * Used by the implementation to prevent flickering when flushing the double buffer
-     * 
+     *
      * @return true if the form has media components within it
      */
     public final boolean hasMedia() {
@@ -1940,7 +1943,7 @@ public class Form extends Container {
 
     /**
      * Indicate that cmp would no longer like to receive animation events
-     * 
+     *
      * @param mediaCmp component that would no longer receive animation events
      */
     void deregisterMediaComponent(Component mediaCmp) {
@@ -1951,7 +1954,7 @@ public class Form extends Container {
      * The given component is interested in animating its appearance and will start
      * receiving callbacks when it is visible in the form allowing it to animate
      * its appearance. This method would not register a compnent instance more than once
-     * 
+     *
      * @param cmp component that would be animated
      */
     public void registerAnimated(Animation cmp) {
@@ -1971,7 +1974,7 @@ public class Form extends Container {
      */
     void registerAnimatedInternal(Animation cmp) {
         if (cmp instanceof Component) {
-            Component c = (Component)cmp;
+            Component c = (Component) cmp;
             if (c.internalRegisteredAnimated) {
                 return;
             }
@@ -1994,7 +1997,7 @@ public class Form extends Container {
     void deregisterAnimatedInternal(Animation cmp) {
         if (internalAnimatableComponents != null) {
             if (cmp instanceof Component) {
-                Component c = (Component)cmp;
+                Component c = (Component) cmp;
                 if (!c.internalRegisteredAnimated) {
                     return;
                 }
@@ -2006,7 +2009,7 @@ public class Form extends Container {
 
     /**
      * Indicate that cmp would no longer like to receive animation events
-     * 
+     *
      * @param cmp component that would no longer receive animation events
      */
     public void deregisterAnimated(Animation cmp) {
@@ -2030,11 +2033,11 @@ public class Form extends Container {
      * frame
      */
     void repaintAnimations() {
-        if(rippleComponent != null) {
+        if (rippleComponent != null) {
             rippleComponent.repaint();
-            if(rippleMotion == null) {
+            if (rippleMotion == null) {
                 rippleComponent = null;
-            } 
+            }
         }
         if (animatableComponents != null) {
             loopAnimations(animatableComponents, null);
@@ -2042,14 +2045,15 @@ public class Form extends Container {
         if (internalAnimatableComponents != null) {
             loopAnimations(internalAnimatableComponents, animatableComponents);
         }
-        if(animMananger != null) {
+        if (animMananger != null) {
             animMananger.updateAnimations();
         }
     }
 
     /**
-     * The form itself should 
-     * @return 
+     * The form itself should
+     *
+     * @return
      */
     @Override
     public int getSideGap() {
@@ -2063,15 +2067,13 @@ public class Form extends Container {
     @Override
     protected void paintScrollbars(Graphics g) {
         if (getParent() == null) {
-            // Don't paint scrollbars on top-level form.  
+            // Don't paint scrollbars on top-level form.
             // Let the content pane do that.
         } else {
             super.paintScrollbars(g);
         }
     }
 
-    
-    
     private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
         // we don't save size() in a varible since the animate method may deregister
         // the animation thus invalidating the size
@@ -2103,12 +2105,12 @@ public class Form extends Container {
 
     /**
      * If this method returns true the EDT won't go to sleep indefinitely
-     * 
+     *
      * @return true is form has animation; otherwise false
      */
     boolean hasAnimations() {
         return (animatableComponents != null && animatableComponents.size() > 0)
-                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0) 
+                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0)
                 || (animMananger != null && animMananger.isAnimating());
     }
 
@@ -2127,7 +2129,7 @@ public class Form extends Container {
         if (toolbar != null) {
             toolbar.refreshTheme(merge);
         }
-        
+
         super.refreshTheme(merge);
 
         if (toolbar == null) {
@@ -2152,7 +2154,7 @@ public class Form extends Container {
 
     /**
      * Exposing the background painting for the benefit of animations
-     * 
+     *
      * @param g the form graphics
      */
     public void paintBackground(Graphics g) {
@@ -2161,9 +2163,9 @@ public class Form extends Container {
 
     /**
      * This property allows us to define a an animation that will draw the transition for
-     * entering this form. A transition is an animation that would occur when 
+     * entering this form. A transition is an animation that would occur when
      * switching from one form to another.
-     * 
+     *
      * @return the Form in transition
      */
     public Transition getTransitionInAnimator() {
@@ -2172,9 +2174,9 @@ public class Form extends Container {
 
     /**
      * This property allows us to define a an animation that will draw the transition for
-     * entering this form. A transition is an animation that would occur when 
+     * entering this form. A transition is an animation that would occur when
      * switching from one form to another.
-     * 
+     *
      * @param transitionInAnimator the Form in transition
      */
     public void setTransitionInAnimator(Transition transitionInAnimator) {
@@ -2183,9 +2185,9 @@ public class Form extends Container {
 
     /**
      * This property allows us to define a an animation that will draw the transition for
-     * exiting this form. A transition is an animation that would occur when 
+     * exiting this form. A transition is an animation that would occur when
      * switching from one form to another.
-     * 
+     *
      * @return the Form out transition
      */
     public Transition getTransitionOutAnimator() {
@@ -2194,9 +2196,9 @@ public class Form extends Container {
 
     /**
      * This property allows us to define a an animation that will draw the transition for
-     * exiting this form. A transition is an animation that would occur when 
+     * exiting this form. A transition is an animation that would occur when
      * switching from one form to another.
-     * 
+     *
      * @param transitionOutAnimator the Form out transition
      */
     public void setTransitionOutAnimator(Transition transitionOutAnimator) {
@@ -2228,9 +2230,9 @@ public class Form extends Container {
 
     /**
      * Invoked to allow subclasses of form to handle a command from one point
-     * rather than implementing many command instances. All commands selected 
+     * rather than implementing many command instances. All commands selected
      * on the form will trigger this method implicitly.
-     * 
+     *
      * @param cmd the form commmand object
      */
     protected void actionCommand(Command cmd) {
@@ -2238,9 +2240,9 @@ public class Form extends Container {
 
     /**
      * Dispatches a command via the standard form mechanism of firing a command event
-     * 
+     *
      * @param cmd The command to dispatch
-     * @param ev the event to dispatch 
+     * @param ev  the event to dispatch
      */
     public void dispatchCommand(Command cmd, ActionEvent ev) {
         cmd.actionPerformed(ev);
@@ -2254,7 +2256,7 @@ public class Form extends Container {
      * rather than implementing many command instances
      */
     void actionCommandImpl(Command cmd) {
-        actionCommandImpl(cmd, new ActionEvent(cmd,ActionEvent.Type.Command));
+        actionCommandImpl(cmd, new ActionEvent(cmd, ActionEvent.Type.Command));
     }
 
     /**
@@ -2317,13 +2319,13 @@ public class Form extends Container {
                 }
             }
             actionCommand(cmd);
-        } 
+        }
     }
 
     void initFocused() {
         if (focused == null) {
-            Component focusable = formLayeredPane != null ? 
-                    formLayeredPane.findFirstFocusable() : 
+            Component focusable = formLayeredPane != null ?
+                    formLayeredPane.findFirstFocusable() :
                     null;
             if (focusable == null) {
                 focusable = getActualPane().findFirstFocusable();
@@ -2368,7 +2370,7 @@ public class Form extends Container {
             revalidateWithAnimationSafety();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -2376,8 +2378,8 @@ public class Form extends Container {
         if (!comboLock) {
             // Some input devices are compound widgets that contain
             // comboboxes.  If those comboboxes are selected, then
-            // it shows the combobox popup (which is a Dialog) which will 
-            // denitialize the form.  We don't want this to trigger the 
+            // it shows the combobox popup (which is a Dialog) which will
+            // denitialize the form.  We don't want this to trigger the
             // input device change (which may close the input device).
             // Specifically this is to fix an issue with the Calendar picker
             // https://groups.google.com/d/msgid/codenameone-discussions/b8e198a4-3dd1-4feb-81a1-456188e81d92%40googlegroups.com?utm_medium=email&utm_source=footer
@@ -2400,10 +2402,6 @@ public class Form extends Container {
         dragged = null;
     }
 
-    void setPreviousForm(Form previousForm) {
-        this.previousForm = previousForm;
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -2418,25 +2416,25 @@ public class Form extends Container {
             if (f != null) {
                 f.registerAnimated(this);
                 if (pointerPressedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>)pointerPressedListeners.getListenerCollection()) {
+                    for (ActionListener l : (Collection<ActionListener>) pointerPressedListeners.getListenerCollection()) {
                         f.addPointerPressedListener(l);
                     }
                     pointerPressedListeners = null;
                 }
                 if (pointerDraggedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>)pointerDraggedListeners.getListenerCollection()) {
+                    for (ActionListener l : (Collection<ActionListener>) pointerDraggedListeners.getListenerCollection()) {
                         f.addPointerDraggedListener(l);
                     }
                     pointerDraggedListeners = null;
                 }
                 if (pointerReleasedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>)pointerReleasedListeners.getListenerCollection()) {
+                    for (ActionListener l : (Collection<ActionListener>) pointerReleasedListeners.getListenerCollection()) {
                         f.addPointerReleasedListener(l);
                     }
                     pointerReleasedListeners = null;
                 }
                 if (longPressListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>)longPressListeners.getListenerCollection()) {
+                    for (ActionListener l : (Collection<ActionListener>) longPressListeners.getListenerCollection()) {
                         f.addLongPressListener(l);
                     }
                     longPressListeners = null;
@@ -2448,18 +2446,18 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
-    public void setSmoothScrolling(boolean smoothScrolling) {
-        // invoked by the constructor for component
-        if (contentPane != null) {
-            contentPane.setSmoothScrolling(smoothScrolling);
-        }
+    public boolean isSmoothScrolling() {
+        return contentPane.isSmoothScrolling();
     }
 
     /**
      * {@inheritDoc}
      */
-    public boolean isSmoothScrolling() {
-        return contentPane.isSmoothScrolling();
+    public void setSmoothScrolling(boolean smoothScrolling) {
+        // invoked by the constructor for component
+        if (contentPane != null) {
+            contentPane.setSmoothScrolling(smoothScrolling);
+        }
     }
 
     /**
@@ -2497,9 +2495,9 @@ public class Form extends Container {
         setLightweightMode(false);
         onShowCompleted();
         if (showListener != null) {
-            showListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Show));
+            showListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Show));
         }
-        if(editOnShow != null) {
+        if (editOnShow != null) {
             editOnShow.startEditingAsync();
         }
     }
@@ -2510,16 +2508,16 @@ public class Form extends Container {
      * calling thread is the EDT. Notice that this method will not release the block
      * until dispose is called even if show() from another form is called!
      * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
-     * dialogs where you would want the underlying form to "peek" from behind the 
-     * form. 
-     * 
-     * @param top space in pixels between the top of the screen and the form
-     * @param bottom space in pixels between the bottom of the screen and the form
-     * @param left space in pixels between the left of the screen and the form
-     * @param right space in pixels between the right of the screen and the form
+     * dialogs where you would want the underlying form to "peek" from behind the
+     * form.
+     *
+     * @param top          space in pixels between the top of the screen and the form
+     * @param bottom       space in pixels between the bottom of the screen and the form
+     * @param left         space in pixels between the left of the screen and the form
+     * @param right        space in pixels between the right of the screen and the form
      * @param includeTitle whether the title should hang in the top of the screen or
-     * be glued onto the content pane
-     * @param modal indictes if this is a modal or modeless dialog true for modal dialogs
+     *                     be glued onto the content pane
+     * @param modal        indictes if this is a modal or modeless dialog true for modal dialogs
      */
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
         Display.getInstance().flushEdt();
@@ -2547,10 +2545,10 @@ public class Form extends Container {
             }
             Style titleStyle = title.getStyle();
             titleStyle.removeListeners();
-            
+
             Style contentStyle = contentPane.getUnselectedStyle();
             contentStyle.removeListeners();
-            
+
             if (includeTitle) {
                 titleStyle.setMargin(Component.TOP, top, false);
                 titleStyle.setMargin(Component.BOTTOM, 0, false);
@@ -2594,7 +2592,7 @@ public class Form extends Container {
         onShow();
 
         if (modal) {
-            // called to display a dialog and wait for modality  
+            // called to display a dialog and wait for modality
             Display.getInstance().invokeAndBlock(new RunnableWrapper(this, p, reverse));
             // if the virtual keyboard was opend by the dialog close it
             Display.getInstance().setShowVirtualKeyboard(false);
@@ -2603,6 +2601,7 @@ public class Form extends Container {
 
     /**
      * Allows Dialog to override background painting for blur
+     *
      * @param p the painter
      */
     void initDialogBgPainter(Painter p, Form previousForm) {
@@ -2675,7 +2674,7 @@ public class Form extends Container {
                 //previousForm.revalidate();
             }
 
-            if(clearPrevious) {
+            if (clearPrevious) {
                 // enable GC to cleanup the previous form if no longer referenced
                 previousForm = null;
             }
@@ -2719,10 +2718,10 @@ public class Form extends Container {
         }
         return this;
     }
-    
+
     /**
      * Invoked by display to hide the menu during transition
-     * 
+     *
      * @see {@link #restoreMenu()}
      */
     void hideMenu() {
@@ -2731,7 +2730,7 @@ public class Form extends Container {
 
     /**
      * Invoked by display to restore the menu after transition
-     * 
+     *
      * @see {@link #hideMenu()}
      */
     void restoreMenu() {
@@ -2743,55 +2742,20 @@ public class Form extends Container {
     }
 
     /**
-     * Sets the focused component and fires the appropriate events to make it so
-     * 
-     * @param focused the newly focused component or null for no focus
-     */
-    public void setFocused(Component focused) {
-        if (this.focused == focused && focused != null) {
-            this.focused.repaint();
-            return;
-        }
-        Component oldFocus = this.focused;
-        this.focused = focused;
-        boolean triggerRevalidate = false;
-        if (oldFocus != null) {
-            triggerRevalidate = changeFocusState(oldFocus, false);
-            //if we need to revalidate no need to repaint the Component, it will
-            //be painted from the Form
-            if (!triggerRevalidate && oldFocus.getParent() != null) {
-                oldFocus.repaint();
-            }
-        }
-        // a listener might trigger a focus change event essentially
-        // invalidating focus so we shouldn't break that 
-        if (focused != null && this.focused == focused) {
-            triggerRevalidate = changeFocusState(focused, true) || triggerRevalidate;
-            //if we need to revalidate no need to repaint the Component, it will
-            //be painted from the Form
-            if (!triggerRevalidate) {
-                focused.repaint();
-            }
-        }
-        if (triggerRevalidate) {
-            revalidateLater();
-        }
-    }
-
-    /**
-     * This method changes the cmp state to be focused/unfocused and fires the 
-     * focus gained/lost events. 
-     * @param cmp the Component to change the focus state
+     * This method changes the cmp state to be focused/unfocused and fires the
+     * focus gained/lost events.
+     *
+     * @param cmp    the Component to change the focus state
      * @param gained if true this Component needs to gain focus if false
-     * it needs to lose focus
-     * @return this method returns true if the state change needs to trigger a 
+     *               it needs to lose focus
+     * @return this method returns true if the state change needs to trigger a
      * revalidate
      */
     private boolean changeFocusState(Component cmp, boolean gained) {
         boolean trigger = false;
         Style selected = cmp.getSelectedStyle();
         Style unselected = cmp.getUnselectedStyle();
-        //if selected style is different then unselected style there is a good 
+        //if selected style is different then unselected style there is a good
         //chance we need to trigger a revalidate
         if (!selected.getFont().equals(unselected.getFont())
                 || selected.getPaddingTop() != unselected.getPaddingTop()
@@ -2822,8 +2786,8 @@ public class Form extends Container {
             fireFocusLost(cmp);
         }
 
-        //if the styles are different there is a chance the preffered size is 
-        //still the same therefore make sure there is a real need to preform 
+        //if the styles are different there is a chance the preffered size is
+        //still the same therefore make sure there is a real need to preform
         //a revalidate
         if (trigger) {
             cmp.setShouldCalcPreferredSize(true);
@@ -2839,11 +2803,47 @@ public class Form extends Container {
 
     /**
      * Returns the current focus component for this form
-     * 
+     *
      * @return the current focus component for this form
      */
     public Component getFocused() {
         return focused;
+    }
+
+    /**
+     * Sets the focused component and fires the appropriate events to make it so
+     *
+     * @param focused the newly focused component or null for no focus
+     */
+    public void setFocused(Component focused) {
+        if (this.focused == focused && focused != null) {
+            this.focused.repaint();
+            return;
+        }
+        Component oldFocus = this.focused;
+        this.focused = focused;
+        boolean triggerRevalidate = false;
+        if (oldFocus != null) {
+            triggerRevalidate = changeFocusState(oldFocus, false);
+            //if we need to revalidate no need to repaint the Component, it will
+            //be painted from the Form
+            if (!triggerRevalidate && oldFocus.getParent() != null) {
+                oldFocus.repaint();
+            }
+        }
+        // a listener might trigger a focus change event essentially
+        // invalidating focus so we shouldn't break that
+        if (focused != null && this.focused == focused) {
+            triggerRevalidate = changeFocusState(focused, true) || triggerRevalidate;
+            //if we need to revalidate no need to repaint the Component, it will
+            //be painted from the Form
+            if (!triggerRevalidate) {
+                focused.repaint();
+            }
+        }
+        if (triggerRevalidate) {
+            revalidateLater();
+        }
     }
 
     /**
@@ -2864,14 +2864,14 @@ public class Form extends Container {
         if (longPressListeners != null && longPressListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
             longPressListeners.fireActionEvent(ev);
-            if(ev.isConsumed()) {
+            if (ev.isConsumed()) {
                 return;
             }
         }
         if (focused != null && focused.contains(x, y)) {
             if (focused.getComponentForm() == this) {
                 LeadUtil.longPointerPress(focused, x, y);
-                
+
             }
         }
     }
@@ -2879,247 +2879,49 @@ public class Form extends Container {
     /**
      * Indicates whether this form wants to receive pointerReleased events for touch
      * events that started in a different form
+     *
      * @return false by default
      */
     protected boolean shouldSendPointerReleaseToOtherForm() {
         return false;
     }
-    
+
     /**
      * Gets the next component in focus traversal order.  This will return the {@link Component#getNextFocusRight() }
-     * if it is set.  If not, it will return {@link Component#getNextFocusDown() } if it is set.  If not, it will 
+     * if it is set.  If not, it will return {@link Component#getNextFocusDown() } if it is set.  If not, it will
      * return the next component according to the traversal order.
+     *
      * @param current The current component.
      * @return The next component in the focus traversal order.
      */
     public Component getNextComponent(Component current) {
         return getTabIterator(current).getNext();
     }
-    
+
     /**
      * Gets the previous component in focus traversal order.  This will return the {@link Component#getNextFocusLeft() }
-     * if it is set.  If not, it will return {@link Component#getNextFocusUp() } if it is set.  If not, it will 
+     * if it is set.  If not, it will return {@link Component#getNextFocusUp() } if it is set.  If not, it will
      * return the previous component according to the traversal order defined by {@link Form#getTabIterator(com.codename1.ui.Component) }.
+     *
      * @param current The current component.
      * @return The previous component in the traversal order.
      */
     public Component getPreviousComponent(Component current) {
         return getTabIterator(current).getPrevious();
     }
-    
-    /**
-     * Iterates through the components on this form in traversal order.  
-     * @see #getTabIterator(com.codename1.ui.Component) 
-     */
-    public class TabIterator implements ListIterator<Component> {
-        private java.util.List<Component> components;
-        private int currPos;
-        private Component current;
-        
-        private TabIterator(java.util.List<Component> components, Component current) {
-            this.components = components;
-            setCurrent(current);
-        }
-        
-        /**
-         * Gets the current component in this iterator.
-         * @return 
-         */
-        public Component getCurrent() {
-            return current;
-        }
-        
-        /**
-         * Gets the next component in this iterator.  If the current component explicitly specifies
-         * a nextFocusRight or nextFocusDown component, then that component will be returned.
-         * Otherwise it will follow the tab index order.
-         * @return The next component to be traversed after {@link #getCurrent() }
-         */
-        public Component getNext() {
-            Component current = getCurrent();
-            if (current == null && components.isEmpty()) {
-                return null;
-            }
-            
-            Component next = current != null ? current.getNextFocusRight() : null;
-            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
-                return next;
-            }
-            next = current != null ? current.getNextFocusDown() : null;
-            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
-                return next;
-            }
-            if (currPos < 0 && !components.isEmpty()) {
-                return components.get(0);
-            }
-            if (currPos < components.size()-1) {
-                return components.get(currPos+1);
-            }
-            return null;
-        }
-        
-        /**
-         * Gets the previous component that should be traversed when going "back" in through the
-         * form components.  If the current component has a nextFocusLeft or nextFocusUp field
-         * explicitly specified, then it will return that.  Otherwise it just follows the traversal 
-         * order using the tab index.
-         * @return The previous component according to traversal order.
-         */
-        public Component getPrevious() {
-            Component current = getCurrent();
-            if (current == null && components.isEmpty()) {
-                return null;
-            }
-            Component prev = current != null ? current.getNextFocusLeft() : null;
-            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
-                return prev;
-            }
-            prev = current != null ? current.getNextFocusUp() : null;
-            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
-                return prev;
-            }
-            if (currPos < 0 && !components.isEmpty()) {
-                // Negative current position means that we pick the last 
-                // component on the form.
-                return components.get(components.size()-1);
-            }
-            if (currPos > 0 && currPos <= components.size()) {
-                return components.get(currPos-1);
-            }
-            return null;
-        }
-        
-        /**
-         * Sets the current component in the iterator.  This reposition the iterator
-         * to the given component.
-         * @param cmp The component to set as the current component.
-         */
-        public void setCurrent(Component cmp) {
-            current = cmp;
-            
-            currPos = cmp != null ? components.indexOf(cmp) : -1;
-        }
-        
-        /**
-         * Checks to see if there is a "next" component to traverse focus to in this iterator.
-         * @return True if there is a "next" component in this iterator.
-         */
-        public boolean hasNext() {
-            return getNext() != null;
-        }
 
-        /**
-         * Returns the next component in this iterator, and repositions the iterator at this component.
-         * 
-         * @return The "next" component in the iterator.
-         */
-
-        public Component next() {
-            Component next = getNext();
-            setCurrent(next);
-            return next;
-        }
-
-        /**
-         * Checks if this iterator has a "previous" component.
-         * @return 
-         */
-
-        public boolean hasPrevious() {
-            return getPrevious() != null;
-        }
-
-        /**
-         * Returns the previous component in this iterator, and repositions the iterator at this component.
-         * @return 
-         */
-
-        public Component previous() {
-            Component prev = getPrevious();
-            setCurrent(prev);
-            return prev;
-        }
-
-        /**
-         * Gets the index within the iterator of the next component.
-         * @return 
-         */
-
-        public int nextIndex() {
-            Component next = getNext();
-            if (next == null) {
-                return -1;
-            }
-            return components.indexOf(next);
-        }
-
-        /**
-         * Gets the index within the iterator of the previous component.
-         * @return 
-         */
-
-        public int previousIndex() {
-            Component prev = getPrevious();
-            if (prev == null) {
-                return -1;
-            }
-            return components.indexOf(prev);
-        }
-
-        /**
-         * Removes the current component from the iterator, and repositions the iterator to the previous 
-         * component, or the next component (if previous doesn't exist).
-         */
-
-        public void remove() {
-            Component newCurr = getPrevious();
-            if (newCurr == null) {
-                newCurr = getNext();
-            }
-            if (current != null) {
-                components.remove(current);
-                setCurrent(newCurr);
-            }
-            
-        }
-
-        /**
-         * Replaces the current component, in the iterator, with the provided component.
-         * This will not actually replace the component in the form's hierarchy.  Just within
-         * the iterator.
-         * @param e The component to set as the current component.
-         */
-
-        public void set(Component e) {
-            if (currPos >= 0 && currPos < components.size()-1) {
-                components.set(currPos, e);
-                setCurrent(e);
-            }
-        }
-
-        /**
-         * Adds a component to the end of the iterator.
-         * @param e The component to add to the iterator.
-         */
-
-        public void add(Component e) {
-            components.add(e);
-        }
-        
-    }
-    
     /**
      * Returns an iterator that iterates over all of the components in this form, ordered
-     * by their tab index. 
+     * by their tab index.
+     *
      * @param start The start position.  The iterator will automatically initialized such that {@link ListIterator#next() }
-     * will return the next component in the traversal order, and the {@link ListIterator#previous() } returns the previous
-     * component in traversal order.
+     *              will return the next component in the traversal order, and the {@link ListIterator#previous() } returns the previous
+     *              component in traversal order.
      * @return An iterator for the traversal order of the components in this form.
-     * 
-     * @see #getNextComponent(com.codename1.ui.Component) 
-     * @see #getPreviousComponent(com.codename1.ui.Component) 
-     * @see Component#getPreferredTabIndex() 
-     * @see Component#setPreferredTabIndex(int) 
+     * @see #getNextComponent(com.codename1.ui.Component)
+     * @see #getPreviousComponent(com.codename1.ui.Component)
+     * @see Component#getPreferredTabIndex()
+     * @see Component#setPreferredTabIndex(int)
      */
     public TabIterator getTabIterator(Component start) {
         updateTabIndices(0);
@@ -3130,7 +2932,7 @@ public class Form extends Container {
             public boolean filter(Component c) {
                 return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
             }
-            
+
         }));
         Collections.sort(out, new Comparator<Component>() {
 
@@ -3138,17 +2940,14 @@ public class Form extends Container {
             public int compare(Component o1, Component o2) {
                 return o1.getTabIndex() < o2.getTabIndex() ? -1 :
                         o2.getTabIndex() < o1.getTabIndex() ? 1 :
-                        0;
+                                0;
             }
-            
+
         });
-        
+
         return new TabIterator(out, start);
     }
-    
-    
-    
-    
+
     /**
      * {@inheritDoc}
      */
@@ -3189,6 +2988,7 @@ public class Form extends Container {
 
     /**
      * Returns the layout manager of the form's content pane.
+     *
      * @see #getActualLayout() For the actual layout of the form.
      */
     public Layout getLayout() {
@@ -3196,7 +2996,18 @@ public class Form extends Container {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public void setLayout(Layout layout) {
+        if (layout instanceof BorderLayout) {
+            setScrollable(false);
+        }
+        contentPane.setLayout(layout);
+    }
+
+    /**
      * When set to true the physical back button will minimize the application
+     *
      * @return the minimizeOnBack
      */
     public boolean isMinimizeOnBack() {
@@ -3205,6 +3016,7 @@ public class Form extends Container {
 
     /**
      * When set to true the physical back button will minimize the application
+     *
      * @param minimizeOnBack the minimizeOnBack to set
      */
     public void setMinimizeOnBack(boolean minimizeOnBack) {
@@ -3278,9 +3090,9 @@ public class Form extends Container {
             keyReleased(keyCode);
         }
     }
-    
+
     private void initRippleEffect(int x, int y, Component cmp) {
-        if(cmp.isRippleEffect()) {
+        if (cmp.isRippleEffect()) {
             rippleMotion = Motion.createEaseInMotion(0, 1000, 800);
             rippleMotion.start();
             rippleComponent = cmp;
@@ -3294,8 +3106,6 @@ public class Form extends Container {
             Display.getInstance().vibrate(tactileTouchDuration);
         }
     }
-    
-    
 
     //https://github.com/codenameone/CodenameOne/issues/2352
     private void cancelScrolling(Component cmp) {
@@ -3304,18 +3114,18 @@ public class Form extends Container {
         //gesture that should be stopped
         while (parent != null) {
             if (parent.draggedMotionX != null || parent.draggedMotionY != null) {
-            	parent.draggedMotionX = null;
-            	parent.draggedMotionY = null;
+                parent.draggedMotionX = null;
+                parent.draggedMotionY = null;
             }
             parent = parent.getParent();
         }
     }
 
-    private boolean pointerPressedAgainDuringDrag;
     /**
-     * This method fixes <a href="https://github.com/codenameone/CodenameOne/issues/2352">this tensile drag issue</a>. 
+     * This method fixes <a href="https://github.com/codenameone/CodenameOne/issues/2352">this tensile drag issue</a>.
      * However, this might be undesireable in some cases and so this method
      * can be overriden to return false in some cases.
+     *
      * @param x the x position of a pointer press operation
      * @param y the y position of a pointer press operation
      * @return true if drag should be resumed and false otherwise
@@ -3327,44 +3137,40 @@ public class Form extends Container {
         }
         if (cmp != null) {
             cmp = LeadUtil.leadParentImpl(cmp);
-            
+
             if (isCurrentlyScrolling(cmp)) {
                 cancelScrolling(cmp);
                 cmp.initDragAndDrop(x, y);
-                Display.getInstance().pointerDragged(new int[] {x}, new int[] {y});
+                Display.getInstance().pointerDragged(new int[]{x}, new int[]{y});
                 return true;
             }
         }
         return false;
     }
 
-    private Component pressedCmp;
-    private Rectangle pressedCmpAbsBounds=new Rectangle();
-    
     private void setPressedCmp(Component cmp) {
         cmp = LeadUtil.leadParentImpl(cmp);
         pressedCmp = cmp;
         if (cmp == null) {
-            pressedCmpAbsBounds.setBounds(0,0,0,0);
+            pressedCmpAbsBounds.setBounds(0, 0, 0, 0);
         } else {
             pressedCmpAbsBounds.setBounds(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
         }
-        
+
     }
-    
-    private Object currentPointerPress;
-    
+
     /**
      * Gets the handle for the current pointer press event.  A new object
      * is generated for each pointer press.
-     * @return 
+     *
+     * @return
      * @since 7.0
      */
     Object getCurrentPointerPress() {
         return currentPointerPress;
     }
-    
-    
+
+
     /**
      * {@inheritDoc}
      */
@@ -3375,8 +3181,8 @@ public class Form extends Container {
             pointerPressedAgainDuringDrag = true;
             return;
         }
-        
-        
+
+
         setPressedCmp(null);
         stickyDrag = null;
         dragStopFlag = false;
@@ -3385,7 +3191,7 @@ public class Form extends Container {
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
             pointerPressedListeners.fireActionEvent(e);
-            if(e.isConsumed()) {
+            if (e.isConsumed()) {
                 return;
             }
         }
@@ -3411,8 +3217,8 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                
-                
+
+
                 cmp = LeadUtil.leadParentImpl(cmp);
                 cmp.initDragAndDrop(x, y);
                 if (!cmp.isDragAndDropInitialized()) {
@@ -3429,7 +3235,7 @@ public class Form extends Container {
                     cmp.clearDrag();
                     return;
                 }
-                
+
                 if (cmp.isEnabled()) {
                     if (!isScrollWheeling && cmp.isFocusable()) {
                         setFocused(cmp);
@@ -3440,46 +3246,46 @@ public class Form extends Container {
                     tactileTouchVibe(x, y, cmp);
                     initRippleEffect(x, y, cmp);
                 }
-                
+
             }
         } else {
-            if(y < actual.getY()) {
+            if (y < actual.getY()) {
                 Component cmp = getTitleArea().getComponentAt(x, y);
                 while (cmp != null && cmp.isIgnorePointerEvents()) {
                     cmp = cmp.getParent();
                 }
                 if (cmp != null) {
-                    
+
                     cmp = LeadUtil.leadParentImpl(cmp);
                     setPressedCmp(cmp);
                     LeadUtil.pointerPressed(cmp, x, y);
-                    
+
                     tactileTouchVibe(x, y, cmp);
                     initRippleEffect(x, y, cmp);
-                }   
+                }
             } else {
-                Component cmp = ((BorderLayout)super.getLayout()).getWest();
-                if(cmp != null) {
-                    cmp = ((Container)cmp).getComponentAt(x, y);
+                Component cmp = ((BorderLayout) super.getLayout()).getWest();
+                if (cmp != null) {
+                    cmp = ((Container) cmp).getComponentAt(x, y);
                     while (cmp != null && cmp.isIgnorePointerEvents()) {
                         cmp = cmp.getParent();
                     }
-                    if (cmp != null ) {
+                    if (cmp != null) {
                         cmp = LeadUtil.leadParentImpl(cmp);
                         cmp.initDragAndDrop(x, y);
-                        
+
                         setPressedCmp(cmp);
                         LeadUtil.pointerPressed(cmp, x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
-                    }   
+                    }
                 }
             }
         }
         initialPressX = x;
         initialPressY = y;
     }
-    
+
     private boolean isCurrentlyScrolling(Component cmp) {
         Container parent = cmp.getParent();
         //loop over the parents to check if there is a scrolling 
@@ -3492,30 +3298,30 @@ public class Form extends Container {
         }
         return false;
     }
-    
-    
+
+
     public <C extends Component> void addComponentAwaitingRelease(C c) {
-      if(componentsAwaitingRelease == null) {
-	      componentsAwaitingRelease = new ArrayList<Component>();
-	  }
-	  componentsAwaitingRelease.add(c);
+        if (componentsAwaitingRelease == null) {
+            componentsAwaitingRelease = new ArrayList<Component>();
+        }
+        componentsAwaitingRelease.add(c);
     }
 
     public <C extends Component> void removeComponentAwaitingRelease(C c) {
-    	 if(componentsAwaitingRelease != null) {
-             componentsAwaitingRelease.remove(c);
-         }
+        if (componentsAwaitingRelease != null) {
+            componentsAwaitingRelease.remove(c);
+        }
     }
 
     public void clearComponentsAwaitingRelease() {
-    	if (componentsAwaitingRelease != null) {
-    		componentsAwaitingRelease.clear(); //componentsAwatingRelease = null;  //can be set to null or cleared, would be the same. clear may save some unnecessary GC operations when some releasable components are pressed multiple times
-    	}
+        if (componentsAwaitingRelease != null) {
+            componentsAwaitingRelease.clear(); //componentsAwatingRelease = null;  //can be set to null or cleared, would be the same. clear may save some unnecessary GC operations when some releasable components are pressed multiple times
+        }
     }
-   
-    
+
+
     private void autoRelease(int x, int y) {
-        if(componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
+        if (componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
             if (atXY != null) {
@@ -3528,18 +3334,18 @@ public class Form extends Container {
             Component pendingCLead = LeadUtil.leadComponentImpl(pendingC);
             if (atXY != pendingC) {
                 if (pendingCLead instanceof ReleasableComponent) {
-                    ReleasableComponent rc = (ReleasableComponent)pendingCLead;
+                    ReleasableComponent rc = (ReleasableComponent) pendingCLead;
                     int relRadius = rc.getReleaseRadius();
                     if (relRadius > 0) {
                         Rectangle r = new Rectangle(
-                                pendingC.getAbsoluteX() - relRadius, 
-                                pendingC.getAbsoluteY() - relRadius, 
-                                pendingC.getWidth() + relRadius * 2, 
+                                pendingC.getAbsoluteX() - relRadius,
+                                pendingC.getAbsoluteY() - relRadius,
+                                pendingC.getWidth() + relRadius * 2,
                                 pendingC.getHeight() + relRadius * 2
                         );
                         if (!r.contains(x, y)) {
-                             componentsAwaitingRelease = null;
-                             LeadUtil.dragInitiated(pendingC);
+                            componentsAwaitingRelease = null;
+                            LeadUtil.dragInitiated(pendingC);
                         }
                         return;
                     }
@@ -3547,19 +3353,19 @@ public class Form extends Container {
                     LeadUtil.dragInitiated(pendingC);
                 }
             } else if (pendingCLead instanceof ReleasableComponent && ((ReleasableComponent) pendingCLead).isAutoRelease()) {
-            	componentsAwaitingRelease = null;
-            	LeadUtil.dragInitiated(pendingC);
+                componentsAwaitingRelease = null;
+                LeadUtil.dragInitiated(pendingC);
             }
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
-        if(dragStopFlag) {
+        if (dragStopFlag) {
             pointerPressed(x, y);
         }
         autoRelease(x, y);
@@ -3569,13 +3375,13 @@ public class Form extends Container {
             ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
             av.setPointerPressedDuringDrag(localPointerPressedAgainDuringDrag);
             pointerDraggedListeners.fireActionEvent(av);
-            if(av.isConsumed()) {
+            if (av.isConsumed()) {
                 return;
             }
         }
 
         rippleMotion = null;
-        
+
         if (dragged != null) {
             LeadUtil.pointerDragged(dragged, x, y);
             return;
@@ -3584,26 +3390,26 @@ public class Form extends Container {
         if (pressedCmp != null && pressedCmp.isStickyDrag()) {
             stickyDrag = pressedCmp;
         }
-        
-        if(stickyDrag != null) {
+
+        if (stickyDrag != null) {
             LeadUtil.pointerDragged(stickyDrag, x, y);
             repaint();
             return;
         }
         Container actual = getActualPane(formLayeredPane, x, y);
-        if(x < actual.getX()) {
+        if (x < actual.getX()) {
             // special case for sidemenu
-            Component cmp = ((BorderLayout)super.getLayout()).getWest();
-            if(cmp != null) {
-                cmp = ((Container)cmp).getComponentAt(x, y);
+            Component cmp = ((BorderLayout) super.getLayout()).getWest();
+            if (cmp != null) {
+                cmp = ((Container) cmp).getComponentAt(x, y);
                 while (cmp != null && cmp.isIgnorePointerEvents()) {
                     cmp = cmp.getParent();
                 }
-                
+
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if(cmp == pressedCmp && cmp.isStickyDrag()) {
+                    if (cmp == pressedCmp && cmp.isStickyDrag()) {
                         stickyDrag = cmp;
                     }
                 }
@@ -3619,10 +3425,10 @@ public class Form extends Container {
                 setFocused(cmp);
             }
             cmp = LeadUtil.leadParentImpl(cmp);
-            
+
             LeadUtil.pointerDragged(cmp, x, y);
-            
-            if(cmp == pressedCmp && cmp.isStickyDrag()) {
+
+            if (cmp == pressedCmp && cmp.isStickyDrag()) {
                 stickyDrag = cmp;
             }
         }
@@ -3632,16 +3438,16 @@ public class Form extends Container {
     public void pointerDragged(int[] x, int[] y) {
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
-        if(dragStopFlag) {
+        if (dragStopFlag) {
             pointerPressed(x, y);
         }
         autoRelease(x[0], y[0]);
         boolean localPointerPressedAgainDuringDrag = pointerPressedAgainDuringDrag;
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]);
+            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag, x[0], y[0]);
             av.setPointerPressedDuringDrag(localPointerPressedAgainDuringDrag);
             pointerDraggedListeners.fireActionEvent(av);
-            if(av.isConsumed()) {
+            if (av.isConsumed()) {
                 return;
             }
         }
@@ -3655,24 +3461,24 @@ public class Form extends Container {
         if (pressedCmp != null && pressedCmp.isStickyDrag()) {
             stickyDrag = pressedCmp;
         }
-        if(stickyDrag != null) {
+        if (stickyDrag != null) {
             LeadUtil.pointerDragged(stickyDrag, x, y);
             repaint();
             return;
         }
         Container actual = getActualPane(formLayeredPane, x[0], y[0]);
-        if(x[0] < actual.getX()) {
+        if (x[0] < actual.getX()) {
             // special case for sidemenu
-            Component cmp = ((BorderLayout)super.getLayout()).getWest();
-            if(cmp != null) {
-                cmp = ((Container)cmp).getComponentAt(x[0], y[0]);
+            Component cmp = ((BorderLayout) super.getLayout()).getWest();
+            if (cmp != null) {
+                cmp = ((Container) cmp).getComponentAt(x[0], y[0]);
                 while (cmp != null && cmp.isIgnorePointerEvents()) {
                     cmp = cmp.getParent();
                 }
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if(cmp == pressedCmp && cmp.isStickyDrag()) {
+                    if (cmp == pressedCmp && cmp.isStickyDrag()) {
                         stickyDrag = cmp;
                     }
                 }
@@ -3685,20 +3491,19 @@ public class Form extends Container {
         }
         if (cmp != null) {
             cmp = LeadUtil.leadParentImpl(cmp);
-            
-            
+
+
             if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
             LeadUtil.pointerDragged(cmp, x, y);
 
-            if(cmp == pressedCmp && cmp.isStickyDrag()) {
+            if (cmp == pressedCmp && cmp.isStickyDrag()) {
                 stickyDrag = cmp;
             }
         }
     }
-    
-    
+
 
     /**
      * {@inheritDoc}
@@ -3727,7 +3532,7 @@ public class Form extends Container {
      */
     public void pointerHoverPressed(int[] x, int[] y) {
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
-        
+
         Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         Component cmp = actual.getComponentAt(x[0], y[0]);
         while (cmp != null && cmp.isIgnorePointerEvents()) {
@@ -3735,8 +3540,8 @@ public class Form extends Container {
         }
         if (cmp != null) {
             cmp = LeadUtil.leadParentImpl(cmp);
-            
-            
+
+
             if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                 setFocused(cmp);
             }
@@ -3753,24 +3558,24 @@ public class Form extends Container {
             LeadUtil.pointerHover(dragged, x, y);
             return;
         }
-        
+
         Container actual = getActualPane(formLayeredPane, x[0], y[0]);
-        if(actual != null) {
+        if (actual != null) {
             Component cmp = actual.getComponentAt(x[0], y[0]);
             while (cmp != null && cmp.isIgnorePointerEvents()) {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
                 cmp = LeadUtil.leadParentImpl(cmp);
-                
+
                 if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 LeadUtil.pointerHover(cmp, x, y);
             }
-            if(TooltipManager.getInstance() != null) {
+            if (TooltipManager.getInstance() != null) {
                 String tip = cmp.getTooltip();
-                if(tip != null && tip.length() > 0) {
+                if (tip != null && tip.length() > 0) {
                     TooltipManager.getInstance().prepareTooltip(tip, cmp);
                 } else {
                     TooltipManager.getInstance().clearTooltip();
@@ -3782,7 +3587,7 @@ public class Form extends Container {
     /**
      * Returns true if there is only one focusable member in this form. This is useful
      * so setHandlesInput would always be true for this case.
-     * 
+     *
      * @return true if there is one focusable component in this form, false for 0 or more
      */
     public boolean isSingleFocusMode() {
@@ -3793,7 +3598,7 @@ public class Form extends Container {
     }
 
     private int countFocusables(Container c) {
-        int count=0;
+        int count = 0;
         int t = c.getComponentCount();
         for (int iter = 0; iter < t; iter++) {
             Component cmp = c.getComponentAt(iter);
@@ -3801,12 +3606,12 @@ public class Form extends Container {
                 count++;
             }
             if (cmp instanceof Container) {
-                count += countFocusables((Container)cmp);
+                count += countFocusables((Container) cmp);
             }
         }
         return count;
     }
-    
+
     private int isSingleFocusMode(int b, Container c) {
         int t = c.getComponentCount();
         for (int iter = 0; iter < t; iter++) {
@@ -3826,13 +3631,13 @@ public class Form extends Container {
         }
         return b;
     }
-    
-    
+
+
     private boolean fireReleaseListeners(int x, int y) {
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
-            if(ev.isConsumed()) {
+            if (ev.isConsumed()) {
                 if (dragged != null) {
                     if (dragged.isDragAndDropInitialized()) {
                         LeadUtil.dragFinished(dragged, x, y);
@@ -3857,7 +3662,7 @@ public class Form extends Container {
             setPressedCmp(null);
             boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
             Container actual = getActualPane(formLayeredPane, x, y);
-            if(componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
+            if (componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
                 // special case allowing drag within a button
                 Component atXY = actual.getComponentAt(x, y);
                 if (atXY != null) {
@@ -3868,7 +3673,7 @@ public class Form extends Container {
                 if (pendingC != null) {
                     pendingC = LeadUtil.leadParentImpl(pendingC);
                 }
-                if(atXY == pendingC) {
+                if (atXY == pendingC) {
                     componentsAwaitingRelease = null;
                     if (dragged == pendingC) {
                         if (pendingC.isDragAndDropInitialized()) {
@@ -3893,12 +3698,12 @@ public class Form extends Container {
                     return;
                 }
 
-                if(LeadUtil.leadComponentImpl(pendingC) instanceof ReleasableComponent) {
+                if (LeadUtil.leadComponentImpl(pendingC) instanceof ReleasableComponent) {
                     ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(pendingC);
                     int relRadius = rc.getReleaseRadius();
-                    if(relRadius > 0 || pendingC.contains(x, y)) {
+                    if (relRadius > 0 || pendingC.contains(x, y)) {
                         Rectangle r = new Rectangle(pendingC.getAbsoluteX() - relRadius, pendingC.getAbsoluteY() - relRadius, pendingC.getWidth() + relRadius * 2, pendingC.getHeight() + relRadius * 2);
-                        if(r.contains(x, y)) {
+                        if (r.contains(x, y)) {
                             componentsAwaitingRelease = null;
                             if (!pendingC.contains(x, y)) {
                                 pointerReleased(pendingC.getAbsoluteX() + 1, pendingC.getAbsoluteY() + 1);
@@ -3911,7 +3716,7 @@ public class Form extends Container {
             if (fireReleaseListeners(x, y)) {
                 return;
             }
-            if(dragStopFlag) {
+            if (dragStopFlag) {
                 if (dragged != null) {
                     if (dragged.isDragAndDropInitialized()) {
                         LeadUtil.dragFinished(dragged, x, y);
@@ -3950,7 +3755,7 @@ public class Form extends Container {
                     return;
                 }
 
-                if(stickyDrag != null) {
+                if (stickyDrag != null) {
                     if (stickyDrag.isDragAndDropInitialized()) {
                         LeadUtil.dragFinished(stickyDrag, x, y);
                     } else {
@@ -3966,7 +3771,7 @@ public class Form extends Container {
                         }
                         if (cmp != null && cmp.isEnabled()) {
                             cmp = LeadUtil.leadParentImpl(cmp);
-                            
+
                             if (cmp.isEnabled()) {
                                 if (!isScrollWheeling && cmp.isFocusable()) {
                                     setFocused(cmp);
@@ -3975,36 +3780,36 @@ public class Form extends Container {
                             }
                         }
                     } else {
-                        if(y < actual.getY()) {
+                        if (y < actual.getY()) {
                             Component cmp = getTitleArea().getComponentAt(x, y);
                             while (cmp != null && cmp.isIgnorePointerEvents()) {
                                 cmp = cmp.getParent();
                             }
-                            
+
                             if (cmp != null) {
                                 cmp = LeadUtil.leadParentImpl(cmp);
-                                
+
                                 if (cmp.isEnabled() && !isScrollWheeling && cmp.isFocusable()) {
                                     setFocused(cmp);
                                 }
                                 LeadUtil.pointerReleased(cmp, x, y);
                             }
                         } else {
-                            Component cmp = ((BorderLayout)super.getLayout()).getWest();
-                            if(cmp != null) {
-                                cmp = ((Container)cmp).getComponentAt(x, y);
+                            Component cmp = ((BorderLayout) super.getLayout()).getWest();
+                            if (cmp != null) {
+                                cmp = ((Container) cmp).getComponentAt(x, y);
                                 while (cmp != null && cmp.isIgnorePointerEvents()) {
                                     cmp = cmp.getParent();
                                 }
-                                if (cmp != null) {                                
-                                    
+                                if (cmp != null) {
+
                                     cmp = LeadUtil.leadParentImpl(cmp);
-                                    
+
                                     if (!isScrollWheeling && cmp.isEnabled() && cmp.isFocusable()) {
                                         setFocused(cmp);
                                     }
                                     LeadUtil.pointerReleased(cmp, x, y);
-                                    
+
                                 }
                             }
                         }
@@ -4038,15 +3843,9 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
-    public void setScrollableY(boolean scrollableY) {
-        getContentPane().setScrollableY(scrollableY);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void setScrollableX(boolean scrollableX) {
-        getContentPane().setScrollableX(scrollableX);
+    @Override
+    public boolean isScrollVisible() {
+        return getContentPane().isScrollVisible();
     }
 
     /**
@@ -4060,26 +3859,17 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
-    @Override
-    public boolean isScrollVisible() {
-        return getContentPane().isScrollVisible();
-    }
-    
-
-    /**
-     * {@inheritDoc}
-     */
     public int getComponentIndex(Component cmp) {
         return getContentPane().getComponentIndex(cmp);
     }
 
     /**
-     * Adds a command to the menu bar softkeys or into the menu dialog, 
+     * Adds a command to the menu bar softkeys or into the menu dialog,
      * this version of add allows us to place a command in an arbitrary location.
      * This allows us to force a command into the softkeys when order of command
      * addition can't be changed.
-     * 
-     * @param cmd the Form command to be added
+     *
+     * @param cmd    the Form command to be added
      * @param offset position in which the command is added
      * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
@@ -4089,7 +3879,7 @@ public class Form extends Container {
 
     /**
      * A helper method to check the amount of commands within the form menu
-     * 
+     *
      * @return the number of commands
      * @deprecated Please use {@link Toolbar#getComponentCount()} or similar methods
      */
@@ -4099,7 +3889,7 @@ public class Form extends Container {
 
     /**
      * Returns the command occupying the given index
-     * 
+     *
      * @param index offset of the command
      * @return the command at the given index
      */
@@ -4115,7 +3905,7 @@ public class Form extends Container {
      * the right and the second one will be placed on the left.
      * If the Form has more then 2 Commands the first one will stay on the left
      * and a Menu will be added with all the remain Commands.
-     * 
+     *
      * @param cmd the Form command to be added
      * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
@@ -4126,20 +3916,11 @@ public class Form extends Container {
 
     /**
      * Removes the command from the menu bar softkeys
-     * 
+     *
      * @param cmd the Form command to be removed
      */
     public void removeCommand(Command cmd) {
         menuBar.removeCommand(cmd);
-    }
-
-    /**
-     * Indicates whether focus should cycle within the form
-     * 
-     * @param cyclicFocus marks whether focus should cycle
-     */
-    public void setCyclicFocus(boolean cyclicFocus) {
-        this.cyclicFocus = cyclicFocus;
     }
 
     private Component findNextFocusHorizontal(Component focused, Component bestCandidate, Container root, boolean right) {
@@ -4185,7 +3966,7 @@ public class Form extends Container {
             if (current.isFocusable()) {
                 int currentY = current.getAbsoluteY();
                 int focusedY = 0;
-                if(focused != null) {
+                if (focused != null) {
                     focusedY = focused.getAbsoluteY();
                 }
                 if (down) {
@@ -4232,15 +4013,15 @@ public class Form extends Container {
         }
         return bestCandidate;
     }
-    
+
     /**
      * This method returns the next focusable Component vertically
-     * 
-     * <p>NOTE:  This method does NOT make use of {@link Component#getNextFocusDown() } or {@link Component#getNextFocusUp() }. 
+     *
+     * <p>NOTE:  This method does NOT make use of {@link Component#getNextFocusDown() } or {@link Component#getNextFocusUp() }.
      * It simply finds the next focusable component on the form based solely on absolute Y coordinate.</p>
-     * 
+     *
      * @param down if true will the return the next focusable on the bottom else
-     * on the top
+     *             on the top
      * @return a focusable Component or null if not found
      */
     public Component findNextFocusVertical(boolean down) {
@@ -4269,16 +4050,15 @@ public class Form extends Container {
         }
         return null;
     }
-    
-    
+
     /**
      * This method returns the next focusable Component horizontally
-     * 
-     * <p>NOTE:  This method does NOT make use of {@link Component#getNextFocusLeft() } or {@link Component#getNextFocusRight() }. 
+     *
+     * <p>NOTE:  This method does NOT make use of {@link Component#getNextFocusLeft() } or {@link Component#getNextFocusRight() }.
      * It simply finds the next focusable component on the form based solely on absolute X coordinate.</p>
-     * 
+     *
      * @param right if true will the return the next focusable on the right else
-     * on the left
+     *              on the left
      * @return a focusable Component or null if not found
      */
     public Component findNextFocusHorizontal(boolean right) {
@@ -4307,11 +4087,12 @@ public class Form extends Container {
         }
         return null;
     }
-    
+
     /**
      * Finds next focusable component.  This will first check {@link Component#getNextFocusDown() }
      * on the currently focused component.  Failing that it will scan the form based on Y-coord.
-     * @return 
+     *
+     * @return
      */
     Component findNextFocusDown() {
         if (focused != null) {
@@ -4326,7 +4107,8 @@ public class Form extends Container {
     /**
      * Finds next focusable component in upward direction.  This will first check {@link Component#getNextFocusUp() }
      * on the currently focused component.  Failing that it will scan the form based on Y-coord.
-     * @return 
+     *
+     * @return
      */
     Component findNextFocusUp() {
         if (focused != null) {
@@ -4341,7 +4123,8 @@ public class Form extends Container {
     /**
      * Finds next focusable component in rightward direction.  This will first check {@link Component#getNextFocusRight() }
      * on the currently focused component.  Failing that it will scan the form based on X-coord.
-     * @return 
+     *
+     * @return
      */
     Component findNextFocusRight() {
         if (focused != null) {
@@ -4356,7 +4139,8 @@ public class Form extends Container {
     /**
      * Finds next focusable component in leftward direction.  This will first check {@link Component#getNextFocusLeft() }
      * on the currently focused component.  Failing that it will scan the form based on X-coord.
-     * @return 
+     *
+     * @return
      */
     Component findNextFocusLeft() {
         if (focused != null) {
@@ -4370,11 +4154,20 @@ public class Form extends Container {
 
     /**
      * Indicates whether focus should cycle within the form
-     * 
+     *
      * @return true if focus should cycle
      */
     public boolean isCyclicFocus() {
         return cyclicFocus;
+    }
+
+    /**
+     * Indicates whether focus should cycle within the form
+     *
+     * @param cyclicFocus marks whether focus should cycle
+     */
+    public void setCyclicFocus(boolean cyclicFocus) {
+        this.cyclicFocus = cyclicFocus;
     }
 
     private void updateFocus(int gameAction) {
@@ -4442,12 +4235,12 @@ public class Form extends Container {
                 parent = current.getParent();
             }
             while (parent != null) {
-                if(parent == this) {
-                    if(getContentPane().isScrollable()) {
+                if (parent == this) {
+                    if (getContentPane().isScrollable()) {
                         getContentPane().moveScrollTowards(direction, c);
                     }
-                    
-                }else{
+
+                } else {
                     if (parent.isScrollable()) {
                         return parent.moveScrollTowards(direction, c);
                     }
@@ -4458,27 +4251,27 @@ public class Form extends Container {
 
         return true;
     }
-    
+
     /**
      * Initiates a quick drag event on all containers of this form that have a negative scroll position.
-     * Sometimes, after editing, or on a screen-size change, scroll positions can get caught in a 
+     * Sometimes, after editing, or on a screen-size change, scroll positions can get caught in a
      * negative position, and need to be reset.  This is primarily to solve https://github.com/codenameone/CodenameOne/issues/2476
      */
     void fixNegativeScrolls() {
         java.util.Set<Component> negativeScrolls = getContentPane().findNegativeScrolls(new java.util.HashSet<Component>());
         for (Component cmp : negativeScrolls) {
-            int x = cmp.getAbsoluteX()+cmp.getWidth()/2;
-            int y = cmp.getAbsoluteY()+cmp.getHeight()/2;
+            int x = cmp.getAbsoluteX() + cmp.getWidth() / 2;
+            int y = cmp.getAbsoluteY() + cmp.getHeight() / 2;
             cmp.pointerPressed(x, y);
             cmp.pointerDragged(x, y);
             cmp.pointerReleased(x, y);
         }
     }
-    
+
     /**
-     * Makes sure the component is visible in the scroll if this container 
+     * Makes sure the component is visible in the scroll if this container
      * is scrollable
-     * 
+     *
      * @param c the componant to be visible
      */
     public void scrollComponentToVisible(Component c) {
@@ -4486,9 +4279,9 @@ public class Form extends Container {
         Container parent = c.getParent();
         while (parent != null) {
             if (parent.isScrollable()) {
-                if(parent == this) {
+                if (parent == this) {
                     // special case for Form
-                    if(getContentPane().isScrollable()) {
+                    if (getContentPane().isScrollable()) {
                         getContentPane().scrollComponentToVisible(c);
                     }
                 } else {
@@ -4501,9 +4294,9 @@ public class Form extends Container {
     }
 
     /**
-     * Determine the cell renderer used to render menu elements for themeing the 
+     * Determine the cell renderer used to render menu elements for themeing the
      * look of the menu options
-     * 
+     *
      * @param menuCellRenderer the menu cell renderer
      */
     public void setMenuCellRenderer(ListCellRenderer menuCellRenderer) {
@@ -4519,7 +4312,7 @@ public class Form extends Container {
 
     /**
      * Request focus for a form child component
-     * 
+     *
      * @param cmp the form child component
      */
     void requestFocus(Component cmp) {
@@ -4537,13 +4330,11 @@ public class Form extends Container {
         contentPane.setRTL(r);
     }
 
-    private boolean inInternalPaint;
-    
     /**
      * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        if(!inInternalPaint) {
+        if (!inInternalPaint) {
             paintComponentBackground(g);
         }
         super.paint(g);
@@ -4552,19 +4343,12 @@ public class Form extends Container {
             g.fillRect(0, 0, getWidth(), getHeight(), (byte) ((tintColor >> 24) & 0xff));
         }
     }
-    
+
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
         // workaround for form drawing its background twice on standard paint
         inInternalPaint = true;
         super.internalPaintImpl(g, paintIntersects);
         inInternalPaint = false;
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public void setScrollable(boolean scrollable) {
-        getContentPane().setScrollable(scrollable);
     }
 
     /**
@@ -4572,6 +4356,13 @@ public class Form extends Container {
      */
     public boolean isScrollable() {
         return getContentPane().isScrollable();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setScrollable(boolean scrollable) {
+        getContentPane().setScrollable(scrollable);
     }
 
     /**
@@ -4585,9 +4376,23 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    public void setScrollableX(boolean scrollableX) {
+        getContentPane().setScrollableX(scrollableX);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isScrollableY() {
         return getContentPane().isScrollableY();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setScrollableY(boolean scrollableY) {
+        getContentPane().setScrollableY(scrollableY);
     }
 
     /**
@@ -4606,7 +4411,7 @@ public class Form extends Container {
 
     /**
      * Default color for the screen tint when a dialog or a menu is shown
-     * 
+     *
      * @return the tint color when a dialog or a menu is shown
      */
     public int getTintColor() {
@@ -4615,7 +4420,7 @@ public class Form extends Container {
 
     /**
      * Default color for the screen tint when a dialog or a menu is shown
-     * 
+     *
      * @param tintColor the tint color when a dialog or a menu is shown
      */
     public void setTintColor(int tintColor) {
@@ -4624,8 +4429,8 @@ public class Form extends Container {
 
     /**
      * Sets the menu transitions for showing/hiding the menu, can be null...
-     * 
-     * @param transitionIn the transition that will play when the menu appears
+     *
+     * @param transitionIn  the transition that will play when the menu appears
      * @param transitionOut the transition that will play when the menu is folded
      */
     public void setMenuTransitions(Transition transitionIn, Transition transitionOut) {
@@ -4642,7 +4447,7 @@ public class Form extends Container {
 
     /**
      * Returns the associated Menu Bar object
-     * 
+     *
      * @return the associated Menu Bar object
      */
     public MenuBar getMenuBar() {
@@ -4651,45 +4456,44 @@ public class Form extends Container {
 
     /**
      * Sets the associated MenuBar Object.
-     * 
+     *
      * @param menuBar
      */
     public void setMenuBar(MenuBar menuBar) {
         this.menuBar = menuBar;
         menuBar.initMenuBar(this);
     }
-    
+
     /**
      * Sets the Form Toolbar
-     * 
-     * @param toolbar 
+     *
+     * @param toolbar
      * @deprecated use setToolbar instead (lower case b)
      */
-    public void setToolBar(Toolbar toolbar){
-        this.toolbar =toolbar;
+    public void setToolBar(Toolbar toolbar) {
+        this.toolbar = toolbar;
         setMenuBar(toolbar.getMenuBar());
     }
 
     /**
-     * Sets the Form Toolbar
-     * 
-     * @param toolbar 
-     */
-    public void setToolbar(Toolbar toolbar){
-        this.toolbar =toolbar;
-        setMenuBar(toolbar.getMenuBar());
-    }
-    
-    /**
      * Gets the Form Toolbar if exists or null
-     * 
+     *
      * @return the Toolbar instance or null if does not exists.
      */
     public Toolbar getToolbar() {
         return toolbar;
     }
 
-    
+    /**
+     * Sets the Form Toolbar
+     *
+     * @param toolbar
+     */
+    public void setToolbar(Toolbar toolbar) {
+        this.toolbar = toolbar;
+        setMenuBar(toolbar.getMenuBar());
+    }
+
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
@@ -4714,37 +4518,37 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] { "titleUIID", "titleAreaUIID" };
+        return new String[]{"titleUIID", "titleAreaUIID"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {
-           String.class,
-           String.class
-       };
+        return new Class[]{
+                String.class,
+                String.class
+        };
     }
 
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"String", "String"};
+        return new String[]{"String", "String"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("titleUIID")) {
-            if(getTitleComponent() != null) {
+        if (name.equals("titleUIID")) {
+            if (getTitleComponent() != null) {
                 return getTitleComponent().getUIID();
             }
         }
-        if(name.equals("titleAreaUIID")) {
-            if(getTitleArea() != null) {
+        if (name.equals("titleAreaUIID")) {
+            if (getTitleArea() != null) {
                 return getTitleArea().getUIID();
             }
         }
@@ -4755,15 +4559,15 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("titleUIID")) {
-            if(getTitleComponent() != null) {
-                getTitleComponent().setUIID((String)value);
+        if (name.equals("titleUIID")) {
+            if (getTitleComponent() != null) {
+                getTitleComponent().setUIID((String) value);
             }
             return null;
         }
-        if(name.equals("titleAreaUIID")) {
-            if(getTitleArea() != null) {
-                getTitleArea().setUIID((String)value);
+        if (name.equals("titleAreaUIID")) {
+            if (getTitleArea() != null) {
+                getTitleArea().setUIID((String) value);
             }
             return null;
         }
@@ -4772,6 +4576,7 @@ public class Form extends Container {
 
     /**
      * A text component that will receive focus and start editing immediately as the form is shown
+     *
      * @return the component instance
      */
     public TextArea getEditOnShow() {
@@ -4780,14 +4585,225 @@ public class Form extends Container {
 
     /**
      * A text component that will receive focus and start editing immediately as the form is shown
+     *
      * @param editOnShow text component to edit when the form is shown
      */
     public void setEditOnShow(TextArea editOnShow) {
         this.editOnShow = editOnShow;
     }
-    
-    
-        
-        
-    
+
+    /**
+     * Iterates through the components on this form in traversal order.
+     *
+     * @see #getTabIterator(com.codename1.ui.Component)
+     */
+    public class TabIterator implements ListIterator<Component> {
+        private java.util.List<Component> components;
+        private int currPos;
+        private Component current;
+
+        private TabIterator(java.util.List<Component> components, Component current) {
+            this.components = components;
+            setCurrent(current);
+        }
+
+        /**
+         * Gets the current component in this iterator.
+         *
+         * @return
+         */
+        public Component getCurrent() {
+            return current;
+        }
+
+        /**
+         * Sets the current component in the iterator.  This reposition the iterator
+         * to the given component.
+         *
+         * @param cmp The component to set as the current component.
+         */
+        public void setCurrent(Component cmp) {
+            current = cmp;
+
+            currPos = cmp != null ? components.indexOf(cmp) : -1;
+        }
+
+        /**
+         * Gets the next component in this iterator.  If the current component explicitly specifies
+         * a nextFocusRight or nextFocusDown component, then that component will be returned.
+         * Otherwise it will follow the tab index order.
+         *
+         * @return The next component to be traversed after {@link #getCurrent() }
+         */
+        public Component getNext() {
+            Component current = getCurrent();
+            if (current == null && components.isEmpty()) {
+                return null;
+            }
+
+            Component next = current != null ? current.getNextFocusRight() : null;
+            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
+                return next;
+            }
+            next = current != null ? current.getNextFocusDown() : null;
+            if (next != null && next.isFocusable() && next.isVisible() && next.isEnabled()) {
+                return next;
+            }
+            if (currPos < 0 && !components.isEmpty()) {
+                return components.get(0);
+            }
+            if (currPos < components.size() - 1) {
+                return components.get(currPos + 1);
+            }
+            return null;
+        }
+
+        /**
+         * Gets the previous component that should be traversed when going "back" in through the
+         * form components.  If the current component has a nextFocusLeft or nextFocusUp field
+         * explicitly specified, then it will return that.  Otherwise it just follows the traversal
+         * order using the tab index.
+         *
+         * @return The previous component according to traversal order.
+         */
+        public Component getPrevious() {
+            Component current = getCurrent();
+            if (current == null && components.isEmpty()) {
+                return null;
+            }
+            Component prev = current != null ? current.getNextFocusLeft() : null;
+            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
+                return prev;
+            }
+            prev = current != null ? current.getNextFocusUp() : null;
+            if (prev != null && prev.isFocusable() && prev.isVisible() && prev.isEnabled()) {
+                return prev;
+            }
+            if (currPos < 0 && !components.isEmpty()) {
+                // Negative current position means that we pick the last
+                // component on the form.
+                return components.get(components.size() - 1);
+            }
+            if (currPos > 0 && currPos <= components.size()) {
+                return components.get(currPos - 1);
+            }
+            return null;
+        }
+
+        /**
+         * Checks to see if there is a "next" component to traverse focus to in this iterator.
+         *
+         * @return True if there is a "next" component in this iterator.
+         */
+        public boolean hasNext() {
+            return getNext() != null;
+        }
+
+        /**
+         * Returns the next component in this iterator, and repositions the iterator at this component.
+         *
+         * @return The "next" component in the iterator.
+         */
+
+        public Component next() {
+            Component next = getNext();
+            setCurrent(next);
+            return next;
+        }
+
+        /**
+         * Checks if this iterator has a "previous" component.
+         *
+         * @return
+         */
+
+        public boolean hasPrevious() {
+            return getPrevious() != null;
+        }
+
+        /**
+         * Returns the previous component in this iterator, and repositions the iterator at this component.
+         *
+         * @return
+         */
+
+        public Component previous() {
+            Component prev = getPrevious();
+            setCurrent(prev);
+            return prev;
+        }
+
+        /**
+         * Gets the index within the iterator of the next component.
+         *
+         * @return
+         */
+
+        public int nextIndex() {
+            Component next = getNext();
+            if (next == null) {
+                return -1;
+            }
+            return components.indexOf(next);
+        }
+
+        /**
+         * Gets the index within the iterator of the previous component.
+         *
+         * @return
+         */
+
+        public int previousIndex() {
+            Component prev = getPrevious();
+            if (prev == null) {
+                return -1;
+            }
+            return components.indexOf(prev);
+        }
+
+        /**
+         * Removes the current component from the iterator, and repositions the iterator to the previous
+         * component, or the next component (if previous doesn't exist).
+         */
+
+        public void remove() {
+            Component newCurr = getPrevious();
+            if (newCurr == null) {
+                newCurr = getNext();
+            }
+            if (current != null) {
+                components.remove(current);
+                setCurrent(newCurr);
+            }
+
+        }
+
+        /**
+         * Replaces the current component, in the iterator, with the provided component.
+         * This will not actually replace the component in the form's hierarchy.  Just within
+         * the iterator.
+         *
+         * @param e The component to set as the current component.
+         */
+
+        public void set(Component e) {
+            if (currPos >= 0 && currPos < components.size() - 1) {
+                components.set(currPos, e);
+                setCurrent(e);
+            }
+        }
+
+        /**
+         * Adds a component to the end of the iterator.
+         *
+         * @param e The component to add to the iterator.
+         */
+
+        public void add(Component e) {
+            components.add(e);
+        }
+
+    }
+
+
 }

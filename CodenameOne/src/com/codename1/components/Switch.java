@@ -6,25 +6,24 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
 
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
-import static com.codename1.ui.Component.CENTER;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
@@ -41,6 +40,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+
 import java.util.Collection;
 
 /**
@@ -49,26 +49,26 @@ import java.util.Collection;
  * represents its state as a switch When using the Android native theme, this implementation follows the Material
  * Design Switch guidelines:
  * https://material.io/guidelines/components/selection-controls.html#selection-controls-radio-button
- * 
+ *
  * </p>
  *
  * <h3>Customizing Look and Feel</h3>
- * 
+ *
  * <p>You can customize the look and feel of a switch using styles, either directly
  * in the theme.res file or in CSS.  This component consists of two elements: the "thumb" the "track".
- * The "thumb" is the circular handle that can be toggled/dragged between an on and off position.  
+ * The "thumb" is the circular handle that can be toggled/dragged between an on and off position.
  * The "track" is the background track along which the "thumb" appears to slide when it is dragged/toggled.
- * 
- * <p>The thumb will be rendered using Switch's {@link Style#getFgColor() }.  It will use the 
+ *
+ * <p>The thumb will be rendered using Switch's {@link Style#getFgColor() }.  It will use the
  * selected style, when in the "on" position, the unselected style when in the "off" position,
  * and the disabled style, when {@link #isEnabled() } is {@literal false}.</p>
- * 
+ *
  * <p>The track will be rendered using the Switch's {@link Style#getBgColor() }.  It will
  * use the selected style, when in the "on" position, and the unselected style when in the "off"
  * position.</p>
- * 
+ *
  * <p>You can also adjust the thumb and track sizes using the following theme constants:</p>
- * 
+ *
  * <table>
  * <tr><td>{@literal switchThumbScaleY}</td><td>A floating point value used to scale the thumb's diameter, relative to the font size.  In the android native theme, this value is set to 1.5.  On iOS, it is set to 1.4.</td></tr>
  * <tr><td>{@literal switchTrackScaleY}</td><td>A floating point value used to scale the track's height, relative the the font size.  In the android native theme, this value is set to 0.9.  On iOS, it is set to 1.5</td></tr>
@@ -79,77 +79,79 @@ import java.util.Collection;
  * <tr><td>{@literal switchTrackOnOutlineColor}</td><td>The color used to stroke the outline for the track when the switch is in the "on" position, expressed as a base-16 int.  This is currently not used in either Android or iOS.</td></tr>
  * <tr><td>{@literal switchThumbInsetMM}</td><td>An inset to use when rendering the thumb that will cause it to be inset from the edge of the track. In the iOS native theme, this is 0.25</td></tr>
  * </table>
- * 
+ *
  * <p>
  * <strong>IMPORTANT:</strong> when changing the UIID of the switch the constants
- * above implicitly change to match the new UIID with the same convetion. So if 
- * your UIID is {@code MySwitch} then a theme constant will become: 
+ * above implicitly change to match the new UIID with the same convetion. So if
+ * your UIID is {@code MySwitch} then a theme constant will become:
  * {@code myswitchTrackScaleY}. Notice that the whole UIID is lower cased...
  * </p>
- * 
+ *
  * <p><strong>CSS used in the Android native theme:</strong></p>
  * <pre>{@code
-#Constants {
-  ...
-  switchThumbPaddingInt: 2;
-  switchThumbScaleY: "1.5";
-  switchTrackScaleY: "0.9";
-  switchTrackScaleX: "3";
-  switchTrackOffOutlineWidthMM: "0";
-  switchTrackOnOutlineWidthMM: "0";
-  switchTrackOffOutlineColor: "cccccc";
-  switchThumbInsetMM: "0";
-}
-Switch {
-  color: rgb(237, 237, 237);
-  background-color: rgb(159, 158, 158);
-
-}
-Switch.selected {
-    color: rgb(34,44,50);
-    background-color: rgb(117, 126, 132);
-}
-}</pre>
-* 
-* <p><strong>CSS used in the iOS native theme:</strong></p>
-* <pre>{@code 
-#Constants {
-  ...
-  switchThumbPaddingInt: 2;
-    switchThumbScaleY: "1.4";
-    switchTrackScaleY: "1.5";
-    switchTrackScaleX: "2.5";
-    switchTrackOffOutlineWidthMM: "0.25";
-    switchTrackOnOutlineWidthMM: "0";
-    switchTrackOffOutlineColor: "cccccc";
-    switchThumbInsetMM: "0.25";
-}
-Switch {
-    color: white;
-    background-color: white;
-    
-}
-Switch.selected {
-    color: white;
-    background-color: rgb(61, 216, 76);
-    
-}
-}
-</pre>
-* <h4>Using Custom Thumb and Track Images</h4>
-* <p>You can optionally provide custom images for use as the track or thumb via the following
-* theme constants</p>
-* <ul>
-*   <li>{@literal switchThumbOnImage}</li>
-*   <li>{@literal switchThumbOffImage}</li>
-*   <li>{@literal switchThumbDisabledImage}</li>
-*   <li>{@literal switchOnTrackImage}</li>
-*   <li>{@literal switchOffTrackImage}</li>
-*   <li>{@literal switchDisabledTrackImage}</li>
-* </ul>
+ * #Constants {
+ * ...
+ * switchThumbPaddingInt: 2;
+ * switchThumbScaleY: "1.5";
+ * switchTrackScaleY: "0.9";
+ * switchTrackScaleX: "3";
+ * switchTrackOffOutlineWidthMM: "0";
+ * switchTrackOnOutlineWidthMM: "0";
+ * switchTrackOffOutlineColor: "cccccc";
+ * switchThumbInsetMM: "0";
+ * }
+ * Switch {
+ * color: rgb(237, 237, 237);
+ * background-color: rgb(159, 158, 158);
+ *
+ * }
+ * Switch.selected {
+ * color: rgb(34,44,50);
+ * background-color: rgb(117, 126, 132);
+ * }
+ * }</pre>
+ *
+ * <p><strong>CSS used in the iOS native theme:</strong></p>
+ * <pre>{@code
+ * #Constants {
+ * ...
+ * switchThumbPaddingInt: 2;
+ * switchThumbScaleY: "1.4";
+ * switchTrackScaleY: "1.5";
+ * switchTrackScaleX: "2.5";
+ * switchTrackOffOutlineWidthMM: "0.25";
+ * switchTrackOnOutlineWidthMM: "0";
+ * switchTrackOffOutlineColor: "cccccc";
+ * switchThumbInsetMM: "0.25";
+ * }
+ * Switch {
+ * color: white;
+ * background-color: white;
+ *
+ * }
+ * Switch.selected {
+ * color: white;
+ * background-color: rgb(61, 216, 76);
+ *
+ * }
+ * }
+ * </pre>
+ * <h4>Using Custom Thumb and Track Images</h4>
+ * <p>You can optionally provide custom images for use as the track or thumb via the following
+ * theme constants</p>
+ * <ul>
+ *   <li>{@literal switchThumbOnImage}</li>
+ *   <li>{@literal switchThumbOffImage}</li>
+ *   <li>{@literal switchThumbDisabledImage}</li>
+ *   <li>{@literal switchOnTrackImage}</li>
+ *   <li>{@literal switchOffTrackImage}</li>
+ *   <li>{@literal switchDisabledTrackImage}</li>
+ * </ul>
  */
 public class Switch extends Component implements ActionSource, ReleasableComponent {
 
+    private final EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher changeDispatcher = new EventDispatcher();
     private boolean value;
     private Image thumbOnImage;
     private Image thumbOffImage;
@@ -161,10 +163,99 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private long dragStartTime;
     private int pressX, pressY;
     private int deltaX, deltaY; //pressX - currentdragX
-    private final EventDispatcher dispatcher = new EventDispatcher();
-    private final EventDispatcher changeDispatcher = new EventDispatcher();
-    private boolean animationLock;
+    private final ActionListener pointerPressed = new ActionListener() {
+        public void actionPerformed(ActionEvent evt) {
+            Form f = getComponentForm();
+            if (f != null) {
+                f.addComponentAwaitingRelease(Switch.this);
+            }
+            dragged = false;
+            dragStartTime = System.currentTimeMillis();
+            deltaX = 0;
+            deltaY = 0;
+            pressX = evt.getX();
+            pressY = evt.getY();
+        }
+    };
+    private final ActionListener pointerDragged = new ActionListener() {
+        public void actionPerformed(ActionEvent evt) {
 
+            dragged = true;
+            deltaX = pressX - evt.getX();
+            deltaY = pressY - evt.getY();
+            if (Math.abs(deltaY) >= Math.abs(deltaX * 0.5)) {
+                dragged = false;
+                deltaX = 0;
+                deltaY = 0;
+            } else {
+                evt.consume();
+            }
+        }
+    };
+    private boolean animationLock;
+    private final ActionListener pointerReleased = new ActionListener() {
+        private int tapThreshold = CN.convertToPixels(1);
+
+        private boolean dragWasActuallyATap() {
+            return System.currentTimeMillis() - dragStartTime < 60 && Math.abs(deltaX) < tapThreshold;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            if (animationLock) {
+                return;
+            }
+            animationLock = true;
+
+            if (!dragWasActuallyATap() && dragged) {
+                if (deltaX > 0) { //dragged from RtL
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    if (deltaX > trackLength / 2) {
+                        animateTo(isRTL(), deltaX, trackLength, trackLength);
+                    } else { //Not moved enaugh, go back to the state where we come from (i.e. ON for LtR switch and OFF for RtL ones)
+                        animateTo(!isRTL(), deltaX, 0, trackLength);
+                    }
+                } else { //dragged from LtR
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    if (deltaX * -1 > trackLength / 2) {
+                        animateTo(!isRTL(), deltaX, -trackLength, trackLength);
+                    } else {
+                        animateTo(isRTL(), deltaX, 0, trackLength);
+                    }
+                }
+            } else {
+                if (value) {
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    animateTo(false, 0, trackLength, trackLength);
+                } else {
+                    int trackLength = 0;
+                    if (isRTL()) {
+                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
+                    } else {
+                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
+                    }
+                    animateTo(true, 0, -trackLength, trackLength);
+                }
+
+            }
+            // PMD Fix (UnnecessaryReturn): Removed redundant return at the end of the method.
+            animationLock = false;
+        }
+    };
     private int valign = CENTER;
 
     /**
@@ -177,8 +268,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * This constructor should be used when customizing theme constants
      * for a different UIID
-     * @param uiid accepts an alternate UIID for switch which might be 
-     * necessary for theme constants 
+     *
+     * @param uiid accepts an alternate UIID for switch which might be
+     *             necessary for theme constants
      */
     public Switch(String uiid) {
         setUIID(uiid);
@@ -186,7 +278,94 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         initialize();
     }
 
-    
+    private static Image createRoundThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
+        Image img = ImageFactory.createImage(context, pxDim + 2 * shadowSpread, pxDim + 2 * shadowSpread, 0x0);
+        Graphics g = img.getGraphics();
+        g.setAntiAliased(true);
+
+        int shadowOpacity = 200;
+        float shadowBlur = 10;
+
+        if (shadowSpread > 0) {
+            // draw a gradient of sort for the shadow
+            for (int iter = shadowSpread - 1; iter >= 0; iter--) {
+                g.translate(iter, iter);
+                g.setColor(0);
+                int alpha = g.concatenateAlpha(shadowOpacity / shadowSpread);
+                g.fillArc(
+                        Math.max(1, thumbInset + shadowSpread + shadowSpread / 2 - iter),
+                        Math.max(1, thumbInset + 2 * shadowSpread - iter),
+                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset),
+                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset), 0, 360);
+                g.setAlpha(alpha);
+                g.translate(-iter, -iter);
+            }
+            if (Display.getInstance().isGaussianBlurSupported()) {
+                Image blured = Display.getInstance().gaussianBlurImage(img, shadowBlur / 2);
+                //img = Image.createImage(pxDim+2*shadowSpread, pxDim+2*shadowSpread, 0);
+                img = blured;
+                g = img.getGraphics();
+                //g.drawImage(blured, 0, 0);
+                g.setAntiAliased(true);
+            }
+        }
+
+        //g.translate(shadowSpread, shadowSpread);
+        int alpha = g.concatenateAlpha(255);
+        g.setColor(color);
+        g.fillArc(shadowSpread + thumbInset, shadowSpread + thumbInset, Math.max(1, pxDim - 2 * thumbInset), Math.max(1, pxDim - 2 * thumbInset), 0, 360);
+        //g.setColor(outlinecolor);
+        //g.drawArc(shadowSize, shadowSize, pxDim-1, pxDim-1, 0, 360);
+        g.setAlpha(alpha);
+        return img;
+    }
+
+    private static Image createPlatformThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
+        return createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);
+    }
+
+    private static Image createRoundRectTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
+        Image img = ImageFactory.createImage(context, width + 2 * thumbPadding, height, 0x0);
+        Graphics g = img.getGraphics();
+        g.setAntiAliased(true);
+        int oldAlpha = g.concatenateAlpha(alpha);
+        int topPadding = 0;
+        if (outlineWidth > 0) {
+            g.setColor(outlineColor);
+            g.fillRoundRect(thumbPadding, 0, width, height, height, height);
+            thumbPadding += outlineWidth;
+            topPadding += outlineWidth;
+            width -= 2 * outlineWidth;
+            height -= 2 * outlineWidth;
+        }
+        thumbPadding = Math.max(0, thumbPadding);
+        topPadding = Math.max(0, topPadding);
+        width = Math.max(2, width);
+        height = Math.max(2, height);
+        g.setColor(color);
+        g.fillRoundRect(thumbPadding, topPadding, width, height, height, height);
+        g.setAlpha(oldAlpha);
+        return img;
+    }
+
+    private static Image createPlatformTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
+        return createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
+    }
+
+    private static int getAlignedCoord(int coord, int parentDim, int elemDim, int alignment) {
+        switch (alignment) {
+            case Component.CENTER:
+                return coord + parentDim / 2 - elemDim / 2;
+            case Component.RIGHT:
+            case Component.BOTTOM:
+                return coord + parentDim - elemDim;
+            //case Component.LEFT: case Component.TOP:
+            //	return coord;
+            default:
+                return coord;
+        }
+    }
+
     private int getFontSize() {
         Font f = getUnselectedStyle().getFont();
         if (f == null) {
@@ -194,26 +373,68 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
         return f.getHeight();
     }
-    
+
     private Image getThumbOnImage() {
         if (thumbOnImage == null) {
             thumbOnImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getSelectedStyle().getFgColor(), 2, getThumbInset());
         }
         return thumbOnImage;
     }
-    
+
+    private void setThumbOnImage(Image image) {
+        if (image != null) {
+            this.thumbOnImage = image;
+            //also set other thumb images if we don't have images for them yet
+            if (this.thumbOffImage == null) {
+                this.thumbOffImage = image;
+            }
+            if (this.thumbDisabledImage == null) {
+                this.thumbDisabledImage = image;
+            }
+            setShouldCalcPreferredSize(true);
+        }
+    }
+
     private Image getThumbOffImage() {
         if (thumbOffImage == null) {
             thumbOffImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getUnselectedStyle().getFgColor(), 2, getThumbInset()); //getUnselectedStyle().getFgColor(), true);
         }
         return thumbOffImage;
     }
-    
+
+    private void setThumbOffImage(Image image) {
+        if (image != null) {
+            this.thumbOffImage = image;
+            //also set other thumb images if we don't have images for them yet
+            if (this.thumbOnImage == null) {
+                this.thumbOnImage = image;
+            }
+            if (this.thumbDisabledImage == null) {
+                this.thumbDisabledImage = image;
+            }
+            setShouldCalcPreferredSize(true);
+        }
+    }
+
     private Image getThumbDisabledImage() {
         if (thumbDisabledImage == null) {
             thumbDisabledImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getDisabledStyle().getFgColor(), 2, getThumbInset()); //getDisabledStyle().getFgColor(), true);
         }
         return thumbDisabledImage;
+    }
+
+    private void setThumbDisabledImage(Image image) {
+        if (image != null) {
+            this.thumbDisabledImage = image;
+            //also set other thumb images if we don't have images for them yet
+            if (this.thumbOnImage == null) {
+                this.thumbOnImage = image;
+            }
+            if (this.thumbDisabledImage == null) {
+                this.thumbDisabledImage = image;
+            }
+            setShouldCalcPreferredSize(true);
+        }
     }
 
     @Override
@@ -237,56 +458,88 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return Double.parseDouble(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "TrackScaleY", "0.9"));
     }
-    
+
     private double getThumbScaleY() {
         return Double.parseDouble(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "ThumbScaleY", "1.5"));
     }
-    
+
     private double getTrackScaleX() {
         return Double.parseDouble(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "TrackScaleX", "3"));
     }
-    
+
     private int getTrackOnOutlineWidth() {
         return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "TrackOnOutlineWidthMM", "0")));
     }
-    
+
     private int getTrackOnOutlineColor() {
         return Integer.parseInt(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "TrackOnOutlineColor", "0"), 16);
     }
-    
+
     private int getTrackOffOutlineWidth() {
         return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "TrackOffOutlineWidthMM", "0")));
     }
-    
+
     private int getTrackOffOutlineColor() {
         return Integer.parseInt(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "TrackOffOutlineColor", "0"), 16);
     }
-    
+
     private int getThumbInset() {
         return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "ThumbInsetMM", "0")));
     }
-    
+
     private Image getTrackOnImage() {
         if (trackOnImage == null) {
             trackOnImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getSelectedStyle().getBgColor(), 255, 2, getTrackOnOutlineColor(), getTrackOnOutlineWidth());
         }
         return trackOnImage;
     }
-    
+
+    private void setTrackOnImage(Image image) {
+        if (image != null) {
+            this.trackOnImage = image;
+            if (this.trackOffImage == null) {
+                this.trackOffImage = image;
+            }
+            if (this.trackDisabledImage == null) {
+                this.trackDisabledImage = image;
+            }
+            setShouldCalcPreferredSize(true);
+        }
+    }
+
     private Image getTrackDisabledImage() {
         if (trackDisabledImage == null) {
             trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
         }
         return trackDisabledImage;
     }
-    
+
+    /**
+     * Sets the image to be used for track when the component is disabled.
+     * Use the "switchDisabledTrackImage" theme constant as a default value.
+     *
+     * @param image
+     */
+    private void setTrackDisabledImage(Image image) {
+        if (image != null) {
+            this.trackDisabledImage = image;
+            if (this.trackOnImage == null) {
+                this.trackOnImage = image;
+            }
+            if (this.trackOffImage == null) {
+                this.trackOffImage = image;
+            }
+            setShouldCalcPreferredSize(true);
+        }
+    }
+
     private Image getCurrentTrackOnImage() {
         if (isEnabled()) {
             return getTrackOnImage();
@@ -294,12 +547,31 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             return getTrackDisabledImage();
         }
     }
-    
+
     private Image getTrackOffImage() {
         if (trackOffImage == null) {
             trackOffImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getUnselectedStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
         }
         return trackOffImage;
+    }
+
+    /**
+     * Sets the image to use for the track when the switch is set to "off".
+     * Use the "switchOffTrackImage" theme constant as a default value.
+     *
+     * @param image The image to use.
+     */
+    private void setTrackOffImage(Image image) {
+        if (image != null) {
+            this.trackOffImage = image;
+            if (this.trackOnImage == null) {
+                this.trackOnImage = image;
+            }
+            if (this.trackDisabledImage == null) {
+                this.trackDisabledImage = image;
+            }
+            setShouldCalcPreferredSize(true);
+        }
     }
 
     private Image getCurrentTrackOffImage() {
@@ -310,7 +582,6 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
     }
 
-    
     /**
      * {@inheritDoc}
      */
@@ -322,16 +593,14 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         super.styleChanged(propertyName, source);
     }
 
-    
-    
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         return new Dimension(
-                    getStyle().getHorizontalPadding() +Math.max(getCurrentThumbImage().getWidth(), Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),
-                    getStyle().getVerticalPadding() + Math.max(getCurrentThumbImage().getHeight(), Math.max(getCurrentTrackOnImage().getHeight(), getCurrentTrackOffImage().getHeight())));
-        
+                getStyle().getHorizontalPadding() + Math.max(getCurrentThumbImage().getWidth(), Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),
+                getStyle().getVerticalPadding() + Math.max(getCurrentThumbImage().getHeight(), Math.max(getCurrentTrackOnImage().getHeight(), getCurrentTrackOffImage().getHeight())));
+
     }
 
     /**
@@ -383,80 +652,6 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 getThemeImageConstant(getUIID().toLowerCase() + "DisabledTrackImage"));
     }
 
-    private static Image createRoundThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
-        Image img = ImageFactory.createImage(context, pxDim + 2 * shadowSpread, pxDim + 2 * shadowSpread, 0x0);
-        Graphics g = img.getGraphics();
-        g.setAntiAliased(true);
-
-        int shadowOpacity = 200;
-        float shadowBlur = 10;
-
-        if (shadowSpread > 0) {
-            // draw a gradient of sort for the shadow
-            for (int iter = shadowSpread - 1; iter >= 0; iter--) {
-                g.translate(iter, iter);
-                g.setColor(0);
-                int alpha = g.concatenateAlpha(shadowOpacity / shadowSpread);
-                g.fillArc(
-                        Math.max(1, thumbInset+shadowSpread + shadowSpread / 2 - iter), 
-                        Math.max(1, thumbInset + 2 * shadowSpread - iter), 
-                        Math.max(1, pxDim - (iter * 2) - 2*thumbInset), 
-                        Math.max(1, pxDim - (iter * 2) - 2*thumbInset), 0, 360);
-                g.setAlpha(alpha);
-                g.translate(-iter, -iter);
-            }
-            if (Display.getInstance().isGaussianBlurSupported()) {
-                Image blured = Display.getInstance().gaussianBlurImage(img, shadowBlur / 2);
-                //img = Image.createImage(pxDim+2*shadowSpread, pxDim+2*shadowSpread, 0);
-                img = blured;
-                g = img.getGraphics();
-                //g.drawImage(blured, 0, 0);
-                g.setAntiAliased(true);
-            }
-        }
-
-        //g.translate(shadowSpread, shadowSpread);
-        int alpha = g.concatenateAlpha(255);
-        g.setColor(color);
-        g.fillArc(shadowSpread+thumbInset, shadowSpread+thumbInset, Math.max(1, pxDim-2*thumbInset), Math.max(1, pxDim-2*thumbInset), 0, 360);
-        //g.setColor(outlinecolor);
-        //g.drawArc(shadowSize, shadowSize, pxDim-1, pxDim-1, 0, 360);
-        g.setAlpha(alpha);
-        return img;
-    }
-    
-    private static Image createPlatformThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
-        return createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);
-    }
-
-    private static Image createRoundRectTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
-        Image img = ImageFactory.createImage(context, width + 2 * thumbPadding, height, 0x0);
-        Graphics g = img.getGraphics();
-        g.setAntiAliased(true);
-        int oldAlpha = g.concatenateAlpha(alpha);
-        int topPadding=0;
-        if (outlineWidth > 0) {
-            g.setColor(outlineColor);
-            g.fillRoundRect(thumbPadding, 0, width, height, height, height);
-            thumbPadding += outlineWidth;
-            topPadding += outlineWidth;
-            width -= 2*outlineWidth;
-            height -= 2*outlineWidth;
-        }
-        thumbPadding = Math.max(0, thumbPadding);
-        topPadding = Math.max(0, topPadding);
-        width = Math.max(2, width);
-        height = Math.max(2, height);
-        g.setColor(color);
-        g.fillRoundRect(thumbPadding, topPadding, width, height, height, height);
-        g.setAlpha(oldAlpha);
-        return img;
-    }
-    
-    private static Image createPlatformTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
-        return createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -482,7 +677,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
-    
+
     /**
      * Adds a listener to the switch which will cause an event on change
      *
@@ -518,7 +713,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);
         }
     }
-    
+
     void fireChangeEvent() {
         changeDispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
     }
@@ -563,7 +758,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         Image nextThumbImage = null;
         Image nextTrackImage = null;
         double nextImageProgress = 0.0;
-        
+
         if (value) { //switch is ON so only drag movements going to the OFF position are relevant, meaning a vdelta < 0
             if (vdeltaX > 0) {
                 dragged = false;
@@ -574,9 +769,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 if (vdeltaX < -trackMLength) {
                     vdeltaX = -trackMLength;
                 }
-                nextImageProgress = Math.abs(vdeltaX)/(double)Math.abs(trackMLength);
-                
-                
+                nextImageProgress = Math.abs(vdeltaX) / (double) Math.abs(trackMLength);
+
+
             }
         } else { //switch is OFF so only consider drag movements toward the ON position, meaning a vdelta > 0
             if (vdeltaX < 0) {
@@ -588,7 +783,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 if (vdeltaX > trackMLength) {
                     vdeltaX = trackMLength;
                 }
-                nextImageProgress = 1-Math.abs(trackMLength-vdeltaX)/(double)Math.abs(trackMLength);
+                nextImageProgress = 1 - Math.abs(trackMLength - vdeltaX) / (double) Math.abs(trackMLength);
             }
         }
         if (dragged) {
@@ -599,7 +794,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 } else {
                     thumbCenterrX = cTrackImage.getWidth() + vdeltaX - cthumbImage.getWidth() / 2;
                 }
-            } else { //positive vdelta	
+            } else { //positive vdelta
                 if (isRTL()) {
                     thumbCenterrX = cTrackImage.getWidth() - vdeltaX - cthumbImage.getWidth() / 2;
                 } else {
@@ -609,17 +804,17 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
             thumbrX = thumbCenterrX - cthumbImage.getWidth() / 2;
 
-            
+
             int imgY = getY() + padTop + getAlignedCoord((sheight / 2 - cTrackImage.getHeight() / 2), innerHeight, sheight, valign);
             int imgX = getX() + padLeft + getAlignedCoord(0, innerWidth, strackLength, halign);
 
             int alph = g.getAlpha();
             if (nextImageProgress > 0 && nextTrackImage != null) {
-                g.setAlpha((int)Math.round((1-nextImageProgress)*255));
+                g.setAlpha((int) Math.round((1 - nextImageProgress) * 255));
             }
             g.drawImage(cTrackImage, imgX, imgY);
             if (nextImageProgress > 0 && nextTrackImage != null) {
-                g.setAlpha((int)Math.round(nextImageProgress*255));
+                g.setAlpha((int) Math.round(nextImageProgress * 255));
                 g.drawImage(nextTrackImage, imgX, imgY);
                 g.setAlpha(alph);
             }
@@ -628,39 +823,25 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             int imgX = getX() + padLeft + getAlignedCoord(0, innerWidth, strackLength, halign);
             int imgY = getY() + padTop + getAlignedCoord((sheight / 2 - cTrackImage.getHeight() / 2), innerHeight, sheight, valign);
             g.drawImage(cTrackImage, imgX, imgY);
-            
+
         }
 
         //draw the thumb image
         int alph = g.getAlpha();
         if (nextImageProgress > 0 && nextThumbImage != null) {
-            g.setAlpha((int)Math.round((1-nextImageProgress)*255));
+            g.setAlpha((int) Math.round((1 - nextImageProgress) * 255));
         }
         g.drawImage(cthumbImage,
                 getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),
                 getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));
         if (nextImageProgress > 0 && nextThumbImage != null) {
-            g.setAlpha((int)Math.round(nextImageProgress*255));
+            g.setAlpha((int) Math.round(nextImageProgress * 255));
             g.drawImage(nextThumbImage,
-                getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),
-                getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));
+                    getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),
+                    getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));
             g.setAlpha(alph);
         }
 
-    }
-
-    private static int getAlignedCoord(int coord, int parentDim, int elemDim, int alignment) {
-        switch (alignment) {
-            case Component.CENTER:
-                return coord + parentDim / 2 - elemDim / 2;
-            case Component.RIGHT:
-            case Component.BOTTOM:
-                return coord + parentDim - elemDim;
-            //case Component.LEFT: case Component.TOP:
-            //	return coord;
-            default:
-                return coord;
-        }
     }
 
     /**
@@ -682,103 +863,6 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         removePointerReleasedListener(pointerReleased);
         super.deinitialize();
     }
-
-    private final ActionListener pointerPressed = new ActionListener() {
-        public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
-            if (f != null) {
-                f.addComponentAwaitingRelease(Switch.this);
-            }
-            dragged = false;
-            dragStartTime = System.currentTimeMillis();
-            deltaX = 0;
-            deltaY = 0;
-            pressX = evt.getX();
-            pressY = evt.getY();
-        }
-    };
-    
-    private final ActionListener pointerDragged = new ActionListener() {
-        public void actionPerformed(ActionEvent evt) {
-
-            dragged = true;
-            deltaX = pressX - evt.getX();
-            deltaY = pressY - evt.getY();
-            if (Math.abs(deltaY) >= Math.abs(deltaX*0.5)) {
-                dragged = false;
-                deltaX = 0;
-                deltaY = 0;
-            } else {
-                evt.consume();
-            }
-        }
-    };
-    
-    private final ActionListener pointerReleased = new ActionListener() {
-        private int tapThreshold = CN.convertToPixels(1);
-        private boolean dragWasActuallyATap() {
-            return System.currentTimeMillis() - dragStartTime < 60 && Math.abs(deltaX) < tapThreshold;
-        }
-        
-        public void actionPerformed(ActionEvent evt) {
-            if (animationLock) {
-                return;
-            }
-            animationLock = true;
-            
-            if (!dragWasActuallyATap() && dragged) {
-                if (deltaX > 0) { //dragged from RtL
-                    int trackLength = 0;
-                    if (isRTL()) {
-                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                    } else {
-                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                    }
-                    if (deltaX > trackLength / 2) {
-                        animateTo(isRTL(), deltaX, trackLength, trackLength);
-                    } else { //Not moved enaugh, go back to the state where we come from (i.e. ON for LtR switch and OFF for RtL ones)
-                        animateTo(!isRTL(), deltaX, 0, trackLength);
-                    }
-                } else { //dragged from LtR
-                    int trackLength = 0;
-                    if (isRTL()) {
-                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                    } else {
-                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                    }
-                    if (deltaX * -1 > trackLength / 2) {
-                        animateTo(!isRTL(), deltaX, -trackLength, trackLength);
-                    } else {
-                        animateTo(isRTL(), deltaX, 0, trackLength);
-                    }
-                }  
-            } else {
-                if (value) {
-                    int trackLength = 0;
-                    if (isRTL()) {
-                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                    } else {
-                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                    }
-                    animateTo(false, 0, trackLength, trackLength);
-                } else {
-                    int trackLength = 0;
-                    if (isRTL()) {
-                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();
-                    } else {
-                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();
-                    }
-                    animateTo(true, 0, -trackLength, trackLength);
-                }
-
-            }
-            // PMD Fix (UnnecessaryReturn): Removed redundant return at the end of the method.
-            animationLock = false;
-        }
-    };
-    
-    
-   
 
     private void animateTo(final boolean value, final int deltaStart, final int deltaEnd, final int maxMoveDist) {
         int anim_duration = (int) Math.abs((deltaEnd - deltaStart) / (double) maxMoveDist * 100.0);
@@ -815,7 +899,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             dragged = false;
             setValue(value, true);
         }
-        
+
     }
 
     /**
@@ -835,13 +919,13 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     public void setValue(boolean value) {
         setValue(value, false);
     }
-    
+
     // PMD Fix (UnusedPrivateMethod): Removed the unused flip() helper and retained this setter as the single source of truth.
     private void setValue(boolean value, boolean fireEvent) {
         boolean orig = animationLock;
         animationLock = true;
         boolean oldValue = this.value;
-        
+
         this.value = value;
         if (oldValue != value) {
             fireChangeEvent();
@@ -855,6 +939,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     /**
      * Checks if switch is in the "on" position.
+     *
      * @return True if switch is on.
      */
     public boolean isOn() {
@@ -870,6 +955,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     /**
      * Checks if the switch is in the "off" position.
+     *
      * @return True of switch is currently off.
      */
     public boolean isOff() {
@@ -888,7 +974,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      */
     public String[] getPropertyNames() {
         return new String[]{
-            "value",};
+                "value",};
     }
 
     /**
@@ -911,7 +997,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      * @param state the non-null state
      */
     public void setComponentState(Object state) {
-        System.out.println("Setting component state "+state);
+        System.out.println("Setting component state " + state);
         value = ((Boolean) state).booleanValue();
     }
 
@@ -920,7 +1006,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      */
     public Class[] getPropertyTypes() {
         return new Class[]{
-            Boolean.class,};
+                Boolean.class,};
     }
 
     /**
@@ -947,115 +1033,13 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return super.setPropertyValue(name, value);
     }
 
-    
-
-    private void setThumbOnImage(Image image) {
-        if (image != null) {
-            this.thumbOnImage = image;
-            //also set other thumb images if we don't have images for them yet
-            if (this.thumbOffImage == null) {
-                this.thumbOffImage = image;
-            }
-            if (this.thumbDisabledImage == null) {
-                this.thumbDisabledImage = image;
-            }
-            setShouldCalcPreferredSize(true);
-        }
-    }
-
-    
-
-    private void setThumbOffImage(Image image) {
-        if (image != null) {
-            this.thumbOffImage = image;
-            //also set other thumb images if we don't have images for them yet
-            if (this.thumbOnImage == null) {
-                this.thumbOnImage = image;
-            }
-            if (this.thumbDisabledImage == null) {
-                this.thumbDisabledImage = image;
-            }
-            setShouldCalcPreferredSize(true);
-        }
-    }
-
-
-    private void setThumbDisabledImage(Image image) {
-        if (image != null) {
-            this.thumbDisabledImage = image;
-            //also set other thumb images if we don't have images for them yet
-            if (this.thumbOnImage == null) {
-                this.thumbOnImage = image;
-            }
-            if (this.thumbDisabledImage == null) {
-                this.thumbDisabledImage = image;
-            }
-            setShouldCalcPreferredSize(true);
-        }
-    }
-
-   
-
-    private void setTrackOnImage(Image image) {
-        if (image != null) {
-            this.trackOnImage = image;
-            if (this.trackOffImage == null) {
-                this.trackOffImage = image;
-            }
-            if (this.trackDisabledImage == null) {
-                this.trackDisabledImage = image;
-            }
-            setShouldCalcPreferredSize(true);
-        }
-    }
-
-    
-
-    /**
-     * Sets the image to use for the track when the switch is set to "off".
-     * Use the "switchOffTrackImage" theme constant as a default value.
-     * @param image The image to use.
-     */
-    private void setTrackOffImage(Image image) {
-        if (image != null) {
-            this.trackOffImage = image;
-            if (this.trackOnImage == null) {
-                this.trackOnImage = image;
-            }
-            if (this.trackDisabledImage == null) {
-                this.trackDisabledImage = image;
-            }
-            setShouldCalcPreferredSize(true);
-        }
-    }
-
-
-    /**
-     * Sets the image to be used for track when the component is disabled.
-     * Use the "switchDisabledTrackImage" theme constant as a default value.
-     * @param image 
-     */
-    private void setTrackDisabledImage(Image image) {
-        if (image != null) {
-            this.trackDisabledImage = image;
-            if (this.trackOnImage == null) {
-                this.trackOnImage = image;
-            }
-            if (this.trackOffImage == null) {
-                this.trackOffImage = image;
-            }
-            setShouldCalcPreferredSize(true);
-        }
-    }
-
     /*
     The following methods are here to support the ReleasableComponent interface
     Which is necessary for press/release to work properly.  If the component
     weren't a ReleasableComponent, some pointerReleased() events may not be called.
     */
-    
+
     /**
-     * 
      * {@inheritDoc }
      */
     @Override
@@ -1064,16 +1048,14 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     }
 
     /**
-     * 
      * {@inheritDoc }
      */
     @Override
     public void setAutoRelease(boolean arg0) {
-        
+
     }
 
     /**
-     * 
      * {@inheritDoc }
      */
     @Override
@@ -1082,21 +1064,19 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     }
 
     /**
-     * 
      * {@inheritDoc }
      */
     @Override
     public void setReleaseRadius(int arg0) {
-        
+
     }
 
     /**
-     * 
      * {@inheritDoc }
      */
     @Override
     public void setReleased() {
-        
+
     }
 
 }

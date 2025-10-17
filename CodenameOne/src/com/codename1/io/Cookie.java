@@ -34,22 +34,51 @@ import java.io.IOException;
  * @author Shai Almog
  */
 public class Cookie implements Externalizable {
+    public static String STORAGE_NAME = "Cookies";
+    private static boolean autoStored = true;
+
+    static {
+        Util.register("Cookie", Cookie.class);
+    }
+
     private String name;
     private String value;
     private String domain;
-    private String path="/";
-    private boolean secure=false;
-    private boolean httpOnly=false;
-    
+    private String path = "/";
+    private boolean secure = false;
+    private boolean httpOnly = false;
     private long expires;
 
-    private static boolean autoStored = true;
-
-    public static String STORAGE_NAME = "Cookies";
-    
-    static{
-        Util.register("Cookie", Cookie.class);
+    /**
+     * Returns true if the Cookies are auto stored to storage
+     *
+     * @return autoStored
+     */
+    public static boolean isAutoStored() {
+        return autoStored;
     }
+
+    /**
+     * This method configures the auto storage of cookies
+     *
+     * @param autoStored
+     */
+    public static void setAutoStored(boolean autoStored) {
+        Cookie.autoStored = autoStored;
+    }
+
+    /**
+     * Clears all cookies history from storage
+     */
+    public static void clearCookiesFromStorage() {
+        if (Storage.getInstance().exists(Cookie.STORAGE_NAME)) {
+            Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
+        }
+        // This is necessary to clear cookies on iOS
+        // https://github.com/codenameone/CodenameOne/issues/1422
+        Util.getImplementation().clearNativeCookies();
+    }
+
     /**
      * @return the name
      */
@@ -64,30 +93,30 @@ public class Cookie implements Externalizable {
         this.name = name;
     }
 
-    public void setSecure(boolean secure){
-        this.secure = secure;
-    }
-    
-    public boolean isSecure(){
+    public boolean isSecure() {
         return this.secure;
     }
-    
-    public void setHttpOnly(boolean httpOnly){
-        this.httpOnly = httpOnly;
+
+    public void setSecure(boolean secure) {
+        this.secure = secure;
     }
-    
-    public boolean isHttpOnly(){
+
+    public boolean isHttpOnly() {
         return this.httpOnly;
     }
-    
-    public void setPath(String path){
-        this.path = path;
+
+    public void setHttpOnly(boolean httpOnly) {
+        this.httpOnly = httpOnly;
     }
-    
-    public String getPath(){
+
+    public String getPath() {
         return this.path;
     }
-    
+
+    public void setPath(String path) {
+        this.path = path;
+    }
+
     /**
      * @return the value
      */
@@ -142,13 +171,13 @@ public class Cookie implements Externalizable {
      */
     public void externalize(DataOutputStream out) throws IOException {
         out.writeUTF(name);
-        if(value != null) {
+        if (value != null) {
             out.writeBoolean(true);
             out.writeUTF(value);
         } else {
             out.writeBoolean(false);
         }
-        if(domain != null) {
+        if (domain != null) {
             out.writeBoolean(true);
             out.writeUTF(domain);
         } else {
@@ -162,10 +191,10 @@ public class Cookie implements Externalizable {
      */
     public void internalize(int version, DataInputStream in) throws IOException {
         name = in.readUTF();
-        if(in.readBoolean()) {
+        if (in.readBoolean()) {
             value = in.readUTF();
         }
-        if(in.readBoolean()) {
+        if (in.readBoolean()) {
             domain = in.readUTF();
         }
         expires = in.readLong();
@@ -182,36 +211,6 @@ public class Cookie implements Externalizable {
      * {@inheritDoc}
      */
     public String toString() {
-        return "name = " + name + " value = " + value + " domain = " + domain + "expires = "+expires +" secure = "+secure+" path = "+path;
-    }
-
-    /**
-     * This method configures the auto storage of cookies
-     *
-     * @param autoStored
-     */
-    public static void setAutoStored(boolean autoStored) {
-        Cookie.autoStored = autoStored;
-    }
-
-    /**
-     * Returns true if the Cookies are auto stored to storage
-     * 
-     * @return autoStored
-     */
-    public static boolean isAutoStored() {
-        return autoStored;
-    }
-    
-    /**
-     * Clears all cookies history from storage
-     */
-    public static void clearCookiesFromStorage() {
-        if (Storage.getInstance().exists(Cookie.STORAGE_NAME)) {
-            Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
-        }
-        // This is necessary to clear cookies on iOS
-        // https://github.com/codenameone/CodenameOne/issues/1422
-        Util.getImplementation().clearNativeCookies();
+        return "name = " + name + " value = " + value + " domain = " + domain + "expires = " + expires + " secure = " + secure + " path = " + path;
     }
 }

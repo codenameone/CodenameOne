@@ -25,20 +25,26 @@ package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Log;
-import com.codename1.ui.*;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Painter;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.html.IOCallback;
-import com.codename1.ui.html.DocumentInfo;
-import com.codename1.ui.html.HTMLComponent;
-import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.html.DefaultHTMLCallback;
-import com.codename1.ui.html.HTMLCallback;
-import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.util.Base64;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.html.DefaultHTMLCallback;
+import com.codename1.ui.html.DocumentInfo;
+import com.codename1.ui.html.HTMLCallback;
+import com.codename1.ui.html.HTMLComponent;
+import com.codename1.ui.html.IOCallback;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.util.Base64;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -49,7 +55,7 @@ import java.io.OutputStreamWriter;
  * automatically picks the right component for the platform preferring BrowserComponent whenever it
  * is supported.
  * </p>
- *  <p>On Android this component might show a native progress indicator dialog. You can disable that functionality
+ * <p>On Android this component might show a native progress indicator dialog. You can disable that functionality
  * using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.</p>
  *
  * @author Shai Almog
@@ -64,14 +70,14 @@ public class WebBrowser extends Container {
 
     /**
      * Constructor with a URL
-     * 
+     *
      * @param url the url
      */
     public WebBrowser(String url) {
         this();
         setURL(url);
     }
-    
+
     /**
      * Default constructor
      */
@@ -103,25 +109,25 @@ public class WebBrowser extends Container {
                 internal = b;
                 addComponent(BorderLayout.CENTER, internal);
                 return;
-            } 
-        } catch(Throwable t) {
+            }
+        } catch (Throwable t) {
             // workaround for issue in the designer related to JavaFX, fallback to lightweight mode...
             Log.e(t);
         }
-        
+
         isNative = false;
         HTMLComponent h = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
 
             protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
-                    final IOCallback callback, final Object[] response) {
+                                                                final IOCallback callback, final Object[] response) {
                 return new ConnectionRequest() {
 
                     protected void buildRequestBody(OutputStream os) throws IOException {
                         // PMD Fix (CollapsibleIfStatements): Merge the post and parameter checks into a single conditional.
                         if (isPost() && docInfo.getParams() != null) {
                             String enc = docInfo.getEncoding();
-                            if(enc.indexOf('/') > -1) {
-                                if(enc.indexOf("charset=") > -1) {
+                            if (enc.indexOf('/') > -1) {
+                                if (enc.indexOf("charset=") > -1) {
                                     enc = enc.substring(enc.indexOf("charset=") + 8);
                                 } else {
                                     enc = DocumentInfo.ENCODING_UTF8;
@@ -162,17 +168,17 @@ public class WebBrowser extends Container {
                     protected void handleException(Exception err) {
                         System.out.println("Error occured");
                         Log.e(err);
-                        if(loading != null){
+                        if (loading != null) {
                             loading.unInstall();
                         }
                     }
 
                     public boolean onRedirect(String url) {
                         onStart(url);
-                        if(((HTMLComponent)internal).getPageStatus() == HTMLCallback.STATUS_CANCELLED){
+                        if (((HTMLComponent) internal).getPageStatus() == HTMLCallback.STATUS_CANCELLED) {
                             return true;
                         }
-                        return super.onRedirect(url);                            
+                        return super.onRedirect(url);
                     }
 
 
@@ -185,13 +191,13 @@ public class WebBrowser extends Container {
 
             public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
                 Form f = htmlC.getComponentForm();
-                if(f != null){
-                    if(status == STATUS_REQUESTED || (loading == null && status == STATUS_CONNECTED)){
+                if (f != null) {
+                    if (status == STATUS_REQUESTED || (loading == null && status == STATUS_CONNECTED)) {
                         loading = new Loading(f);
                         loading.install();
-                    }else{
-                        if(loading != null && ( status == STATUS_DISPLAYED || 
-                                status == STATUS_ERROR || status == STATUS_CANCELLED)){
+                    } else {
+                        if (loading != null && (status == STATUS_DISPLAYED ||
+                                status == STATUS_ERROR || status == STATUS_CANCELLED)) {
                             loading.unInstall();
                         }
                     }
@@ -217,6 +223,7 @@ public class WebBrowser extends Container {
      * appending them as a URI. E.g. instead of referencing a file or URL just load the image data
      * and place the contents of this string into the src attribute.
      * <p>This is the easiest way to get an HTML with local images to work on all mobile platforms.
+     *
      * @param data data of an image
      * @param mime the mime type of the image e.g. image/png
      * @return a data URL that can be placed into the img src attribute in HTML e.g. data:image/png;base64,encodedData
@@ -224,11 +231,12 @@ public class WebBrowser extends Container {
     public static String createDataURI(byte[] data, String mime) {
         return "data:" + mime + ";base64," + Base64.encodeNoNewline(data);
     }
-    
+
     /**
      * This is a callback method, this method is called before the url has been
      * loaded
-     * @param url 
+     *
+     * @param url
      */
     public void onStart(String url) {
     }
@@ -236,52 +244,56 @@ public class WebBrowser extends Container {
     /**
      * This is a callback method, this method is called after the url has been
      * loaded
-     * @param url 
+     *
+     * @param url
      */
     public void onLoad(String url) {
     }
 
     /**
-     * Set the browser navigation callback which allows handling a case where 
-     * a URL invocation can be delegated to Java code. This allows binding 
+     * The browser navigation callback interface allows handling a case where
+     * a URL invocation can be delegated to Java code. This allows binding
      * Java side functionality to JavaScript functionality in the same
      * way PhoneGap/Cordova work
-     * @param callback the callback interface
-     */
-    public void setBrowserNavigationCallback(BrowserNavigationCallback callback){
-        if(BrowserComponent.isNativeBrowserSupported()) {
-            ((BrowserComponent)this.getInternal()).setBrowserNavigationCallback(callback);
-        } 
-    }
-
-    /**
-     * The browser navigation callback interface allows handling a case where 
-     * a URL invocation can be delegated to Java code. This allows binding 
-     * Java side functionality to JavaScript functionality in the same
-     * way PhoneGap/Cordova work
-     * 
+     *
      * @return the callback interface
      */
-    public BrowserNavigationCallback getBrowserNavigationCallback(){
-        if(BrowserComponent.isNativeBrowserSupported()) {
-            return ((BrowserComponent)this.getInternal()).getBrowserNavigationCallback();
+    public BrowserNavigationCallback getBrowserNavigationCallback() {
+        if (BrowserComponent.isNativeBrowserSupported()) {
+            return ((BrowserComponent) this.getInternal()).getBrowserNavigationCallback();
         } else {
             return null;
         }
     }
 
     /**
+     * Set the browser navigation callback which allows handling a case where
+     * a URL invocation can be delegated to Java code. This allows binding
+     * Java side functionality to JavaScript functionality in the same
+     * way PhoneGap/Cordova work
+     *
+     * @param callback the callback interface
+     */
+    public void setBrowserNavigationCallback(BrowserNavigationCallback callback) {
+        if (BrowserComponent.isNativeBrowserSupported()) {
+            ((BrowserComponent) this.getInternal()).setBrowserNavigationCallback(callback);
+        }
+    }
+
+    /**
      * This is a callback method to inform on an error.
-     * @param message 
-     * @param errorCode 
+     *
+     * @param message
+     * @param errorCode
      */
     public void onError(String message, int errorCode) {
     }
 
     /**
      * Since the internal component can be either an HTMLComponent or a BrowserComponent one of them
-     * will be returned. If you are targeting modern smartphones only you can rely on this method 
+     * will be returned. If you are targeting modern smartphones only you can rely on this method
      * returning a BrowserComponent instance.
+     *
      * @return BrowserComponent or HTMLComponent
      */
     public Component getInternal() {
@@ -290,6 +302,7 @@ public class WebBrowser extends Container {
 
     /**
      * Returns the title for the browser page
+     *
      * @return the title
      */
     public String getTitle() {
@@ -302,6 +315,7 @@ public class WebBrowser extends Container {
 
     /**
      * The page URL
+     *
      * @return the URL
      */
     public String getURL() {
@@ -314,7 +328,8 @@ public class WebBrowser extends Container {
 
     /**
      * Sets the page URL, jar: URL's must be supported by the implementation
-     * @param url  the URL
+     *
+     * @param url the URL
      */
     public void setURL(String url) {
         if (isNative) {
@@ -345,7 +360,7 @@ public class WebBrowser extends Container {
             ((HTMLComponent) internal).cancel();
         }
     }
-    
+
     /**
      * Release WebBrowser native resources.
      */
@@ -361,7 +376,7 @@ public class WebBrowser extends Container {
     /**
      * Shows the given HTML in the native viewer
      *
-     * @param html HTML web page
+     * @param html    HTML web page
      * @param baseUrl base URL to associate with the HTML
      */
     public void setPage(String html, String baseUrl) {
@@ -375,7 +390,7 @@ public class WebBrowser extends Container {
 
     /**
      * Returns the page set by getPage for the GUI builder
-     * 
+     *
      * @return the HTML page set manually
      */
     public String getPage() {
@@ -400,7 +415,7 @@ public class WebBrowser extends Container {
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"String", "String"};
+        return new String[]{"String", "String"};
     }
 
     /**
@@ -430,20 +445,20 @@ public class WebBrowser extends Container {
         }
         return super.setPropertyValue(name, value);
     }
-    
-    class Loading implements Painter, Animation{
+
+    class Loading implements Painter, Animation {
 
         private Form f;
-        
+
         private InfiniteProgress progress = new InfiniteProgress();
-        
-        Loading(Form f){
+
+        Loading(Form f) {
             this.f = f;
         }
-        
+
         public void paint(Graphics g, Rectangle rect) {
-            int x = f.getWidth()/2 - progress.getPreferredW()/2;
-            int y = f.getHeight()/2 - progress.getPreferredH()/2;
+            int x = f.getWidth() / 2 - progress.getPreferredW() / 2;
+            int y = f.getHeight() / 2 - progress.getPreferredH() / 2;
             progress.setX(x);
             progress.setY(y);
             progress.setWidth(progress.getPreferredW());
@@ -458,16 +473,16 @@ public class WebBrowser extends Container {
         public void paint(Graphics g) {
             paint(g, null);
         }
-        
-        void install(){
+
+        void install() {
             f.setGlassPane(this);
             f.registerAnimated(this);
         }
-        
-        void unInstall(){
+
+        void unInstall() {
             f.setGlassPane(null);
             f.deregisterAnimated(this);
         }
-    
+
     }
 }

@@ -24,6 +24,7 @@
 package com.codename1.ui.html;
 
 import com.codename1.ui.geom.Rectangle;
+
 import java.util.Hashtable;
 
 /**
@@ -38,16 +39,16 @@ class ImageMapData {
     String defaultLink;
 
     ImageMapData(String name) {
-        this.name=name;
+        this.name = name;
     }
 
     void setDefaultLink(String link) {
-        defaultLink=link;
+        defaultLink = link;
     }
 
-    void addRectArea(Rectangle rect,String link) {
-        if (areas==null) {
-            areas=new Hashtable();
+    void addRectArea(Rectangle rect, String link) {
+        if (areas == null) {
+            areas = new Hashtable();
         }
         areas.put(rect, link);
     }

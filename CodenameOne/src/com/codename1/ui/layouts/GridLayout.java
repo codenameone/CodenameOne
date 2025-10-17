@@ -36,12 +36,12 @@ import com.codename1.ui.plaf.Style;
  * If the number of rows * columns is smaller than the number of components added a new row is implicitly added to the grid.
  * However, if the number of components is smaller than available cells (won't fill the last row) blank spaces will
  * be left in place.
- * </p> 
+ * </p>
  * <p>
  * In this example we can see that a 2x2 grid is used to add 5 elements, this results in an additional row that's implicitly
  * added turning the grid to a 3x2 grid implicitly and leaving one blank cell.
  * </p>
- *<script src="https://gist.github.com/codenameone/cd69363cc953f6bdb66c.js"></script>
+ * <script src="https://gist.github.com/codenameone/cd69363cc953f6bdb66c.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-2x2.png" alt="Grid Layout 2x2" />
  * <p>
  * When we use a 2x4 size ratio we would see elements getting cropped as we do here. The grid layout uses the grid
@@ -49,7 +49,7 @@ import com.codename1.ui.plaf.Style;
  * </p>
  * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-2x4.png" alt="Grid Layout 2x4" />
  * <p>
- * Grid also has an autoFit attribute that can be used to automatically calculate the column count based on 
+ * Grid also has an autoFit attribute that can be used to automatically calculate the column count based on
  * available space and preferred width. This is really useful for working with UI's where the device orientation
  * might change.<br>
  * There is also a terse syntax for working with a grid that has two versions, one that uses the "auto fit" option and
@@ -59,20 +59,19 @@ import com.codename1.ui.plaf.Style;
  * <script src="https://gist.github.com/codenameone/acb3e2dc10ea767a72db.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-portrait.png" alt="Grid Layout autofit portrait" />
  * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-landscape.png" alt="Grid Layout autofit landscape" />
- * 
- * 
+ *
  * @author Chen Fishbein
  */
-public class GridLayout extends Layout{
+public class GridLayout extends Layout {
     private boolean fillLastRow;
     private int portraitRows;
     private int portraitColumns;
 
     private int landscapeRows = -1;
     private int landscapeColumns = -1;
-    
+
     /**
-     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This 
+     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
      * makes animating a grid layout component MUCH easier.
      */
     private boolean hideZeroSized;
@@ -81,30 +80,29 @@ public class GridLayout extends Layout{
      * Auto fits columns/rows to available screen space
      */
     private boolean autoFit;
-    
-    /** 
+
+    /**
      * Creates a new instance of GridLayout with the given rows and columns
-     * 
-     * @param rows - number of rows.
+     *
+     * @param rows    - number of rows.
      * @param columns - number of columns.
      * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
      */
     public GridLayout(int rows, int columns) {
         this.portraitRows = rows;
         this.portraitColumns = columns;
-        if(rows < 1 || columns < 1){
+        if (rows < 1 || columns < 1) {
             throw new IllegalArgumentException("Rows and columns must be greater than zero");
         }
     }
 
-    /** 
+    /**
      * Creates a new instance of GridLayout with the given rows and columns
-     * 
-     * @param rows - number of rows.
-     * @param columns - number of columns.
-     * @param landscapeRows - number of rows when in landscape mode
+     *
+     * @param rows             - number of rows.
+     * @param columns          - number of columns.
+     * @param landscapeRows    - number of rows when in landscape mode
      * @param landscapeColumns - number of columns when in landscape mode
-     * 
      * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
      */
     public GridLayout(int rows, int columns, int landscapeRows, int landscapeColumns) {
@@ -112,15 +110,15 @@ public class GridLayout extends Layout{
         this.portraitColumns = columns;
         this.landscapeRows = landscapeRows;
         this.landscapeColumns = landscapeColumns;
-        if(rows < 1 || columns < 1){
+        if (rows < 1 || columns < 1) {
             throw new IllegalArgumentException("Rows and columns must be greater than zero");
         }
     }
 
-    /** 
+    /**
      * Creates a new instance of GridLayout with the given columns, rows is set to 1 but will implicitly grow
      * if more components are added
-     * 
+     *
      * @param columns - number of columns.
      * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
      */
@@ -130,34 +128,36 @@ public class GridLayout extends Layout{
 
     /**
      * Returns a grid layout that implicitly auto-fits to width in term of number of columns
+     *
      * @return a grid layout that automatically adapts its size
      */
     public static GridLayout autoFit() {
-        GridLayout g= new GridLayout(1);
+        GridLayout g = new GridLayout(1);
         g.setAutoFit(true);
         return g;
     }
-    
+
     /**
      * Creates a new container with an auto fit grid layout and the components added to it
+     *
      * @param cmp the components
      * @return a new container
      */
     public static Container encloseIn(Component... cmp) {
         return Container.encloseIn(autoFit(), cmp);
     }
-    
+
     /**
      * Creates a new container with the grid layout and the components added to it
-     * 
+     *
      * @param columns the number of columns for the grid
-     * @param cmp the components
+     * @param cmp     the components
      * @return a new container
      */
     public static Container encloseIn(int columns, Component... cmp) {
         return Container.encloseIn(new GridLayout(columns), cmp);
     }
-        
+
     private boolean isLandscapeMode() {
         return landscapeRows > -1 && (!Display.getInstance().isPortrait());
     }
@@ -165,40 +165,40 @@ public class GridLayout extends Layout{
     private int autoSizeCols(Container parent, int width, boolean landscapeMode) {
         int numOfcomponents = parent.getComponentCount();
         int totalComponentCount = numOfcomponents;
-        if(isAutoFit()) {
+        if (isAutoFit()) {
             int maxWidth = 0;
-            for(int iter = 0 ; iter < numOfcomponents ; iter++) {
+            for (int iter = 0; iter < numOfcomponents; iter++) {
                 Component cmp = parent.getComponentAt(iter);
-                if(hideZeroSized && cmp.isHidden()) {
+                if (hideZeroSized && cmp.isHidden()) {
                     totalComponentCount--;
                 } else {
                     Style s = cmp.getStyle();
                     maxWidth = Math.max(cmp.getPreferredW() + s.getHorizontalMargins(), maxWidth);
                 }
             }
-            if(width < maxWidth) {
+            if (width < maxWidth) {
                 width = Display.getInstance().getDisplayWidth();
             }
-            if(landscapeMode) {
+            if (landscapeMode) {
                 // prevent arithmetic exception
-                if(maxWidth <= 0) {
+                if (maxWidth <= 0) {
                     landscapeColumns = 1;
                 } else {
                     landscapeColumns = Math.max(width / maxWidth, 1);
                 }
                 landscapeRows = Math.max(1, totalComponentCount / landscapeColumns);
-                if(totalComponentCount % landscapeColumns > 0 && totalComponentCount > landscapeColumns) {
+                if (totalComponentCount % landscapeColumns > 0 && totalComponentCount > landscapeColumns) {
                     landscapeRows++;
                 }
             } else {
                 // prevent arithmentic exception
-                if(maxWidth <= 0) {
+                if (maxWidth <= 0) {
                     portraitColumns = 1;
                 } else {
                     portraitColumns = Math.max(width / maxWidth, 1);
                 }
                 portraitRows = Math.max(1, totalComponentCount / portraitColumns);
-                if(totalComponentCount % portraitColumns > 0 && totalComponentCount > portraitColumns) {
+                if (totalComponentCount % portraitColumns > 0 && totalComponentCount > portraitColumns) {
                     portraitRows++;
                 }
             }
@@ -208,7 +208,7 @@ public class GridLayout extends Layout{
 
     /**
      * {@inheritDoc}
-     */    
+     */
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
         int width = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();
@@ -217,60 +217,60 @@ public class GridLayout extends Layout{
 
         boolean landscapeMode = isLandscapeMode();
         autoSizeCols(parent, width, landscapeMode);
-        
+
         int rows, columns;
-        if(landscapeMode) {
+        if (landscapeMode) {
             rows = landscapeRows;
             columns = landscapeColumns;
         } else {
             rows = portraitRows;
             columns = portraitColumns;
         }
-        
+
         int x = s.getPaddingLeft(parent.isRTL());
         int y = s.getPaddingTop();
 
         boolean rtl = parent.isRTL();
         if (rtl) {
-        	x += parent.getSideGap();
+            x += parent.getSideGap();
         }
         int localColumns = columns;
         int cmpWidth = width / columns;
         int cmpHeight;
         if (numOfcomponents > rows * columns) {
             // actual rows number
-            cmpHeight  = height / (numOfcomponents / columns + (numOfcomponents % columns == 0 ? 0 : 1));
+            cmpHeight = height / (numOfcomponents / columns + (numOfcomponents % columns == 0 ? 0 : 1));
         } else {
-            cmpHeight  = height / rows;
+            cmpHeight = height / rows;
         }
-        int row = 0;        
-        
+        int row = 0;
+
         int offset = 0;
-        for(int iter = 0 ; iter < numOfcomponents ; iter++){
+        for (int iter = 0; iter < numOfcomponents; iter++) {
             Component cmp = parent.getComponentAt(iter);
             Style cmpStyle = cmp.getStyle();
             int marginLeft = cmpStyle.getMarginLeft(parent.isRTL());
             int marginTop = cmpStyle.getMarginTop();
-            if(hideZeroSized) {
-                if(cmp.isHidden()) {
+            if (hideZeroSized) {
+                if (cmp.isHidden()) {
                     continue;
                 }
             }
             cmp.setWidth(cmpWidth - marginLeft - cmpStyle.getMarginRight(parent.isRTL()));
             cmp.setHeight(cmpHeight - marginTop - cmpStyle.getMarginBottom());
             if (rtl) {
-            	cmp.setX(x + (localColumns - 1 - (offset % localColumns)) * cmpWidth + marginLeft);
+                cmp.setX(x + (localColumns - 1 - (offset % localColumns)) * cmpWidth + marginLeft);
             } else {
-            	cmp.setX(x + (offset % localColumns) * cmpWidth + marginLeft);
+                cmp.setX(x + (offset % localColumns) * cmpWidth + marginLeft);
             }
             cmp.setY(y + row * cmpHeight + marginTop);
-            if((offset + 1) % columns == 0){
+            if ((offset + 1) % columns == 0) {
                 row++;
-                
+
                 // check if we need to recalculate component widths
-                if(fillLastRow && row == rows - 1) {
+                if (fillLastRow && row == rows - 1) {
                     localColumns = numOfcomponents % columns;
-                    if(localColumns == 0) {
+                    if (localColumns == 0) {
                         localColumns = columns;
                     }
                     cmpWidth = width / localColumns;
@@ -289,9 +289,9 @@ public class GridLayout extends Layout{
 
         int numOfcomponents = parent.getComponentCount();
         int totalComponentCount = numOfcomponents;
-        for(int i=0; i< numOfcomponents; i++){
+        for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
-            if(hideZeroSized && cmp.isHidden()) {
+            if (hideZeroSized && cmp.isHidden()) {
                 totalComponentCount--;
             } else {
                 width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL());
@@ -302,7 +302,7 @@ public class GridLayout extends Layout{
         boolean landscapeMode = isLandscapeMode();
         autoSizeCols(parent, parent.getWidth(), landscapeMode);
         int rows, columns;
-        if(landscapeMode) {
+        if (landscapeMode) {
             rows = landscapeRows;
             columns = landscapeColumns;
         } else {
@@ -310,15 +310,15 @@ public class GridLayout extends Layout{
             columns = portraitColumns;
         }
 
-        if(columns > 1){
-            width = width*columns;
+        if (columns > 1) {
+            width = width * columns;
         }
 
-        if(rows > 1){
-            if(totalComponentCount>rows*columns){ //if there are more components than planned
-                height =  height * (totalComponentCount/columns + (totalComponentCount%columns == 0 ? 0 : 1));
-            }else{
-                height = height*rows;
+        if (rows > 1) {
+            if (totalComponentCount > rows * columns) { //if there are more components than planned
+                height = height * (totalComponentCount / columns + (totalComponentCount % columns == 0 ? 0 : 1));
+            } else {
+                height = height * rows;
             }
         }
 
@@ -326,7 +326,7 @@ public class GridLayout extends Layout{
         return new Dimension(width + s.getHorizontalPadding(),
                 height + s.getVerticalPadding());
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -352,8 +352,8 @@ public class GridLayout extends Layout{
      * {@inheritDoc}
      */
     public boolean equals(Object o) {
-        return super.equals(o) && ((GridLayout)o).getRows() == getRows() &&
-                ((GridLayout)o).getColumns() == getColumns() && ((GridLayout)o).autoFit == autoFit;
+        return super.equals(o) && ((GridLayout) o).getRows() == getRows() &&
+                ((GridLayout) o).getColumns() == getColumns() && ((GridLayout) o).autoFit == autoFit;
     }
 
     /**
@@ -369,7 +369,7 @@ public class GridLayout extends Layout{
     /**
      * When set to true makes the grid layout fill the last row of the layout
      * entirely if the number of elements in that row is bigger.
-     * 
+     *
      * @param fillLastRow the fillLastRow to set
      */
     public void setFillLastRow(boolean fillLastRow) {
@@ -378,6 +378,7 @@ public class GridLayout extends Layout{
 
     /**
      * Auto fits columns/rows to available screen space
+     *
      * @return the autoFit
      */
     public boolean isAutoFit() {
@@ -386,6 +387,7 @@ public class GridLayout extends Layout{
 
     /**
      * Auto fits columns/rows to available screen space
+     *
      * @param autoFit the autoFit to set
      */
     public void setAutoFit(boolean autoFit) {
@@ -402,6 +404,7 @@ public class GridLayout extends Layout{
     /**
      * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
      * makes animating a grid layout component MUCH easier.
+     *
      * @return the hideZeroSized
      */
     public boolean isHideZeroSized() {
@@ -411,6 +414,7 @@ public class GridLayout extends Layout{
     /**
      * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
      * makes animating a grid layout component MUCH easier.
+     *
      * @param hideZeroSized the hideZeroSized to set
      */
     public void setHideZeroSized(boolean hideZeroSized) {

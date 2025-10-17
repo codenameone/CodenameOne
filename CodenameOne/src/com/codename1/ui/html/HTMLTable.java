@@ -34,21 +34,20 @@ import com.codename1.ui.table.TableLayout.Constraint;
  */
 class HTMLTable extends Table {
 
-    boolean innerBorderGroups; // Denotes that the inner border mode is groups
-
     /**
      * Constant denoting that only inner borders rows should be drawn, only when seperating between table segments
      * The groups/segments feature is not available to Table, but is available internally to HTMLTable
      */
     static final int INNER_BORDERS_GROUPS = 4;
+    boolean innerBorderGroups; // Denotes that the inner border mode is groups
 
     /**
      * Constructs an HTMLTAble with the given model, which has to be HTMLTableModel
-     * 
+     *
      * @param model The HTMLTableModel for this Table
      */
     HTMLTable(HTMLTableModel model) {
-        super(model,false);
+        super(model, false);
         setCollapseBorder(false); //default for HTML tables
     }
 
@@ -60,16 +59,16 @@ class HTMLTable extends Table {
      * This method is overriden to return the component that is contained in the HTMLTableModel
      * (Since our model contains the actual component and does not store data that can be rendered using toString we can't use the original createCell method)
      *
-     * @param value the new value object
-     * @param row row number, -1 for the header rows
-     * @param column column number
+     * @param value    the new value object
+     * @param row      row number, -1 for the header rows
+     * @param column   column number
      * @param editable true if the cell is editable
      * @return cell component instance
      */
     protected Component createCell(Object value, int row, int column, boolean editable) {
-        Component cmp=null;
-       if (value instanceof Component) {
-            cmp=(Component)value;
+        Component cmp = null;
+        if (value instanceof Component) {
+            cmp = (Component) value;
             // TODO - table cells styling - needs to propogate downwards since the cell is usually a container, on the other hand can't wipe out the style of the container's components - TBD
 //            boolean isHeader=((HTMLTableModel)getModel()).isHeader(value);
 //            if (isHeader) {
@@ -78,7 +77,7 @@ class HTMLTable extends Table {
 //                cmp.setUIID("TableCell");
 //            }
         } else {
-            cmp=super.createCell(value, row, column, editable);
+            cmp = super.createCell(value, row, column, editable);
         }
         cmp.setFocusable(false);
         return cmp;
@@ -87,14 +86,14 @@ class HTMLTable extends Table {
     /**
      * This method is overriden to fetch the constraints from the associated HTMLTableModel and converts it to TableLayout.Constraint
      *
-     * @param value the value of the cell
-     * @param row the table row
+     * @param value  the value of the cell
+     * @param row    the table row
      * @param column the table column
      * @return the table constraint
      */
     protected Constraint createCellConstraint(Object value, int row, int column) {
-        CellConstraint cConstraint=((HTMLTableModel)getModel()).getConstraint(value);
-        if (cConstraint==null) { // Can be null for cells that were "spanned over"
+        CellConstraint cConstraint = ((HTMLTableModel) getModel()).getConstraint(value);
+        if (cConstraint == null) { // Can be null for cells that were "spanned over"
             return super.createCellConstraint(value, row, column);
         }
         Constraint constraint = new Constraint();
@@ -113,7 +112,7 @@ class HTMLTable extends Table {
      */
     protected boolean shouldDrawInnerBorderAfterRow(int row) {
         if (innerBorderGroups) {
-            return ((HTMLTableModel)getModel()).isSegmentEnd(row);
+            return ((HTMLTableModel) getModel()).isSegmentEnd(row);
         } else {
             return true;
         }
@@ -121,20 +120,18 @@ class HTMLTable extends Table {
 
     /**
      * Overrides Table.setInnerBorderMode to accept also the INNER_BORDER_GROUPS constant that implement the 'groups' value for the 'rules' attribute on the 'table' tag.
-     * 
+     *
      * @param innerBorder The inner border mode, one of the INNER_BORDER_* constants
      */
     public void setInnerBorderMode(int innerBorder) {
-        if (innerBorder==INNER_BORDERS_GROUPS) {
-            innerBorderGroups=true;
-            innerBorder=INNER_BORDERS_ROWS;
+        if (innerBorder == INNER_BORDERS_GROUPS) {
+            innerBorderGroups = true;
+            innerBorder = INNER_BORDERS_ROWS;
         } else {
-            innerBorderGroups=false;
+            innerBorderGroups = false;
         }
         super.setInnerBorderMode(innerBorder);
     }
-
-
 
 
 }

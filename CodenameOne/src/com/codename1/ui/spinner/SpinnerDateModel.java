@@ -28,9 +28,9 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.util.EventDispatcher;
+
 import java.util.Calendar;
 import java.util.Date;
-import java.util.TimeZone;
 
 /**
  * Represents a date model for the spinner
@@ -39,13 +39,51 @@ import java.util.TimeZone;
  * @deprecated use Picker instead
  */
 class SpinnerDateModel implements ListModel {
+    private static final long DAY = 24 * 60 * 60 * 1000;
     private EventDispatcher dataListener = new EventDispatcher();
     private EventDispatcher selectionListener = new EventDispatcher();
     private long min;
     private long max;
     private long currentValue;
 
-    private static final long DAY = 24 * 60 * 60 * 1000;
+    /**
+     * Indicates the range of the spinner
+     *
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
+     * @param currentValue the starting value for the mode
+     */
+    public SpinnerDateModel(long min, long max, long currentValue) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(new Date(max));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.add(Calendar.MINUTE, 0);
+        cal.add(Calendar.SECOND, 0);
+        cal.add(Calendar.MILLISECOND, 0);
+        //this.max = max - max % DAY;
+        this.max = cal.getTime().getTime();
+
+        cal.setTime(new Date(min));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.add(Calendar.MINUTE, 0);
+        cal.add(Calendar.SECOND, 0);
+        cal.add(Calendar.MILLISECOND, 0);
+        //this.min = min - min % DAY;
+        this.min = cal.getTime().getTime();
+
+        cal.setTime(new Date(currentValue));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.add(Calendar.MINUTE, 0);
+        cal.add(Calendar.SECOND, 0);
+        cal.add(Calendar.MILLISECOND, 0);
+        //this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
+        this.currentValue = cal.getTime().getTime();
+    }
+
+    Object getValue() {
+        //return new Date(currentValue - currentValue % DAY + 12 * 60 * 60000);
+        return new Date(currentValue);
+    }
 
     void setValue(Date value) {
         int oldIndex = getSelectedIndex();
@@ -62,45 +100,6 @@ class SpinnerDateModel implements ListModel {
         }
     }
 
-    Object getValue() {
-        //return new Date(currentValue - currentValue % DAY + 12 * 60 * 60000);
-        return new Date(currentValue);
-    }
-
-    /**
-     * Indicates the range of the spinner
-     * 
-     * @param min lowest value allowed
-     * @param max maximum value allowed
-     * @param currentValue the starting value for the mode
-     */
-    public SpinnerDateModel(long min, long max, long currentValue) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(new Date(max));
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.add(Calendar.MINUTE, 0);
-        cal.add(Calendar.SECOND, 0);
-        cal.add(Calendar.MILLISECOND, 0);
-        //this.max = max - max % DAY;
-        this.max = cal.getTime().getTime();
-        
-        cal.setTime(new Date(min));
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.add(Calendar.MINUTE, 0);
-        cal.add(Calendar.SECOND, 0);
-        cal.add(Calendar.MILLISECOND, 0);
-        //this.min = min - min % DAY;
-        this.min = cal.getTime().getTime();
-        
-        cal.setTime(new Date(currentValue));
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.add(Calendar.MINUTE, 0);
-        cal.add(Calendar.SECOND, 0);
-        cal.add(Calendar.MILLISECOND, 0);
-        //this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
-        this.currentValue = cal.getTime().getTime();
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -114,7 +113,7 @@ class SpinnerDateModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSize() {
-        return (int)((max - min) / DAY) + 1;
+        return (int) ((max - min) / DAY) + 1;
     }
 
 
@@ -122,7 +121,7 @@ class SpinnerDateModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSelectedIndex() {
-        int out = (int)((currentValue - min) / DAY);
+        int out = (int) ((currentValue - min) / DAY);
         return out;
     }
 

@@ -33,26 +33,14 @@ package com.codename1.ui.layouts.mig;
  *         Date: 2006-sep-08
  */
 
-import com.codename1.ui.layouts.mig.AC;
-import com.codename1.ui.layouts.mig.BoundSize;
-import com.codename1.ui.layouts.mig.ComponentWrapper;
-import com.codename1.ui.layouts.mig.CC;
-import com.codename1.ui.layouts.mig.ContainerWrapper;
-import com.codename1.ui.layouts.mig.LayoutCallback;
-import com.codename1.ui.layouts.mig.Grid;
-import com.codename1.ui.layouts.mig.LayoutUtil;
-import com.codename1.ui.layouts.mig.LC;
-import com.codename1.ui.layouts.mig.UnitValue;
-import com.codename1.ui.layouts.mig.PlatformDefaults;
-import com.codename1.ui.layouts.mig.ConstraintParser;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
+
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -75,18 +63,14 @@ public final class MigLayout extends Layout {
      * The component to string constraints mappings.
      */
     private final Map<Component, Object> scrConstrMap = new IdentityHashMap<Component, Object>(8);
-
+    private final Map<ComponentWrapper, CC> ccMap = new HashMap<ComponentWrapper, CC>(8);
     /**
      * Hold the serializable text representation of the constraints.
      */
     private Object layoutConstraints = "", colConstraints = "", rowConstraints = "";    // Should never be null!
-
-	// ******** Transient part ********
+    // ******** Transient part ********
     private ContainerWrapper cacheParentW = null;
-
-    private final Map<ComponentWrapper, CC> ccMap = new HashMap<ComponentWrapper, CC>(8);
     //private javax.swing.Timer debugTimer = null;
-
     private LC lc = null;
     private AC colSpecs = null, rowSpecs = null;
     private Grid grid = null;
@@ -99,6 +83,7 @@ public final class MigLayout extends Layout {
     private ArrayList<LayoutCallback> callbackList = null;
 
     private boolean dirty = true;
+    private long lastSize = 0;
 
     /**
      * Constructor with no constraints.
@@ -111,7 +96,7 @@ public final class MigLayout extends Layout {
      * Constructor.
      *
      * @param layoutConstraints The constraints that concern the whole layout.
-     * <code>null</code> will be treated as "".
+     *                          <code>null</code> will be treated as "".
      */
     public MigLayout(String layoutConstraints) {
         this(layoutConstraints, "", "");
@@ -121,9 +106,9 @@ public final class MigLayout extends Layout {
      * Constructor.
      *
      * @param layoutConstraints The constraints that concern the whole layout.
-     * <code>null</code> will be treated as "".
-     * @param colConstraints The constraints for the columns in the grid.
-     * <code>null</code> will be treated as "".
+     *                          <code>null</code> will be treated as "".
+     * @param colConstraints    The constraints for the columns in the grid.
+     *                          <code>null</code> will be treated as "".
      */
     public MigLayout(String layoutConstraints, String colConstraints) {
         this(layoutConstraints, colConstraints, "");
@@ -133,11 +118,11 @@ public final class MigLayout extends Layout {
      * Constructor.
      *
      * @param layoutConstraints The constraints that concern the whole layout.
-     * <code>null</code> will be treated as "".
-     * @param colConstraints The constraints for the columns in the grid.
-     * <code>null</code> will be treated as "".
-     * @param rowConstraints The constraints for the rows in the grid.
-     * <code>null</code> will be treated as "".
+     *                          <code>null</code> will be treated as "".
+     * @param colConstraints    The constraints for the columns in the grid.
+     *                          <code>null</code> will be treated as "".
+     * @param rowConstraints    The constraints for the rows in the grid.
+     *                          <code>null</code> will be treated as "".
      */
     public MigLayout(String layoutConstraints, String colConstraints, String rowConstraints) {
         setLayoutConstraints(layoutConstraints);
@@ -149,7 +134,7 @@ public final class MigLayout extends Layout {
      * Constructor.
      *
      * @param layoutConstraints The constraints that concern the whole layout.
-     * <code>null</code> will be treated as an empty constraint.
+     *                          <code>null</code> will be treated as an empty constraint.
      */
     public MigLayout(LC layoutConstraints) {
         this(layoutConstraints, null, null);
@@ -159,9 +144,9 @@ public final class MigLayout extends Layout {
      * Constructor.
      *
      * @param layoutConstraints The constraints that concern the whole layout.
-     * <code>null</code> will be treated as an empty constraint.
-     * @param colConstraints The constraints for the columns in the grid.
-     * <code>null</code> will be treated as an empty constraint.
+     *                          <code>null</code> will be treated as an empty constraint.
+     * @param colConstraints    The constraints for the columns in the grid.
+     *                          <code>null</code> will be treated as an empty constraint.
      */
     public MigLayout(LC layoutConstraints, AC colConstraints) {
         this(layoutConstraints, colConstraints, null);
@@ -171,16 +156,24 @@ public final class MigLayout extends Layout {
      * Constructor.
      *
      * @param layoutConstraints The constraints that concern the whole layout.
-     * <code>null</code> will be treated as an empty constraint.
-     * @param colConstraints The constraints for the columns in the grid.
-     * <code>null</code> will be treated as an empty constraint.
-     * @param rowConstraints The constraints for the rows in the grid.
-     * <code>null</code> will be treated as an empty constraint.
+     *                          <code>null</code> will be treated as an empty constraint.
+     * @param colConstraints    The constraints for the columns in the grid.
+     *                          <code>null</code> will be treated as an empty constraint.
+     * @param rowConstraints    The constraints for the rows in the grid.
+     *                          <code>null</code> will be treated as an empty constraint.
      */
     public MigLayout(LC layoutConstraints, AC colConstraints, AC rowConstraints) {
         setLayoutConstraints(layoutConstraints);
         setColumnConstraints(colConstraints);
         setRowConstraints(rowConstraints);
+    }
+
+    public static <E> E findType(Class<E> clazz, Component comp) {
+        while (comp != null && !clazz.isInstance(comp)) {
+            comp = comp.getParent();
+        }
+
+        return (E) comp;
     }
 
     /**
@@ -203,8 +196,8 @@ public final class MigLayout extends Layout {
      * See the class JavaDocs for information on how this string is formatted.
      *
      * @param constr The layout constraints as a String pr
-     * {@link net.miginfocom.layout.LC} representation. <code>null</code> is
-     * converted to <code>""</code> for storage.
+     *               {@link net.miginfocom.layout.LC} representation. <code>null</code> is
+     *               converted to <code>""</code> for storage.
      * @throws RuntimeException if the constraint was not valid.
      */
     public void setLayoutConstraints(Object constr) {
@@ -240,8 +233,8 @@ public final class MigLayout extends Layout {
      * See the class JavaDocs for information on how this string is formatted.
      *
      * @param constr The column layout constraints as a String or
-     * {@link net.miginfocom.layout.AC} representation. <code>null</code> is
-     * converted to <code>""</code> for storage.
+     *               {@link net.miginfocom.layout.AC} representation. <code>null</code> is
+     *               converted to <code>""</code> for storage.
      * @throws RuntimeException if the constraint was not valid.
      */
     public void setColumnConstraints(Object constr) {
@@ -277,8 +270,8 @@ public final class MigLayout extends Layout {
      * See the class JavaDocs for information on how this string is formatted.
      *
      * @param constr The row layout constraints as a String or
-     * {@link net.miginfocom.layout.AC} representation. <code>null</code> is
-     * converted to <code>""</code> for storage.
+     *               {@link net.miginfocom.layout.AC} representation. <code>null</code> is
+     *               converted to <code>""</code> for storage.
      * @throws RuntimeException if the constraint was not valid.
      */
     public void setRowConstraints(Object constr) {
@@ -342,11 +335,11 @@ public final class MigLayout extends Layout {
      * See the class JavaDocs for information on how this string is formatted.
      *
      * @param constr The component constraints as a String or
-     * {@link net.miginfocom.layout.CC}. <code>null</code> is ok.
-     * @param comp The component to set the constraints for.
-     * @throws RuntimeException if the constraint was not valid.
+     *               {@link net.miginfocom.layout.CC}. <code>null</code> is ok.
+     * @param comp   The component to set the constraints for.
+     * @throws RuntimeException         if the constraint was not valid.
      * @throws IllegalArgumentException If the component is not handling the
-     * component.
+     *                                  component.
      */
     public void setComponentConstraints(Component comp, Object constr) {
         setComponentConstraintsImpl(comp, constr, false);
@@ -358,13 +351,13 @@ public final class MigLayout extends Layout {
      * <p>
      * See the class JavaDocs for information on how this string is formatted.
      *
-     * @param constr The component constraints as a String or
-     * {@link net.miginfocom.layout.CC}. <code>null</code> is ok.
-     * @param comp The component to set the constraints for.
+     * @param constr  The component constraints as a String or
+     *                {@link net.miginfocom.layout.CC}. <code>null</code> is ok.
+     * @param comp    The component to set the constraints for.
      * @param noCheck Doe not check if the component is handled if true
-     * @throws RuntimeException if the constraint was not valid.
+     * @throws RuntimeException         if the constraint was not valid.
      * @throws IllegalArgumentException If the component is not handling the
-     * component.
+     *                                  component.
      */
     private void setComponentConstraintsImpl(Component comp, Object constr, boolean noCheck) {
         Container parent = comp.getParent();
@@ -396,7 +389,7 @@ public final class MigLayout extends Layout {
      * Returns if this layout manager is currently managing this component.
      *
      * @param c The component to check. If <code>null</code> then
-     * <code>false</code> will be returned.
+     *          <code>false</code> will be returned.
      * @return If this layout manager is currently managing this component.
      */
     public boolean isManagingComponent(Component c) {
@@ -447,7 +440,7 @@ public final class MigLayout extends Layout {
      * information.
      *
      * @param parentW The parent to set debug for.
-     * @param b <code>true</code> means debug is turned on.
+     * @param b       <code>true</code> means debug is turned on.
      */
     private void setDebug(final ComponentWrapper parentW, boolean b) {
         /*if (b && (debugTimer == null || debugTimer.getDelay() != getDebugMillis())) {
@@ -621,17 +614,15 @@ public final class MigLayout extends Layout {
         return cacheParentW;
     }
 
-    private long lastSize = 0;
-
     public void layoutContainer(final Container parent) {
         checkCache(parent);
 
         Style i = parent.getStyle();
         int[] b = new int[]{
-            i.getMarginLeftNoRTL(),
-            i.getMarginTop(),
-            parent.getWidth() - i.getHorizontalMargins(),
-            parent.getHeight() - i.getVerticalMargins()
+                i.getMarginLeftNoRTL(),
+                i.getMarginTop(),
+                parent.getWidth() - i.getHorizontalMargins(),
+                parent.getHeight() - i.getVerticalMargins()
         };
 
         if (grid.layout(b, lc.getAlignX(), lc.getAlignY(), getDebug())) {
@@ -731,14 +722,6 @@ public final class MigLayout extends Layout {
 
          return findType(Window.class, comp);*/
         return null;
-    }
-
-    public static <E> E findType(Class<E> clazz, Component comp) {
-        while (comp != null && !clazz.isInstance(comp)) {
-            comp = comp.getParent();
-        }
-
-        return (E) comp;
     }
 
     private int constrain(ContainerWrapper parent, int winSize, int prefSize, BoundSize constrain) {

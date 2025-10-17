@@ -18,6 +18,7 @@ package com.codename1.ui.layouts;
 
 /**
  * Port of Insets from Harmony for the use of the GridBag code
+ *
  * @author Dmitry A. Durnev
  */
 
@@ -59,14 +60,14 @@ public class Insets {
 
     @Override
     public String toString() {
-        /* The format is based on 1.5 release behavior 
+        /* The format is based on 1.5 release behavior
          * which can be revealed by the following code:
          * System.out.println(new Insets(1, 2, 3, 4));
          */
 
         return (getClass().getName() +
                 "[left=" + left + ",top=" + top + //$NON-NLS-1$ //$NON-NLS-2$
-                ",right=" + right + ",bottom="  + bottom + "]"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+                ",right=" + right + ",bottom=" + bottom + "]"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
     }
 
     public void set(int top, int left, int bottom, int right) {

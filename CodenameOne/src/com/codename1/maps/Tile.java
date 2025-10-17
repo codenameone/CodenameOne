@@ -19,39 +19,38 @@
  */
 package com.codename1.maps;
 
-import com.codename1.ui.geom.Dimension;
-import com.codename1.maps.BoundingBox;
-import com.codename1.maps.Coord;
-import com.codename1.ui.geom.Point;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Point;
 import com.codename1.ui.plaf.UIManager;
 
 /**
  * This class represents a single tile on a map.
- * a map is been constructed from a few tiles that are been tiled on next to the 
+ * a map is been constructed from a few tiles that are been tiled on next to the
  * other.
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public class Tile {
-    
+
+    private static Image tileLoadingImage;
+    private static String tileLoadingText = "Loading...";
+    private static Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
+    private static boolean paintLoading = false;
     private Dimension dimension;
     private BoundingBox bbox;
     private Image tileImage;
-    private static Image tileLoadingImage;    
-    private static String tileLoadingText = "Loading...";
     private ActionListener listener;
-    private static Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
-    private static boolean paintLoading = false;
-    
+
     /**
      * Creates a new Tile.
-     * 
-     * @param dimension the tile Dimensions (usually 256x256)
+     *
+     * @param dimension      the tile Dimensions (usually 256x256)
      * @param getBoundingBox the bounding box this tile is showing
-     * @param image the map image or null.
+     * @param image          the map image or null.
      */
     public Tile(Dimension dimension, BoundingBox boundingBox, Image image) {
         this.dimension = dimension;
@@ -60,9 +59,42 @@ public class Tile {
         tileLoadingImage = UIManager.getInstance().getThemeImageConstant("mapTileLoadingImage");
         tileLoadingText = UIManager.getInstance().getThemeConstant("mapTileLoadingText", "Loading...");
     }
-    
+
+    /**
+     * This flag indicates if the Tile should paint a Loading image or Text or
+     * simply not do any painting if a map image is not ready for painting
+     *
+     * @param if true a Loading rect is displayed when map image is being
+     *           downloaded
+     */
+    public static void setPaintLoading(boolean toPaint) {
+        paintLoading = toPaint;
+    }
+
+    /**
+     * Sets a static image that will be drawn on the map if the tile image is
+     * not available yet.
+     *
+     * @param tileLoadingImage
+     */
+    public static void setTileLoadingImage(Image tileLoadingImage) {
+        Tile.tileLoadingImage = tileLoadingImage;
+    }
+
+    /**
+     * Sets a static text to paint.
+     * This will be used if the map if the tile image is not available yet and
+     * the tileLoadingImage is null
+     *
+     * @param tileLoadingText
+     */
+    public static void setTileLoadingText(String tileLoadingText) {
+        Tile.tileLoadingText = tileLoadingText;
+    }
+
     /**
      * Returns the x, y point of the given coordinate relative to this tile
+     *
      * @param point a coordinate to translate to x, y
      * @return a Point object relative to this tile
      */
@@ -74,17 +106,18 @@ public class Tile {
         //
         return new Point(x, dimension.getHeight() - y);
     }
-    
+
     private int position(int dx, double x, double x1, double x2) {
         return (int) (dx * (x - x1) / (x2 - x1));
     }
-    
+
     private double coord(double percent, double x1, double x2) {
         return x1 + percent * (x2 - x1);
     }
-    
+
     /**
      * Returns the Coordinate of the given x, y position on the tile
+     *
      * @param posX
      * @param posY
      * @return a Coordinate that was created from the given x, y position
@@ -94,25 +127,28 @@ public class Tile {
         double latitude = coord(1.0 * posY / dimension.getHeight(), bbox.getSouthWest().getLatitude(), bbox.getNorthEast().getLatitude());
         return new Coord(latitude, longitude, bbox.getSouthWest().isProjected());
     }
-    
+
     /**
      * Gets the tile dimension
+     *
      * @return the tile dimension
      */
     public Dimension dimension() {
         return dimension;
     }
-    
+
     /**
      * Gets the tile bounding box.
+     *
      * @return the tile bounding box.
      */
     public BoundingBox getBoundingBox() {
         return bbox;
     }
-    
+
     /**
      * Paints the tile on the Graphics Object
+     *
      * @param g Graphics object to paint on.
      * @return true if painting succeeded.
      */
@@ -123,12 +159,12 @@ public class Tile {
         }
         return false;
     }
-    
+
     /**
-     * Paints the tile on the Graphics Object translated to the given x, y, 
-     * This method paints the tile image if available or will call 
+     * Paints the tile on the Graphics Object translated to the given x, y,
+     * This method paints the tile image if available or will call
      * paintTileLoading
-     * 
+     *
      * @param g Graphics object to paint on.
      * @param x translate to x before painting
      * @param y translate to y before painting
@@ -140,10 +176,11 @@ public class Tile {
         }
         g.translate(-x, -y);
     }
-    
+
     /**
-     * This method paints a "tile loading" on the Graphics if 
+     * This method paints a "tile loading" on the Graphics if
      * boolean paint(Graphics g) returned false.
+     *
      * @param g Graphics object to paint on.
      */
     public void paintTileLoading(Graphics g) {
@@ -151,7 +188,7 @@ public class Tile {
             paintLoadingText(g);
         } else {
             paintLoadingImage(g);
-        }        
+        }
     }
 
     private void paintLoadingText(Graphics g) {
@@ -163,7 +200,7 @@ public class Tile {
         int strWidth = f.stringWidth(tileLoadingText);
         g.drawString(tileLoadingText, (dimension().getWidth() - strWidth) / 2, (dimension().getHeight() - f.getHeight()) / 2);
     }
-    
+
     private void paintLoadingImage(Graphics g) {
         for (int y = 0; y < dimension().getHeight(); y += tileLoadingImage.getHeight()) {
             for (int x = 0; x < dimension().getWidth(); x += tileLoadingImage.getWidth()) {
@@ -171,46 +208,16 @@ public class Tile {
             }
         }
     }
-    
-    /**
-     * This flag indicates if the Tile should paint a Loading image or Text or
-     * simply not do any painting if a map image is not ready for painting
-     * 
-     * @param if true a Loading rect is displayed when map image is being 
-     * downloaded
-     */ 
-    public static void setPaintLoading(boolean toPaint){
-        paintLoading = toPaint;
-    }
-    
-    /**
-     * Sets a static image that will be drawn on the map if the tile image is 
-     * not available yet.
-     * 
-     * @param tileLoadingImage 
-     */
-    public static void setTileLoadingImage(Image tileLoadingImage) {
-        Tile.tileLoadingImage = tileLoadingImage;
-    }
-    
-    /**
-     * Sets a static text to paint.
-     * This will be used if the map if the tile image is not available yet and
-     * the tileLoadingImage is null
-     * @param tileLoadingText 
-     */
-    public static void setTileLoadingText(String tileLoadingText) {
-        Tile.tileLoadingText = tileLoadingText;
-    }
-    
+
     /**
      * Sets a Listener to be notified when the tile is fireReady to be painted
-     * @param listener 
+     *
+     * @param listener
      */
     public void setsTileReadyListener(ActionListener listener) {
         this.listener = listener;
     }
-    
+
     /**
      * inform the TileReadyListener that this tile is ready to be painted
      */
@@ -219,7 +226,7 @@ public class Tile {
             listener.actionPerformed(null);
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */

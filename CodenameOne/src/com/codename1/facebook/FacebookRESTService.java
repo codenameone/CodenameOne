@@ -31,6 +31,7 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.io.Util;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.util.StringUtil;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -46,10 +47,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
     // PMD Fix (UnusedPrivateField): Removed redundant token storage; the access token is forwarded directly via request arguments.
 
-    private Hashtable entry = new Hashtable();
-    private Hashtable currentData = entry;
-    private Vector stack = new Vector();
-    private String connectionType = "";
+    public static final String GRAPH_URL = "https://graph.facebook.com/";
     public static String PICTURE = "picture";
     public static String FRIENDS = "friends";
     public static String TAGGED = "tagged";
@@ -65,14 +63,16 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static String INBOX = "inbox";
     public static String MESSAGES = "messages";
     public static String EVENTS = "events";
-    public static String NOTES = "notes";      
-    
+    public static String NOTES = "notes";
+    private Hashtable entry = new Hashtable();
+    private Hashtable currentData = entry;
+    private Vector stack = new Vector();
+    private String connectionType = "";
     private DefaultListModel responseDestination;
     private int responseOffset = -1;
     private String imageKey;
+    private String root;
 
-    public static final String GRAPH_URL = "https://graph.facebook.com/";
-    
     public FacebookRESTService(boolean post, String token) {
         setPost(post);
     }
@@ -99,16 +99,16 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
     protected void setQuery(String query) {
         if (query.indexOf("?") > 0) {
-            String search = query.substring(query.indexOf("?")+1);
+            String search = query.substring(query.indexOf("?") + 1);
             query = query.substring(0, query.indexOf("?"));
             java.util.List<String> parts = StringUtil.tokenize(search, "&");
             for (String part : parts) {
                 java.util.List<String> kv = StringUtil.tokenize(part, "=");
-                addArgumentNoEncoding(kv.get(0), kv.size()>1 ?kv.get(1):"");
+                addArgumentNoEncoding(kv.get(0), kv.size() > 1 ? kv.get(1) : "");
             }
         }
         String url = GRAPH_URL + query;
-        if(FaceBookAccess.getApiVersion().length() > 0){
+        if (FaceBookAccess.getApiVersion().length() > 0) {
             url = GRAPH_URL + FaceBookAccess.getApiVersion() + "/" + query;
         }
         setUrl(url);
@@ -121,31 +121,30 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     protected void readResponse(InputStream input) throws IOException {
         //BufferedInputStream i = new BufferedInputStream(new InputStreamReader(input, ));
         BufferedInputStream i;
-        if(input instanceof BufferedInputStream){
+        if (input instanceof BufferedInputStream) {
             i = (BufferedInputStream) input;
-        }else{
+        } else {
             i = new BufferedInputStream(input);
         }
         i.setYield(-1);
         InputStreamReader reader = new InputStreamReader(i, "UTF-8");
         JSONParser.parse(reader, this);
         Util.cleanup(reader);
-        if(stack.size() > 0){
+        if (stack.size() > 0) {
             fireResponseListener(new NetworkEvent(this, stack.elementAt(0)));
         }
+    }
+
+    protected String getConnectionType() {
+        return connectionType;
     }
 
     protected void setConnectionType(String connectionType) {
         this.connectionType = connectionType;
     }
 
-    protected String getConnectionType() {
-        return connectionType;
-    }
-    private String root;
-
     public void startBlock(String block) {
-        if(block.equals("paging")){
+        if (block.equals("paging")) {
             return;
         }
         Object node;
@@ -157,11 +156,11 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
                 public synchronized void addElement(Object obj) {
                     if (responseDestination != null) {
-                        if(responseOffset == -1) {
+                        if (responseOffset == -1) {
                             responseDestination.addItem(obj);
                         } else {
-                            Hashtable h = (Hashtable)responseDestination.getItemAt(responseOffset);
-                            h.putAll((Hashtable)obj);
+                            Hashtable h = (Hashtable) responseDestination.getItemAt(responseOffset);
+                            h.putAll((Hashtable) obj);
                             responseDestination.setItem(responseOffset, h);
                             responseOffset++;
                         }
@@ -189,7 +188,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public void startArray(String block) {
-        if(block.equals("paging")){
+        if (block.equals("paging")) {
             return;
         }
         Vector items = new Vector();
@@ -222,10 +221,10 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public void endArray(String block) {
-        if(block.equals("paging")){
+        if (block.equals("paging")) {
             return;
         }
-        if(stack.size() > 1){
+        if (stack.size() > 1) {
             stack.removeElementAt(stack.size() - 1);
             Object node = stack.elementAt(stack.size() - 1);
             if (node instanceof Hashtable) {
@@ -233,9 +232,9 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
             }
         }
     }
-    
+
     public void endBlock(String block) {
-        if(block.equals("paging")){
+        if (block.equals("paging")) {
             return;
         }
         if (stack.size() > 1) {
@@ -272,7 +271,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
     public void setResponseDestination(DefaultListModel des) {
         responseDestination = des;
-    }    
+    }
 
     public boolean isAlive() {
         return !isKilled();

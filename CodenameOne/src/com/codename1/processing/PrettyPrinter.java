@@ -37,40 +37,41 @@ Derivative Revision History:
 package com.codename1.processing;
 
 import com.codename1.l10n.SimpleDateFormat;
+
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Private class, do not use.
- * 
+ * <p>
  * An internal utility method used by toString() methods to produce a JSON document
  * from a given Map or List.
- * 
+ *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
 class PrettyPrinter {
     Map myHashMap;
-    
+
     private PrettyPrinter(Map h) {
-    	this.myHashMap = h;
+        this.myHashMap = h;
     }
-    
+
     public static String print(Map h) {
-    	return print(h, 2, 0);
+        return print(h, 2, 0);
     }
 
     public static String print(List v) {
-    	return print(v, 2, 0);
+        return print(v, 2, 0);
     }
 
     static String print(Map h, int indentFactor, int indent) {
-    	PrettyPrinter printer = new PrettyPrinter(h);
-    	return printer.toString(indentFactor, indent);
+        PrettyPrinter printer = new PrettyPrinter(h);
+        return printer.toString(indentFactor, indent);
     }
-    
+
     static String print(List v, int indentFactor, int indent) {
         int len = v.size();
         if (len == 0) {
@@ -101,7 +102,178 @@ class PrettyPrinter {
         }
         sb.append(']');
         return sb.toString();
-    	
+
+    }
+
+    /**
+     * Make a prettyprinted JSON text of an object value.
+     * <p>
+     * Warning: This method assumes that the data structure is acyclical.
+     *
+     * @param value        The value to be serialized.
+     * @param indentFactor The number of spaces to add to each level of
+     *                     indentation.
+     * @param indent       The indentation of the top level.
+     * @return a printable, displayable, transmittable
+     * representation of the object, beginning
+     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
+     * with <code>}</code>&nbsp;<small>(right brace)</small>.
+     */
+    static String valueToString(Object value, int indentFactor, int indent) {
+        if (value == null || value.equals(null)) {
+            return "null";
+        }
+        try {
+            if (value instanceof String) {
+                return quote((String) value);
+            }
+        } catch (Exception e) {
+            /* forget about it */
+        }
+        if (value instanceof Float || value instanceof Double ||
+                value instanceof Byte || value instanceof Short ||
+                value instanceof Integer || value instanceof Long) {
+            return numberToString(value);
+        }
+        if (value instanceof Boolean) {
+            return value.toString();
+        }
+        if (value instanceof Map) {
+            return print((Map) value, indentFactor, indent);
+        }
+        if (value instanceof List) {
+            return print((List) value, indentFactor, indent);
+        }
+        if (value instanceof Date) {
+            return quote(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").format((Date) value));
+        }
+        return quote(value.toString());
+    }
+
+    /**
+     * Produce a string in double quotes with backslash sequences in all the
+     * right places. A backslash will be inserted within </, allowing JSON
+     * text to be delivered in HTML. In JSON text, a string cannot contain a
+     * control character or an unescaped quote or backslash.
+     *
+     * @param string A String
+     * @return A String correctly formatted for insertion in a JSON text.
+     */
+    public static String quote(String string) {
+        if (string == null || string.length() == 0) {
+            return "\"\"";
+        }
+
+        char b;
+        char c = 0;
+        int i;
+        int len = string.length();
+        StringBuffer sb = new StringBuffer(len + 4);
+        String t;
+
+        sb.append('"');
+        for (i = 0; i < len; i += 1) {
+            b = c;
+            c = string.charAt(i);
+            switch (c) {
+                case '\\':
+                case '"':
+                    sb.append('\\');
+                    sb.append(c);
+                    break;
+                case '/':
+                    if (b == '<') {
+                        sb.append('\\');
+                    }
+                    sb.append(c);
+                    break;
+                case '\b':
+                    sb.append("\\b");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\f':
+                    sb.append("\\f");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                default:
+                    if (c < ' ') {
+                        t = "000" + Integer.toHexString(c);
+                        sb.append("\\u" + t.substring(t.length() - 4));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        sb.append('"');
+        return sb.toString();
+    }
+
+    /**
+     * Make a JSON text of an Object value. If the object has an
+     * value.toJSONString() method, then that method will be used to produce
+     * the JSON text. The method is required to produce a strictly
+     * conforming text. If the object does not contain a toJSONString
+     * method (which is the most common case), then a text will be
+     * produced by the rules.
+     * <p>
+     * Warning: This method assumes that the data structure is acyclical.
+     *
+     * @param value The value to be serialized.
+     * @return a printable, displayable, transmittable
+     * representation of the object, beginning
+     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
+     * with <code>}</code>&nbsp;<small>(right brace)</small>.
+     */
+    static String valueToString(Object value) {
+        if (value == null || value.equals(null)) {
+            return "null";
+        }
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value instanceof Float || value instanceof Double ||
+                value instanceof Byte || value instanceof Short ||
+                value instanceof Integer || value instanceof Long) {
+            return numberToString(value);
+        }
+        if (value instanceof Boolean || value instanceof Map ||
+                value instanceof List) {
+            return value.toString();
+        }
+        return quote(value.toString());
+    }
+
+    static public String trimNumber(String s) {
+        if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
+            while (s.endsWith("0")) {
+                s = s.substring(0, s.length() - 1);
+            }
+            if (s.endsWith(".")) {
+                s = s.substring(0, s.length() - 1);
+            }
+        }
+        return s;
+    }
+
+    /**
+     * Produce a string from a Number.
+     *
+     * @param n A Number
+     * @return A String.
+     * @throws JSONException If n is a non-finite number.
+     */
+    static public String numberToString(Object n) {
+        if (n == null) {
+            return null;
+        }
+        return trimNumber(n.toString());
     }
 
     /**
@@ -126,40 +298,41 @@ class PrettyPrinter {
      * Make a prettyprinted JSON text of this Map.
      * <p>
      * Warning: This method assumes that the data structure is acyclical.
+     *
      * @param indentFactor The number of spaces to add to each level of
-     *  indentation.
+     *                     indentation.
      * @return a printable, displayable, portable, transmittable
-     *  representation of the object, beginning
-     *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     *  with <code>}</code>&nbsp;<small>(right brace)</small>.
+     * representation of the object, beginning
+     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
+     * with <code>}</code>&nbsp;<small>(right brace)</small>.
      */
     public String toString(int indentFactor) {
         return toString(indentFactor, 0);
     }
 
-
     /**
      * Make a prettyprinted JSON text of this Map.
      * <p>
      * Warning: This method assumes that the data structure is acyclical.
+     *
      * @param indentFactor The number of spaces to add to each level of
-     *  indentation.
-     * @param indent The indentation of the top level.
+     *                     indentation.
+     * @param indent       The indentation of the top level.
      * @return a printable, displayable, transmittable
-     *  representation of the object, beginning
-     *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     *  with <code>}</code>&nbsp;<small>(right brace)</small>.
+     * representation of the object, beginning
+     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
+     * with <code>}</code>&nbsp;<small>(right brace)</small>.
      */
     String toString(int indentFactor, int indent) {
-        int          i;
-        int          n = length();
+        int i;
+        int n = length();
         if (n == 0) {
             return "{}";
         }
         Enumeration keys = keys();
         StringBuffer sb = new StringBuffer("{");
-        int          newindent = indent + indentFactor;
-        Object       o;
+        int newindent = indent + indentFactor;
+        Object o;
         if (n == 1) {
             o = keys.nextElement();
             sb.append(quote(o.toString()));
@@ -192,173 +365,4 @@ class PrettyPrinter {
         sb.append('}');
         return sb.toString();
     }
-
-
-
-    /**
-     * Make a prettyprinted JSON text of an object value.
-     * <p>
-     * Warning: This method assumes that the data structure is acyclical.
-     * @param value The value to be serialized.
-     * @param indentFactor The number of spaces to add to each level of
-     *  indentation.
-     * @param indent The indentation of the top level.
-     * @return a printable, displayable, transmittable
-     *  representation of the object, beginning
-     *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-     */
-     static String valueToString(Object value, int indentFactor, int indent) {
-        if (value == null || value.equals(null)) {
-            return "null";
-        }
-        try {
-	        if (value instanceof String) {
-	        	return quote((String)value);
-	        }
-        } catch (Exception e) {
-        	/* forget about it */
-        }
-         if (value instanceof Float || value instanceof Double ||
-            value instanceof Byte || value instanceof Short || 
-            value instanceof Integer || value instanceof Long) {
-            return numberToString(value);
-        }
-        if (value instanceof Boolean) {
-            return value.toString();
-        }
-        if (value instanceof Map) {
-            return print((Map)value, indentFactor, indent);
-        }
-        if (value instanceof List) {
-            return print((List)value, indentFactor, indent);
-        }
-        if(value instanceof Date) {
-            return quote(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").format((Date)value));
-        }
-        return quote(value.toString());
-    }
-
-     /**
-      * Produce a string in double quotes with backslash sequences in all the
-      * right places. A backslash will be inserted within </, allowing JSON
-      * text to be delivered in HTML. In JSON text, a string cannot contain a
-      * control character or an unescaped quote or backslash.
-      * @param string A String
-      * @return  A String correctly formatted for insertion in a JSON text.
-      */
-     public static String quote(String string) {
-         if (string == null || string.length() == 0) {
-             return "\"\"";
-         }
-
-         char         b;
-         char         c = 0;
-         int          i;
-         int          len = string.length();
-         StringBuffer sb = new StringBuffer(len + 4);
-         String       t;
-
-         sb.append('"');
-         for (i = 0; i < len; i += 1) {
-             b = c;
-             c = string.charAt(i);
-             switch (c) {
-             case '\\':
-             case '"':
-                 sb.append('\\');
-                 sb.append(c);
-                 break;
-             case '/':
-                 if (b == '<') {
-                     sb.append('\\');
-                 }
-                 sb.append(c);
-                 break;
-             case '\b':
-                 sb.append("\\b");
-                 break;
-             case '\t':
-                 sb.append("\\t");
-                 break;
-             case '\n':
-                 sb.append("\\n");
-                 break;
-             case '\f':
-                 sb.append("\\f");
-                 break;
-             case '\r':
-                 sb.append("\\r");
-                 break;
-             default:
-                 if (c < ' ') {
-                     t = "000" + Integer.toHexString(c);
-                     sb.append("\\u" + t.substring(t.length() - 4));
-                 } else {
-                     sb.append(c);
-                 }
-             }
-         }
-         sb.append('"');
-         return sb.toString();
-     }
-
-     /**
-      * Make a JSON text of an Object value. If the object has an
-      * value.toJSONString() method, then that method will be used to produce
-      * the JSON text. The method is required to produce a strictly
-      * conforming text. If the object does not contain a toJSONString
-      * method (which is the most common case), then a text will be
-      * produced by the rules.
-      * <p>
-      * Warning: This method assumes that the data structure is acyclical.
-      * @param value The value to be serialized.
-      * @return a printable, displayable, transmittable
-      *  representation of the object, beginning
-      *  with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-      *  with <code>}</code>&nbsp;<small>(right brace)</small>.
-      */
-     static String valueToString(Object value) {
-         if (value == null || value.equals(null)) {
-             return "null";
-         }
-         if (value instanceof String) {
- 	        	return (String)value;
-         }
-         if (value instanceof Float || value instanceof Double ||
-             value instanceof Byte || value instanceof Short || 
-             value instanceof Integer || value instanceof Long) {
-             return numberToString(value);
-         }
-         if (value instanceof Boolean || value instanceof Map ||
-                 value instanceof List) {
-             return value.toString();
-         }
-         return quote(value.toString());
-     }
-     
-     static public String trimNumber(String s) {
-         if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
-             while (s.endsWith("0")) {
-                 s = s.substring(0, s.length() - 1);
-             }
-             if (s.endsWith(".")) {
-                 s = s.substring(0, s.length() - 1);
-             }
-         }
-         return s;
-     }
-
-     /**
-      * Produce a string from a Number.
-      * @param  n A Number
-      * @return A String.
-      * @throws JSONException If n is a non-finite number.
-      */
-     static public String numberToString(Object n) {
-         if (n == null) {
-             return null;
-         }
-         return trimNumber(n.toString());
-     }
 }

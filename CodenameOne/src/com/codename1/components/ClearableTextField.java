@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -28,7 +28,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -47,14 +46,15 @@ public class ClearableTextField extends Container {
 
     /**
      * Wraps the given text field with a UI that will allow us to clear it
-     * @param tf the text field
+     *
+     * @param tf       the text field
      * @param iconSize size in millimeters for the clear icon, -1 for default size
      * @return a Container that should be added to the UI instead of the actual text field
      */
     public static ClearableTextField wrap(final TextArea tf, float iconSize) {
         ClearableTextField cf = new ClearableTextField();
         Button b = new Button("", tf.getUIID());
-        if(iconSize > 0) {
+        if (iconSize > 0) {
             FontImage.setMaterialIcon(b, FontImage.MATERIAL_CLEAR, iconSize);
         } else {
             FontImage.setMaterialIcon(b, FontImage.MATERIAL_CLEAR);
@@ -71,18 +71,19 @@ public class ClearableTextField extends Container {
                 tf.startEditingAsync();
             }
         });
-        return cf;        
+        return cf;
     }
-    
+
     /**
      * Wraps the given text field with a UI that will allow us to clear it
+     *
      * @param tf the text field
      * @return a Container that should be added to the UI instead of the actual text field
      */
     public static ClearableTextField wrap(final TextArea tf) {
         return wrap(tf, -1);
     }
-    
+
     private static void removeCmpBackground(Component cmp) {
         Style s = cmp.getAllStyles();
         s.setBorder(Border.createEmpty());

@@ -46,6 +46,7 @@ public class EmbeddedContainer extends Container {
 
     /**
      * Indicates the name of the container to embed into this container
+     *
      * @return the embed
      */
     public String getEmbed() {
@@ -54,6 +55,7 @@ public class EmbeddedContainer extends Container {
 
     /**
      * Indicates the name of the container to embed into this container
+     *
      * @param embed the embed to set
      */
     public void setEmbed(String embed) {

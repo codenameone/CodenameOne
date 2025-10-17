@@ -31,6 +31,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+
 import java.util.Map;
 
 /**
@@ -40,15 +41,15 @@ import java.util.Map;
  * @author Chen Fishbein
  */
 public class DefaultListCellRenderer<T> extends Label implements ListCellRenderer<T>, CellRenderer<T> {
+    private static boolean showNumbersDefault = true;
     private boolean showNumbers;
     private boolean showNumbersForce;
-    private static boolean showNumbersDefault = true;
     private Label focusComponent = new Label();
     private boolean rightAlignNumbers;
     private boolean alwaysRenderSelection;
-    
-    /** 
-     * Creates a new instance of DefaultCellRenderer 
+
+    /**
+     * Creates a new instance of DefaultCellRenderer
      */
     public DefaultListCellRenderer() {
         super("");
@@ -60,17 +61,45 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     }
 
     /**
+     * Creates a new instance of DefaultCellRenderer
+     *
+     * @param showNumbers indicates numbers should be shown
+     */
+    public DefaultListCellRenderer(boolean showNumbers) {
+        this();
+        showNumbersForce = true;
+        this.showNumbers = showNumbers;
+    }
+
+    /**
+     * Indicates whether the default list cell renderer will show numbers by default
+     * when constructed
+     *
+     * @return true when showing numbers, false otherwise
+     */
+    public static boolean isShowNumbersDefault() {
+        return showNumbersDefault;
+    }
+
+    /**
+     * Indicates whether the default list cell renderer will show numbers by default
+     * when constructed
+     *
+     * @param def true to show numbers for all renderers created in the future
+     */
+    public static void setShowNumbersDefault(boolean def) {
+        showNumbersDefault = def;
+    }
+
+    /**
      * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
-        if(!showNumbersForce) {
+        if (!showNumbersForce) {
             showNumbers = uim.isThemeConstant("rendererShowsNumbersBool", showNumbersDefault);
         }
     }
-    
-    
-    
 
     /**
      * {@inheritDoc}
@@ -80,48 +109,36 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
         focusComponent.refreshTheme(merge);
     }
 
-    /** 
-     * Creates a new instance of DefaultCellRenderer 
-     * 
-     * @param showNumbers indicates numbers should be shown
-     */
-    public DefaultListCellRenderer(boolean showNumbers) {
-        this();
-        showNumbersForce = true;
-        this.showNumbers = showNumbers;
-    }
-
-
     /**
      * {@inheritDoc}
      */
     public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
-        if(!alwaysRenderSelection && !Display.getInstance().shouldRenderSelection(list)) {
+        if (!alwaysRenderSelection && !Display.getInstance().shouldRenderSelection(list)) {
             isSelected = false;
         }
         setFocus(isSelected);
-        if(showNumbers) {
+        if (showNumbers) {
             String text = "" + value;
-            Map<String, String> t =  UIManager.getInstance().getBundle();
-            if(t != null && value != null) {
+            Map<String, String> t = UIManager.getInstance().getBundle();
+            if (t != null && value != null) {
                 Object o = t.get(value.toString());
-                if(o != null) {
-                    text = (String)o;
+                if (o != null) {
+                    text = (String) o;
                 }
             }
-            if(isRTL()){
-                setText(text+ " ." + (index + 1));
-            }else{
+            if (isRTL()) {
+                setText(text + " ." + (index + 1));
+            } else {
                 setText("" + (index + 1) + ". " + text);
             }
         } else {
-            if(value != null) {
+            if (value != null) {
                 String v = value.toString();
                 setText(v);
-                if(isRightAlignNumbers()) {
+                if (isRightAlignNumbers()) {
                     char c = v.charAt(0);
                     Style s = getStyle();
-                    if(c >= '0' && c <= '9') {
+                    if (c >= '0' && c <= '9') {
                         s.setAlignment(RIGHT);
                     } else {
                         s.setAlignment(LEFT);
@@ -131,14 +148,14 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
                 setText("null");
             }
         }
-        if(value instanceof Command) {
-            Image i = ((Command)value).getIcon();
-            if(i == null) {
-                if(((Command)value).getMaterialIcon() != 0) {
-                    if(((Command)value).getIconFont()!=null) {
-                        setFontIcon(((Command)value).getIconFont(),((Command)value).getMaterialIcon());
+        if (value instanceof Command) {
+            Image i = ((Command) value).getIcon();
+            if (i == null) {
+                if (((Command) value).getMaterialIcon() != 0) {
+                    if (((Command) value).getIconFont() != null) {
+                        setFontIcon(((Command) value).getIconFont(), ((Command) value).getMaterialIcon());
                     } else {
-                        setMaterialIcon(((Command)value).getMaterialIcon());
+                        setMaterialIcon(((Command) value).getMaterialIcon());
                     }
                 } else {
                     setIcon(null);
@@ -146,7 +163,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
             } else {
                 setIcon(i);
             }
-            setEnabled(((Command)value).isEnabled());
+            setEnabled(((Command) value).isEnabled());
         }
         return this;
     }
@@ -175,6 +192,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     public Component getListFocusComponent(List list) {
         return focusComponent;
     }
+
     /**
      * Overriden to do nothing and remove a performance issue where renderer changes
      * perform needless repaint calls
@@ -184,7 +202,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
 
     /**
      * Indicate whether numbering should exist for the default cell renderer
-     * 
+     *
      * @return true if numers are shown by the numbers
      */
     public boolean isShowNumbers() {
@@ -193,7 +211,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
 
     /**
      * Indicate whether numbering should exist for the default cell renderer
-     * 
+     *
      * @param showNumbers indicate whether numbering should exist for the default cell renderer
      */
     public void setShowNumbers(boolean showNumbers) {
@@ -203,7 +221,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
 
     /**
      * The background transparency factor to apply to the selection focus
-     * 
+     *
      * @return selection transperancy value
      */
     public int getSelectionTransparency() {
@@ -212,31 +230,11 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
 
     /**
      * The background transparency factor to apply to the selection focus
-     * 
+     *
      * @param selectionTransparency the selection transperancy value
      */
     public void setSelectionTransparency(int selectionTransparency) {
         focusComponent.getUnselectedStyle().setBgTransparency(selectionTransparency);
-    }
-
-    /**
-     * Indicates whether the default list cell renderer will show numbers by default
-     * when constructed
-     *
-     * @param def true to show numbers for all renderers created in the future
-     */
-    public static void setShowNumbersDefault(boolean def) {
-        showNumbersDefault = def;
-    }
-
-    /**
-     * Indicates whether the default list cell renderer will show numbers by default
-     * when constructed
-     *
-     * @return true when showing numbers, false otherwise
-     */
-    public static boolean isShowNumbersDefault() {
-        return showNumbersDefault;
     }
 
     /**
@@ -262,7 +260,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
 
     /**
      * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
-     * 
+     *
      * @return the alwaysRenderSelection
      */
     public boolean isAlwaysRenderSelection() {
@@ -271,7 +269,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
 
     /**
      * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
-     * 
+     *
      * @param alwaysRenderSelection the alwaysRenderSelection to set
      */
     public void setAlwaysRenderSelection(boolean alwaysRenderSelection) {

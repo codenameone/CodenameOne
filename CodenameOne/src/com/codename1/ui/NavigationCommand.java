@@ -32,13 +32,13 @@ import com.codename1.ui.events.ActionEvent;
  *
  * @author Chen
  */
-public class NavigationCommand extends Command{
+public class NavigationCommand extends Command {
 
     private Form nextForm;
-    
+
     /**
      * Creates a new instance of NavigationCommand
-     * 
+     *
      * @param command the string that will be placed on the Soft buttons\Menu
      */
     public NavigationCommand(String command) {
@@ -47,9 +47,9 @@ public class NavigationCommand extends Command{
 
     /**
      * Creates a new instance of NavigationCommand
-     * 
+     *
      * @param command the string that will be placed on the Soft buttons\Menu
-     * @param icon the icon representing the command
+     * @param icon    the icon representing the command
      */
     public NavigationCommand(String command, Image icon) {
         super(command, icon);
@@ -57,10 +57,10 @@ public class NavigationCommand extends Command{
 
     /**
      * Creates a new instance of NavigationCommand
-     * 
+     *
      * @param command the string that will be placed on the Soft buttons\Menu
-     * @param id user defined ID for a command simplifying switch statement code
-     * working with a command
+     * @param id      user defined ID for a command simplifying switch statement code
+     *                working with a command
      */
     public NavigationCommand(String command, int id) {
         super(command, id);
@@ -68,14 +68,23 @@ public class NavigationCommand extends Command{
 
     /**
      * Creates a new instance of NavigationCommand
-     * 
+     *
      * @param command the string that will be placed on the Soft buttons\Menu
-     * @param icon the icon representing the command
-     * @param id user defined ID for a command simplifying switch statement code
-     * working with a command
+     * @param icon    the icon representing the command
+     * @param id      user defined ID for a command simplifying switch statement code
+     *                working with a command
      */
     public NavigationCommand(String command, Image icon, int id) {
         super(command, icon, id);
+    }
+
+    /**
+     * Gets the next Form
+     *
+     * @return the next Form
+     */
+    public Form getNextForm() {
+        return nextForm;
     }
 
     /**
@@ -83,28 +92,19 @@ public class NavigationCommand extends Command{
      * Command
      *
      * @param nextForm The next Form
-     */ 
+     */
     public void setNextForm(Form nextForm) {
         this.nextForm = nextForm;
-    }
-    
-    /**
-     * Gets the next Form
-     * 
-     * @return the next Form
-     */ 
-    public Form getNextForm(){
-        return nextForm;
     }
 
     @Override
     public void actionPerformed(ActionEvent evt) {
         super.actionPerformed(evt);
         Form n = getNextForm();
-        if(n != null){
+        if (n != null) {
             n.show();
         }
     }
-    
-    
+
+
 }

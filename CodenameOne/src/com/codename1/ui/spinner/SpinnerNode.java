@@ -8,7 +8,6 @@ package com.codename1.ui.spinner;
 import com.codename1.ui.Component;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
-import com.codename1.ui.Painter;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.SelectionListener;
@@ -21,25 +20,38 @@ import com.codename1.ui.scene.Node;
 import com.codename1.ui.scene.NodePainter;
 import com.codename1.ui.scene.Point3D;
 import com.codename1.ui.scene.TextPainter;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * A spinner node for rendering spinnable lists. 
+ * A spinner node for rendering spinnable lists.
+ *
  * @author shannah
  */
 class SpinnerNode extends Node {
+    ListModel<String> listModel;
+    Node selectedRowOverlay = new Node();
     private Label rowTemplate = new Label("", "Spinner3DRow");
     private Label overlayTemplate = new Label("", "Spinner3DOverlay");
     private Style rowStyle, selectedRowStyle, overlayStyle;
-    private Map<Integer,Node> childIndex = new HashMap<Integer,Node>();
+    private Map<Integer, Node> childIndex = new HashMap<Integer, Node>();
     private List<ScrollListener> scrollListeners;
-
     private boolean setSelectedIndexReentrantLock;
     private boolean setScrollYReentrantLock;
-
+    private RowFormatter rowFormatter;
+    private double flatScrollPos;
+    private int numSides = 14;
+    private Label renderer = new Label("Testing", "Spinner3DRow");
+    private DataChangedListener listChangedListener = new DataChangedListener() {
+        public void dataChanged(int type, int index) {
+            rebuildChildren();
+        }
+    };
+    private int selectedIndex = -1;
+    private List<SelectionListener> selectionListeners;
     private SelectionListener selectionListener = new SelectionListener() {
         public void selectionChanged(int oldSelected, int newSelected) {
             if (newSelected < 0 && listModel != null) {
@@ -50,53 +62,6 @@ class SpinnerNode extends Node {
             }
         }
     };
-    
-    private DataChangedListener listChangedListener = new DataChangedListener() {
-        public void dataChanged(int type, int index) {
-            rebuildChildren();
-        }
-    };
-    
-    public void addScrollListener(ScrollListener l) {
-        if (scrollListeners == null) {
-            scrollListeners = new ArrayList<ScrollListener>();
-        }
-        scrollListeners.add(l);
-    }
-    
-    public void removeScrollListener(ScrollListener l) {
-        if (scrollListeners != null) {
-            scrollListeners.remove(l);
-            if (scrollListeners.isEmpty()) {
-                scrollListeners = null;
-            }
-        }
-    }
-    
-    private void fireScrollEvent(int scrollPos) {
-        if (scrollListeners != null) {
-            for (ScrollListener l : scrollListeners) {
-                l.scrollChanged(-1, scrollPos, -1, -1);
-            }
-        }
-    }
-    
-    public static interface RowFormatter {
-        public String format(String input);
-    }
-
-    private RowFormatter rowFormatter;
-    private double flatScrollPos;
-    private int numSides = 14;
-    private Label renderer = new Label("Testing", "Spinner3DRow");
-    ListModel<String> listModel;
-    Node selectedRowOverlay = new Node();
-
-    private static boolean usePerspective() {
-        // Disabling perspective for now because need to work out a few issues
-        return false;
-    }
-    
     public SpinnerNode() {
         rowStyle = rowTemplate.getUnselectedStyle();
         selectedRowStyle = rowTemplate.getSelectedStyle();
@@ -110,46 +75,70 @@ class SpinnerNode extends Node {
                 g.setColor(style.getFgColor());
                 int alpha = g.concatenateAlpha(style.getFgAlpha());
                 g.drawLine(bounds.getX(), bounds.getY(), bounds.getWidth() + bounds.getX(), bounds.getY());
-                g.drawLine(bounds.getX(), bounds.getY()+bounds.getHeight(), 
+                g.drawLine(bounds.getX(), bounds.getY() + bounds.getHeight(),
                         bounds.getX() + bounds.getWidth(), bounds.getY() + bounds.getHeight()
                 );
                 g.setAlpha(alpha);
             }
         });
     }
-    
+
+    private static boolean usePerspective() {
+        // Disabling perspective for now because need to work out a few issues
+        return false;
+    }
+
+    public void addScrollListener(ScrollListener l) {
+        if (scrollListeners == null) {
+            scrollListeners = new ArrayList<ScrollListener>();
+        }
+        scrollListeners.add(l);
+    }
+
+    public void removeScrollListener(ScrollListener l) {
+        if (scrollListeners != null) {
+            scrollListeners.remove(l);
+            if (scrollListeners.isEmpty()) {
+                scrollListeners = null;
+            }
+        }
+    }
+
+    private void fireScrollEvent(int scrollPos) {
+        if (scrollListeners != null) {
+            for (ScrollListener l : scrollListeners) {
+                l.scrollChanged(-1, scrollPos, -1, -1);
+            }
+        }
+    }
+
     public void setRowFormatter(RowFormatter formatter) {
         if (rowFormatter != formatter) {
             rowFormatter = formatter;
             rebuildChildren();
         }
     }
-    
+
     public Style getRowStyle() {
         return rowStyle;
     }
-    
+
     public int getNumSides() {
         return numSides;
     }
+
     public Style getSelectedRowStyle() {
         return selectedRowStyle;
     }
+
     public Style getSelectedOverlayStyle() {
         return overlayStyle;
     }
-    
+
     public ListModel<String> getListModel() {
         return listModel;
     }
-    
-    private void rebuildChildren() {
-        childIndex.clear();
-        removeAll();
-        setSelectedIndex(listModel.getSelectedIndex());
-        add(selectedRowOverlay);
-    }
-    
+
     public void setListModel(ListModel<String> list) {
         if (listModel != null) {
             listModel.removeSelectionListener(selectionListener);
@@ -162,42 +151,49 @@ class SpinnerNode extends Node {
         }
         rebuildChildren();
     }
-    
+
+    private void rebuildChildren() {
+        childIndex.clear();
+        removeAll();
+        setSelectedIndex(listModel.getSelectedIndex());
+        add(selectedRowOverlay);
+    }
+
     public Node getSelectedRowOverlay() {
         return selectedRowOverlay;
     }
-    
+
     public double calcRowHeight() {
         return renderer.getPreferredH();
     }
-    
+
     public double calcFlatListHeight() {
         return renderer.getPreferredH() * listModel.getSize();
     }
-    
+
     public double calcViewportHeight() {
         double circumference = renderer.getPreferredH() * numSides;
         double diameter = circumference / Math.PI;
         return diameter;
     }
-    
+
     private double calculateRotationForChild(int index) {
         double degreeOffset = flatScrollPos * 360.0 / (numSides * renderer.getPreferredH());
-        
+
         int pos = index % numSides;
         return (-(360.0 / numSides) * pos + degreeOffset) % 360;
     }
-    
+
     private double getRotationRangeForSide() {
         return 360.0 / numSides;
     }
-    
+
     private double getFlatVisibleHeight() {
         return renderer.getPreferredH() * numSides / 2;
     }
-    
+
     public int getSelectedIndex() {
-        return (int)(flatScrollPos / calcFlatListHeight() * listModel.getSize());
+        return (int) (flatScrollPos / calcFlatListHeight() * listModel.getSize());
     }
 
     public void setSelectedIndex(int index) {
@@ -207,7 +203,7 @@ class SpinnerNode extends Node {
         setSelectedIndexReentrantLock = true;
         try {
             if (index < 0 || index > listModel.getSize() - 1) {
-                throw new ArrayIndexOutOfBoundsException("Index out of bounds:" + index + ", must be between 0 and " + (listModel.getSize()-1));
+                throw new ArrayIndexOutOfBoundsException("Index out of bounds:" + index + ", must be between 0 and " + (listModel.getSize() - 1));
             }
 
             setScrollY(index * calcFlatListHeight() / listModel.getSize());
@@ -215,9 +211,7 @@ class SpinnerNode extends Node {
             setSelectedIndexReentrantLock = false;
         }
     }
-    
-    private int selectedIndex=-1;
-    private List<SelectionListener> selectionListeners;
+
     private void updateSelectedIndex() {
         int newSelectedIndex = getSelectedIndex();
         if (newSelectedIndex != selectedIndex) {
@@ -229,17 +223,17 @@ class SpinnerNode extends Node {
                     l.selectionChanged(oldSelectedIndex, newSelectedIndex);
                 }
             }
-            
+
         }
     }
-    
+
     public void addSelectionListener(SelectionListener l) {
         if (selectionListeners == null) {
             selectionListeners = new ArrayList<SelectionListener>();
         }
         selectionListeners.add(l);
     }
-    
+
     public void removeSelectionListener(SelectionListener l) {
         if (selectionListeners != null) {
             selectionListeners.remove(l);
@@ -248,14 +242,19 @@ class SpinnerNode extends Node {
             selectionListeners = null;
         }
     }
-    
+
     private int getMinVisibleIndex(int selectedIndex) {
-        return selectedIndex - numSides/4;
+        return selectedIndex - numSides / 4;
     }
-    
+
     private int getMaxVisibleIndex(int selectedIndex) {
-        return selectedIndex + numSides/4;
+        return selectedIndex + numSides / 4;
     }
+
+    public double getScrollY() {
+        return flatScrollPos;
+    }
+
     public void setScrollY(double pos) {
         if (setScrollYReentrantLock) {
             return;
@@ -277,11 +276,7 @@ class SpinnerNode extends Node {
             setScrollYReentrantLock = false;
         }
     }
-    
-    public double getScrollY() {
-        return flatScrollPos;
-    }
-    
+
     private Node getOrCreateChild(int i) {
         if (childIndex.containsKey(i)) {
             return childIndex.get(i);
@@ -317,7 +312,7 @@ class SpinnerNode extends Node {
 
         return null;
     }
-    
+
     @Override
     protected void layoutChildren() {
         double width = boundsInLocal.get().getWidth();
@@ -331,7 +326,7 @@ class SpinnerNode extends Node {
         int maxVisibleIndex = getMaxVisibleIndex(selectedIndex);
         if (hasChildren()) {
             int len = listModel.getSize();
-            for (int i=0; i<len; i++) {
+            for (int i = 0; i < len; i++) {
                 if ((minVisibleIndex > index || maxVisibleIndex < index) && !childIndex.containsKey(i)) {
                     index++;
                     continue;
@@ -349,7 +344,7 @@ class SpinnerNode extends Node {
                 localBounds.setHeight(diameter);
                 localBounds.setMinX(0.0);
                 localBounds.setMinY(0.0);
-                child.paintingRect.set(new Rectangle(0, (int)(diameter/2 - rendererHeight/2), (int)width, (int)rendererHeight));
+                child.paintingRect.set(new Rectangle(0, (int) (diameter / 2 - rendererHeight / 2), (int) width, (int) rendererHeight));
                 if (usePerspective()) {
                     localBounds.setDepth(diameter);
                     double angle = calculateRotationForChild(index);
@@ -367,12 +362,12 @@ class SpinnerNode extends Node {
                     child.rotationAxis.set(new Point3D(1, 0, 0)); // Rotate along X-Axis
                     child.layoutX.set(0.0);
                     child.layoutY.set(0.0);
-                    child.layoutZ.set(-diameter/2);
+                    child.layoutZ.set(-diameter / 2);
                 } else {
                     double angle = calculateRotationForChild(index) * Math.PI / 180.0;
-                    double minAngle = angle + getRotationRangeForSide() * Math.PI/180.0 / 2;
-                    double maxAngle = angle - getRotationRangeForSide() * Math.PI/180.0 /2;
-                    if (Math.abs(angle) < 10 * Math.PI/180) {
+                    double minAngle = angle + getRotationRangeForSide() * Math.PI / 180.0 / 2;
+                    double maxAngle = angle - getRotationRangeForSide() * Math.PI / 180.0 / 2;
+                    if (Math.abs(angle) < 10 * Math.PI / 180) {
                         child.addTags("selected");
                         child.setStyle(selectedRowStyle);
                         child.opacity.set(1.0);
@@ -382,13 +377,13 @@ class SpinnerNode extends Node {
                         double opacity = Math.cos(angle);
                         child.opacity.set(opacity);
                     }
-                    double projectedHeight = Math.abs((diameter/2) * (Math.sin(minAngle) - Math.sin(maxAngle)));
+                    double projectedHeight = Math.abs((diameter / 2) * (Math.sin(minAngle) - Math.sin(maxAngle)));
                     child.layoutX.set(0.0);
-                    child.layoutY.set(-(diameter/2) * Math.sin(angle));
+                    child.layoutY.set(-(diameter / 2) * Math.sin(angle));
                     child.layoutZ.set(0.0);
                     child.scaleY.set(projectedHeight / rendererHeight);
                 }
-                
+
                 index++;
             }
 
@@ -398,7 +393,7 @@ class SpinnerNode extends Node {
             b.setMinX(0);
             b.setMinY(0);
             selectedRowOverlay.layoutX.set(0.0);
-            selectedRowOverlay.layoutY.set(diameter/2 - rendererHeight/2);
+            selectedRowOverlay.layoutY.set(diameter / 2 - rendererHeight / 2);
         }
     }
 
@@ -406,37 +401,37 @@ class SpinnerNode extends Node {
         g.setColor(overlayStyle.getBgColor());
         int alpha = g.getAlpha();
         g.setAlpha(255);
-        g.fillRect(0, 0, (int)boundsInLocal.get().getWidth(), (int)boundsInLocal.get().getHeight());
+        g.fillRect(0, 0, (int) boundsInLocal.get().getWidth(), (int) boundsInLocal.get().getHeight());
         g.setAlpha(alpha);
         super.render(g);
-        
+
         int clipX = g.getClipX();
         int clipY = g.getClipY();
         int clipW = g.getClipWidth();
         int clipH = g.getClipHeight();
         Rectangle2D overlayRect = selectedRowOverlay.getBoundsInScene(new Rectangle2D());
-        
+
         double magnification = 1.35;
         double oldScaleX = scaleX.get();
         double oldScaleY = scaleY.get();
         double oldTranslateX = translateX.get();
-        scaleX.set(oldScaleX*magnification);
-        scaleY.set(oldScaleY*magnification);
+        scaleX.set(oldScaleX * magnification);
+        scaleY.set(oldScaleY * magnification);
         switch (getRowStyle().getAlignment()) {
             case Component.LEFT:
-                translateX.set(oldTranslateX + boundsInLocal.get().getWidth() * (magnification - 1.0)/2/magnification);
+                translateX.set(oldTranslateX + boundsInLocal.get().getWidth() * (magnification - 1.0) / 2 / magnification);
                 break;
             case Component.RIGHT:
-                translateX.set(oldTranslateX - boundsInLocal.get().getWidth() * (magnification - 1.0)/2/magnification);
+                translateX.set(oldTranslateX - boundsInLocal.get().getWidth() * (magnification - 1.0) / 2 / magnification);
                 break;
         }
 
         selectedRowOverlay.visible.set(false);
         g.setClip(
-                (int)overlayRect.getX(), 
-                (int)overlayRect.getY()+1, 
-                (int)overlayRect.getWidth(), 
-                (int)overlayRect.getHeight()-2
+                (int) overlayRect.getX(),
+                (int) overlayRect.getY() + 1,
+                (int) overlayRect.getWidth(),
+                (int) overlayRect.getHeight() - 2
         );
         super.render(g);
         selectedRowOverlay.visible.set(true);
@@ -444,6 +439,10 @@ class SpinnerNode extends Node {
         scaleX.set(oldScaleX);
         scaleY.set(oldScaleY);
         translateX.set(oldTranslateX);
+    }
+
+    public static interface RowFormatter {
+        public String format(String input);
     }
 
 }

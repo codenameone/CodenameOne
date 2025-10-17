@@ -21,30 +21,31 @@ package com.codename1.maps;
 
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
-import com.codename1.ui.geom.Point;
+import com.codename1.maps.layers.Layer;
+import com.codename1.maps.layers.PointsLayer;
+import com.codename1.maps.providers.MapProvider;
+import com.codename1.maps.providers.OpenStreetMapProvider;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
 import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.geom.Rectangle;
-import java.util.Enumeration;
-import java.util.Vector;
-import com.codename1.maps.providers.MapProvider;
-import com.codename1.maps.layers.AbstractLayer;
-import com.codename1.maps.layers.Layer;
-import com.codename1.maps.layers.PointsLayer;
-import com.codename1.maps.providers.OpenStreetMapProvider;
-import com.codename1.ui.*;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Point;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.MathUtil;
+
 import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Vector;
 
 
 /**
@@ -56,6 +57,7 @@ import java.util.ArrayList;
  */
 public class MapComponent extends Container {
 
+    private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
     private Coord _center;
     private int _zoom;
     private MapProvider _map;
@@ -82,9 +84,8 @@ public class MapComponent extends Container {
     private int tapCount = 0;
     private int singleTapThreshold = 200;
     private int doubleTapThreshold = 200;
-    private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
     private ArrayList<MapListener> listeners;
-    
+
     /**
      * Empty constructor creates a map with OpenStreetMapProvider on the Last
      * known Location of the LocationManager
@@ -105,9 +106,9 @@ public class MapComponent extends Container {
     /**
      * Constructor
      *
-     * @param provider map provider
+     * @param provider       map provider
      * @param centerPosition center position
-     * @param zoomLevel zoom level
+     * @param zoomLevel      zoom level
      */
     public MapComponent(MapProvider provider, Location centerPosition, int zoomLevel) {
         this(provider, centerPosition, zoomLevel, true);
@@ -116,10 +117,10 @@ public class MapComponent extends Container {
     /**
      * Constructor
      *
-     * @param provider map provider
+     * @param provider       map provider
      * @param centerPosition center position
-     * @param zoomLevel zoom level
-     * @param cacheEnabled is cache enabled
+     * @param zoomLevel      zoom level
+     * @param cacheEnabled   is cache enabled
      */
     public MapComponent(MapProvider provider, Location centerPosition, int zoomLevel, boolean cacheEnabled) {
         this(provider, new Coord(centerPosition.getLatitude(), centerPosition.getLongitude()), zoomLevel, cacheEnabled);
@@ -128,9 +129,9 @@ public class MapComponent extends Container {
     /**
      * Constructor
      *
-     * @param provider map provider
+     * @param provider       map provider
      * @param centerPosition center position
-     * @param zoomLevel zoom level
+     * @param zoomLevel      zoom level
      */
     public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel) {
         this(provider, centerPosition, zoomLevel, true);
@@ -139,10 +140,10 @@ public class MapComponent extends Container {
     /**
      * Constructor
      *
-     * @param provider map provider
+     * @param provider       map provider
      * @param centerPosition center position
-     * @param zoomLevel zoom level
-     * @param cacheEnabled is cache enabled
+     * @param zoomLevel      zoom level
+     * @param cacheEnabled   is cache enabled
      */
     public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel, boolean cacheEnabled) {
         if (cacheEnabled) {
@@ -150,7 +151,7 @@ public class MapComponent extends Container {
         } else {
             _map = provider;
         }
-        
+
         if (centerPosition == null) {
             Location l = LocationManager.getLocationManager().getLastKnownLocation();
             if (l != null) {
@@ -198,6 +199,24 @@ public class MapComponent extends Container {
     }
 
     /**
+     * Returns the distance between 2 points in meters
+     *
+     * @param latitude1
+     * @param longitude1
+     * @param latitude2
+     * @param longitude2
+     * @return distance in meters
+     */
+    public static long distance(double latitude1, double longitude1, double latitude2, double longitude2) {
+        double latitudeSin = Math.sin(Math.toRadians(latitude2 - latitude1) / 2);
+        double longitudeSin = Math.sin(Math.toRadians(longitude2 - longitude1) / 2);
+        double a = latitudeSin * latitudeSin
+                + Math.cos(Math.toRadians(latitude1)) * Math.cos(Math.toRadians(latitude2)) * longitudeSin * longitudeSin;
+        double c = 2 * MathUtil.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return (long) (6378137 * c);
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void paintBackground(Graphics g) {
@@ -212,11 +231,11 @@ public class MapComponent extends Container {
             }
             g.translate(-translateX, -translateY);
             if (scaleX > 0) {
-                float tx = (float)zoomCenterX / (float)getWidth();
-                tx = tx * (float)(scaleX - getWidth());
-                float ty = (float)zoomCenterY / (float)getHeight();
-                ty = ty * (float)(scaleY - getHeight());
-                g.drawImage(buffer, -(int)tx, -(int)ty, scaleX, scaleY);
+                float tx = (float) zoomCenterX / (float) getWidth();
+                tx = tx * (float) (scaleX - getWidth());
+                float ty = (float) zoomCenterY / (float) getHeight();
+                ty = ty * (float) (scaleY - getHeight());
+                g.drawImage(buffer, -(int) tx, -(int) ty, scaleX, scaleY);
             } else {
                 g.drawImage(buffer, (getWidth() - buffer.getWidth()) / 2, (getHeight() - buffer.getHeight()) / 2);
             }
@@ -230,15 +249,15 @@ public class MapComponent extends Container {
             if (scaleX > 0) {
                 float sx = (float) scaleX / (float) getWidth();
                 float sy = (float) scaleY / (float) getHeight();
-                float tx = (float)zoomCenterX / (float)getWidth();
-                tx = -tx * (float)(scaleX - getWidth())/sx;
-                float ty = (float)zoomCenterY / (float)getHeight();
-                ty = -ty * (float)(scaleY - getHeight())/sy;
-                g.translate((int)tx, (int)ty);
+                float tx = (float) zoomCenterX / (float) getWidth();
+                tx = -tx * (float) (scaleX - getWidth()) / sx;
+                float ty = (float) zoomCenterY / (float) getHeight();
+                ty = -ty * (float) (scaleY - getHeight()) / sy;
+                g.translate((int) tx, (int) ty);
                 g.scale(sx, sy);
                 paintmap(g);
                 g.resetAffine();
-                g.translate(-(int)tx, -(int)ty);
+                g.translate(-(int) tx, -(int) ty);
             } else {
                 g.translate(-translateX, -translateY);
                 paintmap(g);
@@ -288,12 +307,12 @@ public class MapComponent extends Container {
      */
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
-        if ( oldDistance ==  -1 ){
+        if (oldDistance == -1) {
             translateX += (draggedx - x);
             translateY += (draggedy - y);
             draggedx = x;
             draggedy = y;
-            if ( Math.abs(translateX)>10 || Math.abs(translateY)>10){
+            if (Math.abs(translateX) > 10 || Math.abs(translateY) > 10) {
                 Coord scale = _map.scale(_zoom);
                 _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());
                 _needTiles = true;
@@ -325,8 +344,8 @@ public class MapComponent extends Container {
             double currentDis = distance(x, y);
             if (oldDistance == -1) {
                 oldDistance = currentDis;
-                zoomCenterX = (x[0]+x[1])/2 - getAbsoluteX();
-                zoomCenterY = (y[0]+y[1])/2 - getAbsoluteY();
+                zoomCenterX = (x[0] + x[1]) / 2 - getAbsoluteX();
+                zoomCenterY = (y[0] + y[1]) / 2 - getAbsoluteY();
                 scaleX = getWidth();
                 scaleY = getHeight();
             }
@@ -363,15 +382,15 @@ public class MapComponent extends Container {
         return Math.sqrt(disx * disx + disy * disy);
     }
 
-    protected void pointerTapped(int x, int y, int tapCount){
-        if ( tapCount == 2 ){
+    protected void pointerTapped(int x, int y, int tapCount) {
+        if (tapCount == 2) {
             Coord c = this.getCoordFromPosition(x, y);
             _center = _map.projection().fromWGS84(c);
             zoomIn();
             super.repaint();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -379,29 +398,29 @@ public class MapComponent extends Container {
         super.pointerReleased(x, y);
 
         final long currTime = System.currentTimeMillis();
-        if ( currTime - lastPressed < singleTapThreshold ){
+        if (currTime - lastPressed < singleTapThreshold) {
             tapCount++;
             final int tapX = x;
             final int tapY = y;
             final int currTapCount = tapCount;
-            UITimer timer = new UITimer(new Runnable(){
+            UITimer timer = new UITimer(new Runnable() {
 
                 public void run() {
-                    if ( currTapCount == tapCount ){
+                    if (currTapCount == tapCount) {
                         pointerTapped(tapX, tapY, tapCount);
                         tapCount = 0;
                     }
                 }
-                
+
             });
             timer.schedule(doubleTapThreshold, false, this.getComponentForm());
         } else {
             tapCount = 0;
         }
-        
+
         if (oldDistance != -1) {
             double scale = (double) scaleX / (double) getWidth();
-            Coord refCoord = this.getCoordFromPosition(zoomCenterX+getAbsoluteX(), zoomCenterY+getAbsoluteY());
+            Coord refCoord = this.getCoordFromPosition(zoomCenterX + getAbsoluteX(), zoomCenterY + getAbsoluteY());
             int oldZoom = _zoom;
             if (scale > 1) {
                 if (scale < 1.2) {
@@ -435,13 +454,13 @@ public class MapComponent extends Container {
                     zoomOut();
                 }
             }
-            if ( oldZoom != _zoom ){
+            if (oldZoom != _zoom) {
                 Coord c1 = this.getCoordFromPosition(0, 0);
                 Coord c2 = this.getCoordFromPosition(getWidth(), getHeight());
-                Coord pixelToCoord = new Coord((c2.getLatitude()-c1.getLatitude())/(float)getHeight(), (c2.getLongitude()-c1.getLongitude())/(float)getWidth());
-                float offX = (getWidth()/2) - zoomCenterX;
-                float offY = (getHeight()/2) - zoomCenterY;
-                _center = _map.projection().fromWGS84(refCoord.translate(offY*pixelToCoord.getLatitude(), offX*pixelToCoord.getLongitude()));
+                Coord pixelToCoord = new Coord((c2.getLatitude() - c1.getLatitude()) / (float) getHeight(), (c2.getLongitude() - c1.getLongitude()) / (float) getWidth());
+                float offX = (getWidth() / 2) - zoomCenterX;
+                float offY = (getHeight() / 2) - zoomCenterY;
+                _center = _map.projection().fromWGS84(refCoord.translate(offY * pixelToCoord.getLatitude(), offX * pixelToCoord.getLongitude()));
             }
             translateX = 0;
             translateY = 0;
@@ -453,7 +472,7 @@ public class MapComponent extends Container {
                 buffer = null;
                 refreshLayers = true;
             }
-            if(Display.getInstance().areMutableImagesFast()) {
+            if (Display.getInstance().areMutableImagesFast()) {
                 super.repaint();
             } else {
                 // workaround for rounding error in scale/clipping
@@ -679,7 +698,7 @@ public class MapComponent extends Container {
     /**
      * Adds a layer to the map
      *
-     * @param layer to add
+     * @param layer        to add
      * @param minZoomLevel min zoom level of this Layer
      * @param maxZoomLevel max zoom level of this Layer
      */
@@ -718,6 +737,7 @@ public class MapComponent extends Container {
 
     /**
      * Returns layers count
+     *
      * @return The number of layers.
      */
     public int getLayersConut() {
@@ -730,7 +750,7 @@ public class MapComponent extends Container {
      * @param index the index of the layer
      * @return The layer at the given index.
      * @throws ArrayIndexOutOfBoundsException - if the index is out of range
-     * (index &lt; 0 || index &gt;= size())
+     *                                        (index &lt; 0 || index &gt;= size())
      */
     public Layer getLayerAt(int index) {
         Layer l = ((LayerWithZoomLevels) _layers.elementAt(index)).layer;
@@ -752,8 +772,6 @@ public class MapComponent extends Container {
         _needTiles = true;
         super.repaint();
     }
-    
-    
 
     /**
      * move the map 25% left
@@ -843,8 +861,8 @@ public class MapComponent extends Container {
     /**
      * Zoom map to the center of the given coordinate with the given zoom level
      *
-     * @param coord center map to this coordinate, coord should be in wg84
-     * format
+     * @param coord     center map to this coordinate, coord should be in wg84
+     *                  format
      * @param zoomLevel zoom map to this level;
      * @throws IllegalArgumentException if the coord is not wg84 format
      */
@@ -888,6 +906,7 @@ public class MapComponent extends Container {
 
     /**
      * Gets the center location of the map in WGS84 format.
+     *
      * @return Coordinate of center location of map.
      */
     public Coord getCenter() {
@@ -947,12 +966,10 @@ public class MapComponent extends Container {
     }
 
     /**
-     *
      * Checks if key code is left keycode.
      *
-     * @return true if this is a left keycode
-     *
      * @param keyCode The key-code to check.
+     * @return true if this is a left keycode
      */
     protected boolean isLeftKey(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -1022,25 +1039,6 @@ public class MapComponent extends Container {
         return keyCode == '5';
     }
 
-    /**
-     * Returns the distance between 2 points in meters
-     *
-     * @param latitude1
-     * @param longitude1
-     * @param latitude2
-     * @param longitude2
-     *
-     * @return distance in meters
-     */
-    public static long distance(double latitude1, double longitude1, double latitude2, double longitude2) {
-        double latitudeSin = Math.sin(Math.toRadians(latitude2 - latitude1) / 2);
-        double longitudeSin = Math.sin(Math.toRadians(longitude2 - longitude1) / 2);
-        double a = latitudeSin * latitudeSin
-                + Math.cos(Math.toRadians(latitude1)) * Math.cos(Math.toRadians(latitude2)) * longitudeSin * longitudeSin;
-        double c = 2 * MathUtil.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return (long) (6378137 * c);
-    }
-
     private void setLatitude(double latitude) {
         this.latitude = latitude;
         setCoord(latitude, longitude);
@@ -1061,19 +1059,20 @@ public class MapComponent extends Container {
 
     private void fireMapListenerEvent() {
         // assuming always EDT
-        if(listeners != null) {
-            for(MapListener l : listeners) {
+        if (listeners != null) {
+            for (MapListener l : listeners) {
                 l.mapPositionUpdated(this, _zoom, getCenter());
             }
         }
     }
-    
+
     /**
      * Adds a listener to map panning/zooming
+     *
      * @param listener the listener callback
      */
     public void addMapListener(MapListener listener) {
-        if(listeners == null) {
+        if (listeners == null) {
             listeners = new ArrayList<MapListener>();
         }
         listeners.add(listener);
@@ -1081,15 +1080,16 @@ public class MapComponent extends Container {
 
     /**
      * Removes the map listener callback
+     *
      * @param listener the listener
      */
     public void removeMapListener(MapListener listener) {
-        if(listeners == null) {
+        if (listeners == null) {
             return;
         }
         listeners.remove(listener);
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -1141,6 +1141,7 @@ public class MapComponent extends Container {
         return super.setPropertyValue(name, value);
     }
 }
+
 class LayerWithZoomLevels {
 
     public Layer layer;

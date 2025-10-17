@@ -21,9 +21,9 @@ package com.codename1.maps;
 
 /**
  * This class represents a projection type.
- * a Projection has the ability to translate a WGS84 Coordinate to a 
+ * a Projection has the ability to translate a WGS84 Coordinate to a
  * projected Coordinate.
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public abstract class Projection {
@@ -32,6 +32,7 @@ public abstract class Projection {
 
     /**
      * Creates a projection to the given bounding box
+     *
      * @param extent the bounding box of this projection
      */
     protected Projection(BoundingBox extent) {
@@ -40,6 +41,7 @@ public abstract class Projection {
 
     /**
      * Gets the projection bounding box
+     *
      * @return bounding box
      */
     public BoundingBox extent() {
@@ -48,22 +50,24 @@ public abstract class Projection {
 
     /**
      * Converts a given WGS84 coordinate to a projection coordinate
+     *
      * @param wgs84
-     * @return 
+     * @return
      */
     public abstract Coord fromWGS84(Coord wgs84);
 
     /**
      * Converts a projected coordinate to a WGS84 coordinate
+     *
      * @param projection
-     * @return 
+     * @return
      */
     public abstract Coord toWGS84(Coord projection);
 
     /**
-     * a utility method that converts an array of WGS84 coordinate to the 
+     * a utility method that converts an array of WGS84 coordinate to the
      * projection coordinates system.
-     * 
+     *
      * @param coords an array to converts
      * @return a converted array
      */
@@ -78,22 +82,22 @@ public abstract class Projection {
 
     /**
      * Converts a WGS84 bounding box to the projection system bounding box
-     * 
+     *
      * @param bbox bounding box too convert
      * @return a converted bounding box
      */
     public final BoundingBox fromWGS84(BoundingBox bbox) {
         return new BoundingBox(fromWGS84(bbox.getSouthWest()), fromWGS84(bbox.getNorthEast()));
     }
-    
+
     /**
      * Converts a projected bounding box to a WGS84 bounding box
-     * 
+     *
      * @param bbox bounding box too convert
      * @return a converted bounding box
      */
     public final BoundingBox toWGS84(BoundingBox bbox) {
         return new BoundingBox(toWGS84(bbox.getSouthWest()), toWGS84(bbox.getNorthEast()));
     }
-    
+
 }

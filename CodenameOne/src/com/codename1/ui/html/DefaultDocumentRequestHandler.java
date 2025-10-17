@@ -27,11 +27,10 @@ import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.Resources;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.util.Vector;
 
 /**
@@ -45,6 +44,24 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
     private static Resources resFile;
     private boolean trackVisitedURLs;
     private Vector visitedURLs;
+
+    /**
+     * Allows URL's referring to a res:// local resource to default to this file
+     *
+     * @return the resFile
+     */
+    public static Resources getResFile() {
+        return resFile;
+    }
+
+    /**
+     * Allows URL's referring to a local:// local resource to default to this file
+     *
+     * @param res the resource
+     */
+    public static void setResFile(Resources res) {
+        resFile = res;
+    }
 
     /**
      * {@inheritDoc}
@@ -62,15 +79,15 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
 
     /**
      * This method can be invoked to indicate a URL was visited fro tracking
-     * 
+     *
      * @param url the url
      */
     protected void visitingURL(String url) {
-        if(trackVisitedURLs) {
-            if(visitedURLs == null) {
+        if (trackVisitedURLs) {
+            if (visitedURLs == null) {
                 visitedURLs = new Vector();
             }
-            if(!visitedURLs.contains(url)) {
+            if (!visitedURLs.contains(url)) {
                 visitedURLs.addElement(url);
             }
         }
@@ -78,7 +95,7 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
 
     /**
      * Returns true if the URL was visited, requires trackVisitedURLs to be true
-     * 
+     *
      * @param url the url
      * @return true if it was visited
      */
@@ -93,33 +110,33 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
 
         // trim anchors
         int hash = url.indexOf('#');
-        if (hash!=-1) {
-           url = url.substring(0,hash);
+        if (hash != -1) {
+            url = url.substring(0, hash);
         }
 
-        if(url.startsWith("jar://")) {
+        if (url.startsWith("jar://")) {
             callback.streamReady(Display.getInstance().getResourceAsStream(getClass(), docInfo.getUrl().substring(6)), docInfo);
             return null;
         } else {
             try {
-                if(url.startsWith("local://")) {
+                if (url.startsWith("local://")) {
                     Image img = resFile.getImage(url.substring(8));
-                    if(img instanceof EncodedImage) {
-                        callback.streamReady(new ByteArrayInputStream(((EncodedImage)img).getImageData()),
+                    if (img instanceof EncodedImage) {
+                        callback.streamReady(new ByteArrayInputStream(((EncodedImage) img).getImageData()),
                                 docInfo);
                     }
                 }
-                if(url.startsWith("res://")) {
+                if (url.startsWith("res://")) {
                     InputStream i = Display.getInstance().getResourceAsStream(getClass(), docInfo.getUrl().substring(6));
                     Resources r = Resources.open(i);
                     i.close();
                     i = r.getData(docInfo.getParams());
-                    if(i != null) {
+                    if (i != null) {
                         callback.streamReady(i, docInfo);
                     } else {
                         Image img = r.getImage(docInfo.getParams());
-                        if(img instanceof EncodedImage) {
-                            callback.streamReady(new ByteArrayInputStream(((EncodedImage)img).getImageData()),
+                        if (img instanceof EncodedImage) {
+                            callback.streamReady(new ByteArrayInputStream(((EncodedImage) img).getImageData()),
                                     docInfo);
                         }
                     }
@@ -134,25 +151,8 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
     }
 
     /**
-     * Allows URL's referring to a res:// local resource to default to this file
-     *
-     * @return the resFile
-     */
-    public static Resources getResFile() {
-        return resFile;
-    }
-
-    /**
-     * Allows URL's referring to a local:// local resource to default to this file
-     * 
-     * @param res the resource
-     */
-    public static void setResFile(Resources res) {
-        resFile = res;
-    }
-
-    /**
      * Allows tracking whether a URL was visited or not
+     *
      * @return the trackVisitedURLs
      */
     public boolean isTrackVisitedURLs() {
@@ -161,6 +161,7 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
 
     /**
      * Allows tracking whether a URL was visited or not
+     *
      * @param trackVisitedURLs the trackVisitedURLs to set
      */
     public void setTrackVisitedURLs(boolean trackVisitedURLs) {

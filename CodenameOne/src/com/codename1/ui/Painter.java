@@ -23,32 +23,33 @@
  */
 package com.codename1.ui;
 
-import com.codename1.ui.geom.*;
+import com.codename1.ui.geom.Rectangle;
 
 /**
- * <p>{@code Painter} can be used to draw on components backgrounds. 
- * The use of this interface allows reuse of a background {@code Painter} for various 
+ * <p>{@code Painter} can be used to draw on components backgrounds.
+ * The use of this interface allows reuse of a background {@code Painter} for various
  * components. <br>
  * A simple example of a background painter is shown here to draw a circle background:
- * 
+ *
  * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
- * 
+ *
  * <p>
- * Painters can also be used to draw the glasspane which is layered on top of the form. 
+ * Painters can also be used to draw the glasspane which is layered on top of the form.
  * The example shows a glasspane running on top of a field to show a validation hint,
  * notice that for real world usage you should probably look into {@link com.codename1.ui.validation.Validator}.
  * Also notice that this example uses the shorter Java 8 lambda syntax to represent the glasspane.
  * </p>
  * <script src="https://gist.github.com/codenameone/f5b83373088600b19610.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/graphics-glasspane.png" alt="Sample of glasspane" />
+ *
  * @author Chen Fishbein
  */
 public interface Painter {
 
     /**
      * Draws inside the given rectangle clipping area.
-     * 
-     * @param g the {@link Graphics} object
+     *
+     * @param g    the {@link Graphics} object
      * @param rect the given rectangle cliping area
      */
     public void paint(Graphics g, Rectangle rect);

@@ -19,12 +19,12 @@
  */
 package com.codename1.maps.providers;
 
-import com.codename1.ui.geom.Dimension;
 import com.codename1.maps.Mercator;
+import com.codename1.ui.geom.Dimension;
 
 /**
  * This is an OpenStreetMap Provider http://www.openstreetmap.org/
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public class OpenStreetMapProvider extends TiledProvider {

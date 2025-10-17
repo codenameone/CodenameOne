@@ -1,18 +1,17 @@
 /**
- * Copyright 2012 Kamran Zafar 
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
- * you may not use this file except in compliance with the License. 
- * You may obtain a copy of the License at 
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0 
- * 
- * Unless required by applicable law or agreed to in writing, software 
- * distributed under the License is distributed on an "AS IS" BASIS, 
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
- * See the License for the specific language governing permissions and 
- * limitations under the License. 
- * 
+ * Copyright 2012 Kamran Zafar
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /**
@@ -21,11 +20,9 @@
 
 package com.codename1.io.tar;
 
-import com.codename1.io.FileSystemStorage;
-
 /**
  * Header
- * 
+ *
  * <pre>
  * Offset  Size     Field
  * 0       100      File name
@@ -38,10 +35,10 @@ import com.codename1.io.FileSystemStorage;
  * 156     1        Link indicator (file type)
  * 157     100      Name of linked file
  * </pre>
- * 
- * 
+ *
+ *
  * File Types
- * 
+ *
  * <pre>
  * Value        Meaning
  * '0'          Normal file
@@ -54,11 +51,11 @@ import com.codename1.io.FileSystemStorage;
  * '6'          FIFO
  * '7'          Contigous
  * </pre>
- * 
- * 
- * 
+ *
+ *
+ *
  * Ustar header
- * 
+ *
  * <pre>
  * Offset  Size    Field
  * 257     6       UStar indicator "ustar"
@@ -133,7 +130,7 @@ public class TarHeader {
     public int devMinor;
 
     public TarHeader() {
-        this.magic = new StringBuffer( TarHeader.TMAGIC );
+        this.magic = new StringBuffer(TarHeader.TMAGIC);
 
         this.name = new StringBuffer();
         this.linkName = new StringBuffer();
@@ -142,17 +139,17 @@ public class TarHeader {
         String user = "";
 
         if (user.length() > 31)
-            user = user.substring( 0, 31 );
+            user = user.substring(0, 31);
 
         this.userId = 0;
         this.groupId = 0;
-        this.userName = new StringBuffer( user );
-        this.groupName = new StringBuffer( "" );
+        this.userName = new StringBuffer(user);
+        this.groupName = new StringBuffer("");
     }
 
     /**
      * Parse an entry name from a header buffer.
-     * 
+     *
      * @param name
      * @param header
      *            The header buffer from which to parse.
@@ -163,13 +160,13 @@ public class TarHeader {
      * @return The header's entry name.
      */
     public static StringBuffer parseName(byte[] header, int offset, int length) {
-        StringBuffer result = new StringBuffer( length );
+        StringBuffer result = new StringBuffer(length);
 
         int end = offset + length;
         for (int i = offset; i < end; ++i) {
             if (header[i] == 0)
                 break;
-            result.append( (char) header[i] );
+            result.append((char) header[i]);
         }
 
         return result;
@@ -177,7 +174,7 @@ public class TarHeader {
 
     /**
      * Determine the number of bytes in an entry name.
-     * 
+     *
      * @param name
      * @param header
      *            The header buffer from which to parse.
@@ -192,7 +189,7 @@ public class TarHeader {
 
         int nlen = name.length();
         for (i = 0; i < length && i < nlen; ++i) {
-            buf[offset + i] = (byte) name.charAt( i );
+            buf[offset + i] = (byte) name.charAt(i);
         }
 
         for (; i < length; ++i) {

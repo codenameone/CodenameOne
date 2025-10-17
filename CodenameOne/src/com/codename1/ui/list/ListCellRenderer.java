@@ -28,7 +28,7 @@ import com.codename1.ui.List;
 
 /**
  * A "rubber stamp" tool that allows us to extract a component (often the same
- * component instance for all invocations) that is initialized to the value 
+ * component instance for all invocations) that is initialized to the value
  * of the current item extracted from the model, this component is drawn on the
  * list and discarded. No state of the component is kept and the component is
  * essentially discarded.<br>
@@ -37,36 +37,36 @@ import com.codename1.ui.List;
  * to avoid mistakes.<br>
  * <p>An instance of a renderer can be developed as such:
  * <script src="https://gist.github.com/codenameone/003d20de84f1a962b811.js"></script></pre>
- * 
+ *
  * @author Chen Fishbein
  */
-public interface ListCellRenderer<T> { 
+public interface ListCellRenderer<T> {
     /**
      * Returns a component instance that is already set to render "value". While it is not a requirement
      * many renderes often derive from a component (such as a label) and return "this".
      * Notice that a null value for the value argument might be sent when refreshing the theme of the
      * list.
-     * 
-     * @param list the list component
-     * @param value the value to render
-     * @param index the index in the list
+     *
+     * @param list       the list component
+     * @param value      the value to render
+     * @param index      the index in the list
      * @param isSelected whether the entry is selected
      * @return a component to paint within the list
      */
     public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected);
-    
+
     /**
      * Returns a component instance that is painted under the currently focused renderer
-     * and is animated to provide smooth scrolling. 
-     * When the selection moves, this component is drawn above/below the list items - 
-     * it is recommended to give this component some level of transparency (see above code example). 
-     * This method is optional an implementation 
+     * and is animated to provide smooth scrolling.
+     * When the selection moves, this component is drawn above/below the list items -
+     * it is recommended to give this component some level of transparency (see above code example).
+     * This method is optional an implementation
      * can choose to return null.
-     * 
-     * @param list the parent list 
+     *
+     * @param list the parent list
      * @return a component to use as focus
      * @see List#setSmoothScrolling
      */
     public Component getListFocusComponent(List list);
-    
+
 }

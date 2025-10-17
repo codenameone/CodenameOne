@@ -27,12 +27,12 @@ import com.codename1.ui.Button;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
+
 import java.util.Enumeration;
-import java.util.Hashtable;
 
 /**
- * This class implements HTML Image maps (ones defined with the MAP and AREA tags) 
- * 
+ * This class implements HTML Image maps (ones defined with the MAP and AREA tags)
+ *
  * @author Ofir Leitner
  */
 class HTMLImageMap extends Button implements ActionListener {
@@ -41,29 +41,29 @@ class HTMLImageMap extends Button implements ActionListener {
     HTMLComponent htmlC;
 
     HTMLImageMap(HTMLComponent htmlC) {
-        this.htmlC=htmlC;
+        this.htmlC = htmlC;
         setUIID("HTMLLink");
         addActionListener(this);
     }
-    
-    
+
+
     public void actionPerformed(ActionEvent evt) {
-        if (mapData!=null) {
-            int x=evt.getX();
-            int y=evt.getY();
-            if ((mapData.areas!=null) && (x!=-1)) {
-                for(Enumeration e=mapData.areas.keys();e.hasMoreElements();) {
-                    Rectangle rect = (Rectangle)e.nextElement();
-                    if (rect.contains(x-getAbsoluteX(), y-getAbsoluteY())) {
-                        String link=(String)mapData.areas.get(rect);
-                        if (link!=null) {
+        if (mapData != null) {
+            int x = evt.getX();
+            int y = evt.getY();
+            if ((mapData.areas != null) && (x != -1)) {
+                for (Enumeration e = mapData.areas.keys(); e.hasMoreElements(); ) {
+                    Rectangle rect = (Rectangle) e.nextElement();
+                    if (rect.contains(x - getAbsoluteX(), y - getAbsoluteY())) {
+                        String link = (String) mapData.areas.get(rect);
+                        if (link != null) {
                             HTMLLink.processLink(htmlC, link);
                         }
                         return;
                     }
                 }
             }
-            if (mapData.defaultLink!=null) {
+            if (mapData.defaultLink != null) {
                 HTMLLink.processLink(htmlC, mapData.defaultLink);
             }
         }

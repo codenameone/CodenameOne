@@ -41,7 +41,7 @@ import java.util.ArrayList;
  * <pre>
  *  boolean matched = r.match("aaaab");
  * </pre>
- *
+ * <p>
  * will cause the boolean matched to be set to true because the
  * pattern "a*b" matches the string "aaaab".
  *
@@ -66,7 +66,7 @@ import java.util.ArrayList;
  *  int endInside = r.getParenEnd(1);        // endInside will be index 5
  *  int lenInside = r.getParenLength(1);     // lenInside will be 4
  * </pre>
- *
+ * <p>
  * You can also refer to the contents of a parenthesized expression
  * within a regular expression itself.  This is called a
  * 'backreference'.  The first backreference in a regular expression is
@@ -75,7 +75,7 @@ import java.util.ArrayList;
  * <pre>
  *  ([0-9]+)=\1
  * </pre>
- *
+ * <p>
  * will match any string of the form n=n (like 0=0 or 2=2).
  *
  * <p>
@@ -262,10 +262,9 @@ import java.util.ArrayList;
  *
  * </font>
  *
- * @see RECompiler
- *
  * @author <a href="mailto:jonl@muppetlabs.com">Jonathan Locke</a>
  * @author <a href="mailto:ts@sch-fer.de">Tobias Sch&auml;fer</a>
+ * @see RECompiler
  */
 public class RE {
 
@@ -285,6 +284,20 @@ public class RE {
      * Consider all input a single body of text - newlines are matched by .
      */
     public static final int MATCH_SINGLELINE = 0x0004;
+    /**
+     * Flag bit that indicates that subst should replace all occurrences of this
+     * regular expression.
+     */
+    public static final int REPLACE_ALL = 0x0000;
+    /**
+     * Flag bit that indicates that subst should only replace the first occurrence
+     * of this regular expression.
+     */
+    public static final int REPLACE_FIRSTONLY = 0x0001;
+    /**
+     * Flag bit that indicates that subst should replace backreferences
+     */
+    public static final int REPLACE_BACKREFERENCES = 0x0002;
     /************************************************
      *                                              *
      * The format of a node in a program is:        *
@@ -297,74 +310,68 @@ public class RE {
      *                                              *
      ************************************************/
 
-                 //   Opcode              Char       Opdata/Operand  Meaning
-                 //   ----------          ---------- --------------- --------------------------------------------------
-    static final char OP_END              = 'E';  //                 end of program
-    static final char OP_BOL              = '^';  //                 match only if at beginning of line
-    static final char OP_EOL              = '$';  //                 match only if at end of line
-    static final char OP_ANY              = '.';  //                 match any single character except newline
-    static final char OP_ANYOF            = '[';  // count/ranges    match any char in the list of ranges
-    static final char OP_BRANCH           = '|';  // node            match this alternative or the next one
-    static final char OP_ATOM             = 'A';  // length/string   length of string followed by string itself
-    static final char OP_STAR             = '*';  // node            kleene closure
-    static final char OP_PLUS             = '+';  // node            positive closure
-    static final char OP_MAYBE            = '?';  // node            optional closure
-    static final char OP_ESCAPE           = '\\'; // escape          special escape code char class (escape is E_* code)
-    static final char OP_OPEN             = '(';  // number          nth opening paren
-    static final char OP_OPEN_CLUSTER     = '<';  //                 opening cluster
-    static final char OP_CLOSE            = ')';  // number          nth closing paren
-    static final char OP_CLOSE_CLUSTER    = '>';  //                 closing cluster
-    static final char OP_BACKREF          = '#';  // number          reference nth already matched parenthesized string
-    static final char OP_GOTO             = 'G';  //                 nothing but a (back-)pointer
-    static final char OP_NOTHING          = 'N';  //                 match null string such as in '(a|)'
-    static final char OP_CONTINUE         = 'C';  //                 continue to the following command (ignore next)
-    static final char OP_RELUCTANTSTAR    = '8';  // none/expr       reluctant '*' (mnemonic for char is unshifted '*')
-    static final char OP_RELUCTANTPLUS    = '=';  // none/expr       reluctant '+' (mnemonic for char is unshifted '+')
-    static final char OP_RELUCTANTMAYBE   = '/';  // none/expr       reluctant '?' (mnemonic for char is unshifted '?')
-    static final char OP_POSIXCLASS       = 'P';  // classid         one of the posix character classes
-
+    //   Opcode              Char       Opdata/Operand  Meaning
+    //   ----------          ---------- --------------- --------------------------------------------------
+    static final char OP_END = 'E';  //                 end of program
+    static final char OP_BOL = '^';  //                 match only if at beginning of line
+    static final char OP_EOL = '$';  //                 match only if at end of line
+    static final char OP_ANY = '.';  //                 match any single character except newline
+    static final char OP_ANYOF = '[';  // count/ranges    match any char in the list of ranges
+    static final char OP_BRANCH = '|';  // node            match this alternative or the next one
+    static final char OP_ATOM = 'A';  // length/string   length of string followed by string itself
+    static final char OP_STAR = '*';  // node            kleene closure
+    static final char OP_PLUS = '+';  // node            positive closure
+    static final char OP_MAYBE = '?';  // node            optional closure
+    static final char OP_ESCAPE = '\\'; // escape          special escape code char class (escape is E_* code)
+    static final char OP_OPEN = '(';  // number          nth opening paren
+    static final char OP_OPEN_CLUSTER = '<';  //                 opening cluster
+    static final char OP_CLOSE = ')';  // number          nth closing paren
+    static final char OP_CLOSE_CLUSTER = '>';  //                 closing cluster
+    static final char OP_BACKREF = '#';  // number          reference nth already matched parenthesized string
+    static final char OP_GOTO = 'G';  //                 nothing but a (back-)pointer
+    static final char OP_NOTHING = 'N';  //                 match null string such as in '(a|)'
+    static final char OP_CONTINUE = 'C';  //                 continue to the following command (ignore next)
+    static final char OP_RELUCTANTSTAR = '8';  // none/expr       reluctant '*' (mnemonic for char is unshifted '*')
+    static final char OP_RELUCTANTPLUS = '=';  // none/expr       reluctant '+' (mnemonic for char is unshifted '+')
+    static final char OP_RELUCTANTMAYBE = '/';  // none/expr       reluctant '?' (mnemonic for char is unshifted '?')
+    static final char OP_POSIXCLASS = 'P';  // classid         one of the posix character classes
     // Escape codes
-    static final char E_ALNUM             = 'w';  // Alphanumeric
-    static final char E_NALNUM            = 'W';  // Non-alphanumeric
-    static final char E_BOUND             = 'b';  // Word boundary
-    static final char E_NBOUND            = 'B';  // Non-word boundary
-    static final char E_SPACE             = 's';  // Whitespace
-    static final char E_NSPACE            = 'S';  // Non-whitespace
-    static final char E_DIGIT             = 'd';  // Digit
-    static final char E_NDIGIT            = 'D';  // Non-digit
-
+    static final char E_ALNUM = 'w';  // Alphanumeric
+    static final char E_NALNUM = 'W';  // Non-alphanumeric
+    static final char E_BOUND = 'b';  // Word boundary
+    static final char E_NBOUND = 'B';  // Non-word boundary
+    static final char E_SPACE = 's';  // Whitespace
+    static final char E_NSPACE = 'S';  // Non-whitespace
+    static final char E_DIGIT = 'd';  // Digit
+    static final char E_NDIGIT = 'D';  // Non-digit
     // Posix character classes
-    static final char POSIX_CLASS_ALNUM   = 'w';  // Alphanumerics
-    static final char POSIX_CLASS_ALPHA   = 'a';  // Alphabetics
-    static final char POSIX_CLASS_BLANK   = 'b';  // Blanks
-    static final char POSIX_CLASS_CNTRL   = 'c';  // Control characters
-    static final char POSIX_CLASS_DIGIT   = 'd';  // Digits
-    static final char POSIX_CLASS_GRAPH   = 'g';  // Graphic characters
-    static final char POSIX_CLASS_LOWER   = 'l';  // Lowercase characters
-    static final char POSIX_CLASS_PRINT   = 'p';  // Printable characters
-    static final char POSIX_CLASS_PUNCT   = '!';  // Punctuation
-    static final char POSIX_CLASS_SPACE   = 's';  // Spaces
-    static final char POSIX_CLASS_UPPER   = 'u';  // Uppercase characters
-    static final char POSIX_CLASS_XDIGIT  = 'x';  // Hexadecimal digits
-    static final char POSIX_CLASS_JSTART  = 'j';  // Java identifier start
-    static final char POSIX_CLASS_JPART   = 'k';  // Java identifier part
-
+    static final char POSIX_CLASS_ALNUM = 'w';  // Alphanumerics
+    static final char POSIX_CLASS_ALPHA = 'a';  // Alphabetics
+    static final char POSIX_CLASS_BLANK = 'b';  // Blanks
+    static final char POSIX_CLASS_CNTRL = 'c';  // Control characters
+    static final char POSIX_CLASS_DIGIT = 'd';  // Digits
+    static final char POSIX_CLASS_GRAPH = 'g';  // Graphic characters
+    static final char POSIX_CLASS_LOWER = 'l';  // Lowercase characters
+    static final char POSIX_CLASS_PRINT = 'p';  // Printable characters
+    static final char POSIX_CLASS_PUNCT = '!';  // Punctuation
+    static final char POSIX_CLASS_SPACE = 's';  // Spaces
+    static final char POSIX_CLASS_UPPER = 'u';  // Uppercase characters
+    static final char POSIX_CLASS_XDIGIT = 'x';  // Hexadecimal digits
+    static final char POSIX_CLASS_JSTART = 'j';  // Java identifier start
+    static final char POSIX_CLASS_JPART = 'k';  // Java identifier part
     // Limits
-    static final int maxNode  = 65536;            // Maximum number of nodes in a program
+    static final int maxNode = 65536;            // Maximum number of nodes in a program
     static final int MAX_PAREN = 16;              // Number of paren pairs (only 9 can be backrefs)
-
     // Node layout constants
     static final int offsetOpcode = 0;            // Opcode offset (first character)
     static final int offsetOpdata = 1;            // Opdata offset (second char)
-    static final int offsetNext   = 2;            // Next index offset (third char)
-    static final int nodeSize     = 3;            // Node size (in chars)
-
+    static final int offsetNext = 2;            // Next index offset (third char)
+    static final int nodeSize = 3;            // Node size (in chars)
     // State of current program
     REProgram program;                            // Compiled regular expression 'program'
     transient CharacterIterator search;           // The string being matched against
     int matchFlags;                               // Match behaviour flags
     int maxParen = MAX_PAREN;
-
     // Parenthesized subexpressions
     transient int parenCount;                     // Number of subexpressions matched (num open parens + 1)
     transient int start0;                         // Cache of start[0]
@@ -375,7 +382,6 @@ public class RE {
     transient int end2;                           // Cache of start[2]
     transient int[] startn;                       // Lazy-alloced array of sub-expression starts
     transient int[] endn;                         // Lazy-alloced array of sub-expression ends
-
     // Backreferences
     transient int[] startBackref;                 // Lazy-alloced array of backref starts
     transient int[] endBackref;                   // Lazy-alloced array of backref ends
@@ -386,7 +392,7 @@ public class RE {
      * expressions, you may prefer to use a single RECompiler object instead.
      *
      * @param pattern The regular expression pattern to compile.
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      * @see RECompiler
      */
     public RE(String pattern) throws RESyntaxException {
@@ -398,9 +404,9 @@ public class RE {
      * using a new instance of RECompiler.  If you will be compiling many
      * expressions, you may prefer to use a single RECompiler object instead.
      *
-     * @param pattern The regular expression pattern to compile.
+     * @param pattern    The regular expression pattern to compile.
      * @param matchFlags The matching style
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      * @see RECompiler
      */
     public RE(String pattern, int matchFlags) throws RESyntaxException {
@@ -412,15 +418,14 @@ public class RE {
      * (bytecode) data.  Permits special flags to be passed in to modify matching
      * behaviour.
      *
-     * @param program Compiled regular expression program (see RECompiler)
+     * @param program    Compiled regular expression program (see RECompiler)
      * @param matchFlags One or more of the RE match behaviour flags (RE.MATCH_*):
      *
-     * <pre>
-     *   MATCH_NORMAL              // Normal (case-sensitive) matching
-     *   MATCH_CASEINDEPENDENT     // Case folded comparisons
-     *   MATCH_MULTILINE           // Newline matches as BOL/EOL
-     * </pre>
-     *
+     *                   <pre>
+     *                     MATCH_NORMAL              // Normal (case-sensitive) matching
+     *                     MATCH_CASEINDEPENDENT     // Case folded comparisons
+     *                     MATCH_MULTILINE           // Newline matches as BOL/EOL
+     *                   </pre>
      * @see RECompiler
      * @see REProgram
      */
@@ -486,21 +491,8 @@ public class RE {
     }
 
     /**
-     * Sets match behaviour flags which alter the way RE does matching.
-     * @param matchFlags One or more of the RE match behaviour flags (RE.MATCH_*):
-     *
-     * <pre>
-     *   MATCH_NORMAL              // Normal (case-sensitive) matching
-     *   MATCH_CASEINDEPENDENT     // Case folded comparisons
-     *   MATCH_MULTILINE           // Newline matches as BOL/EOL
-     * </pre>
-     */
-    public void setMatchFlags(int matchFlags) {
-        this.matchFlags = matchFlags;
-    }
-
-    /**
      * Returns the current match behaviour flags.
+     *
      * @return Current match behaviour flags (RE.MATCH_*).
      *
      * <pre>
@@ -508,11 +500,35 @@ public class RE {
      *   MATCH_CASEINDEPENDENT     // Case folded comparisons
      *   MATCH_MULTILINE           // Newline matches as BOL/EOL
      * </pre>
-     *
      * @see #setMatchFlags
      */
     public int getMatchFlags() {
         return matchFlags;
+    }
+
+    /**
+     * Sets match behaviour flags which alter the way RE does matching.
+     *
+     * @param matchFlags One or more of the RE match behaviour flags (RE.MATCH_*):
+     *
+     *                   <pre>
+     *                     MATCH_NORMAL              // Normal (case-sensitive) matching
+     *                     MATCH_CASEINDEPENDENT     // Case folded comparisons
+     *                     MATCH_MULTILINE           // Newline matches as BOL/EOL
+     *                   </pre>
+     */
+    public void setMatchFlags(int matchFlags) {
+        this.matchFlags = matchFlags;
+    }
+
+    /**
+     * Returns the current regular expression program in use by this matcher object.
+     *
+     * @return Regular expression program
+     * @see #setProgram
+     */
+    public REProgram getProgram() {
+        return program;
     }
 
     /**
@@ -529,16 +545,6 @@ public class RE {
         } else {
             this.maxParen = MAX_PAREN;
         }
-    }
-
-    /**
-     * Returns the current regular expression program in use by this matcher object.
-     *
-     * @return Regular expression program
-     * @see #setProgram
-     */
-    public REProgram getProgram() {
-        return program;
     }
 
     /**
@@ -637,7 +643,7 @@ public class RE {
      * Sets the start of a paren level
      *
      * @param which Which paren level
-     * @param i Index in input array
+     * @param i     Index in input array
      */
     protected final void setParenStart(int which, int i) {
         if (which < parenCount) {
@@ -668,7 +674,7 @@ public class RE {
      * Sets the end of a paren level
      *
      * @param which Which paren level
-     * @param i Index in input array
+     * @param i     Index in input array
      */
     protected final void setParenEnd(int which, int i) {
         if (which < parenCount) {
@@ -738,7 +744,7 @@ public class RE {
         int next, opcode, opdata;
         int idxNew;
         char[] instruction = program.instruction;
-        for (int node = firstNode; node < lastNode;) {
+        for (int node = firstNode; node < lastNode; ) {
             opcode = instruction[node /* + offsetOpcode */];
             next = node + (short) instruction[node + offsetNext];
             opdata = instruction[node + offsetOpdata];
@@ -831,41 +837,40 @@ public class RE {
                     }
                     return idxNew;
 
-                case OP_BACKREF:
-                     {
-                        // Get the start and end of the backref
-                        int s = startBackref[opdata];
-                        int e = endBackref[opdata];
+                case OP_BACKREF: {
+                    // Get the start and end of the backref
+                    int s = startBackref[opdata];
+                    int e = endBackref[opdata];
 
-                        // We don't know the backref yet
-                        if (s == -1 || e == -1) {
+                    // We don't know the backref yet
+                    if (s == -1 || e == -1) {
+                        return -1;
+                    }
+
+                    // The backref is empty size
+                    if (s == e) {
+                        break;
+                    }
+
+                    // Get the length of the backref
+                    int l = e - s;
+
+                    // If there's not enough input left, give up.
+                    if (search.isEnd(idx + l - 1)) {
+                        return -1;
+                    }
+
+                    // Case fold the backref?
+                    final boolean caseFold =
+                            ((matchFlags & MATCH_CASEINDEPENDENT) != 0);
+                    // Compare backref to input
+                    for (int i = 0; i < l; i++) {
+                        if (compareChars(search.charAt(idx++), search.charAt(s + i), caseFold) != 0) {
                             return -1;
-                        }
-
-                        // The backref is empty size
-                        if (s == e) {
-                            break;
-                        }
-
-                        // Get the length of the backref
-                        int l = e - s;
-
-                        // If there's not enough input left, give up.
-                        if (search.isEnd(idx + l - 1)) {
-                            return -1;
-                        }
-
-                        // Case fold the backref?
-                        final boolean caseFold =
-                                ((matchFlags & MATCH_CASEINDEPENDENT) != 0);
-                        // Compare backref to input
-                        for (int i = 0; i < l; i++) {
-                            if (compareChars(search.charAt(idx++), search.charAt(s + i), caseFold) != 0) {
-                                return -1;
-                            }
                         }
                     }
-                    break;
+                }
+                break;
 
                 case OP_BOL:
 
@@ -903,15 +908,14 @@ public class RE {
                     switch (opdata) {
                         // Word boundary match
                         case E_NBOUND:
-                        case E_BOUND:
-                             {
-                                char cLast = ((idx == 0) ? '\n' : search.charAt(idx - 1));
-                                char cNext = ((search.isEnd(idx)) ? '\n' : search.charAt(idx));
-                                if ((RECharacter.isLetterOrDigit(cLast) == RECharacter.isLetterOrDigit(cNext)) == (opdata == E_BOUND)) {
-                                    return -1;
-                                }
+                        case E_BOUND: {
+                            char cLast = ((idx == 0) ? '\n' : search.charAt(idx - 1));
+                            char cNext = ((search.isEnd(idx)) ? '\n' : search.charAt(idx));
+                            if ((RECharacter.isLetterOrDigit(cLast) == RECharacter.isLetterOrDigit(cNext)) == (opdata == E_BOUND)) {
+                                return -1;
                             }
-                            break;
+                        }
+                        break;
 
                         // Alpha-numeric, digit, space, javaLetter, javaLetterOrDigit
                         case E_ALNUM:
@@ -975,188 +979,184 @@ public class RE {
                     idx++;
                     break;
 
-                case OP_ATOM:
-                     {
-                        // Match an atom value
-                        if (search.isEnd(idx)) {
+                case OP_ATOM: {
+                    // Match an atom value
+                    if (search.isEnd(idx)) {
+                        return -1;
+                    }
+
+                    // Get length of atom and starting index
+                    // int lenAtom = opdata;
+                    int startAtom = node + nodeSize;
+
+                    // Give up if not enough input remains to have a match
+                    if (search.isEnd(opdata + idx - 1)) {
+                        return -1;
+                    }
+
+                    // Match atom differently depending on casefolding flag
+                    final boolean caseFold =
+                            ((matchFlags & MATCH_CASEINDEPENDENT) != 0);
+
+                    for (int i = 0; i < opdata; i++) {
+                        if (compareChars(search.charAt(idx++), instruction[startAtom + i], caseFold) != 0) {
                             return -1;
                         }
+                    }
+                }
+                break;
 
-                        // Get length of atom and starting index
-                        // int lenAtom = opdata;
-                        int startAtom = node + nodeSize;
+                case OP_POSIXCLASS: {
+                    // Out of input?
+                    if (search.isEnd(idx)) {
+                        return -1;
+                    }
 
-                        // Give up if not enough input remains to have a match
-                        if (search.isEnd(opdata + idx - 1)) {
-                            return -1;
+                    switch (opdata) {
+                        case POSIX_CLASS_ALNUM:
+                            if (!RECharacter.isLetterOrDigit(search.charAt(idx))) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_ALPHA:
+                            if (!RECharacter.isLetter(search.charAt(idx))) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_DIGIT:
+                            if (!RECharacter.isDigit(search.charAt(idx))) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_BLANK: // JWL - bugbug: is this right??
+                            if (!RECharacter.isSpaceChar(search.charAt(idx))) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_SPACE:
+                            if (!RECharacter.isWhitespace(search.charAt(idx))) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_CNTRL:
+                            if (RECharacter.getType(search.charAt(idx)) != RECharacter.CONTROL) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_GRAPH: // JWL - bugbug???
+                            switch (RECharacter.getType(search.charAt(idx))) {
+                                case RECharacter.MATH_SYMBOL:
+                                case RECharacter.CURRENCY_SYMBOL:
+                                case RECharacter.MODIFIER_SYMBOL:
+                                case RECharacter.OTHER_SYMBOL:
+                                    break;
+
+                                default:
+                                    return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_LOWER:
+                            if (RECharacter.getType(search.charAt(idx)) != RECharacter.LOWERCASE_LETTER) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_UPPER:
+                            if (RECharacter.getType(search.charAt(idx)) != RECharacter.UPPERCASE_LETTER) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_PRINT:
+                            if (RECharacter.getType(search.charAt(idx)) == RECharacter.CONTROL) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_PUNCT: {
+                            int type = RECharacter.getType(search.charAt(idx));
+                            switch (type) {
+                                case RECharacter.DASH_PUNCTUATION:
+                                case RECharacter.START_PUNCTUATION:
+                                case RECharacter.END_PUNCTUATION:
+                                case RECharacter.CONNECTOR_PUNCTUATION:
+                                case RECharacter.OTHER_PUNCTUATION:
+                                    break;
+
+                                default:
+                                    return -1;
+                            }
                         }
+                        break;
 
-                        // Match atom differently depending on casefolding flag
-                        final boolean caseFold =
-                                ((matchFlags & MATCH_CASEINDEPENDENT) != 0);
-
-                        for (int i = 0; i < opdata; i++) {
-                            if (compareChars(search.charAt(idx++), instruction[startAtom + i], caseFold) != 0) {
+                        case POSIX_CLASS_XDIGIT: // JWL - bugbug??
+                        {
+                            boolean isXDigit = ((search.charAt(idx) >= '0' && search.charAt(idx) <= '9') ||
+                                    (search.charAt(idx) >= 'a' && search.charAt(idx) <= 'f') ||
+                                    (search.charAt(idx) >= 'A' && search.charAt(idx) <= 'F'));
+                            if (!isXDigit) {
                                 return -1;
                             }
                         }
+                        break;
+
+                        case POSIX_CLASS_JSTART:
+                            if (!RECharacter.isJavaIdentifierStart(search.charAt(idx))) {
+                                return -1;
+                            }
+                            break;
+
+                        case POSIX_CLASS_JPART:
+                            if (!RECharacter.isJavaIdentifierPart(search.charAt(idx))) {
+                                return -1;
+                            }
+                            break;
+
+                        default:
+                            internalError("Bad posix class");
+                            break;
                     }
-                    break;
 
-                case OP_POSIXCLASS:
-                     {
-                        // Out of input?
-                        if (search.isEnd(idx)) {
-                            return -1;
-                        }
+                    // Matched.
+                    idx++;
+                }
+                break;
 
-                        switch (opdata) {
-                            case POSIX_CLASS_ALNUM:
-                                if (!RECharacter.isLetterOrDigit(search.charAt(idx))) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_ALPHA:
-                                if (!RECharacter.isLetter(search.charAt(idx))) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_DIGIT:
-                                if (!RECharacter.isDigit(search.charAt(idx))) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_BLANK: // JWL - bugbug: is this right??
-                                if (!RECharacter.isSpaceChar(search.charAt(idx))) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_SPACE:
-                                if (!RECharacter.isWhitespace(search.charAt(idx))) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_CNTRL:
-                                if (RECharacter.getType(search.charAt(idx)) != RECharacter.CONTROL) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_GRAPH: // JWL - bugbug???
-                                switch (RECharacter.getType(search.charAt(idx))) {
-                                    case RECharacter.MATH_SYMBOL:
-                                    case RECharacter.CURRENCY_SYMBOL:
-                                    case RECharacter.MODIFIER_SYMBOL:
-                                    case RECharacter.OTHER_SYMBOL:
-                                        break;
-
-                                    default:
-                                        return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_LOWER:
-                                if (RECharacter.getType(search.charAt(idx)) != RECharacter.LOWERCASE_LETTER) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_UPPER:
-                                if (RECharacter.getType(search.charAt(idx)) != RECharacter.UPPERCASE_LETTER) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_PRINT:
-                                if (RECharacter.getType(search.charAt(idx)) == RECharacter.CONTROL) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_PUNCT:
-                                 {
-                                    int type = RECharacter.getType(search.charAt(idx));
-                                    switch (type) {
-                                        case RECharacter.DASH_PUNCTUATION:
-                                        case RECharacter.START_PUNCTUATION:
-                                        case RECharacter.END_PUNCTUATION:
-                                        case RECharacter.CONNECTOR_PUNCTUATION:
-                                        case RECharacter.OTHER_PUNCTUATION:
-                                            break;
-
-                                        default:
-                                            return -1;
-                                    }
-                                }
-                                break;
-
-                            case POSIX_CLASS_XDIGIT: // JWL - bugbug??
-                                 {
-                                    boolean isXDigit = ((search.charAt(idx) >= '0' && search.charAt(idx) <= '9') ||
-                                            (search.charAt(idx) >= 'a' && search.charAt(idx) <= 'f') ||
-                                            (search.charAt(idx) >= 'A' && search.charAt(idx) <= 'F'));
-                                    if (!isXDigit) {
-                                        return -1;
-                                    }
-                                }
-                                break;
-
-                            case POSIX_CLASS_JSTART:
-                                if (!RECharacter.isJavaIdentifierStart(search.charAt(idx))) {
-                                    return -1;
-                                }
-                                break;
-
-                            case POSIX_CLASS_JPART:
-                                if (!RECharacter.isJavaIdentifierPart(search.charAt(idx))) {
-                                    return -1;
-                                }
-                                break;
-
-                            default:
-                                internalError("Bad posix class");
-                                break;
-                        }
-
-                        // Matched.
-                        idx++;
+                case OP_ANYOF: {
+                    // Out of input?
+                    if (search.isEnd(idx)) {
+                        return -1;
                     }
-                    break;
 
-                case OP_ANYOF:
-                     {
-                        // Out of input?
-                        if (search.isEnd(idx)) {
-                            return -1;
-                        }
+                    // Get character to match against character class and maybe casefold
+                    char c = search.charAt(idx);
+                    boolean caseFold = (matchFlags & MATCH_CASEINDEPENDENT) != 0;
+                    // Loop through character class checking our match character
+                    int idxRange = node + nodeSize;
+                    int idxEnd = idxRange + (opdata * 2);
+                    boolean match = false;
+                    for (int i = idxRange; !match && i < idxEnd; ) {
+                        // Get start, end and match characters
+                        char s = instruction[i++];
+                        char e = instruction[i++];
 
-                        // Get character to match against character class and maybe casefold
-                        char c = search.charAt(idx);
-                        boolean caseFold = (matchFlags & MATCH_CASEINDEPENDENT) != 0;
-                        // Loop through character class checking our match character
-                        int idxRange = node + nodeSize;
-                        int idxEnd = idxRange + (opdata * 2);
-                        boolean match = false;
-                        for (int i = idxRange; !match && i < idxEnd;) {
-                            // Get start, end and match characters
-                            char s = instruction[i++];
-                            char e = instruction[i++];
-
-                            match = ((compareChars(c, s, caseFold) >= 0) && (compareChars(c, e, caseFold) <= 0));
-                        }
-
-                        // Fail if we didn't match the character class
-                        if (!match) {
-                            return -1;
-                        }
-                        idx++;
+                        match = ((compareChars(c, s, caseFold) >= 0) && (compareChars(c, e, caseFold) <= 0));
                     }
-                    break;
+
+                    // Fail if we didn't match the character class
+                    if (!match) {
+                        return -1;
+                    }
+                    idx++;
+                }
+                break;
 
                 case OP_BRANCH: {
                     // Check for choices
@@ -1186,7 +1186,7 @@ public class RE {
 
                 case OP_OPEN_CLUSTER:
                 case OP_CLOSE_CLUSTER:
-                // starting or ending the matching of a subexpression which has no backref.
+                    // starting or ending the matching of a subexpression which has no backref.
 
                 case OP_NOTHING:
                 case OP_GOTO:
@@ -1265,7 +1265,7 @@ public class RE {
      * starting at a given index.
      *
      * @param search String to match against
-     * @param i Index to start searching at
+     * @param i      Index to start searching at
      * @return True if string matched
      */
     public boolean match(String search, int i) {
@@ -1277,7 +1277,7 @@ public class RE {
      * starting at a given index.
      *
      * @param search String to match against
-     * @param i Index to start searching at
+     * @param i      Index to start searching at
      * @return True if string matched
      */
     public boolean match(CharacterIterator search, int i) {
@@ -1420,20 +1420,6 @@ public class RE {
         v.toArray(ret);
         return ret;
     }
-    /**
-     * Flag bit that indicates that subst should replace all occurrences of this
-     * regular expression.
-     */
-    public static final int REPLACE_ALL = 0x0000;
-    /**
-     * Flag bit that indicates that subst should only replace the first occurrence
-     * of this regular expression.
-     */
-    public static final int REPLACE_FIRSTONLY = 0x0001;
-    /**
-     * Flag bit that indicates that subst should replace backreferences
-     */
-    public static final int REPLACE_BACKREFERENCES = 0x0002;
 
     /**
      * Substitutes a string for this regular expression in another string.
@@ -1471,11 +1457,11 @@ public class RE {
      *
      * @param substituteIn String to substitute within
      * @param substitution String to substitute for matches of this regular expression
-     * @param flags One or more bitwise flags from REPLACE_*.  If the REPLACE_FIRSTONLY
-     * flag bit is set, only the first occurrence of this regular expression is replaced.
-     * If the bit is not set (REPLACE_ALL), all occurrences of this pattern will be
-     * replaced. If the flag REPLACE_BACKREFERENCES is set, all backreferences will
-     * be processed.
+     * @param flags        One or more bitwise flags from REPLACE_*.  If the REPLACE_FIRSTONLY
+     *                     flag bit is set, only the first occurrence of this regular expression is replaced.
+     *                     If the bit is not set (REPLACE_ALL), all occurrences of this pattern will be
+     *                     replaced. If the flag REPLACE_BACKREFERENCES is set, all backreferences will
+     *                     be processed.
      * @return The string substituteIn with zero or more occurrences of the current
      * regular expression replaced with the substitution String (if this regular
      * expression object doesn't match at any position, the original String is returned
@@ -1596,11 +1582,11 @@ public class RE {
     /**
      * Compares two characters.
      *
-     * @param c1 first character to compare.
-     * @param c2 second character to compare.
+     * @param c1              first character to compare.
+     * @param c2              second character to compare.
      * @param caseIndependent whether comparision is case insensitive or not.
      * @return negative, 0, or positive integer as the first character
-     *         less than, equal to, or greater then the second.
+     * less than, equal to, or greater then the second.
      */
     private int compareChars(char c1, char c2, boolean caseIndependent) {
         if (caseIndependent) {

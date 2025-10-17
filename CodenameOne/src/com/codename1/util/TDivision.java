@@ -46,18 +46,12 @@ class TDivision {
      * Art of Computer Programming, vol. 2. Steps D1-D8 correspond the steps in
      * the algorithm description.
      *
-     * @param quot
-     *            the quotient
-     * @param quotLength
-     *            the quotient's length
-     * @param a
-     *            the dividend
-     * @param aLength
-     *            the dividend's length
-     * @param b
-     *            the divisor
-     * @param bLength
-     *            the divisor's length
+     * @param quot       the quotient
+     * @param quotLength the quotient's length
+     * @param a          the dividend
+     * @param aLength    the dividend's length
+     * @param b          the divisor
+     * @param bLength    the divisor's length
      * @return the remainder
      */
     static int[] divide(int quot[], int quotLength, int a[], int aLength, int b[], int bLength) {
@@ -94,14 +88,14 @@ class TDivision {
                 long res = TDivision.divideLongByInt(product, firstDivisorDigit);
                 guessDigit = (int) res; // the quotient of divideLongByInt
                 int rem = (int) (res >> 32); // the remainder of
-                                             // divideLongByInt
+                // divideLongByInt
                 // decrease guessDigit by 1 while leftHand > rightHand
                 if (guessDigit != 0) {
                     long leftHand = 0;
                     long rightHand = 0;
                     boolean rOverflowed = false;
                     guessDigit++; // to have the proper value in the loop
-                                  // below
+                    // below
                     do {
                         guessDigit--;
                         if (rOverflowed) {
@@ -167,14 +161,10 @@ class TDivision {
      * Divides an array by an integer value. Implements the Knuth's division
      * algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
      *
-     * @param dest
-     *            the quotient
-     * @param src
-     *            the dividend
-     * @param srcLength
-     *            the length of the dividend
-     * @param divisor
-     *            the divisor
+     * @param dest      the quotient
+     * @param src       the dividend
+     * @param srcLength the length of the dividend
+     * @param divisor   the divisor
      * @return remainder
      */
     static int divideArrayByInt(int dest[], int src[], final int srcLength, final int divisor) {
@@ -223,12 +213,9 @@ class TDivision {
      * Divides an array by an integer value. Implements the Knuth's division
      * algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
      *
-     * @param src
-     *            the dividend
-     * @param srcLength
-     *            the length of the dividend
-     * @param divisor
-     *            the divisor
+     * @param src       the dividend
+     * @param srcLength the length of the dividend
+     * @param divisor   the divisor
      * @return remainder
      */
     static int remainderArrayByInt(int src[], final int srcLength, final int divisor) {
@@ -247,10 +234,8 @@ class TDivision {
      * Divides a <code>BigInteger</code> by a signed <code>int</code> and
      * returns the remainder.
      *
-     * @param dividend
-     *            the BigInteger to be divided. Must be non-negative.
-     * @param divisor
-     *            a signed int
+     * @param dividend the BigInteger to be divided. Must be non-negative.
+     * @param divisor  a signed int
      * @return divide % divisor
      */
     static int remainder(TBigInteger dividend, int divisor) {
@@ -261,12 +246,10 @@ class TDivision {
      * Divides an unsigned long a by an unsigned int b. It is supposed that the
      * most significant bit of b is set to 1, i.e. b < 0
      *
-     * @param a
-     *            the dividend
-     * @param b
-     *            the divisor
+     * @param a the dividend
+     * @param b the divisor
      * @return the long value containing the unsigned integer remainder in the
-     *         left half and the unsigned integer quotient in the right half
+     * left half and the unsigned integer quotient in the right half
      */
     static long divideLongByInt(long a, int b) {
         long quot;
@@ -326,34 +309,29 @@ class TDivision {
             if (valSign < 0) {
                 rem = -rem;
             }
-            return new TBigInteger[] { TBigInteger.valueOf(quo), TBigInteger.valueOf(rem) };
+            return new TBigInteger[]{TBigInteger.valueOf(quo), TBigInteger.valueOf(rem)};
         }
         int quotientLength = valLen;
         int quotientSign = ((valSign == divisorSign) ? 1 : -1);
         int quotientDigits[] = new int[quotientLength];
         int remainderDigits[];
-        remainderDigits = new int[] { TDivision.divideArrayByInt(quotientDigits, valDigits, valLen, divisor) };
+        remainderDigits = new int[]{TDivision.divideArrayByInt(quotientDigits, valDigits, valLen, divisor)};
         TBigInteger result0 = new TBigInteger(quotientSign, quotientLength, quotientDigits);
         TBigInteger result1 = new TBigInteger(valSign, 1, remainderDigits);
         result0.cutOffLeadingZeroes();
         result1.cutOffLeadingZeroes();
-        return new TBigInteger[] { result0, result1 };
+        return new TBigInteger[]{result0, result1};
     }
 
     /**
      * Multiplies an array by int and subtracts it from a subarray of another
      * array.
      *
-     * @param a
-     *            the array to subtract from
-     * @param start
-     *            the start element of the subarray of a
-     * @param b
-     *            the array to be multiplied and subtracted
-     * @param bLen
-     *            the length of b
-     * @param c
-     *            the multiplier of b
+     * @param a     the array to subtract from
+     * @param start the start element of the subarray of a
+     * @param b     the array to be multiplied and subtracted
+     * @param bLen  the length of b
+     * @param c     the multiplier of b
      * @return the carry element of subtraction
      */
     static int multiplyAndSubtract(int a[], int start, int b[], int bLen, int c) {
@@ -374,16 +352,12 @@ class TDivision {
     }
 
     /**
-     * @param m
-     *            a positive modulus Return the greatest common divisor of op1
+     * @param m   a positive modulus Return the greatest common divisor of op1
      *            and op2,
-     *
-     * @param op1
-     *            must be greater than zero
-     * @param op2
-     *            must be greater than zero
-     * @see TBigInteger#gcd(TBigInteger)
+     * @param op1 must be greater than zero
+     * @param op2 must be greater than zero
      * @return {@code GCD(op1, op2)}
+     * @see TBigInteger#gcd(TBigInteger)
      */
     static TBigInteger gcdBinary(TBigInteger op1, TBigInteger op2) {
         // PRE: (op1 > 0) and (op2 > 0)
@@ -444,12 +418,10 @@ class TDivision {
      * with numbers of 63 bits, represented in positives values of {@code long}
      * type.
      *
-     * @param op1
-     *            a positive number
-     * @param op2
-     *            a positive number
-     * @see #gcdBinary(TBigInteger, TBigInteger)
+     * @param op1 a positive number
+     * @param op2 a positive number
      * @return <code>GCD(op1, op2)</code>
+     * @see #gcdBinary(TBigInteger, TBigInteger)
      */
     static long gcdBinary(long op1, long op2) {
         // PRE: (op1 > 0) and (op2 > 0)
@@ -584,7 +556,7 @@ class TDivision {
     }
 
     static TBigInteger squareAndMultiply(TBigInteger x2, TBigInteger a2, TBigInteger exponent, TBigInteger modulus,
-            int n2) {
+                                         int n2) {
         TBigInteger res = x2;
         for (int i = exponent.bitLength() - 1; i >= 0; i--) {
             res = monPro(res, res, modulus, n2);
@@ -600,11 +572,9 @@ class TDivision {
      * Hars - Modular Inverse Algorithms Without Multiplications for
      * Cryptographic Applications"
      *
+     * @param a a positive number
+     * @param m a positive modulus
      * @see TBigInteger#modInverse(TBigInteger)
-     * @param a
-     *            a positive number
-     * @param m
-     *            a positive modulus
      */
     static TBigInteger modInverseHars(TBigInteger a, TBigInteger m) {
         // PRE: (a > 0) and (m > 0)
@@ -724,9 +694,9 @@ class TDivision {
      * @see TBigInteger#modPow(TBigInteger, TBigInteger)
      * @see #monPro(TBigInteger, TBigInteger, TBigInteger, int)
      * @see #slidingWindow(TBigInteger, TBigInteger, TBigInteger, TBigInteger,
-     *      int)
+     * int)
      * @see #squareAndMultiply(TBigInteger, TBigInteger, TBigInteger,
-     *      TBigInteger, int)
+     * TBigInteger, int)
      */
     static TBigInteger oddModPow(TBigInteger base, TBigInteger exponent, TBigInteger modulus) {
         // PRE: (base > 0), (exponent > 0), (modulus > 0) and (odd modulus)
@@ -849,16 +819,12 @@ class TDivision {
      * {@code int} arrays. The arrays are supposed in <i>little endian</i>
      * notation.
      *
-     * @param a
-     *            The first factor of the product.
-     * @param b
-     *            The second factor of the product.
-     * @param modulus
-     *            The modulus of the operations. Z<sub>modulus</sub>.
-     * @param n2
-     *            The digit modulus'[0].
+     * @param a       The first factor of the product.
+     * @param b       The second factor of the product.
+     * @param modulus The modulus of the operations. Z<sub>modulus</sub>.
+     * @param n2      The digit modulus'[0].
      * @ar.org.fitc.ref "C. K. Koc - Analyzing and Comparing Montgomery
-     *                  Multiplication Algorithms"
+     * Multiplication Algorithms"
      * @see #modPowOdd(TBigInteger, TBigInteger, TBigInteger)
      */
     static TBigInteger monPro(TBigInteger a, TBigInteger b, TBigInteger modulus, int n2) {
@@ -905,10 +871,8 @@ class TDivision {
     }
 
     /**
-     * @param x
-     *            an odd positive number.
-     * @param n
-     *            the exponent by which 2 is raised.
+     * @param x an odd positive number.
+     * @param n the exponent by which 2 is raised.
      * @return {@code x<sup>-1</sup> (mod 2<sup>n</sup>)}.
      */
     static TBigInteger modPow2Inverse(TBigInteger x, int n) {
@@ -930,10 +894,8 @@ class TDivision {
     /**
      * Performs {@code x = x mod (2<sup>n</sup>)}.
      *
-     * @param x
-     *            a positive number, it will store the result.
-     * @param n
-     *            a positive exponent of {@code 2}.
+     * @param x a positive number, it will store the result.
+     * @param n a positive exponent of {@code 2}.
      */
     static void inplaceModPow2(TBigInteger x, int n) {
         // PRE: (x > 0) and (n >= 0)

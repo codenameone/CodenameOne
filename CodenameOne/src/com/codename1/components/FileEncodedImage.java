@@ -24,10 +24,11 @@
 
 package com.codename1.components;
 
-import com.codename1.ui.EncodedImage;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.ui.EncodedImage;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,34 +45,11 @@ public class FileEncodedImage extends EncodedImage {
     private String fileName;
     private boolean keep;
     private byte[] data;
+
     private FileEncodedImage(String fileName, int w, int h, boolean keep) {
         super(w, h);
         this.fileName = fileName;
         this.keep = keep;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public byte[] getImageData() {
-        if(data != null) {
-            return data;
-        }
-        InputStream i = null;
-        try {
-            byte[] imageData = new byte[(int) FileSystemStorage.getInstance().getLength(fileName)];
-            i = FileSystemStorage.getInstance().openInputStream(fileName);
-            Util.readFully(i, imageData);
-            if(keep) {
-                data = imageData;
-            }
-            return imageData;
-        } catch (IOException ex) {
-            Log.e(ex);
-            return null;
-        } finally {
-            Util.cleanup(i);
-        }
     }
 
     /**
@@ -80,8 +58,8 @@ public class FileEncodedImage extends EncodedImage {
      * files.
      *
      * @param fileName the name of the file
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
      * @return image that will load the file seamlessly
      */
     public static FileEncodedImage create(String fileName, int width, int height) {
@@ -94,9 +72,9 @@ public class FileEncodedImage extends EncodedImage {
      * files. This version of the method creates the file from an input stream
      *
      * @param fileName the name of the file
-     * @param i input stream from which to create the file
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param i        input stream from which to create the file
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
      * @return image that will load the file seamlessly
      */
     public static FileEncodedImage create(String fileName, InputStream i, int width, int height) throws IOException {
@@ -115,12 +93,36 @@ public class FileEncodedImage extends EncodedImage {
      * files.
      *
      * @param fileName the name of the file
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
-     * @param keep if set to true keeps the file in RAM once loaded
+     * @param width    the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height   the height of the file or -1 if unknown (notice that this will improve performance)
+     * @param keep     if set to true keeps the file in RAM once loaded
      * @return image that will load the file seamlessly
      */
     public static FileEncodedImage create(String fileName, int width, int height, boolean keep) {
         return new FileEncodedImage(fileName, width, height, keep);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public byte[] getImageData() {
+        if (data != null) {
+            return data;
+        }
+        InputStream i = null;
+        try {
+            byte[] imageData = new byte[(int) FileSystemStorage.getInstance().getLength(fileName)];
+            i = FileSystemStorage.getInstance().openInputStream(fileName);
+            Util.readFully(i, imageData);
+            if (keep) {
+                data = imageData;
+            }
+            return imageData;
+        } catch (IOException ex) {
+            Log.e(ex);
+            return null;
+        } finally {
+            Util.cleanup(i);
+        }
     }
 }

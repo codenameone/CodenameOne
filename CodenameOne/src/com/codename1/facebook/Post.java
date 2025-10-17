@@ -28,8 +28,8 @@ import java.util.Vector;
 
 /**
  * This class represents a Facebook Post Object
- *  http://developers.facebook.com/docs/reference/api/post/
- * 
+ * http://developers.facebook.com/docs/reference/api/post/
+ *
  * @author Chen Fishbein
  */
 public class Post extends FBObject {
@@ -74,7 +74,7 @@ public class Post extends FBObject {
 
     /**
      * Gets the to users
-     * 
+     *
      * @return Vector of Users
      */
     public Vector getTo() {
@@ -83,6 +83,7 @@ public class Post extends FBObject {
 
     /**
      * Get the type
+     *
      * @return the type
      */
     public String getType() {
@@ -106,6 +107,7 @@ public class Post extends FBObject {
     public String getMessage() {
         return message;
     }
+
     /**
      * Gets the link Url
      *
@@ -136,6 +138,7 @@ public class Post extends FBObject {
 
     /**
      * Gets the linkDescription
+     *
      * @return the linkDescription
      */
     public String getLinkDescription() {
@@ -143,7 +146,7 @@ public class Post extends FBObject {
     }
 
     /**
-     *  Gets the picture id
+     * Gets the picture id
      *
      * @return the picture id
      */
@@ -165,7 +168,7 @@ public class Post extends FBObject {
         return likes;
     }
 
-     /**
+    /**
      * {@inheritDoc}
      */
     public String toString() {
@@ -174,9 +177,10 @@ public class Post extends FBObject {
 
     /**
      * copies the relevant values from the given hashtable
+     *
      * @param props an hashtable to copy from
      */
-    public void copy(Hashtable props){
+    public void copy(Hashtable props) {
         super.copy(props);
         init(props);
     }

@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui.animations;
@@ -38,10 +38,10 @@ import com.codename1.ui.plaf.Style;
  * until the destination is displayed in place.
  * The Bubble window can be round on supported platforms
  * </p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/5c44d837d3582b11deed.js"></script>
  * <img src="https://www.codenameone.com/img/blog/bubble-transition.gif" alt="Bubble transition converting a circular button to a Dialog" />
- * 
+ *
  * @author Chen
  */
 public class BubbleTransition extends Transition {
@@ -59,43 +59,63 @@ public class BubbleTransition extends Transition {
     private String componentName;
     private boolean roundBubble = true;
     private GeneralPath bubbleShape;
-    
-    
+
+
     /**
      * Creates a Bubble Transition
-     */ 
+     */
     public BubbleTransition() {
     }
 
     /**
      * Creates a Bubble Transition
+     *
      * @param duration the duration of the transition
-     */ 
+     */
     public BubbleTransition(int duration) {
         this.duration = duration;
     }
-    
+
     /**
      * Creates a Bubble Transition
-     * 
-     * @param duration the duration of the transition
-     * @param componentName the name of the component from the source Form that 
-     * this transition should start from.
-     */ 
+     *
+     * @param duration      the duration of the transition
+     * @param componentName the name of the component from the source Form that
+     *                      this transition should start from.
+     */
     public BubbleTransition(int duration, String componentName) {
         this(duration);
         this.componentName = componentName;
     }
 
+    private static Component findByName(Container root, String componentName) {
+        int count = root.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            Component c = root.getComponentAt(iter);
+            String n = c.getName();
+            if (n != null && n.equals(componentName)) {
+                return c;
+            }
+            if (c instanceof Container) {
+                c = findByName((Container) c, componentName);
+                if (c != null) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
+
     /**
-     * the name of the component from the source Form that 
+     * the name of the component from the source Form that
      * this transition should start from.
+     *
      * @param componentName name of the component to start the transition from
-     */ 
+     */
     public void setComponentName(String componentName) {
         this.componentName = componentName;
     }
-    
+
     @Override
     public void initTransition() {
 
@@ -104,7 +124,7 @@ public class BubbleTransition extends Transition {
         int w = source.getWidth();
         int h = source.getHeight();
 
-        // a transition might occur with illegal source or destination values (common with 
+        // a transition might occur with illegal source or destination values (common with
         // improper replace() calls, this may still be valid and shouldn't fail
         if (w <= 0 || h <= 0) {
             return;
@@ -114,7 +134,7 @@ public class BubbleTransition extends Transition {
         originSrc = findByName(sourceForm, componentName);
         Form destForm = destination.getComponentForm();
         originDest = findByName(destForm, componentName);
-        
+
         Display d = Display.getInstance();
         if (getDestination() instanceof Dialog) {
             Dialog dlg = (Dialog) destination;
@@ -128,7 +148,7 @@ public class BubbleTransition extends Transition {
             stl.setBgTransparency(0xff);
             drawDialogCmp(destBuffer.getGraphics(), dlg);
             stl.setBgTransparency(bgt & 0xff, true);
-            
+
         } else if (getSource() instanceof Dialog) {
             Dialog dlg = (Dialog) source;
             // transparent image!
@@ -143,10 +163,10 @@ public class BubbleTransition extends Transition {
             stl.setBgTransparency(bgt & 0xff, true);
 
         } else {
-            if(originDest != null){
+            if (originDest != null) {
                 destBuffer = createMutableImage(source.getWidth(), source.getHeight());
-                paint(destBuffer.getGraphics(), source, -source.getAbsoluteX(), -source.getAbsoluteY());            
-            }else{
+                paint(destBuffer.getGraphics(), source, -source.getAbsoluteX(), -source.getAbsoluteY());
+            } else {
                 destBuffer = createMutableImage(destination.getWidth(), destination.getHeight());
                 paint(destBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());
             }
@@ -160,14 +180,14 @@ public class BubbleTransition extends Transition {
             src = getDialogParent(src);
         }
 
-        
-        if(originSrc != null){
-            locMotionX = Motion.createLinearMotion(originSrc.getAbsoluteX() + originSrc.getWidth()/2 - dest.getWidth()/2, dest.getAbsoluteX(), duration);
+
+        if (originSrc != null) {
+            locMotionX = Motion.createLinearMotion(originSrc.getAbsoluteX() + originSrc.getWidth() / 2 - dest.getWidth() / 2, dest.getAbsoluteX(), duration);
             locMotionX.start();
-            locMotionY = Motion.createLinearMotion(originSrc.getAbsoluteY() + originSrc.getHeight()/2 - dest.getHeight()/2, dest.getAbsoluteY(), duration);
+            locMotionY = Motion.createLinearMotion(originSrc.getAbsoluteY() + originSrc.getHeight() / 2 - dest.getHeight() / 2, dest.getAbsoluteY(), duration);
             locMotionY.start();
-            clipMotion = Motion.createLinearMotion(Math.min(originSrc.getWidth(), originSrc.getHeight()), Math.max(dest.getWidth(), dest.getHeight())*3/2, duration);
-        }else{
+            clipMotion = Motion.createLinearMotion(Math.min(originSrc.getWidth(), originSrc.getHeight()), Math.max(dest.getWidth(), dest.getHeight()) * 3 / 2, duration);
+        } else {
             if (originDest != null) {
                 locMotionX = Motion.createLinearMotion(src.getAbsoluteX(), originDest.getAbsoluteX() + originDest.getWidth() / 2 - src.getWidth() / 2, duration);
                 locMotionX.start();
@@ -187,7 +207,7 @@ public class BubbleTransition extends Transition {
     @Override
     public boolean animate() {
         clipSize = clipMotion.getValue();
-        if(originSrc != null || originDest != null){
+        if (originSrc != null || originDest != null) {
             x = locMotionX.getValue();
             y = locMotionY.getValue();
         }
@@ -200,39 +220,39 @@ public class BubbleTransition extends Transition {
         }
         return bubbleShape;
     }
-    
+
     @Override
     public void paint(Graphics g) {
         Component source = getSource();
         Component dest = getDestination();
-        
+
         Component srcCmp = source;
         Component destCmp = dest;
-        
-        if ((source instanceof Dialog && dest instanceof Form) 
+
+        if ((source instanceof Dialog && dest instanceof Form)
                 || originDest != null) {
             srcCmp = dest;
             destCmp = source;
         }
-        
-        
-        paint(g, srcCmp, -srcCmp.getAbsoluteX(), -srcCmp.getAbsoluteY(), true);
-        
-        int [] clip = g.getClip();
 
-        if(destCmp instanceof Dialog){
+
+        paint(g, srcCmp, -srcCmp.getAbsoluteX(), -srcCmp.getAbsoluteY(), true);
+
+        int[] clip = g.getClip();
+
+        if (destCmp instanceof Dialog) {
             destCmp = getDialogParent(destCmp);
         }
-        if(roundBubble && g.isShapeClipSupported()){
+        if (roundBubble && g.isShapeClipSupported()) {
 
             GeneralPath p = getBubbleShape();
             p.reset();
-            p.arc(x + destCmp.getWidth()/2 - clipSize/2, y + destCmp.getHeight()/2 - clipSize/2, clipSize, clipSize, 0, Math.toRadians(360));
+            p.arc(x + destCmp.getWidth() / 2 - clipSize / 2, y + destCmp.getHeight() / 2 - clipSize / 2, clipSize, clipSize, 0, Math.toRadians(360));
             g.setClip(p);
-        }else{
-            g.setClip(x + destCmp.getWidth()/2 - clipSize/2, y + destCmp.getHeight()/2 - clipSize/2, clipSize, clipSize);
+        } else {
+            g.setClip(x + destCmp.getWidth() / 2 - clipSize / 2, y + destCmp.getHeight() / 2 - clipSize / 2, clipSize, clipSize);
         }
-        g.drawImage(destBuffer, x, y);        
+        g.drawImage(destBuffer, x, y);
         g.setClip(clip);
     }
 
@@ -240,14 +260,12 @@ public class BubbleTransition extends Transition {
      * Determines if the Bubble is a round circle or a rectangle.
      * Round bubble apply to platforms who supports shaped clipping.
      * See Graphics.isShapeClipSupported().
-     * 
+     *
      * @param roundBubble true if the bubble should be round
-     */ 
+     */
     public void setRoundBubble(boolean roundBubble) {
         this.roundBubble = roundBubble;
     }
-    
-    
 
     private Image createMutableImage(int w, int h) {
         Display d = Display.getInstance();
@@ -319,28 +337,10 @@ public class BubbleTransition extends Transition {
     private Container getDialogParent(Component dlg) {
         return ((Dialog) dlg).getDialogComponent();
     }
-    
-    
-    private static Component findByName(Container root, String componentName) {
-        int count = root.getComponentCount();
-        for(int iter = 0 ; iter < count ; iter++) {
-            Component c = root.getComponentAt(iter);
-            String n = c.getName();
-            if(n != null && n.equals(componentName)) {
-                return c;
-            }
-            if(c instanceof Container) {
-                c = findByName((Container)c, componentName);
-                if(c != null) {
-                    return c;
-                }
-            }
-        }
-        return null;
-    }
 
     /**
      * {@inheritDoc}
+     *
      * @param reverse {@inheritDoc}
      * @return {@inheritDoc}
      */

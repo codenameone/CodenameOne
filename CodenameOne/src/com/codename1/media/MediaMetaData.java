@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.media;
@@ -27,13 +27,19 @@ import com.codename1.ui.Image;
 /**
  * MetaData for use by {@link RemoteControlListener} to provide information about
  * the currently playing background media on the device's lock screen.
+ *
  * @author shannah
  * @since 7.0
  */
 public class MediaMetaData {
 
+    private String title, subtitle;
+    private int trackNumber, numTracks;
+    private Image displayIcon, albumArt, art;
+
     /**
      * Gets the media title.
+     *
      * @return the title
      */
     public String getTitle() {
@@ -42,6 +48,7 @@ public class MediaMetaData {
 
     /**
      * Sets the media title.
+     *
      * @param title the title to set
      */
     public void setTitle(String title) {
@@ -50,6 +57,7 @@ public class MediaMetaData {
 
     /**
      * Gets the media subtitle.
+     *
      * @return the subtitle
      */
     public String getSubtitle() {
@@ -58,6 +66,7 @@ public class MediaMetaData {
 
     /**
      * Sets the media subtitle.
+     *
      * @param subtitle the subtitle to set
      */
     public void setSubtitle(String subtitle) {
@@ -66,6 +75,7 @@ public class MediaMetaData {
 
     /**
      * Gets the media track number.
+     *
      * @return the trackNumber
      */
     public int getTrackNumber() {
@@ -74,6 +84,7 @@ public class MediaMetaData {
 
     /**
      * Sets the media track number.
+     *
      * @param trackNumber the trackNumber to set
      */
     public void setTrackNumber(int trackNumber) {
@@ -82,6 +93,7 @@ public class MediaMetaData {
 
     /**
      * Gets the current number of tracks in the current play list.
+     *
      * @return the numTracks
      */
     public int getNumTracks() {
@@ -90,6 +102,7 @@ public class MediaMetaData {
 
     /**
      * Sets the current number of tracks in the current play list.
+     *
      * @param numTracks the numTracks to set
      */
     public void setNumTracks(int numTracks) {
@@ -98,6 +111,7 @@ public class MediaMetaData {
 
     /**
      * Gets the display icon for the media.
+     *
      * @return the displayIcon
      */
     public Image getDisplayIcon() {
@@ -106,6 +120,7 @@ public class MediaMetaData {
 
     /**
      * Sets the display icon for the media.
+     *
      * @param displayIcon the displayIcon to set
      */
     public void setDisplayIcon(Image displayIcon) {
@@ -114,6 +129,7 @@ public class MediaMetaData {
 
     /**
      * Gets the album art for the media.
+     *
      * @return the albumArt
      */
     public Image getAlbumArt() {
@@ -122,6 +138,7 @@ public class MediaMetaData {
 
     /**
      * Sets the album art for the media.
+     *
      * @param albumArt the albumArt to set
      */
     public void setAlbumArt(Image albumArt) {
@@ -130,6 +147,7 @@ public class MediaMetaData {
 
     /**
      * Gets the art for the current media.
+     *
      * @return the art
      */
     public Image getArt() {
@@ -138,12 +156,10 @@ public class MediaMetaData {
 
     /**
      * Sets the art for the current media.
+     *
      * @param art the art to set
      */
     public void setArt(Image art) {
         this.art = art;
     }
-    private String title, subtitle;
-    private int trackNumber, numTracks;
-    private Image displayIcon, albumArt, art;
 }

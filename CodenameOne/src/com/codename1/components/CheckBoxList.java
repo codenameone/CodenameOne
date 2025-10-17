@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
@@ -30,23 +30,21 @@ import com.codename1.ui.list.MultipleSelectionListModel;
 
 /**
  * A list of checkboxes.
- * 
- * 
- * 
+ *
  * @author Steve Hannah
- * @since 6.0
  * @see ButtonList for code samples.
+ * @since 6.0
  */
 public class CheckBoxList extends ButtonList {
-    
+
     /**
      * Change listener added to individual checkboxes to keep them in sync with the model.
      */
     private final ActionListener changeListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (evt.getSource() instanceof CheckBox && contains((Component)evt.getSource())) {
-                CheckBox src = (CheckBox)evt.getSource();
+            if (evt.getSource() instanceof CheckBox && contains((Component) evt.getSource())) {
+                CheckBox src = (CheckBox) evt.getSource();
                 int index = CheckBoxList.this.getComponentIndex(src);
                 if (src.isSelected()) {
                     getMultiListModel().addSelectedIndices(index);
@@ -55,9 +53,9 @@ public class CheckBoxList extends ButtonList {
                 }
             }
         }
-        
+
     };
-    
+
     public CheckBoxList(MultipleSelectionListModel model) {
         super(model);
         fireReady();
@@ -75,22 +73,22 @@ public class CheckBoxList extends ButtonList {
 
     @Override
     protected void setSelected(Component button, boolean selected) {
-        ((CheckBox)button).setSelected(selected);
+        ((CheckBox) button).setSelected(selected);
     }
-    
-     @Override
+
+    @Override
     protected Component decorateComponent(Object modelItem, Component b) {
         b = super.decorateComponent(modelItem, b);
-        ((CheckBox)b).addActionListener(this);
-        ((CheckBox)b).addChangeListener(changeListener);
+        ((CheckBox) b).addActionListener(this);
+        ((CheckBox) b).addChangeListener(changeListener);
         return b;
     }
 
     @Override
     protected Component undecorateComponent(Component b) {
-        ((CheckBox)b).removeActionListener(this);
-        ((CheckBox)b).removeChangeListeners(changeListener);
+        ((CheckBox) b).removeActionListener(this);
+        ((CheckBox) b).removeChangeListeners(changeListener);
         return super.undecorateComponent(b);
     }
-    
+
 }

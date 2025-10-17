@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl;
@@ -28,10 +28,15 @@ import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.services.ImageDownloadService;
-import com.codename1.ui.*;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -40,17 +45,10 @@ import java.util.Vector;
 
 /**
  * The v-serv ad service implements full screen ads
- * 
+ *
  * @author Shai Almog
  */
 public class VServAds extends FullScreenAdService {
-    boolean failed;
-    private static final String URL = "https://a.vserv.mobi/delivery/adapi.php";
-    private String zoneId = "6216";
-    private String countryCode;
-    private String networkCode;
-    private String locale = "en";
-    
     public static final int CAT_ID_ACTION_ADVENTURE = 18;
     public static final int CAT_ID_SPORTS = 19;
     public static final int CAT_ID_MOVIES = 20;
@@ -69,16 +67,21 @@ public class VServAds extends FullScreenAdService {
     public static final int CAT_ID_SOCIAL_NETWORKING = 34;
     public static final int CAT_ID_HEALTH = 35;
     public static final int CAT_ID_OTHERS = 36;
-
+    private static final String URL = "https://a.vserv.mobi/delivery/adapi.php";
+    boolean failed;
+    private String zoneId = "6216";
+    private String countryCode;
+    private String networkCode;
+    private String locale = "en";
     private int category = CAT_ID_PRODUCTIVITY;
-    
+
     private String destination;
     private String imageURL;
     private String contentType;
     private int backgroundColor;
     private String renderNotify;
     private String actionNotify;
-    
+
     /**
      * {@inheritDoc}
      */
@@ -95,37 +98,37 @@ public class VServAds extends FullScreenAdService {
 
             private String getString(Hashtable h, String n) {
                 Object v = h.get(n);
-                if(v == null) {
+                if (v == null) {
                     return null;
                 }
-                if(v instanceof Vector) {
-                    return (String)((Vector)v).elementAt(0);
+                if (v instanceof Vector) {
+                    return (String) ((Vector) v).elementAt(0);
                 }
-                return (String)v;
+                return (String) v;
             }
-            
+
             protected void readResponse(InputStream input) throws IOException {
                 JSONParser parser = new JSONParser();
                 Hashtable h = parser.parse(new InputStreamReader(input, "UTF-8"));
-                if(h.size() == 0) {
+                if (h.size() == 0) {
                     return;
                 }
-                backgroundColor = Integer.parseInt( (String)((Hashtable)((Vector)h.get("style")).elementAt(0)).get("background-color"), 16);
-                Hashtable actionHash = ((Hashtable)((Vector)h.get("action")).elementAt(0));
+                backgroundColor = Integer.parseInt((String) ((Hashtable) ((Vector) h.get("style")).elementAt(0)).get("background-color"), 16);
+                Hashtable actionHash = ((Hashtable) ((Vector) h.get("action")).elementAt(0));
                 actionNotify = getString(actionHash, "notify");
-                if(actionNotify == null) {
+                if (actionNotify == null) {
                     actionNotify = getString(actionHash, "notify-once");
                 }
-                
-                destination = (String)actionHash.get("data");
-                
-                Hashtable renderHash = ((Hashtable)((Vector)h.get("render")).elementAt(0));
-                contentType = (String)renderHash.get("type");
+
+                destination = (String) actionHash.get("data");
+
+                Hashtable renderHash = ((Hashtable) ((Vector) h.get("render")).elementAt(0));
+                contentType = (String) renderHash.get("type");
                 renderNotify = getString(renderHash, "notify");
-                if(renderNotify == null) {
+                if (renderNotify == null) {
                     renderNotify = getString(renderHash, "notify-once");
                 }
-                imageURL = (String)renderHash.get("data");
+                imageURL = (String) renderHash.get("data");
             }
         };
         con.setUrl(URL);
@@ -142,14 +145,14 @@ public class VServAds extends FullScreenAdService {
         con.addArgument("vs3", "1");
         con.addArgument("partnerid", "1");
         con.addArgument("zc", "" + category);
-        if(countryCode != null) {
+        if (countryCode != null) {
             con.addArgument("cc", countryCode);
         }
-        if(networkCode != null) {
-            con.addArgument("nc", networkCode);            
+        if (networkCode != null) {
+            con.addArgument("nc", networkCode);
         }
-        if(locale != null) {
-            con.addArgument("lc", locale);            
+        if (locale != null) {
+            con.addArgument("lc", locale);
         }
         return con;
     }
@@ -157,40 +160,40 @@ public class VServAds extends FullScreenAdService {
     protected boolean hasPendingAd() {
         return imageURL != null;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     protected void clearPendingAd() {
         imageURL = null;
         renderNotify = null;
-        
+
     }
-    
+
     /**
      * {@inheritDoc}
      */
     protected Component getPendingAd() {
-        if(imageURL == null) {
+        if (imageURL == null) {
             return null;
         }
-        if(renderNotify != null && renderNotify.length() > 0) {
+        if (renderNotify != null && renderNotify.length() > 0) {
             ConnectionRequest c = new ConnectionRequest();
             c.setFailSilently(true);
             c.setUrl(renderNotify);
             c.setPost(false);
             NetworkManager.getInstance().addToQueue(c);
         }
-        if("image".equalsIgnoreCase(contentType)) {
-            Button adComponent = new Button(){
+        if ("image".equalsIgnoreCase(contentType)) {
+            Button adComponent = new Button() {
 
                 public void setIcon(Image icon) {
-                    if(icon != null && isScaleMode()){
+                    if (icon != null && isScaleMode()) {
                         icon = icon.scaledWidth(Display.getInstance().getDisplayWidth());
                     }
                     super.setIcon(icon);
                 }
-                
+
             };
             adComponent.setUIID("Container");
             adComponent.getStyle().setBgColor(backgroundColor);
@@ -205,8 +208,8 @@ public class VServAds extends FullScreenAdService {
             return adComponent;
         } else {
             WebBrowser wb = new WebBrowser();
-            if(wb.getInternal() instanceof BrowserComponent) {
-                BrowserComponent bc = (BrowserComponent)wb.getInternal();
+            if (wb.getInternal() instanceof BrowserComponent) {
+                BrowserComponent bc = (BrowserComponent) wb.getInternal();
                 bc.setBrowserNavigationCallback(new BrowserNavigationCallback() {
                     public boolean shouldNavigate(final String url) {
                         unlock(new ActionListener() {
@@ -227,7 +230,7 @@ public class VServAds extends FullScreenAdService {
      * {@inheritDoc}
      */
     protected String getAdDestination() {
-        if(actionNotify != null && actionNotify.length() > 0) {
+        if (actionNotify != null && actionNotify.length() > 0) {
             ConnectionRequest c = new ConnectionRequest();
             c.setFailSilently(true);
             c.setUrl(actionNotify);
@@ -321,6 +324,6 @@ public class VServAds extends FullScreenAdService {
     public boolean isAllowSkipping() {
         return true;
     }
-    
-    
+
+
 }

@@ -54,7 +54,7 @@ import com.codename1.ui.util.WeakHashMap;
  * A second approach allows showing the infinite progress over the entire screen which blocks all input. This tints
  * the background while the infinite progress rotates:
  * </p>
- *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+ * <script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/infinite-progress.png" alt="InfiniteProgress">
  *
  * @author Shai Almog
@@ -70,10 +70,44 @@ public class InfiniteProgress extends Component {
      * The default color of the current material design progress spinner
      */
     private static int defaultMaterialDesignColor = 0x6200ee;
+    private Image animation;
+    private int angle = 0;
+    private int tick;
+    private WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
+    private int tintColor = 0x90000000;
+    /**
+     * Indicates whether this instance of infinite progress works in the material
+     * design mode by default
+     */
+    private boolean materialDesignMode = defaultMaterialDesignMode;
+    /**
+     * The color of the current material design progress spinner
+     */
+    private int materialDesignColor = defaultMaterialDesignColor;
+    private Motion materialLengthAngle;
+    private boolean materialLengthDirection;
+    /**
+     * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
+     * number and to speed it up reduce it to 1. It can't be 0 or lower.
+     */
+    private int tickCount = 3;
+    /**
+     * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
+     * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
+     * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
+     */
+    private int angleIncrease = 16;
+    /**
+     * Default constructor to define the UIID
+     */
+    public InfiniteProgress() {
+        setUIID("InfiniteProgress");
+    }
 
     /**
      * Indicates whether infinite progress and pull to refresh work in the material
      * design mode by default
+     *
      * @return the defaultMaterialDesignMode
      */
     public static boolean isDefaultMaterialDesignMode() {
@@ -83,15 +117,17 @@ public class InfiniteProgress extends Component {
     /**
      * Indicates whether infinite progress and pull to refresh work in the material
      * design mode by default
+     *
      * @param aDefaultMaterialDesignMode the defaultMaterialDesignMode to set
      */
     public static void setDefaultMaterialDesignMode(
-        boolean aDefaultMaterialDesignMode) {
+            boolean aDefaultMaterialDesignMode) {
         defaultMaterialDesignMode = aDefaultMaterialDesignMode;
     }
 
     /**
      * The default color of the current material design progress spinner
+     *
      * @return the defaultMaterialDesignColor
      */
     public static int getDefaultMaterialDesignColor() {
@@ -100,55 +136,19 @@ public class InfiniteProgress extends Component {
 
     /**
      * The default color of the current material design progress spinner
+     *
      * @param aDefaultMaterialDesignColor the defaultMaterialDesignColor to set
      */
     public static void setDefaultMaterialDesignColor(
-        int aDefaultMaterialDesignColor) {
+            int aDefaultMaterialDesignColor) {
         defaultMaterialDesignColor = aDefaultMaterialDesignColor;
-    }
-    private Image animation;
-    private int angle = 0;
-    private int tick;
-    private WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
-    private int tintColor = 0x90000000;
-
-    /**
-     * Indicates whether this instance of infinite progress works in the material
-     * design mode by default
-     */
-    private boolean materialDesignMode = defaultMaterialDesignMode;
-
-    /**
-     * The color of the current material design progress spinner
-     */
-    private int materialDesignColor = defaultMaterialDesignColor;
-    private Motion materialLengthAngle;
-    private boolean materialLengthDirection;
-
-    /**
-     * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
-     * number and to speed it up reduce it to 1. It can't be 0 or lower.
-     */
-    private int tickCount = 3;
-
-    /**
-     * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
-     * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
-     * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
-     */
-    private int angleIncrease = 16;
-
-    /**
-     * Default constructor to define the UIID
-     */
-    public InfiniteProgress() {
-        setUIID("InfiniteProgress");
     }
 
     /**
      * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code>
      * on the returned <code>Dialog</code>.
-     *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+     * <script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+     *
      * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
      * @deprecated typo in method name please use {@link #showInfiniteBlocking()} instead
      */
@@ -159,12 +159,13 @@ public class InfiniteProgress extends Component {
     /**
      * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code>
      * on the returned <code>Dialog</code>.
-     *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+     * <script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+     *
      * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
      */
     public Dialog showInfiniteBlocking() {
         Form f = Display.getInstance().getCurrent();
-        if(f == null) {
+        if (f == null) {
             f = new Form();
             f.show();
         }
@@ -188,11 +189,11 @@ public class InfiniteProgress extends Component {
      */
     protected void initComponent() {
         super.initComponent();
-        if(animation == null) {
+        if (animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
         }
         Form f = getComponentForm();
-        if(f != null) {
+        if (f != null) {
             f.registerAnimated(this);
         }
     }
@@ -202,7 +203,7 @@ public class InfiniteProgress extends Component {
      */
     protected void deinitialize() {
         Form f = getComponentForm();
-        if(f == null) {
+        if (f == null) {
             f = Display.getInstance().getCurrent();
         }
         f.deregisterAnimated(this);
@@ -213,6 +214,7 @@ public class InfiniteProgress extends Component {
      * Updates the progress animation.  This only updates if the InfiniteProgress is on the
      * currently displayed form and is visible.  If you need to update the progress animation
      * in another context, use {@link #animate(boolean) }.
+     *
      * @return true if it animated and should be repainted.
      */
     public boolean animate() {
@@ -221,8 +223,9 @@ public class InfiniteProgress extends Component {
 
     /**
      * Updates the progress animation.
+     *
      * @param force If false, then the animation is only updated if the progress is visible and on
-     * the current form.  True will force the update.
+     *              the current form.  True will force the update.
      * @return True if it animated and should be repainted.
      * @since 7.0
      */
@@ -233,7 +236,7 @@ public class InfiniteProgress extends Component {
         // reduce repaint thrushing of the UI from the infinite progress
         boolean val = super.animate() || tick % tickCount == 0;
         tick++;
-        if(val) {
+        if (val) {
             angle += angleIncrease;
         }
         return val;
@@ -257,18 +260,18 @@ public class InfiniteProgress extends Component {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
-        if(materialDesignMode) {
+        if (materialDesignMode) {
             int size = getMaterialDesignSize();
             return new Dimension(getStyle().getHorizontalPadding() + size,
-                getStyle().getVerticalPadding() + size);
+                    getStyle().getVerticalPadding() + size);
         }
-        if(animation == null) {
+        if (animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
-            if(animation == null) {
+            if (animation == null) {
                 int size = getMaterialImageSize();
                 String f = getUIManager().getThemeConstant("infiniteDefaultColor", null);
                 int color = 0x777777;
-                if(f != null) {
+                if (f != null) {
                     color = Integer.parseInt(f, 16);
                 }
                 FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_AUTORENEW,
@@ -278,7 +281,7 @@ public class InfiniteProgress extends Component {
                 animation = fi.toImage();
             }
         }
-        if(animation == null) {
+        if (animation == null) {
             return new Dimension(100, 100);
         }
         Style s = getStyle();
@@ -294,7 +297,7 @@ public class InfiniteProgress extends Component {
             return;
         }
         super.paint(g);
-        if(materialDesignMode) {
+        if (materialDesignMode) {
             int size = getMaterialDesignSize();
             int strokeWidth = Display.getInstance().convertToPixels(0.635f);
             int oldColor = g.getColor();
@@ -303,7 +306,7 @@ public class InfiniteProgress extends Component {
 
             Style s = getStyle();
             GeneralPath gp = new GeneralPath();
-            if(materialLengthAngle == null || materialLengthAngle.isFinished()) {
+            if (materialLengthAngle == null || materialLengthAngle.isFinished()) {
                 materialLengthAngle = Motion.createEaseInOutMotion(
                         10, 300, 1000);
                 materialLengthAngle.start();
@@ -311,7 +314,7 @@ public class InfiniteProgress extends Component {
             }
             int angleLength = materialLengthAngle.getValue();
             double dr;
-            if(!materialLengthDirection) {
+            if (!materialLengthDirection) {
                 angleLength = 300 - angleLength;
                 dr = Math.toRadians((angle - angleLength) % 360);
             } else {
@@ -328,7 +331,7 @@ public class InfiniteProgress extends Component {
             g.setAlpha(oldAlpha);
             return;
         }
-        if(animation == null) {
+        if (animation == null) {
             return;
         }
         int v = angle % 360;
@@ -340,12 +343,12 @@ public class InfiniteProgress extends Component {
         } else {*/
 
         Image rotated;
-        if(animation instanceof FontImage) {
+        if (animation instanceof FontImage) {
             rotated = animation.rotate(v);
         } else {
             Integer angle = Integer.valueOf(v); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
             rotated = cache.get(angle);
-            if(rotated == null) {
+            if (rotated == null) {
                 rotated = animation.rotate(v);
                 cache.put(angle, rotated);
             }
@@ -363,6 +366,7 @@ public class InfiniteProgress extends Component {
 
     /**
      * Allows setting the image that will be rotated as part of this effect
+     *
      * @param animation the animation to set
      */
     public void setAnimation(Image animation) {
@@ -374,21 +378,21 @@ public class InfiniteProgress extends Component {
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"animation"};
+        return new String[]{"animation"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {Image.class};
+        return new Class[]{Image.class};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("animation")) {
+        if (name.equals("animation")) {
             return animation;
         }
         return null;
@@ -398,8 +402,8 @@ public class InfiniteProgress extends Component {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("animation")) {
-            this.animation = (Image)value;
+        if (name.equals("animation")) {
+            this.animation = (Image) value;
             cache.clear();
             return null;
         }
@@ -408,6 +412,7 @@ public class InfiniteProgress extends Component {
 
     /**
      * The tinting color of the screen when the showInfiniteBlocking method is invoked
+     *
      * @return the tintColor
      */
     public int getTintColor() {
@@ -416,6 +421,7 @@ public class InfiniteProgress extends Component {
 
     /**
      * The tinting color of the screen when the showInfiniteBlocking method is invoked
+     *
      * @param tintColor the tintColor to set
      */
     public void setTintColor(int tintColor) {
@@ -425,6 +431,7 @@ public class InfiniteProgress extends Component {
     /**
      * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
      * number and to speed it up reduce it to 1. It can't be 0 or lower.
+     *
      * @return the tickCount
      */
     public int getTickCount() {
@@ -434,6 +441,7 @@ public class InfiniteProgress extends Component {
     /**
      * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
      * number and to speed it up reduce it to 1. It can't be 0 or lower.
+     *
      * @param tickCount the tickCount to set
      */
     public void setTickCount(int tickCount) {
@@ -444,6 +452,7 @@ public class InfiniteProgress extends Component {
      * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
      * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
      * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
+     *
      * @return the angleIncrease
      */
     public int getAngleIncrease() {
@@ -454,6 +463,7 @@ public class InfiniteProgress extends Component {
      * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
      * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
      * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
+     *
      * @param angleIncrease the angleIncrease to set
      */
     public void setAngleIncrease(int angleIncrease) {
@@ -463,6 +473,7 @@ public class InfiniteProgress extends Component {
     /**
      * Indicates whether this instance of infinite progress works in the material
      * design mode by default
+     *
      * @return the materialDesignMode
      */
     public boolean isMaterialDesignMode() {
@@ -472,6 +483,7 @@ public class InfiniteProgress extends Component {
     /**
      * Indicates whether this instance of infinite progress works in the material
      * design mode by default
+     *
      * @param materialDesignMode the materialDesignMode to set
      */
     public void setMaterialDesignMode(boolean materialDesignMode) {
@@ -480,6 +492,7 @@ public class InfiniteProgress extends Component {
 
     /**
      * The color of the current material design progress spinner
+     *
      * @return the materialDesignColor
      */
     public int getMaterialDesignColor() {
@@ -488,6 +501,7 @@ public class InfiniteProgress extends Component {
 
     /**
      * The color of the current material design progress spinner
+     *
      * @param materialDesignColor the materialDesignColor to set
      */
     public void setMaterialDesignColor(int materialDesignColor) {

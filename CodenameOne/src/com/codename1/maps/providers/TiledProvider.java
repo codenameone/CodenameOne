@@ -19,32 +19,32 @@
  */
 package com.codename1.maps.providers;
 
-import com.codename1.ui.geom.Dimension;
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
-import com.codename1.ui.geom.Point;
 import com.codename1.maps.Projection;
 import com.codename1.maps.ProxyHttpTile;
 import com.codename1.maps.Tile;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Point;
 
 /**
  * This is a tiled map provider
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public abstract class TiledProvider extends MapProvider {
 
     protected final String _url;
+    protected int _zoomLevel;
     // Very ugly cacheing
     private Point _tileNo;
-    protected int _zoomLevel;
 
     /**
      * Creates a new Tiled provider
-     * 
-     * @param url the url of the provider
+     *
+     * @param url        the url of the provider
      * @param projection the Projection system of the Provider
-     * @param tileSize the tiles size(usually 256x256)
+     * @param tileSize   the tiles size(usually 256x256)
      */
     public TiledProvider(String url, Projection projection, Dimension tileSize) {
         super(projection, tileSize);
@@ -53,10 +53,10 @@ public abstract class TiledProvider extends MapProvider {
 
     /**
      * build a url request for a tile
-     * 
+     *
      * @param zoomLevel the zoom level
-     * @param xTile x position of the tile
-     * @param yTile y position of the tile
+     * @param xTile     x position of the tile
+     * @param yTile     y position of the tile
      * @return the image url of the tile
      */
     protected String url(int zoomLevel, int xTile, int yTile) {
@@ -81,8 +81,8 @@ public abstract class TiledProvider extends MapProvider {
 
     /**
      * Scale to the zoom level
+     *
      * @param zoomLevel to scale to
-     * 
      * @return a scaled coordinate.
      */
     public Coord scale(int zoomLevel) {

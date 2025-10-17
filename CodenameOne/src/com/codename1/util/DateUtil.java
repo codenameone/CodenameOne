@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.util;
@@ -29,11 +29,10 @@ import java.util.TimeZone;
 
 /**
  * Utility class for working with dates and timezones.
+ *
  * @author shannah, Diamond
  */
 public class DateUtil {
-
-    private final TimeZone tz;
 
     public static final long MILLISECOND = 1L;
     public static final long SECOND = 1000 * MILLISECOND;
@@ -42,17 +41,27 @@ public class DateUtil {
     public static final long DAY = 24 * HOUR;
     public static final long MONTH = 2629800000L;
     public static final long YEAR = 31557600000L;
+    private final TimeZone tz;
 
     /**
      * Constructor for timezone.
+     *
      * @param tz Timezone
      */
     public DateUtil(TimeZone tz) {
         this.tz = tz;
     }
-    
+
+    /**
+     * Creates DateUtil object in default timezone.
+     */
+    public DateUtil() {
+        this(TimeZone.getDefault());
+    }
+
     /**
      * Returns the earliest of a set of dates.
+     *
      * @param dates
      * @return The earliest of a set of dates.
      * @since 6.0
@@ -61,7 +70,7 @@ public class DateUtil {
         int len = dates.length;
         if (len == 0) return null;
         Date out = null;
-        for (int i=0; i<len; i++) {
+        for (int i = 0; i < len; i++) {
             if (dates[i] == null) {
                 continue;
             }
@@ -71,9 +80,10 @@ public class DateUtil {
         }
         return out;
     }
-    
+
     /**
      * Compares two dates.
+     *
      * @param d1 A date
      * @param d2 A date
      * @return -1 if first date is earlier.  1 if first date is later.  0 if they are the same.
@@ -106,7 +116,6 @@ public class DateUtil {
      *               <li>{@code DateUtil.DATE}
      *               <li>{@code DateUtil.MONTH}
      *               <li>{@code DateUtil.YEAR}
-     *
      * @return <ul>
      * <li>&gt; 0 - if first date is earlier.
      * <li>&lt; 0 - if first date is later.
@@ -151,6 +160,7 @@ public class DateUtil {
 
     /**
      * Returns the latest of a set of dates.
+     *
      * @param dates
      * @return The latest of a set of dates.
      * @since 6.0
@@ -159,7 +169,7 @@ public class DateUtil {
         int len = dates.length;
         if (len == 0) return null;
         Date out = null;
-        for (int i=0; i<len; i++) {
+        for (int i = 0; i < len; i++) {
             if (dates[i] == null) {
                 continue;
             }
@@ -169,17 +179,10 @@ public class DateUtil {
         }
         return out;
     }
-    
-    
+
     /**
-     * Creates DateUtil object in default timezone.
-     */
-    public DateUtil() {
-        this(TimeZone.getDefault());
-    }
-    
-    /**
-     * Gets the offset from GMT in milliseconds for the given date.  
+     * Gets the offset from GMT in milliseconds for the given date.
+     *
      * @param date The date at which the offset is calculated.
      * @return Millisecond offset from GMT in the current timezone for the given date.
      */
@@ -192,14 +195,14 @@ public class DateUtil {
         calStartOfDay.set(Calendar.SECOND, 0);
         calStartOfDay.set(Calendar.HOUR_OF_DAY, 0);
         calStartOfDay.set(Calendar.MINUTE, 0);
-        
-        
-        return tz.getOffset(1, 
-                cal.get(Calendar.YEAR), 
-                cal.get(Calendar.MONTH), 
-                cal.get(Calendar.DAY_OF_MONTH), 
-                cal.get(Calendar.DAY_OF_WEEK), 
-                (int)(cal.getTime().getTime() - calStartOfDay.getTime().getTime())
+
+
+        return tz.getOffset(1,
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH),
+                cal.get(Calendar.DAY_OF_WEEK),
+                (int) (cal.getTime().getTime() - calStartOfDay.getTime().getTime())
         );
     }
 
@@ -207,7 +210,6 @@ public class DateUtil {
      * Checks whether the given date is in daylight savings time for the given date.
      *
      * @param date the date to check
-     *
      * @return True if date is in daylight savings time
      */
     public boolean inDaylightTime(Date date) {
@@ -219,7 +221,6 @@ public class DateUtil {
      *
      * @param c1 First time to compare.
      * @param c2 Second time to compare.
-     *
      * @return True if the two times are on the same year.
      * @since 7.0
      */
@@ -233,7 +234,6 @@ public class DateUtil {
      *
      * @param d1 First date to compare.
      * @param d2 Second date to compare.
-     *
      * @return True if the two dates are on the same year.
      * @since 7.0
      */
@@ -251,7 +251,6 @@ public class DateUtil {
      *
      * @param c1 First time to compare.
      * @param c2 Second time to compare.
-     *
      * @return True if the two times are on the same month.
      * @since 7.0
      */
@@ -266,7 +265,6 @@ public class DateUtil {
      *
      * @param d1 First date to compare.
      * @param d2 Second date to compare.
-     *
      * @return True if the two dates are on the same month.
      * @since 7.0
      */
@@ -284,7 +282,6 @@ public class DateUtil {
      *
      * @param c1 First time to compare.
      * @param c2 Second time to compare.
-     *
      * @return True if the two times are on the same day.
      * @since 7.0
      */
@@ -299,7 +296,6 @@ public class DateUtil {
      *
      * @param d1 First date to compare.
      * @param d2 Second date to compare.
-     *
      * @return True if the two dates are on the same day.
      * @since 7.0
      */
@@ -317,7 +313,6 @@ public class DateUtil {
      *
      * @param c1 First time to compare.
      * @param c2 Second time to compare.
-     *
      * @return True if the two times are on the same hour.
      * @since 7.0
      */
@@ -332,7 +327,6 @@ public class DateUtil {
      *
      * @param d1 First date to compare.
      * @param d2 Second date to compare.
-     *
      * @return True if the two dates are on the same hour.
      * @since 7.0
      */
@@ -350,7 +344,6 @@ public class DateUtil {
      *
      * @param c1 First time to compare.
      * @param c2 Second time to compare.
-     *
      * @return True if the two times are on the same minute.
      * @since 7.0
      */
@@ -365,7 +358,6 @@ public class DateUtil {
      *
      * @param d1 First date to compare.
      * @param d2 Second date to compare.
-     *
      * @return True if the two dates are on the same minute.
      * @since 7.0
      */
@@ -383,7 +375,6 @@ public class DateUtil {
      *
      * @param c1 First time to compare.
      * @param c2 Second time to compare.
-     *
      * @return True if the two times are on the same second.
      * @since 7.0
      */
@@ -398,7 +389,6 @@ public class DateUtil {
      *
      * @param d1 First date to compare.
      * @param d2 Second date to compare.
-     *
      * @return True if the two dates are on the same second.
      * @since 7.0
      */
@@ -416,7 +406,6 @@ public class DateUtil {
      *
      * @param c1 First time to compare.
      * @param c2 Second time to compare.
-     *
      * @return True if the two times are on the same time.
      * @since 7.0
      */
@@ -430,7 +419,6 @@ public class DateUtil {
      *
      * @param d1 First date to compare.
      * @param d2 Second date to compare.
-     *
      * @return True if the two dates are on the same time.
      * @since 7.0
      */
@@ -440,6 +428,7 @@ public class DateUtil {
 
     /**
      * Gets the date in "time ago" format.  E.g. "Just now", or "1 day ago", etc..
+     *
      * @param date The date
      * @return String representing how long ago from now the given date is.
      * @since 6.0
@@ -449,8 +438,8 @@ public class DateUtil {
             return "N/A";
         }
         long time_ago = date.getTime() / 1000l;
-        
-        long cur_time =  new Date().getTime() / 1000l;
+
+        long cur_time = new Date().getTime() / 1000l;
         long time_elapsed = cur_time - time_ago;
         long seconds = time_elapsed;
         // Seconds
@@ -518,5 +507,5 @@ public class DateUtil {
         }
 
     }
-    
+
 }

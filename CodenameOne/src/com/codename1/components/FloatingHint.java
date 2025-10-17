@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
@@ -28,7 +28,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
@@ -37,14 +36,14 @@ import com.codename1.ui.layouts.LayeredLayout;
 
 /**
  * <p>A floating hint is similar to a text field with a hint. However, when the text field has text in it the hint appears
- * above the text field instead including an animation when focus hits the text field see 
+ * above the text field instead including an animation when focus hits the text field see
  * <a href="http://www.google.com/design/spec/components/text-fields.html#text-fields-floating-labels"
  * target="_blank">
  * Googles take on this</a>.
  * </p>
  * <script src="https://gist.github.com/codenameone/54e919b2be01561ac91c.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-floatinghint.png" alt="The FloatingHint component with one component that contains text and another that doesn't" />
- * 
+ *
  * <h4>The animation effect</h4>
  * <img src="http://www.codenameone.com/img/blog/floatinghint.gif" alt="Animation" />
  *
@@ -55,9 +54,10 @@ public class FloatingHint extends Container {
     private final TextArea tf;
     private final Button hintButton;
     private final Label hintLabel;
-    
+
     /**
      * Wraps a text field in a floating hint
+     *
      * @param tf the text field
      */
     public FloatingHint(final TextArea tf) {
@@ -77,22 +77,22 @@ public class FloatingHint extends Container {
         hintButton.setUIID("FloatingHint");
         hintLabel.setUIID("TextHint");
         tf.setLabelForComponent(hintButton);
-        
+
         // we block user initiated editing to allow the animation time to complete
         tf.setEditable(false);
-        
+
         add(BorderLayout.north(new Label(" ")).
                 add(BorderLayout.CENTER, tf));
-        
+
         add(BorderLayout.north(hintButton).
                 add(BorderLayout.CENTER, hintLabel));
-        
+
         hintButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 tf.startEditingAsync();
             }
         });
-        if(tf.getText() == null || tf.getText().length() == 0) {
+        if (tf.getText() == null || tf.getText().length() == 0) {
             hintButton.setVisible(false);
         } else {
             hintLabel.setVisible(false);
@@ -110,11 +110,11 @@ public class FloatingHint extends Container {
     }
 
     private void focusGainedImpl() {
-        if(isInitializedImpl()) {
+        if (isInitializedImpl()) {
             hintButton.setFocus(true);
-            if(!hintButton.isVisible()) {
+            if (!hintButton.isVisible()) {
                 hintButton.setVisible(true);
-                if(getComponentForm().grabAnimationLock()) {
+                if (getComponentForm().grabAnimationLock()) {
                     morphAndWait(hintLabel, hintButton, 150);
                     getComponentForm().releaseAnimationLock();
                 }
@@ -133,17 +133,17 @@ public class FloatingHint extends Container {
             revalidate();
         }
     }
-    
+
     private boolean isInitializedImpl() {
         return isInitialized() && getComponentForm() == Display.getInstance().getCurrent();
     }
-    
+
     private void focusLostImpl() {
-        if(isInitializedImpl()) {
+        if (isInitializedImpl()) {
             hintButton.setFocus(false);
-            if(tf.getText().length() == 0) {
+            if (tf.getText().length() == 0) {
                 hintLabel.setVisible(true);
-                if(getComponentForm().grabAnimationLock()) {
+                if (getComponentForm().grabAnimationLock()) {
                     morphAndWait(hintButton, hintLabel, 150);
                     getComponentForm().releaseAnimationLock();
                 }
@@ -151,7 +151,7 @@ public class FloatingHint extends Container {
                 tf.getComponentForm().revalidate();
                 revalidate();
                 tf.setEditable(false);
-            } 
+            }
         } else {
             boolean t = tf.getText() == null || tf.getText().length() == 0;
             hintButton.setVisible(!t);
@@ -159,17 +159,15 @@ public class FloatingHint extends Container {
             revalidate();
         }
     }
-    
+
     @Override
     protected void initComponent() {
-        super.initComponent(); 
+        super.initComponent();
         if (tf.hasFocus()) {
             focusGainedImpl();
         }
-        
+
     }
 
-    
-    
-    
+
 }

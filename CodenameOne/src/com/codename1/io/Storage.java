@@ -25,6 +25,7 @@
 package com.codename1.io;
 
 import com.codename1.util.StringUtil;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -40,20 +41,67 @@ import java.io.OutputStream;
  * <p>
  * The sample code below shows a simple storage browser tool in action:
  * </p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/a941ef1f2f398b2c1074.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/storage-list.png" alt="List of files within the storage" />
- * 
+ *
  * @author Shai Almog
  */
 public class Storage {
-    private final CacheMap cache = new CacheMap();
     private static Storage INSTANCE;
+    private final CacheMap cache = new CacheMap();
     private boolean normalizeNames = true;
 
     /**
+     * This method must be invoked before using the storage otherwise some platforms
+     * might fail without the application data.
+     *
+     * @param data either the name of the application e.g. on CDC platforms or
+     *             a context object on other platforms
+     */
+    private static void init(Object data) {
+        if (Util.getImplementation() != null) {
+            Util.getImplementation().setStorageData(data);
+        }
+        if (INSTANCE == null) {
+            INSTANCE = new Storage();
+        }
+    }
+
+    /**
+     * Returns true if the storage is initialized
+     *
+     * @return true if the storage is initialized
+     */
+    public static boolean isInitialized() {
+        return INSTANCE != null;
+    }
+
+    /**
+     * Returns the storage instance or null if the storage wasn't initialized using
+     * a call to init(String) first.
+     *
+     * @return storage instance
+     */
+    public static Storage getInstance() {
+        if (INSTANCE == null) {
+            init("cn1");
+        }
+        return INSTANCE;
+    }
+
+    /**
+     * Allows installing a custom storage instance to provide functionality such as seamless encryption
+     *
+     * @param s the storage instance
+     */
+    public static void setStorageInstance(Storage s) {
+        INSTANCE = s;
+    }
+
+    /**
      * Indicates the caching size, storage can be pretty slow
-     * 
+     *
      * @param size size in elements (not kb!)
      */
     public void setHardCacheSize(int size) {
@@ -62,60 +110,23 @@ public class Storage {
 
     /**
      * If a file name contains slashes replace them with underscores, same goes for *, %, ? etc.
+     *
      * @param name the file name
      * @return the fixed filename
      */
     private String fixFileName(String name) {
-        if(normalizeNames) {
+        if (normalizeNames) {
             name = StringUtil.replaceAll(name, "/", "_");
             name = StringUtil.replaceAll(name, "\\", "_");
             name = StringUtil.replaceAll(name, "%", "_");
             name = StringUtil.replaceAll(name, "?", "_");
             name = StringUtil.replaceAll(name, "*", "_");
             name = StringUtil.replaceAll(name, ":", "_");
-            name = StringUtil.replaceAll(name, "=", "_");            
+            name = StringUtil.replaceAll(name, "=", "_");
         }
         return name;
     }
-    
-    /**
-     * This method must be invoked before using the storage otherwise some platforms
-     * might fail without the application data.
-     *
-     * @param data either the name of the application e.g. on CDC platforms or
-     * a context object on other platforms
-     */
-    private static void init(Object data) {
-        if(Util.getImplementation() != null) {
-            Util.getImplementation().setStorageData(data);
-        }
-        if(INSTANCE == null) {
-            INSTANCE = new Storage();
-        }
-    }
 
-    /**
-     * Returns true if the storage is initialized
-     * 
-     * @return true if the storage is initialized
-     */
-    public static boolean isInitialized(){
-        return INSTANCE != null;
-    }
-    
-    /**
-     * Returns the storage instance or null if the storage wasn't initialized using
-     * a call to init(String) first.
-     *
-     * @return storage instance
-     */
-    public static Storage getInstance() {
-        if(INSTANCE == null) {
-            init("cn1");
-        }
-        return INSTANCE;
-    }
-    
     /**
      * Storage is cached for faster access, however this might cause a problem with refreshing
      * objects since they are not cloned. Clearing the cache allows to actually reload from the
@@ -124,7 +135,7 @@ public class Storage {
     public void clearCache() {
         cache.clearAllCache();
     }
-    
+
     /**
      * Flush the storage cache allowing implementations that cache storage objects
      * to store
@@ -171,7 +182,7 @@ public class Storage {
      */
     public InputStream createInputStream(String name) throws IOException {
         if (!exists(name)) {
-            throw new IOException("Storage key "+name+" does not exist");
+            throw new IOException("Storage key " + name + " does not exist");
         }
         name = fixFileName(name);
         return Util.getImplementation().createStorageInputStream(name);
@@ -199,6 +210,7 @@ public class Storage {
 
     /**
      * Returns the size in bytes of the given entry
+     *
      * @param name the name of the entry
      * @return the size in bytes
      */
@@ -206,18 +218,18 @@ public class Storage {
         name = fixFileName(name);
         return Util.getImplementation().getStorageEntrySize(name);
     }
-    
+
     /**
      * <p>Writes the given object to storage assuming it is an externalizable type
      * or one of the supported types.</p>
-     * 
+     *
      * <p>
      * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
      * </p>
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param name store name
-     * @param o object to store
+     * @param o    object to store
      * @return true for success, false for failure
      */
     public boolean writeObject(String name, Object o) {
@@ -229,9 +241,9 @@ public class Storage {
             Util.writeObject(o, d);
             d.close();
             return true;
-        } catch(Exception err) {
+        } catch (Exception err) {
             Log.e(err);
-            if(Log.isCrashBound()) {
+            if (Log.isCrashBound()) {
                 Log.sendLog();
             }
             Util.getImplementation().deleteStorageFile(name);
@@ -247,19 +259,18 @@ public class Storage {
      * </p>
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
-     *
      * @param name name of the store
      * @return object stored under that name
      */
     public Object readObject(String name) {
         name = fixFileName(name);
         Object o = cache.get(name);
-        if(o != null) {
+        if (o != null) {
             return o;
         }
         DataInputStream d = null;
         try {
-            if(!exists(name)) {
+            if (!exists(name)) {
                 return null;
             }
             d = new DataInputStream(createInputStream(name));
@@ -267,10 +278,10 @@ public class Storage {
             d.close();
             cache.put(name, o);
             return o;
-        } catch(Throwable err) {
+        } catch (Throwable err) {
             Log.p("Error while reading: " + name);
             Log.e(err);
-            if(Log.isCrashBound()) {
+            if (Log.isCrashBound()) {
                 Log.sendLog();
             }
             Util.getImplementation().cleanup(d);
@@ -280,7 +291,8 @@ public class Storage {
 
     /**
      * Indicates whether characters that are typically illegal in filesystems should
-     * be sanitized and replaced with underscore  
+     * be sanitized and replaced with underscore
+     *
      * @return the normalizeNames
      */
     public boolean isNormalizeNames() {
@@ -289,18 +301,11 @@ public class Storage {
 
     /**
      * Indicates whether characters that are typically illegal in filesystems should
-     * be sanitized and replaced with underscore  
+     * be sanitized and replaced with underscore
+     *
      * @param normalizeNames the normalizeNames to set
      */
     public void setNormalizeNames(boolean normalizeNames) {
         this.normalizeNames = normalizeNames;
-    }
-    
-    /**
-     * Allows installing a custom storage instance to provide functionality such as seamless encryption
-     * @param s the storage instance
-     */
-    public static void setStorageInstance(Storage s) {
-        INSTANCE = s;
     }
 }

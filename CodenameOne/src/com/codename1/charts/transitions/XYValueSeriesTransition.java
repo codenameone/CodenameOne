@@ -25,77 +25,77 @@
 package com.codename1.charts.transitions;
 
 import com.codename1.charts.ChartComponent;
-import com.codename1.charts.models.XYSeries;
 import com.codename1.charts.models.XYValueSeries;
 
 /**
  * A transition for enabling animations between different values in an XYSeries.
+ *
  * @author shannah
  */
 public class XYValueSeriesTransition extends SeriesTransition {
-    
-   
+
+
     /**
      * The subject series.
      */
     private final XYValueSeries series;
-    
+
     /**
      * The buffer series where values are set before they are finally applied
      * to the series during the animation.
      */
     private XYValueSeries cachedSeries;
-    
+
     /**
      * Start values for the series in the transition.
      */
     private XYValueSeries startVals;
-    
+
     /**
      * End values for the series in the transition.
      */
     private XYValueSeries endVals;
-    
-    
+
+
     /**
-     * Creates a new transition on the given chart and associated series.  The 
+     * Creates a new transition on the given chart and associated series.  The
      * series should be one of the series rendered by the given chart.
-     * @param chart The ChartComponent that is being used to render the series.
+     *
+     * @param chart  The ChartComponent that is being used to render the series.
      * @param series The series whose data you wish to animate.
      */
-    public XYValueSeriesTransition(ChartComponent chart, XYValueSeries series){
+    public XYValueSeriesTransition(ChartComponent chart, XYValueSeries series) {
         super(chart);
         this.series = series;
     }
 
     /**
-     * Initializes the transition.  This can be overridden by subclasses to 
+     * Initializes the transition.  This can be overridden by subclasses to
      * provide their own functionality to be executed just before the transition
      * occurs.
      */
     @Override
     public void initTransition() {
         super.initTransition();
-        
-        
-        
+
+
         // Now make sure that there are the same number of values in source and
         // target
         startVals = new XYValueSeries("Start");
         copyValues(series, startVals);
-        
+
         endVals = new XYValueSeries("End");
         copyValues(cachedSeries, endVals);
-        
-        
+
+
     }
-    
-    private void copyValues(XYValueSeries source, XYValueSeries target){
+
+    private void copyValues(XYValueSeries source, XYValueSeries target) {
         int len = source.getItemCount();
-        
-        for (int i=0; i<len; i++){
+
+        for (int i = 0; i < len; i++) {
             int index = target.getIndexForKey(source.getX(i));
-            if (index > -1){
+            if (index > -1) {
                 target.remove(index);
             }
             target.add(source.getX(i), source.getY(i), source.getValue(i));
@@ -107,20 +107,20 @@ public class XYValueSeriesTransition extends SeriesTransition {
      */
     @Override
     protected void cleanup() {
-        super.cleanup(); 
+        super.cleanup();
         this.cachedSeries.clear();
     }
-    
-    
+
 
     /**
      * Updates the series and renderer at the given progress position (0 to 100).
+     *
      * @param progress The progress position in the motion. (0-100).
      */
     protected void update(int progress) {
-        double dProgress = (double)progress;
+        double dProgress = (double) progress;
         int len = endVals.getItemCount(); // PMD Fix: UnusedLocalVariable removed unused endindex
-        for (int i=0; i<len; i++){
+        for (int i = 0; i < len; i++) {
             double x = endVals.getX(i);
             double y = endVals.getY(i);
             double val = endVals.getValue(i);
@@ -128,54 +128,57 @@ public class XYValueSeriesTransition extends SeriesTransition {
 
             double startY = startIndex == -1 ? 0.0 : startVals.getY(startIndex);
             double endY = y;
-            double tweenY = startY + (endY-startY)*dProgress/100.0;
-            
+            double tweenY = startY + (endY - startY) * dProgress / 100.0;
+
             double startVal = startIndex == -1 ? 0.0 : startVals.getValue(startIndex);
             double endVal = val;
-            double tweenVal = startVal + (endVal-startVal)*dProgress/100.0;
-            
-            
+            double tweenVal = startVal + (endVal - startVal) * dProgress / 100.0;
+
+
             int seriesIndex = series.getIndexForKey(x);
-            
-            if (seriesIndex > -1 ){
+
+            if (seriesIndex > -1) {
                 series.remove(seriesIndex);
             }
             series.add(x, tweenY, tweenVal);
-            
-            
+
+
         }
-        
-        
+
+
     }
-    
+
     /**
-     * Gets the "buffer" series where values can be set.  Any values set on the 
-     * buffer will be applied to the target series during the course of the 
+     * Gets the "buffer" series where values can be set.  Any values set on the
+     * buffer will be applied to the target series during the course of the
      * transition.
-     * @return 
+     *
+     * @return
      */
-    public XYValueSeries getBuffer(){
-        if (cachedSeries == null){
-             cachedSeries = new XYValueSeries(series.getTitle());
+    public XYValueSeries getBuffer() {
+        if (cachedSeries == null) {
+            cachedSeries = new XYValueSeries(series.getTitle());
         }
         return cachedSeries;
     }
-    
+
     /**
      * Sets the buffer/cache series to be used.
-     * @param buffer 
+     *
+     * @param buffer
      */
-    void setBuffer(XYValueSeries buffer){
+    void setBuffer(XYValueSeries buffer) {
         this.cachedSeries = buffer;
     }
-    
+
     /**
      * Gets the series whose values are to be animated by this transition.
-     * @return 
+     *
+     * @return
      */
-    public XYValueSeries getSeries(){
+    public XYValueSeries getSeries() {
         return series;
     }
 
-   
+
 }

@@ -22,9 +22,9 @@ import com.codename1.ui.Container;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
+
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 
@@ -32,10 +32,9 @@ import java.util.Hashtable;
  * <p>Codename One port of the infamous GridBagLayout based on the Apache Harmony code. For new applications
  * we generally recommend a "native" Codename One layout such as {@link com.codename1.ui.table.TableLayout}
  * and recommend avoiding this layout. Its here for developers who are accustomed to it and need to port existing code.</p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/6266580.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/gridbag-layout.png" alt="Sample gridbag layout usage" />
- * 
  */
 public class GridBagLayout extends Layout {
     protected static final int MAXGRIDSIZE = 512;
@@ -43,22 +42,14 @@ public class GridBagLayout extends Layout {
     protected static final int MINSIZE = 1;
 
     protected static final int PREFERREDSIZE = 2;
-
+    public volatile double columnWeights[];
+    public volatile double rowWeights[];
+    public volatile int columnWidths[];
+    public volatile int rowHeights[];
     // Direct modification is forbidden
     protected volatile Hashtable<Component, GridBagConstraints> comptable;
-
     protected volatile GridBagConstraints defaultConstraints;
-
     protected volatile GridBagLayoutInfo layoutInfo;
-
-    public volatile double columnWeights[];
-
-    public volatile double rowWeights[];
-
-    public volatile int columnWidths[];
-
-    public volatile int rowHeights[];
-
     private ParentInfo lastParentInfo;
 
     public GridBagLayout() {
@@ -70,7 +61,7 @@ public class GridBagLayout extends Layout {
         lastParentInfo = null;
     }
 
- 
+
     public void addLayoutComponent(Object constraints, Component comp, Container c) {
         GridBagConstraints cons;
         if (constraints != null) {
@@ -181,15 +172,15 @@ public class GridBagLayout extends Layout {
 
     public int[][] getLayoutDimensions() {
         if (lastParentInfo == null) {
-            return new int[][] { new int[0], new int[0] };
+            return new int[][]{new int[0], new int[0]};
         }
-        return new int[][] { lastParentInfo.grid.getWidths(),
-                lastParentInfo.grid.getHeights() };
+        return new int[][]{lastParentInfo.grid.getWidths(),
+                lastParentInfo.grid.getHeights()};
     }
 
     public double[][] getLayoutWeights() {
         if (lastParentInfo == null) {
-            return new double[][] { new double[0], new double[0] };
+            return new double[][]{new double[0], new double[0]};
         }
         return lastParentInfo.grid.getWeights();
     }
@@ -308,8 +299,8 @@ public class GridBagLayout extends Layout {
         if (parent == null) {
             return null;
         }
-        ParentInfo pi = (ParentInfo)parent.getClientProperty("cn1$gridBagLayoutData");
-        if(pi == null) {
+        ParentInfo pi = (ParentInfo) parent.getClientProperty("cn1$gridBagLayoutData");
+        if (pi == null) {
             pi = new ParentInfo();
             parent.putClientProperty("cn1$gridBagLayoutData", pi);
         }
@@ -335,7 +326,7 @@ public class GridBagLayout extends Layout {
     }
 
     private void calculateComponentBounds(ComponentSide horSide, ComponentSide vertSide,
-            Rectangle r, Grid grid) {
+                                          Rectangle r, Grid grid) {
         Rectangle dispArea = grid.componentDisplayArea(horSide, vertSide);
         r.setWidth(fillDisplaySide(dispArea.getWidth(), horSide));
         r.setHeight(fillDisplaySide(dispArea.getHeight(), vertSide));
@@ -354,7 +345,7 @@ public class GridBagLayout extends Layout {
     }
 
     private int anchorComponentSide(int dispStart, int dispLength, ComponentSide compSide,
-            int compLength) {
+                                    int compLength) {
         //        if (compLength == 0) {
         //            return 0;
         //        }
@@ -379,7 +370,7 @@ public class GridBagLayout extends Layout {
     }
 
     private void initHorCompSide(ComponentSide side, GridBagConstraints cons,
-            Dimension minSize, Dimension prefSize, ParentInfo info) {
+                                 Dimension minSize, Dimension prefSize, ParentInfo info) {
         MixedConstraints mixCons = info.consTable.get(cons);
         side.gridStart = mixCons.mapped.getX();
         side.gridLength = mixCons.mapped.getSize().getWidth();
@@ -412,7 +403,7 @@ public class GridBagLayout extends Layout {
     }
 
     private void initVertCompSide(ComponentSide side, GridBagConstraints cons,
-            Dimension minSize, Dimension prefSize, ParentInfo info) {
+                                  Dimension minSize, Dimension prefSize, ParentInfo info) {
         MixedConstraints mixCons = info.consTable.get(cons);
         side.gridStart = mixCons.mapped.getY();
         side.gridLength = mixCons.mapped.getSize().getHeight();
@@ -556,7 +547,7 @@ public class GridBagLayout extends Layout {
 
     private void updateParentInfo(Container parent) {
         int count = parent.getComponentCount();
-        for (int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0; iter < count; iter++) {
             Component element = parent.getComponentAt(iter);
             GridBagConstraints gbc = comptable.get(element);
             updateParentInfo(parent, gbc);
@@ -564,10 +555,8 @@ public class GridBagLayout extends Layout {
     }
 
     private class RelativeTranslator {
-        private int curY; //Left-to-right (or vice versa)
-
         private final int curX[]; // up-to-down
-
+        private int curY; //Left-to-right (or vice versa)
         private int maxW; //Common for relative
 
         private int maxH; // and absolute components
@@ -624,7 +613,7 @@ public class GridBagLayout extends Layout {
         }
 
         private int translateVert(MixedConstraints mixCons, int i,
-                ArrayList<MixedConstraints> allConstraints) {
+                                  ArrayList<MixedConstraints> allConstraints) {
             int endY;
             if (mixCons.initial.getY() != GridBagConstraints.RELATIVE) {
                 curY = mixCons.initial.getY();
@@ -659,7 +648,7 @@ public class GridBagLayout extends Layout {
         private void translateHor(MixedConstraints mixCons, int endY) {
             int trueCurY = curY;
             if (mixCons.initial.getX() != GridBagConstraints.RELATIVE) {
-                for (;; trueCurY++) {
+                for (; ; trueCurY++) {
                     if (trueCurY == MAXGRIDSIZE) {
                         // awt.8E=
                         throw new RuntimeException("component is out of grid's range"); //$NON-NLS-1$
@@ -829,7 +818,7 @@ public class GridBagLayout extends Layout {
         }
 
         public double[][] getWeights() {
-            return new double[][] { cols.getWeights(), rows.getWeights() };
+            return new double[][]{cols.getWeights(), rows.getWeights()};
         }
 
         /*public Point getOrigin() {
@@ -854,15 +843,10 @@ public class GridBagLayout extends Layout {
 
             /*Cashed data. Validation controlled by parent class*/
             private final int minLengths[] = new int[MAXGRIDSIZE];
-
-            private int minLength = 0;
-
             private final int prefLengths[] = new int[MAXGRIDSIZE];
-
-            private int prefLength = 0;
-
             private final double weights[] = new double[MAXGRIDSIZE];
-
+            private int minLength = 0;
+            private int prefLength = 0;
             private double weight = 0.;
 
             private int weightlessPrefLength = 0;
@@ -872,7 +856,7 @@ public class GridBagLayout extends Layout {
             private int weightyPartsNum = 0;
 
             public void validate(ComponentSide compSides[], int lengthsOverride[],
-                    double weightsOverride[]) {
+                                 double weightsOverride[]) {
                 resetCache();
                 spreadComponents(compSides);
                 applyOverrides(lengthsOverride, weightsOverride);
@@ -1016,14 +1000,14 @@ public class GridBagLayout extends Layout {
             }
 
             private void spreadUnicellularComponent(int part, int minCompLength,
-                    int prefCompLength, double compWeight) {
+                                                    int prefCompLength, double compWeight) {
                 minLengths[part] = Math.max(minLengths[part], minCompLength);
                 prefLengths[part] = Math.max(prefLengths[part], prefCompLength);
                 weights[part] = Math.max(weights[part], compWeight);
             }
 
             private void spreadMulticellularComponent(int startPart, int partsNum,
-                    int minCompLength, int prefCompLength, double compWeight) {
+                                                      int minCompLength, int prefCompLength, double compWeight) {
                 double sumWeight = spreadComponentWeight(weights, startPart, partsNum,
                         compWeight);
                 spreadComponentLength(minLengths, startPart, partsNum, minCompLength, sumWeight);
@@ -1044,7 +1028,7 @@ public class GridBagLayout extends Layout {
             }
 
             private void spreadComponentLength(int arr[], int startPart, int partsNum,
-                    int compLength, double sumWeight) {
+                                               int compLength, double sumWeight) {
                 int rest = compLength;
                 int lastPart = startPart + partsNum - 1;
                 for (int part = startPart; part < lastPart; part++) {
@@ -1069,7 +1053,7 @@ public class GridBagLayout extends Layout {
             }
 
             private double spreadComponentWeight(double arr[], int startPart, int partsNum,
-                    double compWeight) {
+                                                 double compWeight) {
                 int lastPart = startPart + partsNum - 1;
                 double sumWeight = .0;
                 for (int part = startPart; part <= lastPart; part++) {
@@ -1195,7 +1179,7 @@ public class GridBagLayout extends Layout {
 
         Component components[]; // Hashtable is too slow
 
-        
+
         // true for RTL
         boolean orientation;
 

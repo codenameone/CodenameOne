@@ -23,29 +23,29 @@
  */
 package com.codename1.ui;
 
-import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.animations.Motion;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Border;
-import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
 import java.util.Collection;
 import java.util.Vector;
 
 /**
  * <p>A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
- * and are extracted via the {@link com.codename1.ui.list.ListModel}, <b>notice</b> that 
+ * and are extracted via the {@link com.codename1.ui.list.ListModel}, <b>notice</b> that
  * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
  * discourage usage of lists</a>.<br>
  * A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
@@ -57,10 +57,10 @@ import java.util.Vector;
  * (e.g. checkboxed elemenents, icons etc.).</p>
  * <h3>Important</h3>
  * <p>
- * {@code List} is a pretty complex class to use so we generally recommend developers use 
- * {@link com.codename1.ui.Container}, 
+ * {@code List} is a pretty complex class to use so we generally recommend developers use
+ * {@link com.codename1.ui.Container},
  * {@link com.codename1.components.InfiniteScrollAdapter} or {@link com.codename1.ui.InfiniteContainer}
- * coupled with widgets such as {@link com.codename1.components.MultiButton}. Arranging those in a 
+ * coupled with widgets such as {@link com.codename1.components.MultiButton}. Arranging those in a
  * {@link com.codename1.ui.layouts.BoxLayout} on the {@link com.codename1.ui.layouts.BoxLayout#Y_AXIS}
  * can produce the functionality of the {@code List} with better performance and far simpler code!
  * </p>
@@ -69,24 +69,24 @@ import java.util.Vector;
  * that removes a lot of the {@link com.codename1.ui.list.ListCellRenderer} related complexities inherent
  * in building a list.
  * </p>
- * 
+ *
  * <h4>Sample Usage</h4>
  * <p>
- * The sample below uses the {@link com.codename1.ui.list.GenericListCellRenderer} class instead of the 
+ * The sample below uses the {@link com.codename1.ui.list.GenericListCellRenderer} class instead of the
  * {@link com.codename1.ui.list.DefaultListCellRenderer}. We generally recommend using the builtin classes
  * as the renderer is probably the greatest source of pitfalls in {@code Lists}.
  * </p>
  *
  * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png" alt="Sample of using the generic list cell renderer" />
- * 
+ *
+ * @author Chen Fishbein
  * @see com.codename1.ui.Container
  * @see com.codename1.ui.InfiniteContainer
  * @see com.codename1.components.InfiniteScrollAdapter
  * @see com.codename1.components.MultiButton
  * @see com.codename1.ui.list
  * @see com.codename1.ui.list.MultiList
- * @author Chen Fishbein
  */
 public class List<T> extends Component implements ActionSource {
     /**
@@ -103,10 +103,6 @@ public class List<T> extends Component implements ActionSource {
      */
     public static final int FIXED_NONE_ONE_ELEMENT_MARGIN_FROM_EDGE = 2;
     /**
-     * Allows to test for fixed none
-     */
-    private static final int FIXED_NONE_BOUNDRY = 9;
-    /**
      * Indicates the list selection is fixed into place at the top of the list
      * or at the left of the list
      */
@@ -120,44 +116,32 @@ public class List<T> extends Component implements ActionSource {
      * Indicates the list selection is fixed into place at the center of the list
      */
     public static final int FIXED_CENTER = 12;
-
+    /**
+     * Indicates the list orientation is VERTICAL
+     */
+    public static final int VERTICAL = 0;
+    /**
+     * Indicates the list orientation is HORIZONTAL
+     */
+    public static final int HORIZONTAL = 1;
+    static final int COMBO = 2;
+    /**
+     * Allows to test for fixed none
+     */
+    private static final int FIXED_NONE_BOUNDRY = 9;
+    private static boolean defaultFireOnClick = true;
+    /**
+     * Indicates whether the list should not paint the focus component if the list
+     * itself has no focus.
+     */
+    private static boolean defaultIgnoreFocusComponentWhenUnfocused = true;
     Style spinnerOverlay;
-
+    EventDispatcher dispatcher = new EventDispatcher();
+    Object eventSource = this;
     /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     * @return the defaultIgnoreFocusComponentWhenUnfocused
+     * Used internally by the combo box
      */
-    public static boolean isDefaultIgnoreFocusComponentWhenUnfocused() {
-        return defaultIgnoreFocusComponentWhenUnfocused;
-    }
-
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     * @param aDefaultIgnoreFocusComponentWhenUnfocused the defaultIgnoreFocusComponentWhenUnfocused to set
-     */
-    public static void setDefaultIgnoreFocusComponentWhenUnfocused(boolean aDefaultIgnoreFocusComponentWhenUnfocused) {
-        defaultIgnoreFocusComponentWhenUnfocused = aDefaultIgnoreFocusComponentWhenUnfocused;
-    }
-
-    /**
-     * Default value for the fire on click behavior
-     *
-     * @return the defaultFireOnClick
-     */
-    public static boolean isDefaultFireOnClick() {
-        return defaultFireOnClick;
-    }
-
-    /**
-     * Default value for the fire on click behavior
-     * 
-     * @param aDefaultFireOnClick the defaultFireOnClick to set
-     */
-    public static void setDefaultFireOnClick(boolean aDefaultFireOnClick) {
-        defaultFireOnClick = aDefaultFireOnClick;
-    }
+    boolean disposeDialogOnSelection;
     /**
      * @see #setRenderingPrototype
      */
@@ -171,48 +155,32 @@ public class List<T> extends Component implements ActionSource {
     private ListModel<T> model;
     private ListCellRenderer<T> renderer = new DefaultListCellRenderer<T>();
     private int orientation = VERTICAL;
-    /**
-     * Indicates the list orientation is VERTICAL
-     */
-    public static final int VERTICAL = 0;
-    /**
-     * Indicates the list orientation is HORIZONTAL
-     */
-    public static final int HORIZONTAL = 1;
-    static final int COMBO = 2;
-    EventDispatcher dispatcher = new EventDispatcher();
-    Object eventSource = this;
     private Dimension elemSize;
     private Dimension selectedElemSize;
     private boolean inputOnFocus = true;
     private boolean numericKeyActions = true;
     private boolean paintFocusBehindList = true;
-    
     /**
      * Indicates the number of elements the list should check to determine the element
      * sizes. This is ignored when a rendering prototype is present.
      */
     private int listSizeCalculationSampleCount = 5;
-
     /**
      * Minimum number of elements shown in a list, this member is used to calculate
      * the list preferred size. If the number of elements in the model is smaller than
      * this then this value is used in the calculations.
      */
     private int minElementHeight = 0;
-
     /**
      * Maximum number of elements shown in a list, this member is used to calculate
      * the list preferred size. If the number of elements in the model is larger than
      * this then this value is used in the calculations.
      */
     private int maxElementHeight = Integer.MAX_VALUE;
-
     /**
      * Indicates the gap between each item in the list
      */
     private int itemGap = 2;
-
     private Listeners listener;
     /**
      * Indicates the position within the current animation, 0 means no animation
@@ -222,53 +190,33 @@ public class List<T> extends Component implements ActionSource {
     private int fixedDraggedAnimationPosition;
     private int fixedDraggedPosition;
     private Motion fixedDraggedMotion;
-    
     private int destination;
     private Motion listMotion;
-    private static boolean defaultFireOnClick = true;
     private boolean fireOnClick = defaultFireOnClick;
     private boolean fireOnRelease;
-
     /**
      * Initial x/y positions for the fixed mode drag
      */
     private int fixedDraggedSelection = 0;
-
     private boolean commandList;
-
-    /**
-     * Indicates whether the list should not paint the focus component if the list
-     * itself has no focus.
-     */
-    private static boolean defaultIgnoreFocusComponentWhenUnfocused = true;
-
     /**
      * Indicates whether the list should not paint the focus component if the list
      * itself has no focus.
      */
     private boolean ignoreFocusComponentWhenUnfocused = defaultIgnoreFocusComponentWhenUnfocused;
-
-    /**
-     * Used internally by the combo box
-     */
-    boolean disposeDialogOnSelection;
-
     /**
      * Indicates that the background of a cell renderer might mutate between one entry and the next,
      * it is recommended that this flag remains false for performance reasons.
      */
     private boolean mutableRendererBackgrounds;
-
     /**
      * This flag indicates if the List should automatically scroll to the
      * selected element when it's been initialized.
      */
     private boolean scrollToSelected = true;
-
     private Label hintLabel;
-
     private boolean longPointerPressAction;
-    
+
     /**
      * Creates a new instance of List
      *
@@ -305,6 +253,44 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
+     * Indicates whether the list should not paint the focus component if the list
+     * itself has no focus.
+     *
+     * @return the defaultIgnoreFocusComponentWhenUnfocused
+     */
+    public static boolean isDefaultIgnoreFocusComponentWhenUnfocused() {
+        return defaultIgnoreFocusComponentWhenUnfocused;
+    }
+
+    /**
+     * Indicates whether the list should not paint the focus component if the list
+     * itself has no focus.
+     *
+     * @param aDefaultIgnoreFocusComponentWhenUnfocused the defaultIgnoreFocusComponentWhenUnfocused to set
+     */
+    public static void setDefaultIgnoreFocusComponentWhenUnfocused(boolean aDefaultIgnoreFocusComponentWhenUnfocused) {
+        defaultIgnoreFocusComponentWhenUnfocused = aDefaultIgnoreFocusComponentWhenUnfocused;
+    }
+
+    /**
+     * Default value for the fire on click behavior
+     *
+     * @return the defaultFireOnClick
+     */
+    public static boolean isDefaultFireOnClick() {
+        return defaultFireOnClick;
+    }
+
+    /**
+     * Default value for the fire on click behavior
+     *
+     * @param aDefaultFireOnClick the defaultFireOnClick to set
+     */
+    public static void setDefaultFireOnClick(boolean aDefaultFireOnClick) {
+        defaultFireOnClick = aDefaultFireOnClick;
+    }
+
+    /**
      * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
@@ -315,7 +301,7 @@ public class List<T> extends Component implements ActionSource {
         longPointerPressAction = uim.isThemeConstant("listLongPressBool", true);
     }
 
-    
+
     /**
      * {@inheritDoc}
      */
@@ -326,7 +312,7 @@ public class List<T> extends Component implements ActionSource {
         bindListeners();
         super.initComponentImpl();
         int index = model.getSelectedIndex();
-        if(index >= 0){
+        if (index >= 0) {
             model.setSelectedIndex(index);
         }
     }
@@ -363,7 +349,7 @@ public class List<T> extends Component implements ActionSource {
      * Callback to allow subclasses to react to a change in the model
      *
      * @param status the type data change; REMOVED, ADDED or CHANGED
-     * @param index item index in a list model
+     * @param index  item index in a list model
      */
     protected void modelChanged(int status, int index) {
     }
@@ -449,7 +435,6 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
-     *
      * Returns the number of elements in the list, shorthand for
      * getModel().getSize()
      *
@@ -461,14 +446,16 @@ public class List<T> extends Component implements ActionSource {
 
     /**
      * Returns the visual selection during a drag operation, otherwise equivalent to model.getSelectedIndex
+     *
      * @return visual selection
      */
-    public int getCurrentSelected(){
-        if(fixedSelection > FIXED_NONE_BOUNDRY && isDragActivated()){
+    public int getCurrentSelected() {
+        if (fixedSelection > FIXED_NONE_BOUNDRY && isDragActivated()) {
             return fixedDraggedSelection;
         }
         return model.getSelectedIndex();
     }
+
     /**
      * Returns the current selected offset in the list
      *
@@ -506,30 +493,30 @@ public class List<T> extends Component implements ActionSource {
      * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
-        if(!isScrollable()) {
+        if (!isScrollable()) {
             return DRAG_REGION_NOT_DRAGGABLE;
         }
-        if(getOrientation() == HORIZONTAL) {
+        if (getOrientation() == HORIZONTAL) {
             return DRAG_REGION_POSSIBLE_DRAG_X;
         }
         return DRAG_REGION_POSSIBLE_DRAG_Y;
     }
-    
+
     /**
      * Sets the current selected offset in the list
      *
-     * @param index the current selected offset in the list
+     * @param index             the current selected offset in the list
      * @param scrollToSelection indicates whether scrolling to selection should
-     * occur if the selection is outside of view
+     *                          occur if the selection is outside of view
      */
     public void setSelectedIndex(int index, boolean scrollToSelection) {
         if (index < 0) {
             throw new IllegalArgumentException("Selection index is negative:" + index);
         }
         model.setSelectedIndex(index);
-        if(!isInitialized()) {
+        if (!isInitialized()) {
             Form f = getComponentForm();
-            if(f == null) {
+            if (f == null) {
                 return;
             }
             f.revalidate();
@@ -578,53 +565,6 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
-     * {@inheritDoc}
-     */
-    public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
-        super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
-        elemSize = null;
-        selectedElemSize = null;
-
-        // we should try passing the should calcPreferredSize to the renderer so it can revalidate too
-        if(shouldCalcPreferredSize) {
-            ListCellRenderer r = getRenderer();
-            Object val;
-            if (renderingPrototype != null) {
-                val = renderingPrototype;
-            } else {
-                if (getModel().getSize() > 0) {
-                    val = getModel().getItemAt(0);
-                } else {
-                    return;
-                }
-            }
-            Component c = r.getListCellRendererComponent(this, val, 0, false);
-            c.setShouldCalcPreferredSize(shouldCalcPreferredSize);
-            c = r.getListCellRendererComponent(this, val, 0, true);
-            c.setShouldCalcPreferredSize(shouldCalcPreferredSize);
-        }
-    }
-
-
-    void dataChanged(int status, int index) {
-        setShouldCalcPreferredSize(true);
-        if (getSelectedIndex() >= model.getSize()) {
-            setSelectedIndex(Math.max(model.getSize() - 1, 0));
-        }
-
-        modelChanged(status, index);
-        repaint();
-    }
-
-    private void bindListeners() {
-        if (listener == null) {
-            listener = new Listeners();
-            model.addDataChangedListener(listener);
-            model.addSelectionListener(listener);
-        }
-    }
-
-    /**
      * Replaces/sets the model underlying the list
      *
      * @param model the new model underlying the list
@@ -650,6 +590,52 @@ public class List<T> extends Component implements ActionSource {
             bindListeners();
         }
         repaint();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
+        super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
+        elemSize = null;
+        selectedElemSize = null;
+
+        // we should try passing the should calcPreferredSize to the renderer so it can revalidate too
+        if (shouldCalcPreferredSize) {
+            ListCellRenderer r = getRenderer();
+            Object val;
+            if (renderingPrototype != null) {
+                val = renderingPrototype;
+            } else {
+                if (getModel().getSize() > 0) {
+                    val = getModel().getItemAt(0);
+                } else {
+                    return;
+                }
+            }
+            Component c = r.getListCellRendererComponent(this, val, 0, false);
+            c.setShouldCalcPreferredSize(shouldCalcPreferredSize);
+            c = r.getListCellRendererComponent(this, val, 0, true);
+            c.setShouldCalcPreferredSize(shouldCalcPreferredSize);
+        }
+    }
+
+    void dataChanged(int status, int index) {
+        setShouldCalcPreferredSize(true);
+        if (getSelectedIndex() >= model.getSize()) {
+            setSelectedIndex(Math.max(model.getSize() - 1, 0));
+        }
+
+        modelChanged(status, index);
+        repaint();
+    }
+
+    private void bindListeners() {
+        if (listener == null) {
+            listener = new Listeners();
+            model.addDataChangedListener(listener);
+            model.addSelectionListener(listener);
+        }
     }
 
     /**
@@ -713,7 +699,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * Indicates that the background of a cell renderer might mutate between one entry and the next,
      * it is recommended that this flag remains false for performance reasons.
-
+     *
      * @return the value of the flag
      */
     public boolean isMutableRendererBackgrounds() {
@@ -723,7 +709,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * Indicates that the background of a cell renderer might mutate between one entry and the next,
      * it is recommended that this flag remains false for performance reasons.
-
+     *
      * @param mutableRendererBackgrounds the new value for the flag
      */
     public void setMutableRendererBackgrounds(boolean mutableRendererBackgrounds) {
@@ -733,6 +719,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * Indicates the number of elements the list should check to determine the element
      * sizes. This is ignored when a rendering prototype is present.
+     *
      * @return the listSizeCalculationSampleCount
      */
     public int getListSizeCalculationSampleCount() {
@@ -742,6 +729,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * Indicates the number of elements the list should check to determine the element
      * sizes. This is ignored when a rendering prototype is present.
+     *
      * @param listSizeCalculationSampleCount the listSizeCalculationSampleCount to set
      */
     public void setListSizeCalculationSampleCount(int listSizeCalculationSampleCount) {
@@ -750,6 +738,7 @@ public class List<T> extends Component implements ActionSource {
 
     /**
      * Enable/disable list action on long pointer press event
+     *
      * @return the longPointerPressAction
      */
     public boolean isLongPointerPressActionEnabled() {
@@ -758,32 +747,11 @@ public class List<T> extends Component implements ActionSource {
 
     /**
      * Enable/disable list action on long pointer press event
+     *
      * @param longPointerPressAction the longPointerPressAction to set
      */
     public void setLongPointerPressActionEnabled(boolean longPointerPressAction) {
         this.longPointerPressAction = longPointerPressAction;
-    }
-
-
-    private class Listeners implements DataChangedListener, SelectionListener {
-
-        public void dataChanged(int status, int index) {
-            List.this.dataChanged(status, index);
-        }
-
-        public void selectionChanged(int oldSelected, int newSelected) {
-            repaint();
-            List.this.listSelectionChanged(oldSelected, newSelected);
-        }
-    }
-
-    /**
-     * Sets the renderer which is used to draw list elements
-     *
-     * @param renderer cell renderer instance
-     */
-    public void setRenderer(ListCellRenderer renderer) {
-        setListCellRenderer(renderer);
     }
 
     /**
@@ -813,6 +781,15 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
+     * Sets the renderer which is used to draw list elements
+     *
+     * @param renderer cell renderer instance
+     */
+    public void setRenderer(ListCellRenderer renderer) {
+        setListCellRenderer(renderer);
+    }
+
+    /**
      * Returns the list orientation
      *
      * @return the list orientation HORIZONTAL or VERTICAL
@@ -821,6 +798,17 @@ public class List<T> extends Component implements ActionSource {
      */
     public int getOrientation() {
         return orientation;
+    }
+
+    /**
+     * Sets the list orientation HORIZONTAL or VERTICAL
+     *
+     * @param orientation the list orientation HORIZONTAL or VERTICAL
+     * @see #HORIZONTAL
+     * @see #VERTICAL
+     */
+    public void setOrientation(int orientation) {
+        this.orientation = orientation;
     }
 
     /**
@@ -842,17 +830,6 @@ public class List<T> extends Component implements ActionSource {
             focus.refreshTheme(merge);
         }
         super.refreshTheme(merge);
-    }
-
-    /**
-     * Sets the list orientation HORIZONTAL or VERTICAL
-     *
-     * @param orientation the list orientation HORIZONTAL or VERTICAL
-     * @see #HORIZONTAL
-     * @see #VERTICAL
-     */
-    public void setOrientation(int orientation) {
-        this.orientation = orientation;
     }
 
     /**
@@ -998,7 +975,7 @@ public class List<T> extends Component implements ActionSource {
             model.setSelectedIndex(selectedIndex);
             int direction = (gameAction == keyFwd ? 1 : -1);
             if ((isRTL()) && (getOrientation() == HORIZONTAL)) {
-            	direction = -direction;
+                direction = -direction;
             }
             updateAnimationPosition(direction);
             if (fixedSelection == FIXED_NONE || fixedSelection == FIXED_NONE_CYCLIC) {
@@ -1023,13 +1000,13 @@ public class List<T> extends Component implements ActionSource {
             rect = new Rectangle(getX(), (size.getHeight() + itemGap) * selectedIndex, getElementSize(true, true));
         } else {
             int x = (size.getWidth() + itemGap) * selectedIndex;
-            if(isRTL() && isScrollableX()){
+            if (isRTL() && isScrollableX()) {
                 x = getScrollDimension().getWidth() - x - (size.getWidth() + itemGap);
             }
             rect = new Rectangle(x, getY(), getElementSize(true, true));
         }
-        if(hasScrollableParent(getParent())) {
-            if(hasFocus()) {
+        if (hasScrollableParent(getParent())) {
+            if (hasFocus()) {
                 scrollRectToVisible(rect);
             }
         } else {
@@ -1038,10 +1015,10 @@ public class List<T> extends Component implements ActionSource {
     }
 
     private boolean hasScrollableParent(Container c) {
-        if(c == null) {
+        if (c == null) {
             return false;
         }
-        if(c.isScrollable()) {
+        if (c.isScrollable()) {
             return true;
         }
         return hasScrollableParent(c.getParent());
@@ -1057,7 +1034,7 @@ public class List<T> extends Component implements ActionSource {
             animationPosition = 0;
             animate();
         }
-        
+
         if (isSmoothScrolling()) {
             if (orientation != HORIZONTAL) {
                 animationPosition += (direction * getElementSize(false, true).getHeight());
@@ -1071,7 +1048,7 @@ public class List<T> extends Component implements ActionSource {
 
     private void initListMotion() {
         Form p = getComponentForm();
-        if(p != null) {
+        if (p != null) {
             p.registerAnimatedInternal(this);
         }
         listMotion = Motion.createSplineMotion(0, destination, getScrollAnimationSpeed());
@@ -1093,7 +1070,7 @@ public class List<T> extends Component implements ActionSource {
         }
 
         int selection = getCurrentSelected();
-        
+
         Dimension d = rect.getSize();
         int selectedDiff;
 
@@ -1157,8 +1134,8 @@ public class List<T> extends Component implements ActionSource {
                     if (!beforeSelected) {
                         x += selectedDiff;
                     }
-                    if(rtl) {
-                    	x = listWidth - x - width;
+                    if (rtl) {
+                        x = listWidth - x - width;
                     }
 
                     x = recalcOffset(x, totalWidth, listWidth, width + itemGap);
@@ -1171,7 +1148,7 @@ public class List<T> extends Component implements ActionSource {
                         x += selectedDiff;
                     }
                     if (rtl) {
-                    	x = listWidth - x - width;
+                        x = listWidth - x - width;
                     }
                     x = recalcOffset(x, totalWidth, listWidth, width + itemGap);
                     break;
@@ -1182,14 +1159,14 @@ public class List<T> extends Component implements ActionSource {
                     }
                     break;
             }
-            int rectX=initialX + x;
-            if ((rtl) && (fixedSelection<FIXED_NONE_BOUNDRY)) {
-            	rectX = initialX + totalWidth - (x - initialX) - (width + itemGap);
-            	if(index == getCurrentSelected()) {
-            		rectX -= selectedDiff;
+            int rectX = initialX + x;
+            if ((rtl) && (fixedSelection < FIXED_NONE_BOUNDRY)) {
+                rectX = initialX + totalWidth - (x - initialX) - (width + itemGap);
+                if (index == getCurrentSelected()) {
+                    rectX -= selectedDiff;
                 }
-            	if(totalWidth < listWidth) {
-            		rectX += (listWidth - totalWidth);
+                if (totalWidth < listWidth) {
+                    rectX += (listWidth - totalWidth);
                 }
             }
             rect.setX(rectX);
@@ -1203,19 +1180,19 @@ public class List<T> extends Component implements ActionSource {
      * Allows us to recalculate the bounds of a coordinate to make it "loop" back
      * into view
      *
-     * @param offset either x or y coordinate
-     * @param totalSize the total width or height of the list with all the elements (including scroll)
-     * @param viewSize the size visible to the user
+     * @param offset        either x or y coordinate
+     * @param totalSize     the total width or height of the list with all the elements (including scroll)
+     * @param viewSize      the size visible to the user
      * @param componentSize the size of the component
      * @return offset after manipulation if such manipulation was performed
      */
     private int recalcOffset(int offset, int totalSize, int viewSize, int componentSize) {
-        if (offset + (animationPosition % componentSize) + 
+        if (offset + (animationPosition % componentSize) +
                 (fixedDraggedAnimationPosition % componentSize) >= viewSize) {
             offset -= totalSize;
         } else {
-            if (offset + (animationPosition % componentSize) + 
-                (fixedDraggedAnimationPosition % componentSize) < 1 - componentSize) {
+            if (offset + (animationPosition % componentSize) +
+                    (fixedDraggedAnimationPosition % componentSize) < 1 - componentSize) {
                 offset += totalSize;
             }
         }
@@ -1244,8 +1221,8 @@ public class List<T> extends Component implements ActionSource {
         Rectangle pos = new Rectangle();
         Dimension rendererSize = getElementSize(false, true);
 
-        if(fixedSelection > FIXED_NONE_BOUNDRY){
-            if (animationPosition != 0  || isDragActivated() ) {
+        if (fixedSelection > FIXED_NONE_BOUNDRY) {
+            if (animationPosition != 0 || isDragActivated()) {
                 if (orientation != HORIZONTAL) {
                     yTranslate += (animationPosition + fixedDraggedAnimationPosition);
                     g.translate(0, animationPosition + fixedDraggedAnimationPosition);
@@ -1271,7 +1248,7 @@ public class List<T> extends Component implements ActionSource {
             int startX = clipX + getAbsoluteX();
             if (isRTL()) {
                 //In RTL the start of the list is not in the left side of the viewport, but rather the right side
-            	startX += getWidth();
+                startX += getWidth();
             }
             startingPoint = Math.max(0, pointerSelect(startX, clipY + getAbsoluteY()) - 1);
         }
@@ -1279,11 +1256,11 @@ public class List<T> extends Component implements ActionSource {
         int startOffset = 0;
         int endOffset = numOfcomponents;
 
-        if(mutableRendererBackgrounds) {
+        if (mutableRendererBackgrounds) {
             for (int i = startingPoint; i < numOfcomponents; i++) {
                 // skip on the selected
                 if (i == getCurrentSelected() && animationPosition == 0 && fixedDraggedAnimationPosition == 0) {
-                    if(!shouldBreak) {
+                    if (!shouldBreak) {
                         startOffset = i;
                     }
                     endOffset = i;
@@ -1294,7 +1271,7 @@ public class List<T> extends Component implements ActionSource {
 
                 // if the renderer is in the clipping region
                 if (pos.intersects(clipX, clipY, clipWidth, clipHeight)) {
-                    if(!shouldBreak) {
+                    if (!shouldBreak) {
                         startOffset = i;
                     }
                     endOffset = i;
@@ -1313,7 +1290,7 @@ public class List<T> extends Component implements ActionSource {
             T valueAt0 = getModel().getItemAt(0);
             Component selectionCmp;
             int selectedIndex = getSelectedIndex();
-            if(selectedIndex > -1 && selectedIndex < numOfcomponents) {
+            if (selectedIndex > -1 && selectedIndex < numOfcomponents) {
                 // this is essential otherwise we constantly ticker based on the value of the first entry
                 selectionCmp = renderer.getListCellRendererComponent(this, getModel().getItemAt(selectedIndex), 0, true);
             } else {
@@ -1323,7 +1300,7 @@ public class List<T> extends Component implements ActionSource {
             for (int i = startingPoint; i < numOfcomponents; i++) {
                 // skip on the selected
                 if (i == getCurrentSelected() && animationPosition == 0) {
-                    if(!shouldBreak) {
+                    if (!shouldBreak) {
                         startOffset = i;
                     }
                     endOffset = i;
@@ -1334,11 +1311,11 @@ public class List<T> extends Component implements ActionSource {
 
                 // if the renderer is in the clipping region
                 if (pos.intersects(clipX, clipY, clipWidth, clipHeight)) {
-                    if(!shouldBreak) {
+                    if (!shouldBreak) {
                         startOffset = i;
                     }
                     endOffset = i;
-                    if(i == getCurrentSelected()) {
+                    if (i == getCurrentSelected()) {
                         Dimension size = pos.getSize();
                         renderComponentBackground(g, selectionCmp, pos.getX(), pos.getY(), size.getWidth(), size.getHeight());
                     } else {
@@ -1360,7 +1337,7 @@ public class List<T> extends Component implements ActionSource {
         calculateComponentPosition(getCurrentSelected(), width, selectedPos, rendererSize, getElementSize(true, true), true);
         Dimension size = selectedPos.getSize();
         int curSel = getCurrentSelected();
-        if(shouldRendererSelectedEntry && curSel > -1 && curSel < model.getSize()) {
+        if (shouldRendererSelectedEntry && curSel > -1 && curSel < model.getSize()) {
             Component selected = renderer.getListCellRendererComponent(this, model.getItemAt(getCurrentSelected()), getCurrentSelected(), true);
             renderComponentBackground(g, selected, selectedPos.getX(), selectedPos.getY(), size.getWidth(), size.getHeight());
         }
@@ -1394,8 +1371,8 @@ public class List<T> extends Component implements ActionSource {
         }
 
         g.translate(-xTranslate, -yTranslate);
-        if(spinnerOverlay != null) {
-            if(spinnerOverlay.getBorder() != null) {
+        if (spinnerOverlay != null) {
+            if (spinnerOverlay.getBorder() != null) {
                 spinnerOverlay.getBorder().paintBorderBackground(g, this);
                 spinnerOverlay.getBorder().paint(g, this);
             } else {
@@ -1407,17 +1384,18 @@ public class List<T> extends Component implements ActionSource {
     /**
      * Allows subclasses to override the selection rendering for the component, specifically the spinner
      * in some themes
+     *
      * @return true to render the selection, false otherwise.
      */
     protected boolean shouldRenderSelection() {
         return Display.getInstance().shouldRenderSelection(this);
     }
-    
+
     private void paintFocus(Graphics g, int width, Rectangle pos, Dimension rendererSize) {
-        if(ignoreFocusComponentWhenUnfocused && !hasFocus()) {
+        if (ignoreFocusComponentWhenUnfocused && !hasFocus()) {
             return;
         }
-        if(!shouldRenderSelection()) {
+        if (!shouldRenderSelection()) {
             return;
         }
         calculateComponentPosition(getCurrentSelected(), width, pos, rendererSize, getElementSize(true, true), true);
@@ -1447,7 +1425,7 @@ public class List<T> extends Component implements ActionSource {
     private void renderComponent(Graphics g, Component cmp, int x, int y, int width, int height) {
         Style s = cmp.getStyle();
         int left = s.getMarginLeft(isRTL());
-        int top =  s.getMarginTop();
+        int top = s.getMarginTop();
         cmp.setWidth(width - left - s.getMarginRight(isRTL()));
         cmp.setHeight(height - top - s.getMarginBottom());
         cmp.setX(x + left);
@@ -1460,11 +1438,11 @@ public class List<T> extends Component implements ActionSource {
         //g.pushClip();
         g.clipRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
         if (cmp instanceof Container) {
-            ((Container)cmp).layoutContainer();
+            ((Container) cmp).layoutContainer();
         }
         cmp.paint(g);
         Border b = s.getBorder();
-        if(b != null && !b.isBackgroundPainter()) {
+        if (b != null && !b.isBackgroundPainter()) {
             cmp.paintBorder(g);
         }
         g.setClip(oX, oY, oWidth, oHeight);
@@ -1474,7 +1452,7 @@ public class List<T> extends Component implements ActionSource {
     private void renderComponentBackground(Graphics g, Component cmp, int x, int y, int width, int height) {
         Style s = cmp.getStyle();
         int left = s.getMarginLeft(isRTL());
-        int top =  s.getMarginTop();
+        int top = s.getMarginTop();
         cmp.setWidth(width - left - s.getMarginRight(isRTL()));
         cmp.setHeight(height - top - s.getMarginBottom());
         cmp.setX(x + left);
@@ -1486,7 +1464,7 @@ public class List<T> extends Component implements ActionSource {
         //g.pushClip();
         g.clipRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
         if (cmp instanceof Container) {
-            ((Container)cmp).layoutContainer();
+            ((Container) cmp).layoutContainer();
         }
         cmp.paintComponentBackground(g);
         g.setClip(cX, cY, cW, cH);
@@ -1522,7 +1500,7 @@ public class List<T> extends Component implements ActionSource {
 
     /**
      * This method allows extracting the action listeners from the current list
-     * 
+     *
      * @return vector containing the action listeners on the list
      * @deprecated use getListeners instead
      */
@@ -1532,7 +1510,7 @@ public class List<T> extends Component implements ActionSource {
 
     /**
      * This method allows extracting the action listeners from the current list
-     * 
+     *
      * @return Collection containing the action listeners on the list
      */
     public Collection getListeners() {
@@ -1552,35 +1530,35 @@ public class List<T> extends Component implements ActionSource {
      * {@inheritDoc}
      */
     protected void fireActionEvent() {
-        fireActionEvent(new ActionEvent(eventSource,ActionEvent.Type.Other));
+        fireActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));
     }
 
-    
     /**
      * Triggers the event to the listeners
+     *
      * @param a the event to fire
-     */ 
+     */
     protected void fireActionEvent(ActionEvent a) {
-        if(isEnabled() && !Display.getInstance().hasDragOccured()){
-            if(disposeDialogOnSelection) {
-                ((Dialog)getComponentForm()).dispose();
+        if (isEnabled() && !Display.getInstance().hasDragOccured()) {
+            if (disposeDialogOnSelection) {
+                ((Dialog) getComponentForm()).dispose();
             }
             super.fireActionEvent();
             dispatcher.fireActionEvent(a);
-            if(isCommandList() && !a.isConsumed()) {
+            if (isCommandList() && !a.isConsumed()) {
                 T i = getSelectedItem();
-                if(i != null && i instanceof Command && ((Command)i).isEnabled()) {
-                    ((Command)i).actionPerformed(a);
-                    if(!a.isConsumed()) {
+                if (i != null && i instanceof Command && ((Command) i).isEnabled()) {
+                    ((Command) i).actionPerformed(a);
+                    if (!a.isConsumed()) {
                         Form f = getComponentForm();
-                        if(f != null) {
-                            f.actionCommandImpl((Command)i);
+                        if (f != null) {
+                            f.actionCommandImpl((Command) i);
                         }
                     }
                 }
             }
             Display d = Display.getInstance();
-            if(d.isBuiltinSoundsEnabled()) {
+            if (d.isBuiltinSoundsEnabled()) {
                 d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);
             }
         }
@@ -1593,7 +1571,7 @@ public class List<T> extends Component implements ActionSource {
      * where the list "steals" focus.
      *
      * @param inputOnFocus true is a list can start handling input
-     * implicitly upon gaining focus
+     *                     implicitly upon gaining focus
      */
     public void setInputOnFocus(boolean inputOnFocus) {
         this.inputOnFocus = inputOnFocus;
@@ -1645,6 +1623,16 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
+     * See set rendering prototype
+     *
+     * @return the value of the rendering prototype
+     * @see #setRenderingPrototype(java.lang.Object)
+     */
+    public T getRenderingPrototype() {
+        return renderingPrototype;
+    }
+
+    /**
      * <p>The rendering prototype is optionally used in calculating the size of the
      * List and is recommended for performance reasons. You should invoke it with an object
      * representing a theoretical value in the list which will be used to calculate
@@ -1656,25 +1644,15 @@ public class List<T> extends Component implements ActionSource {
      * String to determine the size of the list element. E.g. for a list of dates you can use
      * new Date(30, 12, 00) etc..</p>
      * <p>The example below was designed for {@link com.codename1.ui.list.MultiList} but
-     * should work for any list. Its goal is to render 2 lines of text with 20 characters and a 
+     * should work for any list. Its goal is to render 2 lines of text with 20 characters and a
      * 5mm square icon:</p>
      * <script src="https://gist.github.com/codenameone/dc9c7f13f6b312d1edc8.js"></script>
      *
      * @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
-     * size of a list component.
+     *                           size of a list component.
      */
     public void setRenderingPrototype(T renderingPrototype) {
         this.renderingPrototype = renderingPrototype;
-    }
-
-    /**
-     * See set rendering prototype
-     *
-     * @see #setRenderingPrototype(java.lang.Object)
-     * @return the value of the rendering prototype
-     */
-    public T getRenderingPrototype() {
-        return renderingPrototype;
     }
 
     /**
@@ -1689,7 +1667,7 @@ public class List<T> extends Component implements ActionSource {
                 if (renderingPrototype == null) {
                     if (model.getSize() == 0) {
                         // put a sensible value as default when there are no elements or rendering prototype
-                        if(addMargin) {
+                        if (addMargin) {
                             return new Label("XXXXXX").getPreferredSizeWithMargin();
                         }
                         return new Label("XXXXXX").getPreferredSize();
@@ -1705,7 +1683,7 @@ public class List<T> extends Component implements ActionSource {
                     if (model.getSize() == 0) {
                         // put a sensible value as default when there are no elements or rendering prototype
                         Label l = new Label("XXXXXX");
-                        if(addMargin) {
+                        if (addMargin) {
                             return l.getPreferredSizeWithMargin();
                         } else {
                             return l.getPreferredSize();
@@ -1724,7 +1702,7 @@ public class List<T> extends Component implements ActionSource {
     private Dimension calculateElementSize(boolean selected, boolean addMargin) {
         if (renderingPrototype != null) {
             Component unselected = renderer.getListCellRendererComponent(this, renderingPrototype, 0, selected);
-            if(addMargin) {
+            if (addMargin) {
                 return unselected.getPreferredSizeWithMargin();
             } else {
                 return unselected.getPreferredSize();
@@ -1737,13 +1715,13 @@ public class List<T> extends Component implements ActionSource {
         int marginX = 0;
         for (int iter = 0; iter < elements; iter++) {
             Component cmp = renderer.getListCellRendererComponent(this, model.getItemAt(iter), iter, selected);
-            if(cmp instanceof Container) {
+            if (cmp instanceof Container) {
                 cmp.setShouldCalcPreferredSize(true);
             }
             Dimension d = cmp.getPreferredSize();
             width = Math.max(width, d.getWidth());
             height = Math.max(height, d.getHeight());
-            if(iter == 0) {
+            if (iter == 0) {
                 Style s = cmp.getStyle();
                 marginY = s.getVerticalMargins();
                 marginX = s.getHorizontalMargins();
@@ -1752,18 +1730,16 @@ public class List<T> extends Component implements ActionSource {
         return new Dimension(width + marginX, height + marginY);
     }
 
-
-
     /**
      * {@inheritDoc}
      */
     public void longPointerPress(int x, int y) {
-        if(!isEnabled()) {
+        if (!isEnabled()) {
             return;
         }
-        if(longPointerPressAction) {
+        if (longPointerPressAction) {
             int s = pointerSelect(x, y);
-            if(s > -1) {
+            if (s > -1) {
                 model.setSelectedIndex(s);
             }
             pointerReleasedImpl(x, y, false, true);
@@ -1774,18 +1750,18 @@ public class List<T> extends Component implements ActionSource {
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
-        if(!isEnabled()) {
+        if (!isEnabled()) {
             return;
         }
-        if(fixedSelection > FIXED_NONE_BOUNDRY) {
+        if (fixedSelection > FIXED_NONE_BOUNDRY) {
             // for a fixed list we need to store the initial drag position
-            if(isSmoothScrolling()) {
-                if(orientation != HORIZONTAL) {
+            if (isSmoothScrolling()) {
+                if (orientation != HORIZONTAL) {
                     fixedDraggedPosition = y;
                 } else {
                     fixedDraggedPosition = x;
                 }
-                if(isDragActivated()){
+                if (isDragActivated()) {
                     int selected = getCurrentSelected();
                     model.setSelectedIndex(selected);
                     fixedDraggedMotion = null;
@@ -1795,11 +1771,11 @@ public class List<T> extends Component implements ActionSource {
             }
         }
         // prevent a hover event from activating the drag in case of a click screen,
-        // this is essential for the Storm device        
+        // this is essential for the Storm device
         setDragActivated(false);
         int current = model.getSelectedIndex();
         int selection = pointerSelect(x, y);
-        
+
         if (selection > -1 && fixedSelection < FIXED_NONE_BOUNDRY) {
             model.setSelectedIndex(selection);
         }
@@ -1822,44 +1798,44 @@ public class List<T> extends Component implements ActionSource {
     }
 
     private void pointerDraggedImpl(int x, int y) {
-        if(!isEnabled()) {
+        if (!isEnabled()) {
             return;
         }
         if (isSmoothScrolling()) {
-            if(fixedSelection < FIXED_NONE_BOUNDRY) {
+            if (fixedSelection < FIXED_NONE_BOUNDRY) {
                 super.pointerDragged(x, y);
             } else {
-                if(!isDragActivated()){
+                if (!isDragActivated()) {
                     setDragActivated(true);
                 }
                 Dimension size = getElementSize(false, true);
                 boolean vertical = orientation == List.VERTICAL;
                 int pos;
                 int s;
-                if(vertical){
+                if (vertical) {
                     pos = y;
                     s = size.getHeight();
-                }else{
+                } else {
                     pos = x;
-                    s = size.getWidth();                
+                    s = size.getWidth();
                 }
                 fixedDraggedAnimationPosition = fixedDraggedAnimationPosition - (fixedDraggedPosition - pos);
-                fixedDraggedPosition = pos; 
-                if(fixedDraggedAnimationPosition <= -s){
+                fixedDraggedPosition = pos;
+                if (fixedDraggedAnimationPosition <= -s) {
                     fixedDraggedSelection++;
-                    if(fixedDraggedSelection >= model.getSize()){
+                    if (fixedDraggedSelection >= model.getSize()) {
                         fixedDraggedSelection = 0;
                     }
-                }else if(fixedDraggedAnimationPosition >= s){
+                } else if (fixedDraggedAnimationPosition >= s) {
                     fixedDraggedSelection--;
-                    if(fixedDraggedSelection < 0){
+                    if (fixedDraggedSelection < 0) {
                         fixedDraggedSelection = model.getSize() - 1;
                     }
                 }
                 fixedDraggedAnimationPosition = fixedDraggedAnimationPosition % s;
             }
         } else {
-            int sel=pointerSelect(x, y);
+            int sel = pointerSelect(x, y);
             if (sel > -1) {
                 model.setSelectedIndex(sel);
             }
@@ -1900,14 +1876,14 @@ public class List<T> extends Component implements ActionSource {
             calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);
 
             if (orientation != HORIZONTAL) {
-                if(y < pos.getY()){
+                if (y < pos.getY()) {
                     selectedIndex = (y - style.getPaddingTop()) / (rendererSize.getHeight() + itemGap);
-                }else{
+                } else {
                     int current = getSelectedIndex();
-                    if(y < pos.getY() + selectedSize.getHeight()){
+                    if (y < pos.getY() + selectedSize.getHeight()) {
                         selectedIndex = current;
-                    }else{
-                        selectedIndex = (current+1) + (y - (pos.getY() + selectedSize.getHeight()))/(rendererSize.getHeight() + itemGap);
+                    } else {
+                        selectedIndex = (current + 1) + (y - (pos.getY() + selectedSize.getHeight())) / (rendererSize.getHeight() + itemGap);
                     }
                 }
             } else {
@@ -1934,8 +1910,8 @@ public class List<T> extends Component implements ActionSource {
                         int current = getSelectedIndex();
                         if (x < pos.getX() + selectedSize.getWidth()) {
                             selectedIndex = current;
-                        }else{
-                            selectedIndex = (current+1) + (x - (pos.getX() + selectedSize.getWidth()))/(rendererSize.getWidth() + itemGap);
+                        } else {
+                            selectedIndex = (current + 1) + (x - (pos.getX() + selectedSize.getWidth())) / (rendererSize.getWidth() + itemGap);
                         }
                     }
                 }
@@ -1964,7 +1940,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @param fireOnClick
      */
-    public void setFireOnClick(boolean fireOnClick){
+    public void setFireOnClick(boolean fireOnClick) {
         this.fireOnClick = fireOnClick;
     }
 
@@ -1974,23 +1950,22 @@ public class List<T> extends Component implements ActionSource {
     public void pointerHoverReleased(int[] x, int[] y) {
     }
 
-    
     private void pointerReleasedImpl(int x, int y, boolean isHover, boolean longPress) {
-        if(!isEnabled()) {
+        if (!isEnabled()) {
             return;
         }
         if (isDragActivated()) {
-            if(fixedSelection < FIXED_NONE_BOUNDRY) {
+            if (fixedSelection < FIXED_NONE_BOUNDRY) {
                 super.pointerReleased(x, y);
             } else {
                 boolean vertical = getOrientation() == VERTICAL;
                 float speed = getDragSpeed(vertical);
                 if (vertical) {
                     fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                           Integer.MAX_VALUE, speed, 0.0007f);
-                }else{
+                            Integer.MAX_VALUE, speed, 0.0007f);
+                } else {
                     fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                           Integer.MAX_VALUE , speed, 0.0007f);
+                            Integer.MAX_VALUE, speed, 0.0007f);
                 }
                 fixedDraggedPosition = fixedDraggedAnimationPosition;
                 Form p = getComponentForm();
@@ -2001,16 +1976,16 @@ public class List<T> extends Component implements ActionSource {
             }
             return;
         }
-        
+
         if (!isHover && pointerSelect(x, y) > -1) {
-            if(fixedSelection > FIXED_NONE_BOUNDRY){
+            if (fixedSelection > FIXED_NONE_BOUNDRY) {
                 int index = pointerSelect(x, y);
                 updateAnimationPosition(index - getSelectedIndex());
                 setSelectedIndex(index);
-                fireActionEvent(new ActionEvent(eventSource,ActionEvent.Type.Other));
+                fireActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));
                 return;
-            } 
-            
+            }
+
             if ((fireOnClick && fixedSelection < FIXED_NONE_BOUNDRY) || fireOnRelease) {
                 // fire the action event into the selected component
                 Component selectionCmp = renderer.getListCellRendererComponent(this, getSelectedItem(), getSelectedIndex(), true);
@@ -2028,16 +2003,16 @@ public class List<T> extends Component implements ActionSource {
                 int newY = y - absY - posY;
                 selectionCmp.setX(0);
                 selectionCmp.setY(0);
-                if(selectionCmp instanceof Container) {
-                    Component tmp = ((Container)selectionCmp).getComponentAt(newX, newY);
-                    if(tmp != null) {
+                if (selectionCmp instanceof Container) {
+                    Component tmp = ((Container) selectionCmp).getComponentAt(newX, newY);
+                    if (tmp != null) {
                         selectionCmp = tmp;
                     }
                 }
-                if(longPress){
+                if (longPress) {
                     selectionCmp.longPointerPress(newX, newY);
                     fireActionEvent(new ActionEvent(eventSource, newX, newY, true));
-                }else{
+                } else {
                     selectionCmp.pointerPressed(newX, newY);
                     selectionCmp.pointerReleased(newX, newY);
                     fireActionEvent(new ActionEvent(eventSource, newX, newY, false));
@@ -2057,21 +2032,21 @@ public class List<T> extends Component implements ActionSource {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
-        if(shouldShowHint()) {
+        if (shouldShowHint()) {
             Label l = getHintLabelImpl();
-            if(l != null) {
+            if (l != null) {
                 Dimension d1 = getUIManager().getLookAndFeel().getListPreferredSize(this);
                 Dimension d2 = l.getPreferredSize();
                 return new Dimension(d1.getWidth() + d2.getWidth(), d1.getHeight() + d2.getHeight());
             }
         }
         Dimension d = getUIManager().getLookAndFeel().getListPreferredSize(this);
-        if(spinnerOverlay != null) {
-            if(spinnerOverlay.getBorder() != null) {
+        if (spinnerOverlay != null) {
+            if (spinnerOverlay.getBorder() != null) {
                 d.setWidth(Math.max(spinnerOverlay.getBorder().getMinimumWidth(), d.getWidth()));
                 d.setHeight(Math.max(spinnerOverlay.getBorder().getMinimumHeight(), d.getHeight()));
             }
-            
+
         }
         return d;
     }
@@ -2102,7 +2077,7 @@ public class List<T> extends Component implements ActionSource {
      * elements in the list move and selection stays in place.
      *
      * @param fixedSelection one of: FIXED_NONE, FIXED_TRAIL, FIXED_LEAD,
-     * FIXED_CENTER, FIXED_NONE_CYCLIC
+     *                       FIXED_CENTER, FIXED_NONE_CYCLIC
      */
     public void setFixedSelection(int fixedSelection) {
         this.fixedSelection = fixedSelection;
@@ -2114,7 +2089,6 @@ public class List<T> extends Component implements ActionSource {
         }
     }
 
-    
     /**
      * {@inheritDoc}
      */
@@ -2165,16 +2139,16 @@ public class List<T> extends Component implements ActionSource {
                 if (fixedDraggedAnimationPosition != 0) {
                     if (fixedDraggedAnimationPosition < 0) {
                         if (fixedDraggedAnimationPosition < -s / 2) {
-                            destination = s+fixedDraggedAnimationPosition;
+                            destination = s + fixedDraggedAnimationPosition;
                             animationPosition = destination;
                         } else {
                             destination = -fixedDraggedAnimationPosition;
                             animationPosition = fixedDraggedAnimationPosition;
                         }
-                        
+
                     } else {
                         if (fixedDraggedAnimationPosition > s / 2) {
-                            destination = (s-fixedDraggedAnimationPosition);
+                            destination = (s - fixedDraggedAnimationPosition);
                             animationPosition = -destination;
                         } else {
                             destination = fixedDraggedAnimationPosition;
@@ -2219,7 +2193,7 @@ public class List<T> extends Component implements ActionSource {
      */
     protected boolean isTactileTouch(int x, int y) {
         // provide touch feedback only when pressing an entry in the list and not for the entire list
-        if(isTactileTouch()) {
+        if (isTactileTouch()) {
             int selection = pointerSelect(x, y);
             if (selection > -1) {
                 return true;
@@ -2233,7 +2207,7 @@ public class List<T> extends Component implements ActionSource {
      * element when it's been initialized.
      *
      * @param scrollToSelected if true the List scrolls to the selected element
-     * when It's been initialized.
+     *                         when It's been initialized.
      */
     public void setScrollToSelected(boolean scrollToSelected) {
         this.scrollToSelected = scrollToSelected;
@@ -2250,8 +2224,8 @@ public class List<T> extends Component implements ActionSource {
 
     private int calcGrid(int scroll, int gridSize) {
         int fraction = scroll % gridSize;
-        if(Math.abs(fraction - gridSize) > 2) {
-            if(fraction > gridSize / 2) {
+        if (Math.abs(fraction - gridSize) > 2) {
+            if (fraction > gridSize / 2) {
                 return scroll + gridSize - fraction;
             } else {
                 return scroll - fraction;
@@ -2285,16 +2259,6 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
-     * Sets the TextArea hint text, the hint text  is displayed on the TextArea
-     * When there is no text in the TextArea
-     *
-     * @param hint the hint text to display
-     */
-    public void setHint(String hint){
-        super.setHint(hint, getHintIcon());
-    }
-
-    /**
      * Returns the hint text
      *
      * @return the hint text or null
@@ -2304,13 +2268,13 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
-     * Sets the TextArea hint icon, the hint is displayed on the TextArea
+     * Sets the TextArea hint text, the hint text  is displayed on the TextArea
      * When there is no text in the TextArea
      *
-     * @param icon the icon
+     * @param hint the hint text to display
      */
-    public void setHintIcon(Image icon){
-        setHint(getHint(), icon);
+    public void setHint(String hint) {
+        super.setHint(hint, getHintIcon());
     }
 
     /**
@@ -2323,13 +2287,23 @@ public class List<T> extends Component implements ActionSource {
     }
 
     /**
+     * Sets the TextArea hint icon, the hint is displayed on the TextArea
+     * When there is no text in the TextArea
+     *
+     * @param icon the icon
+     */
+    public void setHintIcon(Image icon) {
+        setHint(getHint(), icon);
+    }
+
+    /**
      * Sets the TextArea hint text and Icon, the hint text and icon are
      * displayed on the TextArea when there is no text in the TextArea
      *
      * @param hint the hint text to display
      * @param icon the hint icon to display
      */
-    public void setHint(String hint, Image icon){
+    public void setHint(String hint, Image icon) {
         super.setHint(hint, icon);
     }
 
@@ -2343,5 +2317,17 @@ public class List<T> extends Component implements ActionSource {
 
     boolean shouldShowHint() {
         return getModel().getSize() == 0;
+    }
+
+    private class Listeners implements DataChangedListener, SelectionListener {
+
+        public void dataChanged(int status, int index) {
+            List.this.dataChanged(status, index);
+        }
+
+        public void selectionChanged(int oldSelected, int newSelected) {
+            repaint();
+            List.this.listSelectionChanged(oldSelected, newSelected);
+        }
     }
 }

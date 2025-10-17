@@ -26,19 +26,12 @@ package com.codename1.io;
 
 import com.codename1.components.InfiniteProgress;
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Externalizable;
-import com.codename1.io.IOProgressListener;
-import com.codename1.io.FileSystemStorage;
-import com.codename1.io.Storage;
 import com.codename1.io.gzip.GZConnectionRequest;
-import com.codename1.l10n.DateFormat;
-import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.ParseException;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
-import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionListener;
@@ -50,6 +43,7 @@ import com.codename1.util.FailureCallback;
 import com.codename1.util.OnComplete;
 import com.codename1.util.SuccessCallback;
 import com.codename1.util.Wrapper;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -77,26 +71,36 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class Util {
+    private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis());
     private static CodenameOneImplementation implInstance;
     private static Hashtable externalizables = new Hashtable();
-
     private static boolean charArrayBugTested;
     private static boolean charArrayBug;
-    private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis()); 
-
-    static {
-        register("EncodedImage", EncodedImage.class);
-    }
-    
     /**
      * Fix for RFE 427: http://java.net/jira/browse/LWUIT-427
      * Allows determining chars that should not be encoded
      */
     private static String ignoreCharsWhenEncoding = "";
+    private static SimpleDateFormat dateFormatter;
+
+    static {
+        register("EncodedImage", EncodedImage.class);
+    }
 
     /**
-     *  These chars will not be encoded by the encoding method in this class
+     * These chars will not be encoded by the encoding method in this class
      * as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
+     *
+     * @return chars skipped
+     */
+    public static String getIgnorCharsWhileEncoding() {
+        return ignoreCharsWhenEncoding;
+    }
+
+    /**
+     * These chars will not be encoded by the encoding method in this class
+     * as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
+     *
      * @param s set of characters to skip when encoding
      */
     public static void setIgnorCharsWhileEncoding(String s) {
@@ -104,19 +108,9 @@ public class Util {
     }
 
     /**
-     *  These chars will not be encoded by the encoding method in this class
-     * as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
-     * @return chars skipped
-     */
-    public static String getIgnorCharsWhileEncoding() {
-        return ignoreCharsWhenEncoding;
-    }
-
-
-    /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
      * a case of an exception
-     * 
+     *
      * @param i source
      * @param o destination
      */
@@ -127,42 +121,42 @@ public class Util {
     /**
      * Copy the input stream into the output stream, without closing the streams when done
      *
-     * @param i source
-     * @param o destination
+     * @param i          source
+     * @param o          destination
      * @param bufferSize the size of the buffer, which should be a power of 2 large enough
      */
     public static void copyNoClose(InputStream i, OutputStream o, int bufferSize) throws IOException {
         copyNoClose(i, o, bufferSize, null);
     }
-    
+
     /**
      * Copy the input stream into the output stream, without closing the streams when done
      *
-     * @param i source
-     * @param o destination
+     * @param i          source
+     * @param o          destination
      * @param bufferSize the size of the buffer, which should be a power of 2 large enough
-     * @param callback called after each copy step
+     * @param callback   called after each copy step
      */
     public static void copyNoClose(InputStream i, OutputStream o, int bufferSize, IOProgressListener callback) throws IOException {
 
         byte[] buffer = new byte[bufferSize];
         int size = i.read(buffer);
         int total = 0;
-        while(size > -1) {
+        while (size > -1) {
             o.write(buffer, 0, size);
-            if(callback != null) {
+            if (callback != null) {
                 callback.ioStreamUpdate(i, total += size);
             }
             size = i.read(buffer);
         }
     }
-    
+
     /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
      * a case of an exception
      *
-     * @param i source
-     * @param o destination
+     * @param i          source
+     * @param o          destination
      * @param bufferSize the size of the buffer, which should be a power of 2 large enough
      */
     public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
@@ -186,7 +180,7 @@ public class Util {
 
     /**
      * Reads an input stream to a string
-     * 
+     *
      * @param i the input stream
      * @return a UTF-8 string
      * @throws IOException thrown by the stream
@@ -194,41 +188,40 @@ public class Util {
     public static String readToString(InputStream i) throws IOException {
         return readToString(i, "UTF-8");
     }
-    
+
     /**
      * Reads the contents of a file to a string.
-     * @param file The file to read.
+     *
+     * @param file    The file to read.
      * @param charset The Charset to use to write the file.
      * @return The string read from the file.
-     * 
      * @throws IOException If the file does not exist, or cannot be read for some reason.
-     * 
      * @since 8.0
      */
     public static String readToString(File file, String charset) throws IOException {
         if (charset == null) charset = "UTF-8";
         if (!file.exists()) {
-            throw new IOException("Failed to read file "+file+" because it does not exist.");
+            throw new IOException("Failed to read file " + file + " because it does not exist.");
         }
         return Util.readToString(FileSystemStorage.getInstance().openInputStream(file.getAbsolutePath()), charset);
     }
-    
+
     /**
      * Reads the contents of a file to a string.  Uses UTF-8 encoding.
+     *
      * @param file The file to read.
      * @return The string read from the file.
-     * 
      * @throws IOException If the file does not exist, or cannot be read for some reason.
-     * 
      * @since 8.0
      */
     public static String readToString(File file) throws IOException {
         return readToString(file, "UTF-8");
     }
-    
+
     /**
      * Writes a string to a file using UTF-8 encoding.
-     * @param file The file to write to.
+     *
+     * @param file     The file to write to.
      * @param contents The contents to write to the file.
      * @throws IOException If it cannot write to the file for some reason.
      * @since 8.0
@@ -236,17 +229,18 @@ public class Util {
     public static void writeStringToFile(File file, String contents) throws IOException {
         writeStringToFile(file, contents, "UTF-8");
     }
-    
+
     /**
      * Writes a string to a file.
-     * @param file The file to write to.
+     *
+     * @param file     The file to write to.
      * @param contents The contents to write to the file.
-     * @param charset The charset to use.  If null, it defaults to UTF-8
+     * @param charset  The charset to use.  If null, it defaults to UTF-8
      * @throws IOException If it cannot write to the file for some reason.
      * @since 8.0
      */
     public static void writeStringToFile(File file, String contents, String charset) throws IOException {
-        if (charset == null) charset= "UTF-8";
+        if (charset == null) charset = "UTF-8";
         OutputStream output = null;
         try {
             output = FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());
@@ -255,15 +249,16 @@ public class Util {
             if (output != null) {
                 try {
                     output.close();
-                } catch (Exception ex){}
+                } catch (Exception ex) {
+                }
             }
         }
     }
 
     /**
      * Reads an input stream to a string
-     * 
-     * @param i the input stream
+     *
+     * @param i        the input stream
      * @param encoding the encoding of the stream
      * @return a string
      * @throws IOException thrown by the stream
@@ -272,11 +267,11 @@ public class Util {
         byte[] b = readInputStream(i);
         return new String(b, 0, b.length, encoding);
     }
-    
+
     /**
      * Reads a reader to a string
-     * 
-     * @param i the input stream
+     *
+     * @param i        the input stream
      * @param encoding the encoding of the stream
      * @return a string
      * @throws IOException thrown by the stream
@@ -311,7 +306,6 @@ public class Util {
      * </p>
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
-     *
      * @param e the externalizable instance
      */
     public static void register(Externalizable e) {
@@ -327,7 +321,7 @@ public class Util {
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param id id of the externalizable
-     * @param c the class for the externalizable
+     * @param c  the class for the externalizable
      */
     public static void register(String id, Class c) {
         externalizables.put(id, c);
@@ -336,158 +330,158 @@ public class Util {
     /**
      * <p>Writes an object to the given output stream, notice that it should be externalizable or one of
      * the supported types.</p>
-     * 
+     *
      * <p>
      * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
      * </p>
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
-     * @param o the object to write which can be null
+     * @param o   the object to write which can be null
      * @param out the destination output stream
      * @throws IOException thrown by the stream
      */
     public static void writeObject(Object o, DataOutputStream out) throws IOException {
-        if(o == null) {
+        if (o == null) {
             out.writeBoolean(false);
             return;
         }
         out.writeBoolean(true);
-        if(o instanceof Externalizable) {
-            Externalizable e = (Externalizable)o;
+        if (o instanceof Externalizable) {
+            Externalizable e = (Externalizable) o;
             out.writeUTF(e.getObjectId());
             out.writeInt(e.getVersion());
             e.externalize(out);
             return;
         }
-        if(o instanceof PropertyBusinessObject) {
-            Externalizable e = ((PropertyBusinessObject)o).getPropertyIndex().asExternalizable();
+        if (o instanceof PropertyBusinessObject) {
+            Externalizable e = ((PropertyBusinessObject) o).getPropertyIndex().asExternalizable();
             out.writeUTF(e.getObjectId());
             out.writeInt(e.getVersion());
             e.externalize(out);
             return;
         }
 
-        if(o instanceof Vector) {
-            Vector v = (Vector)o;
+        if (o instanceof Vector) {
+            Vector v = (Vector) o;
             out.writeUTF("java.util.Vector");
             int size = v.size();
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 writeObject(v.elementAt(iter), out);
             }
             return;
         }
 
-        if(o instanceof Set) {
-            Collection v = (Collection)o;
+        if (o instanceof Set) {
+            Collection v = (Collection) o;
             out.writeUTF("java.util.Set");
             int size = v.size();
             out.writeInt(size);
-            for(Object cur : v) {
+            for (Object cur : v) {
                 writeObject(cur, out);
             }
             return;
         }
 
-        if(o instanceof Collection) {
-            Collection v = (Collection)o;
+        if (o instanceof Collection) {
+            Collection v = (Collection) o;
             out.writeUTF("java.util.Collection");
             int size = v.size();
             out.writeInt(size);
-            for(Object cur : v) {
+            for (Object cur : v) {
                 writeObject(cur, out);
             }
             return;
         }
 
-        if(o instanceof Hashtable) {
-            Hashtable v = (Hashtable)o;
+        if (o instanceof Hashtable) {
+            Hashtable v = (Hashtable) o;
             out.writeUTF("java.util.Hashtable");
             out.writeInt(v.size());
             Enumeration k = v.keys();
-            while(k.hasMoreElements()) {
+            while (k.hasMoreElements()) {
                 Object key = k.nextElement();
                 writeObject(key, out);
                 writeObject(v.get(key), out);
             }
             return;
         }
-        if(o instanceof Map) {
-            Map v = (Map)o;
+        if (o instanceof Map) {
+            Map v = (Map) o;
             out.writeUTF("java.util.Map");
             out.writeInt(v.size());
-            for(Object key : v.keySet()) {
+            for (Object key : v.keySet()) {
                 writeObject(key, out);
                 writeObject(v.get(key), out);
             }
             return;
         }
 
-        if(o instanceof String) {
-            String v = (String)o;
+        if (o instanceof String) {
+            String v = (String) o;
             out.writeUTF("String");
             out.writeUTF(v);
             return;
         }
 
-        if(o instanceof Date) {
-            Date v = (Date)o;
+        if (o instanceof Date) {
+            Date v = (Date) o;
             out.writeUTF("Date");
             out.writeLong(v.getTime());
             return;
         }
 
-        if(o instanceof Integer) {
-            Integer v = (Integer)o;
+        if (o instanceof Integer) {
+            Integer v = (Integer) o;
             out.writeUTF("int");
             out.writeInt(v.intValue());
             return;
         }
-        if(o instanceof Long) {
-            Long v = (Long)o;
+        if (o instanceof Long) {
+            Long v = (Long) o;
             out.writeUTF("long");
             out.writeLong(v.longValue());
             return;
         }
 
-        if(o instanceof Byte) {
-            Byte v = (Byte)o;
+        if (o instanceof Byte) {
+            Byte v = (Byte) o;
             out.writeUTF("byte");
             out.writeByte(v.byteValue());
             return;
         }
 
-        if(o instanceof Short) {
-            Short v = (Short)o;
+        if (o instanceof Short) {
+            Short v = (Short) o;
             out.writeUTF("short");
             out.writeShort(v.shortValue());
             return;
         }
 
-        if(o instanceof Float) {
-            Float v = (Float)o;
+        if (o instanceof Float) {
+            Float v = (Float) o;
             out.writeUTF("float");
             out.writeFloat(v.floatValue());
             return;
         }
 
-        if(o instanceof Double) {
-            Double v = (Double)o;
+        if (o instanceof Double) {
+            Double v = (Double) o;
             out.writeUTF("double");
             out.writeDouble(v.doubleValue());
             return;
         }
 
-        if(o instanceof Boolean) {
-            Boolean v = (Boolean)o;
+        if (o instanceof Boolean) {
+            Boolean v = (Boolean) o;
             out.writeUTF("bool");
             out.writeBoolean(v.booleanValue());
             return;
         }
-        
+
         if (o instanceof EncodedImage) {
             out.writeUTF("EncodedImage");
-            EncodedImage e = (EncodedImage)o;
+            EncodedImage e = (EncodedImage) o;
             out.writeInt(e.getWidth());
             out.writeInt(e.getHeight());
             out.writeBoolean(e.isOpaque());
@@ -496,71 +490,71 @@ public class Util {
             out.write(b);
             return;
         }
-        
-        if(instanceofObjArray(o)) {
-            Object[] v = (Object[])o;
+
+        if (instanceofObjArray(o)) {
+            Object[] v = (Object[]) o;
             out.writeUTF("ObjectArray");
             int size = v.length;
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 writeObject(v[iter], out);
             }
             return;
         }
-        if(instanceofByteArray(o)) {
-            byte[] v = (byte[])o;
+        if (instanceofByteArray(o)) {
+            byte[] v = (byte[]) o;
             out.writeUTF("ByteArray");
             int size = v.length;
             out.writeInt(size);
             out.write(v);
             return;
         }
-        if(instanceofShortArray(o)) {
-            short[] v = (short[])o;
+        if (instanceofShortArray(o)) {
+            short[] v = (short[]) o;
             out.writeUTF("ShortArray");
             int size = v.length;
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 out.writeShort(v[iter]);
             }
             return;
         }
-        if(instanceofDoubleArray(o)) {
-            double[] v = (double[])o;
+        if (instanceofDoubleArray(o)) {
+            double[] v = (double[]) o;
             out.writeUTF("DoubleArray");
             int size = v.length;
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 out.writeDouble(v[iter]);
             }
             return;
         }
-        if(instanceofFloatArray(o)) {
-            float[] v = (float[])o;
+        if (instanceofFloatArray(o)) {
+            float[] v = (float[]) o;
             out.writeUTF("FloatArray");
             int size = v.length;
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 out.writeFloat(v[iter]);
             }
             return;
         }
-        if(instanceofIntArray(o)) {
-            int[] v = (int[])o;
+        if (instanceofIntArray(o)) {
+            int[] v = (int[]) o;
             out.writeUTF("IntArray");
             int size = v.length;
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 out.writeInt(v[iter]);
             }
             return;
         }
-        if(instanceofLongArray(o)) {
-            long[] v = (long[])o;
+        if (instanceofLongArray(o)) {
+            long[] v = (long[]) o;
             out.writeUTF("LongArray");
             int size = v.length;
             out.writeInt(size);
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 out.writeLong(v[iter]);
             }
             return;
@@ -572,82 +566,82 @@ public class Util {
 
     /**
      * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     * 
+     *
      * @param o object to test
      * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
      * once the bug is fixed
      */
     public static boolean instanceofObjArray(Object o) {
         return getImplementation().instanceofObjArray(o);
     }
-    
+
     /**
      * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     * 
+     *
      * @param o object to test
      * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
      * once the bug is fixed
      */
     public static boolean instanceofByteArray(Object o) {
         return getImplementation().instanceofByteArray(o);
     }
-    
+
     /**
      * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     * 
+     *
      * @param o object to test
      * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
      * once the bug is fixed
      */
     public static boolean instanceofShortArray(Object o) {
         return getImplementation().instanceofShortArray(o);
     }
-    
+
     /**
      * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     * 
+     *
      * @param o object to test
      * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
      * once the bug is fixed
      */
     public static boolean instanceofLongArray(Object o) {
         return getImplementation().instanceofLongArray(o);
     }
-    
+
     /**
      * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     * 
+     *
      * @param o object to test
      * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
      * once the bug is fixed
      */
     public static boolean instanceofIntArray(Object o) {
         return getImplementation().instanceofIntArray(o);
     }
-    
+
     /**
      * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     * 
+     *
      * @param o object to test
      * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
      * once the bug is fixed
      */
     public static boolean instanceofFloatArray(Object o) {
         return getImplementation().instanceofFloatArray(o);
     }
-    
+
     /**
      * This method allows working around <a href="http://code.google.com/p/codenameone/issues/detail?id=58">issue 58</a>
-     * 
+     *
      * @param o object to test
      * @return true if it matches the state
-     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed 
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
      * once the bug is fixed
      */
     public static boolean instanceofDoubleArray(Object o) {
@@ -655,7 +649,7 @@ public class Util {
     }
 
     /**
-     * <p>Reads an object from the stream, notice that this is the inverse of the 
+     * <p>Reads an object from the stream, notice that this is the inverse of the
      * {@link #writeObject(java.lang.Object, java.io.DataOutputStream)}.</p>
      *
      * <p>
@@ -764,7 +758,7 @@ public class Util {
             if ("java.util.Hashtable".equals(type)) {
                 Hashtable v = new Hashtable();
                 int size = input.readInt();
-                for(int iter = 0 ; iter < size ; iter++) {
+                for (int iter = 0; iter < size; iter++) {
                     v.put(readObject(input), readObject(input));
                 }
                 return v;
@@ -788,7 +782,7 @@ public class Util {
             if ("java.util.Map".equals(type)) {
                 Map v = new HashMap();
                 int size = input.readInt();
-                for(int iter = 0 ; iter < size ; iter++) {
+                for (int iter = 0; iter < size; iter++) {
                     v.put(readObject(input), readObject(input));
                 }
                 return v;
@@ -804,12 +798,12 @@ public class Util {
             Class cls = (Class) externalizables.get(type);
             if (cls != null) {
                 Object o = cls.newInstance();
-                if(o instanceof Externalizable) {
-                    Externalizable ex = (Externalizable)o; 
+                if (o instanceof Externalizable) {
+                    Externalizable ex = (Externalizable) o;
                     ex.internalize(input.readInt(), input);
                     return ex;
                 } else {
-                    PropertyBusinessObject pb = (PropertyBusinessObject)o;
+                    PropertyBusinessObject pb = (PropertyBusinessObject) o;
                     pb.getPropertyIndex().asExternalizable().internalize(input.readInt(), input);
                     return pb;
                 }
@@ -821,7 +815,7 @@ public class Util {
         } catch (IllegalAccessException ex1) {
             Log.e(ex1);
             throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
-        } 
+        }
     }
 
     /**
@@ -833,12 +827,13 @@ public class Util {
     public static String encodeUrl(final String str) {
         return encode(str, "%20");
     }
-    
+
     /**
      * Encodes the provided string as a URL (with %20 for spaces).
-     * @param str The URL to encode
+     *
+     * @param str              The URL to encode
      * @param doNotEncodeChars A string whose characters will not be encoded.
-     * @return 
+     * @return
      */
     public static String encodeUrl(final String str, String doNotEncodeChars) {
         return encode(str.toCharArray(), "%20", doNotEncodeChars);
@@ -848,6 +843,7 @@ public class Util {
      * toCharArray should return a new array always, however some devices might
      * suffer a bug that allows mutating a String (serious security hole in the JVM)
      * hence this method simulates the proper behavior
+     *
      * @param s a string
      * @return the contents of the string as a char array guaranteed to be a copy of the current array
      */
@@ -855,13 +851,13 @@ public class Util {
         // toCharArray should return a new array always, however some devices might
         // suffer a bug that allows mutating a String (serious security hole in the JVM)
         // hence this method simulates the proper behavior
-        if(!charArrayBugTested) {
+        if (!charArrayBugTested) {
             charArrayBugTested = true;
-            if(s.toCharArray() == s.toCharArray()) {
+            if (s.toCharArray() == s.toCharArray()) {
                 charArrayBug = true;
             }
         }
-        if(charArrayBug) {
+        if (charArrayBug) {
             char[] c = new char[s.length()];
             System.arraycopy(s.toCharArray(), 0, c, 0, c.length);
             return c;
@@ -875,18 +871,18 @@ public class Util {
         }
         return encode(toCharArray(str), spaceChar);
     }
-    
+
     /**
      * Decodes a String URL encoded URL
-     * 
-     * @param s the string
-     * @param enc the encoding (defaults to UTF-8 if null)
+     *
+     * @param s           the string
+     * @param enc         the encoding (defaults to UTF-8 if null)
      * @param plusToSpace true if plus signs be converted to spaces
      * @return a decoded string
      */
     public static String decode(String s, String enc, boolean plusToSpace) {
         boolean modified = false;
-        if(enc == null || enc.length() == 0) {
+        if (enc == null || enc.length() == 0) {
             enc = "UTF-8";
         }
         int numChars = s.length();
@@ -899,7 +895,7 @@ public class Util {
             c = s.charAt(i);
             switch (c) {
                 case '+':
-                    if(plusToSpace) {
+                    if (plusToSpace) {
                         sb.append(' ');
                     } else {
                         sb.append('+');
@@ -913,7 +909,7 @@ public class Util {
                         if (bytes == null) {
                             bytes = new byte[(numChars - i) / 3];
                         }
-                        
+
                         int pos = 0;
 
                         while (((i + 2) < numChars) && (c == '%')) {
@@ -930,13 +926,11 @@ public class Util {
 
                         try {
                             sb.append(new String(bytes, 0, pos, enc));
-                        }
-                        catch (UnsupportedEncodingException e) {
+                        } catch (UnsupportedEncodingException e) {
                             throw new RuntimeException(e.toString());
                         }
-                    }
-                    catch (NumberFormatException e) {
-                            throw new IllegalArgumentException("Illegal URL encoding: " + s);
+                    } catch (NumberFormatException e) {
+                        throw new IllegalArgumentException("Illegal URL encoding: " + s);
                     }
                     modified = true;
                     break;
@@ -948,25 +942,25 @@ public class Util {
             }
         }
 
-        if(modified) {
+        if (modified) {
             return sb.toString();
         }
         return s;
     }
-   
+
     private static String encode(char[] buf, String spaceChar) {
         return encode(buf, spaceChar, null);
     }
-    
+
     private static String encode(char[] buf, String spaceChar, String doNotEncode) {
         final StringBuilder sbuf = new StringBuilder(buf.length * 3);
         int blen = buf.length;
         for (int i = 0; i < blen; i++) {
             final char ch = buf[i];
-            
+
             if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') ||
                     (ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '!'
-          || ch == '*' || ch == '\'' || ch == '(' || ch == ')' || ignoreCharsWhenEncoding.indexOf(ch) > -1) || (doNotEncode != null && doNotEncode.indexOf(ch) > -1)) {
+                            || ch == '*' || ch == '\'' || ch == '(' || ch == ')' || ignoreCharsWhenEncoding.indexOf(ch) > -1) || (doNotEncode != null && doNotEncode.indexOf(ch) > -1)) {
                 sbuf.append(ch);
             } else if (ch == ' ') {
                 sbuf.append(spaceChar);
@@ -996,8 +990,8 @@ public class Util {
      */
     public static String encodeUrl(final byte[] buf) {
         char[] b = new char[buf.length];
-        for(int iter = 0 ; iter < buf.length ; iter++) {
-            b[iter] = (char)buf[iter];
+        for (int iter = 0; iter < buf.length; iter++) {
+            b[iter] = (char) buf[iter];
         }
         return encode(b, "%20");
     }
@@ -1032,8 +1026,8 @@ public class Util {
     public static String encodeBody(final byte[] buf) {
         char[] b = new char[buf.length];
         int blen = buf.length;
-        for(int iter = 0 ; iter < blen ; iter++) {
-            b[iter] = (char)buf[iter];
+        for (int iter = 0; iter < blen; iter++) {
+            b[iter] = (char) buf[iter];
         }
         return encode(b, "+");
     }
@@ -1041,19 +1035,19 @@ public class Util {
     private static void appendHex(StringBuilder sbuf, char ch) {
         int firstLiteral = ch / 256;
         int secLiteral = ch % 256;
-        if(firstLiteral == 0 && secLiteral < 127) {
+        if (firstLiteral == 0 && secLiteral < 127) {
             sbuf.append("%");
             String s = Integer.toHexString(secLiteral).toUpperCase();
-            if(s.length() == 1) {
+            if (s.length() == 1) {
                 sbuf.append("0");
-            } 
+            }
             sbuf.append(s);
             return;
         }
         if (ch <= 0x07ff) {
             // 2 literals unicode
-            firstLiteral = 192 + (firstLiteral << 2) +(secLiteral >> 6);
-            secLiteral=128+(secLiteral & 63);
+            firstLiteral = 192 + (firstLiteral << 2) + (secLiteral >> 6);
+            secLiteral = 128 + (secLiteral & 63);
             sbuf.append("%");
             sbuf.append(Integer.toHexString(firstLiteral).toUpperCase());
             sbuf.append("%");
@@ -1062,7 +1056,7 @@ public class Util {
             // 3 literals unicode
             int thirdLiteral = 128 + (secLiteral & 63);
             secLiteral = 128 + ((firstLiteral % 16) << 2) + (secLiteral >> 6);
-            firstLiteral=224+(firstLiteral>>4);
+            firstLiteral = 224 + (firstLiteral >> 4);
             sbuf.append("%");
             sbuf.append(Integer.toHexString(firstLiteral).toUpperCase());
             sbuf.append("%");
@@ -1075,12 +1069,12 @@ public class Util {
     /**
      * Converts a relative url e.g.: /myfile.html to an absolute url
      *
-     * @param baseURL a source URL whose properties should be used to construct the actual URL
+     * @param baseURL     a source URL whose properties should be used to construct the actual URL
      * @param relativeURL relative address
      * @return an absolute URL
      */
     public static String relativeToAbsolute(String baseURL, String relativeURL) {
-        if(relativeURL.startsWith("/")) {
+        if (relativeURL.startsWith("/")) {
             return getURLProtocol(baseURL) + "://" + getURLHost(baseURL) + relativeURL;
         } else {
             return getURLProtocol(baseURL) + "://" + getURLHost(baseURL) + getURLBasePath(baseURL) + relativeURL;
@@ -1109,7 +1103,7 @@ public class Util {
      */
     public static String getURLHost(String url) {
         int start = url.indexOf("://");
-        int end  = url.indexOf('/', start + 3);
+        int end = url.indexOf('/', start + 3);
         if (end != -1) {
             return url.substring(start + 3, end);
         } else {
@@ -1124,13 +1118,12 @@ public class Util {
      * @return the path within the host
      */
     public static String getURLPath(String url) {
-        int start  = url.indexOf('/', url.indexOf("://") + 3);
+        int start = url.indexOf('/', url.indexOf("://") + 3);
         if (start != -1) {
             return url.substring(start + 1);
-        } 
+        }
         return "/";
     }
-
 
     /**
      * Returns the URL's base path, which is the same as the path only without an ending file e.g.:
@@ -1140,8 +1133,8 @@ public class Util {
      * @return the path within the host
      */
     public static String getURLBasePath(String url) {
-        int start  = url.indexOf('/', url.indexOf("://") + 3);
-        int end  = url.lastIndexOf('/');
+        int start = url.indexOf('/', url.indexOf("://") + 3);
+        int end = url.lastIndexOf('/');
         if (start != -1 && end > start) {
             return url.substring(start, end + 1);
         }
@@ -1156,7 +1149,7 @@ public class Util {
      * @throws java.io.IOException
      */
     public static void writeUTF(String s, DataOutputStream d) throws IOException {
-        if(s == null) {
+        if (s == null) {
             d.writeBoolean(false);
             return;
         }
@@ -1172,20 +1165,20 @@ public class Util {
      * @throws java.io.IOException
      */
     public static String readUTF(DataInputStream d) throws IOException {
-        if(d.readBoolean()) {
+        if (d.readBoolean()) {
             return d.readUTF();
         }
         return null;
     }
-    
+
     /**
      * The read fully method from data input stream is very useful for all types of
      * streams...
      *
-     * @param      b   the buffer into which the data is read.
-     * @exception  IOException   the stream has been closed and the contained
-     * 		   input stream does not support reading after close, or
-     * 		   another I/O error occurs.
+     * @param b the buffer into which the data is read.
+     * @throws IOException the stream has been closed and the contained
+     *                     input stream does not support reading after close, or
+     *                     another I/O error occurs.
      */
     public static void readFully(InputStream i, byte b[]) throws IOException {
         readFully(i, b, 0, b.length);
@@ -1195,19 +1188,19 @@ public class Util {
      * The read fully method from data input stream is very useful for all types of
      * streams...
      *
-     * @param      b     the buffer into which the data is read.
-     * @param      off   the start offset of the data.
-     * @param      len   the number of bytes to read.
-     * @exception  IOException   the stream has been closed and the contained
-     * 		   input stream does not support reading after close, or
-     * 		   another I/O error occurs.
+     * @param b   the buffer into which the data is read.
+     * @param off the start offset of the data.
+     * @param len the number of bytes to read.
+     * @throws IOException the stream has been closed and the contained
+     *                     input stream does not support reading after close, or
+     *                     another I/O error occurs.
      */
     public static final void readFully(InputStream i, byte b[], int off, int len) throws IOException {
         if (len < 0) {
             throw new IndexOutOfBoundsException();
         }
         int n = 0;
-    	while (n < len) {
+        while (n < len) {
             int count = i.read(b, off + n, len - n);
             if (count < 0) {
                 throw new EOFException();
@@ -1219,11 +1212,11 @@ public class Util {
     /**
      * Reads until the array is full or until the stream ends
      *
-     * @param      b     the buffer into which the data is read.
-     * @return     the amount read
-     * @exception  IOException   the stream has been closed and the contained
-     * 		   input stream does not support reading after close, or
-     * 		   another I/O error occurs.
+     * @param b the buffer into which the data is read.
+     * @return the amount read
+     * @throws IOException the stream has been closed and the contained
+     *                     input stream does not support reading after close, or
+     *                     another I/O error occurs.
      */
     public static int readAll(InputStream i, byte b[]) throws IOException {
         int len = b.length;
@@ -1239,14 +1232,15 @@ public class Util {
     }
 
     /**
-     * Provides a utility method breaks a given String to array of String according 
+     * Provides a utility method breaks a given String to array of String according
      * to the given separator
-     * @param original the String to break
+     *
+     * @param original  the String to break
      * @param separator the pattern to look in the original String
      * @return array of Strings from the original String
      */
     public static String[] split(String original, String separator) {
-        
+
         Vector nodes = new Vector();
 
         int index = original.indexOf(separator);
@@ -1256,27 +1250,27 @@ public class Util {
             index = original.indexOf(separator);
         }
         nodes.addElement(original);
-        
-        String [] ret = new String[nodes.size()];
-         for (int i = 0; i < nodes.size(); i++) {
-             ret[i] = (String) nodes.elementAt(i);             
-         }
+
+        String[] ret = new String[nodes.size()];
+        for (int i = 0; i < nodes.size(); i++) {
+            ret[i] = (String) nodes.elementAt(i);
+        }
         return ret;
     }
-     
+
+    static CodenameOneImplementation getImplementation() {
+        return implInstance;
+    }
+
     /**
      * Invoked internally from Display, this method is for internal use only
-     * 
+     *
      * @param impl implementation instance
      */
     public static void setImplementation(CodenameOneImplementation impl) {
         implInstance = impl;
     }
-    
-    static CodenameOneImplementation getImplementation() { 
-        return implInstance;
-    }
-    
+
     /**
      * Merges arrays into one larger array
      */
@@ -1284,42 +1278,45 @@ public class Util {
         System.arraycopy(arr1, 0, destinationArray, 0, arr1.length);
         System.arraycopy(arr2, 0, destinationArray, arr1.length, arr2.length);
     }
-    
+
     /**
      * Removes the object at the source array offset and copies all other objects to the destination array
-     * @param sourceArray the source array
+     *
+     * @param sourceArray      the source array
      * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
-     * @param o the object to remove from the array
+     * @param o                the object to remove from the array
      */
     public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, Object o) {
         int off = indexOf(sourceArray, o);
         removeObjectAtOffset(sourceArray, destinationArray, off);
     }
-    
+
     /**
      * Removes the object at the source array offset and copies all other objects to the destination array
-     * @param sourceArray the source array
+     *
+     * @param sourceArray      the source array
      * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
-     * @param offset the offset of the array
+     * @param offset           the offset of the array
      */
     public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset) {
         System.arraycopy(sourceArray, 0, destinationArray, 0, offset);
         System.arraycopy(sourceArray, offset + 1, destinationArray, offset, sourceArray.length - offset - 1);
     }
-    
+
     /**
-     * Inserts the object at the destination array offset 
-     * @param sourceArray the source array
+     * Inserts the object at the destination array offset
+     *
+     * @param sourceArray      the source array
      * @param destinationArray the resulting array which should be of the length sourceArray.length + 1
-     * @param offset the offset of the array
-     * @param o the object
+     * @param offset           the offset of the array
+     * @param o                the object
      */
     public static void insertObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset, Object o) {
-        if(offset == 0) {
+        if (offset == 0) {
             destinationArray[0] = o;
             System.arraycopy(sourceArray, 0, destinationArray, 1, sourceArray.length);
         } else {
-            if(offset == sourceArray.length) {
+            if (offset == sourceArray.length) {
                 System.arraycopy(sourceArray, 0, destinationArray, 0, sourceArray.length);
                 destinationArray[sourceArray.length] = o;
             } else {
@@ -1333,25 +1330,27 @@ public class Util {
     /**
      * Finds the object at the given offset while using the == operator and not the equals method call, it doesn't
      * rely on the ordering of the elements like the Arrays method.
-     * @param arr the array
+     *
+     * @param arr   the array
      * @param value the value to search
      * @return the offset or -1
      */
     public static int indexOf(Object[] arr, Object value) {
         int l = arr.length;
-        for(int iter = 0 ; iter < l ; iter++) {
-            if(arr[iter] == value) {
+        for (int iter = 0; iter < l; iter++) {
+            if (arr[iter] == value) {
                 return iter;
             }
         }
         return -1;
     }
-    
+
     /**
-     * Blocking method that will download the given URL to storage and return when the 
+     * Blocking method that will download the given URL to storage and return when the
      * operation completes
-     * @param url the URL
-     * @param fileName the storage file name
+     *
+     * @param url          the URL
+     * @param fileName     the storage file name
      * @param showProgress whether to block the UI until download completes/fails
      * @return true on success false on error
      */
@@ -1360,10 +1359,11 @@ public class Util {
     }
 
     /**
-     * Blocking method that will download the given URL to the file system storage and return when the 
+     * Blocking method that will download the given URL to the file system storage and return when the
      * operation completes
-     * @param url the URL
-     * @param fileName the file name
+     *
+     * @param url          the URL
+     * @param fileName     the file name
      * @param showProgress whether to block the UI until download completes/fails
      * @return true on success false on error
      */
@@ -1372,13 +1372,14 @@ public class Util {
     }
 
     /**
-     * <p>Non-blocking method that will download the given URL to storage in the background and return 
+     * <p>Non-blocking method that will download the given URL to storage in the background and return
      * immediately. This method can be used to fetch data dynamically and asynchronously e.g. in this code it is used
      * to fetch book covers for the {@link com.codename1.components.ImageViewer}:</p>
-     * 
+     *
      * <script src="https://gist.github.com/codenameone/305c3f5426b0e2e80833.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" alt="Image viewer with dynamic URL fetching model" />
-     * @param url the URL
+     *
+     * @param url      the URL
      * @param fileName the storage file name
      */
     public static void downloadUrlToStorageInBackground(String url, String fileName) {
@@ -1387,7 +1388,8 @@ public class Util {
 
     /**
      * Non-blocking method that will download the given URL to file system storage in the background and return immediately
-     * @param url the URL
+     *
+     * @param url      the URL
      * @param fileName the file name
      */
     public static void downloadUrlToFileSystemInBackground(String url, String fileName) {
@@ -1396,138 +1398,146 @@ public class Util {
 
     /**
      * Non-blocking method that will download the given URL to storage in the background and return immediately
-     * @param url the URL
-     * @param fileName the storage file name
+     *
+     * @param url          the URL
+     * @param fileName     the storage file name
      * @param onCompletion invoked when download completes
      */
     public static void downloadUrlToStorageInBackground(String url, String fileName, ActionListener onCompletion) {
         downloadUrlTo(url, fileName, false, true, true, onCompletion);
     }
-    
+
     /**
      * Non-blocking method that will download the given URL to file system storage in the background and return immediately
-     * @param url the URL
-     * @param fileName the file name
+     *
+     * @param url          the URL
+     * @param fileName     the file name
      * @param onCompletion invoked when download completes
      */
     public static void downloadUrlToFileSystemInBackground(String url, String fileName, ActionListener onCompletion) {
         downloadUrlTo(url, fileName, false, true, false, onCompletion);
     }
-    
+
     /**
-     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from 
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
      * the file system.
-     * @param url The URL to download the image from.
-     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the 
-     * network request altogether.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
      * @param onSuccess Callback called on success.
-     * @param onFail Callback called if we fail to load the image.
+     * @param onFail    Callback called if we fail to load the image.
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
      * @since 3.4
-     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         implInstance.downloadImageToFileSystem(url, fileName, onSuccess, onFail);
     }
-    
-    
+
     /**
-     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from 
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
      * the file system.
-     * @param url The URL to download the image from.
-     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the 
-     * network request altogether.
+     *
+     * @param url      The URL to download the image from.
+     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+     *                 network request altogether.
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
      * @since 7.0
-     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static AsyncResource<Image> downloadImageToFileSystem(String url, String fileName) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToFileSystem(url, fileName, new SuccessCallback<Image>() {
-            @Override
-            public void onSucess(Image value) {
-                out.complete(value);
-            }
+                    @Override
+                    public void onSucess(Image value) {
+                        out.complete(value);
+                    }
 
-        },
+                },
                 new FailureCallback<Image>() {
-            @Override
-            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-                out.error(err);
-            }
-        }
+                    @Override
+                    public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                        out.error(err);
+                    }
+                }
         );
         return out;
     }
-    
+
     /**
-     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from 
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
      * the file system.
-     * @param url The URL to download the image from.
-     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the 
-     * network request altogether.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
      * @param onSuccess Callback called on success.
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback)
      * @since 3.4
-     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback) 
      */
     public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess) {
         downloadImageToFileSystem(url, fileName, onSuccess, new CallbackAdapter<Image>());
     }
-    
+
     /**
-     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from 
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
      * storage.
-     * @param url The URL to download the image from.
-     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the 
-     * network request altogether.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
      * @param onSuccess Callback called on success.
-     * @param onFail Callback called if we fail to load the image.
+     * @param onFail    Callback called if we fail to load the image.
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
      * @since 3.4
-     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         implInstance.downloadImageToStorage(url, fileName, onSuccess, onFail);
     }
-    
+
     /**
-     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from 
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
      * storage.
-     * @param url The URL to download the image from.
-     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the 
-     * network request altogether.
+     *
+     * @param url      The URL to download the image from.
+     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+     *                 network request altogether.
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
      * @since 7.0
-     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static AsyncResource<Image> downloadImageToStorage(String url, String fileName) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToStorage(url, fileName, new SuccessCallback<Image>() {
-            @Override
-            public void onSucess(Image value) {
-                out.complete(value);
-            }
+                    @Override
+                    public void onSucess(Image value) {
+                        out.complete(value);
+                    }
 
-        },
+                },
                 new FailureCallback<Image>() {
-            @Override
-            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-                out.error(err);
-            }
-        }
+                    @Override
+                    public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                        out.error(err);
+                    }
+                }
         );
         return out;
     }
-    
+
     /**
      * Downloads an image to the cache asynchronously.
-     * @param url The URL to download.
+     *
+     * @param url       The URL to download.
      * @param onSuccess Callback to run on successful completion.
-     * @param onFail Callback to run if download fails.
+     * @param onFail    Callback to run if download fails.
      */
     public static void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         implInstance.downloadImageToCache(url, onSuccess, onFail);
-        
+
     }
-    
+
     /**
      * Downloads an image to the cache asynchronously.
+     *
      * @param url The URL of the image to download.
      * @return AsyncResource to wrap the Image.
      * @since 7.0
@@ -1535,36 +1545,37 @@ public class Util {
     public static AsyncResource<Image> downloadImageToCache(String url) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToCache(url, new SuccessCallback<Image>() {
-            @Override
-            public void onSucess(Image value) {
-                out.complete(value);
-            }
+                    @Override
+                    public void onSucess(Image value) {
+                        out.complete(value);
+                    }
 
-        },
+                },
                 new FailureCallback<Image>() {
-            @Override
-            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-                out.error(err);
-            }
-        }
+                    @Override
+                    public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                        out.error(err);
+                    }
+                }
         );
         return out;
     }
-    
+
     /**
-     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from 
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
      * storage.
-     * @param url The URL to download the image from.
-     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the 
-     * network request altogether.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
      * @param onSuccess Callback called on success.
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback)
      * @since 3.4
-     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback) 
      */
     public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess) {
         downloadImageToStorage(url, fileName, onSuccess, new CallbackAdapter<Image>());
     }
-    
+
     private static boolean downloadUrlTo(String url, String fileName, boolean showProgress, boolean background, boolean storage, ActionListener callback) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
@@ -1572,19 +1583,19 @@ public class Util {
         cr.setReadResponseForErrors(false);
         cr.setDuplicateSupported(true);
         cr.setUrl(url);
-        if(callback != null) {
+        if (callback != null) {
             cr.addResponseListener(callback);
         }
-        if(storage) {
+        if (storage) {
             cr.setDestinationStorage(fileName);
         } else {
             cr.setDestinationFile(fileName);
         }
-        if(background) {
+        if (background) {
             NetworkManager.getInstance().addToQueue(cr);
             return true;
-        } 
-        if(showProgress) {
+        }
+        if (showProgress) {
             InfiniteProgress ip = new InfiniteProgress();
             Dialog d = ip.showInifiniteBlocking();
             NetworkManager.getInstance().addToQueueAndWait(cr);
@@ -1592,14 +1603,14 @@ public class Util {
         } else {
             NetworkManager.getInstance().addToQueueAndWait(cr);
         }
-        if(cr.getContentLength() > 0) {
+        if (cr.getContentLength() > 0) {
             // verify the resulting file has the same size as the content length
-            if(storage) {
-                if(Storage.getInstance().entrySize(fileName) < cr.getContentLength()) {
+            if (storage) {
+                if (Storage.getInstance().entrySize(fileName) < cr.getContentLength()) {
                     return false;
                 }
             } else {
-                if(FileSystemStorage.getInstance().getLength(fileName) < cr.getContentLength()) {
+                if (FileSystemStorage.getInstance().getLength(fileName) < cr.getContentLength()) {
                     return false;
                 }
             }
@@ -1607,95 +1618,99 @@ public class Util {
         int rc = cr.getResponseCode();
         return rc == 200 || rc == 201;
     }
-    
+
     /**
      * Shorthand method for Thread sleep that doesn't throw the stupid interrupted checked exception
+     *
      * @param t the time
      */
     public static void sleep(int t) {
         try {
             Thread.sleep(t);
-        } catch(InterruptedException e) {
+        } catch (InterruptedException e) {
         }
     }
-    
-    
+
     /**
      * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
      * includes the synchronized block to further reduce code clutter
+     *
      * @param o the object to wait on
      * @param t the time
      */
     public static void wait(Object o, int t) {
-        synchronized(o) {
+        synchronized (o) {
             try {
                 o.wait(t);
-            } catch(InterruptedException e) {
+            } catch (InterruptedException e) {
             }
         }
-    }    
-    
+    }
+
     /**
      * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
      * includes the synchronized block to further reduce code clutter
+     *
      * @param o the object to wait on
      */
     public static void wait(Object o) {
-        synchronized(o) {
+        synchronized (o) {
             try {
                 o.wait();
-            } catch(InterruptedException e) {
+            } catch (InterruptedException e) {
             }
         }
-    }    
-    
+    }
+
     /**
      * Returns true or false based on a "soft" object
+     *
      * @param val a boolean value as a Boolean object, String or number
      * @return true or false
      */
     public static boolean toBooleanValue(Object val) {
-        if(val == null) {
+        if (val == null) {
             return false;
         }
-        if(val instanceof Boolean) {
-            return ((Boolean)val).booleanValue();
+        if (val instanceof Boolean) {
+            return ((Boolean) val).booleanValue();
         }
-        if(val instanceof String) {
-            String sl = ((String)val).toLowerCase();
+        if (val instanceof String) {
+            String sl = ((String) val).toLowerCase();
             return sl.startsWith("t") || sl.equals("1");
         }
         return toIntValue(val) != 0;
     }
-    
+
     /**
      * Returns the number object as an int
+     *
      * @param number this can be a String or any number type
      * @return an int value or an exception
      */
     public static int toIntValue(Object number) {
-        if(number == null) {
+        if (number == null) {
             return 0;
         }
         // we should convert this to use Number
-        if(number instanceof Integer) {
-            return ((Integer)number).intValue();
+        if (number instanceof Integer) {
+            return ((Integer) number).intValue();
         }
-        if(number instanceof String) {
-            String n = (String)number;
-            if(n.length() == 0 || n.equals(" ")) {
+        if (number instanceof String) {
+            String n = (String) number;
+            if (n.length() == 0 || n.equals(" ")) {
                 return 0;
             }
             return Integer.parseInt(n);
         }
-        if(number instanceof Double) {
-            return ((Double)number).intValue();
+        if (number instanceof Double) {
+            return ((Double) number).intValue();
         }
-        if(number instanceof Float) {
-            return ((Float)number).intValue();
+        if (number instanceof Float) {
+            return ((Float) number).intValue();
         }
-        if(number instanceof Long) {
-            return ((Long)number).intValue();
+        if (number instanceof Long) {
+            return ((Long) number).intValue();
         }
         /*if(number instanceof Short) {
             return ((Short)number).intValue();
@@ -1703,9 +1718,9 @@ public class Util {
         if(number instanceof Byte) {
             return ((Byte)number).intValue();
         }*/
-        if(number instanceof Boolean) {
-            Boolean b = (Boolean)number;
-            if(b.booleanValue()) {
+        if (number instanceof Boolean) {
+            Boolean b = (Boolean) number;
+            if (b.booleanValue()) {
                 return 1;
             }
             return 0;
@@ -1715,28 +1730,29 @@ public class Util {
 
     /**
      * Returns the number object as a long
+     *
      * @param number this can be a String or any number type
      * @return a long value or an exception
      */
     public static long toLongValue(Object number) {
         // we should convert this to use Number
-        if(number instanceof Long) {
-            return ((Long)number).longValue();
+        if (number instanceof Long) {
+            return ((Long) number).longValue();
         }
-        if(number instanceof Integer) {
-            return ((Integer)number).longValue();
+        if (number instanceof Integer) {
+            return ((Integer) number).longValue();
         }
-        if(number instanceof String) {
-            return Long.parseLong((String)number);
+        if (number instanceof String) {
+            return Long.parseLong((String) number);
         }
-        if(number instanceof Double) {
-            return ((Double)number).longValue();
+        if (number instanceof Double) {
+            return ((Double) number).longValue();
         }
-        if(number instanceof Float) {
-            return ((Float)number).longValue();
+        if (number instanceof Float) {
+            return ((Float) number).longValue();
         }
-        if(number instanceof Date) {
-            return ((Date)number).getTime();
+        if (number instanceof Date) {
+            return ((Date) number).getTime();
         }
         /*if(number instanceof Short) {
             return ((Short)number).longValue();
@@ -1744,9 +1760,9 @@ public class Util {
         if(number instanceof Byte) {
             return ((Byte)number).longValue();
         }*/
-        if(number instanceof Boolean) {
-            Boolean b = (Boolean)number;
-            if(b.booleanValue()) {
+        if (number instanceof Boolean) {
+            Boolean b = (Boolean) number;
+            if (b.booleanValue()) {
                 return 1;
             }
             return 0;
@@ -1756,25 +1772,26 @@ public class Util {
 
     /**
      * Returns the number object as a float
+     *
      * @param number this can be a String or any number type
      * @return a float value or an exception
      */
     public static float toFloatValue(Object number) {
         // we should convert this to use Number
-        if(number instanceof Float) {
-            return ((Float)number).floatValue();
+        if (number instanceof Float) {
+            return ((Float) number).floatValue();
         }
-        if(number instanceof Long) {
-            return ((Long)number).floatValue();
+        if (number instanceof Long) {
+            return ((Long) number).floatValue();
         }
-        if(number instanceof Integer) {
-            return ((Integer)number).floatValue();
+        if (number instanceof Integer) {
+            return ((Integer) number).floatValue();
         }
-        if(number instanceof String) {
-            return Float.parseFloat((String)number);
+        if (number instanceof String) {
+            return Float.parseFloat((String) number);
         }
-        if(number instanceof Double) {
-            return ((Double)number).floatValue();
+        if (number instanceof Double) {
+            return ((Double) number).floatValue();
         }
         /*if(number instanceof Short) {
             return ((Short)number).floatValue();
@@ -1782,9 +1799,9 @@ public class Util {
         if(number instanceof Byte) {
             return ((Byte)number).floatValue();
         }*/
-        if(number instanceof Boolean) {
-            Boolean b = (Boolean)number;
-            if(b.booleanValue()) {
+        if (number instanceof Boolean) {
+            Boolean b = (Boolean) number;
+            if (b.booleanValue()) {
                 return 1;
             }
             return 0;
@@ -1794,25 +1811,26 @@ public class Util {
 
     /**
      * Returns the number object as a double
+     *
      * @param number this can be a String or any number type
      * @return a double value or an exception
      */
     public static double toDoubleValue(Object number) {
         // we should convert this to use Number
-        if(number instanceof Double) {
-            return ((Double)number).doubleValue();
+        if (number instanceof Double) {
+            return ((Double) number).doubleValue();
         }
-        if(number instanceof Float) {
-            return ((Float)number).doubleValue();
+        if (number instanceof Float) {
+            return ((Float) number).doubleValue();
         }
-        if(number instanceof Long) {
-            return ((Long)number).doubleValue();
+        if (number instanceof Long) {
+            return ((Long) number).doubleValue();
         }
-        if(number instanceof Integer) {
-            return ((Integer)number).doubleValue();
+        if (number instanceof Integer) {
+            return ((Integer) number).doubleValue();
         }
-        if(number instanceof String) {
-            return Double.parseDouble((String)number);
+        if (number instanceof String) {
+            return Double.parseDouble((String) number);
         }
         /*if(number instanceof Short) {
             return ((Short)number).doubleValue();
@@ -1820,71 +1838,71 @@ public class Util {
         if(number instanceof Byte) {
             return ((Byte)number).doubleValue();
         }*/
-        if(number instanceof Boolean) {
-            Boolean b = (Boolean)number;
-            if(b.booleanValue()) {
+        if (number instanceof Boolean) {
+            Boolean b = (Boolean) number;
+            if (b.booleanValue()) {
                 return 1;
             }
             return 0;
         }
         throw new IllegalArgumentException("Not a number: " + number);
     }
-    
-    private static SimpleDateFormat dateFormatter;
-    
+
     /**
      * Sets a custom formatter to use when toDateValue is invoked
+     *
      * @param formatter the formatter to use
      */
     public static void setDateFormatter(SimpleDateFormat formatter) {
         dateFormatter = formatter;
     }
-    
+
     /**
      * Tries to convert an arbitrary object to a date
+     *
      * @param o an object that can be a string, number or date
      * @return a Date object
      */
     public static Date toDateValue(Object o) {
-        if(o == null) {
+        if (o == null) {
             return null;
         }
-        if(o instanceof Date) {
-            return (Date)o;
+        if (o instanceof Date) {
+            return (Date) o;
         }
-        if(o instanceof String) {
-            if(dateFormatter != null) {
+        if (o instanceof String) {
+            if (dateFormatter != null) {
                 try {
-                    return dateFormatter.parse((String)o);
-                } catch(ParseException e) {
+                    return dateFormatter.parse((String) o);
+                } catch (ParseException e) {
                     // falls back to the default formatting
                     Log.e(e);
                 }
             }
             try {
-                return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse((String)o);
-            } catch(ParseException e) {
+                return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse((String) o);
+            } catch (ParseException e) {
                 throw new IllegalArgumentException("Not a supported date, we use this format 'yyyy-MM-dd'T'HH:mm:ss.SSS': " + o);
             }
         }
         return new Date(toLongValue(o));
     }
-    
+
     /**
-     * Encodes a string in a way that makes it harder to read it "as is" this makes it possible for Strings to be 
+     * Encodes a string in a way that makes it harder to read it "as is" this makes it possible for Strings to be
      * "encoded" within the app and thus harder to discover by a casual search.
-     * 
+     *
      * @param s the string to decode
      * @return the decoded string
      */
-    public  static String xorDecode(String s) {
-        try { 
+    public static String xorDecode(String s) {
+        try {
             byte[] dat = Base64.decode(s.getBytes("UTF-8"));
-            for(int iter = 0 ; iter < dat.length ; iter++) {
-                dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
+            for (int iter = 0; iter < dat.length; iter++) {
+                dat[iter] = (byte) (dat[iter] ^ (iter % 254 + 1));
             }
             return new String(dat, "UTF-8");
-        } catch(UnsupportedEncodingException err) {
+        } catch (UnsupportedEncodingException err) {
             // will never happen damn stupid exception
             err.printStackTrace();
             return null;
@@ -1893,24 +1911,24 @@ public class Util {
 
     /**
      * The inverse method of xorDecode, this is normally unnecessary and is here mostly for completeness
-     * 
+     *
      * @param s a regular string
      * @return a String that can be used in the xorDecode method
      */
     public static String xorEncode(String s) {
-        try { 
+        try {
             byte[] dat = s.getBytes("UTF-8");
-            for(int iter = 0 ; iter < dat.length ; iter++) {
-                dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
+            for (int iter = 0; iter < dat.length; iter++) {
+                dat[iter] = (byte) (dat[iter] ^ (iter % 254 + 1));
             }
             return Base64.encodeNoNewline(dat);
-        } catch(UnsupportedEncodingException err) {
+        } catch (UnsupportedEncodingException err) {
             // will never happen damn stupid exception
             err.printStackTrace();
             return null;
         }
     }
-    
+
     /**
      * Tries to determine the mime type of a file based on its first
      * bytes.Direct inspection of the bytes to determine the content type is
@@ -1918,7 +1936,7 @@ public class Util {
      * <code>http</code> server or by the file extension.
      *
      * @param sourceFile, it automatically choose Storage API or
-     * FileSystemStorage API
+     *                    FileSystemStorage API
      * @return the detected mime type, or "application/octet-stream" if the type
      * is not detected
      * @throws IOException
@@ -2127,7 +2145,7 @@ public class Util {
 
         return "application/octet-stream"; // unknown file type
     }
-    
+
     /**
      * Returns -1 if the content length is unknown, a value greater than 0 if
      * the Content-Length is known.
@@ -2146,7 +2164,7 @@ public class Util {
      *
      * @param url
      * @param checkPartialDownloadSupport if true returns -2 if the server
-     * doesn't accept partial downloads.
+     *                                    doesn't accept partial downloads.
      * @return Content-Length if known
      */
     public static long getFileSizeWithoutDownload(final String url, final boolean checkPartialDownloadSupport) {
@@ -2177,7 +2195,7 @@ public class Util {
         NetworkManager.getInstance().addToQueueAndWait(cr);
         return result.get();
     }
-    
+
     /**
      * <p>
      * Safely download the given URL to the Storage or to the FileSystemStorage:
@@ -2204,16 +2222,15 @@ public class Util {
      * <p>
      * Usage example:</p>
      * <script src="https://gist.github.com/jsfan3/554590a12c3102a3d77e17533e7eca98.js"></script>
-     * 
      *
      * @param url
-     * @param fileName must be a valid Storage file name or FileSystemStorage
-     * file path
+     * @param fileName           must be a valid Storage file name or FileSystemStorage
+     *                           file path
      * @param percentageCallback invoked (in EDT) during the download to notify
-     * the progress (from 0 to 100); it can be null if you are not interested in
-     * monitoring the progress
-     * @param filesavedCallback invoked (in EDT) only when the download is
-     * finished; if null, no action is taken
+     *                           the progress (from 0 to 100); it can be null if you are not interested in
+     *                           monitoring the progress
+     * @param filesavedCallback  invoked (in EDT) only when the download is
+     *                           finished; if null, no action is taken
      * @throws IOException
      */
     public static void downloadUrlSafely(String url, final String fileName, final OnComplete<Integer> percentageCallback, final OnComplete<String> filesavedCallback) throws IOException {
@@ -2315,8 +2332,8 @@ public class Util {
             }
         });
     }
-    
-       /**
+
+    /**
      * <p>
      * Creates a new UUID, that is a 128-bit number used to identify information
      * in computer systems. UUIDs aim to be unique for practical purposes.</p>
@@ -2365,9 +2382,8 @@ public class Util {
     /**
      * Creates a custom UUID, from the given two <code>long</code> values.
      *
-     * @param time the upper 64 bits
+     * @param time            the upper 64 bits
      * @param clockSeqAndNode the lower 64 bits
-     *
      * @return a Universally Unique Identifier in its canonical textual
      * representation
      */
@@ -2411,32 +2427,12 @@ public class Util {
         /**
          * Constructs a UUID from two <code>long</code> values.
          *
-         * @param time the upper 64 bits
+         * @param time            the upper 64 bits
          * @param clockSeqAndNode the lower 64 bits
          */
         public UUID(long time, long clockSeqAndNode) {
             this.time = time;
             this.clockSeqAndNode = clockSeqAndNode;
-        }
-
-        /**
-         * Returns this UUID as a String.
-         *
-         * @return a String, never <code>null</code>
-         */
-        @Override
-        public final String toString() {
-            return toCanonicalForm();
-        }
-
-        private String toCanonicalForm() {
-            String out = "";
-            out = append(out, (int) (time >> 32)) + '-'
-                    + append(out, (short) (time >> 16)) + '-'
-                    + append(out, (short) time) + '-'
-                    + append(out, (short) (clockSeqAndNode >> 48)) + '-'
-                    + append(out, clockSeqAndNode, 12);
-            return out;
         }
 
         private static String append(String a, short in) {
@@ -2501,6 +2497,26 @@ public class Util {
                 }
             }
             return result.substring(0, Math.min(10, result.length())).toUpperCase();
+        }
+
+        /**
+         * Returns this UUID as a String.
+         *
+         * @return a String, never <code>null</code>
+         */
+        @Override
+        public final String toString() {
+            return toCanonicalForm();
+        }
+
+        private String toCanonicalForm() {
+            String out = "";
+            out = append(out, (int) (time >> 32)) + '-'
+                    + append(out, (short) (time >> 16)) + '-'
+                    + append(out, (short) time) + '-'
+                    + append(out, (short) (clockSeqAndNode >> 48)) + '-'
+                    + append(out, clockSeqAndNode, 12);
+            return out;
         }
 
     }
