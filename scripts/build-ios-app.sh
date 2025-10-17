@@ -174,6 +174,18 @@ fi
 
 bia_log "Found generated iOS project at $PROJECT_DIR"
 
+UITEST_TEMPLATE="$SCRIPT_DIR/ios/tests/HelloCodenameOneUITests.swift.tmpl"
+if [ -f "$UITEST_TEMPLATE" ]; then
+  IOS_UITEST_DIR="$(find "$PROJECT_DIR" -maxdepth 1 -type d -name '*UITests' -print -quit 2>/dev/null || true)"
+  if [ -n "$IOS_UITEST_DIR" ]; then
+    UI_TEST_DEST="$IOS_UITEST_DIR/templateUITests.swift"
+    bia_log "Installing UI test template at $UI_TEST_DEST"
+    cp "$UITEST_TEMPLATE" "$UI_TEST_DEST"
+  else
+    bia_log "Warning: Could not locate a *UITests target directory under $PROJECT_DIR; UI tests will be skipped"
+  fi
+fi
+
 if [ -f "$PROJECT_DIR/Podfile" ]; then
   bia_log "Installing CocoaPods dependencies"
   (
@@ -185,6 +197,20 @@ if [ -f "$PROJECT_DIR/Podfile" ]; then
   )
 else
   bia_log "Podfile not found in generated project; skipping pod install"
+fi
+
+SCHEME_HELPER="$SCRIPT_DIR/ios/create-shared-scheme.py"
+if [ -f "$SCHEME_HELPER" ]; then
+  bia_log "Ensuring shared Xcode scheme exposes UI tests"
+  if command -v python3 >/dev/null 2>&1; then
+    if ! python3 "$SCHEME_HELPER" "$PROJECT_DIR" "$MAIN_NAME"; then
+      bia_log "Warning: Failed to configure shared Xcode scheme" >&2
+    fi
+  else
+    bia_log "Warning: python3 is not available; skipping shared scheme configuration" >&2
+  fi
+else
+  bia_log "Warning: Missing scheme helper script at $SCHEME_HELPER" >&2
 fi
 
 WORKSPACE=""
