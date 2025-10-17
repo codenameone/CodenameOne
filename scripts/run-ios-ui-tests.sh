@@ -266,6 +266,7 @@ if ! xcodebuild \
   -destination "$SIM_DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   -resultBundlePath "$RESULT_BUNDLE" \
+  "${XCODE_TEST_FILTERS[@]}" \
   test | tee "$TEST_LOG"; then
   ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
   exit 10

@@ -50,8 +50,8 @@ jobs:
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
     timeout-minutes: 60         # allow enough time for dependency installs and full build
     concurrency:                # ensure only one mac build runs at once
-      group: mac-ci
-      cancel-in-progress: false # queue new ones instead of canceling in-flight
+      group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
 
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
