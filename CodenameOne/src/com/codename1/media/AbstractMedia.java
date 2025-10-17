@@ -164,7 +164,53 @@ public abstract class AbstractMedia implements AsyncMedia {
 
 
         if (pendingPauseRequest != null) {
-            pendingPauseRequest.ready(new         class StateChangeListener implements ActionListener<MediaStateChangeEvent> {
+            pendingPauseRequest.ready(new SuccessCallback<AsyncMedia>() {
+                @Override
+                public void onSucess(AsyncMedia value) {
+                    if (!out.isDone()) {
+                        playAsync(out);
+                    }
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    if (!out.isDone()) {
+                        playAsync(out);
+                    }
+                }
+            });
+            pendingPauseRequest = null;
+            pendingPlayRequest = out;
+            return out;
+        }
+
+        if (pendingPlayRequest != null && pendingPlayRequest != out) {
+            pendingPlayRequest.ready(new SuccessCallback<AsyncMedia>() {
+                @Override
+                public void onSucess(AsyncMedia value) {
+                    if (!out.isDone()) {
+                        out.complete(value);
+                    }
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    if (!out.isDone()) {
+                        out.error(value);
+                    }
+                }
+            });
+            return out;
+        } else {
+            pendingPlayRequest = out;
+        }
+
+        if (getState() == State.Playing) {
+            out.complete(this);
+            return out;
+        }
+
+        class StateChangeListener implements ActionListener<MediaStateChangeEvent> {
             ActionListener<MediaErrorEvent> onError;
 
             @Override
@@ -182,53 +228,7 @@ public abstract class AbstractMedia implements AsyncMedia {
 
             }
 
-        }).except(new SuccessCallback<AsyncMedia>() {
-                @Override
-                public void onSucess(AsyncMedia value) {
-                    if (!out.isDone()) {
-                        playAsync(out);
-                    }
-                }
-            });
-            pendingPauseRequest = null;
-            pendingPlayRequest = out;
-            return out;
         }
-
-        if (pendingPlayRequest != null && pendingPlayRequest != out) {
-            pendingPlayRequest.ready(new SuccessCallback<Throwable>() {
-                @Override
-                public void onSucess(Throwable value) {
-                    if (!out.isDone()) {
-                        playAsync(out);
-                    }
-                }
-            }).except(new SuccessCallback<AsyncMedia>() {
-                @Override
-                public void onSucess(AsyncMedia value) {
-                    if (!out.isDone()) {
-                        out.complete(value);
-                    }
-                }
-            });
-            return out;
-        } else {
-            pendingPlayRequest = out;
-        }
-
-        if (getState() == State.Playing) {
-            out.complete(this);
-            return out;
-        }
-
-SuccessCallback<Throwable>() {
-                @Override
-                public void onSucess(Throwable value) {
-                    if (!out.isDone()) {
-                        out.error(value);
-                    }
-                }
-            }
         ;
         final StateChangeListener onStateChange = new StateChangeListener();
         ActionListener<MediaErrorEvent> onError = new ActionListener<MediaErrorEvent>() {
@@ -285,7 +285,52 @@ SuccessCallback<Throwable>() {
 
 
         if (pendingPlayRequest != null) {
-            pendingPlayRequest.ready(new         class StateChangeListener implements ActionListener<MediaStateChangeEvent> {
+            pendingPlayRequest.ready(new SuccessCallback<AsyncMedia>() {
+                @Override
+                public void onSucess(AsyncMedia value) {
+                    if (!out.isDone()) {
+                        pauseAsync(out);
+                    }
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    if (!out.isDone()) {
+                        pauseAsync(out);
+                    }
+                }
+            });
+            pendingPlayRequest = null;
+            pendingPauseRequest = out;
+            return out;
+        }
+        if (pendingPauseRequest != null && pendingPauseRequest != out) {
+            pendingPauseRequest.ready(new SuccessCallback<AsyncMedia>() {
+                @Override
+                public void onSucess(AsyncMedia value) {
+                    if (!out.isDone()) {
+                        out.complete(value);
+                    }
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    if (!out.isDone()) {
+                        out.error(value);
+                    }
+                }
+            });
+            return out;
+        } else {
+            pendingPauseRequest = out;
+        }
+
+        if (getState() == State.Paused) {
+            out.complete(this);
+            return out;
+        }
+
+        class StateChangeListener implements ActionListener<MediaStateChangeEvent> {
             ActionListener<MediaErrorEvent> onError;
 
             @Override
@@ -303,52 +348,7 @@ SuccessCallback<Throwable>() {
 
             }
 
-        }).except(new SuccessCallback<AsyncMedia>() {
-                @Override
-                public void onSucess(AsyncMedia value) {
-                    if (!out.isDone()) {
-                        pauseAsync(out);
-                    }
-                }
-            });
-            pendingPlayRequest = null;
-            pendingPauseRequest = out;
-            return out;
         }
-        if (pendingPauseRequest != null && pendingPauseRequest != out) {
-            pendingPauseRequest.ready(new SuccessCallback<Throwable>() {
-                @Override
-                public void onSucess(Throwable value) {
-                    if (!out.isDone()) {
-                        pauseAsync(out);
-                    }
-                }
-            }).except(new SuccessCallback<AsyncMedia>() {
-                @Override
-                public void onSucess(AsyncMedia value) {
-                    if (!out.isDone()) {
-                        out.complete(value);
-                    }
-                }
-            });
-            return out;
-        } else {
-            pendingPauseRequest = out;
-        }
-
-        if (getState() == State.Paused) {
-            out.complete(this);
-            return out;
-        }
-
-SuccessCallback<Throwable>() {
-                @Override
-                public void onSucess(Throwable value) {
-                    if (!out.isDone()) {
-                        out.error(value);
-                    }
-                }
-            }
         ;
 
         final StateChangeListener onStateChange = new StateChangeListener();
