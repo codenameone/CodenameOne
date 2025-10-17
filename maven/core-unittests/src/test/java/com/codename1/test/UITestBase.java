@@ -40,7 +40,7 @@ public abstract class UITestBase {
         when(implementation.getDefaultFont()).thenReturn(new Object());
         when(implementation.isInitialized()).thenReturn(true);
         when(implementation.getCommandBehavior()).thenReturn(Display.COMMAND_BEHAVIOR_DEFAULT);
-        when(implementation.isNativeFontSchemeSupported()).thenReturn(false);
+        when(implementation.isNativeFontSchemeSupported()).thenReturn(true);
         when(implementation.loadTrueTypeFont(anyString(), anyString())).thenAnswer(invocation -> new Object());
         when(implementation.deriveTrueTypeFont(any(), anyFloat(), anyInt())).thenAnswer(invocation -> new Object());
         when(implementation.loadNativeFont(anyString())).thenAnswer(invocation -> new Object());
