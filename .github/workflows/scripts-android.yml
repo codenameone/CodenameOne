@@ -9,8 +9,8 @@ name: Test Android build scripts
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
-      - 'scripts/android/lib/**/*.py'
-      - 'scripts/android/tests/**/*.py'
+      - 'scripts/android/lib/**/*.java'
+      - 'scripts/android/tests/**/*.java'
       - 'scripts/android/screenshots/**'
       - '!scripts/android/screenshots/**/*.md'
       - 'scripts/templates/**'
@@ -30,8 +30,8 @@ name: Test Android build scripts
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
-      - 'scripts/android/lib/**/*.py'
-      - 'scripts/android/tests/**/*.py'
+      - 'scripts/android/lib/**/*.java'
+      - 'scripts/android/tests/**/*.java'
       - 'scripts/android/screenshots/**'
       - '!scripts/android/screenshots/**/*.md'
       - 'scripts/templates/**'
@@ -70,10 +70,6 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Pillow for image processing
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pillow
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port

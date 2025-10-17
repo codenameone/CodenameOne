@@ -276,14 +276,21 @@ grep -q '^android.enableJetifier=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.
 
 APP_BUILD_GRADLE="$GRADLE_PROJECT_DIR/app/build.gradle"
 ROOT_BUILD_GRADLE="$GRADLE_PROJECT_DIR/build.gradle"
-PATCH_GRADLE_SCRIPT="$SCRIPT_DIR/android/lib/patch_gradle_files.py"
+PATCH_GRADLE_SOURCE_PATH="$SCRIPT_DIR/android/lib"
+PATCH_GRADLE_MAIN_CLASS="PatchGradleFiles"
 
-if [ ! -x "$PATCH_GRADLE_SCRIPT" ]; then
-  ba_log "Missing gradle patch helper: $PATCH_GRADLE_SCRIPT" >&2
+if [ ! -f "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" ]; then
+  ba_log "Missing gradle patch helper: $PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" >&2
   exit 1
 fi
 
-python3 "$PATCH_GRADLE_SCRIPT" \
+PATCH_GRADLE_JAVA="${JAVA17_HOME}/bin/java"
+if [ ! -x "$PATCH_GRADLE_JAVA" ]; then
+  ba_log "JDK 17 java binary missing at $PATCH_GRADLE_JAVA" >&2
+  exit 1
+fi
+
+"$PATCH_GRADLE_JAVA" "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" \
   --root "$ROOT_BUILD_GRADLE" \
   --app "$APP_BUILD_GRADLE" \
   --compile-sdk 33 \
