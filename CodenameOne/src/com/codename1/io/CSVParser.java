@@ -41,9 +41,9 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class CSVParser {
-    private char separatorChar;
+    private final char separatorChar;
     private Reader currentReader;
-    private char[] buffer = new char[8192];
+    private final char[] buffer = new char[8192];
     private int bufferSize = -1;
     private int bufferOffset;
 

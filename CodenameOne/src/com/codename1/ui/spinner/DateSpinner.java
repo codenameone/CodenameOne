@@ -258,25 +258,25 @@ public class DateSpinner extends BaseSpinner {
      */
     public Object getPropertyValue(String name) {
         if (name.equals("startYear")) {
-            return new Integer(startYear);
+            return Integer.valueOf(startYear);
         }
         if (name.equals("endYear")) {
-            return new Integer(endYear);
+            return Integer.valueOf(endYear);
         }
         if (name.equals("currentYear")) {
-            return new Integer(currentYear);
+            return Integer.valueOf(currentYear);
         }
         if (name.equals("currentDay")) {
-            return new Integer(currentDay);
+            return Integer.valueOf(currentDay);
         }
         if (name.equals("currentMonth")) {
-            return new Integer(currentMonth);
+            return Integer.valueOf(currentMonth);
         }
         if (name.equals("monthDayYear")) {
-            return new Boolean(monthDayYear);
+            return Boolean.valueOf(monthDayYear);
         }
         if (name.equals("numericMonths")) {
-            return new Boolean(numericMonths);
+            return Boolean.valueOf(numericMonths);
         }
         return null;
     }

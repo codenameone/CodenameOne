@@ -49,7 +49,7 @@ import java.util.TimerTask;
  * @author Shai Almog
  */
 public abstract class FullScreenAdService {
-    private static Object LOCK = new Object();
+    private static final Object LOCK = new Object();
     private boolean allowWithoutNetwork = true;
     private int timeout = 10000;
     private int adDisplayTime = 6000;

@@ -187,7 +187,7 @@ public class Picker extends Button {
                                 gs.setRenderingPrototype((String) renderingPrototype);
                             }
                             String[] strArr = (String[]) metaData;
-                            gs.setModel(new DefaultListModel((Object[]) strArr));
+                            gs.setModel(new DefaultListModel(strArr));
                             if (value != null) {
                                 int slen = strArr.length;
                                 for (int iter = 0; iter < slen; iter++) {
@@ -261,7 +261,7 @@ public class Picker extends Button {
                                 } else {
                                     hour = ts.getCurrentHour();
                                 }
-                                value = new Integer(hour * 60 + ts.getCurrentMinute());
+                                value = Integer.valueOf(hour * 60 + ts.getCurrentMinute());
                             } else {
                                 evt.consume();
                             }
@@ -311,8 +311,8 @@ public class Picker extends Button {
                             ts.setMinuteStep(minuteStep);
                             if (showDialog(pickerDlg, ts)) {
 
-                                value = new Long(ts.getCurrentHour() * 60 * 60 * 1000l +
-                                        ts.getCurrentMinute() * 60 * 1000l);
+                                value = Long.valueOf(ts.getCurrentHour() * 60L * 60 * 1000L +
+                                        ts.getCurrentMinute() * 60L * 1000L);
                             } else {
                                 evt.consume();
                             }
@@ -950,7 +950,7 @@ public class Picker extends Button {
             case Display.PICKER_TYPE_STRINGS:
                 if (value == null ||
                         (!Util.instanceofObjArray(value) && !(value instanceof String[]))) {
-                    setStrings(new String[]{" "});
+                    setStrings(" ");
                 }
                 break;
             case Display.PICKER_TYPE_TIME:
@@ -963,7 +963,7 @@ public class Picker extends Button {
             case Display.PICKER_TYPE_DURATION_MINUTES:
 
                 if (!(value instanceof Long)) {
-                    setDuration(0l);
+                    setDuration(0L);
                 }
                 break;
         }
@@ -1137,7 +1137,6 @@ public class Picker extends Button {
                 Log.e(ex);
                 // Failed to edit string because the previous input device would not
                 // give up control
-                return;
             }
         }
     }
@@ -1325,7 +1324,7 @@ public class Picker extends Button {
      * @param time the time value as minutes since midnight e.g. 630 is 10:30am
      */
     public void setTime(int time) {
-        value = new Integer(time);
+        value = Integer.valueOf(time);
         updateValue();
     }
 
@@ -1349,7 +1348,7 @@ public class Picker extends Button {
      * @see #getDurationMinutes()
      */
     public void setDuration(int hour, int minute) {
-        setDuration(hour * 60 * 60 * 1000l + minute * 60 * 1000l);
+        setDuration(hour * 60L * 60 * 1000L + minute * 60L * 1000L);
     }
 
     /**
@@ -1373,7 +1372,7 @@ public class Picker extends Button {
      * @see #getDurationMinutes()
      */
     public void setDuration(long duration) {
-        value = new Long(duration);
+        value = Long.valueOf(duration);
         updateValue();
     }
 
@@ -1385,7 +1384,7 @@ public class Picker extends Button {
      * @see #getDuration()
      */
     public int getDurationHours() {
-        return (int) (getDuration() / 60 / 60 / 1000l);
+        return (int) (getDuration() / 60 / 60 / 1000L);
     }
 
     /**

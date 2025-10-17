@@ -23,13 +23,13 @@ import com.codename1.ui.geom.Shape;
  * Holds A PieChart Segment
  */
 public class PieSegment {
-    private float mStartAngle;
+    private final float mStartAngle;
 
-    private float mEndAngle;
+    private final float mEndAngle;
 
-    private int mDataIndex;
+    private final int mDataIndex;
 
-    private float mValue;
+    private final float mValue;
 
 
     public PieSegment(int dataIndex, float value, float startAngle, float angle) {

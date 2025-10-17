@@ -79,7 +79,7 @@ final class Inflate {
     static final private int COMMENT = 21;
     static final private int HCRC = 22;
     static final private int FLAGS = 23;
-    static private byte[] mark = {(byte) 0, (byte) 0, (byte) 0xff, (byte) 0xff};
+    static private final byte[] mark = {(byte) 0, (byte) 0, (byte) 0xff, (byte) 0xff};
     private final ZStream z;
     int mode;                            // current inflate mode
     // mode dependent information
@@ -100,7 +100,7 @@ final class Inflate {
     GZIPHeader gheader = null;
     private int flags;
     private int need_bytes = -1;
-    private byte[] crcbuf = new byte[4];
+    private final byte[] crcbuf = new byte[4];
     private java.io.ByteArrayOutputStream tmp_string = null;
 
     Inflate(ZStream z) {
@@ -280,7 +280,7 @@ final class Inflate {
 
                     z.avail_in--;
                     z.total_in++;
-                    this.need = ((z.next_in[z.next_in_index++] & 0xff) << 24) & 0xff000000L;
+                    this.need = ((long) (z.next_in[z.next_in_index++] & 0xff) << 24) & 0xff000000L;
                     this.mode = DICT3;
                 case DICT3:
 
@@ -344,7 +344,7 @@ final class Inflate {
 
                     z.avail_in--;
                     z.total_in++;
-                    this.need = ((z.next_in[z.next_in_index++] & 0xff) << 24) & 0xff000000L;
+                    this.need = ((long) (z.next_in[z.next_in_index++] & 0xff) << 24) & 0xff000000L;
                     this.mode = CHECK3;
                 case CHECK3:
 
@@ -678,12 +678,11 @@ final class Inflate {
             if (z.avail_in == 0) {
                 throw new Return(r);
             }
-            ;
             r = f;
             z.avail_in--;
             z.total_in++;
             this.need = this.need |
-                    ((z.next_in[z.next_in_index++] & 0xff) << ((n - need_bytes) * 8));
+                    ((long) (z.next_in[z.next_in_index++] & 0xff) << ((n - need_bytes) * 8));
             need_bytes--;
         }
         if (n == 2) {
@@ -704,7 +703,6 @@ final class Inflate {
             if (z.avail_in == 0) {
                 throw new Return(r);
             }
-            ;
             r = f;
             z.avail_in--;
             z.total_in++;
@@ -725,7 +723,6 @@ final class Inflate {
             if (z.avail_in == 0) {
                 throw new Return(r);
             }
-            ;
             r = f;
             z.avail_in--;
             z.total_in++;

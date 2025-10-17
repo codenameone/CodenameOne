@@ -39,11 +39,11 @@ import java.io.InputStream;
  */
 public class StorageImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
-    private String fileName;
+    private final String fileName;
     private boolean changePending;
     private boolean imageCreated;
     private byte[] imageData;
-    private Image placeholderImage;
+    private final Image placeholderImage;
     private boolean queued;
 
     private StorageImageAsync(String fileName, Image placeholderImage) {

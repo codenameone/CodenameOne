@@ -448,9 +448,9 @@ public class WebBrowser extends Container {
 
     class Loading implements Painter, Animation {
 
-        private Form f;
+        private final Form f;
 
-        private InfiniteProgress progress = new InfiniteProgress();
+        private final InfiniteProgress progress = new InfiniteProgress();
 
         Loading(Form f) {
             this.f = f;

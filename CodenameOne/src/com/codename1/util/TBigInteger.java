@@ -89,7 +89,7 @@ class TBigInteger {
      * is represented as [ Integer.MIN_VALUE ] The magnitude array may be longer
      * than strictly necessary, which results in additional trailing zeros.
      */
-    transient int digits[];
+    transient int[] digits;
     /**
      * The length of this in measured in ints. Can be less than digits.length().
      */
@@ -312,7 +312,7 @@ class TBigInteger {
      * @param signum The sign of the number represented by {@code digits}
      * @param digits The magnitude of the number
      */
-    TBigInteger(int signum, int digits[]) {
+    TBigInteger(int signum, int[] digits) {
         if (digits.length == 0) {
             sign = 0;
             numberLength = 1;
@@ -416,7 +416,7 @@ class TBigInteger {
         }
         int intCount = exp >> 5;
         int bitN = exp & 31;
-        int resDigits[] = new int[intCount + 1];
+        int[] resDigits = new int[intCount + 1];
         resDigits[intCount] = 1 << bitN;
         return new TBigInteger(1, intCount + 1, resDigits);
     }
@@ -1094,8 +1094,8 @@ class TBigInteger {
         int quotientLength = thisLen - divisorLen + 1;
         int remainderLength = divisorLen;
         int quotientSign = ((thisSign == divisorSign) ? 1 : -1);
-        int quotientDigits[] = new int[quotientLength];
-        int remainderDigits[] = TDivision.divide(quotientDigits, quotientLength, thisDigits, thisLen, divisorDigits,
+        int[] quotientDigits = new int[quotientLength];
+        int[] remainderDigits = TDivision.divide(quotientDigits, quotientLength, thisDigits, thisLen, divisorDigits,
                 divisorLen);
         TBigInteger result0 = new TBigInteger(quotientSign, quotientLength, quotientDigits);
         TBigInteger result1 = new TBigInteger(thisSign, remainderLength, remainderDigits);
@@ -1139,7 +1139,7 @@ class TBigInteger {
             return ZERO;
         }
         int resLength = thisLen - divisorLen + 1;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
         int resSign = ((thisSign == divisorSign) ? 1 : -1);
         if (divisorLen == 1) {
             TDivision.divideArrayByInt(resDigits, digits, thisLen, divisor.digits[0]);
@@ -1172,7 +1172,7 @@ class TBigInteger {
             return this;
         }
         int resLength = divisorLen;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
         if (resLength == 1) {
             resDigits[0] = TDivision.remainderArrayByInt(digits, thisLen, divisor.digits[0]);
         } else {

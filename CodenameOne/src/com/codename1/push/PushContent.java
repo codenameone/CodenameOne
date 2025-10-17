@@ -31,9 +31,15 @@ import com.codename1.ui.Display;
  * @author Steve Hannah
  */
 public class PushContent {
-    private static String PROP_PREFIX = "com.codename1.push.prop.";
+    private static final String PROP_PREFIX = "com.codename1.push.prop.";
 
-    private String title, body, imageUrl, category, metaData, actionId, textResponse;
+    private final String title;
+    private final String body;
+    private final String imageUrl;
+    private final String category;
+    private final String metaData;
+    private final String actionId;
+    private final String textResponse;
     private int type;
 
     private PushContent() {

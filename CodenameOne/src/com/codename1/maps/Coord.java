@@ -26,7 +26,7 @@ package com.codename1.maps;
  */
 public class Coord {
 
-    private static double DELTA = 0.0000001;
+    private static final double DELTA = 0.0000001;
     private double longitude;
     private double latitude;
     // Projected to local coordinate system. False means WGS84
@@ -104,8 +104,8 @@ public class Coord {
      * {@inheritDoc}
      */
     public String toString() {
-        return new StringBuilder().append("{'longitude':").append(getLongitude()).append(", 'latitude':").
-                append(getLatitude()).append("}").toString();
+        return "{'longitude':" + getLongitude() + ", 'latitude':" +
+                getLatitude() + "}";
     }
 
     /**

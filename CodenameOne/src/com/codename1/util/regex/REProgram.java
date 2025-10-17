@@ -107,9 +107,9 @@ public class REProgram {
         // Try various compile-time optimizations if there's a program
         if (instruction != null && lenInstruction != 0) {
             // If the first node is a branch
-            if (lenInstruction >= RE.nodeSize && instruction[0 + RE.offsetOpcode] == RE.OP_BRANCH) {
+            if (lenInstruction >= RE.nodeSize && instruction[RE.offsetOpcode] == RE.OP_BRANCH) {
                 // to the end node
-                int next = (short) instruction[0 + RE.offsetNext];
+                int next = (short) instruction[RE.offsetNext];
                 if (instruction[next + RE.offsetOpcode] == RE.OP_END && lenInstruction >= (RE.nodeSize * 2)) {
                     final char nextOp = instruction[RE.nodeSize + RE.offsetOpcode];
                     // the branch starts with an atom

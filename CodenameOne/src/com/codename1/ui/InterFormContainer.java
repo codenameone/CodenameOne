@@ -45,7 +45,7 @@ import static com.codename1.ui.ComponentSelector.$;
  * @since 7.0
  */
 public class InterFormContainer extends Container {
-    private Component content;
+    private final Component content;
 
     /**
      * Creates an interform container with the provided content.

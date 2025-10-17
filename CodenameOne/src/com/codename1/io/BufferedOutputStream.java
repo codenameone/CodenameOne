@@ -36,7 +36,7 @@ public class BufferedOutputStream extends OutputStream {
     /**
      * The internal buffer where data is stored.
      */
-    protected byte buf[];
+    protected byte[] buf;
     /**
      * The number of valid bytes in the buffer. This value is always
      * in the range <tt>0</tt> through <tt>buf.length</tt>; elements
@@ -46,11 +46,11 @@ public class BufferedOutputStream extends OutputStream {
     protected int count;
     private Object connection;
     private boolean closed;
-    private OutputStream out;
+    private final OutputStream out;
     private long lastActivityTime;
     private int totalBytesWritten;
     private IOProgressListener progressListener;
-    private String name;
+    private final String name;
 
     /**
      * Creates a new buffered output stream to write data to the
@@ -179,7 +179,7 @@ public class BufferedOutputStream extends OutputStream {
      * @param len the number of bytes to write.
      * @throws IOException if an I/O error occurs.
      */
-    public synchronized void write(byte b[], int off, int len) throws IOException {
+    public synchronized void write(byte[] b, int off, int len) throws IOException {
         if (len >= buf.length) {
             /* If the request length exceeds the size of the output buffer,
             flush the output buffer and then write the data directly.
@@ -261,7 +261,7 @@ public class BufferedOutputStream extends OutputStream {
      * @param b the data to be written.
      * @throws IOException if an I/O error occurs.
      */
-    public void write(byte b[]) throws IOException {
+    public void write(byte[] b) throws IOException {
         write(b, 0, b.length);
     }
 

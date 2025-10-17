@@ -1009,9 +1009,9 @@ public class ToastBar {
         boolean hidden = true;
         Button leadButton = new Button();
         private TextArea label;
-        private InfiniteProgress progressLabel;
-        private Slider progressBar;
-        private Label icon;
+        private final InfiniteProgress progressLabel;
+        private final Slider progressBar;
+        private final Label icon;
         private Status currentlyShowing;
 
         public ToastBarComponent() {

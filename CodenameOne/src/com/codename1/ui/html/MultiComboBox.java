@@ -45,8 +45,8 @@ import java.util.Vector;
  */
 class MultiComboBox extends List {
 
-    private boolean multiple; // true if this is a multiple choice combo
-    private MultiListModel model;
+    private final boolean multiple; // true if this is a multiple choice combo
+    private final MultiListModel model;
 
     MultiComboBox(boolean multiple) {
         this(null, multiple);
@@ -145,7 +145,6 @@ class MultiComboBox extends List {
                 fireActionEvent();
             }
             repaint();
-            return;
         } else {
             super.keyReleased(keyCode);
         }
@@ -308,7 +307,7 @@ class MultiComboBox extends List {
      */
     class MultiCellRenderer extends DefaultListCellRenderer {
 
-        private MultiListModel model;
+        private final MultiListModel model;
         private boolean optgroup;
         private int bgColor = -1;
         private int fgColor = -1;

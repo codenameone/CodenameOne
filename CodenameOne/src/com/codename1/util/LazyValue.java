@@ -36,5 +36,5 @@ public interface LazyValue<T> {
      * @param args optional arguments for the creation of the lazy value
      * @return the value
      */
-    public T get(Object... args);
+    T get(Object... args);
 }

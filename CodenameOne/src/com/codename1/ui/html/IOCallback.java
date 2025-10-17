@@ -35,6 +35,6 @@ public interface IOCallback {
      * @param is      The ready InputStream
      * @param docInfo A DocumentInfo object representing the fetched InputStream
      */
-    public void streamReady(InputStream is, DocumentInfo docInfo);
+    void streamReady(InputStream is, DocumentInfo docInfo);
 
 }

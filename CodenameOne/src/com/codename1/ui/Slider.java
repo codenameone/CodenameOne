@@ -63,8 +63,8 @@ public class Slider extends Label implements ActionSource {
     private int minValue = 0;
     private boolean vertical;
     private boolean editable;
-    private EventDispatcher listeners = new EventDispatcher();
-    private EventDispatcher actionListeners = new EventDispatcher();
+    private final EventDispatcher listeners = new EventDispatcher();
+    private final EventDispatcher actionListeners = new EventDispatcher();
     private int increments = 4;
     private int previousX = -1, previousY = -1;
     private Style sliderFull;
@@ -175,7 +175,7 @@ public class Slider extends Label implements ActionSource {
                 infiniteDirection *= (-1);
             }
             if (value <= 0) {
-                value = (int) 0;
+                value = 0;
                 infiniteDirection *= (-1);
             }
             return true;
@@ -606,7 +606,7 @@ public class Slider extends Label implements ActionSource {
             switch (game) {
                 case Display.GAME_UP:
                     if (vertical) {
-                        setProgressInternal((int) (Math.min(maxValue, value + increments)));
+                        setProgressInternal(Math.min(maxValue, value + increments));
                         fireDataChanged(DataChangedListener.ADDED, value);
                     } else {
                         setHandlesInput(false);
@@ -614,7 +614,7 @@ public class Slider extends Label implements ActionSource {
                     break;
                 case Display.GAME_DOWN:
                     if (vertical) {
-                        setProgressInternal((int) (Math.max(minValue, value - increments)));
+                        setProgressInternal(Math.max(minValue, value - increments));
                         fireDataChanged(DataChangedListener.REMOVED, value);
                     } else {
                         setHandlesInput(false);
@@ -622,7 +622,7 @@ public class Slider extends Label implements ActionSource {
                     break;
                 case Display.GAME_LEFT:
                     if (!vertical) {
-                        setProgressInternal((int) (Math.max(minValue, value - increments)));
+                        setProgressInternal(Math.max(minValue, value - increments));
                         fireDataChanged(DataChangedListener.REMOVED, value);
                     } else {
                         setHandlesInput(false);
@@ -630,7 +630,7 @@ public class Slider extends Label implements ActionSource {
                     break;
                 case Display.GAME_RIGHT:
                     if (!vertical) {
-                        setProgressInternal((int) (Math.min(maxValue, value + increments)));
+                        setProgressInternal(Math.min(maxValue, value + increments));
                         fireDataChanged(DataChangedListener.ADDED, value);
                     } else {
                         setHandlesInput(false);
@@ -803,7 +803,7 @@ public class Slider extends Label implements ActionSource {
     }
 
     private class SliderActionEvent extends ActionEvent {
-        private int value;
+        private final int value;
 
         private SliderActionEvent() {
             super(Slider.this, ActionEvent.Type.PointerPressed);

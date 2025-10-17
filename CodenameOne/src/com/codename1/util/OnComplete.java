@@ -35,5 +35,5 @@ public interface OnComplete<T> {
      *
      * @param v the value of the process
      */
-    public void completed(T v);
+    void completed(T v);
 }

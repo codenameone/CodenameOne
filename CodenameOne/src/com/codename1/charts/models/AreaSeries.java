@@ -28,16 +28,16 @@ public class AreaSeries {
     /**
      * The series data table.
      */
-    private Map<String, HashMap<Integer, Double>> mTable = new HashMap<String, HashMap<Integer, Double>>();
+    private final Map<String, HashMap<Integer, Double>> mTable = new HashMap<String, HashMap<Integer, Double>>();
 
     /**
      * The categories.
      */
-    private List<String> mCategories = new ArrayList<String>();
+    private final List<String> mCategories = new ArrayList<String>();
     /**
      * The series.
      */
-    private List<String> mSeries = new ArrayList<String>();
+    private final List<String> mSeries = new ArrayList<String>();
 
     /**
      * Adds a new Category series to the table.

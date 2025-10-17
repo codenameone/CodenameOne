@@ -36,7 +36,7 @@ import com.codename1.ui.list.ListModel;
  * @author Francesco Galgani
  */
 public class AutoCompleteTextComponent extends TextComponent {
-    private static int animationSpeed = 100;
+    private static final int animationSpeed = 100;
     private final AutoCompleteTextField field;
     private Container animationLayer;
     private Boolean focusAnimation;
@@ -464,7 +464,7 @@ public class AutoCompleteTextComponent extends TextComponent {
     /**
      * Allows filtering the entries in the auto complete
      */
-    public static interface AutoCompleteFilter {
+    public interface AutoCompleteFilter {
         /**
          * Callback to filter based on this given text
          *

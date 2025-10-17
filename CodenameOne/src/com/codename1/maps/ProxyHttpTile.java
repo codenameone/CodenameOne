@@ -36,7 +36,7 @@ import com.codename1.util.StringUtil;
 public class ProxyHttpTile extends Tile {
 
     private Tile _tile;
-    private String _url;
+    private final String _url;
 
     /**
      * Creates an Http Tile

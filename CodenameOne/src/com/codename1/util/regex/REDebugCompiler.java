@@ -33,29 +33,29 @@ public class REDebugCompiler extends RECompiler {
     static HashMap hashOpcode = new HashMap();
 
     static {
-        hashOpcode.put(new Integer(RE.OP_RELUCTANTSTAR), "OP_RELUCTANTSTAR");
-        hashOpcode.put(new Integer(RE.OP_RELUCTANTPLUS), "OP_RELUCTANTPLUS");
-        hashOpcode.put(new Integer(RE.OP_RELUCTANTMAYBE), "OP_RELUCTANTMAYBE");
-        hashOpcode.put(new Integer(RE.OP_END), "OP_END");
-        hashOpcode.put(new Integer(RE.OP_BOL), "OP_BOL");
-        hashOpcode.put(new Integer(RE.OP_EOL), "OP_EOL");
-        hashOpcode.put(new Integer(RE.OP_ANY), "OP_ANY");
-        hashOpcode.put(new Integer(RE.OP_ANYOF), "OP_ANYOF");
-        hashOpcode.put(new Integer(RE.OP_BRANCH), "OP_BRANCH");
-        hashOpcode.put(new Integer(RE.OP_ATOM), "OP_ATOM");
-        hashOpcode.put(new Integer(RE.OP_STAR), "OP_STAR");
-        hashOpcode.put(new Integer(RE.OP_PLUS), "OP_PLUS");
-        hashOpcode.put(new Integer(RE.OP_MAYBE), "OP_MAYBE");
-        hashOpcode.put(new Integer(RE.OP_NOTHING), "OP_NOTHING");
-        hashOpcode.put(new Integer(RE.OP_GOTO), "OP_GOTO");
-        hashOpcode.put(new Integer(RE.OP_CONTINUE), "OP_CONTINUE");
-        hashOpcode.put(new Integer(RE.OP_ESCAPE), "OP_ESCAPE");
-        hashOpcode.put(new Integer(RE.OP_OPEN), "OP_OPEN");
-        hashOpcode.put(new Integer(RE.OP_CLOSE), "OP_CLOSE");
-        hashOpcode.put(new Integer(RE.OP_BACKREF), "OP_BACKREF");
-        hashOpcode.put(new Integer(RE.OP_POSIXCLASS), "OP_POSIXCLASS");
-        hashOpcode.put(new Integer(RE.OP_OPEN_CLUSTER), "OP_OPEN_CLUSTER");
-        hashOpcode.put(new Integer(RE.OP_CLOSE_CLUSTER), "OP_CLOSE_CLUSTER");
+        hashOpcode.put(Integer.valueOf(RE.OP_RELUCTANTSTAR), "OP_RELUCTANTSTAR");
+        hashOpcode.put(Integer.valueOf(RE.OP_RELUCTANTPLUS), "OP_RELUCTANTPLUS");
+        hashOpcode.put(Integer.valueOf(RE.OP_RELUCTANTMAYBE), "OP_RELUCTANTMAYBE");
+        hashOpcode.put(Integer.valueOf(RE.OP_END), "OP_END");
+        hashOpcode.put(Integer.valueOf(RE.OP_BOL), "OP_BOL");
+        hashOpcode.put(Integer.valueOf(RE.OP_EOL), "OP_EOL");
+        hashOpcode.put(Integer.valueOf(RE.OP_ANY), "OP_ANY");
+        hashOpcode.put(Integer.valueOf(RE.OP_ANYOF), "OP_ANYOF");
+        hashOpcode.put(Integer.valueOf(RE.OP_BRANCH), "OP_BRANCH");
+        hashOpcode.put(Integer.valueOf(RE.OP_ATOM), "OP_ATOM");
+        hashOpcode.put(Integer.valueOf(RE.OP_STAR), "OP_STAR");
+        hashOpcode.put(Integer.valueOf(RE.OP_PLUS), "OP_PLUS");
+        hashOpcode.put(Integer.valueOf(RE.OP_MAYBE), "OP_MAYBE");
+        hashOpcode.put(Integer.valueOf(RE.OP_NOTHING), "OP_NOTHING");
+        hashOpcode.put(Integer.valueOf(RE.OP_GOTO), "OP_GOTO");
+        hashOpcode.put(Integer.valueOf(RE.OP_CONTINUE), "OP_CONTINUE");
+        hashOpcode.put(Integer.valueOf(RE.OP_ESCAPE), "OP_ESCAPE");
+        hashOpcode.put(Integer.valueOf(RE.OP_OPEN), "OP_OPEN");
+        hashOpcode.put(Integer.valueOf(RE.OP_CLOSE), "OP_CLOSE");
+        hashOpcode.put(Integer.valueOf(RE.OP_BACKREF), "OP_BACKREF");
+        hashOpcode.put(Integer.valueOf(RE.OP_POSIXCLASS), "OP_POSIXCLASS");
+        hashOpcode.put(Integer.valueOf(RE.OP_OPEN_CLUSTER), "OP_OPEN_CLUSTER");
+        hashOpcode.put(Integer.valueOf(RE.OP_CLOSE_CLUSTER), "OP_CLOSE_CLUSTER");
     }
 
     /**
@@ -66,7 +66,7 @@ public class REDebugCompiler extends RECompiler {
      */
     String opcodeToString(char opcode) {
         // Get string for opcode
-        String ret = (String) hashOpcode.get(new Integer(opcode));
+        String ret = (String) hashOpcode.get(Integer.valueOf(opcode));
 
         // Just in case we have a corrupt program
         if (ret == null) {
@@ -100,7 +100,7 @@ public class REDebugCompiler extends RECompiler {
     String nodeToString(int node) {
         // Get opcode and opdata for node
         char opcode = instruction[node /* + RE.offsetOpcode */];
-        int opdata = (int) instruction[node + RE.offsetOpdata];
+        int opdata = instruction[node + RE.offsetOpdata];
 
         // Return opcode as a string and opdata value
         return opcodeToString(opcode) + ", opdata = " + opdata;
@@ -172,7 +172,7 @@ public class REDebugCompiler extends RECompiler {
             }
 
             // Print a newline
-            p.println("");
+            p.println();
         }
     }
 

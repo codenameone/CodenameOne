@@ -667,7 +667,7 @@ class CSSParser {
      */
     private int addAttributeTo(CSSElement selector, int attrId, String value, HTMLComponent htmlC) {
         int error = selector.addAttribute(attrId, value);
-        reportAddAttributeError(error, selector, selector.getAttributeName(new Integer(attrId)), value, htmlC);
+        reportAddAttributeError(error, selector, selector.getAttributeName(Integer.valueOf(attrId)), value, htmlC);
         return error;
     }
 

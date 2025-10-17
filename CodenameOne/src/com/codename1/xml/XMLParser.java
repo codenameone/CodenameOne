@@ -154,7 +154,7 @@ public class XMLParser {
         if (userDefinedCharEntities == null) {
             userDefinedCharEntities = new Hashtable();
         }
-        userDefinedCharEntities.put(trimCharEntity(symbol), new Integer(code));
+        userDefinedCharEntities.put(trimCharEntity(symbol), Integer.valueOf(code));
     }
 
     /**
@@ -171,7 +171,7 @@ public class XMLParser {
         int slen = symbols.length;
         for (int i = 0; i < slen; i++) {
             if (symbols[i] != null) {
-                userDefinedCharEntities.put(trimCharEntity(symbols[i]), new Integer(startcode + i));
+                userDefinedCharEntities.put(trimCharEntity(symbols[i]), Integer.valueOf(startcode + i));
             }
         }
     }
@@ -223,7 +223,7 @@ public class XMLParser {
         } catch (IllegalArgumentException iae) {
             notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY, null, null, null, "Unrecognized char entity: " + charEntity);
             // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the & char (instead of &apos;)
-            return new StringBuilder().append('&').append(charEntity).append(';').toString();
+            return '&' + charEntity + ';';
         }
 
         /*int charCode=-1;
@@ -419,7 +419,7 @@ public class XMLParser {
                     // Mistakenly "collected" something that is not a char entity, perhaps
                     // misuse of the & character (instead of using &apos;)
                     if (charEntity != null) {
-                        text.append('&').append(charEntity.toString());
+                        text.append('&').append(charEntity);
                         charEntity = null;
                     }
                     if (leadingSpace) {
@@ -580,7 +580,7 @@ public class XMLParser {
 
         //collect tag name
         while ((!isWhiteSpace(c)) && (c != '>') && (c != '/')) {
-            if (eventParser == false) {
+            if (!eventParser) {
                 if (!caseSensitive) {
                     c = Character.toLowerCase(c);
                 }
@@ -641,7 +641,7 @@ public class XMLParser {
                     c = (char) i;
                 }
                 if (lastChar != '/') { // If this is an empty tag, no need to search for its closing tag as there's none...
-                    String endTag = new StringBuilder().append('<').append('/').append(tagName).append('>').toString();
+                    String endTag = String.valueOf('<' + '/' + tagName) + '>';
                     int index = 0;
                     int elen = endTag.length();
                     while (index < elen) {
@@ -690,7 +690,7 @@ public class XMLParser {
             curAttribute.delete(0, curAttribute.length()).append(c);
             c = (char) read(is);
             while ((!isWhiteSpace(c)) && (c != '=') && (c != '>')) {
-                if (eventParser == false) {
+                if (!eventParser) {
                     if (!caseSensitive) {
                         c = Character.toLowerCase(c);
                     }
@@ -713,7 +713,7 @@ public class XMLParser {
             }
 
             if (c != '=') {
-                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), null, "Unexpected character " + c + ", expected '=' after attribute " + curAttribute.toString() + " in tag " + tagName);
+                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), null, "Unexpected character " + c + ", expected '=' after attribute " + curAttribute + " in tag " + tagName);
                 if (c == '>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
                     if (!isEmptyTag(tn)) {
                         parseTagContent(element, is);
@@ -793,7 +793,7 @@ public class XMLParser {
                     notifyError(error, tn, curAttribute.toString(), curValue.toString(), "Attribute '" + curAttribute + "' is not supported for tag '" + tagName + "'.");
                     //notifyError(error, tagName, curAttribute, curValue, "Attribute '"+curAttribute+"' is not supported for tag '"+tagName+"'. Supported attributes: "+element.getSupportedAttributesList());
                 } else if (error == ParserCallback.ERROR_ATTIBUTE_VALUE_INVALID) {
-                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), "Attribute '" + curAttribute + "' in tag '" + tn + "' has an invalid value (" + curValue.toString() + ")");
+                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), "Attribute '" + curAttribute + "' in tag '" + tn + "' has an invalid value (" + curValue + ")");
                 }
             }
 
@@ -844,7 +844,7 @@ public class XMLParser {
      * @throws IOException
      */
     protected Element parseCommentOrXMLDeclaration(Reader is, String endTag) throws IOException {
-        char endTagChars[] = endTag.toCharArray();
+        char[] endTagChars = endTag.toCharArray();
         int endTagPos = 0;
         StringBuilder text = new StringBuilder();
         boolean ended = false;

@@ -204,7 +204,7 @@ public class ThreadSafeDatabase extends Database {
     }
 
     private class RowWrapper implements RowExt {
-        private Row underlyingRow;
+        private final Row underlyingRow;
 
         public RowWrapper(Row underlyingRow) {
             this.underlyingRow = underlyingRow;

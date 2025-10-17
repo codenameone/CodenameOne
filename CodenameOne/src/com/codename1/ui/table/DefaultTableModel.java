@@ -27,6 +27,7 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.util.EventDispatcher;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 /**
  * <p>A default implementation of the table model based on a two dimensional array.
@@ -43,7 +44,7 @@ public class DefaultTableModel extends AbstractTableModel {
     ArrayList<Object[]> data = new ArrayList<Object[]>();
     String[] columnNames;
     boolean editable;
-    private EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Constructs a new table with a 2 dimensional array for row/column data
@@ -64,9 +65,7 @@ public class DefaultTableModel extends AbstractTableModel {
      * @see #isCellEditable(int, int)
      */
     public DefaultTableModel(String[] columnNames, Object[][] data, boolean editable) {
-        for (Object[] o : data) {
-            this.data.add(o);
-        }
+        Collections.addAll(this.data, data);
         this.columnNames = columnNames;
         this.editable = editable;
     }

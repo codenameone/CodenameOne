@@ -39,7 +39,7 @@ import java.util.List;
  * An abstract class to be implemented by the chart rendering classes.
  */
 public abstract class AbstractChart {
-    private static char[] stopCharCandidates = "!@#$%^&*()?><,./+-qwertyuiop[zxcvbnm,./\\|}{".toCharArray();
+    private static final char[] stopCharCandidates = "!@#$%^&*()?><,./+-qwertyuiop[zxcvbnm,./\\|}{".toCharArray();
 
     private static float[] calculateDrawPoints(float p1x, float p1y, float p2x, float p2y,
                                                int screenHeight, int screenWidth) {

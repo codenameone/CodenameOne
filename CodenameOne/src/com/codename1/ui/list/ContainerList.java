@@ -60,7 +60,7 @@ public class ContainerList extends Container {
     private CellRenderer renderer = new DefaultListCellRenderer();
     private ListModel model;
     private Listeners listener;
-    private EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Default constructor

@@ -32,7 +32,7 @@ public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: Unneces
     /** If the chart points should be filled. */
     private boolean mFillPoints = false;
     /** If the chart should be filled outside its line. */
-    private List<FillOutsideLine> mFillBelowLine = new ArrayList<FillOutsideLine>();
+    private final List<FillOutsideLine> mFillBelowLine = new ArrayList<FillOutsideLine>();
     /** The point style. */
     private PointStyle mPointStyle = PointStyle.POINT;
     /** The point stroke width */

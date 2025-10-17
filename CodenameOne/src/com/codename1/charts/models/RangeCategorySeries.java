@@ -23,7 +23,7 @@ import java.util.List;
  */
 public class RangeCategorySeries extends CategorySeries {
     /** The series values. */
-    private List<Double> mMaxValues = new ArrayList<Double>();
+    private final List<Double> mMaxValues = new ArrayList<Double>();
 
     /**
      * Builds a new category series.

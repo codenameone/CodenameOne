@@ -60,12 +60,12 @@ public class FaceBookAccess {
     private static String redirectURI = "https://www.codenameone.com/";
     private static String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
     private static String[] permissions = new String[]{"public_profile", "email", "user_friends"};
-    private static FaceBookAccess instance = new FaceBookAccess();
+    private static final FaceBookAccess instance = new FaceBookAccess();
     private static String token;
     private static String apiVersion = "v2.0";
     private Slider slider;
     private ConnectionRequest current;
-    private Vector responseCodeListeners = new Vector();
+    private final Vector responseCodeListeners = new Vector();
 
 
     private FaceBookAccess() {
@@ -1038,7 +1038,7 @@ public class FaceBookAccess {
         checkAuthentication();
 
         FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.FEED, true);
-        con.addArgument("message", "" + message);
+        con.addArgument("message", message);
         con.addResponseListener(new Listener(con, callback));
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
@@ -1125,7 +1125,7 @@ public class FaceBookAccess {
 
         FacebookRESTService con = new FacebookRESTService(token, postId, FacebookRESTService.COMMENTS, true);
         con.addResponseListener(new Listener(con, callback));
-        con.addArgument("message", "" + message);
+        con.addArgument("message", message);
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
@@ -1147,8 +1147,8 @@ public class FaceBookAccess {
 
         FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.NOTES, true);
         con.addResponseListener(new Listener(con, callback));
-        con.addArgument("subject", "" + subject);
-        con.addArgument("message", "" + message);
+        con.addArgument("subject", subject);
+        con.addArgument("message", message);
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
@@ -1326,8 +1326,8 @@ public class FaceBookAccess {
     }
 
     class Listener implements ActionListener {
-        private FacebookRESTService con;
-        private ActionListener callback;
+        private final FacebookRESTService con;
+        private final ActionListener callback;
 
         Listener(FacebookRESTService con, ActionListener callback) {
             this.con = con;

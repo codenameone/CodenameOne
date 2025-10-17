@@ -160,17 +160,17 @@ public class SplitPane extends Container {
     /**
      * The minimum allowable inset for the divider.
      */
-    private LayeredLayoutConstraint minInset;
+    private final LayeredLayoutConstraint minInset;
     /**
      * The maximum allowable inset for the divider.
      */
-    private LayeredLayoutConstraint maxInset;
+    private final LayeredLayoutConstraint maxInset;
     /**
      * The starting preferred inset for the divider.  This will be changed over the life of the
      * split pane.  Any time the user explicitly drags the divider to a new location, that location
      * will become the new preferred inset.
      */
-    private LayeredLayoutConstraint preferredInset;
+    private final LayeredLayoutConstraint preferredInset;
     /**
      * Flag to indicate that the split pane is expanded.
      */

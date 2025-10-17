@@ -42,8 +42,8 @@ import java.io.OutputStream;
  * @author Shai Almog
  */
 public class FileEncodedImage extends EncodedImage {
-    private String fileName;
-    private boolean keep;
+    private final String fileName;
+    private final boolean keep;
     private byte[] data;
 
     private FileEncodedImage(String fileName, int w, int h, boolean keep) {

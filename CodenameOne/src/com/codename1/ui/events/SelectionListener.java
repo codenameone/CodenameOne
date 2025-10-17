@@ -36,6 +36,6 @@ public interface SelectionListener {
      * @param oldSelected old selected index in list model
      * @param newSelected new selected index in list model
      */
-    public void selectionChanged(int oldSelected, int newSelected);
+    void selectionChanged(int oldSelected, int newSelected);
 
 }

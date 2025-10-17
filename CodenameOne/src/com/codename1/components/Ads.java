@@ -157,7 +157,7 @@ public class Ads extends Container implements HTMLCallback {
             return false;
         }
         long t = System.currentTimeMillis();
-        if (t - elapsed > getUpdateDuration() * 1000) {
+        if (t - elapsed > getUpdateDuration() * 1000L) {
             // we need to update the ad
             elapsed = t;
             requestAd();

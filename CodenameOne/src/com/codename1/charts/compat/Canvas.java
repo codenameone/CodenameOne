@@ -239,7 +239,7 @@ public class Canvas {
             g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
         } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {
             g.fillRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
-            g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
+            g.drawRoundRect((int) rect.getX(), (int) rect.getY(), getWidth(), (int) (rect.getHeight()), (int) rx, (int) ry);
         }
         g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);
 

@@ -133,7 +133,7 @@ public class ChartComponent extends Component {
      * Util object for rendering the chart.
      */
     private final ChartUtil util = new ChartUtil();
-    private ArrayList<IZoomTransition> animations = new ArrayList<IZoomTransition>();
+    private final ArrayList<IZoomTransition> animations = new ArrayList<IZoomTransition>();
     /**
      * The chart that is to be rendered in this component.
      */
@@ -606,7 +606,7 @@ public class ChartComponent extends Component {
 
             if (chart instanceof XYChart) {
                 XYChart xyChart = (XYChart) chart;
-                double panLimits[] = xyChart.getRenderer().getPanLimits();
+                double[] panLimits = xyChart.getRenderer().getPanLimits();
                 if (dragStartBBox == null) {
                     dragStart = new Point(x[0], y[0]);
                     dragStartBBox = getBBox();
@@ -872,7 +872,7 @@ public class ChartComponent extends Component {
             float[] newRect = new float[]{(float) minX, (float) (maxX - minX), (float) minY, (float) (maxY - minY)};
 
             float currentAspect = currentRect[2] / currentRect[3];
-            float newAspect = newRect[3] / newRect[3];
+            float newAspect = 1.0f;
             Rectangle newViewPort = new Rectangle((int) newRect[0], (int) newRect[1], (int) newRect[2], (int) newRect[3]);
             if (newAspect != currentAspect) {
                 newViewPort.setHeight((int) (((double) newViewPort.getWidth()) / currentAspect));
@@ -949,7 +949,7 @@ public class ChartComponent extends Component {
         private final Rectangle currentViewPort;
         private final Rectangle newViewPort;
         private final Transform origTransform;
-        private Motion motion;
+        private final Motion motion;
         private boolean finished = false;
 
         ZoomTransition(Rectangle currentViewPort, Rectangle newViewPort, int duration) {

@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -356,10 +357,7 @@ public class Result {
         }
         if ("true".equals(s)) {
             return true;
-        } else if ("1".equals(s)) {
-            return true;
-        }
-        return false;
+        } else return "1".equals(s);
     }
 
     /**
@@ -673,7 +671,7 @@ public class Result {
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
-            arr[i] = (String) element.getText();
+            arr[i] = element.getText();
         }
         return arr;
     }
@@ -729,7 +727,7 @@ public class Result {
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = (String) element.getText();
+            String s = element.getText();
             arr[i] = Integer.parseInt(s);
         }
         return arr;
@@ -756,7 +754,7 @@ public class Result {
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = (String) element.getText();
+            String s = element.getText();
             arr[i] = Long.parseLong(s);
         }
         return arr;
@@ -783,7 +781,7 @@ public class Result {
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = (String) element.getText();
+            String s = element.getText();
             arr[i] = Double.parseDouble(s);
         }
         return arr;
@@ -808,7 +806,7 @@ public class Result {
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = (String) element.getText();
+            String s = element.getText();
             boolean b = false;
             if ("true".equals(s)) {
                 b = true;
@@ -1035,7 +1033,7 @@ public class Result {
         Iterator e = attributes.keySet().iterator();
         while (e.hasNext()) {
             String key = (String) e.next();
-            if (key.startsWith("xmlns:") == false) {
+            if (!key.startsWith("xmlns:")) {
                 continue;
             }
             if (namespaceURI.equals(attributes.get(key))) {

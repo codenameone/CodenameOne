@@ -49,16 +49,16 @@ import java.util.Comparator;
  */
 public class Geofence {
 
-    private String id;
+    private final String id;
 
     // Location of the geofence
-    private Location loc;
+    private final Location loc;
 
     // radius in metres.
-    private int radius;
+    private final int radius;
 
     // Expiration in milliseconds .  Duration, not timestamp.  -1L to never expire.
-    private long expiration;
+    private final long expiration;
 
     /**
      * Constructor

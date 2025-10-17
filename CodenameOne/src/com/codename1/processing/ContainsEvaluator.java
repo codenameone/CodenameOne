@@ -54,7 +54,7 @@ class ContainsEvaluator extends AbstractEvaluator {
     }
 
     private String[] _getLeftValue(StructuredContent element, String lvalue) {
-        String v[];
+        String[] v;
         // getChild() is a bit of a hack here because the content object
         // calls getParent()
         StructuredContent child = element.getChild(0);
@@ -72,7 +72,7 @@ class ContainsEvaluator extends AbstractEvaluator {
      * java.lang.String)
      */
     protected Object evaluateLeftContainsRight(StructuredContent element, String lvalue, String rvalue) {
-        String lvalues[] = _getLeftValue(element, lvalue);
+        String[] lvalues = _getLeftValue(element, lvalue);
         if (lvalues == null) {
             return null;
         }
@@ -83,7 +83,7 @@ class ContainsEvaluator extends AbstractEvaluator {
                 return element;
             }
         }
-        String rvalues[] = explode(rvalue);
+        String[] rvalues = explode(rvalue);
         int i;
         int lvlen = lvalues.length;
         for (String r : rvalues) {

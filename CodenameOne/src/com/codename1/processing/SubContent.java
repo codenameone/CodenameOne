@@ -36,7 +36,7 @@ import java.util.Vector;
  */
 class SubContent implements StructuredContent {
 
-    private List<StructuredContent> root;
+    private final List<StructuredContent> root;
     private StructuredContent parent;
 
     /**

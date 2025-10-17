@@ -153,7 +153,7 @@ public class Preferences {
      * @param i    a number
      */
     public static void set(String pref, int i) {
-        set(pref, new Integer(i));
+        set(pref, Integer.valueOf(i));
     }
 
     /**
@@ -163,7 +163,7 @@ public class Preferences {
      * @param l    a number
      */
     public static void set(String pref, long l) {
-        set(pref, new Long(l));
+        set(pref, Long.valueOf(l));
     }
 
     /**
@@ -204,7 +204,7 @@ public class Preferences {
     public static void clearAll() {
         // We only need to save prior values for Preferences that actually have listeners.
         Hashtable<String, Object> priorValues = null;
-        if (!listenerMap.keySet().isEmpty()) {
+        if (!listenerMap.isEmpty()) {
 
             // Save all the Preferences for which there are registered listeners.
             priorValues = new Hashtable<String, Object>();

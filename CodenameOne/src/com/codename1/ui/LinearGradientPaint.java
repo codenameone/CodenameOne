@@ -36,8 +36,12 @@ import static com.codename1.ui.MultipleGradientPaint.CycleMethod.REFLECT;
  * @since 7.0
  */
 public class LinearGradientPaint extends MultipleGradientPaint {
-    private double startX, startY, endX, endY;
-    private Transform t = Transform.makeIdentity(), t2 = Transform.makeIdentity();
+    private final double startX;
+    private final double startY;
+    private final double endX;
+    private final double endY;
+    private final Transform t = Transform.makeIdentity();
+    private final Transform t2 = Transform.makeIdentity();
 
     /**
      * Creates a LinearGradientPaint with the specified settings.

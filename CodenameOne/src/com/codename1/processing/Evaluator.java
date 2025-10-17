@@ -75,7 +75,7 @@ interface Evaluator {
      * @return Either a single StructuredContent element, or an array of StructuredContent elements.
      * @throws IllegalArgumentException thrown if there is an error processing the predicate expression.
      */
-    public Object evaluate(List elements)
+    Object evaluate(List elements)
             throws IllegalArgumentException;
 
     /**
@@ -89,6 +89,6 @@ interface Evaluator {
      * @return Either a single StructuredContent element, or an array of StructuredContent elements.
      * @throws IllegalArgumentException thrown if there is an error processing the predicate expression.
      */
-    public Object evaluate(StructuredContent element)
+    Object evaluate(StructuredContent element)
             throws IllegalArgumentException;
 }

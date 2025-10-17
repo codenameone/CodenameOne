@@ -31,9 +31,9 @@ import com.codename1.ui.events.ActionListener;
  * @since 8.0
  */
 public class OpenGalleryEvent extends PluginEvent<Void> {
-    private ActionListener response;
+    private final ActionListener response;
 
-    private int type;
+    private final int type;
 
     public OpenGalleryEvent(ActionListener response, int type) {
         super(null, Type.OpenGallery);

@@ -67,13 +67,13 @@ public class PreferencesObject {
             Class type = pb.getGenericType();
             String n = prefix + name;
             if (type == String.class || type == null) {
-                ((Property) pb).set(Preferences.getAndSet(n, (String) ((Property) pb).get()));
+                ((Property) pb).set(Preferences.getAndSet(n, (String) pb.get()));
                 bindChangeListener((Property) pb, n, type);
                 continue;
             }
-            Object obj = ((Property) pb).get();
+            Object obj = pb.get();
             if (type == Boolean.class) {
-                ((Property) pb).set(Preferences.getAndSet(n, obj == null ? false : (Boolean) obj));
+                ((Property) pb).set(Preferences.getAndSet(n, obj != null && (Boolean) obj));
                 bindChangeListener((Property) pb, n, type);
                 continue;
             }
@@ -107,27 +107,27 @@ public class PreferencesObject {
         pb.addChangeListener(new PropertyChangeListener() {
             public void propertyChanged(PropertyBase p) {
                 if (type == String.class || type == null) {
-                    Preferences.set(n, (String) ((Property) pb).get());
+                    Preferences.set(n, (String) pb.get());
                     return;
                 }
                 if (type == Boolean.class) {
-                    Preferences.set(n, (Boolean) ((Property) pb).get());
+                    Preferences.set(n, (Boolean) pb.get());
                     return;
                 }
                 if (type == Double.class) {
-                    Preferences.set(n, (Double) ((Property) pb).get());
+                    Preferences.set(n, (Double) pb.get());
                     return;
                 }
                 if (type == Float.class) {
-                    Preferences.set(n, (Float) ((Property) pb).get());
+                    Preferences.set(n, (Float) pb.get());
                     return;
                 }
                 if (type == Integer.class) {
-                    Preferences.set(n, (Integer) ((Property) pb).get());
+                    Preferences.set(n, (Integer) pb.get());
                     return;
                 }
                 if (type == Long.class) {
-                    Preferences.set(n, (Long) ((Property) pb).get());
+                    Preferences.set(n, (Long) pb.get());
                 }
             }
         });

@@ -191,12 +191,12 @@ public class TextSelection {
     private final Rectangle selectedBounds = new Rectangle();
     private final Spans selectedSpans = new Spans();
     private final EventDispatcher textSelectionListeners = new EventDispatcher();
-    private Rectangle tmpRect = new Rectangle();
+    private final Rectangle tmpRect = new Rectangle();
     private SelectionMask selectionMask;
-    private Component root;
-    private boolean ltr = true;
+    private final Component root;
+    private final boolean ltr = true;
     private boolean enabled;
-    private TextSelectionTrigger trigger = getDefaultTextSelectionTrigger();
+    private final TextSelectionTrigger trigger = getDefaultTextSelectionTrigger();
     // The nearest scrollable parent of the component that triggered a text
     // selection event.
     private Component selectionRoot;
@@ -204,12 +204,12 @@ public class TextSelection {
     /**
      * The listener that handles all of the pointer events to update the selections.
      */
-    private ActionListener pressListener = new ActionListener() {
+    private final ActionListener pressListener = new ActionListener() {
         int startX, startY;
         int startDragHandleX, startDragHandleY;
-        Rectangle startSelectedBounds = new Rectangle();
+        final Rectangle startSelectedBounds = new Rectangle();
         boolean inSelectionDrag;
-        private int ONE_MM = CN.convertToPixels(1);
+        private final int ONE_MM = CN.convertToPixels(1);
 
         @Override
         public void actionPerformed(final ActionEvent evt) {
@@ -665,10 +665,7 @@ public class TextSelection {
         int spy = span.getBounds().getY();
         int sph = span.getBounds().getHeight();
         boolean shouldCoverToEndOfLine = spy + 2 * sph / 3 > bounds.getY() && spy + sph <= bounds.getY() + bounds.getHeight();
-        if (shouldCoverToEndOfLine) {
-            return true;
-        }
-        return false;
+        return shouldCoverToEndOfLine;
     }
 
     private void updateSnappedSelectedBounds() {
@@ -743,7 +740,7 @@ public class TextSelection {
     /**
      * Trigger types for text selection.
      */
-    public static enum TextSelectionTrigger {
+    public enum TextSelectionTrigger {
         /**
          * TextSelection is triggered by a pointer press and drag.  This is
          * consistent with desktop mouse text selection behaviour.
@@ -759,7 +756,7 @@ public class TextSelection {
      * An interface that can be returned from any Component's {@link Component#getTextSelectionSupport() } method to provide
      * text selection support on that component.
      */
-    public static interface TextSelectionSupport {
+    public interface TextSelectionSupport {
 
         /**
          * Gets the spans that should be selected for the given bounds.
@@ -768,7 +765,7 @@ public class TextSelection {
          * @param bounds The bounds to check.  Relative to {@link #getSelectionRoot() }
          * @return Spans of text that should be selected.
          */
-        public Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds);
+        Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds);
 
         /**
          * Checks if text selection is enabled for this component.
@@ -776,7 +773,7 @@ public class TextSelection {
          * @param sel The TextSelection instance.
          * @return True if text selection is enabled.
          */
-        public boolean isTextSelectionEnabled(TextSelection sel);
+        boolean isTextSelectionEnabled(TextSelection sel);
 
         /**
          * Checks if this component can be used to trigger a text selection.  On mobile devices
@@ -785,7 +782,7 @@ public class TextSelection {
          * @param sel The TextSelection instance.
          * @return True if text selection can be triggered on this component.
          */
-        public boolean isTextSelectionTriggerEnabled(TextSelection sel);
+        boolean isTextSelectionTriggerEnabled(TextSelection sel);
 
         /**
          * Trigger a text selection at a given point.
@@ -795,7 +792,7 @@ public class TextSelection {
          * @param y   The y coordinate of the event.  Relative to {@link #getSelectionRoot() }
          * @return The span that should be selected by a long press at this point.
          */
-        public Span triggerSelectionAt(TextSelection sel, int x, int y);
+        Span triggerSelectionAt(TextSelection sel, int x, int y);
 
         /**
          * Returns the text for a given span.
@@ -804,7 +801,7 @@ public class TextSelection {
          * @param span The span describing the range of text that should be returned.
          * @return The text that is contained.
          */
-        public String getTextForSpan(TextSelection sel, Span span);
+        String getTextForSpan(TextSelection sel, Span span);
 
     }
 
@@ -818,12 +815,12 @@ public class TextSelection {
         /**
          * The bounds of the box, relative to {@link #getSelectionRoot() }
          */
-        private Rectangle bounds = new Rectangle();
+        private final Rectangle bounds = new Rectangle();
 
         /**
          * The position of the character in the text model.
          */
-        private int pos;
+        private final int pos;
 
         /**
          * Creates a new Char
@@ -888,7 +885,7 @@ public class TextSelection {
 
 
         private final Rectangle bounds = new Rectangle();
-        private List<Char> chars = new ArrayList<Char>();
+        private final List<Char> chars = new ArrayList<Char>();
         private Component component;
         private int startPos, endPos;
         private boolean boundsDirty = true;
@@ -1162,7 +1159,7 @@ public class TextSelection {
      * Encapsulates a collection of Spans.
      */
     public class Spans implements Iterable<Span> {
-        private List<Span> spans = new ArrayList<Span>();
+        private final List<Span> spans = new ArrayList<Span>();
 
         @Override
         public Iterator<Span> iterator() {
@@ -1309,8 +1306,9 @@ public class TextSelection {
     }
 
     private class SelectionMask extends Container {
-        private DragHandle startHandle = new DragHandle(true), endHandle = new DragHandle(false);
-        private SelectionMenu selectionMenu = new SelectionMenu();
+        private final DragHandle startHandle = new DragHandle(true);
+        private final DragHandle endHandle = new DragHandle(false);
+        private final SelectionMenu selectionMenu = new SelectionMenu();
 
         SelectionMask() {
             if (trigger == TextSelectionTrigger.LongPress) {

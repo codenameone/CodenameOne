@@ -34,5 +34,5 @@ public interface PropertyChangeListener<T, K> {
      *
      * @param p the property
      */
-    public void propertyChanged(PropertyBase<T, K> p);
+    void propertyChanged(PropertyBase<T, K> p);
 }

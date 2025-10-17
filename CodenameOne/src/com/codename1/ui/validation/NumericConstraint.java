@@ -28,10 +28,10 @@ package com.codename1.ui.validation;
  * @author Shai Almog
  */
 public class NumericConstraint implements Constraint {
-    private boolean dec;
-    private double minimum;
-    private double maximum;
-    private String errorMessage;
+    private final boolean dec;
+    private final double minimum;
+    private final double maximum;
+    private final String errorMessage;
 
     /**
      * Creates a new numeric constraint

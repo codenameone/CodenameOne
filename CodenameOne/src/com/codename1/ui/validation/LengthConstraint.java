@@ -28,8 +28,8 @@ package com.codename1.ui.validation;
  * @author Shai Almog
  */
 public class LengthConstraint implements Constraint {
-    private int length;
-    private String errorMessage;
+    private final int length;
+    private final String errorMessage;
 
     /**
      * Creates a new length constraint

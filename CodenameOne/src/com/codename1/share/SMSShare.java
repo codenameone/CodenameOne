@@ -112,7 +112,7 @@ public class SMSShare extends ShareService {
                                                     Display.getInstance().sendSMS(f[0].getTo(), f[0].getMessage());
                                                 } catch (IOException ex) {
                                                     Log.e(ex);
-                                                    System.out.println("failed to send sms to " + (String) contact.get("phone"));
+                                                    System.out.println("failed to send sms to " + contact.get("phone"));
                                                 }
                                                 finish();
                                             }

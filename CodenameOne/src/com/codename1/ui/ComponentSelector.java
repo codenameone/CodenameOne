@@ -46,6 +46,7 @@ import com.codename1.util.SuccessCallback;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -319,9 +320,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     public ComponentSelector(Component... cmps) {
         this.roots = new LinkedHashSet<Component>();
         this.results = new LinkedHashSet<Component>();
-        for (Component cmp : cmps) {
-            this.results.add(cmp);
-        }
+        Collections.addAll(this.results, cmps);
     }
 
     /**
@@ -367,9 +366,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      */
     public ComponentSelector(String selector, Component... roots) {
         this.roots = new LinkedHashSet<Component>();
-        for (Component root : roots) {
-            this.roots.add(root);
-        }
+        Collections.addAll(this.roots, roots);
         parse(selector);
     }
 
@@ -2269,9 +2266,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                     existingSet.add(existingStr);
                 }
             }
-            for (String tag : tags) {
-                existingSet.add(tag);
-            }
+            Collections.addAll(existingSet, tags);
             existing = "";
             if (existingSet.isEmpty()) {
                 c.putClientProperty(PROPERTY_TAG, null);
@@ -4459,8 +4454,6 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return (int) Math.round((parent.getHeight() * percentage / 100));
     }
 
-    ;
-
     private int percentWidth(double percentage, Component parent) {
         return (int) Math.round((parent.getWidth() * percentage / 100));
     }
@@ -4672,8 +4665,6 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         }
         return this;
     }
-
-    ;
 
     /**
      * Wraps {@link Style#setBgColor(int) }
@@ -5105,21 +5096,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /**
      * Interface used for providing callbacks that receive a Component as input.
      */
-    public static interface ComponentClosure {
+    public interface ComponentClosure {
 
         /**
          * Callback to apply.
          *
          * @param c Component that is passed to the closure.
          */
-        public void call(Component c);
+        void call(Component c);
     }
 
     /**
      * Interface used by {@link #map(com.codename1.ui.ComponentSelector.ComponentMapper) } to form a new set of
      * components based on the components in one set.
      */
-    public static interface ComponentMapper {
+    public interface ComponentMapper {
 
         /**
          * Maps component {@literal c } to a replacement component.
@@ -5127,14 +5118,14 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
          * @param c The source component.
          * @return The component that should replace {@literal c} in the new set.
          */
-        public Component map(Component c);
+        Component map(Component c);
     }
 
     /**
      * Interface used by {@link #filter(com.codename1.ui.ComponentSelector.Filter) } to form a new set of
      * components based on the components in one set.
      */
-    public static interface Filter {
+    public interface Filter {
 
         /**
          * Determines whether component {@literal c} should be included in new set.
@@ -5142,7 +5133,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
          * @param c The component to test for inclusion in new set.
          * @return True if {@literal c } should be included in new set.  False otherwise
          */
-        public boolean filter(Component c);
+        boolean filter(Component c);
     }
 
 

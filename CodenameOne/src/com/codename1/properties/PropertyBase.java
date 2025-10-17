@@ -204,9 +204,7 @@ public class PropertyBase<T, K> {
     public boolean equals(Object obj) {
         if (obj != null && obj.getClass() == getClass()) {
             PropertyBase other = (PropertyBase) obj;
-            if (other.getName().equals(name)) {
-                return true;
-            }
+            return other.getName().equals(name);
         }
         return false;
     }

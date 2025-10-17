@@ -30,7 +30,7 @@ public class CharArrayReader extends Reader {
     /**
      * The buffer for characters.
      */
-    protected char buf[];
+    protected char[] buf;
 
     /**
      * The current buffer position.
@@ -193,7 +193,7 @@ public class CharArrayReader extends Reader {
      * @throws IOException               if this reader is closed.
      */
     @Override
-    public int read(char buffer[], int offset, int len) throws IOException {
+    public int read(char[] buffer, int offset, int len) throws IOException {
         if (offset < 0 || offset > buffer.length) {
             // luni.12=Offset out of bounds \: {0}
             throw new ArrayIndexOutOfBoundsException();

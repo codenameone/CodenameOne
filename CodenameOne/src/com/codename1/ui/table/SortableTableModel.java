@@ -40,7 +40,7 @@ public class SortableTableModel extends AbstractTableModel {
     private final boolean asc;
     private final int sortColumn;
     private int[] sorted;
-    private Comparator cmp;
+    private final Comparator cmp;
 
     /**
      * Sorts a table based on the given column

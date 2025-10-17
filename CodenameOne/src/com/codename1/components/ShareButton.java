@@ -63,7 +63,7 @@ public class ShareButton extends Button implements ActionListener {
 
     private String imageMimeType;
 
-    private Vector shareServices = new Vector();
+    private final Vector shareServices = new Vector();
 
     /**
      * Default constructor

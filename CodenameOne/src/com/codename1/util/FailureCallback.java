@@ -39,5 +39,5 @@ public interface FailureCallback<T> {
      * @param errorCode    if applicable e.g. with http error codes, -1 for unknown
      * @param errorMessage if applicable a user displayable message (can be null)
      */
-    public void onError(Object sender, Throwable err, int errorCode, String errorMessage);
+    void onError(Object sender, Throwable err, int errorCode, String errorMessage);
 }

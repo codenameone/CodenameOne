@@ -35,7 +35,7 @@ public class Rectangle2D implements Shape {
 
     private double x;
     private double y;
-    private Dimension2D size;
+    private final Dimension2D size;
     private GeneralPath path;
 
     /**
@@ -501,7 +501,7 @@ public class Rectangle2D implements Shape {
     }
 
     public boolean contains(int x, int y) {
-        return contains((double) x, (double) y);
+        return contains(x, (double) y);
     }
 
     public Shape intersection(Rectangle rect) {

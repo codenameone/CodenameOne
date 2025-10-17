@@ -118,7 +118,7 @@ public class XYSeriesTransition extends SeriesTransition {
      * @param progress The progress position in the motion. (0-100).
      */
     protected void update(int progress) {
-        double dProgress = (double) progress;
+        double dProgress = progress;
         int len = endVals.getItemCount(); // PMD Fix: UnusedLocalVariable removed unused endindex
         for (int i = 0; i < len; i++) {
             double x = endVals.getX(i);

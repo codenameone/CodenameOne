@@ -41,6 +41,6 @@ public interface DocumentRequestHandler {
      * @param docInfo A DocumentInfo object representing the requested URL and its attributes
      * @return the document at the URL as an InputStream
      */
-    public InputStream resourceRequested(DocumentInfo docInfo);
+    InputStream resourceRequested(DocumentInfo docInfo);
 
 }

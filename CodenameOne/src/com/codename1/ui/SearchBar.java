@@ -33,10 +33,10 @@ import com.codename1.ui.plaf.UIManager;
  */
 class SearchBar extends Toolbar {
 
-    private TextField search;
+    private final TextField search;
 
-    private Toolbar parent;
-    private float iconSize;
+    private final Toolbar parent;
+    private final float iconSize;
 
     /**
      * Creates the SearchBar Toolbar

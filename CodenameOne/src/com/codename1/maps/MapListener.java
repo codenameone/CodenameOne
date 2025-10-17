@@ -38,5 +38,5 @@ public interface MapListener {
      * @param zoom   the zoom level of the current map
      * @param center the center position of the map
      */
-    public void mapPositionUpdated(Component source, int zoom, Coord center);
+    void mapPositionUpdated(Component source, int zoom, Coord center);
 }

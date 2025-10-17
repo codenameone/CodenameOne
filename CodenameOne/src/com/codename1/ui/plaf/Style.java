@@ -2258,15 +2258,15 @@ public class Style {
         if (unitType != null) {
             switch (unitType[orientation]) {
                 case UNIT_TYPE_REM:
-                    return (int) Math.round(v * Font.getDefaultFont().getHeight());
+                    return Math.round(v * Font.getDefaultFont().getHeight());
                 case UNIT_TYPE_VH:
-                    return (int) Math.round(v / 100f * CN.getDisplayHeight());
+                    return Math.round(v / 100f * CN.getDisplayHeight());
                 case UNIT_TYPE_VW:
-                    return (int) Math.round(v / 100f * CN.getDisplayWidth());
+                    return Math.round(v / 100f * CN.getDisplayWidth());
                 case UNIT_TYPE_VMIN:
-                    return (int) Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                    return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
                 case UNIT_TYPE_VMAX:
-                    return (int) Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                    return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
                 case UNIT_TYPE_DIPS:
                     return Display.getInstance().convertToPixels(v);
                 case UNIT_TYPE_SCREEN_PERCENTAGE:
@@ -2463,7 +2463,7 @@ public class Style {
     Object[] getBackgroundGradient() {
         if (backgroundGradient == null) {
             Float c = new Float(0.5f);
-            backgroundGradient = new Object[]{new Integer(0xffffff), new Integer(0), c, c, new Float(1)};
+            backgroundGradient = new Object[]{Integer.valueOf(0xffffff), Integer.valueOf(0), c, c, new Float(1)};
         }
         return backgroundGradient;
     }
@@ -2490,7 +2490,7 @@ public class Style {
             return;
         }
         if (((Integer) getBackgroundGradient()[0]).intValue() != backgroundGradientStartColor) {
-            getBackgroundGradient()[0] = new Integer(backgroundGradientStartColor);
+            getBackgroundGradient()[0] = Integer.valueOf(backgroundGradientStartColor);
             if (!override) {
                 modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;
             }
@@ -2513,7 +2513,7 @@ public class Style {
             return;
         }
         if (((Integer) getBackgroundGradient()[1]).intValue() != backgroundGradientEndColor) {
-            getBackgroundGradient()[1] = new Integer(backgroundGradientEndColor);
+            getBackgroundGradient()[1] = Integer.valueOf(backgroundGradientEndColor);
             if (!override) {
                 modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;
             }
@@ -3107,12 +3107,10 @@ public class Style {
         if (this.bgColor != other.bgColor) {
             return false;
         }
-        if (this.font != other.font &&
-                (this.font == null || !this.font.equals(other.font))) {
+        if (!java.util.Objects.equals(this.font, other.font)) {
             return false;
         }
-        if (this.bgImage != other.bgImage &&
-                (this.bgImage == null || !this.bgImage.equals(other.bgImage))) {
+        if (!java.util.Objects.equals(this.bgImage, other.bgImage)) {
             return false;
         }
         if (!Objects.deepEquals(this.padding, other.padding)) {
@@ -3143,8 +3141,7 @@ public class Style {
                 other.backgroundGradient)) {
             return false;
         }
-        if (this.border != other.border &&
-                (this.border == null || !this.border.equals(other.border))) {
+        if (!java.util.Objects.equals(this.border, other.border)) {
             return false;
         }
         if (this.align != other.align) {
@@ -3156,10 +3153,7 @@ public class Style {
         if (this.elevation != other.elevation) {
             return false;
         }
-        if (this.surface != other.surface) {
-            return false;
-        }
-        return true;
+        return this.surface == other.surface;
     }
 
 }

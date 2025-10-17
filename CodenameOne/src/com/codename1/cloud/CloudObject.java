@@ -121,7 +121,7 @@ public final class CloudObject implements Externalizable {
      */
     public static final int BINDING_AUTO_SAVE = 3;
 
-    private static Hashtable<String, CustomProperty> custom = new Hashtable<String, CustomProperty>();
+    private static final Hashtable<String, CustomProperty> custom = new Hashtable<String, CustomProperty>();
     private Hashtable values = new Hashtable();
     private Hashtable deferedValues;
 
@@ -728,7 +728,7 @@ public final class CloudObject implements Externalizable {
                     cmp.setBoundPropertyValue(propertyName, null);
                 }
             } else {
-                if (cmpVal == null || !(val.equals(cmpVal))) {
+                if (!(val.equals(cmpVal))) {
                     cmp.setBoundPropertyValue(propertyName, val);
                 }
             }

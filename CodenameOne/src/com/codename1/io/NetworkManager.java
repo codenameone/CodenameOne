@@ -90,14 +90,14 @@ public class NetworkManager {
     private static final Object LOCK = new Object();
     private static final NetworkManager INSTANCE = new NetworkManager();
     private static String autoDetectURL = "https://www.google.com/";
-    private Vector pending = new Vector();
+    private final Vector pending = new Vector();
     private boolean running;
     private int threadCount = 1;
     private NetworkThread[] networkThreads;
     private EventDispatcher errorListeners;
     private EventDispatcher progressListeners;
     private int timeout = 300000;
-    private Hashtable threadAssignements = new Hashtable();
+    private final Hashtable threadAssignements = new Hashtable();
     private Hashtable userHeaders;
     private boolean autoDetected;
     private int nextConnectionId = 1;
@@ -410,7 +410,6 @@ public class NetworkManager {
                         if (!out.isDone()) {
                             out.complete(request);
                         }
-                        return;
                     }
                 }
             }
@@ -430,7 +429,7 @@ public class NetworkManager {
      */
     public void addToQueueAndWait(final ConnectionRequest request) {
         class WaitingClass implements Runnable, ActionListener<NetworkEvent> {
-            private boolean edt = CN.isEdt();
+            private final boolean edt = CN.isEdt();
             private boolean finishedWaiting;
 
             public void run() {
@@ -469,7 +468,6 @@ public class NetworkManager {
                         finishedWaiting = true;
                         removeProgressListener(this);
                         removeErrorListener(this);
-                        return;
                     }
                 }
             }
@@ -694,7 +692,7 @@ public class NetworkManager {
      * @param offset      the offset of the thread starting from 0 and smaller than thread count
      */
     public void assignToThread(Class requestType, int offset) {
-        threadAssignements.put(requestType.getName(), new Integer(offset));
+        threadAssignements.put(requestType.getName(), Integer.valueOf(offset));
     }
 
     /**

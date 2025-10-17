@@ -59,7 +59,7 @@ class HTMLTableModel implements TableModel {
     int rowInsretionPos = -1;
     int bodyInsertionPos = 0;
     boolean hasTHead, hasTFoot;
-    private EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Adds the given component as a cell to the end of the current row of the table

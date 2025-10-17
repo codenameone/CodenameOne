@@ -42,7 +42,7 @@ import java.util.Iterator;
  */
 public class MorphTransition extends Transition {
     private int duration;
-    private HashMap<String, String> fromTo = new HashMap<String, String>();
+    private final HashMap<String, String> fromTo = new HashMap<String, String>();
     private CC[] fromToComponents;
     private Motion animationMotion;
     private boolean finished;

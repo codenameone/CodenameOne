@@ -31,14 +31,14 @@ class TMultiplication {
      * An array with powers of ten that fit in the type {@code int}.
      * ({@code 10^0,10^1,...,10^9})
      */
-    static final int tenPows[] = {
+    static final int[] tenPows = {
             1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
     };
     /**
      * An array with powers of five that fit in the type {@code int}.
      * ({@code 5^0,5^1,...,5^13})
      */
-    static final int fivePows[] = {
+    static final int[] fivePows = {
             1, 5, 25, 125, 625, 3125, 15625, 78125, 390625,
             1953125, 9765625, 48828125, 244140625, 1220703125
     };
@@ -51,7 +51,7 @@ class TMultiplication {
      * An array with the first powers of five in {@code BigInteger} version.
      * ({@code 5^0,5^1,...,5^31})
      */
-    static final TBigInteger bigFivePows[] = new TBigInteger[32];
+    static final TBigInteger[] bigFivePows = new TBigInteger[32];
 
     static {
         int i;
@@ -237,7 +237,7 @@ class TMultiplication {
         }
         int[] aDigits = a.digits;
         int[] bDigits = b.digits;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
         // Common case
         multArraysPAP(aDigits, aLen, bDigits, bLen, resDigits);
         TBigInteger result = new TBigInteger(resSign, resLength, resDigits);
@@ -257,7 +257,7 @@ class TMultiplication {
         }
     }
 
-    static void multPAP(int a[], int b[], int t[], int aLen, int bLen) {
+    static void multPAP(int[] a, int[] b, int[] t, int aLen, int bLen) {
         if (a == b && aLen == bLen) {
             square(a, aLen, t);
             return;
@@ -284,7 +284,7 @@ class TMultiplication {
      * @param factor the multiplier
      * @return the top digit of production
      */
-    private static int multiplyByInt(int res[], int a[], final int aSize, final int factor) {
+    private static int multiplyByInt(int[] res, int[] a, final int aSize, final int factor) {
         long carry = 0;
         for (int i = 0; i < aSize; i++) {
             carry = unsignedMultAddAdd(a[i], factor, (int) carry, 0);
@@ -303,7 +303,7 @@ class TMultiplication {
      * @param factor the multiplier
      * @return the top digit of production
      */
-    static int multiplyByInt(int a[], final int aSize, final int factor) {
+    static int multiplyByInt(int[] a, final int aSize, final int factor) {
         return multiplyByInt(a, a, aSize, factor);
     }
 
@@ -332,7 +332,7 @@ class TMultiplication {
         }
         // Common case
         int resLength = aNumberLength + 1;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
 
         resDigits[aNumberLength] = multiplyByInt(resDigits, aDigits, aNumberLength, factor);
         TBigInteger result = new TBigInteger(resSign, resLength, resDigits);

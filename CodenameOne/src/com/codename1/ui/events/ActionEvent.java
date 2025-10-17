@@ -34,11 +34,10 @@ import com.codename1.ui.Container;
  */
 public class ActionEvent {
 
-    private Type trigger;
+    private final Type trigger;
 
-    ;
     private boolean consumed;
-    private Object source;
+    private final Object source;
     private Object sourceComponent;
     private int keyEvent = -1;
     private int y = -1;

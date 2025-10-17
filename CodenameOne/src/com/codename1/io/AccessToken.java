@@ -144,7 +144,7 @@ public class AccessToken implements Externalizable {
                 return null;
             }
         }
-        return new Long(Long.parseLong(str));
+        return Long.valueOf(Long.parseLong(str));
     }
 
     /**
@@ -162,10 +162,10 @@ public class AccessToken implements Externalizable {
             // There was an expiry date, but it might have been from an expires_in
             // header, which would only hold the number of seconds since
             long l = longExpires.longValue();
-            if (l == 0l) {
+            if (l == 0L) {
                 return null;
             }
-            return new Date(System.currentTimeMillis() + l * 1000l);
+            return new Date(System.currentTimeMillis() + l * 1000L);
         }
         return null;
 

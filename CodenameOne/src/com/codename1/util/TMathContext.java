@@ -83,7 +83,7 @@ final class TMathContext {
      * A {@code RoundingMode} object which specifies the algorithm to be used
      * for rounding.
      */
-    private TRoundingMode roundingMode;
+    private final TRoundingMode roundingMode;
 
     /**
      * Constructs a new {@code MathContext} with the specified precision and
@@ -261,13 +261,12 @@ final class TMathContext {
      */
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder(45);
 
-        sb.append(chPrecision);
-        sb.append(precision);
-        sb.append(' ');
-        sb.append(chRoundingMode);
-        sb.append(roundingMode);
-        return sb.toString();
+        String sb = String.valueOf(chPrecision) +
+                precision +
+                ' ' +
+                String.valueOf(chRoundingMode) +
+                roundingMode;
+        return sb;
     }
 }

@@ -63,11 +63,11 @@ public class Oauth2 {
     private String token;
     private String refreshToken;
     private String identityToken;
-    private String clientId;
+    private final String clientId;
     private String redirectURI;
     private String scope;
     private String clientSecret;
-    private String oauth2URL;
+    private final String oauth2URL;
     private String tokenRequestURL;
     private Hashtable additionalParams;
     private Dialog login;
@@ -164,7 +164,7 @@ public class Oauth2 {
             out.additionalParams = new Hashtable();
             out.additionalParams.putAll((Map) m.get("additionalParams"));
         }
-        out.backToParent = (Boolean) m.get("backToParent");
+        backToParent = (Boolean) m.get("backToParent");
         s.deleteStorageFile("__oauth2Params");
         return out;
 
@@ -584,7 +584,6 @@ public class Oauth2 {
                         }
                     }
                 }
-                ;
                 final TokenRequest req = new TokenRequest();
                 req.setReadResponseForErrors(true);
 

@@ -49,7 +49,7 @@ import java.util.Vector;
  */
 public class FileTreeModel implements TreeModel {
 
-    private boolean showFiles;
+    private final boolean showFiles;
 
     private Vector ext;
 
@@ -99,7 +99,7 @@ public class FileTreeModel implements TreeModel {
                             if (!FileSystemStorage.getInstance().isDirectory(name + f) && ext != null) {
                                 int i = f.lastIndexOf('.');
                                 if (i > 0) {
-                                    String e = f.substring(i + 1, f.length());
+                                    String e = f.substring(i + 1);
                                     if (ext.contains(e)) {
                                         response.addElement(name + f);
                                     }

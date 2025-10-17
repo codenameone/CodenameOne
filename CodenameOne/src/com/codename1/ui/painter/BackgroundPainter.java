@@ -36,7 +36,7 @@ import com.codename1.ui.plaf.Style;
  * @author Shai Almog
  */
 public class BackgroundPainter implements Painter {
-    private Component parent;
+    private final Component parent;
 
     /**
      * Construct a background painter for the given component

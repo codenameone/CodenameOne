@@ -167,7 +167,7 @@ public abstract class MultipleGradientPaint implements Paint {
     /**
      * Cycle methods for gradients.
      */
-    public static enum CycleMethod {
+    public enum CycleMethod {
         /**
          * The gradient should not cycle at all.
          */
@@ -186,7 +186,7 @@ public abstract class MultipleGradientPaint implements Paint {
     /**
      * Colors spaces for gradients.
      */
-    public static enum ColorSpaceType {
+    public enum ColorSpaceType {
         LINEAR_RGB,
         SRGB
     }

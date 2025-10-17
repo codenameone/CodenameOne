@@ -32,7 +32,7 @@ import com.codename1.ui.Component;
  * @see Component#removeStateChangeListener(com.codename1.ui.events.ActionListener)
  */
 public class ComponentStateChangeEvent extends ActionEvent {
-    private boolean initialized;
+    private final boolean initialized;
 
     /**
      * Creates a ComponentStateChangeEvent.

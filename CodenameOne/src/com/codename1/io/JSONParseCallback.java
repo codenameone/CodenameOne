@@ -34,46 +34,46 @@ public interface JSONParseCallback {
     /**
      * Indicates that the parser ran into an opening bracket event {
      */
-    public void startBlock(String blockName);
+    void startBlock(String blockName);
 
     /**
      * Indicates that the parser ran into an ending bracket event }
      */
-    public void endBlock(String blockName);
+    void endBlock(String blockName);
 
     /**
      * Indicates that the parser ran into an opening bracket event [
      */
-    public void startArray(String arrayName);
+    void startArray(String arrayName);
 
     /**
      * Indicates that the parser ran into an ending bracket event ]
      */
-    public void endArray(String arrayName);
+    void endArray(String arrayName);
 
     /**
      * Submits a token from the JSON data as a java string, this token is always a string value
      */
-    public void stringToken(String tok);
+    void stringToken(String tok);
 
     /**
      * Submits a numeric token from the JSON data
      *
      * @param tok the token value
      */
-    public void numericToken(double tok);
+    void numericToken(double tok);
 
     /**
      * Submits a boolean token from the JSON data
      *
      * @param tok the token value
      */
-    public void booleanToken(boolean tok);
+    void booleanToken(boolean tok);
 
     /**
      * Submits a numeric token from the JSON data
      */
-    public void longToken(long tok);
+    void longToken(long tok);
 
     /**
      * This method is called when a string key/value pair is detected within the json
@@ -82,7 +82,7 @@ public interface JSONParseCallback {
      * @param key   the key
      * @param value a string value
      */
-    public void keyValue(String key, String value);
+    void keyValue(String key, String value);
 
     /**
      * This method indicates to the Parser if this Callback is still alive
@@ -90,5 +90,5 @@ public interface JSONParseCallback {
      * @return true if the Callback is still interested to get the JSON parse
      * events from the JSONParser
      */
-    public boolean isAlive();
+    boolean isAlive();
 }

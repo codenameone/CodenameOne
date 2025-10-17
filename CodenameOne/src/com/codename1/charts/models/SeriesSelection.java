@@ -16,13 +16,13 @@
 package com.codename1.charts.models;
 
 public class SeriesSelection {
-    private int mSeriesIndex;
+    private final int mSeriesIndex;
 
-    private int mPointIndex;
+    private final int mPointIndex;
 
-    private double mXValue;
+    private final double mXValue;
 
-    private double mValue;
+    private final double mValue;
 
     public SeriesSelection(int seriesIndex, int pointIndex, double xValue, double value) {
         mSeriesIndex = seriesIndex;

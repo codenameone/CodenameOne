@@ -44,7 +44,7 @@ public class FacebookConnect extends Login {
 
     static Class implClass;
     private static FacebookConnect instance;
-    private String[] permissions = new String[]{"public_profile", "email", "user_friends"};
+    private final String[] permissions = new String[]{"public_profile", "email", "user_friends"};
 
     FacebookConnect() {
         setOauth2URL("https://www.facebook.com/dialog/oauth");
@@ -117,7 +117,7 @@ public class FacebookConnect extends Login {
             return t;
         }
         if (isNativeLoginSupported()) {
-            return new AccessToken(getToken(), (String) null);
+            return new AccessToken(getToken(), null);
         } else {
             return null;
         }

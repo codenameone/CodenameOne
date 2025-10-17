@@ -44,7 +44,7 @@ public class HTMLParser extends XMLParser {
      * This is used to enable empty tags to be closed also in a non-strict way (i.e. &lt;br&gt; instead of &lt;br/&gt;)
      * some of these tags are not a part of the XHTML-MP 1.0 standard, but including them here allows a more smooth parsing if the document is not strictly XHTML-MP 1.0
      */
-    private static String[] EMPTY_TAGS = {"br", "link", "meta", "base", "area", "basefont", "col", "frame", "hr", "img", "input", "isindex", "param"};
+    private static final String[] EMPTY_TAGS = {"br", "link", "meta", "base", "area", "basefont", "col", "frame", "hr", "img", "input", "isindex", "param"};
     HTMLComponent htmlC; // The HTMLComponent that uses this Parser
 
     /**

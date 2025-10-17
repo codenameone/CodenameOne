@@ -41,7 +41,7 @@ import java.util.Set;
  */
 public class PushActionCategory {
     private final String id;
-    private List<PushAction> actions;
+    private final List<PushAction> actions;
 
     /**
      * Creates a category with the specified actions.

@@ -56,8 +56,8 @@ public class Motion {
     private long startTime;
     private double initVelocity, friction;
     private int lastReturnedValue;
-    private int[] previousLastReturnedValue = new int[3];
-    private long[] previousLastReturnedValueTime = new long[3];
+    private final int[] previousLastReturnedValue = new int[3];
+    private final long[] previousLastReturnedValueTime = new long[3];
     private long currentMotionTime = -1;
     private long previousCurrentMotionTime = -1;
     private float p0, p1, p2, p3;
@@ -595,7 +595,7 @@ public class Motion {
         if (initVelocity < 0) {
             retVal *= -1;
         }
-        retVal += (int) sourceValue;
+        retVal += sourceValue;
         if (destinationValue > sourceValue) {
             return Math.min(retVal, destinationValue);
         } else {

@@ -46,9 +46,9 @@ import java.io.InputStream;
  */
 class ShareForm extends Form {
 
-    private TextField to = new TextField();
-    private TextArea message = new TextArea(5, 20);
-    private Button post = new Button("Post");
+    private final TextField to = new TextField();
+    private final TextArea message = new TextArea(5, 20);
+    private final Button post = new Button("Post");
 
     ShareForm(final Form contacts, String title, String toShare, String txt, ActionListener share) {
         this(contacts, title, toShare, txt, null, share);

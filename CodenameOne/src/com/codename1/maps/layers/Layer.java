@@ -40,19 +40,19 @@ public interface Layer {
      * @param g          a Graphics Object to paint on
      * @param screenTile the screen tile
      */
-    public void paint(Graphics g, Tile screenTile);
+    void paint(Graphics g, Tile screenTile);
 
     /**
      * The bounding box of this Layer
      *
      * @return the Layer bounding box
      */
-    public abstract BoundingBox boundingBox();
+    BoundingBox boundingBox();
 
     /**
      * Gets the name of this Layer
      *
      * @return the name of this Layer
      */
-    public String getName();
+    String getName();
 }

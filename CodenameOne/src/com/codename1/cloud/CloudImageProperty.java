@@ -45,9 +45,9 @@ import java.util.Hashtable;
  */
 public class CloudImageProperty implements CustomProperty { // PMD Fix: UnnecessarySemicolon removed stray delimiter
     private static CacheMap cloudImageCache;
-    private String idProperty;
-    private EncodedImage placeholderImage;
-    private Hashtable<Object, ReplaceableImage> inProgress = new Hashtable<Object, ReplaceableImage>();
+    private final String idProperty;
+    private final EncodedImage placeholderImage;
+    private final Hashtable<Object, ReplaceableImage> inProgress = new Hashtable<Object, ReplaceableImage>();
 
     /**
      * Create an image property for the given id that will hold the place holder image

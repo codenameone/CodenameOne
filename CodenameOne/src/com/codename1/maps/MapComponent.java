@@ -57,12 +57,12 @@ import java.util.Vector;
  */
 public class MapComponent extends Container {
 
-    private static Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
+    private static final Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
     private Coord _center;
     private int _zoom;
-    private MapProvider _map;
-    private Vector _layers;
-    private boolean _debugInfo = false;
+    private final MapProvider _map;
+    private final Vector _layers;
+    private final boolean _debugInfo = false;
     private boolean _needTiles = true;
     private int draggedx, draggedy;
     private int pressedx, pressedy;
@@ -82,8 +82,8 @@ public class MapComponent extends Container {
     private int zoomCenterY = 0;
     private long lastPressed = -1;
     private int tapCount = 0;
-    private int singleTapThreshold = 200;
-    private int doubleTapThreshold = 200;
+    private final int singleTapThreshold = 200;
+    private final int doubleTapThreshold = 200;
     private ArrayList<MapListener> listeners;
 
     /**
@@ -1117,7 +1117,7 @@ public class MapComponent extends Container {
             return new Double(c.getLongitude());
         }
         if (name.equals("zoom")) {
-            return new Integer(getZoomLevel());
+            return Integer.valueOf(getZoomLevel());
         }
         return null;
     }

@@ -186,7 +186,7 @@ public final class DimConstraint {
         if (isCols)
             return UnitValue.LEADING;
 
-        return fill || PlatformDefaults.getDefaultRowAlignmentBaseline() == false ? UnitValue.CENTER : UnitValue.BASELINE_IDENTITY;
+        return fill || !PlatformDefaults.getDefaultRowAlignmentBaseline() ? UnitValue.CENTER : UnitValue.BASELINE_IDENTITY;
     }
 
     /**
@@ -237,7 +237,7 @@ public final class DimConstraint {
     }
 
     boolean hasGapAfter() {
-        return gapAfter != null && gapAfter.isUnset() == false;
+        return gapAfter != null && !gapAfter.isUnset();
     }
 
     boolean isGapAfterPush() {
@@ -270,7 +270,7 @@ public final class DimConstraint {
     }
 
     boolean hasGapBefore() {
-        return gapBefore != null && gapBefore.isUnset() == false;
+        return gapBefore != null && !gapBefore.isUnset();
     }
 
     boolean isGapBeforePush() {

@@ -45,21 +45,21 @@ public class DateFormatSymbols implements Cloneable {
     private static final String L10N_MONTH_SHORTNAME = "MONTH_SHORTNAME_";
     private static final String L10N_AMPM = "AMPM_";
     private static final String L10N_ERA = "ERA_";
-    private static final String MONTHS[] = {"January", "February", "March", "April", "May", "June", "July", "August",
+    private static final String[] MONTHS = {"January", "February", "March", "April", "May", "June", "July", "August",
             "September", "October", "November", "December"};
-    private static final String WEEKDAYS[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+    private static final String[] WEEKDAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
             "Saturday"};
-    private static final String AMPMS[] = {"AM", "PM"};
-    private static final String ERAS[] = {"AD", "BC"};
+    private static final String[] AMPMS = {"AM", "PM"};
+    private static final String[] ERAS = {"AD", "BC"};
 
     private Hashtable<String, String> resourceBundle;
-    private String ampms[];
-    private String months[];
-    private String zoneStrings[][];
-    private String shortMonths[];
-    private String weekdays[];
-    private String shortWeekdays[];
-    private String eras[];
+    private String[] ampms;
+    private String[] months;
+    private String[][] zoneStrings;
+    private String[] shortMonths;
+    private String[] weekdays;
+    private String[] shortWeekdays;
+    private String[] eras;
 
     /**
      * Allows turning localization on/off defaults to localization
@@ -74,7 +74,7 @@ public class DateFormatSymbols implements Cloneable {
                 if (resourceBundle == null) {
                     return AMPMS;
                 }
-                String newAmpms[] = new String[2];
+                String[] newAmpms = new String[2];
                 newAmpms[0] = getLocalizedValue(L10N_AMPM + "AM", AMPMS[0]);
                 newAmpms[1] = getLocalizedValue(L10N_AMPM + "PM", AMPMS[1]);
                 ampms = newAmpms;
@@ -109,7 +109,7 @@ public class DateFormatSymbols implements Cloneable {
     String getLocalizedValue(String key, String defaultValue) {
         if (localized) {
             Hashtable<String, String> resourceBundle = getResourceBundle();
-            if (resourceBundle == null || resourceBundle.containsKey(key) == false) {
+            if (resourceBundle == null || !resourceBundle.containsKey(key)) {
                 return defaultValue;
             }
             String v = (resourceBundle.get(key));
@@ -121,8 +121,8 @@ public class DateFormatSymbols implements Cloneable {
     public String[][] getZoneStrings() {
         synchronized (this) {
             if (zoneStrings == null) {
-                String ids[] = TimeZone.getAvailableIDs();
-                String newZoneStrings[][] = new String[ids.length][5];
+                String[] ids = TimeZone.getAvailableIDs();
+                String[][] newZoneStrings = new String[ids.length][5];
                 int ilen = ids.length;
                 for (int i = 0; i < ilen; i++) {
                     newZoneStrings[i][ZONE_ID] = ids[i]; // - time zone ID
@@ -140,7 +140,7 @@ public class DateFormatSymbols implements Cloneable {
 
     public void setZoneStrings(String[][] newZoneStrings) {
         if (newZoneStrings != null) {
-            for (String zone[] : newZoneStrings) {
+            for (String[] zone : newZoneStrings) {
                 if (zone.length < 5) {
                     throw new IllegalArgumentException("Expecting inner array size of 5");
                 }
@@ -220,8 +220,8 @@ public class DateFormatSymbols implements Cloneable {
         return getLocalizedValue(L10N_ZONE_LONGNAME_DST + zoneId, defaultValue);
     }
 
-    String[] createShortforms(String longForms[], String l10nKey) {
-        String shortForms[] = new String[longForms.length];
+    String[] createShortforms(String[] longForms, String l10nKey) {
+        String[] shortForms = new String[longForms.length];
         int sflen = shortForms.length;
         for (int i = 0; i < sflen; i++) {
             String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;
@@ -263,7 +263,7 @@ public class DateFormatSymbols implements Cloneable {
                     return WEEKDAYS;
                 }
                 int wlen = WEEKDAYS.length;
-                String newWeekdays[] = new String[wlen];
+                String[] newWeekdays = new String[wlen];
                 for (int i = 0; i < wlen; i++) {
                     String key = WEEKDAYS[i].toUpperCase();
                     newWeekdays[i] = getLocalizedValue(L10N_WEEKDAY_LONGNAME + key, WEEKDAYS[i]);
@@ -340,7 +340,7 @@ public class DateFormatSymbols implements Cloneable {
                     return getPlatformLocalizedMonths();
                 }
                 int mlen = MONTHS.length;
-                String newMonths[] = new String[mlen];
+                String[] newMonths = new String[mlen];
                 for (int i = 0; i < mlen; i++) {
                     String key = MONTHS[i].toUpperCase();
                     newMonths[i] = getLocalizedValue(L10N_MONTH_LONGNAME + key, getPlatformLocalizedMonths()[i]);
@@ -364,7 +364,7 @@ public class DateFormatSymbols implements Cloneable {
                 if (resourceBundle == null) {
                     return ERAS;
                 }
-                String newEras[] = new String[2];
+                String[] newEras = new String[2];
                 newEras[0] = getLocalizedValue(L10N_ERA + "BC", ERAS[0]);
                 newEras[1] = getLocalizedValue(L10N_ERA + "AD", ERAS[1]);
                 eras = newEras;

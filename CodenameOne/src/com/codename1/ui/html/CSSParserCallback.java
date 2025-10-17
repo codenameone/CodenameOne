@@ -33,23 +33,23 @@ interface CSSParserCallback {
     /**
      * Error code denoting that an unsupported CSS attribute (by XHTML-MP 1.0 standards) was found in the HTML or external CSS files
      */
-    public static int ERROR_CSS_ATTRIBUTE_NOT_SUPPORTED = 200;
+    int ERROR_CSS_ATTRIBUTE_NOT_SUPPORTED = 200;
 
     /**
      * Error code denoting that an invalid attribute value was found in the CSS
      */
-    public static int ERROR_CSS_ATTIBUTE_VALUE_INVALID = 201;
+    int ERROR_CSS_ATTIBUTE_VALUE_INVALID = 201;
 
     /**
      * Error code denoting that a CSS file referenced from the HTML or from another external CSS file was not found
      */
-    public static int ERROR_CSS_NOT_FOUND = 202;
+    int ERROR_CSS_NOT_FOUND = 202;
 
     /**
      * Error code denoting that a relative URL was referenced from a document with no base URL (A document that was loaded via setBody/setHTML/setDOM and not via setPage)
      * In this case the return value of parsingError is not considered - parsing continues and the resource at the URL (CSS file/image) is ignored
      */
-    public static int ERROR_CSS_NO_BASE_URL = 203;
+    int ERROR_CSS_NO_BASE_URL = 203;
 
     /**
      * Called when encountering an error while parsing the HTML document.
@@ -63,7 +63,7 @@ interface CSSParserCallback {
      * @param description A verbal description of the error
      * @return true to continue parsing, false to stop
      */
-    public boolean parsingError(int errorId, String tag, String attribute, String value, String description);
+    boolean parsingError(int errorId, String tag, String attribute, String value, String description);
 
 
 }

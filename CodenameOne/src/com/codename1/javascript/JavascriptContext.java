@@ -118,13 +118,13 @@ public class JavascriptContext {
      * is packaged by the JavascriptContext class in response to a
      * BrowserNavigationCallback.
      */
-    private ActionListener scriptMessageListener;
+    private final ActionListener scriptMessageListener;
     /**
      * A handler for navigation attempts.  This intercepts URLs of the
      * form cn1command:... .  This is how Javascript communicates/calls
      * methods in this context.
      */
-    private BrowserNavigationCallback browserNavigationCallback;
+    private final BrowserNavigationCallback browserNavigationCallback;
     /**
      * Stores the previous BrowserNavigationCallback object if one
      * was registered on the BrowserComponent.
@@ -134,18 +134,18 @@ public class JavascriptContext {
      * Stores registered JSFunction callbacks which can be called in response
      * to a JavascriptEvent.
      */
-    private Hashtable callbacks = new Hashtable();
+    private final Hashtable callbacks = new Hashtable();
     /**
      * A map of JSObjects that is used for cleanup when they are no longer needed.
      */
-    private HashMap<Integer, Object> objectMap = new HashMap<Integer, Object>();
+    private final HashMap<Integer, Object> objectMap = new HashMap<Integer, Object>();
     /**
      * Whenever the objectMap exceeds this size, cleanup will be called whenever retain()
      * is called.
      */
-    private int objectMapThresholdSize = 500;
-    private Random cleanupRandomizer = new Random();
-    private double cleanupProbability = 0.1;
+    private final int objectMapThresholdSize = 500;
+    private final Random cleanupRandomizer = new Random();
+    private final double cleanupProbability = 0.1;
     private JSObject window;
 
     /**
@@ -186,7 +186,7 @@ public class JavascriptContext {
      * @param obj
      */
     void retain(JSObject obj) {
-        objectMap.put(new Integer(obj.objectId), Display.getInstance().createSoftWeakRef(obj));
+        objectMap.put(Integer.valueOf(obj.objectId), Display.getInstance().createSoftWeakRef(obj));
         if (objectMap.size() > objectMapThresholdSize || cleanupRandomizer.nextDouble() < cleanupProbability) {
             cleanup();
         }
@@ -496,13 +496,13 @@ public class JavascriptContext {
 
             String lhs = key;
             String rhs = "undefined";
-            if (String.class.isInstance(value)) {
+            if (value instanceof String) {
                 String escaped = StringUtil.replaceAll((String) value, "\\", "\\\\");
                 escaped = StringUtil.replaceAll(escaped, "'", "\\'");
                 rhs = "'" + escaped + "'";
             } else if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
                 rhs = value.toString();
-            } else if (JSObject.class.isInstance(value)) {
+            } else if (value instanceof JSObject) {
                 rhs = ((JSObject) value).toJSPointer();
             } else if (value instanceof Boolean) {
                 rhs = ((Boolean) value).booleanValue() ? "true" : "false";
@@ -546,13 +546,13 @@ public class JavascriptContext {
         String lhs = key;
         String rhs = "undefined";
 
-        if (String.class.isInstance(value)) {
+        if (value instanceof String) {
             String escaped = StringUtil.replaceAll((String) value, "\\", "\\\\");
             escaped = StringUtil.replaceAll(escaped, "'", "\\'");
             rhs = "'" + escaped + "'";
         } else if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
             rhs = value.toString();
-        } else if (JSObject.class.isInstance(value)) {
+        } else if (value instanceof JSObject) {
             rhs = ((JSObject) value).toJSPointer();
         } else if (value instanceof Boolean) {
             rhs = ((Boolean) value).booleanValue() ? "true" : "false";
@@ -866,7 +866,7 @@ public class JavascriptContext {
      * object type.  This will always return null if {@code async} is {@code true}.
      */
     public Object call(String jsFunc, JSObject self, Object[] params, boolean async, Callback callback) {
-        if (callId > 10000000l) {
+        if (callId > 10000000L) {
             callId = 0;
         }
 

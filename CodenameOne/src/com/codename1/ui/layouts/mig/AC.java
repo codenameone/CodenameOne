@@ -1,6 +1,7 @@
 package com.codename1.ui.layouts.mig;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 /*
  * License (BSD):
@@ -68,7 +69,7 @@ public final class AC {
      * @return The different {@link net.miginfocom.layout.DimConstraint}s that this object consists of. A new list and
      * never <code>null</code>.
      */
-    public final DimConstraint[] getConstaints() {
+    public DimConstraint[] getConstaints() {
         return cList.toArray(new DimConstraint[cList.size()]);
     }
 
@@ -81,14 +82,13 @@ public final class AC {
      *               will be copied for storage. <code>null</code> or and empty array will reset the constraints to one <code>DimConstraint</code>
      *               with default values.
      */
-    public final void setConstaints(DimConstraint[] constr) {
+    public void setConstaints(DimConstraint[] constr) {
         if (constr == null || constr.length < 1)
             constr = new DimConstraint[]{new DimConstraint()};
 
         cList.clear();
         cList.ensureCapacity(constr.length);
-        for (DimConstraint c : constr)
-            cList.add(c);
+        Collections.addAll(cList, constr);
     }
 
     /**
@@ -107,7 +107,7 @@ public final class AC {
      * @param size The total number of rows/columns
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC count(int size) {
+    public AC count(int size) {
         makeSize(size);
         return this;
     }
@@ -120,7 +120,7 @@ public final class AC {
      *
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC noGrid() {
+    public AC noGrid() {
         return noGrid(curIx);
     }
 
@@ -133,7 +133,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC noGrid(int... indexes) {
+    public AC noGrid(int... indexes) {
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
             makeSize(ix);
@@ -154,7 +154,7 @@ public final class AC {
      * @param i The new current row/column.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC index(int i) {
+    public AC index(int i) {
         makeSize(i);
         curIx = i;
         return this;
@@ -167,7 +167,7 @@ public final class AC {
      *
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC fill() {
+    public AC fill() {
         return fill(curIx);
     }
 
@@ -179,7 +179,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC fill(int... indexes) {
+    public AC fill(int... indexes) {
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
             makeSize(ix);
@@ -229,7 +229,7 @@ public final class AC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      * @since 3.7.2
      */
-    public final AC sizeGroup() {
+    public AC sizeGroup() {
         return sizeGroup("", curIx);
     }
 
@@ -242,7 +242,7 @@ public final class AC {
      * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC sizeGroup(String s) {
+    public AC sizeGroup(String s) {
         return sizeGroup(s, curIx);
     }
 
@@ -256,7 +256,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC sizeGroup(String s, int... indexes) {
+    public AC sizeGroup(String s, int... indexes) {
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
             makeSize(ix);
@@ -274,7 +274,7 @@ public final class AC {
      *          as a <b>BoundSize</b>. For more info on how <b>BoundSize</b> is formatted see the documentation.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC size(String s) {
+    public AC size(String s) {
         return size(s, curIx);
     }
 
@@ -288,7 +288,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC size(String size, int... indexes) {
+    public AC size(String size, int... indexes) {
         BoundSize bs = ConstraintParser.parseBoundSize(size, false, true);
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
@@ -306,7 +306,7 @@ public final class AC {
      *
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC gap() {
+    public AC gap() {
         curIx++;
         return this;
     }
@@ -320,7 +320,7 @@ public final class AC {
      *             The string will be interpreted as a <b>BoundSize</b>. For more info on how <b>BoundSize</b> is formatted see the documentation.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC gap(String size) {
+    public AC gap(String size) {
         return gap(size, curIx++);
     }
 
@@ -334,7 +334,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC gap(String size, int... indexes) {
+    public AC gap(String size, int... indexes) {
         BoundSize bsa = size != null ? ConstraintParser.parseBoundSize(size, true, true) : null;
 
         for (int i = indexes.length - 1; i >= 0; i--) {
@@ -356,7 +356,7 @@ public final class AC {
      * @param side The default side to align the components. E.g. "top" or "left", or "leading" or "trailing" or "bottom" or "right".
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC align(String side) {
+    public AC align(String side) {
         return align(side, curIx);
     }
 
@@ -371,7 +371,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC align(String side, int... indexes) {
+    public AC align(String side, int... indexes) {
         UnitValue al = ConstraintParser.parseAlignKeywords(side, true);
         if (al == null)
             al = ConstraintParser.parseAlignKeywords(side, false);
@@ -392,7 +392,7 @@ public final class AC {
      * @param p The new grow priority.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC growPrio(int p) {
+    public AC growPrio(int p) {
         return growPrio(p, curIx);
     }
 
@@ -405,7 +405,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC growPrio(int p, int... indexes) {
+    public AC growPrio(int p, int... indexes) {
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
             makeSize(ix);
@@ -424,7 +424,7 @@ public final class AC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      * @since 3.7.2
      */
-    public final AC grow() {
+    public AC grow() {
         return grow(1f, curIx);
     }
 
@@ -436,7 +436,7 @@ public final class AC {
      * @param w The new grow weight.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC grow(float w) {
+    public AC grow(float w) {
         return grow(w, curIx);
     }
 
@@ -449,7 +449,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC grow(float w, int... indexes) {
+    public AC grow(float w, int... indexes) {
         Float gw = new Float(w);
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
@@ -467,7 +467,7 @@ public final class AC {
      * @param p The new shrink priority.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC shrinkPrio(int p) {
+    public AC shrinkPrio(int p) {
         return shrinkPrio(p, curIx);
     }
 
@@ -480,7 +480,7 @@ public final class AC {
      * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      */
-    public final AC shrinkPrio(int p, int... indexes) {
+    public AC shrinkPrio(int p, int... indexes) {
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
             makeSize(ix);
@@ -499,7 +499,7 @@ public final class AC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      * @since 3.7.2
      */
-    public final AC shrink() {
+    public AC shrink() {
         return shrink(100f, curIx);
     }
 
@@ -512,7 +512,7 @@ public final class AC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      * @since 3.7.2
      */
-    public final AC shrink(float w) {
+    public AC shrink(float w) {
         return shrink(w, curIx);
     }
 
@@ -526,7 +526,7 @@ public final class AC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      * @since 3.7.2
      */
-    public final AC shrink(float w, int... indexes) {
+    public AC shrink(float w, int... indexes) {
         Float sw = new Float(w);
         for (int i = indexes.length - 1; i >= 0; i--) {
             int ix = indexes[i];
@@ -545,7 +545,7 @@ public final class AC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      * @deprecated in 3.7.2. Use {@link #shrink(float)} instead.
      */
-    public final AC shrinkWeight(float w) {
+    public AC shrinkWeight(float w) {
         return shrink(w);
     }
 
@@ -559,7 +559,7 @@ public final class AC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new AxisConstraint().noGrid().gap().fill()</code>.
      * @deprecated in 3.7.2. Use {@link #shrink(float, int...)} instead.
      */
-    public final AC shrinkWeight(float w, int... indexes) {
+    public AC shrinkWeight(float w, int... indexes) {
         return shrink(w, indexes);
     }
 

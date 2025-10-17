@@ -57,8 +57,8 @@ public class DateFormat extends Format {
      */
     public static final int DEFAULT = MEDIUM;
 
-    private int dateStyle;
-    private int timeStyle;
+    private final int dateStyle;
+    private final int timeStyle;
 
     /**
      * Construct a date formatter using default patterns for date and time (SHORT/SHORT).
@@ -198,7 +198,7 @@ public class DateFormat extends Format {
     String format(Object obj, StringBuffer toAppendTo) throws IllegalArgumentException {
         StringBuilder sb = new StringBuilder();
         format(obj, sb);
-        toAppendTo.append(sb.toString());
+        toAppendTo.append(sb);
         return toAppendTo.toString();
     }
 
@@ -280,9 +280,7 @@ public class DateFormat extends Format {
         DateFormat other = (DateFormat) obj;
         if (dateStyle != other.dateStyle)
             return false;
-        if (timeStyle != other.timeStyle)
-            return false;
-        return true;
+        return timeStyle == other.timeStyle;
     }
 
     /*

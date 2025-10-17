@@ -42,7 +42,7 @@ interface StructuredContent {
      * @param name tag name to select.
      * @return an array of elements that match the tag name.
      */
-    public List getChildren(String name);
+    List getChildren(String name);
 
     /**
      * Select a single direct child node from the current position.
@@ -50,7 +50,7 @@ interface StructuredContent {
      * @param index the index of the node to select
      * @return a single element, or null if the index is out of range.
      */
-    public StructuredContent getChild(int index);
+    StructuredContent getChild(int index);
 
     /**
      * Globally select all children from the current position with a given tag
@@ -59,7 +59,7 @@ interface StructuredContent {
      * @param name tag name to select.
      * @return an array of elements that match the tag name.
      */
-    public List getDescendants(String name);
+    List getDescendants(String name);
 
     /**
      * Select an attribute from the current node.
@@ -68,7 +68,7 @@ interface StructuredContent {
      * @return the value of the attribute, or null if the attribute is not
      * present.
      */
-    public String getAttribute(String name);
+    String getAttribute(String name);
 
     /**
      * Select all attributes from the current node.
@@ -76,7 +76,7 @@ interface StructuredContent {
      * @return all attributes, or null if no attributes are
      * present.
      */
-    public Map getAttributes();
+    Map getAttributes();
 
     /**
      * Select the parent of the current node.
@@ -85,7 +85,7 @@ interface StructuredContent {
      * @return the value of the attribute, or null if the attribute is not
      * present.
      */
-    public StructuredContent getParent();
+    StructuredContent getParent();
 
     /**
      * Select the text at the current node. If the current node is not a text
@@ -94,7 +94,7 @@ interface StructuredContent {
      *
      * @return
      */
-    public String getText();
+    String getText();
 
     /**
      * Get the native structured document object. For example, an XML document
@@ -103,5 +103,5 @@ interface StructuredContent {
      *
      * @return native structured document object.
      */
-    public Object getNativeRoot();
+    Object getNativeRoot();
 }

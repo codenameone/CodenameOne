@@ -64,7 +64,7 @@ public class StringUtil {
         }
 
         while (idx != -1) {
-            sb.append(workingSource.substring(0, idx));
+            sb.append(workingSource, 0, idx);
             sb.append(replace);
             workingSource = workingSource.substring(idx + pattern.length());
             idx = workingSource.indexOf(pattern);
@@ -92,7 +92,7 @@ public class StringUtil {
             return source;
         }
 
-        sb.append(workingSource.substring(0, idx));
+        sb.append(workingSource, 0, idx);
         sb.append(replace);
         workingSource = workingSource.substring(idx + pattern.length());
         sb.append(workingSource);

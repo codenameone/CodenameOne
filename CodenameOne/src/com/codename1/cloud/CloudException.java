@@ -29,7 +29,7 @@ package com.codename1.cloud;
  * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public class CloudException extends Exception {
-    private int errorCode;
+    private final int errorCode;
 
     CloudException(int errorCode) {
         super("Cloud exception " + errorCode);

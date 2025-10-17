@@ -120,12 +120,12 @@ class TBigDecimal {
      * An array with powers of five that fit in the type <code>long</code>
      * (<code>5^0,5^1,...,5^27</code>).
      */
-    private static final TBigInteger FIVE_POW[];
+    private static final TBigInteger[] FIVE_POW;
     /**
      * An array with powers of ten that fit in the type <code>long</code>
      * (<code>10^0,10^1,...,10^18</code>).
      */
-    private static final TBigInteger TEN_POW[];
+    private static final TBigInteger[] TEN_POW;
     /**
      * An array with powers of ten that fit in the type <code>long</code>
      * (<code>10^0,10^1,...,10^18</code>).
@@ -186,12 +186,12 @@ class TBigDecimal {
      * An array with the first <code>BigInteger</code> scaled by zero.
      * (<code>[0,0],[1,0],...,[10,0]</code>).
      */
-    private static final TBigDecimal BI_SCALED_BY_ZERO[] = new TBigDecimal[BI_SCALED_BY_ZERO_LENGTH];
+    private static final TBigDecimal[] BI_SCALED_BY_ZERO = new TBigDecimal[BI_SCALED_BY_ZERO_LENGTH];
     /**
      * An array with the zero number scaled by the first positive scales.
      * (<code>0*10^0, 0*10^1, ..., 0*10^10</code>).
      */
-    private static final TBigDecimal ZERO_SCALED_BY[] = new TBigDecimal[11];
+    private static final TBigDecimal[] ZERO_SCALED_BY = new TBigDecimal[11];
     /**
      * An array filled with characters <code>'0'</code>.
      */
@@ -1071,7 +1071,7 @@ class TBigDecimal {
                     .add(TBigInteger.valueOf(largerSignum));
         } else {
             tempBI = larger.getUnscaledValue().subtract(TBigInteger.valueOf(largerSignum));
-            tempBI = TMultiplication.multiplyByPositiveInt(tempBI, 10).add(TBigInteger.valueOf(largerSignum * 9));
+            tempBI = TMultiplication.multiplyByPositiveInt(tempBI, 10).add(TBigInteger.valueOf(largerSignum * 9L));
         }
         // Rounding the improved adding
         larger = new TBigDecimal(tempBI, larger.scale + 1);
@@ -1156,7 +1156,7 @@ class TBigDecimal {
                 } else {
                     tempBI = this.getUnscaledValue().subtract(TBigInteger.valueOf(thisSignum));
                     tempBI = TMultiplication.multiplyByPositiveInt(tempBI, 10)
-                            .add(TBigInteger.valueOf(thisSignum * 9));
+                            .add(TBigInteger.valueOf(thisSignum * 9L));
                 }
                 // Rounding the improved subtracting
                 leftOperand = new TBigDecimal(tempBI, this.scale + 1);
@@ -1344,7 +1344,7 @@ class TBigDecimal {
         TBigInteger p = this.getUnscaledValue();
         TBigInteger q = divisor.getUnscaledValue();
         TBigInteger gcd; // greatest common divisor between 'p' and 'q'
-        TBigInteger quotAndRem[];
+        TBigInteger[] quotAndRem;
         long diffScale = (long) scale - divisor.scale;
         int newScale; // the new scale for final quotient
         int k; // number of factors "2" in 'q'
@@ -1423,7 +1423,7 @@ class TBigDecimal {
         int i = 1; // index
         int lastPow = TEN_POW.length - 1; // last power of ten
         TBigInteger integerQuot; // for temporal results
-        TBigInteger quotAndRem[] = {getUnscaledValue()};
+        TBigInteger[] quotAndRem = {getUnscaledValue()};
         // In special cases it reduces the problem to call the dual method
         if ((mc.getPrecision() == 0) || (this.isZero())
                 || (divisor.isZero())) {
@@ -1442,7 +1442,7 @@ class TBigDecimal {
             compRem = quotAndRem[1].shiftLeftOneBit().compareTo(divisor.getUnscaledValue());
             // quot := quot * 10 + r;     with 'r' in {-6,-5,-4, 0,+4,+5,+6}
             integerQuot = integerQuot.multiply(TBigInteger.TEN)
-                    .add(TBigInteger.valueOf(quotAndRem[0].signum() * (5 + compRem)));
+                    .add(TBigInteger.valueOf((long) quotAndRem[0].signum() * (5 + compRem)));
             newScale++;
         } else {
             // To strip trailing zeros until the preferred scale is reached
@@ -1480,7 +1480,7 @@ class TBigDecimal {
     public TBigDecimal divideToIntegralValue(TBigDecimal divisor) {
         TBigInteger integralValue; // the integer of result
         TBigInteger powerOfTen; // some power of ten
-        TBigInteger quotAndRem[] = {getUnscaledValue()};
+        TBigInteger[] quotAndRem = {getUnscaledValue()};
         long newScale = (long) this.scale - divisor.scale;
         long tempScale = 0;
         int i = 1;
@@ -1550,7 +1550,7 @@ class TBigDecimal {
         long diffScale = (long) this.scale - divisor.scale;
         long newScale = diffScale;
         long quotPrecision = diffPrecision - diffScale + 1;
-        TBigInteger quotAndRem[] = new TBigInteger[2];
+        TBigInteger[] quotAndRem = new TBigInteger[2];
         // In special cases it call the dual method
         if ((mcPrecision == 0) || (this.isZero()) || (divisor.isZero())) {
             return this.divideToIntegralValue(divisor);
@@ -1683,7 +1683,7 @@ class TBigDecimal {
      * @see #remainder
      */
     public TBigDecimal[] divideAndRemainder(TBigDecimal divisor) {
-        TBigDecimal quotAndRem[] = new TBigDecimal[2];
+        TBigDecimal[] quotAndRem = new TBigDecimal[2];
 
         quotAndRem[0] = this.divideToIntegralValue(divisor);
         quotAndRem[1] = this.subtract(quotAndRem[0].multiply(divisor));
@@ -1709,7 +1709,7 @@ class TBigDecimal {
      * @see #remainder
      */
     public TBigDecimal[] divideAndRemainder(TBigDecimal divisor, TMathContext mc) {
-        TBigDecimal quotAndRem[] = new TBigDecimal[2];
+        TBigDecimal[] quotAndRem = new TBigDecimal[2];
 
         quotAndRem[0] = this.divideToIntegralValue(divisor, mc);
         quotAndRem[1] = this.subtract(quotAndRem[0].multiply(divisor));
@@ -2336,7 +2336,7 @@ class TBigDecimal {
             if (exponent > 0) {
                 result.insert(++end, '+');
             }
-            result.insert(++end, Long.toString(exponent));
+            result.insert(++end, exponent);
         }
         toStringImage = result.toString();
         return toStringImage;
@@ -2402,7 +2402,7 @@ class TBigDecimal {
                 if (exponent > 0) {
                     result.insert(++end, '+');
                 }
-                result.insert(++end, Long.toString(exponent));
+                result.insert(++end, exponent);
             }
         }
         return result.toString();
@@ -2449,7 +2449,7 @@ class TBigDecimal {
                 result.append(intStr.substring(begin));
             } else {
                 delta = begin - delta;
-                result.append(intStr.substring(begin, delta));
+                result.append(intStr, begin, delta);
                 result.append('.');
                 result.append(intStr.substring(delta));
             }
@@ -2670,7 +2670,7 @@ class TBigDecimal {
             // mantisa = abs(u) * 10^s
             mantisa = mantisa.multiply(TMultiplication.powerOf10(-scale));
         } else {// (scale > 0)
-            TBigInteger quotAndRem[];
+            TBigInteger[] quotAndRem;
             TBigInteger powerOfTen = TMultiplication.powerOf10(scale);
             int k = 100 - (int) powerOfTwo;
             int compRem;
@@ -2687,7 +2687,7 @@ class TBigDecimal {
             compRem = quotAndRem[1].shiftLeftOneBit().compareTo(powerOfTen);
             // To add two rounded bits at end of mantisa
             mantisa = quotAndRem[0].shiftLeft(2).add(
-                    TBigInteger.valueOf((compRem * (compRem + 3)) / 2 + 1));
+                    TBigInteger.valueOf(((long) compRem * (compRem + 3)) / 2 + 1));
             exponent -= 2;
         }
         lowestSetBit = mantisa.getLowestSetBit();

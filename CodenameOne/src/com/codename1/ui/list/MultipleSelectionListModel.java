@@ -34,14 +34,14 @@ public interface MultipleSelectionListModel<T> extends ListModel<T> {
      *
      * @param indices Indices to add to selected indices.
      */
-    public void addSelectedIndices(int... indices);
+    void addSelectedIndices(int... indices);
 
     /**
      * Removes indices from the set of selected indices.
      *
      * @param indices Indices to remove from selected indices.
      */
-    public void removeSelectedIndices(int... indices);
+    void removeSelectedIndices(int... indices);
 
     /**
      * Gets the selected indices in this model.  Indices should be returned
@@ -50,13 +50,13 @@ public interface MultipleSelectionListModel<T> extends ListModel<T> {
      * @return Selected indices in increasing order with no duplicates.  If there
      * are no selected indices, then this will return a zero-length array.
      */
-    public int[] getSelectedIndices();
+    int[] getSelectedIndices();
 
     /**
      * Sets the selected indices in this model.
      *
      * @param indices
      */
-    public void setSelectedIndices(int... indices);
+    void setSelectedIndices(int... indices);
 
 }

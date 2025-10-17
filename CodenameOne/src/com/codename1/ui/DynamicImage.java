@@ -126,7 +126,7 @@ public abstract class DynamicImage extends Image {
     @Override
     public Image fill(int width, int height) {
         try {
-            DynamicImage img = (DynamicImage) this.getClass().newInstance();
+            DynamicImage img = this.getClass().newInstance();
             img.w = width;
             img.h = height;
             img.setStyle(style);
@@ -178,4 +178,4 @@ public abstract class DynamicImage extends Image {
         drawImageImpl(g, nativeGraphics, x, y, w, h);
     }
 
-};
+}

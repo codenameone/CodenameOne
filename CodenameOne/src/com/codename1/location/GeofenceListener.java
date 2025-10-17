@@ -37,11 +37,11 @@ public interface GeofenceListener {
     /**
      * This callback gets called once the device is out of the Geofence area
      */
-    public void onExit(String id);
+    void onExit(String id);
 
     /**
      * This callback gets called once the device enters the Geofence area
      */
-    public void onEntered(String id);
+    void onEntered(String id);
 
 }

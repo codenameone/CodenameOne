@@ -37,7 +37,7 @@ import com.codename1.ui.list.ListModel;
  */
 public class GenericSpinner extends BaseSpinner {
     private Spinner[] spin;
-    private ListModel[] model = new ListModel[]{new DefaultListModel(new Object[]{"Value 1", "Value 2", "Value 3"})};
+    private ListModel[] model = new ListModel[]{new DefaultListModel("Value 1", "Value 2", "Value 3")};
     private ListCellRenderer[] renderer = new ListCellRenderer[]{new SpinnerRenderer<Object>()};
     private Object[] value;
     private String[] renderingPrototype;
@@ -269,7 +269,7 @@ public class GenericSpinner extends BaseSpinner {
             return getRenderer();
         }
         if (name.equals("columns")) {
-            return new Integer(getColumns());
+            return Integer.valueOf(getColumns());
         }
         return null;
     }

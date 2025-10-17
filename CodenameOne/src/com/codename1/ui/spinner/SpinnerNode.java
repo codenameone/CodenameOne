@@ -34,25 +34,27 @@ import java.util.Map;
 class SpinnerNode extends Node {
     ListModel<String> listModel;
     Node selectedRowOverlay = new Node();
-    private Label rowTemplate = new Label("", "Spinner3DRow");
-    private Label overlayTemplate = new Label("", "Spinner3DOverlay");
-    private Style rowStyle, selectedRowStyle, overlayStyle;
-    private Map<Integer, Node> childIndex = new HashMap<Integer, Node>();
+    private final Label rowTemplate = new Label("", "Spinner3DRow");
+    private final Label overlayTemplate = new Label("", "Spinner3DOverlay");
+    private final Style rowStyle;
+    private final Style selectedRowStyle;
+    private final Style overlayStyle;
+    private final Map<Integer, Node> childIndex = new HashMap<Integer, Node>();
     private List<ScrollListener> scrollListeners;
     private boolean setSelectedIndexReentrantLock;
     private boolean setScrollYReentrantLock;
     private RowFormatter rowFormatter;
     private double flatScrollPos;
-    private int numSides = 14;
-    private Label renderer = new Label("Testing", "Spinner3DRow");
-    private DataChangedListener listChangedListener = new DataChangedListener() {
+    private final int numSides = 14;
+    private final Label renderer = new Label("Testing", "Spinner3DRow");
+    private final DataChangedListener listChangedListener = new DataChangedListener() {
         public void dataChanged(int type, int index) {
             rebuildChildren();
         }
     };
     private int selectedIndex = -1;
     private List<SelectionListener> selectionListeners;
-    private SelectionListener selectionListener = new SelectionListener() {
+    private final SelectionListener selectionListener = new SelectionListener() {
         public void selectionChanged(int oldSelected, int newSelected) {
             if (newSelected < 0 && listModel != null) {
                 newSelected = listModel.getSelectedIndex();
@@ -441,8 +443,8 @@ class SpinnerNode extends Node {
         translateX.set(oldTranslateX);
     }
 
-    public static interface RowFormatter {
-        public String format(String input);
+    public interface RowFormatter {
+        String format(String input);
     }
 
 }

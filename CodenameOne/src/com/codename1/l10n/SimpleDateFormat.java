@@ -311,7 +311,7 @@ public class SimpleDateFormat extends DateFormat {
     String format(Date source, StringBuffer toAppendTo) {
         StringBuilder sb = new StringBuilder();
         String out = format(source, sb);
-        toAppendTo.append(sb.toString());
+        toAppendTo.append(sb);
         return toAppendTo.toString();
 
     }
@@ -326,7 +326,7 @@ public class SimpleDateFormat extends DateFormat {
         calendar.setTime(source);
         List<String> pattern = getPatternTokens();
         for (int i = 0; i < pattern.size(); i++) {
-            String token = (String) pattern.get(i);
+            String token = pattern.get(i);
             char patternChar = token.charAt(0);
             token = token.substring(1);
             int len = token.length();
@@ -337,7 +337,7 @@ public class SimpleDateFormat extends DateFormat {
                     break;
                 case AMPM_LETTER:
                     boolean am = calendar.get(Calendar.AM_PM) == Calendar.AM;
-                    String ampm[] = getDateFormatSymbols().getAmPmStrings();
+                    String[] ampm = getDateFormatSymbols().getAmPmStrings();
                     toAppendTo.append(am ? ampm[0] : ampm[1]);
                     break;
                 case ERA_LETTER:
@@ -352,7 +352,7 @@ public class SimpleDateFormat extends DateFormat {
                     }
                     break;
                 case TIMEZONE_LETTER:
-                    String names[] = getTimeZoneDisplayNames(calendar.getTimeZone().getID());
+                    String[] names = getTimeZoneDisplayNames(calendar.getTimeZone().getID());
                     if (names == null) {
                         toAppendTo.append(calendar.getTimeZone().getID());
                     } else {
@@ -447,7 +447,7 @@ public class SimpleDateFormat extends DateFormat {
     }
 
     private String[] getTimeZoneDisplayNames(String id) {
-        for (String zoneStrings[] : getDateFormatSymbols().getZoneStrings()) {
+        for (String[] zoneStrings : getDateFormatSymbols().getZoneStrings()) {
             if (zoneStrings[DateFormatSymbols.ZONE_ID].equalsIgnoreCase(id)) {
                 return zoneStrings;
             }
@@ -482,10 +482,10 @@ public class SimpleDateFormat extends DateFormat {
         int pmMinutes = 0;
         List<String> pattern = getPatternTokens();
         for (int i = 0; i < pattern.size(); i++) {
-            String token = (String) pattern.get(i);
+            String token = pattern.get(i);
             boolean adjacent = false;
             if (i < (pattern.size() - 1)) {
-                adjacent = ((String) pattern.get(i + 1)).charAt(0) != LITERAL_LETTER;
+                adjacent = pattern.get(i + 1).charAt(0) != LITERAL_LETTER;
             }
             String s = null;
             int v = -1;
@@ -753,7 +753,7 @@ public class SimpleDateFormat extends DateFormat {
         int len = source.length();
         for (int i = ofs; i < len; i++) {
             char ch = source.charAt(i);
-            if (isNumeric(ch) == false) {
+            if (!isNumeric(ch)) {
                 // empty string would be invalid number
                 if (i == 0) {
                     return null;
@@ -849,7 +849,7 @@ public class SimpleDateFormat extends DateFormat {
             return null;
         }
         DateFormatSymbols ds = getDateFormatSymbols();
-        String markers[] = ds.getAmPmStrings();
+        String[] markers = ds.getAmPmStrings();
         for (String marker : markers) {
             if (fragment.toLowerCase().startsWith(marker.toLowerCase())) {
                 return readSubstring(source, ofs, ofs + marker.length());
@@ -882,7 +882,7 @@ public class SimpleDateFormat extends DateFormat {
      */
     int parseAmPmMarker(String source, int ofs) throws ParseException {
         DateFormatSymbols ds = getDateFormatSymbols();
-        String markers[] = getDateFormatSymbols().getAmPmStrings();
+        String[] markers = getDateFormatSymbols().getAmPmStrings();
         int mlen = markers.length;
         for (int i = 0; i < mlen; i++) {
             if (markers[i].equalsIgnoreCase(source)) {
@@ -970,7 +970,7 @@ public class SimpleDateFormat extends DateFormat {
             return (parseNumber(month, offset, "month", 1, 12) - 1) + Calendar.JANUARY;
         }
         DateFormatSymbols ds = getDateFormatSymbols();
-        String months[] = ds.getMonths();
+        String[] months = ds.getMonths();
         int mlen = months.length;
         for (int i = 0; i < mlen; i++) {
             if (month.equalsIgnoreCase(months[i])) {
@@ -1023,7 +1023,7 @@ public class SimpleDateFormat extends DateFormat {
         }
         // handle zulu
         if (len == 1) {
-            if (fragment.toLowerCase().equals("z")) {
+            if (fragment.equalsIgnoreCase("z")) {
                 return readSubstring(source, ofs, ofs + 1);
             }
             return null;
@@ -1037,7 +1037,7 @@ public class SimpleDateFormat extends DateFormat {
             return readSubstring(source, ofs, ofs + 5);
         }
         DateFormatSymbols ds = getDateFormatSymbols();
-        for (String timezone[] : ds.getZoneStrings()) {
+        for (String[] timezone : ds.getZoneStrings()) {
             for (String z : timezone) {
                 if (z.equalsIgnoreCase(fragment)) {
                     return readSubstring(source, ofs, ofs + z.length());
@@ -1114,7 +1114,7 @@ public class SimpleDateFormat extends DateFormat {
         DateFormatSymbols ds = getDateFormatSymbols();
 
         // Handle timezone based on ID or full name
-        for (String timezone[] : ds.getZoneStrings()) {
+        for (String[] timezone : ds.getZoneStrings()) {
             for (String z : timezone) {
                 if (z.equalsIgnoreCase(source)) {
                     TimeZone tz = TimeZone.getTimeZone(timezone[DateFormatSymbols.ZONE_ID]);
@@ -1201,7 +1201,7 @@ public class SimpleDateFormat extends DateFormat {
             // Any invalid non-alpha characters are treated as literal text.
             // invalid alpha characters are illegal.
             boolean isValid = PATTERN_LETTERS.indexOf(ch) != -1;
-            if (isValid == false) {
+            if (!isValid) {
                 if (tmp != null) {
                     tokens.add(tmp.charAt(0) + tmp);
                     tmp = null;

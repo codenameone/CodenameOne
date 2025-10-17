@@ -194,7 +194,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     };
     private boolean animationLock;
     private final ActionListener pointerReleased = new ActionListener() {
-        private int tapThreshold = CN.convertToPixels(1);
+        private final int tapThreshold = CN.convertToPixels(1);
 
         private boolean dragWasActuallyATap() {
             return System.currentTimeMillis() - dragStartTime < 60 && Math.abs(deltaX) < tapThreshold;
@@ -256,7 +256,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             animationLock = false;
         }
     };
-    private int valign = CENTER;
+    private final int valign = CENTER;
 
     /**
      * Default constructor

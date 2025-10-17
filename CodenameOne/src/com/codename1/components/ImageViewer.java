@@ -309,7 +309,6 @@ public class ImageViewer extends Component {
             }
             if (gk == Display.GAME_RIGHT || gk == Display.GAME_RIGHT && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
-                return;
             }
         }
     }
@@ -373,7 +372,6 @@ public class ImageViewer extends Component {
                 // animate back
                 new AnimatePanX(0, null, 0);
             }
-            return;
         }
     }
 
@@ -429,12 +427,10 @@ public class ImageViewer extends Component {
                 // this has the potential of being a pan operation...
                 if (panPositionX < 0) {
                     repaint();
-                    return;
                 } else {
                     if (panPositionX > 0) {
                         panPositionX += 1;
                         repaint();
-                        return;
                     }
                 }
             }
@@ -1118,9 +1114,9 @@ public class ImageViewer extends Component {
     }
 
     class AnimatePanX implements Animation {
-        private Motion motion;
-        private Image replaceImage;
-        private int updatePos;
+        private final Motion motion;
+        private final Image replaceImage;
+        private final int updatePos;
 
         public AnimatePanX(float destPan, Image replaceImage, int updatePos) {
             motion = Motion.createEaseInOutMotion((int) (panPositionX * 10000), (int) (destPan * 10000), 200);

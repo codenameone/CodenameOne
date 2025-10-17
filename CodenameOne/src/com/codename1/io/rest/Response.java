@@ -29,9 +29,9 @@ package com.codename1.io.rest;
  * @author Chen Fishbein
  */
 public class Response<T> {
-    private int responseCode;
-    private T responseData;
-    private String responseMessage;
+    private final int responseCode;
+    private final T responseData;
+    private final String responseMessage;
 
     Response(int responseCode, T responseData, String responseMessage) {
         this.responseCode = responseCode;

@@ -36,5 +36,5 @@ public interface SuccessCallback<T> {
      *
      * @param value the value
      */
-    public void onSucess(T value);
+    void onSucess(T value);
 }

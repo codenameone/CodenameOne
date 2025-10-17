@@ -36,14 +36,14 @@ public interface PurchaseCallback {
      *
      * @param sku the sku purchased
      */
-    public void itemPurchased(String sku);
+    void itemPurchased(String sku);
 
     /**
      * Callback indicating a the given SKU purchase failed
      *
      * @param sku the id
      */
-    public void itemPurchaseError(String sku, String errorMessage);
+    void itemPurchaseError(String sku, String errorMessage);
 
     /**
      * Invoked if a refund was granted for a purchase
@@ -52,7 +52,7 @@ public interface PurchaseCallback {
      * @deprecated This callback is no longer used.  Use the Receipts API to check if the user currently "owns" a product.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
      * into how to set up in-app purchase for all scenarios including subscriptions.
      */
-    public void itemRefunded(String sku);
+    void itemRefunded(String sku);
 
     /**
      * Invoked when a subscription SKU is started
@@ -61,7 +61,7 @@ public interface PurchaseCallback {
      * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
      * into how to set up in-app purchase for all scenarios including subscriptions.
      */
-    public void subscriptionStarted(String sku);
+    void subscriptionStarted(String sku);
 
     /**
      * Invoked when a subscription SKU is canceled
@@ -70,19 +70,19 @@ public interface PurchaseCallback {
      * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
      * into how to set up in-app purchase for all scenarios including subscriptions.
      */
-    public void subscriptionCanceled(String sku);
+    void subscriptionCanceled(String sku);
 
     /**
      * Indicates that a manual payment has failed
      *
      * @param paymentCode the transaction id of the payment
      */
-    public void paymentFailed(String paymentCode, String failureReason);
+    void paymentFailed(String paymentCode, String failureReason);
 
     /**
      * Indicates that a manual payment has passed
      *
      * @param paymentCode the transaction id of the payment
      */
-    public void paymentSucceeded(String paymentCode, double amount, String currency);
+    void paymentSucceeded(String paymentCode, double amount, String currency);
 }

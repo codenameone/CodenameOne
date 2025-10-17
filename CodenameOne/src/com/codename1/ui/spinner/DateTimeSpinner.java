@@ -32,13 +32,13 @@ import java.util.Date;
  */
 public class DateTimeSpinner extends TimeSpinner {
     private Spinner date;
-    private Date today = new Date();
+    private final Date today = new Date();
     private Date currentDate = today;
     private Date startDate = new Date(0);
     private Date endDate = new Date(System.currentTimeMillis() + 10000L * 24L * 60L * 60000L);
     private boolean markToday = true;
     private boolean includeYear;
-    private int off;
+    private final int off;
 
     /**
      * Default constructor
@@ -200,10 +200,10 @@ public class DateTimeSpinner extends TimeSpinner {
             return endDate;
         }
         if (name.equals("markToday")) {
-            return new Boolean(markToday);
+            return Boolean.valueOf(markToday);
         }
         if (name.equals("includeYear")) {
-            return new Boolean(includeYear);
+            return Boolean.valueOf(includeYear);
         }
         return super.getPropertyValue(name);
     }

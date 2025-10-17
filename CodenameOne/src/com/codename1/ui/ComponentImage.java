@@ -32,7 +32,7 @@ package com.codename1.ui;
  */
 public class ComponentImage extends Image {
 
-    private Component cmp;
+    private final Component cmp;
     private int w;
     private int h;
     private boolean pulsingAnimation;
@@ -348,4 +348,4 @@ public class ComponentImage extends Image {
     }
 
 
-};
+}

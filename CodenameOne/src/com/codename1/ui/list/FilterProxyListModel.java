@@ -36,9 +36,9 @@ import java.util.Map;
  * @author Shai Almog
  */
 public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListener {
-    private ListModel<T> underlying;
+    private final ListModel<T> underlying;
     private ArrayList<Integer> filter;
-    private ArrayList<DataChangedListener> listeners = new ArrayList<DataChangedListener>();
+    private final ArrayList<DataChangedListener> listeners = new ArrayList<DataChangedListener>();
     private boolean startsWithMode;
 
     /**
@@ -222,7 +222,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
         if (filter == null) {
             return index;
         }
-        return filter.indexOf(new Integer(index));
+        return filter.indexOf(Integer.valueOf(index));
     }
 
     /**
@@ -241,7 +241,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
             Object o = underlying.getItemAt(iter);
             if (o != null) {
                 if (check(o, str)) {
-                    filter.add(new Integer(iter));
+                    filter.add(Integer.valueOf(iter));
                 }
             }
         }
@@ -258,22 +258,15 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     protected boolean check(Object o, String str) {
         if (o instanceof Map) {
             Map h = (Map) o;
-            if (comp(h.get("name"), str)) {
-                return true;
-            }
+            return comp(h.get("name"), str);
         } else {
             String element = o.toString();
             if (startsWithMode) {
-                if (element.toUpperCase().startsWith(str)) {
-                    return true;
-                }
+                return element.toUpperCase().startsWith(str);
             } else {
-                if (element.toUpperCase().indexOf(str) > -1) {
-                    return true;
-                }
+                return element.toUpperCase().indexOf(str) > -1;
             }
         }
-        return false;
     }
 
     private boolean comp(Object val, String str) {

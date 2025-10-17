@@ -91,7 +91,7 @@ abstract class AbstractStringBuilder {
         value[count++] = 'l';
     }
 
-    final void append0(char chars[]) {
+    final void append0(char[] chars) {
         int newSize = count + chars.length;
         if (newSize > value.length) {
             enlargeBuffer(newSize);

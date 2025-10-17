@@ -39,5 +39,5 @@ public interface CrashReport {
      *
      * @param t the exception
      */
-    public void exception(Throwable t);
+    void exception(Throwable t);
 }

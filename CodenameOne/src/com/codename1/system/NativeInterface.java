@@ -39,5 +39,5 @@ public interface NativeInterface {
      *
      * @return true if the native interface is supported on the given platform
      */
-    public boolean isSupported();
+    boolean isSupported();
 }

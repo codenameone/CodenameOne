@@ -903,7 +903,7 @@ public class RECompiler {
                         setNextOfEnd(pos + RE.nodeSize, pos);
                         break;
                     } else if (bracketOpt > 0) {
-                        int opt[] = new int[bracketOpt + 1];
+                        int[] opt = new int[bracketOpt + 1];
                         // Surround first optional terminal with MAYBE
                         nodeInsert(RE.OP_MAYBE, 0, pos);
                         opt[0] = pos;

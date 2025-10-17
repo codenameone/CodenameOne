@@ -34,7 +34,7 @@ import java.util.Arrays;
  */
 public class PerspectiveCamera extends Camera {
     public final Property<Double, Camera> verticalFieldOfView;
-    private Scene scene;
+    private final Scene scene;
 
 
     public PerspectiveCamera(Scene scene, double fovY, double zNear, double zFar) {

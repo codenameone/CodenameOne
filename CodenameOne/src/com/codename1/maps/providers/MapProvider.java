@@ -32,8 +32,8 @@ import com.codename1.ui.geom.Dimension;
  */
 public abstract class MapProvider {
 
-    private Projection _projection;
-    private Dimension _tileSize;
+    private final Projection _projection;
+    private final Dimension _tileSize;
 
     /**
      * Creates a new MapProvider

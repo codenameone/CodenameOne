@@ -88,7 +88,7 @@ public class Log {
     private static Log instance = new Log();
     private static boolean initialized;
     private int level = DEBUG;
-    private long zeroTime = System.currentTimeMillis();
+    private final long zeroTime = System.currentTimeMillis();
     private Writer output;
     private boolean fileWriteEnabled = false;
     private String fileURL = null;
@@ -227,7 +227,7 @@ public class Log {
             MultipartRequest m = new MultipartRequest();
             m.setUrl("https://crashreport.codenameone.com/CrashReporterEmail/sendCrashReport");
             byte[] read = Util.readInputStream(Storage.getInstance().createInputStream("CN1Log__$"));
-            m.addArgument("i", "" + devId);
+            m.addArgument("i", devId);
             m.addArgument("u", Display.getInstance().getProperty("built_by_user", ""));
             m.addArgument("p", Display.getInstance().getProperty("package_name", ""));
             m.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));

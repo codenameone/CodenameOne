@@ -331,9 +331,9 @@ public class SignatureComponent extends Container implements ActionSource {
      */
     private class SignatureDialogBody extends Container {
         private final EventDispatcher eventDispatcher = new EventDispatcher();
-        private Button doneButton;
-        private Button resetButton;
-        private Button cancelButton;
+        private final Button doneButton;
+        private final Button resetButton;
+        private final Button cancelButton;
         private Image value;
 
         public SignatureDialogBody() {
@@ -447,8 +447,8 @@ public class SignatureComponent extends Container implements ActionSource {
         private final Stroke stroke = new Stroke();
         private final Rectangle signatureRect = new Rectangle();
         private boolean initialized;
-        private Style signatureBoxStyle;
-        private Style signatureStyle;
+        private final Style signatureBoxStyle;
+        private final Style signatureStyle;
 
         SignaturePanel() {
             setUIID("SignaturePanel");

@@ -49,7 +49,7 @@ public class TarEntry {
     }
 
     public boolean equals(TarEntry it) {
-        return this.header.name.toString().equals(it.header.name.toString());
+        return this.header.name.toString().contentEquals(it.header.name);
     }
 
     public boolean isDescendent(TarEntry desc) {
@@ -142,8 +142,7 @@ public class TarEntry {
             if (this.header.linkFlag == TarHeader.LF_DIR)
                 return true;
 
-            if (this.header.name.toString().endsWith("/"))
-                return true;
+            return this.header.name.toString().endsWith("/");
         }
 
         return false;
@@ -164,7 +163,7 @@ public class TarEntry {
         if (name.startsWith("/"))
             name = name.substring(1);
 
-        header.linkName = new StringBuffer("");
+        header.linkName = new StringBuffer();
 
         header.name = new StringBuffer(name);
 
@@ -236,8 +235,9 @@ public class TarEntry {
         offset = Octal.getOctalBytes(this.header.devMinor, outbuf, offset, TarHeader.DEVLEN);
 
         int oblen = outbuf.length;
-        for (; offset < oblen; )
+        while (offset < oblen) {
             outbuf[offset++] = 0;
+        }
 
         long checkSum = this.computeCheckSum(outbuf);
 

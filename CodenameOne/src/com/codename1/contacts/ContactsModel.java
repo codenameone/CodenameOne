@@ -36,7 +36,7 @@ import java.util.Hashtable;
  */
 public class ContactsModel extends DefaultListModel {
 
-    private Hashtable contactsCache = new Hashtable();
+    private final Hashtable contactsCache = new Hashtable();
 
     private Image placeHolder;
 
@@ -46,7 +46,7 @@ public class ContactsModel extends DefaultListModel {
      * @param ids the contact ids we would like this model to handle
      */
     public ContactsModel(String... ids) {
-        super((Object[]) ids);
+        super(ids);
     }
 
     /**

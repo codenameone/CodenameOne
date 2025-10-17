@@ -23,7 +23,7 @@ public enum PointStyle {
             "point");
 
     /** The point shape name. */
-    private String mName;
+    private final String mName;
 
     /**
      * The point style enum constructor.

@@ -107,12 +107,12 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
                     if (input != null) {
                         Integer value = null;
                         try {
-                            value = new Integer(new Double(Double.parseDouble(input)).intValue());
+                            value = Integer.valueOf(new Double(Double.parseDouble(input)).intValue());
                         } catch (Throwable t) {
 
                         }
                         if (value != null && value instanceof Integer) {
-                            int i = ((Integer) value).intValue();
+                            int i = value.intValue();
                             if (i < 10) {
                                 return "0" + i;
                             } else {
@@ -215,13 +215,13 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
             return Boolean.FALSE;
         }
         if (name.equals("currentHour")) {
-            return new Integer(currentHour);
+            return Integer.valueOf(currentHour);
         }
         if (name.equals("currentMinute")) {
-            return new Integer(currentMinute);
+            return Integer.valueOf(currentMinute);
         }
         if (name.equals("minuteStep")) {
-            return new Integer(minuteStep);
+            return Integer.valueOf(minuteStep);
         }
         if (name.equals("currentMeridiem")) {
             if (currentMeridiem) {
@@ -399,7 +399,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     public void setCurrentHour(int currentHour) {
         this.currentHour = currentHour;
         if (hour != null) {
-            hour.setValue(new Integer(currentHour));
+            hour.setValue(Integer.valueOf(currentHour));
         }
     }
 
@@ -419,7 +419,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     public void setCurrentMinute(int currentMinute) {
         this.currentMinute = currentMinute;
         if (minute != null) {
-            minute.setValue(new Integer(currentMinute));
+            minute.setValue(Integer.valueOf(currentMinute));
         }
     }
 
@@ -446,9 +446,9 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         this.currentMeridiem = currentMeridiem;
         if (amPM != null) {
             if (currentMeridiem) {
-                amPM.setValue(new Integer(1));
+                amPM.setValue(Integer.valueOf(1));
             } else {
-                amPM.setValue(new Integer(0));
+                amPM.setValue(Integer.valueOf(0));
             }
         }
     }
@@ -501,7 +501,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         zero.set(Calendar.MINUTE, 0);
         zero.set(Calendar.SECOND, 0);
         zero.set(Calendar.MILLISECOND, 0);
-        return (int) ((cld.getTime().getTime() - zero.getTime().getTime()) / 1000l / 60l);
+        return (int) ((cld.getTime().getTime() - zero.getTime().getTime()) / 1000L / 60L);
     }
 
     @Override
@@ -516,14 +516,14 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         cld.set(Calendar.MINUTE, 0);
         cld.set(Calendar.SECOND, 0);
         cld.set(Calendar.MILLISECOND, 0);
-        cld.setTime(new Date(cld.getTime().getTime() + dt.intValue() * 60l * 1000l));
+        cld.setTime(new Date(cld.getTime().getTime() + dt.intValue() * 60L * 1000L));
         setCurrentMinute(cld.get(Calendar.MINUTE));
         int hour = cld.get(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY);
         if (showMeridiem && hour == 0) {
             hour = 12;
         }
         setCurrentHour(hour);
-        setCurrentMeridiem(cld.get(Calendar.AM_PM) == 0 ? false : true);
+        setCurrentMeridiem(cld.get(Calendar.AM_PM) != 0);
     }
 
     @Override

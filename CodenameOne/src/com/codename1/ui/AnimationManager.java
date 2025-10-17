@@ -39,9 +39,9 @@ import java.util.ArrayList;
  */
 public final class AnimationManager {
     private final Form parentForm;
-    private ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();
-    private ArrayList<Runnable> postAnimations = new ArrayList<Runnable>();
-    private ArrayList<UIMutation> uiMutations = new ArrayList<UIMutation>();
+    private final ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();
+    private final ArrayList<Runnable> postAnimations = new ArrayList<Runnable>();
+    private final ArrayList<UIMutation> uiMutations = new ArrayList<UIMutation>();
 
     AnimationManager(Form parentForm) {
         this.parentForm = parentForm;

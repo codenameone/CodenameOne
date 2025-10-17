@@ -15,11 +15,11 @@ import java.io.OutputStream;
  * @since 7.0
  */
 public class WAVWriter implements AutoCloseable {
-    private File outputFile;
+    private final File outputFile;
     private OutputStream out;
-    private int samplingRate;
-    private int channels;
-    private int numBits;
+    private final int samplingRate;
+    private final int channels;
+    private final int numBits;
     private long dataLength;
 
     /**
@@ -42,7 +42,7 @@ public class WAVWriter implements AutoCloseable {
     private void writeHeader() throws IOException {
         final byte[] header = new byte[44];
         long totalDataLen = dataLength + 36;
-        final long bitrate = this.samplingRate * this.channels * this.numBits;
+        final long bitrate = (long) this.samplingRate * this.channels * this.numBits;
         header[0] = 82;
         header[1] = 73;
         header[3] = (header[2] = 70);

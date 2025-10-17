@@ -62,8 +62,8 @@ public class FlipTransition extends Transition {
     private int transitionState = STATE_MOVE_AWAY;
 
     private Motion motion;
-    private boolean firstFinished = false;
-    private boolean started = false;
+    private final boolean firstFinished = false;
+    private final boolean started = false;
 
     private int bgColor = -1;
 
@@ -195,7 +195,7 @@ public class FlipTransition extends Transition {
         //double midY = (float)y+(float)h/2.0;
         double fovy = 0.25;
 
-        t.setPerspective((float) fovy, (float) displayW / (float) displayH, zNear, zFar);
+        t.setPerspective((float) fovy, displayW / displayH, zNear, zFar);
     }
 
 

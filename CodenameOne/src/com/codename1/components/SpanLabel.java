@@ -49,10 +49,10 @@ import static com.codename1.ui.ComponentSelector.$;
  * @author Shai Almog
  */
 public class SpanLabel extends Container implements IconHolder, TextHolder {
-    private Label icon;
+    private final Label icon;
     private int gap;
-    private Container iconWrapper;
-    private TextArea text;
+    private final Container iconWrapper;
+    private final TextArea text;
     private boolean shouldLocalize = true;
     private int preferredW = -1;
 

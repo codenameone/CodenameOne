@@ -19,9 +19,9 @@ import com.codename1.ui.geom.Rectangle2D;
 
 
 public class ClickableArea {
-    private Rectangle2D rect;
-    private double x;
-    private double y;
+    private final Rectangle2D rect;
+    private final double x;
+    private final double y;
 
     public ClickableArea(Rectangle2D rect, double x, double y) {
         super();

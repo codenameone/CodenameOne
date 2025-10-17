@@ -33,7 +33,7 @@ public class DialChart extends RoundChart {
     /** The radius of the needle. */
     private static final int NEEDLE_RADIUS = 10;
     /** The series renderer. */
-    private DialRenderer mRenderer;
+    private final DialRenderer mRenderer;
 
     /**
      * Builds a new dial chart instance.

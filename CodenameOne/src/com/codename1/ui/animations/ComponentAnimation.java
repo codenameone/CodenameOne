@@ -295,7 +295,7 @@ public abstract class ComponentAnimation {
         /**
          * Containers that are being mutated as a part of this animation.
          */
-        private Set<Container> containers = new HashSet<Container>();
+        private final Set<Container> containers = new HashSet<Container>();
 
         /**
          * A flag that is set the first time updateState() is called.  Once this

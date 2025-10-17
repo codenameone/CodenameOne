@@ -30,7 +30,7 @@ package com.codename1.plugin.event;
  * @since 8.0
  */
 public class IsGalleryTypeSupportedEvent extends PluginEvent<Boolean> {
-    private int type;
+    private final int type;
 
     /**
      * Creates a new event with the given type.

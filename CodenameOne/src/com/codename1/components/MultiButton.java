@@ -57,11 +57,11 @@ import static com.codename1.ui.ComponentSelector.$;
  * @see SpanButton
  */
 public class MultiButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
-    private Label firstRow = new Label("MultiButton");
-    private Label secondRow = new Label();
-    private Label thirdRow = new Label();
-    private Label forthRow = new Label();
-    private Button icon = new Button();
+    private final Label firstRow = new Label("MultiButton");
+    private final Label secondRow = new Label();
+    private final Label thirdRow = new Label();
+    private final Label forthRow = new Label();
+    private final Button icon = new Button();
     private Button emblem = new Button();
     private boolean invert;
     private String group;
@@ -374,7 +374,6 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         }
         if (emblem instanceof CheckBox) {
             ((CheckBox) emblem).setSelected(b);
-            return;
         }
     }
 

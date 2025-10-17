@@ -67,7 +67,7 @@ public class OnOffSwitch extends Container implements ActionSource {
     private Image switchOffImage;
     private Image switchMaskImage;
     private int deltaX;
-    private EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dispatcher = new EventDispatcher();
     private boolean animationLock;
 
     /**
@@ -406,17 +406,9 @@ public class OnOffSwitch extends Container implements ActionSource {
             int switchButtonPadInt = UIManager.getInstance().getThemeConstant("switchButtonPadInt", 16);
             if (dragged) {
                 if (deltaX > 0) {
-                    if (deltaX > switchMaskImage.getWidth() / 2 - switchButtonPadInt) {
-                        animateTo(false, deltaX);
-                    } else {
-                        animateTo(true, deltaX);
-                    }
+                    animateTo(deltaX <= switchMaskImage.getWidth() / 2 - switchButtonPadInt, deltaX);
                 } else {
-                    if (deltaX * -1 > switchMaskImage.getWidth() / 2 - switchButtonPadInt) {
-                        animateTo(true, deltaX);
-                    } else {
-                        animateTo(false, deltaX);
-                    }
+                    animateTo(deltaX * -1 > switchMaskImage.getWidth() / 2 - switchButtonPadInt, deltaX);
                 }
             } else {
                 animateTo(!value, 0);
@@ -435,11 +427,7 @@ public class OnOffSwitch extends Container implements ActionSource {
                     left = Math.min(buttonWidth, deltaX * -1);
                     right = Math.max(0, buttonWidth + deltaX);
                 }
-                if (right < left) {
-                    setValue(true);
-                } else {
-                    setValue(false);
-                }
+                setValue(right < left);
 
                 updateButton();
                 animateLayoutAndWait(150);

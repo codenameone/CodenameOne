@@ -86,7 +86,7 @@ public class Table extends Container {
     public static final int INNER_BORDERS_ALL = 3;
 
     private TableModel model;
-    private Listener listener = new Listener();
+    private final Listener listener = new Listener();
     private boolean drawBorder = true;
     private boolean collapseBorder = true;
     private boolean drawEmptyCellsBorder = true;
@@ -397,8 +397,8 @@ public class Table extends Container {
 
     private Component createCellImpl(Object value, final int row, final int column, boolean editable) {
         Component c = createCell(value, row, column, editable);
-        c.putClientProperty("row", new Integer(row));
-        c.putClientProperty("column", new Integer(column));
+        c.putClientProperty("row", Integer.valueOf(row));
+        c.putClientProperty("column", Integer.valueOf(column));
 
         // we do this here to allow subclasses to return a text area or its subclass
         if (c instanceof TextArea) {

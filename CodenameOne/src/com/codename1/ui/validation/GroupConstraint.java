@@ -28,7 +28,7 @@ package com.codename1.ui.validation;
  * @author Shai Almog
  */
 public class GroupConstraint implements Constraint {
-    private Constraint[] group;
+    private final Constraint[] group;
     private String failMessage = null;
 
     /**

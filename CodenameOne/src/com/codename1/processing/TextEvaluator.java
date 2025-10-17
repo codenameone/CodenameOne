@@ -57,7 +57,7 @@ class TextEvaluator extends AbstractEvaluator {
     }
 
     private String[] _getLeftValue(StructuredContent element, String lvalue) {
-        String v[];
+        String[] v;
         if (FUNC_TEXT.equals(lvalue)) {
             v = new String[]{element.getText()};
         } else {
@@ -79,7 +79,7 @@ class TextEvaluator extends AbstractEvaluator {
      */
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
-        String v[] = _getLeftValue(element, lvalue);
+        String[] v = _getLeftValue(element, lvalue);
         if (v == null) {
             return null;
         }
@@ -111,7 +111,7 @@ class TextEvaluator extends AbstractEvaluator {
      */
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
-        String v[] = _getLeftValue(element, lvalue);
+        String[] v = _getLeftValue(element, lvalue);
         if (v == null) {
             return null;
         }
@@ -143,7 +143,7 @@ class TextEvaluator extends AbstractEvaluator {
      */
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
-        String v[] = _getLeftValue(element, lvalue);
+        String[] v = _getLeftValue(element, lvalue);
         if (v == null) {
             return null;
         }

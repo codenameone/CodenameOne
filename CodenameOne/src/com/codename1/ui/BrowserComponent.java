@@ -143,8 +143,8 @@ public class BrowserComponent extends Container {
     private Hashtable<Integer, SuccessCallback<JSRef>> returnValueCallbacks;
     private int nextReturnValueCallbackId = 0;
     private JSONParser returnValueParser;
-    private Container placeholder = new Container();
-    private LinkedList<Runnable> onReady = new LinkedList<Runnable>();
+    private final Container placeholder = new Container();
+    private final LinkedList<Runnable> onReady = new LinkedList<Runnable>();
     private String tmpUrl;
     /**
      * Sets of callbacks that are registered to persist for multiple calls.
@@ -324,7 +324,7 @@ public class BrowserComponent extends Container {
                 if (jsr.isNull()) {
                     jsExpression = StringUtil.replaceAll(jsExpression, pattern, "null");
                 } else if (jsr.getJSType() == JSType.STRING) {
-                    jsExpression = StringUtil.replaceAll(jsExpression, pattern, quote((String) jsr.getValue()));
+                    jsExpression = StringUtil.replaceAll(jsExpression, pattern, quote(jsr.getValue()));
                 } else if (jsr.getJSType() == JSType.FUNCTION || jsr.getJSType() == JSType.OBJECT) {
                     throw new IllegalArgumentException("Cannot inject JSRefs of functions or objects as parameters in JS expressions");
                 } else {
@@ -641,10 +641,7 @@ public class BrowserComponent extends Container {
      * @return True if all of the callbacks say that they can browse.  False otherwise.
      */
     public boolean fireBrowserNavigationCallbacks(String url) {
-        boolean shouldNavigate = true;
-        if (browserNavigationCallback != null && !browserNavigationCallback.shouldNavigate(url)) {
-            shouldNavigate = false;
-        }
+        boolean shouldNavigate = browserNavigationCallback == null || browserNavigationCallback.shouldNavigate(url);
         if (browserNavigationCallbacks != null) {
             for (BrowserNavigationCallback cb : browserNavigationCallbacks) {
                 if (!cb.shouldNavigate(url)) {
@@ -1278,7 +1275,7 @@ public class BrowserComponent extends Container {
         if (Display.impl.supportsBrowserExecuteAndReturnString(internal)) {
             return Display.impl.browserExecuteAndReturnString(internal, javaScript);
         } else {
-            return executeAndWait("callback.onSuccess(eval(${0}))", new Object[]{javaScript}).toString();
+            return executeAndWait("callback.onSuccess(eval(${0}))", javaScript).toString();
 
         }
     }
@@ -1695,7 +1692,7 @@ public class BrowserComponent extends Container {
     /**
      * Enum with the possible types for a {@link JSRef} object.
      */
-    public static enum JSType {
+    public enum JSType {
         OBJECT("object"),
         FUNCTION("function"),
         NUMBER("number"),
@@ -1703,7 +1700,7 @@ public class BrowserComponent extends Container {
         UNDEFINED("undefined"),
         BOOLEAN("boolean");
 
-        private String typeOfValue;
+        private final String typeOfValue;
 
         JSType(String val) {
             typeOfValue = val;
@@ -1844,7 +1841,7 @@ public class BrowserComponent extends Container {
      */
     public static class JSExpression {
 
-        private String expression;
+        private final String expression;
 
         /**
          * Creates a literal javascript expression.
@@ -1964,10 +1961,8 @@ public class BrowserComponent extends Container {
          * @param callback Callback with the property value.
          */
         public void get(int timeout, String property, SuccessCallback<JSRef> callback) {
-            StringBuilder js = new StringBuilder();
-            js.append("callback.onSuccess(" + self + "." + property + ")");
 
-            execute(timeout, js.toString(), callback);
+            execute(timeout, "callback.onSuccess(" + self + "." + property + ")", callback);
         }
 
         /**
@@ -2042,10 +2037,8 @@ public class BrowserComponent extends Container {
          * @return The property value.
          */
         public JSRef getAndWait(int timeout, String property) {
-            StringBuilder js = new StringBuilder();
-            js.append("callback.onSuccess(" + self + "." + property + ")");
 
-            return executeAndWait(timeout, js.toString());
+            return executeAndWait(timeout, "callback.onSuccess(" + self + "." + property + ")");
         }
 
         /**
@@ -2115,7 +2108,7 @@ public class BrowserComponent extends Container {
          * @param value    The property value.
          */
         public void set(int timeout, String property, Object value) {
-            set(timeout, property, value, (SuccessCallback) null);
+            set(timeout, property, value, null);
         }
 
         /**
@@ -2137,9 +2130,7 @@ public class BrowserComponent extends Container {
          * @param callback Callback which is called when complete
          */
         public void set(int timeout, String property, Object value, SuccessCallback<JSRef> callback) {
-            StringBuilder js = new StringBuilder();
-            js.append(self + "['" + property + "']=${0}; callback.onSuccess(undefined);");
-            execute(timeout, js.toString(), new Object[]{value}, callback);
+            execute(timeout, self + "['" + property + "']=${0}; callback.onSuccess(undefined);", new Object[]{value}, callback);
         }
 
         /**
@@ -2217,10 +2208,8 @@ public class BrowserComponent extends Container {
          * @param value    The value to set.
          */
         public void setAndWait(int timeout, String property, Object value) {
-            StringBuilder js = new StringBuilder();
-            js.append(self + "." + property + "=${0}; callback.onSuccess(undefined);");
 
-            executeAndWait(timeout, js.toString(), new Object[]{value});
+            executeAndWait(timeout, self + "." + property + "=${0}; callback.onSuccess(undefined);", value);
         }
 
         /**

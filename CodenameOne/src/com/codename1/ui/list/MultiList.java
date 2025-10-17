@@ -41,8 +41,8 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class MultiList extends List {
-    private MultiButton sel;
-    private MultiButton unsel;
+    private final MultiButton sel;
+    private final MultiButton unsel;
     private Image placeholder;
 
     /**
@@ -60,11 +60,9 @@ public class MultiList extends List {
      * Constructor for the GUI builder
      */
     public MultiList() {
-        super(new DefaultListModel(new Object[]{
-                h("Entry 1", "more..."),
+        super(new DefaultListModel(h("Entry 1", "more..."),
                 h("Entry 2", "more..."),
-                h("Entry 3", "more..."),
-        }));
+                h("Entry 3", "more...")));
         sel = new MultiButton();
         unsel = new MultiButton();
     }

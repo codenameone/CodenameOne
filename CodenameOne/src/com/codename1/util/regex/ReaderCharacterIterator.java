@@ -57,7 +57,7 @@ public final class ReaderCharacterIterator implements CharacterIterator {
     public String substring(int beginIndex, int endIndex) {
         try {
             ensure(endIndex);
-            return buff.toString().substring(beginIndex, endIndex);
+            return buff.substring(beginIndex, endIndex);
         } catch (IOException e) {
             throw new StringIndexOutOfBoundsException(e.getMessage());
         }
@@ -69,7 +69,7 @@ public final class ReaderCharacterIterator implements CharacterIterator {
     public String substring(int beginIndex) {
         try {
             readAll();
-            return buff.toString().substring(beginIndex);
+            return buff.substring(beginIndex);
         } catch (IOException e) {
             throw new StringIndexOutOfBoundsException(e.getMessage());
         }

@@ -81,18 +81,18 @@ public class Calendar extends Container implements ActionSource {
     private ComboBox year;
     private MonthView mv;
     private Label dateLabel;
-    private EventDispatcher dispatcher = new EventDispatcher();
-    private EventDispatcher dataChangedListeners = new EventDispatcher();
-    private EventDispatcher monthChangedListeners = new EventDispatcher();
-    private long[] dates = new long[42];
+    private final EventDispatcher dispatcher = new EventDispatcher();
+    private final EventDispatcher dataChangedListeners = new EventDispatcher();
+    private final EventDispatcher monthChangedListeners = new EventDispatcher();
+    private final long[] dates = new long[42];
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
     private long SELECTED_DAY = -1;
-    private Collection<Date> selectedDays = new ArrayList<Date>();
+    private final Collection<Date> selectedDays = new ArrayList<Date>();
     private boolean multipleSelectionEnabled = false;
     private String selectedDaysUIID = "CalendarMultipleDay";
-    private Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
-    private ArrayList<ActionListener> dayListeners = new ArrayList<ActionListener>();
+    private final Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
+    private final ArrayList<ActionListener> dayListeners = new ArrayList<ActionListener>();
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
@@ -216,7 +216,7 @@ public class Calendar extends Container implements ActionSource {
             year = new ComboBox();
             Vector months = new Vector();
             for (int i = 0; i < MONTHS.length; i++) {
-                months.addElement("" + getLocalizedMonth(i));
+                months.addElement(getLocalizedMonth(i));
             }
             ListModel monthsModel = new DefaultListModel(months);
             int selected = months.indexOf(getLocalizedMonth(mv.getMonth()));

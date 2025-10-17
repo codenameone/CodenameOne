@@ -31,6 +31,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +44,7 @@ import java.util.Map;
  * @author Shai Almog
  */
 public class URL {
-    private URI u;
+    private final URI u;
 
     public URL(java.lang.String url) throws URISyntaxException {
         u = new URI(url);
@@ -211,7 +212,7 @@ public class URL {
     }
 
     private class FileURLConnection extends URLConnection {
-        private File file;
+        private final File file;
 
         private FileURLConnection(File f) {
             this.file = f;
@@ -257,9 +258,9 @@ public class URL {
     }
 
     public class HttpURLConnection extends URLConnection {
-        private String url;
+        private final String url;
         private Object connection;
-        private CodenameOneImplementation impl;
+        private final CodenameOneImplementation impl;
         private String requestMethod = "GET";
 
         HttpURLConnection(String url) {
@@ -317,9 +318,7 @@ public class URL {
                     String[] vals = impl.getHeaderFields(s, connection);
                     ArrayList<String> a = new ArrayList<String>();
                     response.put(s, a);
-                    for (String c : vals) {
-                        a.add(c);
-                    }
+                    Collections.addAll(a, vals);
                 }
                 return response;
             } catch (IOException err) {

@@ -115,8 +115,8 @@ public class Validator {
      * 0 indicates the start of the component and 1 indicates its end on the given axis.
      */
     private float validationEmblemPositionY = defaultValidationEmblemPositionY;
-    private HashMap<Component, Constraint> constraintList = new HashMap<Component, Constraint>();
-    private ArrayList<Component> submitButtons = new ArrayList<Component>();
+    private final HashMap<Component, Constraint> constraintList = new HashMap<Component, Constraint>();
+    private final ArrayList<Component> submitButtons = new ArrayList<Component>();
     /**
      * Indicates whether an error message should be shown for the focused component
      */
@@ -608,7 +608,6 @@ public class Validator {
         }
         if (cmp instanceof PickerComponent) {
             ((PickerComponent) cmp).getPicker().addActionListener(new ComponentListener(cmp));
-            return;
         }
     }
 
@@ -717,7 +716,6 @@ public class Validator {
                 if (!uiid.endsWith("Invalid")) {
                     cmp.setUIID(uiid + "Invalid");
                 }
-                return;
             }
         }
     }
@@ -725,7 +723,7 @@ public class Validator {
     /**
      * Indicates the validation failure modes
      */
-    public static enum HighlightMode {
+    public enum HighlightMode {
         UIID,
         EMBLEM,
         UIID_AND_EMBLEM,
@@ -733,7 +731,7 @@ public class Validator {
     }
 
     class ComponentListener implements ActionListener, DataChangedListener, Painter {
-        private Component cmp;
+        private final Component cmp;
         private Rectangle visibleRect = new Rectangle();
 
         public ComponentListener(Component cmp) {

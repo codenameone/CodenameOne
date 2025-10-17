@@ -44,7 +44,8 @@ class CSSBgPainter implements Painter {
     int horizPos, vertPos;
     boolean horizIsPercentage, vertIsPercentage;
     boolean fixedX;
-    private Component parent, scrollableParent;
+    private final Component parent;
+    private Component scrollableParent;
 
     /**
      * Construct a background painter for the given component
@@ -195,7 +196,6 @@ class CSSBgPainter implements Painter {
                 for (int yPos = getTiledPosition(offsetY, iH); yPos <= height; yPos += iH) {
                     g.drawImage(s.getBgImage(), x + offsetX, y + yPos);
                 }
-                return;
         }
 
     }

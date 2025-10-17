@@ -35,5 +35,5 @@ public interface ErrorCodeHandler<T> {
      *
      * @param errorData the data matching the error.
      */
-    public void onError(Response<T> errorData);
+    void onError(Response<T> errorData);
 }

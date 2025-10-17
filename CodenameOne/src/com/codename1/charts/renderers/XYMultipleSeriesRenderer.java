@@ -51,9 +51,9 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /** The current orientation of the chart. */
     private Orientation mOrientation = Orientation.HORIZONTAL;
     /** The X axis text labels. */
-    private Map<Double, String> mXTextLabels = new HashMap<Double, String>();
+    private final Map<Double, String> mXTextLabels = new HashMap<Double, String>();
     /** The Y axis text labels. */
-    private Map<Integer, Map<Double, String>> mYTextLabels = new LinkedHashMap<Integer, Map<Double, String>>();
+    private final Map<Integer, Map<Double, String>> mYTextLabels = new LinkedHashMap<Integer, Map<Double, String>>();
     /** A flag for enabling or not the pan on the X axis. */
     private boolean mPanXEnabled = true;
     /** A flag for enabling or not the pan on the Y axis. */
@@ -75,13 +75,13 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /** The Y axis labels rotation angle. */
     private float mYLabelsAngle;
     /** The initial axis range. */
-    private Map<Integer, double[]> initialRange = new LinkedHashMap<Integer, double[]>();
+    private final Map<Integer, double[]> initialRange = new LinkedHashMap<Integer, double[]>();
     /** The point size for charts displaying points. */
     private float mPointSize = 3;
     /** The grid color. */
     private int[] mGridColors;
     /** The number of scales. */
-    private int scalesCount;
+    private final int scalesCount;
     /** The X axis labels alignment. */
     private int xLabelsAlign = Component.CENTER;
     /** The Y axis labels alignment. */
@@ -566,7 +566,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * @return the X text label locations
      */
     public synchronized Double[] getXTextLabelLocations() {
-        Double[] out = new Double[mXTextLabels.keySet().size()];
+        Double[] out = new Double[mXTextLabels.size()];
         return mXTextLabels.keySet().toArray(out);
     }
 
@@ -681,7 +681,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      * @return the Y text label locations
      */
     public synchronized Double[] getYTextLabelLocations(int scale) {
-        Double[] out = new Double[mYTextLabels.get(scale).keySet().size()];
+        Double[] out = new Double[mYTextLabels.get(scale).size()];
         return mYTextLabels.get(scale).keySet().toArray(out);
     }
 

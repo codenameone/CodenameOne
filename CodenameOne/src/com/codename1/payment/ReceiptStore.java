@@ -36,7 +36,7 @@ public interface ReceiptStore {
      *
      * @param callback
      */
-    public void fetchReceipts(SuccessCallback<Receipt[]> callback);
+    void fetchReceipts(SuccessCallback<Receipt[]> callback);
 
     /**
      * Submits a receipt to the data source.
@@ -44,5 +44,5 @@ public interface ReceiptStore {
      * @param receipt
      * @param callback
      */
-    public void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback);
+    void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback);
 }

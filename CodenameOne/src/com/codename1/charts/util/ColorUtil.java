@@ -98,7 +98,6 @@ public class ColorUtil {
      * @see Graphics
      */
     private static class IColor
-            extends Object
             implements Cloneable {
 
         public final static IColor White = new IColor(255, 255, 255);

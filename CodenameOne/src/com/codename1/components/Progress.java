@@ -44,7 +44,7 @@ import com.codename1.ui.plaf.UIManager;
  * @author Shai Almog
  */
 public class Progress extends Dialog implements ActionListener {
-    private ConnectionRequest request;
+    private final ConnectionRequest request;
     private boolean disposeOnCompletion;
     private boolean autoShow;
     private boolean showing;

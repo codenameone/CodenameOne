@@ -51,6 +51,7 @@ import com.codename1.ui.util.Resources;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Objects;
 
 /**
  * <p>The component class is the basis of all UI widgets in Codename One, to arrange multiple components
@@ -320,7 +321,7 @@ public class Component implements Animation, StyleListener, Editable {
      * is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
      * Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
      */
-    private boolean useLightweightElevationShadow = true;
+    private final boolean useLightweightElevationShadow = true;
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
@@ -1759,7 +1760,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles == null ? inlineAllStyles != null : !styles.equals(inlineAllStyles)) {
+        if (!Objects.equals(styles, inlineAllStyles)) {
             this.inlineAllStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -1791,7 +1792,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles == null ? inlineSelectedStyles != null : !styles.equals(inlineSelectedStyles)) {
+        if (!Objects.equals(styles, inlineSelectedStyles)) {
             this.inlineSelectedStyles = styles;
 
             unSelectedStyle = null;
@@ -1825,7 +1826,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles == null ? inlineUnselectedStyles != null : !styles.equals(inlineUnselectedStyles)) {
+        if (!Objects.equals(styles, inlineUnselectedStyles)) {
             this.inlineUnselectedStyles = styles;
 
             unSelectedStyle = null;
@@ -1859,7 +1860,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles == null ? inlineDisabledStyles != null : !styles.equals(inlineDisabledStyles)) {
+        if (!Objects.equals(styles, inlineDisabledStyles)) {
             this.inlineDisabledStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -1892,7 +1893,7 @@ public class Component implements Animation, StyleListener, Editable {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles == null ? inlinePressedStyles != null : !styles.equals(inlinePressedStyles)) {
+        if (!Objects.equals(styles, inlinePressedStyles)) {
             this.inlinePressedStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -2298,8 +2299,7 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean useNativeShadowRendering() {
         if (!Display.impl.isDrawShadowSupported()) return false;
         if (Boolean.TRUE.equals(getClientProperty("Component.nativeShadowRendering"))) return true;
-        if ("true".equals(CN.getProperty("Component.nativeShadowRendering", "false"))) return true;
-        return false;
+        return "true".equals(CN.getProperty("Component.nativeShadowRendering", "false"));
     }
 
     /**
@@ -2352,7 +2352,7 @@ public class Component implements Animation, StyleListener, Editable {
             float step = 1;
             for (int rad = blurRadiusPixels; rad > 0; rad--) {
 
-                g.setAlpha((int) (255 / (float) step * opacity * (1 - rad / (1 + (float) blurRadiusPixels))));
+                g.setAlpha((int) (255 / step * opacity * (1 - rad / (1 + (float) blurRadiusPixels))));
                 //System.out.println("rad="+rad+";alpha="+g.getAlpha());
                 g.drawImage(maskImage,
                         relativeX + offsetXPixels - rad - spreadRadiusPixels,
@@ -2361,7 +2361,7 @@ public class Component implements Animation, StyleListener, Editable {
                         img.getHeight() + 2 * (spreadRadiusPixels + rad));
                 step += 0.5;
             }
-            g.setAlpha((int) (opacity * 255 / (float) step));
+            g.setAlpha((int) (opacity * 255 / step));
 
             //System.out.println("drawing;alpha="+g.getAlpha());
 
@@ -2704,8 +2704,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     private boolean canCreateImageOffEdt() {
         String platform = CN.getPlatformName();
-        if ("ios".equals(platform) && !CN.isSimulator()) return false;
-        return true;
+        return !"ios".equals(platform) || CN.isSimulator();
     }
 
     /**
@@ -2746,7 +2745,7 @@ public class Component implements Animation, StyleListener, Editable {
         int x = getX() - getScrollX();
         Container parent = getParent();
         if (parent != relativeTo && parent != null) {
-            x += ((Component) parent).getRelativeX(relativeTo);
+            x += parent.getRelativeX(relativeTo);
         }
         return x;
     }
@@ -2755,7 +2754,7 @@ public class Component implements Animation, StyleListener, Editable {
         int y = getY() - getScrollY();
         Container parent = getParent();
         if (parent != relativeTo && parent != null) {
-            y += ((Component) parent).getRelativeY(relativeTo);
+            y += parent.getRelativeY(relativeTo);
         }
         return y;
     }
@@ -3554,10 +3553,7 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #contains(int, int)
      */
     public boolean visibleBoundsContains(int x, int y) {
-        boolean contains = true;
-        if (!isVisible() || !contains(x, y)) {
-            contains = false;
-        }
+        boolean contains = isVisible() && contains(x, y);
         if (contains) {
             Container parent = getParent();
             while (parent != null) {
@@ -5469,10 +5465,7 @@ public class Component implements Animation, StyleListener, Editable {
             Form parent = getComponentForm();
             return Math.abs(parent.initialPressX - x) > Math.abs(parent.initialPressY - y);
         }
-        if (ix) {
-            return true;
-        }
-        return false;
+        return ix;
     }
 
     /**
@@ -6830,7 +6823,7 @@ public class Component implements Animation, StyleListener, Editable {
             parent.addElevatedComponent(cmp);
             cmp._parentSurface = parent;
         } else {
-            ((Component) parent).registerElevatedInternal(cmp);
+            parent.registerElevatedInternal(cmp);
         }
     }
 

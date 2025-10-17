@@ -52,10 +52,10 @@ import com.codename1.ui.layouts.FlowLayout;
 public class InfiniteScrollAdapter {
     private Container infiniteContainer;
     private Runnable fetchMore;
-    private Component ip;
+    private final Component ip;
     private int componentLimit = -1;
-    private InfiniteProgress progress;
-    private Component endMarker = new EdgeMarker(true);
+    private final InfiniteProgress progress;
+    private final Component endMarker = new EdgeMarker(true);
 
     private InfiniteScrollAdapter() {
         progress = new InfiniteProgress();
@@ -218,7 +218,7 @@ public class InfiniteScrollAdapter {
     }
 
     class EdgeMarker extends Component {
-        private boolean top;
+        private final boolean top;
 
         public EdgeMarker(boolean top) {
             this.top = top;

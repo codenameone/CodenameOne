@@ -136,7 +136,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private static int defaultValign = TOP;
     private static int defaultMaxSize = 124;
     private static boolean autoDegradeMaxSize = false;
-    private static boolean hadSuccessfulEdit = false;
+    private static final boolean hadSuccessfulEdit = false;
     /**
      * By default text area uses charWidth since its much faster on some devices
      * than string width. However, with some fonts and especially some languages (such
@@ -151,7 +151,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * hence this functionality is exposed to developers.
      */
     private static char widestChar = 'W';
-    private EventDispatcher listeners = new EventDispatcher();
+    private final EventDispatcher listeners = new EventDispatcher();
     private ActionListener doneListener;
     private int valign = defaultValign;
     private int linesToScroll = 1;
@@ -567,7 +567,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      */
     public void setText(String t) {
         String old = this.text;
-        if (t != null ? !t.equals(old) : old != null) {
+        if (!java.util.Objects.equals(t, old)) {
             // If we've previously suppressed action events,
             // we need to unsuppress them upon the text changing again.
             setSuppressActionEvent(false);
@@ -1955,7 +1955,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 Log.e(ex);
                 // Failed to edit string because the previous input device would not
                 // give up control
-                return;
             }
         }
     }
@@ -2311,7 +2310,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private static class TextAreaInputDevice implements VirtualInputDevice {
-        private TextArea editedTextArea;
+        private final TextArea editedTextArea;
         private boolean deferStopEditingToNativeLayer;
         private boolean enabled = true;
 
@@ -2334,7 +2333,5 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
 
     }
-
-    ;
 
 }

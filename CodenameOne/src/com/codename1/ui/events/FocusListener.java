@@ -38,12 +38,12 @@ public interface FocusListener {
      *
      * @param cmp the component that gains focus
      */
-    public void focusGained(Component cmp);
+    void focusGained(Component cmp);
 
     /**
      * Invoked when component loses focus
      *
      * @param cmp the component that lost focus
      */
-    public void focusLost(Component cmp);
+    void focusLost(Component cmp);
 }

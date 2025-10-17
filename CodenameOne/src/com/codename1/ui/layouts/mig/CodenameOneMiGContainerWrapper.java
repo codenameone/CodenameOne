@@ -64,14 +64,14 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
         return ((Container) getComponent()).getLayout();
     }
 
-    public final boolean isLeftToRight() {
+    public boolean isLeftToRight() {
         return !((Container) getComponent()).isRTL();
     }
 
-    public final void paintDebugCell(int x, int y, int width, int height) {
+    public void paintDebugCell(int x, int y, int width, int height) {
         Component c = (Component) getComponent();
-        if (c.isVisible() == false)
-            return;
+        if (!c.isVisible()) {
+        }
 
         // TODO: this can probably be done using glasspane
 		/*Graphics2D g = (Graphics2D) c.getGraphics();

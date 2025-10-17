@@ -43,5 +43,5 @@ public interface AsyncDocumentRequestHandler extends DocumentRequestHandler {
      * @param docInfo  A DocumentInfo object representing the requested URL and its attributes
      * @param callback The HTMLComponent that should be called back when the stream was fetched.
      */
-    public void resourceRequestedAsync(DocumentInfo docInfo, IOCallback callback);
+    void resourceRequestedAsync(DocumentInfo docInfo, IOCallback callback);
 }

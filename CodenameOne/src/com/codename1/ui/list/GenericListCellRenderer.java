@@ -89,22 +89,22 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     private static URLImage.ImageAdapter defaultAdapter = URLImage.RESIZE_SCALE;
     private Button lastClickedComponent;
     private ArrayList<Image> pendingAnimations;
-    private Label focusComponent = new Label();
-    private Component selected;
-    private Component unselected;
-    private Component[] selectedEntries;
-    private Component[] unselectedEntries;
+    private final Label focusComponent = new Label();
+    private final Component selected;
+    private final Component unselected;
+    private final Component[] selectedEntries;
+    private final Component[] unselectedEntries;
     private Component selectedEven;
     private Component unselectedEven;
     private Component[] selectedEntriesEven;
     private Component[] unselectedEntriesEven;
-    private Monitor mon = new Monitor();
+    private final Monitor mon = new Monitor();
     private Component parentList;
     private boolean selectionListener = true;
-    private boolean firstCharacterRTL;
+    private final boolean firstCharacterRTL;
     private boolean fisheye;
     private boolean waitingForRegisterAnimation;
-    private HashMap<String, EncodedImage> placeholders = new HashMap<String, EncodedImage>();
+    private final HashMap<String, EncodedImage> placeholders = new HashMap<String, EncodedImage>();
     private URLImage.ImageAdapter adapter = defaultAdapter;
 
     /**
@@ -272,7 +272,6 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
             }
             if (cmp instanceof TextArea) {
                 dest.add(cmp);
-                return;
             }
         }
     }
@@ -331,7 +330,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
             } else {
                 if (value instanceof CloudObject) {
                     CloudObject h = (CloudObject) value;
-                    Boolean enabled = (Boolean) h.getBoolean(ENABLED);
+                    Boolean enabled = h.getBoolean(ENABLED);
                     if (enabled != null) {
                         cmp.setEnabled(enabled.booleanValue());
                     }
@@ -690,7 +689,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     int s = pendingAnimations.size();
                     hasAnimations = true;
                     for (int iter = 0; iter < s; iter++) {
-                        Image i = (Image) pendingAnimations.get(iter);
+                        Image i = pendingAnimations.get(iter);
                         repaint = i.animate() || repaint;
                     }
                     if (repaint) {

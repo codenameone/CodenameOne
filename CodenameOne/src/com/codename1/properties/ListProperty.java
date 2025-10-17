@@ -25,6 +25,7 @@ package com.codename1.properties;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -34,7 +35,7 @@ import java.util.List;
  * @author Shai Almog
  */
 public class ListProperty<T, K> extends CollectionProperty<T, K> {
-    private ArrayList<T> value = new ArrayList<T>();
+    private final ArrayList<T> value = new ArrayList<T>();
 
     /**
      * Constructs a property with the given name and value
@@ -58,9 +59,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      */
     public ListProperty(String name, Class<T> elementType, T... values) {
         super(name, elementType);
-        for (T t : values) {
-            value.add(t);
-        }
+        Collections.addAll(value, values);
     }
 
     /**

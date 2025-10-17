@@ -39,7 +39,7 @@ import java.io.InputStream;
  * @author Shai Almog
  */
 public class CachedDataService extends ConnectionRequest {
-    private CachedData data = new CachedData();
+    private final CachedData data = new CachedData();
 
     private CachedDataService() {
         setReadResponseForErrors(false);

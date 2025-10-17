@@ -151,7 +151,7 @@ public class DefaultCrashReporter implements CrashReport {
                     }
                     Log.sendLog();
                 }
-            }, frequency * 60000, frequency * 60000);
+            }, frequency * 60000L, frequency * 60000L);
         }
         DefaultCrashReporter d = new DefaultCrashReporter();
         d.promptUser = promptUser && Preferences.get("$CN1_prompt", true);

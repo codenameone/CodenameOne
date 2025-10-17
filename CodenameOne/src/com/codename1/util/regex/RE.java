@@ -1478,7 +1478,7 @@ public class RE {
         // Try a match at each position
         while (pos < len && match(substituteIn, pos)) {
             // Append string before match
-            ret.append(substituteIn.substring(pos, getParenStart(0)));
+            ret.append(substituteIn, pos, getParenStart(0));
 
             if ((flags & REPLACE_BACKREFERENCES) != 0) {
                 // Process backreferences
@@ -1491,7 +1491,7 @@ public class RE {
                         char c = substitution.charAt(lCurrentPosition + 1);
                         if (c >= '0' && c <= '9') {
                             // Append everything between the last and the current $ sign
-                            ret.append(substitution.substring(lLastPosition + 2, lCurrentPosition));
+                            ret.append(substitution, lLastPosition + 2, lCurrentPosition);
 
                             // Append the parenthesized expression, if present
                             String val = getParen(c - '0');
@@ -1507,7 +1507,7 @@ public class RE {
                 }
 
                 // Append everything after the last $ sign
-                ret.append(substitution.substring(lLastPosition + 2, lLength));
+                ret.append(substitution, lLastPosition + 2, lLength);
             } else {
                 // Append substitution without processing backreferences
                 ret.append(substitution);

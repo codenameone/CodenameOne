@@ -67,7 +67,7 @@ public class CommonProgressAnimations {
                 return getProgressAnimation(cmp);
             }
             try {
-                ProgressAnimation prg = (ProgressAnimation) type.newInstance();
+                ProgressAnimation prg = type.newInstance();
                 prg.setPreferredH(cmp.getPreferredH());
                 prg.setPreferredW(cmp.getPreferredW());
                 replaceUntilReady(cmp, prg);
@@ -247,10 +247,10 @@ public class CommonProgressAnimations {
     public static class LoadingTextAnimation extends ProgressAnimation {
 
         private static final String loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
-        private int lettersPerChunk = 3;
-        private int cyclesPerChunk = 3; // Number of cycles required to type a letter.
+        private final int lettersPerChunk = 3;
+        private final int cyclesPerChunk = 3; // Number of cycles required to type a letter.
         private int pauseCounter = 0;
-        private int pauseLength = Display.getInstance().getFrameRate();
+        private final int pauseLength = Display.getInstance().getFrameRate();
         private int rows = 3;
         private int cols = 40;
         private int cycleCount;

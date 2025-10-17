@@ -23,6 +23,8 @@
 
 package com.codename1.properties;
 
+import java.util.Objects;
+
 /**
  * Base class for a property, it can store a generic value of any type and broadcast change events to
  * external listeners
@@ -91,8 +93,7 @@ public class Property<T, K> extends PropertyBase<T, K> {
      * @param value the new value
      */
     public K set(T value) {
-        if (!(this.value == value ||
-                (this.value != null && this.value.equals(value)))) {
+        if (!(Objects.equals(this.value, value))) {
             this.value = value;
             firePropertyChanged();
             internalSet();

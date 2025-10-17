@@ -103,7 +103,7 @@ public class Toolbar extends Container {
      */
     private static boolean centeredDefault = true;
     private Component titleComponent;
-    private ToolbarSideMenu sideMenu;
+    private final ToolbarSideMenu sideMenu;
     private Vector<Command> overflowCommands;
     private Button menuButton;
     private Command leftSideMenuCommand;
@@ -601,7 +601,7 @@ public class Toolbar extends Container {
             }
 
         };
-        Form f = (Form) Toolbar.this.getComponentForm();
+        Form f = Toolbar.this.getComponentForm();
         setHidden(true);
         f.removeComponentFromForm(Toolbar.this);
         f.setToolbar(s);
@@ -1368,7 +1368,7 @@ public class Toolbar extends Container {
                 }
 
                 if (!parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
-                    Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
+                    Image i = parent.getUIManager().getThemeImageConstant("sideMenuImage");
                     if (i != null) {
                         Command cmd = addCommandToLeftBar("", i, new ActionListener() {
                             public void actionPerformed(ActionEvent evt) {
@@ -1379,7 +1379,7 @@ public class Toolbar extends Container {
                                 showOnTopSidemenu(-1, false);
                             }
                         });
-                        Image p = (Image) parent.getUIManager().getThemeImageConstant("sideMenuPressImage");
+                        Image p = parent.getUIManager().getThemeImageConstant("sideMenuPressImage");
                         if (p != null) {
                             findCommandComponent(cmd).setPressedIcon(p);
                         }
@@ -1414,7 +1414,7 @@ public class Toolbar extends Container {
                 }
 
                 if (!parent.getUIManager().isThemeConstant("hideRightSideMenuBool", false)) {
-                    Image i = (Image) parent.getUIManager().getThemeImageConstant("rightSideMenuImage");
+                    Image i = parent.getUIManager().getThemeImageConstant("rightSideMenuImage");
                     if (i != null) {
                         Command cmd = addCommandToRightBar("", i, new ActionListener() {
                             public void actionPerformed(ActionEvent evt) {
@@ -1425,7 +1425,7 @@ public class Toolbar extends Container {
                                 showOnTopRightSidemenu(-1, false);
                             }
                         });
-                        Image p = (Image) parent.getUIManager().getThemeImageConstant("rightSideMenuPressImage");
+                        Image p = parent.getUIManager().getThemeImageConstant("rightSideMenuPressImage");
                         if (p != null) {
                             findCommandComponent(cmd).setPressedIcon(p);
                         }
@@ -1672,7 +1672,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
-                    v = dw * 1 / 3;
+                    v = dw / 3;
                 } else {
                     v = dw * (100 - v) / 100;
                 }
@@ -1688,7 +1688,7 @@ public class Toolbar extends Container {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabLandscapeInt", -1);
                 if (v < 0) {
-                    v = dw * 1 / 4;
+                    v = dw / 4;
                 } else {
                     v = dw * (100 - v) / 100;
                 }
@@ -2529,7 +2529,7 @@ public class Toolbar extends Container {
     /**
      * The behavior of the back command in the title
      */
-    public static enum BackCommandPolicy {
+    public enum BackCommandPolicy {
         /**
          * Show the back command always within the title bar on the left hand
          * side
@@ -2648,7 +2648,7 @@ public class Toolbar extends Container {
             super.installRightCommands();
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 UIManager uim = UIManager.getInstance();
-                Image i = (Image) uim.getThemeImageConstant("menuImage");
+                Image i = uim.getThemeImageConstant("menuImage");
                 if (uim.getThemeConstant("overflowImageSize", null) != null) {
                     float size = 4.5f;
                     try {

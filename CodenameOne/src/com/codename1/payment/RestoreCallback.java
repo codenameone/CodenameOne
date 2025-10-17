@@ -37,7 +37,7 @@ public interface RestoreCallback {
      *
      * @param sku the sku purchased
      */
-    public void itemRestored(String sku);
+    void itemRestored(String sku);
 
     /**
      * Indicates that a {@link Purchase#restore()} request was completed without
@@ -45,7 +45,7 @@ public interface RestoreCallback {
      * that the request completed.  After a call to {@link Purchase#restore()},
      * either this or {@link #restoreRequestError} will be called at some point.
      */
-    public void restoreRequestComplete();
+    void restoreRequestComplete();
 
     /**
      * Indicates that a {@link Purchase#restore()} request was completed with
@@ -55,5 +55,5 @@ public interface RestoreCallback {
      *
      * @param message The error message.
      */
-    public void restoreRequestError(String message);
+    void restoreRequestError(String message);
 }

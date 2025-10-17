@@ -1801,13 +1801,9 @@ public class Dialog extends Form {
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
-        if (!getTitleComponent().containsOrOwns(x, y) &&
+        pressedOutOfBounds = !getTitleComponent().containsOrOwns(x, y) &&
                 !getContentPane().containsOrOwns(x, y) &&
-                !getMenuBar().containsOrOwns(x, y)) {
-            pressedOutOfBounds = true;
-        } else {
-            pressedOutOfBounds = false;
-        }
+                !getMenuBar().containsOrOwns(x, y);
     }
 
     /**
@@ -1917,7 +1913,6 @@ public class Dialog extends Form {
             contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
             contentPaneStyle.setMargin(Component.LEFT, left, true);
             contentPaneStyle.setMargin(Component.RIGHT, right, true);
-            return;
         } else {
             int oldW = getWidth();
             int oldH = getHeight();
@@ -1946,7 +1941,6 @@ public class Dialog extends Form {
                     contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
                     contentPaneStyle.setMargin(Component.LEFT, left, true);
                     contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                    return;
                 } else {
                     float ratioW = ((float) w) / ((float) oldW);
                     float ratioH = ((float) h) / ((float) oldH);
@@ -1961,7 +1955,6 @@ public class Dialog extends Form {
                     titleStyle.setMargin(TOP, (int) (titleStyle.getMarginTop() * ratioH));
                     titleStyle.setMargin(LEFT, (int) (titleStyle.getMarginLeft(isRTL()) * ratioW));
                     titleStyle.setMargin(RIGHT, (int) (titleStyle.getMarginRight(isRTL()) * ratioW));
-                    return;
                 }
             }
         }

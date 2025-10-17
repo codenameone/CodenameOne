@@ -41,10 +41,10 @@ import java.util.Vector;
  */
 public class PointsLayer extends AbstractLayer implements ActionSource {
 
-    private Vector points = new Vector();
+    private final Vector points = new Vector();
     private Image icon;
-    private EventDispatcher dispatcher = new EventDispatcher();
-    private Font f = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
+    private final EventDispatcher dispatcher = new EventDispatcher();
+    private final Font f = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
 
     /**
      * Constructor with default projection Mercator.

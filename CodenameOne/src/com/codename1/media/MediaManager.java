@@ -69,7 +69,7 @@ public class MediaManager {
      *
      * @since 7.0
      */
-    private static Map<String, AudioBuffer> audioBuffers = new HashMap<String, AudioBuffer>();
+    private static final Map<String, AudioBuffer> audioBuffers = new HashMap<String, AudioBuffer>();
     private static RemoteControlListener remoteControlListener;
 
     /**

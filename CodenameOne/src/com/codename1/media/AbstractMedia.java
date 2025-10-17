@@ -229,7 +229,6 @@ public abstract class AbstractMedia implements AsyncMedia {
             }
 
         }
-        ;
         final StateChangeListener onStateChange = new StateChangeListener();
         ActionListener<MediaErrorEvent> onError = new ActionListener<MediaErrorEvent>() {
             @Override
@@ -349,7 +348,6 @@ public abstract class AbstractMedia implements AsyncMedia {
             }
 
         }
-        ;
 
         final StateChangeListener onStateChange = new StateChangeListener();
         ActionListener<MediaErrorEvent> onError = new ActionListener<MediaErrorEvent>() {

@@ -43,6 +43,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Vector;
 
@@ -77,10 +78,10 @@ public class Tree extends Container {
     private static Image folder;
     private static Image openFolder;
     private static Image nodeImage;
-    private EventDispatcher leafListener = new EventDispatcher();
-    private ActionListener expansionListener = new Handler();
+    private final EventDispatcher leafListener = new EventDispatcher();
+    private final ActionListener expansionListener = new Handler();
     private TreeModel model;
-    private int depthIndent = 2;
+    private final int depthIndent = 2;
     private boolean multilineMode;
 
     /**
@@ -315,7 +316,7 @@ public class Tree extends Container {
 
                 // the tree component is always at north expanded or otherwise
                 current = bl.getNorth();
-                if (o == node || o != null && o.equals(node)) {
+                if (Objects.equals(o, node)) {
                     if (isExpanded(current)) {
                         return (Container) bl.getCenter();
                     }
@@ -369,7 +370,7 @@ public class Tree extends Container {
         if (root == null) {
             return findNodeComponent(node, this);
         }
-        Object rootNode = (Object) root.getClientProperty(KEY_OBJECT);
+        Object rootNode = root.getClientProperty(KEY_OBJECT);
 
         if (node.equals(rootNode)) {
             return root;
@@ -551,7 +552,7 @@ public class Tree extends Container {
     private void buildBranch(Object parent, int depth, Container destination) {
         Vector children = model.getChildren(parent);
         int size = children.size();
-        Integer depthVal = new Integer(depth + 1);
+        Integer depthVal = Integer.valueOf(depth + 1);
         for (int iter = 0; iter < size; iter++) {
             final Object current = children.elementAt(iter);
             Component nodeComponent = createNode(current, depth);
@@ -734,7 +735,7 @@ public class Tree extends Container {
      * passed to {@link #setTreeState(com.codename1.ui.tree.Tree.TreeState) } for retaining
      * state in a Tree when the model is changed.
      */
-    public static interface TreeState {
+    public interface TreeState {
 
     }
 

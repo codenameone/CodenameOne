@@ -87,7 +87,7 @@ public final class GeneralPath implements Shape {
      * The buffers capacity
      */
     private static final int BUFFER_CAPACITY = 10;
-    private static int MAX_POOL_SIZE = 20;
+    private static final int MAX_POOL_SIZE = 20;
     private static ArrayList<GeneralPath> pathPool;
     private static ArrayList<Rectangle> rectPool;
     private static ArrayList<float[]> floatPool;
@@ -96,7 +96,7 @@ public final class GeneralPath implements Shape {
     /**
      * The space amount in points buffer for different segmenet's types
      */
-    private static int pointShift[] = {
+    private static final int[] pointShift = {
             2, // MOVETO
             2, // LINETO
             4, // QUADTO
@@ -523,7 +523,7 @@ public final class GeneralPath implements Shape {
             GeneralPath p = createPathFromPool();
             p.setShape(shape, t);
             try {
-                return equals(p, (Transform) null);
+                return equals(p, null);
             } finally {
                 recycle(p);
             }
@@ -545,7 +545,7 @@ public final class GeneralPath implements Shape {
             GeneralPath tmpPath2 = createPathFromPool();
             try {
                 tmpPath2.setShape(shape, null);
-                return equals(tmpPath2, (Transform) null);
+                return equals(tmpPath2, null);
             } finally {
                 recycle(tmpPath2);
             }
@@ -590,12 +590,12 @@ public final class GeneralPath implements Shape {
             throw new IndexOutOfBoundsException("First segment must be a moveto"); //$NON-NLS-1$
         }
         if (typeSize == types.length) {
-            byte tmp[] = new byte[typeSize + BUFFER_CAPACITY];
+            byte[] tmp = new byte[typeSize + BUFFER_CAPACITY];
             System.arraycopy(types, 0, tmp, 0, typeSize);
             types = tmp;
         }
         if (pointSize + pointCount > points.length) {
-            float tmp[] = new float[pointSize + Math.max(BUFFER_CAPACITY * 2, pointCount)];
+            float[] tmp = new float[pointSize + Math.max(BUFFER_CAPACITY * 2, pointCount)];
             System.arraycopy(points, 0, tmp, 0, pointSize);
             points = tmp;
         }
@@ -1045,13 +1045,13 @@ public final class GeneralPath implements Shape {
      *                {@link PathIterator#SEG_MOVETO} unchanged.
      */
     public void append(PathIterator path, boolean connect) {
-        float coords[] = createFloatArrayFromPool(6);//new float[6];
+        float[] coords = createFloatArrayFromPool(6);//new float[6];
         append(path, connect, coords);
         recycle(coords);
     }
 
     private void append(PathIterator path, boolean connect, float[] tmpCoordsBuf) {
-        float coords[] = tmpCoordsBuf;
+        float[] coords = tmpCoordsBuf;
         while (!path.isDone()) {
 
             switch (path.currentSegment(coords)) {
@@ -1649,7 +1649,7 @@ public final class GeneralPath implements Shape {
         private double b;
         private double cx;
         private double cy;
-        private EPoint _tmp1 = new EPoint();
+        private final EPoint _tmp1 = new EPoint();
 
         static void initWithBounds(Ellipse e, double x, double y, double w, double h) {
             e.cx = x + w / 2;
@@ -2331,7 +2331,7 @@ public final class GeneralPath implements Shape {
          * @param res - the roots of the equation
          * @return a number of roots
          */
-        public static int solveQuad(double eqn[], double res[]) {
+        public static int solveQuad(double[] eqn, double[] res) {
             double a = eqn[2];
             double b = eqn[1];
             double c = eqn[0];
@@ -2364,7 +2364,7 @@ public final class GeneralPath implements Shape {
          * @param res - the roots of the equation
          * @return a number of roots
          */
-        public static int solveCubic(double eqn[], double res[]) {
+        public static int solveCubic(double[] eqn, double[] res) {
             double d = eqn[3];
             if (d == 0) {
                 return solveQuad(eqn, res);
@@ -2420,7 +2420,7 @@ public final class GeneralPath implements Shape {
          * @param rc  - the roots count
          * @return new roots count
          */
-        static int fixRoots(double res[], int rc) {
+        static int fixRoots(double[] res, int rc) {
             int tc = 0;
             for (int i = 0; i < rc; i++) {
                 out:
@@ -2498,7 +2498,7 @@ public final class GeneralPath implements Shape {
             QuadCurve c = new QuadCurve(x1, y1, cx, cy, x2, y2);
             double px = x - x1;
             double py = y - y1;
-            double res[] = new double[3];
+            double[] res = new double[3];
             int rc = c.solvePoint(res, px);
 
             return c.cross(res, rc, py, py);
@@ -2529,7 +2529,7 @@ public final class GeneralPath implements Shape {
             CubicCurve c = new CubicCurve(x1, y1, cx1, cy1, cx2, cy2, x2, y2);
             double px = x - x1;
             double py = y - y1;
-            double res[] = new double[3];
+            double[] res = new double[3];
             int rc = c.solvePoint(res, px);
             return c.cross(res, rc, py, py);
         }
@@ -2541,7 +2541,7 @@ public final class GeneralPath implements Shape {
             int cross = 0;
             double mx, my, cx, cy;
             mx = my = cx = cy = 0.0;
-            double coords[] = new double[6];
+            double[] coords = new double[6];
 
             while (!p.isDone()) {
                 switch (p.currentSegment(coords)) {
@@ -2603,7 +2603,7 @@ public final class GeneralPath implements Shape {
         /**
          * Sort bound array
          */
-        static void sortBound(double bound[], int bc) {
+        static void sortBound(double[] bound, int bc) {
             for (int i = 0; i < bc - 4; i += 4) {
                 int k = i;
                 for (int j = i + 4; j < bc; j += 4) {
@@ -2631,7 +2631,7 @@ public final class GeneralPath implements Shape {
         /**
          * Returns are bounds intersect or not intersect rectangle
          */
-        static int crossBound(double bound[], int bc, double py1, double py2) {
+        static int crossBound(double[] bound, int bc, double py1, double py2) {
 
             // LEFT/RIGHT
             if (bc == 0) {
@@ -2781,8 +2781,8 @@ public final class GeneralPath implements Shape {
             double px2 = rx2 - x1;
             double py2 = ry2 - y1;
 
-            double res1[] = new double[3];
-            double res2[] = new double[3];
+            double[] res1 = new double[3];
+            double[] res2 = new double[3];
             int rc1 = c.solvePoint(res1, px1);
             int rc2 = c.solvePoint(res2, px2);
 
@@ -2794,7 +2794,7 @@ public final class GeneralPath implements Shape {
             // Build bound --------------------------------------------------------
             double minX = px1 - DELTA;
             double maxX = px2 + DELTA;
-            double bound[] = new double[28];
+            double[] bound = new double[28];
             int bc = 0;
             // Add roots
             bc = c.addBound(bound, bc, res1, rc1, minX, maxX, false, 0);
@@ -2851,8 +2851,8 @@ public final class GeneralPath implements Shape {
             double px2 = rx2 - x1;
             double py2 = ry2 - y1;
 
-            double res1[] = new double[3];
-            double res2[] = new double[3];
+            double[] res1 = new double[3];
+            double[] res2 = new double[3];
             int rc1 = c.solvePoint(res1, px1);
             int rc2 = c.solvePoint(res2, px2);
 
@@ -2865,7 +2865,7 @@ public final class GeneralPath implements Shape {
             double maxX = px2 + DELTA;
 
             // Build bound --------------------------------------------------------
-            double bound[] = new double[40];
+            double[] bound = new double[40];
             int bc = 0;
             // Add roots
             bc = c.addBound(bound, bc, res1, rc1, minX, maxX, false, 0);
@@ -2906,7 +2906,7 @@ public final class GeneralPath implements Shape {
             int count;
             double mx, my, cx, cy;
             mx = my = cx = cy = 0.0;
-            double coords[] = new double[6];
+            double[] coords = new double[6];
 
             double rx1 = x;
             double ry1 = y;
@@ -3001,7 +3001,7 @@ public final class GeneralPath implements Shape {
                 Ay = ay - By;   // Ay = ay - 2.0 * by
             }
 
-            int cross(double res[], int rc, double py1, double py2) {
+            int cross(double[] res, int rc, double py1, double py2) {
                 int cross = 0;
 
                 for (int i = 0; i < rc; i++) {
@@ -3041,12 +3041,12 @@ public final class GeneralPath implements Shape {
                 return cross;
             }
 
-            int solvePoint(double res[], double px) {
-                double eqn[] = {-px, Bx, Ax};
+            int solvePoint(double[] res, double px) {
+                double[] eqn = {-px, Bx, Ax};
                 return solveQuad(eqn, res);
             }
 
-            int solveExtrem(double res[]) {
+            int solveExtrem(double[] res) {
                 int rc = 0;
                 if (Ax != 0.0) {
                     res[rc++] = -Bx / (Ax + Ax);
@@ -3057,7 +3057,7 @@ public final class GeneralPath implements Shape {
                 return rc;
             }
 
-            int addBound(double bound[], int bc, double res[], int rc, double minX, double maxX, boolean changeId, int id) {
+            int addBound(double[] bound, int bc, double[] res, int rc, double minX, double maxX, boolean changeId, int id) {
                 for (int i = 0; i < rc; i++) {
                     double t = res[i];
                     if (t > -DELTA && t < 1 + DELTA) {
@@ -3107,7 +3107,7 @@ public final class GeneralPath implements Shape {
                 Bx2 = Bx + Bx;
             }
 
-            int cross(double res[], int rc, double py1, double py2) {
+            int cross(double[] res, int rc, double py1, double py2) {
                 int cross = 0;
                 for (int i = 0; i < rc; i++) {
                     double t = res[i];
@@ -3152,22 +3152,22 @@ public final class GeneralPath implements Shape {
                 return cross;
             }
 
-            int solvePoint(double res[], double px) {
-                double eqn[] = {-px, Cx, Bx, Ax};
+            int solvePoint(double[] res, double px) {
+                double[] eqn = {-px, Cx, Bx, Ax};
                 return solveCubic(eqn, res);
             }
 
-            int solveExtremX(double res[]) {
-                double eqn[] = {Cx, Bx2, Ax3};
+            int solveExtremX(double[] res) {
+                double[] eqn = {Cx, Bx2, Ax3};
                 return solveQuad(eqn, res);
             }
 
-            int solveExtremY(double res[]) {
-                double eqn[] = {Cy, By + By, Ay + Ay + Ay};
+            int solveExtremY(double[] res) {
+                double[] eqn = {Cy, By + By, Ay + Ay + Ay};
                 return solveQuad(eqn, res);
             }
 
-            int addBound(double bound[], int bc, double res[], int rc, double minX, double maxX, boolean changeId, int id) {
+            int addBound(double[] bound, int bc, double[] res, int rc, double minX, double maxX, boolean changeId, int id) {
                 for (int i = 0; i < rc; i++) {
                     double t = res[i];
                     if (t > -DELTA && t < 1 + DELTA) {
@@ -3222,7 +3222,7 @@ public final class GeneralPath implements Shape {
         GeneralPath p;
 
         Transform transform;
-        private float[] buf = new float[2];
+        private final float[] buf = new float[2];
 
         /**
          * Constructs a new GeneralPath.Iterator for given general path

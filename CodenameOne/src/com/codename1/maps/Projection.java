@@ -28,7 +28,7 @@ package com.codename1.maps;
  */
 public abstract class Projection {
 
-    private BoundingBox extent;
+    private final BoundingBox extent;
 
     /**
      * Creates a projection to the given bounding box

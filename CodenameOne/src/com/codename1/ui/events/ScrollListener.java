@@ -38,6 +38,6 @@ public interface ScrollListener {
      * @param oldscrollX the previous scroll x value
      * @param oldscrollY the previous scroll y value
      */
-    public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY);
+    void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY);
 
 }

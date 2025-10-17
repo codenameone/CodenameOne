@@ -254,7 +254,7 @@ final class JSONSanitizer {
             exp = 0;
         } else {
             try {
-                exp = Integer.parseInt(sanitizedJson.toString().substring(expStart, expEnd), 10);
+                exp = Integer.parseInt(sanitizedJson.substring(expStart, expEnd), 10);
             } catch (NumberFormatException ex) {
                 // The exponent is out of the range of representable ints.
                 // JSON does not place limits on the range of representable numbers but
@@ -684,7 +684,7 @@ final class JSONSanitizer {
             if (sanitizedJson == null) {
                 sanitizedJson = new StringBuilder(n + bracketDepth);
             }
-            sanitizedJson.append(jsonish.substring(cleaned, n));
+            sanitizedJson.append(jsonish, cleaned, n);
             cleaned = n;
 
             switch (state) {
@@ -940,7 +940,7 @@ final class JSONSanitizer {
         if (sanitizedJson == null) {
             sanitizedJson = new StringBuilder(jsonish.length() + 16);
         }
-        sanitizedJson.append(jsonish.substring(cleaned, start));
+        sanitizedJson.append(jsonish, cleaned, start);
         cleaned = end;
     }
 
@@ -1253,7 +1253,6 @@ final class JSONSanitizer {
          * close bracket.
          */
         AFTER_VALUE,
-        ;
     }
 
     /**

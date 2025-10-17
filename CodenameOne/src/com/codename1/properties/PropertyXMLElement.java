@@ -37,7 +37,7 @@ import java.util.Vector;
  * @author shai
  */
 class PropertyXMLElement extends Element {
-    private PropertyIndex parent;
+    private final PropertyIndex parent;
     private int index = -1;
     private PropertyXMLElement parentElement;
 

@@ -72,20 +72,22 @@ import com.codename1.ui.util.EventDispatcher;
  * @author Chen Fishbein
  */
 public class Tabs extends Container {
-    private Container contentPane = new Container(new TabsLayout());
+    private final Container contentPane = new Container(new TabsLayout());
     private boolean eagerSwipeMode;
 
     /**
      * Where the tabs are placed.
      */
     private int tabPlacement;
-    private Container tabsContainer;
-    private ButtonGroup radioGroup = new ButtonGroup();
+    private final Container tabsContainer;
+    private final ButtonGroup radioGroup = new ButtonGroup();
     private Component selectedTab;
     private boolean swipeActivated = true;
     private boolean swipeOnXAxis = true;
 
-    private ActionListener press, drag, release;
+    private final ActionListener press;
+    private final ActionListener drag;
+    private final ActionListener release;
     private Motion slideToDestMotion;
     private int initialX = -1;
     private int initialY = -1;
@@ -97,7 +99,7 @@ public class Tabs extends Container {
 
     private EventDispatcher focusListeners;
     private EventDispatcher selectionListener;
-    private TabFocusListener focusListener;
+    private final TabFocusListener focusListener;
     private boolean tabsFillRows;
     private boolean tabsGridLayout;
     private int textPosition = -1;
@@ -1480,7 +1482,7 @@ public class Tabs extends Container {
             if (Display.getInstance().shouldRenderSelection()) {
                 if (isChangeTabOnFocus()) {
                     if (!((Button) cmp).isSelected()) {
-                        ((Button) cmp).fireClicked();
+                        cmp.fireClicked();
                     }
                 }
                 if (changeTabContainerStyleOnFocus) {
@@ -1755,11 +1757,7 @@ public class Tabs extends Container {
             if (targetComponent == null) {
                 return false;
             }
-            if (contentPane.equals(targetComponent) || contentPane.contains(targetComponent)) {
-                return false;
-            }
-
-            return true;
+            return !contentPane.equals(targetComponent) && !contentPane.contains(targetComponent);
         }
     }
 }

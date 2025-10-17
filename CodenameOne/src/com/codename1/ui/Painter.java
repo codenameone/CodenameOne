@@ -52,5 +52,5 @@ public interface Painter {
      * @param g    the {@link Graphics} object
      * @param rect the given rectangle cliping area
      */
-    public void paint(Graphics g, Rectangle rect);
+    void paint(Graphics g, Rectangle rect);
 }

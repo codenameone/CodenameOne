@@ -64,7 +64,7 @@ public final class Graphics {
     private int color;
     private Paint paint;
     private Font current = Font.getDefaultFont();
-    private CodenameOneImplementation impl;
+    private final CodenameOneImplementation impl;
     private Object nativeGraphics;
     private Object[] nativeGraphicsState;
     private float scaleX = 1, scaleY = 1;
@@ -405,7 +405,6 @@ public final class Graphics {
      */
     public void clearRect(int x, int y, int width, int height) {
         clearRectImpl(xTranslate + x, yTranslate + y, width, height);
-        ;
     }
 
     /**
@@ -1339,14 +1338,14 @@ public final class Graphics {
         }
 
         nativeGraphicsState = new Object[]{
-                new Integer(getTranslateX()),
-                new Integer(getTranslateY()),
-                new Integer(getColor()),
-                new Integer(getAlpha()),
-                new Integer(getClipX()),
-                new Integer(getClipY()),
-                new Integer(getClipWidth()),
-                new Integer(getClipHeight()),
+                Integer.valueOf(getTranslateX()),
+                Integer.valueOf(getTranslateY()),
+                Integer.valueOf(getColor()),
+                Integer.valueOf(getAlpha()),
+                Integer.valueOf(getClipX()),
+                Integer.valueOf(getClipY()),
+                Integer.valueOf(getClipWidth()),
+                Integer.valueOf(getClipHeight()),
                 a, b
         };
         translate(-getTranslateX(), -getTranslateY());

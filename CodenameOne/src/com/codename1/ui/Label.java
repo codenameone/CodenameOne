@@ -1300,7 +1300,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      * @deprecated Use {@link #getShiftMillimetersF() }
      */
     public int getShiftMillimeters() {
-        return (int) Math.round(shiftMillimeters);
+        return Math.round(shiftMillimeters);
     }
 
     /**
@@ -1550,8 +1550,6 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
         return getUIID();
     }
-
-    ;
 
     /**
      * Sets a UIID to be used for the material icon style.

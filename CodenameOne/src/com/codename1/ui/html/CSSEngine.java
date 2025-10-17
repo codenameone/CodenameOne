@@ -135,11 +135,11 @@ class CSSEngine {
     // The possible values of the 'direction' attribute
     private static final int DIRECTION_RTL = 0;
     private static final int DIRECTION_LTR = 1;
-    private static int DEFAULT_3D_BORDER_COLOR = 0x9a9a9a; // default color for outset/inset/ridge/groove
+    private static final int DEFAULT_3D_BORDER_COLOR = 0x9a9a9a; // default color for outset/inset/ridge/groove
     //int count; //for debugging
     private static CSSEngine instance; // The instance of this singleton class
     private static Hashtable specialKeys; // A hashtable containing all recognized special key strings and their keycodes
-    private Hashtable matchingFonts = new Hashtable(); // A hashtable used as a cache for quick find of matching fonts
+    private final Hashtable matchingFonts = new Hashtable(); // A hashtable used as a cache for quick find of matching fonts
 
     /**
      * Returns the singleton instance of CSSEngine and creates it if necessary
@@ -166,7 +166,7 @@ class CSSEngine {
         if (specialKeys == null) {
             specialKeys = new Hashtable();
         }
-        specialKeys.put(specialKeyName, new Integer(specialKeyCode));
+        specialKeys.put(specialKeyName, Integer.valueOf(specialKeyCode));
     }
 
     /**
@@ -227,7 +227,7 @@ class CSSEngine {
                         String imageURL = getCSSUrl(currentSelector.getAttributeById(URL_ATTRIBUTES[i]));
                         if (imageURL != null) {
                             imageURL = cssDocInfo.convertURL(imageURL);
-                            currentSelector.setAttribute(currentSelector.getAttributeName(new Integer(URL_ATTRIBUTES[i])), "url(" + imageURL + ")");
+                            currentSelector.setAttribute(currentSelector.getAttributeName(Integer.valueOf(URL_ATTRIBUTES[i])), "url(" + imageURL + ")");
                         }
                     }
                 }
@@ -539,7 +539,7 @@ class CSSEngine {
             cmp.getSelectedStyle().setFgColor(color);
         }
         if ((styles & STYLE_PRESSED) != 0) {
-            ((HTMLLink) cmp).getPressedStyle().setFgColor(color);
+            cmp.getPressedStyle().setFgColor(color);
         }
 
         if (cmp instanceof Container) {
@@ -864,7 +864,7 @@ class CSSEngine {
             cmp.getUnselectedStyle().setPadding(Component.RIGHT, spacing);
             if (cmp instanceof HTMLLink) {
                 cmp.getSelectedStyle().setPadding(Component.RIGHT, spacing);
-                ((HTMLLink) cmp).getPressedStyle().setPadding(Component.RIGHT, spacing);
+                cmp.getPressedStyle().setPadding(Component.RIGHT, spacing);
             }
         }
     }
@@ -887,8 +887,8 @@ class CSSEngine {
             if (cmp instanceof HTMLLink) {
                 cmp.getSelectedStyle().setPadding(Component.TOP, halfHeight);
                 cmp.getSelectedStyle().setPadding(Component.BOTTOM, halfHeight);
-                ((HTMLLink) cmp).getPressedStyle().setPadding(Component.TOP, halfHeight);
-                ((HTMLLink) cmp).getPressedStyle().setPadding(Component.BOTTOM, halfHeight);
+                cmp.getPressedStyle().setPadding(Component.TOP, halfHeight);
+                cmp.getPressedStyle().setPadding(Component.BOTTOM, halfHeight);
             }
         }
     }
@@ -928,7 +928,7 @@ class CSSEngine {
                 applyDecorationOnStyle(cmp.getSelectedStyle(), decoration);
             }
             if ((styles & STYLE_PRESSED) != 0) {
-                applyDecorationOnStyle(((HTMLLink) cmp).getPressedStyle(), decoration);
+                applyDecorationOnStyle(cmp.getPressedStyle(), decoration);
             }
         }
     }
@@ -960,7 +960,7 @@ class CSSEngine {
                 cmp.getSelectedStyle().setTextDecoration(Style.TEXT_DECORATION_NONE);
             }
             if ((styles & STYLE_PRESSED) != 0) {
-                ((HTMLLink) cmp).getPressedStyle().setTextDecoration(Style.TEXT_DECORATION_NONE);
+                cmp.getPressedStyle().setTextDecoration(Style.TEXT_DECORATION_NONE);
             }
         }
     }
@@ -1133,8 +1133,8 @@ class CSSEngine {
                 ui.getSelectedStyle().setBgTransparency(255);
             }
             if ((styles & STYLE_PRESSED) != 0) {
-                ((HTMLLink) ui).getPressedStyle().setBgColor(bgColor);
-                ((HTMLLink) ui).getPressedStyle().setBgTransparency(255);
+                ui.getPressedStyle().setBgColor(bgColor);
+                ui.getPressedStyle().setBgTransparency(255);
             }
 
         }
@@ -1171,8 +1171,8 @@ class CSSEngine {
                     ui.getUnselectedStyle().setBackgroundType(bgType);
                 }
                 if ((styles & STYLE_PRESSED) != 0) {
-                    ((HTMLLink) ui).getPressedStyle().setBgPainter(bgPainter);
-                    ((HTMLLink) ui).getPressedStyle().setBackgroundType(bgType);
+                    ui.getPressedStyle().setBgPainter(bgPainter);
+                    ui.getPressedStyle().setBackgroundType(bgType);
                 }
 
                 // The background image itself
@@ -1184,7 +1184,7 @@ class CSSEngine {
                             htmlC.getThreadQueue().addBgImage(ui, url, styles);
                         } else {
                             if (htmlC.getHTMLCallback() != null) {
-                                htmlC.getHTMLCallback().parsingError(HTMLCallback.ERROR_NO_BASE_URL, selector.getTagName(), selector.getAttributeName(new Integer(CSSElement.CSS_BACKGROUND_IMAGE)), url, "Ignoring background image file referred in a CSS file/segment (" + url + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
+                                htmlC.getHTMLCallback().parsingError(HTMLCallback.ERROR_NO_BASE_URL, selector.getTagName(), selector.getAttributeName(Integer.valueOf(CSSElement.CSS_BACKGROUND_IMAGE)), url, "Ignoring background image file referred in a CSS file/segment (" + url + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
                             }
                         }
                     }
@@ -1434,7 +1434,7 @@ class CSSEngine {
                 curBorder = borderUi.getSelectedStyle().getBorder();
             }
             if ((styles & STYLE_PRESSED) != 0) {
-                curBorder = ((HTMLLink) borderUi).getSelectedStyle().getBorder();
+                curBorder = borderUi.getSelectedStyle().getBorder();
             }
 
             // In case this element was assigned a top border for instance, and then by belonging to another tag/class/id it has also a bottom border - this merges the two (and gives priority to the new one)
@@ -1456,7 +1456,7 @@ class CSSEngine {
                     borderUi.getUnselectedStyle().setBorder(border);
                 }
                 if ((styles & STYLE_PRESSED) != 0) {
-                    ((HTMLLink) borderUi).getPressedStyle().setBorder(border);
+                    borderUi.getPressedStyle().setBorder(border);
                 }
                 if (borderUi.getParent() != null) {
                     borderUi.getParent().revalidate();
@@ -1559,7 +1559,7 @@ class CSSEngine {
                     addOutlineToStyle(borderUi.getUnselectedStyle(), outline);
                 }
                 if ((styles & STYLE_PRESSED) != 0) {
-                    addOutlineToStyle(((HTMLLink) borderUi).getPressedStyle(), outline);
+                    addOutlineToStyle(borderUi.getPressedStyle(), outline);
                 }
                 if (borderUi.getParent() != null) {
                     borderUi.getParent().revalidate();
@@ -1825,7 +1825,7 @@ class CSSEngine {
             incPadding(ui.getUnselectedStyle(), location, borderWidth);
         }
         if ((styles & STYLE_PRESSED) != 0) {
-            incPadding(((HTMLLink) ui).getPressedStyle(), location, borderWidth);
+            incPadding(ui.getPressedStyle(), location, borderWidth);
         }
         Border border = null;
         if ((borderColor == -1) && (borderStyle >= BORDER_STYLE_GROOVE)) {
@@ -1880,7 +1880,7 @@ class CSSEngine {
 
     private void incPadding(Style style, int location, int padding) {
         if (location == -1) {
-            int pad[] = new int[4];
+            int[] pad = new int[4];
             for (int i = Component.TOP; i <= Component.RIGHT; i++) {
                 pad[i] = style.getPadding(i) + padding;
             }
@@ -1910,7 +1910,7 @@ class CSSEngine {
             curFont = cmp.getSelectedStyle().getFont();
         }
         if ((styles & STYLE_PRESSED) != 0) { // Active
-            curFont = ((HTMLLink) cmp).getPressedStyle().getFont();
+            curFont = cmp.getPressedStyle().getFont();
         }
 
         int curSize = 0;
@@ -2014,7 +2014,7 @@ class CSSEngine {
             cmp.getSelectedStyle().setFont(font);
         }
         if ((styles & STYLE_PRESSED) != 0) {
-            ((HTMLLink) cmp).getPressedStyle().setFont(font);
+            cmp.getPressedStyle().setFont(font);
         }
         cmp.setShouldCalcPreferredSize(true);
 
@@ -2032,7 +2032,7 @@ class CSSEngine {
      */
     private Label getQuote(boolean open) {
         Label quoteLabel = new Label("\"");
-        quoteLabel.putClientProperty(HTMLComponent.CLIENT_PROPERTY_QUOTE, new Integer(open ? 0 : 1)); // 0 is open quote, 1 is closed quote (both stand for primary quotes - see HTMLComponent.addQuote)
+        quoteLabel.putClientProperty(HTMLComponent.CLIENT_PROPERTY_QUOTE, Integer.valueOf(open ? 0 : 1)); // 0 is open quote, 1 is closed quote (both stand for primary quotes - see HTMLComponent.addQuote)
         return quoteLabel;
 
     }
@@ -2077,7 +2077,7 @@ class CSSEngine {
                             htmlC.getThreadQueue().add(imgLabel, url);
                         } else {
                             if (htmlC.getHTMLCallback() != null) {
-                                htmlC.getHTMLCallback().parsingError(HTMLCallback.ERROR_NO_BASE_URL, selector.getTagName(), selector.getAttributeName(new Integer(CSSElement.CSS_CONTENT)), url, "Ignoring image file referred in a CSS file/segment (" + url + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
+                                htmlC.getHTMLCallback().parsingError(HTMLCallback.ERROR_NO_BASE_URL, selector.getTagName(), selector.getAttributeName(Integer.valueOf(CSSElement.CSS_CONTENT)), url, "Ignoring image file referred in a CSS file/segment (" + url + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
                             }
                         }
                     }

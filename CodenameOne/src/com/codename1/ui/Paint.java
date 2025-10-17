@@ -39,7 +39,7 @@ public interface Paint {
      * @param g      Graphics context to paint in.
      * @param bounds Bounds to paint in.  User coordinates.
      */
-    public void paint(Graphics g, Rectangle2D bounds);
+    void paint(Graphics g, Rectangle2D bounds);
 
     /**
      * Paints in the given bounds.
@@ -50,6 +50,6 @@ public interface Paint {
      * @param w width.  User space.
      * @param h Hight.  User space.
      */
-    public void paint(Graphics g, double x, double y, double w, double h);
+    void paint(Graphics g, double x, double y, double w, double h);
 
 }

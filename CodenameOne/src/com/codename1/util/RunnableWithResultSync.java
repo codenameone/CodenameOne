@@ -34,5 +34,5 @@ public interface RunnableWithResultSync<T> {
      *
      * @return the result of the run operation
      */
-    public T run();
+    T run();
 }

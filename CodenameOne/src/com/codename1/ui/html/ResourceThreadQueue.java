@@ -47,7 +47,7 @@ class ResourceThreadQueue {
     /**
      * The default number of maximum threads used for image download
      */
-    private static int DEFAULT_MAX_THREADS = 2;
+    private static final int DEFAULT_MAX_THREADS = 2;
     static int maxThreads = DEFAULT_MAX_THREADS;
     HTMLComponent htmlC;
     Vector queue = new Vector();
@@ -451,7 +451,7 @@ class ResourceThreadQueue {
                     if (cssDocInfo != null) { // CSS
                         if (HTMLComponent.SUPPORT_CSS) { // no need to also check if loadCSS is true, since if we got so far - it is...
                             CSSElement result = CSSParser.getInstance().parseCSSSegment(new InputStreamReader(is), is, htmlC, cssDocInfo.getUrl());
-                            result.setAttribute(result.getAttributeName(new Integer(CSSElement.CSS_PAGEURL)), cssDocInfo.getUrl());
+                            result.setAttribute(result.getAttributeName(Integer.valueOf(CSSElement.CSS_PAGEURL)), cssDocInfo.getUrl());
                             htmlC.addToExternalCSS(result);
                         }
                         threadQueue.threadFinished(this, true);
@@ -504,7 +504,6 @@ class ResourceThreadQueue {
          */
         private void handleImage(Image img, Component cmp) {
             boolean bgUnselected = (threadQueue.bgImageCompsUnselected.contains(cmp));
-            ;
             boolean bgSelected = (threadQueue.bgImageCompsSelected.contains(cmp));
             boolean bgPressed = (threadQueue.bgImageCompsPressed.contains(cmp));
             handleImage(img, cmp, bgUnselected, bgSelected, bgPressed);
@@ -531,7 +530,7 @@ class ResourceThreadQueue {
             }
             if (bgPressed) {
                 if (cmp instanceof HTMLLink) {
-                    ((HTMLLink) cmp).getPressedStyle().setBgImage(img);
+                    cmp.getPressedStyle().setBgImage(img);
                 }
                 bg = true;
             }

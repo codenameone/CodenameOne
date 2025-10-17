@@ -176,12 +176,12 @@ class IndexEvaluator extends AbstractEvaluator {
             if ((dim < 0) || (dim >= elements.size())) {
                 return null;
             }
-            return (StructuredContent) elements.get(dim);
+            return elements.get(dim);
         } else if (expr.equals(FUNC_LAST)) {
             if (elements.size() == 0) {
                 return null;
             }
-            return (StructuredContent) elements.get(elements.size() - 1);
+            return elements.get(elements.size() - 1);
         } else if (expr.indexOf(FUNC_LAST) != -1) {
             return _getByLast(elements, expr);
         } else if (expr.equals(FUNC_POSITION)) {

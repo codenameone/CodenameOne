@@ -47,42 +47,42 @@ public interface AsyncMedia extends Media {
      *
      * @return The state of the media object.
      */
-    public State getState();
+    State getState();
 
     /**
      * Adds a listener to be notified when the state of the media changes.
      *
      * @param l Listener
      */
-    public void addMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l);
+    void addMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l);
 
     /**
      * Removes a listener so that it will no longer be notified of state changes.
      *
      * @param l Listener
      */
-    public void removeMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l);
+    void removeMediaStateChangeListener(ActionListener<MediaStateChangeEvent> l);
 
     /**
      * Adds a listener to be notified when an error occurs in the media.
      *
      * @param l Listener
      */
-    public void addMediaErrorListener(ActionListener<MediaErrorEvent> l);
+    void addMediaErrorListener(ActionListener<MediaErrorEvent> l);
 
     /**
      * Removes a listener so that it will no longer be notified of errors.
      *
      * @param l Listener
      */
-    public void removeMediaErrorListener(ActionListener<MediaErrorEvent> l);
+    void removeMediaErrorListener(ActionListener<MediaErrorEvent> l);
 
     /**
      * Adds a callback to be run when the media has played to completion.
      *
      * @param onComplete
      */
-    public void addMediaCompletionHandler(Runnable onComplete);
+    void addMediaCompletionHandler(Runnable onComplete);
 
     /**
      * Initiates a play request.  Returns immediately without blocking.  Caller can use
@@ -90,7 +90,7 @@ public interface AsyncMedia extends Media {
      *
      * @return
      */
-    public PlayRequest playAsync();
+    PlayRequest playAsync();
 
     /**
      * Initiates a pause request.  Returns immediately without blocking.  Caller can use
@@ -98,12 +98,12 @@ public interface AsyncMedia extends Media {
      *
      * @return
      */
-    public PauseRequest pauseAsync();
+    PauseRequest pauseAsync();
 
     /**
      * An enum to represent the state of a media object.
      */
-    public static enum State {
+    enum State {
         Playing,
         Paused
     }
@@ -113,7 +113,7 @@ public interface AsyncMedia extends Media {
      *
      * @since type.
      */
-    public static enum MediaErrorType {
+    enum MediaErrorType {
         /**
          * The fetching of the associated resource was aborted by the user's request.
          */
@@ -137,7 +137,7 @@ public interface AsyncMedia extends Media {
         Unknown("Unknown error"),
         LineUnavailable("The associated input line is unavailable");
 
-        private String description;
+        private final String description;
 
         MediaErrorType(String description) {
             this.description = description;
@@ -149,10 +149,10 @@ public interface AsyncMedia extends Media {
      *
      * @since 7.0
      */
-    public static class MediaStateChangeEvent extends ActionEvent {
+    class MediaStateChangeEvent extends ActionEvent {
 
-        private State oldState;
-        private State newState;
+        private final State oldState;
+        private final State newState;
 
         /**
          * Creates a new state change event for the given source.
@@ -191,8 +191,8 @@ public interface AsyncMedia extends Media {
      *
      * @since 7.0
      */
-    public static class MediaException extends RuntimeException {
-        private MediaErrorType mediaErrorType;
+    class MediaException extends RuntimeException {
+        private final MediaErrorType mediaErrorType;
 
         /**
          * Creates an exception of the given type.
@@ -242,8 +242,8 @@ public interface AsyncMedia extends Media {
      *
      * @since 7.0
      */
-    public static class MediaErrorEvent extends ActionEvent {
-        private MediaException mediaException;
+    class MediaErrorEvent extends ActionEvent {
+        private final MediaException mediaException;
 
         /**
          * Creates a new error event with the given exception.
@@ -273,7 +273,7 @@ public interface AsyncMedia extends Media {
      * @see #playAsync()
      * @since 7.0
      */
-    public static class PlayRequest extends AsyncResource<AsyncMedia> {
+    class PlayRequest extends AsyncResource<AsyncMedia> {
 
     }
 
@@ -283,7 +283,7 @@ public interface AsyncMedia extends Media {
      *
      * @see #pauseAsync()
      */
-    public static class PauseRequest extends AsyncResource<AsyncMedia> {
+    class PauseRequest extends AsyncResource<AsyncMedia> {
 
     }
 }

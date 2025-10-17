@@ -169,7 +169,7 @@ class LeadUtil {
      * @param x   X-coord
      * @param y   Y-coord
      */
-    public static void pointerHoverReleased(Component cmp, int x[], int y[]) {
+    public static void pointerHoverReleased(Component cmp, int[] x, int[] y) {
         if (cmp == null) {
             return;
         }
@@ -179,7 +179,7 @@ class LeadUtil {
         }
     }
 
-    public static void pointerHoverPressed(Component cmp, int x[], int y[]) {
+    public static void pointerHoverPressed(Component cmp, int[] x, int[] y) {
         if (cmp == null) {
             return;
         }
@@ -190,7 +190,7 @@ class LeadUtil {
         }
     }
 
-    public static void pointerHover(Component cmp, int x[], int y[]) {
+    public static void pointerHover(Component cmp, int[] x, int[] y) {
         if (cmp == null) {
             return;
         }

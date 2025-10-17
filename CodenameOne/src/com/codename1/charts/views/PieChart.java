@@ -37,7 +37,7 @@ import java.util.List;
  */
 public class PieChart extends RoundChart {
     /** Handles returning values when tapping on PieChart. */
-    private PieMapper mPieMapper;
+    private final PieMapper mPieMapper;
 
     /**
      * Builds a new pie chart instance.

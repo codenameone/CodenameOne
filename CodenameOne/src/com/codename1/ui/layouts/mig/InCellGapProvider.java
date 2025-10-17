@@ -65,5 +65,5 @@ public interface InCellGapProvider {
      * @param isLTR        If it is left-to-right.
      * @return The default gap between two components or <code>null</code> if there should be no gap.
      */
-    public abstract BoundSize getDefaultGap(ComponentWrapper comp, ComponentWrapper adjacentComp, int adjacentSide, String tag, boolean isLTR);
+    BoundSize getDefaultGap(ComponentWrapper comp, ComponentWrapper adjacentComp, int adjacentSide, String tag, boolean isLTR);
 }

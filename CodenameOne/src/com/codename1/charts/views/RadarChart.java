@@ -35,7 +35,7 @@ public class RadarChart extends RoundChart {
     /**
      * The series dataset.
      */
-    private AreaSeries mDataset;
+    private final AreaSeries mDataset;
 
     /**
      * A step variable to control the size of the legend shape.

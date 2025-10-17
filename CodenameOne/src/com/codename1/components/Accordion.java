@@ -414,9 +414,9 @@ public class Accordion extends Container {
 
         private final Button arrow = new Button();
         private boolean closed = true;
-        private Component body;
-        private Component header;
-        private Container top;
+        private final Component body;
+        private final Component header;
+        private final Container top;
         private String topUiid = uiidHeader;
 
         public AccordionContent(Component header, final Component body) {

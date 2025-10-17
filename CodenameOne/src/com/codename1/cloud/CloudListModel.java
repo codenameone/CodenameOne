@@ -41,15 +41,15 @@ import java.util.Vector;
  */
 public class CloudListModel implements ListModel {
 
-    private String type;
-    private int visibilityScope;
+    private final String type;
+    private final int visibilityScope;
     private int batchSize = 20;
-    private int keyBatchSize = 1000;
+    private final int keyBatchSize = 1000;
     private int sortProperty;
-    private boolean ascending;
+    private final boolean ascending;
     private Object[] keys;
-    private EventDispatcher modelListener = new EventDispatcher();
-    private EventDispatcher selectionListener = new EventDispatcher();
+    private final EventDispatcher modelListener = new EventDispatcher();
+    private final EventDispatcher selectionListener = new EventDispatcher();
     private int selectedIndex = 0;
     private Hashtable loadingPlaceholder;
     private CacheMap cache;
@@ -141,7 +141,7 @@ public class CloudListModel implements ListModel {
             Object key = vec.elementAt(iter);
             Object val = cache.get(key);
             if (val != null && val instanceof CloudObject) {
-                cld.addElement((CloudObject) val);
+                cld.addElement(val);
             }
         }
         if (cld.size() > 0) {

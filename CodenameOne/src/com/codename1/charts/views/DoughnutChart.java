@@ -33,7 +33,7 @@ import java.util.List;
  */
 public class DoughnutChart extends RoundChart {
     /** The series dataset. */
-    private MultipleCategorySeries mDataset;
+    private final MultipleCategorySeries mDataset;
     /** A step variable to control the size of the legend shape. */
     private int mStep;
 
@@ -115,7 +115,7 @@ public class DoughnutChart extends RoundChart {
                         mRenderer.getLabelsColor(), paint, true, false);
                 currentAngle += angle;
             }
-            radius -= (int) mRadius * decCoef;
+            radius -= mRadius * decCoef;
             shortRadius -= mRadius * decCoef - 2;
             if (mRenderer.getBackgroundColor() != 0) {
                 paint.setColor(mRenderer.getBackgroundColor());

@@ -420,13 +420,13 @@ public class StyleParser {
                     }
                     out.setShadowSpread(parseScalarValue(shadowArg));
                 } else if (shadowArg.startsWith("x:")) {
-                    out.setShadowX((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
+                    out.setShadowX(Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
                 } else if (shadowArg.startsWith("y:")) {
-                    out.setShadowY((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
+                    out.setShadowY(Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
                 } else if (shadowArg.startsWith("blur:")) {
-                    out.setShadowBlur((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
+                    out.setShadowBlur(Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
                 } else if (shadowArg.startsWith("opacity:")) {
-                    out.setShadowOpacity((Integer) Integer.parseInt(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
+                    out.setShadowOpacity(Integer.parseInt(shadowArg.substring(shadowArg.indexOf(":") + 1).trim()));
                 }
             }
 
@@ -434,16 +434,16 @@ public class StyleParser {
                 out.setShadowSpread(parseScalarValue("0.5mm"));
             }
             if (out.getShadowX() == null) {
-                out.setShadowX((Float) (float) 0.5);
+                out.setShadowX((float) 0.5);
             }
             if (out.getShadowY() == null) {
-                out.setShadowY((Float) (float) 0.5);
+                out.setShadowY((float) 0.5);
             }
             if (out.getShadowBlur() == null) {
-                out.setShadowBlur((Float) (float) 0.1);
+                out.setShadowBlur((float) 0.1);
             }
             if (out.getShadowOpacity() == null) {
-                out.setShadowOpacity((Integer) 128);
+                out.setShadowOpacity(128);
             }
             rem = rem.substring(p2 + 1);
         } else {
@@ -461,7 +461,7 @@ public class StyleParser {
             while ((nextSpacePos = rem.indexOf(" ")) != -1) {
                 rem = rem.substring(nextSpacePos + 1).trim();
                 if (rem.startsWith("rect")) {
-                    out.setRectangle((Boolean) true);
+                    out.setRectangle(true);
                 } else if (rem.startsWith("stroke")) {
                     rem = parseStroke(out, rem);
 
@@ -470,7 +470,7 @@ public class StyleParser {
                 } else if (rem.length() == 8 || rem.indexOf(" ") == 8) {
                     String colorStr = rem.substring(0, 8);
                     out.color = Integer.parseInt(colorStr.substring(2), 16) & 0xffffff;
-                    out.setOpacity((Integer) Integer.parseInt(colorStr.substring(0, 2), 16) & 0xff);
+                    out.setOpacity(Integer.parseInt(colorStr.substring(0, 2), 16) & 0xff);
                     rem = rem.substring(8);
                 } else {
                     int spacePos = rem.indexOf(" ");
@@ -481,7 +481,7 @@ public class StyleParser {
                     }
                     if (colorStr.length() > 0 && colorStr.length() <= 6) {
                         out.color = Integer.parseInt(colorStr, 16) & 0xffffff;
-                        out.setOpacity((Integer) 255);
+                        out.setOpacity(255);
                     }
                     rem = rem.substring(colorStr.length());
 
@@ -510,17 +510,17 @@ public class StyleParser {
                     boolean value = rem.charAt(0) == '+';
                     String flagName = rem.substring(1);
                     if (flagName.startsWith("top-only")) {
-                        out.setTopOnlyMode((Boolean) value);
+                        out.setTopOnlyMode(value);
                     } else if (flagName.startsWith("bottom-only")) {
-                        out.setBottomOnlyMode((Boolean) value);
+                        out.setBottomOnlyMode(value);
                     } else if (flagName.startsWith("top-left")) {
-                        out.setTopLeftMode((Boolean) value);
+                        out.setTopLeftMode(value);
                     } else if (flagName.startsWith("top-right")) {
-                        out.setTopRightMode((Boolean) value);
+                        out.setTopRightMode(value);
                     } else if (flagName.startsWith("bottom-left")) {
-                        out.setBottomLeftMode((Boolean) value);
+                        out.setBottomLeftMode(value);
                     } else if (flagName.startsWith("bottom-right")) {
-                        out.setBottomRightMode((Boolean) value);
+                        out.setBottomRightMode(value);
                     }
                 } else if (rem.length() > 0 && Character.isDigit(rem.charAt(0))) {
                     out.setCornerRadius(getMMValue(rem));
@@ -575,9 +575,9 @@ public class StyleParser {
 
         if (plen == 3) {
             String type = parts1[1];
-            out.setColor((Integer) Integer.parseInt(parts1[2], 16));
+            out.setColor(Integer.parseInt(parts1[2], 16));
             ScalarValue thicknessVal = parseSingleTRBLValue(parts1[0]);
-            out.setWidth((Float) (float) thicknessVal.getValue());
+            out.setWidth((float) thicknessVal.getValue());
             out.setWidthUnit(thicknessVal.getUnit());
             if (("solid".equals(type) || "line".equals(type))) {
                 out.setType("line");
@@ -613,7 +613,7 @@ public class StyleParser {
             if (imageStr.startsWith("/")) {
                 im = Image.createImage(imageStr);
             } else {
-                im = theme.getImage((String) imageStr);
+                im = theme.getImage(imageStr);
             }
 
 
@@ -630,7 +630,7 @@ public class StyleParser {
     private static FontInfo parseFontSize(FontInfo out, String arg) {
         arg = arg.trim();
         ScalarValue sizeVal = parseSingleTRBLValue(arg);
-        out.setSize((Float) (float) sizeVal.getValue());
+        out.setSize((float) sizeVal.getValue());
         out.setSizeUnit(sizeVal.getUnit());
         return out;
     }
@@ -1558,11 +1558,11 @@ public class StyleParser {
             StringBuilder sb = new StringBuilder();
             FontInfo finfo = getFont();
             if (finfo != null) {
-                sb.append("font:").append(finfo.toString()).append("; ");
+                sb.append("font:").append(finfo).append("; ");
             }
             BorderInfo binfo = getBorder();
             if (binfo != null) {
-                sb.append("border:").append(binfo.toString()).append("; ");
+                sb.append("border:").append(binfo).append("; ");
             }
 
             Integer bgColor = getBgColor();
@@ -1602,12 +1602,12 @@ public class StyleParser {
 
             MarginInfo margin = getMargin();
             if (margin != null) {
-                sb.append("margin:").append(margin.toString()).append("; ");
+                sb.append("margin:").append(margin).append("; ");
             }
 
             PaddingInfo padding = getPadding();
             if (padding != null) {
-                sb.append("padding:").append(padding.toString()).append("; ");
+                sb.append("padding:").append(padding).append("; ");
             }
 
             Integer textDecoration = getTextDecoration();
@@ -1623,7 +1623,7 @@ public class StyleParser {
      * Encapsulates an image that is referenced by a style string.
      */
     public static class ImageInfo {
-        private String image;
+        private final String image;
 
         /**
          * Creates an ImageInfo to wrap the specified image.
@@ -2167,7 +2167,7 @@ public class StyleParser {
 
         private Border createLineBorder() {
             if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
-                return Border.createLineBorder((float) getWidth(), getColor());
+                return Border.createLineBorder(getWidth(), getColor());
             } else {
                 return Border.createLineBorder(getWidth().intValue(), getColor());
             }

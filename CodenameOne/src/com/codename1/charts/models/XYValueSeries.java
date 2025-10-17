@@ -26,7 +26,7 @@ import java.util.List;
  */
 public class XYValueSeries extends XYSeries {
     /** A list to contain the series values. */
-    private List<Double> mValue = new ArrayList<Double>();
+    private final List<Double> mValue = new ArrayList<Double>();
     /** The minimum value. */
     private double mMinValue = MathHelper.NULL_VALUE;
     /** The maximum value. */

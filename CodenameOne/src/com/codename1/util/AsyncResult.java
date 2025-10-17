@@ -36,5 +36,5 @@ public interface AsyncResult<V> {
      * @param value The value that the AsyncResource completes with.
      * @param error The error that is thrown by the AsyncResource.
      */
-    public void onReady(V value, Throwable error);
+    void onReady(V value, Throwable error);
 }

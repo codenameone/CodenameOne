@@ -48,7 +48,7 @@ public class XYSeries {
     /** The maximum value for the Y axis. */
     private double mMaxY = MathHelper.NULL_VALUE;
     /** Contains the annotations. */
-    private List<String> mAnnotations = new ArrayList<String>();
+    private final List<String> mAnnotations = new ArrayList<String>();
 
     /**
      * Builds a new XY series.

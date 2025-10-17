@@ -53,7 +53,7 @@ public class XMLWriter {
             {">", "&gt;"},
             {"'", "&apos;"}
     };
-    private boolean encodeText;
+    private final boolean encodeText;
 
     /**
      * Creates a new XMLWriter.
@@ -156,7 +156,7 @@ public class XMLWriter {
 
                 if (!isInline) {
                     indentation.deleteCharAt(indentation.length() - 1);
-                    writer.append(indentation.toString());
+                    writer.append(indentation);
                 }
                 writer.append("</");
                 writer.append(elementName);

@@ -40,7 +40,7 @@ public class UITimer {
     private long lastEllapse;
     private int ms;
     private boolean repeat;
-    private Internal i = new Internal();
+    private final Internal i = new Internal();
 
     /**
      * This constructor is useful when deriving this class to implement a timer.

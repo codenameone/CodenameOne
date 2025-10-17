@@ -191,9 +191,9 @@ public class ArrowLinesLayer extends LinesLayer {
 
     private class ArrowHead {
 
-        private int _height;
-        private int _width;
-        private Point[] _nodes;
+        private final int _height;
+        private final int _width;
+        private final Point[] _nodes;
 
         ArrowHead(int height, int width) {
             _height = height;

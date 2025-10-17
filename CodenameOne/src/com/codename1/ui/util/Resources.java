@@ -43,6 +43,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -137,12 +138,12 @@ public class Resources {
      * Hashtable containing the mapping between element types and their names in the
      * resource hashtable
      */
-    private HashMap<String, Byte> resourceTypes = new HashMap<String, Byte>();
+    private final HashMap<String, Byte> resourceTypes = new HashMap<String, Byte>();
     /**
      * A cache within the resource allowing us to preserve some resources in memory
      * so they can be utilized by a theme when it is loaded
      */
-    private HashMap<String, Object> resources = new HashMap<String, Object>();
+    private final HashMap<String, Object> resources = new HashMap<String, Object>();
     private DataInputStream input;
 
     // for internal use by the resource editor, creates an empty resource
@@ -197,23 +198,18 @@ public class Resources {
      * @param password the password or null to clear the password
      */
     public static void setPassword(String password) {
-        try {
-            if (password == null) {
-                key = null;
-                return;
-            }
-            key = password.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException ex) {
-            // won't happen
-            ex.printStackTrace();
+        if (password == null) {
+            key = null;
+            return;
         }
+        key = password.getBytes("UTF-8");
     }
 
     private static String[] toStringArray(ArrayList<String> v) {
         String[] s = new String[v.size()];
         int slen = v.size();
         for (int iter = 0; iter < slen; iter++) {
-            s[iter] = (String) v.get(iter);
+            s[iter] = v.get(iter);
         }
         return s;
     }
@@ -594,7 +590,7 @@ public class Resources {
         Iterator<String> e = resourceTypes.keySet().iterator();
         int alen = arr.length;
         for (int iter = 0; iter < alen; iter++) {
-            arr[iter] = (String) e.next();
+            arr[iter] = e.next();
         }
         return arr;
     }
@@ -626,7 +622,7 @@ public class Resources {
             resourceTypes.remove(id);
         } else {
             resources.put(id, value);
-            resourceTypes.put(id, new Byte(type));
+            resourceTypes.put(id, Byte.valueOf(type));
         }
     }
 
@@ -648,7 +644,7 @@ public class Resources {
         ArrayList<String> vec = new ArrayList<String>();
         Iterator<String> e = resourceTypes.keySet().iterator();
         while (e.hasNext()) {
-            String c = (String) e.next();
+            String c = e.next();
             if (isFont(c)) {
                 vec.add(c);
             }
@@ -665,7 +661,7 @@ public class Resources {
         ArrayList<String> vec = new ArrayList<String>();
         Iterator<String> e = resourceTypes.keySet().iterator();
         while (e.hasNext()) {
-            String c = (String) e.next();
+            String c = e.next();
             if (isTheme(c)) {
                 vec.add(c);
             }
@@ -694,7 +690,7 @@ public class Resources {
      * For internal use only
      */
     byte getResourceType(String name) {
-        Byte b = (Byte) resourceTypes.get(name);
+        Byte b = resourceTypes.get(name);
         if (b == null) {
             return (byte) 0;
         }
@@ -706,7 +702,7 @@ public class Resources {
         Iterator<String> e = resourceTypes.keySet().iterator();
         while (e.hasNext()) {
             String c = e.next();
-            if (((Byte) resourceTypes.get(c)).byteValue() == b) {
+            if (resourceTypes.get(c).byteValue() == b) {
                 vec.add(c);
             }
         }
@@ -721,7 +717,7 @@ public class Resources {
      * @throws NullPointerException if the resource doesn't exist
      */
     public boolean isL10N(String name) {
-        byte b = ((Byte) resourceTypes.get(name)).byteValue();
+        byte b = resourceTypes.get(name).byteValue();
         return b == MAGIC_L10N;
     }
 
@@ -733,7 +729,7 @@ public class Resources {
      * @throws NullPointerException if the resource doesn't exist
      */
     public boolean isTheme(String name) {
-        byte b = ((Byte) resourceTypes.get(name)).byteValue();
+        byte b = resourceTypes.get(name).byteValue();
         return b == MAGIC_THEME_LEGACY || b == MAGIC_THEME;
     }
 
@@ -745,7 +741,7 @@ public class Resources {
      * @throws NullPointerException if the resource doesn't exist
      */
     public boolean isFont(String name) {
-        byte b = ((Byte) resourceTypes.get(name)).byteValue();
+        byte b = resourceTypes.get(name).byteValue();
         return b == MAGIC_FONT || b == MAGIC_FONT_LEGACY || b == MAGIC_INDEXED_FONT_LEGACY;
     }
 
@@ -758,7 +754,7 @@ public class Resources {
      * @deprecated animations are no longer distinguished from images in the resource file, use Image.isAnimation instead
      */
     public boolean isAnimation(String name) {
-        byte b = ((Byte) resourceTypes.get(name)).byteValue();
+        byte b = resourceTypes.get(name).byteValue();
         return b == MAGIC_ANIMATION_LEGACY;
     }
 
@@ -770,7 +766,7 @@ public class Resources {
      * @throws NullPointerException if the resource doesn't exist
      */
     public boolean isData(String name) {
-        byte b = ((Byte) resourceTypes.get(name)).byteValue();
+        byte b = resourceTypes.get(name).byteValue();
         return b == MAGIC_DATA;
     }
 
@@ -782,7 +778,7 @@ public class Resources {
      * @throws NullPointerException if the resource doesn't exist
      */
     public boolean isUI(String name) {
-        byte b = ((Byte) resourceTypes.get(name)).byteValue();
+        byte b = resourceTypes.get(name).byteValue();
         return b == MAGIC_UI;
     }
 
@@ -794,7 +790,7 @@ public class Resources {
      * @throws NullPointerException if the resource doesn't exist
      */
     public boolean isImage(String name) {
-        Byte bt = (Byte) resourceTypes.get(name);
+        Byte bt = resourceTypes.get(name);
         if (bt == null) {
             return false;
         }
@@ -1421,10 +1417,7 @@ public class Resources {
                         mediaRules = new HashMap<String, MediaRule>();
                     }
                     MediaRule rule = mediaRules.get(subkey);
-                    boolean replace = false;
-                    if (rule == null) {
-                        replace = true;
-                    }
+                    boolean replace = rule == null;
                     if (!replace && rule.matchCount <= matchCount) {
                         replace = true;
                     }
@@ -1453,7 +1446,7 @@ public class Resources {
             }
 
             if (key.endsWith("align") || key.endsWith("textDecoration")) {
-                theme.put(key, new Integer(input.readShort()));
+                theme.put(key, Integer.valueOf(input.readShort()));
                 continue;
             }
 
@@ -1571,7 +1564,7 @@ public class Resources {
                 } else {
                     key = "";
                 }
-                theme.put(key + Style.BACKGROUND_TYPE, new Byte((byte) type));
+                theme.put(key + Style.BACKGROUND_TYPE, Byte.valueOf((byte) type));
 
                 switch (type) {
                     // Scaled Image
@@ -1592,7 +1585,7 @@ public class Resources {
                         String imageName = input.readUTF();
                         theme.put(key + Style.BG_IMAGE, imageName);
                         byte align = input.readByte();
-                        theme.put(key + Style.BACKGROUND_ALIGNMENT, new Byte(align));
+                        theme.put(key + Style.BACKGROUND_ALIGNMENT, Byte.valueOf(align));
                         break;
 
                     // Horizontal Linear Gradient
@@ -1600,7 +1593,7 @@ public class Resources {
                         // Vertical Linear Gradient
                     case 0xF7:
                         Float c = new Float(0.5f);
-                        theme.put(key + Style.BACKGROUND_GRADIENT, new Object[]{new Integer(input.readInt()), new Integer(input.readInt()), c, c, new Float(1)});
+                        theme.put(key + Style.BACKGROUND_GRADIENT, new Object[]{Integer.valueOf(input.readInt()), Integer.valueOf(input.readInt()), c, c, new Float(1)});
                         break;
 
                     // Radial Gradient
@@ -1613,8 +1606,8 @@ public class Resources {
                         if (minorVersion > 1) {
                             radialSize = input.readFloat();
                         }
-                        theme.put(key + Style.BACKGROUND_GRADIENT, new Object[]{new Integer(c1),
-                                new Integer(c2),
+                        theme.put(key + Style.BACKGROUND_GRADIENT, new Object[]{Integer.valueOf(c1),
+                                Integer.valueOf(c2),
                                 new Float(f1),
                                 new Float(f2),
                                 new Float(radialSize)});
@@ -1653,22 +1646,22 @@ public class Resources {
             }
 
             if (key.endsWith(Style.BACKGROUND_TYPE) || key.endsWith(Style.BACKGROUND_ALIGNMENT)) {
-                theme.put(key, new Byte(input.readByte()));
+                theme.put(key, Byte.valueOf(input.readByte()));
                 continue;
             }
 
             if (key.endsWith(Style.BACKGROUND_GRADIENT)) {
                 if (minorVersion < 2) {
                     theme.put(key, new Object[]{
-                            new Integer(input.readInt()),
-                            new Integer(input.readInt()),
+                            Integer.valueOf(input.readInt()),
+                            Integer.valueOf(input.readInt()),
                             new Float(input.readFloat()),
                             new Float(input.readFloat())
                     });
                 } else {
                     theme.put(key, new Object[]{
-                            new Integer(input.readInt()),
-                            new Integer(input.readInt()),
+                            Integer.valueOf(input.readInt()),
+                            Integer.valueOf(input.readInt()),
                             new Float(input.readFloat()),
                             new Float(input.readFloat()),
                             new Float(input.readFloat())

@@ -140,7 +140,7 @@ public final class LayoutUtil {
         if (DT_MAP == null)
             return HAS_BEANS;
 
-        if (cw != null && DT_MAP.containsKey(cw.getComponent()) == false)
+        if (cw != null && !DT_MAP.containsKey(cw.getComponent()))
             cw = null;
 
         Boolean b = DT_MAP.get(cw != null ? cw.getComponent() : null);
@@ -241,7 +241,7 @@ public final class LayoutUtil {
             for (int i = 0; i < sizes.length; i++) {
                 ResizeConstraint resC = (ResizeConstraint) getIndexSafe(resConstr, i);
                 if (resC != null)
-                    prioList.add(new Integer(isGrow ? resC.growPrio : resC.shrinkPrio));
+                    prioList.add(Integer.valueOf(isGrow ? resC.growPrio : resC.shrinkPrio));
             }
             Integer[] prioIntegers = prioList.toArray(new Integer[prioList.size()]);
 
