@@ -7,8 +7,11 @@ on:
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-simulator-tests.sh'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
+      - 'scripts/ios/**'
+      - '!scripts/ios/**/*.md'
       - 'CodenameOne/src/**'
       - '!CodenameOne/src/**/*.md'
       - 'Ports/iOSPort/**'
@@ -24,8 +27,11 @@ on:
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-simulator-tests.sh'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
+      - 'scripts/ios/**'
+      - '!scripts/ios/**/*.md'
       - 'CodenameOne/src/**'
       - '!CodenameOne/src/**/*.md'
       - 'Ports/iOSPort/**'
@@ -37,14 +43,26 @@ on:
 
 jobs:
   build-ios:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
     timeout-minutes: 60         # allow enough time for dependency installs and full build
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci
       cancel-in-progress: false # queue new ones instead of canceling in-flight
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Pillow for image processing
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pillow
 
       - name: Ensure CocoaPods tooling
         run: |
@@ -75,6 +93,21 @@ jobs:
         timeout-minutes: 25
 
       - name: Build sample iOS app and compile workspace
+        id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
+
+      - name: Run iOS simulator automation tests
+        run: ./scripts/run-ios-simulator-tests.sh "${{ steps.build-ios-app.outputs.app_bundle }}"
+        timeout-minutes: 20
+
+      - name: Upload simulator artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-artifacts
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
 

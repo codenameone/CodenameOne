@@ -119,6 +119,7 @@ set_property() {
 
 set_property "codename1.packageName" "$PACKAGE_NAME"
 set_property "codename1.mainName" "$MAIN_NAME"
+set_property "automation.platform" "ios"
 
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
@@ -138,6 +139,17 @@ sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
     "$TEMPLATE" > "$MAIN_FILE"
 
 bia_log "Wrote main application class to $MAIN_FILE"
+
+AUTOMATION_TEMPLATE="$SCRIPT_DIR/templates/HelloCodenameOneAutomation.java.tmpl"
+AUTOMATION_FILE="$JAVA_DIR/${MAIN_NAME}Automation.java"
+if [ -f "$AUTOMATION_TEMPLATE" ]; then
+  sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
+      -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
+      "$AUTOMATION_TEMPLATE" > "$AUTOMATION_FILE"
+  bia_log "Wrote automation harness to $AUTOMATION_FILE"
+else
+  bia_log "Automation template not found at $AUTOMATION_TEMPLATE"
+fi
 
 # --- Build iOS project ---
 DERIVED_DATA_DIR="${TMPDIR}/codenameone-ios-derived"

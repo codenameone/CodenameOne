@@ -1,0 +1,298 @@
+package @PACKAGE@;
+
+import com.codename1.components.BrowserComponent;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.ImageIO;
+import com.codename1.ui.util.UITimer;
+import com.codename1.util.Base64;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+/**
+ * Automation harness that emits CN1SS screenshot streams when enabled via
+ * {@code automation.platform=ios} in codenameone_settings.properties.
+ */
+public final class @MAIN_NAME@Automation {
+    private static final int CHUNK_SIZE = 2000;
+    private static final int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 30, 20, 10};
+    private static final int MAX_PREVIEW_BYTES = 20 * 1024;
+    private static boolean running;
+
+    private @MAIN_NAME@Automation() {}
+
+    public static void schedule() {
+        Display.getInstance().callSerially(() -> {
+            if (running) {
+                return;
+            }
+            if (!shouldRun()) {
+                return;
+            }
+            running = true;
+            log("CN1SS:INFO:automation=start");
+            runMainTest(() -> runBrowserTest(@MAIN_NAME@Automation::finish));
+        });
+    }
+
+    private static boolean shouldRun() {
+        Display d = Display.getInstance();
+        String platform = d.getProperty("automation.platform", null);
+        if (platform == null) {
+            return false;
+        }
+        String lower = platform.toLowerCase();
+        return lower.indexOf("ios") >= 0 || lower.indexOf("simulator") >= 0;
+    }
+
+    private static void runMainTest(Runnable next) {
+        Display.getInstance().callSerially(() -> {
+            Form current = ensureForm("Main Screen");
+            Container content = new Container(BoxLayout.y());
+            Style s = content.getAllStyles();
+            s.setBgColor(0x1f2937);
+            s.setBgTransparency(255);
+            s.setPadding(6, 6, 6, 6);
+            s.setFgColor(0xf9fafb);
+
+            Label heading = new Label("Hello Codename One");
+            heading.getAllStyles().setFgColor(0x38bdf8);
+            heading.getAllStyles().setMargin(0, 4, 0, 0);
+
+            Label body = new Label("iOS automation preview");
+            body.getAllStyles().setFgColor(0xf9fafb);
+
+            content.removeAll();
+            content.add(heading);
+            content.add(body);
+
+            current.removeAll();
+            current.setTitle("Main Screen");
+            current.setLayout(new BorderLayout());
+            current.add(BorderLayout.CENTER, content);
+            current.revalidate();
+
+            UITimer.timer(600, false, current, () -> captureAndEmit("MainActivity", next));
+        });
+    }
+
+    private static void runBrowserTest(Runnable next) {
+        Display.getInstance().callSerially(() -> {
+            Form current = ensureForm("Browser Test");
+            current.removeAll();
+            current.setLayout(new BorderLayout());
+
+            BrowserComponent browser = new BrowserComponent();
+            if (!BrowserComponent.isNativeBrowserSupported()) {
+                log("CN1SS:WARN:test=BrowserComponent native_browser_unsupported=1");
+                emitChannel(null, "BrowserComponent", "");
+                if (next != null) {
+                    Display.getInstance().callSerially(next);
+                }
+                return;
+            }
+            final boolean[] captured = new boolean[] {false};
+            final Runnable captureTask = () -> captureAndEmit("BrowserComponent", next);
+
+            String html = "<html><head><meta charset='utf-8'/>"
+                    + "<style>body{margin:0;font-family:sans-serif;background:#0e1116;color:#f3f4f6;}"
+                    + ".container{padding:24px;text-align:center;}h1{font-size:24px;margin-bottom:12px;}"
+                    + "p{font-size:16px;line-height:1.4;}span{color:#4cc9f0;}</style></head>"
+                    + "<body><div class='container'><h1>Codename One</h1>"
+                    + "<p>BrowserComponent <span>automation</span> test content.</p></div></body></html>";
+
+            browser.addWebEventListener(BrowserComponent.onLoad, evt -> {
+                if (captured[0]) {
+                    return;
+                }
+                captured[0] = true;
+                UITimer.timer(700, false, current, captureTask);
+            });
+            browser.setPage(html, null);
+
+            UITimer.timer(10000, false, current, () -> {
+                if (!captured[0]) {
+                    log("CN1SS:WARN:test=BrowserComponent timed_out=1");
+                    captureTask.run();
+                }
+            });
+
+            current.add(BorderLayout.CENTER, browser);
+            current.revalidate();
+        });
+    }
+
+    private static Form ensureForm(String title) {
+        Form current = Display.getInstance().getCurrent();
+        if (current == null) {
+            current = new Form(title, new BorderLayout());
+            current.show();
+            return current;
+        }
+        current.setTitle(title);
+        current.setLayout(new BorderLayout());
+        return current;
+    }
+
+    private static void captureAndEmit(String testName, Runnable next) {
+        try {
+            ScreenshotCapture capture = captureScreenshot(testName);
+            emitScreenshot(capture, testName);
+        } catch (Throwable t) {
+            log("CN1SS:ERR:test=" + sanitize(testName) + " " + t);
+        } finally {
+            if (next != null) {
+                Display.getInstance().callSerially(next);
+            }
+        }
+    }
+
+    private static ScreenshotCapture captureScreenshot(String testName) throws IOException {
+        Form current = Display.getInstance().getCurrent();
+        if (current == null) {
+            return new ScreenshotCapture(null, null, 0, 0, 0);
+        }
+        int w = Math.max(1, current.getWidth());
+        int h = Math.max(1, current.getHeight());
+
+        Image screenshot = Display.getInstance().captureScreen();
+        if (screenshot == null) {
+            screenshot = Image.createImage(w, h);
+            current.paintComponent(screenshot.getGraphics(), true);
+        }
+
+        ImageIO io = ImageIO.getImageIO();
+        if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+            log("CN1SS:ERR:test=" + sanitize(testName) + " image_io_unavailable=1");
+            return new ScreenshotCapture(null, null, 0, w, h);
+        }
+
+        ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, w * h));
+        io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
+        byte[] png = pngOut.toByteArray();
+
+        byte[] preview = null;
+        int previewQuality = 0;
+        if (io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+            int smallest = Integer.MAX_VALUE;
+            for (int quality : PREVIEW_QUALITIES) {
+                ByteArrayOutputStream jpegOut = new ByteArrayOutputStream(Math.max(512, w * h / 2));
+                io.save(screenshot, jpegOut, ImageIO.FORMAT_JPEG, quality / 100f);
+                byte[] candidate = jpegOut.toByteArray();
+                if (candidate.length < smallest) {
+                    smallest = candidate.length;
+                    preview = candidate;
+                    previewQuality = quality;
+                }
+                if (candidate.length <= MAX_PREVIEW_BYTES) {
+                    break;
+                }
+            }
+        }
+
+        return new ScreenshotCapture(png, preview, previewQuality, w, h);
+    }
+
+    private static void emitScreenshot(ScreenshotCapture capture, String testName) {
+        if (capture == null || capture.png == null || capture.png.length == 0) {
+            log("CN1SS:ERR:test=" + sanitize(testName) + " png_bytes=0");
+            emitChannel(null, testName, "");
+            return;
+        }
+        log("CN1SS:INFO:test=" + sanitize(testName) + " png_bytes=" + capture.png.length
+                + " dims=" + capture.width + "x" + capture.height);
+        emitChannel(capture.png, testName, "");
+        if (capture.preview != null && capture.preview.length > 0) {
+            log("CN1SS:INFO:test=" + sanitize(testName) + " preview_bytes=" + capture.preview.length
+                    + " preview_quality=" + capture.previewQuality);
+            emitChannel(capture.preview, testName, "PREVIEW");
+        }
+    }
+
+    private static void emitChannel(byte[] data, String testName, String channel) {
+        String prefix = "CN1SS";
+        if (channel != null && channel.length() > 0) {
+            prefix += channel;
+        }
+        String safe = sanitize(testName);
+        if (data == null || data.length == 0) {
+            log(prefix + ":END:" + safe);
+            return;
+        }
+        String b64 = Base64.encodeNoNewline(data);
+        int chunkCount = (b64.length() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        log(prefix + ":INFO:test=" + safe + " chunks=" + chunkCount + " total_b64_len=" + b64.length());
+        for (int idx = 0; idx < chunkCount; idx++) {
+            int start = idx * CHUNK_SIZE;
+            int end = Math.min(start + CHUNK_SIZE, b64.length());
+            String chunk = b64.substring(start, end);
+            String index = formatIndex(idx);
+            log(prefix + ":" + safe + ":" + index + ":" + chunk);
+        }
+        log(prefix + ":END:" + safe);
+    }
+
+    private static String formatIndex(int idx) {
+        String s = String.valueOf(idx);
+        if (s.length() >= 6) {
+            return s;
+        }
+        StringBuffer buffer = new StringBuffer(6);
+        for (int i = s.length(); i < 6; i++) {
+            buffer.append('0');
+        }
+        buffer.append(s);
+        return buffer.toString();
+    }
+
+    private static String sanitize(String name) {
+        if (name == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char ch = name.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+                    || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-' || ch == '.') {
+                sb.append(ch);
+            } else {
+                sb.append('_');
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void finish() {
+        Display.getInstance().callSerially(() -> {
+            log("CN1SS:INFO:automation=done");
+            Display.getInstance().exitApplication();
+            running = false;
+        });
+    }
+
+    private static void log(String s) {
+        System.out.println(s);
+    }
+
+    private static final class ScreenshotCapture {
+        final byte[] png;
+        final byte[] preview;
+        final int previewQuality;
+        final int width;
+        final int height;
+
+        ScreenshotCapture(byte[] png, byte[] preview, int previewQuality, int width, int height) {
+            this.png = png;
+            this.preview = preview;
+            this.previewQuality = previewQuality;
+            this.width = width;
+            this.height = height;
+        }
+    }
+}

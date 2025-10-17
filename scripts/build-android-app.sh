@@ -235,6 +235,17 @@ sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
     -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
     "$TEMPLATE" > "$MAIN_FILE"
 
+AUTOMATION_TEMPLATE="$SCRIPT_DIR/templates/HelloCodenameOneAutomation.java.tmpl"
+AUTOMATION_FILE="$JAVA_DIR/${MAIN_NAME}Automation.java"
+if [ -f "$AUTOMATION_TEMPLATE" ]; then
+  sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
+      -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
+      "$AUTOMATION_TEMPLATE" > "$AUTOMATION_FILE"
+  ba_log "Wrote automation harness to $AUTOMATION_FILE"
+else
+  ba_log "Automation template not found at $AUTOMATION_TEMPLATE"
+fi
+
 # --- Ensure codename1.mainName is set ---
 ba_log "Setting codename1.mainName to $MAIN_NAME"
 if grep -q '^codename1.mainName=' "$SETTINGS_FILE"; then

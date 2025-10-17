@@ -20,6 +20,8 @@ public class @MAIN_NAME@ {
         Form helloForm = new Form("Hello Codename One", new BorderLayout());
         helloForm.add(BorderLayout.CENTER, new Label("Hello Codename One"));
         helloForm.show();
+
+        @MAIN_NAME@Automation.schedule();
     }
 
     public void stop() {
