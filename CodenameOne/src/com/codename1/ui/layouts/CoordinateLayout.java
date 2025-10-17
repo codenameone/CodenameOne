@@ -30,20 +30,20 @@ import com.codename1.ui.geom.Dimension;
 /**
  * Allows laying out components based on absolute positions/sizes
  * that are adapted based on available space for the layout.
- * The layout 
+ * The layout
  *
  * @author Chen Fishbein
  * @deprecated the usage of this layout is strongly discouraged as elements will not adapt to the right position/size
  */
-public class CoordinateLayout extends Layout{
-    
+public class CoordinateLayout extends Layout {
+
     private int width;
     private int height;
-    
+
     /**
      * Allows creating a coordinate layouts that disables the scaling feature
      */
-    public CoordinateLayout(){
+    public CoordinateLayout() {
         this.width = -1;
         this.height = -1;
     }
@@ -51,11 +51,11 @@ public class CoordinateLayout extends Layout{
     /**
      * This constructor accepts the relative width and height used to define the
      * aspect ratio of the Container
-     * 
+     *
      * @param width
      * @param height
      */
-    public CoordinateLayout(int width, int height){
+    public CoordinateLayout(int width, int height) {
         this.width = width;
         this.height = height;
     }
@@ -63,31 +63,31 @@ public class CoordinateLayout extends Layout{
     /**
      * This constructor accepts the relative width and height used to define the
      * aspect ratio of the Container
-     * 
+     *
      * @param d the width/height
      */
-    public CoordinateLayout(Dimension d){
+    public CoordinateLayout(Dimension d) {
         this(d.getWidth(), d.getHeight());
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {
-        if(width < 0) {
+        if (width < 0) {
             return;
         }
         int numOfcomponents = parent.getComponentCount();
         int parentW = parent.getWidth();
         int parentH = parent.getHeight();
-        
-        for(int i=0; i< numOfcomponents; i++){
+
+        for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
-            int x = cmp.getX() * parentW /width;
-            int y = cmp.getY() * parentH /height;
+            int x = cmp.getX() * parentW / width;
+            int y = cmp.getY() * parentH / height;
             cmp.setX(x);
             cmp.setY(y);
-            
+
             cmp.setWidth(cmp.getPreferredW());
             cmp.setHeight(cmp.getPreferredH());
         }
@@ -101,12 +101,12 @@ public class CoordinateLayout extends Layout{
     public Dimension getPreferredSize(Container parent) {
         Dimension retVal = new Dimension();
         int numOfcomponents = parent.getComponentCount();
-        for(int i=0; i< numOfcomponents; i++){
+        for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
             retVal.setWidth(Math.max(retVal.getWidth(), cmp.getX() + cmp.getPreferredW()));
             retVal.setHeight(Math.max(retVal.getHeight(), cmp.getY() + cmp.getPreferredH()));
         }
-        
+
         return retVal;
     }
 

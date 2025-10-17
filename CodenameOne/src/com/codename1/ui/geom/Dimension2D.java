@@ -24,15 +24,15 @@
 package com.codename1.ui.geom;
 
 /**
- * Utility class that holds a width and height that represents a dimension of 
+ * Utility class that holds a width and height that represents a dimension of
  * a component or element
- * 
+ *
  * @author Nir Shabi
  */
 public class Dimension2D {
-    
+
     private double width;
-    
+
     private double height;
 
     /**
@@ -43,7 +43,7 @@ public class Dimension2D {
 
     /**
      * Creates a new instance of Dimension with a predefine dimension
-     * 
+     *
      * @param d Dimension to copy
      */
     public Dimension2D(Dimension2D d) {
@@ -53,8 +53,8 @@ public class Dimension2D {
 
     /**
      * CCreates a new instance of Dimension with width and height
-     * 
-     * @param width the dimention width
+     *
+     * @param width  the dimention width
      * @param height the dimention height
      */
     public Dimension2D(double width, double height) {
@@ -63,8 +63,17 @@ public class Dimension2D {
     }
 
     /**
+     * Returns the width of the dimension
+     *
+     * @return width of the dimension
+     */
+    public double getWidth() {
+        return width;
+    }
+
+    /**
      * Set the width of the dimension
-     * 
+     *
      * @param width the dimention width
      */
     public void setWidth(double width) {
@@ -72,8 +81,17 @@ public class Dimension2D {
     }
 
     /**
+     * Return the height of the dimension
+     *
+     * @return height of the dimension
+     */
+    public double getHeight() {
+        return height;
+    }
+
+    /**
      * Set the height of the dimension
-     * 
+     *
      * @param height the dimention height
      */
     public void setHeight(double height) {
@@ -81,31 +99,11 @@ public class Dimension2D {
     }
 
     /**
-     * Returns the width of the dimension
-     * 
-     * @return width of the dimension
-     */
-    public double getWidth() {
-        return width;
-    }
-
-   /**
-    * Return the height of the dimension
-    * 
-    * @return height of the dimension
-    */
-    public double getHeight() {
-        return height;
-    }
-
-    /**
      * {@inheritDoc}
      */
     public String toString() {
-        return "width = " + width + " height = " +height;
+        return "width = " + width + " height = " + height;
     }
 
-    
-    
-    
+
 }

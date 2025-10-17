@@ -19,23 +19,18 @@
  */
 package com.codename1.maps;
 
-import com.codename1.maps.Tile;
-import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.services.ImageDownloadService;
-import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.geom.Dimension;
-
-import com.codename1.maps.BoundingBox;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.util.StringUtil;
 
 /**
  * This Tile brings the tile image from a given http url.
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public class ProxyHttpTile extends Tile {
@@ -45,21 +40,21 @@ public class ProxyHttpTile extends Tile {
 
     /**
      * Creates an Http Tile
-     * 
+     *
      * @param tileSize the tile size
-     * @param bbox the tile bounding box
-     * @param url the url to bring the image from
+     * @param bbox     the tile bounding box
+     * @param url      the url to bring the image from
      */
     public ProxyHttpTile(Dimension tileSize, BoundingBox bbox, final String url) {
         super(tileSize, bbox, null);
         _url = url;
-        String cacheId = url.substring(url.indexOf(":")+1);
+        String cacheId = url.substring(url.indexOf(":") + 1);
         cacheId = StringUtil.replaceAll(cacheId, "\\", "_");
         cacheId = StringUtil.replaceAll(cacheId, "/", "_");
         cacheId = StringUtil.replaceAll(cacheId, ".", "_");
         cacheId = StringUtil.replaceAll(cacheId, "?", "_");
         cacheId = StringUtil.replaceAll(cacheId, "&", "_");
-        
+
         ImageDownloadService.createImageToStorage(url, new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
@@ -81,7 +76,7 @@ public class ProxyHttpTile extends Tile {
      * {@inheritDoc}
      */
     public boolean paint(Graphics g) {
-        if(_tile == null){
+        if (_tile == null) {
             return false;
         }
         return _tile.paint(g);

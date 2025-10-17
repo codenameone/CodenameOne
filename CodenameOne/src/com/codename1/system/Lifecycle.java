@@ -22,12 +22,8 @@
  */
 package com.codename1.system;
 
-import static com.codename1.ui.CN.addNetworkErrorListener;
-import static com.codename1.ui.CN.updateNetworkThreadCount;
-
 import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
-import com.codename1.io.NetworkManager;
 import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
@@ -37,6 +33,8 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+
+import static com.codename1.ui.CN.addNetworkErrorListener;
 
 /**
  * Optional helper class that implements the Codename One lifecycle methods with reasonable default
@@ -80,6 +78,7 @@ public class Lifecycle {
 
     /**
      * Returns the default number of network thread count
+     *
      * @return currently two threads
      */
     protected int getNetworkThreadCount() {
@@ -89,6 +88,7 @@ public class Lifecycle {
     /**
      * Returns the name of the global theme file, by default it's "/theme". Can be overriden by subclasses to
      * load a different file name
+     *
      * @return "/theme"
      */
     protected String getThemeName() {
@@ -97,6 +97,7 @@ public class Lifecycle {
 
     /**
      * The theme instance
+     *
      * @return the theme
      */
     public Resources getTheme() {
@@ -105,6 +106,7 @@ public class Lifecycle {
 
     /**
      * Invoked on a network error callback
+     *
      * @param err the network error event
      */
     protected void handleNetworkError(NetworkEvent err) {
@@ -121,7 +123,7 @@ public class Lifecycle {
      * Default start callback that's invoked on application resume
      */
     public void start() {
-        if(current != null){
+        if (current != null) {
             current.show();
             return;
         }
@@ -129,7 +131,7 @@ public class Lifecycle {
         runApp();
     }
 
-    
+
     /**
      * This method is invoked by start to show the first form of the application
      */
@@ -145,8 +147,8 @@ public class Lifecycle {
      */
     public void stop() {
         current = CN.getCurrentForm();
-        if(current instanceof Dialog) {
-            ((Dialog)current).dispose();
+        if (current instanceof Dialog) {
+            ((Dialog) current).dispose();
             current = CN.getCurrentForm();
         }
     }
@@ -156,14 +158,14 @@ public class Lifecycle {
      */
     public void destroy() {
     }
-    
+
     /**
      * The current form within the application lifecycle which possibly differs from the one in the implementation
      */
     protected Form getCurrentForm() {
         return current;
     }
-    
+
     /**
      * The current form within the application lifecycle which possibly differs from the one in the implementation
      *

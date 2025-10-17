@@ -28,7 +28,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>FlowLayout is the default layout manager for Codename One Containers and Forms. It places components
@@ -36,13 +35,13 @@ import com.codename1.ui.plaf.UIManager;
  * a line and start a new row. </p>
  * <script src="https://gist.github.com/codenameone/124cab8d0c1da82756f1.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/flow-layout.png" alt="Result of FlowLayout code" />
- * 
+ *
  * <p>
- * Since flow layout isn't a constraint based layout it has a bunch of very useful enclose methods that can significantly 
+ * Since flow layout isn't a constraint based layout it has a bunch of very useful enclose methods that can significantly
  * reduce the code required to create the same UI e.g.:
  * </p>
  * <script src="https://gist.github.com/codenameone/3481c77f93726745ad28.js"></script>
- * 
+ *
  * <p>
  * This class works nicely for simple elements, however since Codename One doesn't reflow recursively (for performance)
  * it can't accurately handle complex layouts. As a result when an element of varying size is placed in a flow layout
@@ -51,37 +50,38 @@ import com.codename1.ui.plaf.UIManager;
  * </p>
  *
  * <p>
- * Flow layout supports aligning the component horizontally and vertically, it defaults to the top left alignment for 
+ * Flow layout supports aligning the component horizontally and vertically, it defaults to the top left alignment for
  * LTR languages. E.g. the following alignments are supported thru the usage of <code>setAlign</code> &amp;
  * <code>setValign</code>.
  * </p>
  * <p>E.g. you can align to the center</p>
  * <img src="https://www.codenameone.com/img/developer-guide/flow-layout-center.png" alt="Flow layout align center" />
- * 
+ *
  * <p>You can align to the right</p>
  * <img src="https://www.codenameone.com/img/developer-guide/flow-layout-right.png" alt="Flow layout align right" />
- * 
+ *
  * <p>You can align to the center and the middle horizontally</p>
  * <img src="https://www.codenameone.com/img/developer-guide/flow-layout-center-middle.png" alt="Flow layout align middle" />
- * 
+ *
  * <p>There are quite a few additional combinations that are possible with these API's.</p>
- * 
- * @see BoxLayout see the box layout X which is often a better choice than flow layout.
+ *
  * @author Nir Shabi
+ * @see BoxLayout see the box layout X which is often a better choice than flow layout.
  */
-public class FlowLayout extends Layout{
+public class FlowLayout extends Layout {
     private boolean fillRows;
 
     private int orientation = Component.LEFT;
     private int valign = Component.TOP;
     private boolean vAlignByRow;
-
+    private Dimension dim = new Dimension(0, 0);
 
     /**
      * Creates a new instance of FlowLayout with left alignment
      */
     public FlowLayout() {
     }
+
 
     /**
      * Creates a new instance of FlowLayout with the given orientation one of
@@ -93,13 +93,12 @@ public class FlowLayout extends Layout{
         this.orientation = orientation;
     }
 
-
     /**
      * Creates a new instance of FlowLayout with the given orientation one of
      * LEFT, RIGHT or CENTER and the vertical orientation
      *
      * @param orientation the orientation value
-     * @param valign the vertical orientation one of Component.TOP/BOTTOM/CENTER
+     * @param valign      the vertical orientation one of Component.TOP/BOTTOM/CENTER
      */
     public FlowLayout(int orientation, int valign) {
         this.orientation = orientation;
@@ -111,13 +110,185 @@ public class FlowLayout extends Layout{
      * LEFT, RIGHT or CENTER and the vertical orientation
      *
      * @param orientation the orientation value
-     * @param valign the vertical orientation one of Component.TOP/BOTTOM/CENTER
+     * @param valign      the vertical orientation one of Component.TOP/BOTTOM/CENTER
      * @param vAlignByRow whether vertical alignment should be computed by row elements
      */
     public FlowLayout(int orientation, int valign, boolean vAlignByRow) {
         this.orientation = orientation;
         this.valign = valign;
         this.vAlignByRow = vAlignByRow;
+    }
+
+    /**
+     * <p>Shorthand for {@link com.codename1.ui.Container#encloseIn(com.codename1.ui.layouts.Layout, com.codename1.ui.Component...)}
+     * with a {@code FlowLayout instance} see:</p>
+     * <script src="https://gist.github.com/codenameone/3481c77f93726745ad28.js"></script>
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseIn(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenter(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRight(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseMiddleByRow(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterMiddleByRow(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER, true), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightMiddleByRow(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER, true), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseLeftMiddle(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseLeftMiddleByRow(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseBottom(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterBottom(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightBottom(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseBottomByRow(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM, true), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterBottomByRow(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM, true), cmps);
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightBottomByRow(Component... cmps) {
+        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM, true), cmps);
     }
 
     /**
@@ -133,32 +304,32 @@ public class FlowLayout extends Layout{
         int layoutWidth = parent.getLayoutWidth();
         int width = layoutWidth - sideGap - containerPaddingRight - containerPaddingLeft;
 
-        if(rtl) {
+        if (rtl) {
             x += sideGap;
         }
         int initX = x;
 
         int y = s.getPaddingTop();
-        int rowH=0;
-        int start=0;
-        int rowBaseline=0;
-        
+        int rowH = 0;
+        int start = 0;
+        int rowBaseline = 0;
+
         int maxComponentWidth = width;
 
         int numOfcomponents = parent.getComponentCount();
-        for(int i=0; i< numOfcomponents; i++){
+        for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
             Style style = cmp.getStyle();
             int marginX = style.getHorizontalMargins();
             cmp.setWidth(Math.min(maxComponentWidth - marginX, cmp.getPreferredW()));
             cmp.setHeight(cmp.getPreferredH());
 
-            // first component never breaks the line. Since width already removed padding and X already includes the 
+            // first component never breaks the line. Since width already removed padding and X already includes the
             // left padding we need to re-add the left padding to the width
-            if((x == initX) || ( x+ cmp.getPreferredW() <= width + containerPaddingLeft) ) {
+            if ((x == initX) || (x + cmp.getPreferredW() <= width + containerPaddingLeft)) {
                 // We take the actual LEFT since drawing is done in reverse
                 x += cmp.getStyle().getMarginLeftNoRTL();
-                if(rtl) {
+                if (rtl) {
                     cmp.setX(layoutWidth - x - cmp.getWidth());
                     //cmp.setX(width - x - cmp.getWidth());
                 } else {
@@ -168,60 +339,60 @@ public class FlowLayout extends Layout{
                 cmp.setY(y + cmp.getStyle().getMarginTop());
 
                 x += cmp.getWidth() + cmp.getStyle().getMarginRightNoRTL();
-                rowH = Math.max(rowH, cmp.getHeight() + cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom());
-                if ( valign == Component.BASELINE ){
+                rowH = Math.max(rowH, cmp.getHeight() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());
+                if (valign == Component.BASELINE) {
                     int cmpPrefH = cmp.getPreferredH();
                     int cmpBaseline = cmp.getBaseline(cmp.getPreferredW(), cmpPrefH);
-                    
+
                     rowBaseline = Math.max(rowBaseline, cmpBaseline + cmp.getStyle().getMarginTop());
-                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMarginBottom() + cmpPrefH-cmpBaseline);
+                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMarginBottom() + cmpPrefH - cmpBaseline);
                 }
             } else {
-                moveComponents(parent, 0, y, width - (x-initX), rowH, start, i, rowBaseline);
-                if(fillRows) {
+                moveComponents(parent, 0, y, width - (x - initX), rowH, start, i, rowBaseline);
+                if (fillRows) {
                     fillRow(parent, width, start, i);
                 }
                 x = initX;
                 y += rowH;
                 rowBaseline = 0;
 
-                if(rtl) {
-                	//cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
-                        cmp.setX(layoutWidth - x - cmp.getWidth());
-                        
+                if (rtl) {
+                    //cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
+                    cmp.setX(layoutWidth - x - cmp.getWidth());
+
                 } else {
-                	cmp.setX(x);
+                    cmp.setX(x);
                 }
 
                 cmp.setY(y + cmp.getStyle().getMarginTop());
-                rowH = cmp.getPreferredH()+ cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom();
-                if ( valign == Component.BASELINE ){
+                rowH = cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom();
+                if (valign == Component.BASELINE) {
                     int cmpPrefH = cmp.getPreferredH();
                     int cmpBaseline = cmp.getBaseline(cmp.getPreferredW(), cmpPrefH);
-                    
+
                     rowBaseline = Math.max(rowBaseline, cmpBaseline + cmp.getStyle().getMarginTop());
-                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMarginBottom() + cmpPrefH-cmpBaseline);
+                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMarginBottom() + cmpPrefH - cmpBaseline);
                 }
-                x += cmp.getPreferredW()+ cmp.getStyle().getMarginRightNoRTL();
+                x += cmp.getPreferredW() + cmp.getStyle().getMarginRightNoRTL();
                 start = i;
 
             }
         }
-        moveComponents(parent, 0, y, width - (x-initX), rowH, start, numOfcomponents, rowBaseline);
-        if(fillRows) {
+        moveComponents(parent, 0, y, width - (x - initX), rowH, start, numOfcomponents, rowBaseline);
+        if (fillRows) {
             fillRow(parent, width, start, numOfcomponents);
         }
         if (!vAlignByRow) {
-            
+
             if (valign == Component.BOTTOM) {
                 int dy = parent.getLayoutHeight() - s.getPaddingBottom() - (y + rowH);
-                for(int i=0; i< numOfcomponents; i++){
+                for (int i = 0; i < numOfcomponents; i++) {
                     Component cmp = parent.getComponentAt(i);
                     cmp.setY(cmp.getY() + dy);
                 }
             } else if (valign == Component.CENTER) {
-                int dy = (parent.getLayoutHeight() - s.getPaddingBottom() - (y + rowH))/2;
-                for(int i=0; i< numOfcomponents; i++){
+                int dy = (parent.getLayoutHeight() - s.getPaddingBottom() - (y + rowH)) / 2;
+                for (int i = 0; i < numOfcomponents; i++) {
                     Component cmp = parent.getComponentAt(i);
                     cmp.setY(cmp.getY() + dy);
                 }
@@ -232,29 +403,29 @@ public class FlowLayout extends Layout{
     /**
      * This method tries to fill up the available space in a row.
      * This method is called if isFillRows() returns true.
-     * 
+     *
      * @param target the parent container
-     * @param width the width of the row to fill
-     * @param start the index of the first component in this row
-     * @param end the index of the last component in this row
-     */ 
+     * @param width  the width of the row to fill
+     * @param start  the index of the first component in this row
+     * @param end    the index of the last component in this row
+     */
     protected void fillRow(Container target, int width, int start, int end) {
         int available = width;
-        for(int iter = start ; iter < end ; iter++) {
+        for (int iter = start; iter < end; iter++) {
             Component c = target.getComponentAt(iter);
-            available -= (c.getWidth() + c.getStyle().getMarginRightNoRTL() + 
+            available -= (c.getWidth() + c.getStyle().getMarginRightNoRTL() +
                     c.getStyle().getMarginLeftNoRTL());
         }
-        if(available > 0 && end - start > 0) {
+        if (available > 0 && end - start > 0) {
             int perComponent = available / (end - start);
             int lastComponent = perComponent + available % (end - start);
-            if(perComponent > 0) {
+            if (perComponent > 0) {
                 int addOffset = 0;
                 boolean rtl = target.isRTL();
-                for(int iter = start ; iter < end - 1 ; iter++) {
+                for (int iter = start; iter < end - 1; iter++) {
                     Component c = target.getComponentAt(iter);
                     c.setWidth(c.getWidth() + perComponent);
-                    if(rtl) {
+                    if (rtl) {
                         addOffset += perComponent;
                         c.setX(c.getX() - addOffset);
                     } else {
@@ -263,7 +434,7 @@ public class FlowLayout extends Layout{
                     }
                 }
                 Component c = target.getComponentAt(end - 1);
-                if(rtl) {
+                if (rtl) {
                     addOffset += lastComponent;
                     c.setX(c.getX() - addOffset);
                 } else {
@@ -275,24 +446,22 @@ public class FlowLayout extends Layout{
                 c.setWidth(c.getWidth() + lastComponent);
             }
         }
-        
+
     }
 
-    
-    
-    private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd, int baseline ) {
+    private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd, int baseline) {
         switch (orientation) {
             case Component.CENTER:
                 // this will remove half of last gap
                 if (target.isRTL()) {
-                	x = -(width) / 2;
+                    x = -(width) / 2;
                 } else {
-                	x = (width) / 2;
+                    x = (width) / 2;
                 }
                 break;
             case Component.RIGHT:
-                if(target.isRTL()) {
-                    x=-width;  // this will remove the last gap                    
+                if (target.isRTL()) {
+                    x = -width;  // this will remove the last gap
                 } else {
                     x = width;
                 }
@@ -302,16 +471,16 @@ public class FlowLayout extends Layout{
         int parentPadding = parentStyle.getHorizontalPadding();
 
 
-        for (int i = rowStart ; i < rowEnd ; i++) {
+        for (int i = rowStart; i < rowEnd; i++) {
             Component m = target.getComponentAt(i);
             Style style = m.getStyle();
             int marginX = style.getMarginLeftNoRTL() + style.getMarginRightNoRTL();
-            if(m.getWidth() + marginX < target.getWidth() - parentPadding){
-                m.setX(m.getX()+ x);
+            if (m.getWidth() + marginX < target.getWidth() - parentPadding) {
+                m.setX(m.getX() + x);
             }
-            
+
             int marginTop = style.getMarginTop();
-            switch(valign) {
+            switch (valign) {
                 case Component.BOTTOM:
                     if (vAlignByRow) {
                         m.setY(y + Math.max(marginTop, height - m.getHeight() - style.getMarginBottom()));
@@ -321,33 +490,31 @@ public class FlowLayout extends Layout{
                     break;
                 case Component.CENTER:
                     if (vAlignByRow) {
-                        m.setY(y + Math.max(marginTop, (height - m.getOuterHeight()) / 2 + style.getMarginTop()));                    
+                        m.setY(y + Math.max(marginTop, (height - m.getOuterHeight()) / 2 + style.getMarginTop()));
                     } else {
                         //m.setY(y + Math.max(marginTop, (target.getHeight() - m.getHeight()) / 2));
                     }
                     break;
                 case Component.BASELINE:
                     m.setY(y + Math.max(marginTop, baseline - m.getBaseline(m.getWidth(), m.getHeight())));
-                    
+
                     break;
                 default:
                     m.setY(y + marginTop);
                     break;
             }
-            
+
         }
     }
-
-    private Dimension dim = new Dimension(0, 0);
 
     /**
      * {@inheritDoc}
      */
-    public  Dimension getPreferredSize(Container parent) {
+    public Dimension getPreferredSize(Container parent) {
         int parentWidth = parent.getWidth();
-        
+
         // display width can be larger on orientation change when the UI didn't have time to adapt
-        if(parentWidth == 0 || parentWidth > Display.getInstance().getDisplayWidth()) {
+        if (parentWidth == 0 || parentWidth > Display.getInstance().getDisplayWidth()) {
             parent.invalidate();
         }
         int width = 0;
@@ -357,10 +524,10 @@ public class FlowLayout extends Layout{
         Style parentStyle = parent.getStyle();
         int parentPadding = parentStyle.getHorizontalPadding();
 
-        for(int i=0; i< numOfcomponents; i++){
+        for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
-            height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom());
-            int prefW = cmp.getPreferredW()+ cmp.getStyle().getHorizontalMargins();
+            height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());
+            int prefW = cmp.getPreferredW() + cmp.getStyle().getHorizontalMargins();
             w += prefW;
             //we need to break a line
             if (parentWidth > parentPadding && w > parentWidth - parentPadding && i > 0) {
@@ -372,11 +539,10 @@ public class FlowLayout extends Layout{
 
         width = Math.max(w, width);
 
-        dim.setWidth(width + parent.getStyle().getPaddingLeftNoRTL()+ parent.getStyle().getPaddingRightNoRTL());
-        dim.setHeight(height + parent.getStyle().getPaddingTop()+ parent.getStyle().getPaddingBottom());
+        dim.setWidth(width + parent.getStyle().getPaddingLeftNoRTL() + parent.getStyle().getPaddingRightNoRTL());
+        dim.setHeight(height + parent.getStyle().getPaddingTop() + parent.getStyle().getPaddingBottom());
         return dim;
     }
-
 
     /**
      * {@inheritDoc}
@@ -422,26 +588,25 @@ public class FlowLayout extends Layout{
     public void setValign(int valign) {
         this.valign = valign;
     }
-    
+
     /**
-     * When set to true vertical alignment will be performed by row (components within the container will be aligned vertically to each other in the same row)
-     * When set to false (which is default) vertical alignment relates to the alignment of this container in regards to external components
-     * 
-     * @param internal true for internal, false otherwise
-     */
-    public void setValignByRow(boolean internal) {
-        vAlignByRow=internal;
-    }
-    
-    /**
-     * Returns whether vertical alignment is done internally or externally 
-     * 
-     * @return whether vertical alignment is done internally or externally 
+     * Returns whether vertical alignment is done internally or externally
+     *
+     * @return whether vertical alignment is done internally or externally
      */
     public boolean isValignByRow() {
         return vAlignByRow;
     }
-    
+
+    /**
+     * When set to true vertical alignment will be performed by row (components within the container will be aligned vertically to each other in the same row)
+     * When set to false (which is default) vertical alignment relates to the alignment of this container in regards to external components
+     *
+     * @param internal true for internal, false otherwise
+     */
+    public void setValignByRow(boolean internal) {
+        vAlignByRow = internal;
+    }
 
     /**
      * Alignment of the flow layout, defaults to LEFT
@@ -465,168 +630,8 @@ public class FlowLayout extends Layout{
      * {@inheritDoc}
      */
     public boolean equals(Object o) {
-        return super.equals(o) && ((FlowLayout)o).orientation == orientation &&
-                ((FlowLayout)o).valign == valign &&
-                ((FlowLayout)o).fillRows == fillRows;
-    }
-    
-    /**
-     * <p>Shorthand for {@link com.codename1.ui.Container#encloseIn(com.codename1.ui.layouts.Layout, com.codename1.ui.Component...)} 
-     * with a {@code FlowLayout instance} see:</p>
-     * <script src="https://gist.github.com/codenameone/3481c77f93726745ad28.js"></script>
-     * 
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseIn(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(), cmps);
-    }
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseCenter(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.CENTER), cmps);
-    }
-
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseRight(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);
-    }
-
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseMiddle(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
-    }
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseMiddleByRow(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
-    }
-
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseCenterMiddle(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);
-    }
-
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER, true), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseCenterMiddleByRow(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER, true), cmps);
-    }
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseRightMiddle(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
-    }
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER, true), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseRightMiddleByRow(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER, true), cmps);
-    }
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseLeftMiddle(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
-    }
-
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseLeftMiddleByRow(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
-    }
-
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseBottom(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
-    }
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseCenterBottom(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);
-    }
-
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseRightBottom(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);
-    }
-
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM, true), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseBottomByRow(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM, true), cmps);
-    }
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM, true), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseCenterBottomByRow(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM, true), cmps);
-    }
-
-    
-    /**
-     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM, true), cmps);
-     * @param cmps the components to enclose in a new container
-     * @return the new container
-     */
-    public static Container encloseRightBottomByRow(Component... cmps) {
-        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM, true), cmps);
+        return super.equals(o) && ((FlowLayout) o).orientation == orientation &&
+                ((FlowLayout) o).valign == valign &&
+                ((FlowLayout) o).fillRows == fillRows;
     }
 }

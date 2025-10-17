@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.push;
@@ -27,6 +27,7 @@ import com.codename1.ui.Display;
 /**
  * Encapsulates the content of a Push message.  Use this class inside the {@link PushCallback#push(java.lang.String) }
  * method to retrieve details of the push, including title, body, image URL, category, type, and metadata if available.
+ *
  * @author Steve Hannah
  */
 public class PushContent {
@@ -34,7 +35,7 @@ public class PushContent {
 
     private String title, body, imageUrl, category, metaData, actionId, textResponse;
     private int type;
-    
+
     private PushContent() {
         title = p("title", null);
         body = p("body", null);
@@ -44,34 +45,36 @@ public class PushContent {
         actionId = p("actionId", null);
         textResponse = p("textResponse", null);
     }
-    
+
     private static String[] keys() {
-        return new String[] {"title", "body", "imageUrl", "category", "metaData", "actionId", "textResponse"};
+        return new String[]{"title", "body", "imageUrl", "category", "metaData", "actionId", "textResponse"};
     }
-    
+
     /**
      * Checks if there is pending push content to retrieve.
+     *
      * @return True if there is pending push content to retrieve.
      */
     public static boolean exists() {
-        return anyProperties(keys()); 
+        return anyProperties(keys());
     }
-    
+
     /**
      * Gets the most recent push notification content if it exists.  This functions like Stack.pop()
      * for a single-element stack.  I.e. In addition to returning the PushContent, that push content
-     * is removed from the queue.  
+     * is removed from the queue.
      * <p>
      * {@code
      * if (PushContent.exists()) {
-     *     PushContent content = PushContent.get();
-     *        // content should be non-null
-     *     PushContent content2 = PushContent.get();
-     *        // content2 should be null
-     *     PushContent.exists(); // false
+     * PushContent content = PushContent.get();
+     * // content should be non-null
+     * PushContent content2 = PushContent.get();
+     * // content2 should be null
+     * PushContent.exists(); // false
      * }
      * }
      * </p>
+     *
      * @return Pending push content if it exists.
      */
     public static PushContent get() {
@@ -82,30 +85,29 @@ public class PushContent {
         }
         return null;
     }
-    
-    
-    
+
+
     private static String p(String propName, String defaultVal) {
-        return Display.getInstance().getProperty(PROP_PREFIX+propName, defaultVal);
+        return Display.getInstance().getProperty(PROP_PREFIX + propName, defaultVal);
     }
-    
+
     private static void setProperty(String propName, String value) {
-        Display.getInstance().setProperty(PROP_PREFIX+propName, value);
+        Display.getInstance().setProperty(PROP_PREFIX + propName, value);
     }
-    
+
     private static void clearAll(String... propNames) {
         for (String propName : propNames) {
             setProperty(propName, null);
         }
     }
-    
+
     /**
      * Resets the push content.  After calling this, {@link PushContent#exists()} will return {@literal false}.
      */
     public static void reset() {
         clearAll(keys());
     }
-    
+
     private static boolean anyProperties(String... propNames) {
         for (String propName : propNames) {
             if (p(propName, null) != null) return true;
@@ -115,6 +117,7 @@ public class PushContent {
 
     /**
      * Gets the title of the Push content.
+     *
      * @return the title
      */
     public String getTitle() {
@@ -122,7 +125,8 @@ public class PushContent {
     }
 
     /**
-     * Sets the title of the pending push content.  
+     * Sets the title of the pending push content.
+     *
      * @param title the title to set
      * @deprecated For internal use only.
      */
@@ -132,6 +136,7 @@ public class PushContent {
 
     /**
      * Gets the body of the push content.
+     *
      * @return the body
      */
     public String getBody() {
@@ -140,6 +145,7 @@ public class PushContent {
 
     /**
      * Sets the body of pending push content.
+     *
      * @param body the body to set
      * @deprecated For internal use only
      */
@@ -149,6 +155,7 @@ public class PushContent {
 
     /**
      * Gets the image URL of the push content.
+     *
      * @return the imageUrl
      */
     public String getImageUrl() {
@@ -157,16 +164,18 @@ public class PushContent {
 
     /**
      * Sets the image URL of pending push content.
+     *
      * @param imageUrl the imageUrl to set
      * @deprecated For internal use only.
      */
     public static void setImageUrl(String imageUrl) {
-        
+
         setProperty("imageUrl", imageUrl);
     }
 
     /**
      * Gets category of the push content.
+     *
      * @return the category
      */
     public String getCategory() {
@@ -175,6 +184,7 @@ public class PushContent {
 
     /**
      * Sets the category of the pending push content.
+     *
      * @param category the category to set
      * @deprecated For internal use only.
      */
@@ -184,6 +194,7 @@ public class PushContent {
 
     /**
      * Gets the metadata associated with push.  This is hidden content not shown to the user.
+     *
      * @return the metaData
      */
     public String getMetaData() {
@@ -192,6 +203,7 @@ public class PushContent {
 
     /**
      * Sets the metadata of pending push content.
+     *
      * @param metaData the metaData to set
      * @deprecated For internal use only.
      */
@@ -201,6 +213,7 @@ public class PushContent {
 
     /**
      * Gets the type of the push content.
+     *
      * @return the type of the push content.
      */
     public int getType() {
@@ -209,16 +222,18 @@ public class PushContent {
 
     /**
      * Sets the type of the push content.
+     *
      * @param type the type to set
      * @deprecated For internal use only.
      */
     public static void setType(int type) {
-        setProperty("type", ""+type);
+        setProperty("type", "" + type);
     }
-    
+
     /**
      * If the user selected an action on the push notification, then the ID of the selected action will be stored in the PushContent's
      * actionId.  If the user did not tap an action, then this will be null.
+     *
      * @return The action ID that was selected by the user.
      * @see PushActionsProvider
      * @see PushActionCategory
@@ -227,44 +242,46 @@ public class PushContent {
     public String getActionId() {
         return actionId;
     }
-    
-    /**
-     * If the push notification action included a text field for the user to enter a response, then that response
-     * will be returned here.  For notifications that don't include a response, this will return {@literal null}.
-     * @return The action ID that was selected by the user.
-     * @see PushActionsProvider
-     * @see PushActionCategory
-     * @see PushAction
-     * @see PushAction#getTextInputButtonText() 
-     * @see PushAction#getTextInputPlaceholder() 
-     */
-    public String getTextResponse() {
-        return textResponse;
-    }
-    
-    
+
     /**
      * Sets the action ID of the push content.  The action ID is only set if the user tapped on one of the actions
      * in the push notification; and, if set, it will be set to the ID of the action that was selected.
+     *
      * @param actionId The ID of the action that was selected by the user.
-     * @deprecated For internal use only.
      * @see PushActionsProvider
      * @see PushActionCategory
      * @see PushAction
+     * @deprecated For internal use only.
      */
     public static void setActionId(String actionId) {
         setProperty("actionId", actionId);
     }
-    
+
     /**
-     * Sets the text response for the notification.  Only applies to notifications where the user has entered 
-     * a text response.
-     * @deprecated For internal use only.
+     * If the push notification action included a text field for the user to enter a response, then that response
+     * will be returned here.  For notifications that don't include a response, this will return {@literal null}.
+     *
+     * @return The action ID that was selected by the user.
      * @see PushActionsProvider
      * @see PushActionCategory
      * @see PushAction
-     * @see PushAction#getTextInputButtonText() 
-     * @see PushAction#getTextInputPlaceholder() 
+     * @see PushAction#getTextInputButtonText()
+     * @see PushAction#getTextInputPlaceholder()
+     */
+    public String getTextResponse() {
+        return textResponse;
+    }
+
+    /**
+     * Sets the text response for the notification.  Only applies to notifications where the user has entered
+     * a text response.
+     *
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     * @see PushAction#getTextInputButtonText()
+     * @see PushAction#getTextInputPlaceholder()
+     * @deprecated For internal use only.
      */
     public static void setTextResponse(String textResponse) {
         setProperty("textResponse", textResponse);

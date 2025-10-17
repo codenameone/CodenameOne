@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.io.gzip;
@@ -30,57 +30,46 @@ import java.io.InputStream;
  *
  * @author Shai Almog
  */
-public class FilterInputStream extends InputStream
-{
+public class FilterInputStream extends InputStream {
     protected InputStream in;
 
-    protected FilterInputStream(InputStream underlying)
-    {
+    protected FilterInputStream(InputStream underlying) {
         in = underlying;
     }
 
-    public int read() throws IOException
-    {
+    public int read() throws IOException {
         return in.read();
     }
 
-    public int read(byte[] b) throws IOException
-    {
+    public int read(byte[] b) throws IOException {
         return read(b, 0, b.length);
     }
 
-    public int read(byte[] b, int offset, int length) throws IOException
-    {
+    public int read(byte[] b, int offset, int length) throws IOException {
         return in.read(b, offset, length);
     }
 
-    public long skip(long n) throws IOException
-    {
+    public long skip(long n) throws IOException {
         return in.skip(n);
     }
 
-    public int available() throws IOException
-    {
+    public int available() throws IOException {
         return in.available();
     }
 
-    public void close() throws IOException
-    {
+    public void close() throws IOException {
         in.close();
     }
 
-    public void mark(int readlimit)
-    {
+    public void mark(int readlimit) {
         in.mark(readlimit);
     }
 
-    public void reset() throws IOException
-    {
+    public void reset() throws IOException {
         in.reset();
     }
 
-    public boolean markSupported()
-    {
+    public boolean markSupported() {
         return in.markSupported();
     }
 }

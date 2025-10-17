@@ -19,15 +19,15 @@
  */
 package com.codename1.maps.providers;
 
-import com.codename1.ui.geom.Dimension;
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
 import com.codename1.maps.Projection;
 import com.codename1.maps.Tile;
+import com.codename1.ui.geom.Dimension;
 
 /**
  * This is a generic map provider.
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public abstract class MapProvider {
@@ -37,8 +37,8 @@ public abstract class MapProvider {
 
     /**
      * Creates a new MapProvider
-     * 
-     * @param p the projection system
+     *
+     * @param p        the projection system
      * @param tileSize the tile size
      */
     protected MapProvider(Projection p, Dimension tileSize) {
@@ -57,7 +57,8 @@ public abstract class MapProvider {
 
     /**
      * Returns the bounding box of a position ina given zoom level
-     * @param position on the map
+     *
+     * @param position  on the map
      * @param zoomLevel the zoom level
      * @return a bounding box
      */
@@ -65,7 +66,7 @@ public abstract class MapProvider {
 
     /**
      * Gets a tile for the given bounding box
-     * 
+     *
      * @param bbox a bounding box
      * @return a Tile for the given bounding box
      */
@@ -74,12 +75,14 @@ public abstract class MapProvider {
     /**
      * Maximal zoom level. Zoom levels are counted from zero to maxZoomLevel().
      * 0 is farest view, where the scale is greatest.
+     *
      * @return
      */
     public abstract int maxZoomLevel();
 
     /**
      * Minimal zoom level user is able to see.
+     *
      * @return
      */
     public int minZoomLevel() {
@@ -88,16 +91,18 @@ public abstract class MapProvider {
 
     /**
      * Scale is the distance in map units between each pixel in tile at given zoom level.
+     *
      * @return Scale at given zoom level.
      */
     public abstract Coord scale(int zoomLevel);
 
     /**
      * Translates position by [pixelsX, pixelsY] at zoomLevel acordingly to maps scale.
-     * @param position in map projection
-     * @param zoomLevel 
-     * @param pixelsX 
-     * @param pixelsY 
+     *
+     * @param position  in map projection
+     * @param zoomLevel
+     * @param pixelsX
+     * @param pixelsY
      * @return translated position.
      */
     public Coord translate(Coord position, int zoomLevel, int pixelsX, int pixelsY) {
@@ -107,6 +112,7 @@ public abstract class MapProvider {
 
     /**
      * Gets the Provider projection
+     *
      * @return the Provider projection
      */
     public Projection projection() {
@@ -115,6 +121,7 @@ public abstract class MapProvider {
 
     /**
      * Gets the tile size
+     *
      * @return the tile size
      */
     public Dimension tileSize() {
@@ -123,13 +130,14 @@ public abstract class MapProvider {
 
     /**
      * The provider attribution.
-     * 
+     *
      * @return a String of the provider attribution
      */
     public abstract String attribution();
 
     /**
      * Returns the maximum zoom of a specific Tile.
+     *
      * @param tile tile to check the max zoom
      * @return the max zoom of the tile
      */

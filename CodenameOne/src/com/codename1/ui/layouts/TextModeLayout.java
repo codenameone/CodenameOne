@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -29,26 +29,26 @@ import com.codename1.ui.InputComponent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.table.TableLayout;
+
 import java.util.ArrayList;
 
 /**
- * <p>This is a special case layout specifically designed for {@link com.codename1.ui.InputComponent}. 
- * When the  on top mode of text layout is used this layout acts exactly like a table layout and uses the 
- * given constraints. When this mode is false it uses a regular box Y layout mode and orders the elements one 
+ * <p>This is a special case layout specifically designed for {@link com.codename1.ui.InputComponent}.
+ * When the  on top mode of text layout is used this layout acts exactly like a table layout and uses the
+ * given constraints. When this mode is false it uses a regular box Y layout mode and orders the elements one
  * on top of the other.</p>
- * <p>One important difference between this layout and the default table layout is that the vertical alignment 
+ * <p>One important difference between this layout and the default table layout is that the vertical alignment
  * here is set to {@code TOP} so the error label below doesn't break component alignment if two components
  * are on the same row and only one has an error message.
- * </p> 
-  * <p>
- * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with 
+ * </p>
+ * <p>
+ * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
  * validation errors
  * </p>
  * <script src="https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js"></script>
  * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-ios.png" alt="Running on iOS" />
  * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-android.png" alt="Running on Android" />
  * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-error-handling-blank.png" alt="Android validation errors" />
-*
  *
  * @author Shai Almog
  */
@@ -58,25 +58,26 @@ public class TextModeLayout extends Layout {
      */
     public final TableLayout table;
     private Layout actual;
-    
+
     /**
-     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)} 
+     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
      * method on the text components in a BoxY layout scenario
      */
     private boolean autoGrouping = true;
-    
+
     private int lastComponentCount = 0;
-    
+
     /**
-     * The constructor works like the standard table layout constructor and will behave as such with the on 
+     * The constructor works like the standard table layout constructor and will behave as such with the on
      * top mode
-     * @param rows the number of rows
+     *
+     * @param rows    the number of rows
      * @param columns the number of columns;
      */
     public TextModeLayout(int rows, int columns) {
-        table = new TableLayout(rows, columns);    
+        table = new TableLayout(rows, columns);
         table.setGrowHorizontally(true);
-        if(!UIManager.getInstance().isThemeConstant("textComponentOnTopBool", false)) {
+        if (!UIManager.getInstance().isThemeConstant("textComponentOnTopBool", false)) {
             actual = BoxLayout.y();
         } else {
             actual = table;
@@ -88,9 +89,9 @@ public class TextModeLayout extends Layout {
      */
     @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
-        if(actual == table) {
+        if (actual == table) {
             // forcing default constraint to still be aligned top
-            if(!(value instanceof TableLayout.Constraint)) {
+            if (!(value instanceof TableLayout.Constraint)) {
                 value = createConstraint();
             }
             table.addLayoutComponent(value, comp, c);
@@ -150,20 +151,20 @@ public class TextModeLayout extends Layout {
      */
     @Override
     public void layoutContainer(Container parent) {
-        if(autoGrouping && actual != table && lastComponentCount != parent.getComponentCount()) {
+        if (autoGrouping && actual != table && lastComponentCount != parent.getComponentCount()) {
             lastComponentCount = parent.getComponentCount();
             ArrayList<Component> tc = new ArrayList<Component>();
-            for(Component c : parent) {
-                if(c instanceof InputComponent) {
+            for (Component c : parent) {
+                if (c instanceof InputComponent) {
                     tc.add(c);
                 }
             }
-            if(tc.size() > 0) {
+            if (tc.size() > 0) {
                 Component[] tcArr = new Component[tc.size()];
                 tc.toArray(tcArr);
                 InputComponent.group(tcArr);
             }
-        } 
+        }
         actual.layoutContainer(parent);
     }
 
@@ -192,11 +193,11 @@ public class TextModeLayout extends Layout {
     public TableLayout.Constraint cc() {
         return table.createConstraint().verticalAlign(Component.TOP);
     }
-    
+
     /**
      * Creates a new Constraint instance to add to the layout
      *
-     * @param row the row for the table starting with 0
+     * @param row    the row for the table starting with 0
      * @param column the column for the table starting with 0
      * @return the new constraint
      */
@@ -207,7 +208,7 @@ public class TextModeLayout extends Layout {
     /**
      * Creates a new Constraint instance to add to the layout
      *
-     * @param row the row for the table starting with 0
+     * @param row    the row for the table starting with 0
      * @param column the column for the table starting with 0
      * @return the default constraint
      */
@@ -218,6 +219,7 @@ public class TextModeLayout extends Layout {
     /**
      * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
      * method on the text components in a BoxY layout scenario
+     *
      * @return the autoGrouping
      */
     public boolean isAutoGrouping() {
@@ -227,6 +229,7 @@ public class TextModeLayout extends Layout {
     /**
      * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
      * method on the text components in a BoxY layout scenario
+     *
      * @param autoGrouping the autoGrouping to set
      */
     public void setAutoGrouping(boolean autoGrouping) {

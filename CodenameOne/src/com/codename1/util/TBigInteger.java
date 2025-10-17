@@ -33,10 +33,53 @@ import java.util.Random;
  * discouraged. In simple words: Do NOT implement any bit fields based on
  * BigInteger.
  */
-class TBigInteger  {
+class TBigInteger {
 
 
     /* Fields used for the internal representation. */
+
+    /**
+     * The {@code BigInteger} constant 0.
+     */
+    public static final TBigInteger ZERO = new TBigInteger(0, 0);
+    /**
+     * The {@code BigInteger} constant 1.
+     */
+    public static final TBigInteger ONE = new TBigInteger(1, 1);
+    /**
+     * The {@code BigInteger} constant 10.
+     */
+    public static final TBigInteger TEN = new TBigInteger(1, 10);
+    /**
+     * The {@code BigInteger} constant -1.
+     */
+    static final TBigInteger MINUS_ONE = new TBigInteger(-1, 1);
+    /**
+     * The {@code BigInteger} constant 0 used for comparison.
+     */
+    static final int EQUALS = 0;
+    /**
+     * The {@code BigInteger} constant 1 used for comparison.
+     */
+    static final int GREATER = 1;
+    /**
+     * The {@code BigInteger} constant -1 used for comparison.
+     */
+    static final int LESS = -1;
+    /**
+     * All the {@code BigInteger} numbers in the range [0,10] are cached.
+     */
+    static final TBigInteger[] SMALL_VALUES = {ZERO, ONE, new TBigInteger(1, 2), new TBigInteger(1, 3),
+            new TBigInteger(1, 4), new TBigInteger(1, 5), new TBigInteger(1, 6), new TBigInteger(1, 7),
+            new TBigInteger(1, 8), new TBigInteger(1, 9), TEN};
+    static final TBigInteger[] TWO_POWS;
+
+    static {
+        TWO_POWS = new TBigInteger[32];
+        for (int i = 0; i < TWO_POWS.length; i++) {
+            TWO_POWS[i] = TBigInteger.valueOf(1L << i);
+        }
+    }
 
     /**
      * The magnitude of this big integer. This array holds unsigned little
@@ -47,71 +90,28 @@ class TBigInteger  {
      * than strictly necessary, which results in additional trailing zeros.
      */
     transient int digits[];
-
     /**
      * The length of this in measured in ints. Can be less than digits.length().
      */
     transient int numberLength;
-
-    /** The sign of this. */
+    /**
+     * The sign of this.
+     */
     transient int sign;
-
-    /**
-     * The {@code BigInteger} constant 0.
-     */
-    public static final TBigInteger ZERO = new TBigInteger(0, 0);
-
-    /**
-     * The {@code BigInteger} constant 1.
-     */
-    public static final TBigInteger ONE = new TBigInteger(1, 1);
-
-    /**
-     * The {@code BigInteger} constant 10.
-     */
-    public static final TBigInteger TEN = new TBigInteger(1, 10);
-
-    /** The {@code BigInteger} constant -1. */
-    static final TBigInteger MINUS_ONE = new TBigInteger(-1, 1);
-
-    /** The {@code BigInteger} constant 0 used for comparison. */
-    static final int EQUALS = 0;
-
-    /** The {@code BigInteger} constant 1 used for comparison. */
-    static final int GREATER = 1;
-
-    /** The {@code BigInteger} constant -1 used for comparison. */
-    static final int LESS = -1;
-
-    /** All the {@code BigInteger} numbers in the range [0,10] are cached. */
-    static final TBigInteger[] SMALL_VALUES = { ZERO, ONE, new TBigInteger(1, 2), new TBigInteger(1, 3),
-            new TBigInteger(1, 4), new TBigInteger(1, 5), new TBigInteger(1, 6), new TBigInteger(1, 7),
-            new TBigInteger(1, 8), new TBigInteger(1, 9), TEN };
-
-    static final TBigInteger[] TWO_POWS;
-
-    static {
-        TWO_POWS = new TBigInteger[32];
-        for (int i = 0; i < TWO_POWS.length; i++) {
-            TWO_POWS[i] = TBigInteger.valueOf(1L << i);
-        }
-    }
-
     private transient int firstNonzeroDigit = -2;
 
-    /** Cache for the hash code. */
+    /**
+     * Cache for the hash code.
+     */
     private transient int hashCode = 0;
 
     /**
      * Constructs a random non-negative {@code BigInteger} instance in the range
      * [0, 2^(numBits)-1].
      *
-     * @param numBits
-     *            maximum length of the new {@code BigInteger} in bits.
-     * @param rnd
-     *            is an optional random generator to be used.
-     * @throws IllegalArgumentException
-     *             if {@code numBits} < 0.
+     * @param numBits maximum length of the new {@code BigInteger} in bits.
+     * @param rnd     is an optional random generator to be used.
+     * @throws IllegalArgumentException if {@code numBits} < 0.
      */
     public TBigInteger(int numBits, Random rnd) {
         if (numBits < 0) {
@@ -120,7 +120,7 @@ class TBigInteger  {
         if (numBits == 0) {
             sign = 0;
             numberLength = 1;
-            digits = new int[] { 0 };
+            digits = new int[]{0};
         } else {
             sign = 1;
             numberLength = (numBits + 31) >> 5;
@@ -139,14 +139,10 @@ class TBigInteger  {
      * 2^(bitLength)-1] which is probably prime. The probability that the
      * returned {@code BigInteger} is prime is beyond (1-1/2^certainty).
      *
-     * @param bitLength
-     *            length of the new {@code BigInteger} in bits.
-     * @param certainty
-     *            tolerated primality uncertainty.
-     * @param rnd
-     *            is an optional random generator to be used.
-     * @throws ArithmeticException
-     *             if {@code bitLength} < 2.
+     * @param bitLength length of the new {@code BigInteger} in bits.
+     * @param certainty tolerated primality uncertainty.
+     * @param rnd       is an optional random generator to be used.
+     * @throws ArithmeticException if {@code bitLength} < 2.
      */
     public TBigInteger(int bitLength, int certainty, Random rnd) {
         if (bitLength < 2) {
@@ -163,13 +159,10 @@ class TBigInteger  {
      * representation. The string representation consists of an optional minus
      * sign followed by a non-empty sequence of decimal digits.
      *
-     * @param val
-     *            string representation of the new {@code BigInteger}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
-     * @throws NumberFormatException
-     *             if {@code val} is not a valid representation of a
-     *             {@code BigInteger}.
+     * @param val string representation of the new {@code BigInteger}.
+     * @throws NullPointerException  if {@code val == null}.
+     * @throws NumberFormatException if {@code val} is not a valid representation of a
+     *                               {@code BigInteger}.
      */
     public TBigInteger(String val) {
         this(val, 10);
@@ -182,16 +175,12 @@ class TBigInteger  {
      * For the conversion the method {@code Character.digit(char, radix)} is
      * used.
      *
-     * @param val
-     *            string representation of the new {@code BigInteger}.
-     * @param radix
-     *            the base to be used for the conversion.
-     * @throws NullPointerException
-     *             if {@code val == null}.
-     * @throws NumberFormatException
-     *             if {@code val} is not a valid representation of a
-     *             {@code BigInteger} or if {@code radix < Character.MIN_RADIX}
-     *             or {@code radix > Character.MAX_RADIX}.
+     * @param val   string representation of the new {@code BigInteger}.
+     * @param radix the base to be used for the conversion.
+     * @throws NullPointerException  if {@code val == null}.
+     * @throws NumberFormatException if {@code val} is not a valid representation of a
+     *                               {@code BigInteger} or if {@code radix < Character.MIN_RADIX}
+     *                               or {@code radix > Character.MAX_RADIX}.
      */
     public TBigInteger(String val, int radix) {
         if (val == null) {
@@ -212,17 +201,13 @@ class TBigInteger  {
      * zero, 1 for positive). The magnitude is specified as a byte array. The
      * most significant byte is the entry at index 0.
      *
-     * @param signum
-     *            sign of the new {@code BigInteger} (-1 for negative, 0 for
-     *            zero, 1 for positive).
-     * @param magnitude
-     *            magnitude of the new {@code BigInteger} with the most
-     *            significant byte first.
-     * @throws NullPointerException
-     *             if {@code magnitude == null}.
-     * @throws NumberFormatException
-     *             if the sign is not one of -1, 0, 1 or if the sign is zero and
-     *             the magnitude contains non-zero entries.
+     * @param signum    sign of the new {@code BigInteger} (-1 for negative, 0 for
+     *                  zero, 1 for positive).
+     * @param magnitude magnitude of the new {@code BigInteger} with the most
+     *                  significant byte first.
+     * @throws NullPointerException  if {@code magnitude == null}.
+     * @throws NumberFormatException if the sign is not one of -1, 0, 1 or if the sign is zero and
+     *                               the magnitude contains non-zero entries.
      */
     public TBigInteger(int signum, byte[] magnitude) {
         if (magnitude == null) {
@@ -241,7 +226,7 @@ class TBigInteger  {
         if (magnitude.length == 0) {
             sign = 0;
             numberLength = 1;
-            digits = new int[] { 0 };
+            digits = new int[]{0};
         } else {
             sign = signum;
             putBytesPositiveToIntegers(magnitude);
@@ -255,12 +240,9 @@ class TBigInteger  {
      * most significant bit of this entry determines the sign of the new
      * {@code BigInteger} instance. The given array must not be empty.
      *
-     * @param val
-     *            two's complement representation of the new {@code BigInteger}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
-     * @throws NumberFormatException
-     *             if the length of {@code val} is zero.
+     * @param val two's complement representation of the new {@code BigInteger}.
+     * @throws NullPointerException  if {@code val == null}.
+     * @throws NumberFormatException if the length of {@code val} is zero.
      */
     public TBigInteger(byte[] val) {
         if (val.length == 0) {
@@ -279,27 +261,22 @@ class TBigInteger  {
     /**
      * Constructs a number which array is of size 1.
      *
-     * @param sign
-     *            the sign of the number
-     * @param value
-     *            the only one digit of array
+     * @param sign  the sign of the number
+     * @param value the only one digit of array
      */
     TBigInteger(int sign, int value) {
         this.sign = sign;
         numberLength = 1;
-        digits = new int[] { value };
+        digits = new int[]{value};
     }
 
     /**
      * Constructs a number without to create new space. This construct should be
      * used only if the three fields of representation are known.
      *
-     * @param sign
-     *            the sign of the number
-     * @param numberLength
-     *            the length of the internal array
-     * @param digits
-     *            a reference of some array created before
+     * @param sign         the sign of the number
+     * @param numberLength the length of the internal array
+     * @param digits       a reference of some array created before
      */
     TBigInteger(int sign, int numberLength, int[] digits) {
         this.sign = sign;
@@ -311,10 +288,8 @@ class TBigInteger  {
      * Creates a new {@code BigInteger} whose value is equal to the specified
      * {@code long}.
      *
-     * @param sign
-     *            the sign of the number
-     * @param val
-     *            the value of the new {@code BigInteger}.
+     * @param sign the sign of the number
+     * @param val  the value of the new {@code BigInteger}.
      */
     TBigInteger(int sign, long val) {
         // PRE: (val >= 0) && (sign >= -1) && (sign <= 1)
@@ -322,10 +297,10 @@ class TBigInteger  {
         if ((val & 0xFFFFFFFF00000000L) == 0) {
             // It fits in one 'int'
             numberLength = 1;
-            digits = new int[] { (int)val };
+            digits = new int[]{(int) val};
         } else {
             numberLength = 2;
-            digits = new int[] { (int)val, (int)(val >> 32) };
+            digits = new int[]{(int) val, (int) (val >> 32)};
         }
     }
 
@@ -334,16 +309,14 @@ class TBigInteger  {
      * constructor does not create a copy, so any changes to the reference will
      * affect the new number.
      *
-     * @param signum
-     *            The sign of the number represented by {@code digits}
-     * @param digits
-     *            The magnitude of the number
+     * @param signum The sign of the number represented by {@code digits}
+     * @param digits The magnitude of the number
      */
     TBigInteger(int signum, int digits[]) {
         if (digits.length == 0) {
             sign = 0;
             numberLength = 1;
-            this.digits = new int[] { 0 };
+            this.digits = new int[]{0};
         } else {
             sign = signum;
             numberLength = digits.length;
@@ -359,85 +332,15 @@ class TBigInteger  {
             }
             return MINUS_ONE;
         } else if (val <= 10) {
-            return SMALL_VALUES[(int)val];
+            return SMALL_VALUES[(int) val];
         } else {// (val > 10)
             return new TBigInteger(1, val);
         }
     }
 
     /**
-     * Returns the two's complement representation of this BigInteger in a byte
-     * array.
-     *
-     * @return two's complement representation of {@code this}.
+     * @see TBigInteger#BigInteger(String, int)
      */
-    public byte[] toByteArray() {
-        if (this.sign == 0) {
-            return new byte[] { 0 };
-        }
-        TBigInteger temp = this;
-        int bitLen = bitLength();
-        int iThis = getFirstNonzeroDigit();
-        int bytesLen = (bitLen >> 3) + 1;
-        /*
-         * Puts the little-endian int array representing the magnitude of this
-         * BigInteger into the big-endian byte array.
-         */
-        byte[] bytes = new byte[bytesLen];
-        int firstByteNumber = 0;
-        int highBytes;
-        int digitIndex = 0;
-        int bytesInInteger = 4;
-        int digit;
-        int hB;
-
-        if (bytesLen - (numberLength << 2) == 1) {
-            bytes[0] = (byte)((sign < 0) ? -1 : 0);
-            highBytes = 4;
-            firstByteNumber++;
-        } else {
-            hB = bytesLen & 3;
-            highBytes = (hB == 0) ? 4 : hB;
-        }
-
-        digitIndex = iThis;
-        bytesLen -= iThis << 2;
-
-        if (sign < 0) {
-            digit = -temp.digits[digitIndex];
-            digitIndex++;
-            if (digitIndex == numberLength) {
-                bytesInInteger = highBytes;
-            }
-            for (int i = 0; i < bytesInInteger; i++, digit >>= 8) {
-                bytes[--bytesLen] = (byte)digit;
-            }
-            while (bytesLen > firstByteNumber) {
-                digit = ~temp.digits[digitIndex];
-                digitIndex++;
-                if (digitIndex == numberLength) {
-                    bytesInInteger = highBytes;
-                }
-                for (int i = 0; i < bytesInInteger; i++, digit >>= 8) {
-                    bytes[--bytesLen] = (byte)digit;
-                }
-            }
-        } else {
-            while (bytesLen > firstByteNumber) {
-                digit = temp.digits[digitIndex];
-                digitIndex++;
-                if (digitIndex == numberLength) {
-                    bytesInInteger = highBytes;
-                }
-                for (int i = 0; i < bytesInInteger; i++, digit >>= 8) {
-                    bytes[--bytesLen] = (byte)digit;
-                }
-            }
-        }
-        return bytes;
-    }
-
-    /** @see TBigInteger#BigInteger(String, int) */
     private static void setFromString(TBigInteger bi, String val, int radix) {
         int sign;
         int[] digits;
@@ -492,6 +395,105 @@ class TBigInteger  {
     }
 
     /**
+     * Returns a random positive {@code BigInteger} instance in the range [0,
+     * 2^(bitLength)-1] which is probably prime. The probability that the
+     * returned {@code BigInteger} is prime is beyond (1-1/2^80).
+     * <p>
+     * <b>Implementation Note:</b> Currently {@code rnd} is ignored.
+     *
+     * @param bitLength length of the new {@code BigInteger} in bits.
+     * @param rnd       random generator used to generate the new {@code BigInteger}.
+     * @return probably prime random {@code BigInteger} instance.
+     * @throws IllegalArgumentException if {@code bitLength < 2}.
+     */
+    public static TBigInteger probablePrime(int bitLength, Random rnd) {
+        return new TBigInteger(bitLength, 100, rnd);
+    }
+
+    static TBigInteger getPowerOfTwo(int exp) {
+        if (exp < TWO_POWS.length) {
+            return TWO_POWS[exp];
+        }
+        int intCount = exp >> 5;
+        int bitN = exp & 31;
+        int resDigits[] = new int[intCount + 1];
+        resDigits[intCount] = 1 << bitN;
+        return new TBigInteger(1, intCount + 1, resDigits);
+    }
+
+    /**
+     * Returns the two's complement representation of this BigInteger in a byte
+     * array.
+     *
+     * @return two's complement representation of {@code this}.
+     */
+    public byte[] toByteArray() {
+        if (this.sign == 0) {
+            return new byte[]{0};
+        }
+        TBigInteger temp = this;
+        int bitLen = bitLength();
+        int iThis = getFirstNonzeroDigit();
+        int bytesLen = (bitLen >> 3) + 1;
+        /*
+         * Puts the little-endian int array representing the magnitude of this
+         * BigInteger into the big-endian byte array.
+         */
+        byte[] bytes = new byte[bytesLen];
+        int firstByteNumber = 0;
+        int highBytes;
+        int digitIndex = 0;
+        int bytesInInteger = 4;
+        int digit;
+        int hB;
+
+        if (bytesLen - (numberLength << 2) == 1) {
+            bytes[0] = (byte) ((sign < 0) ? -1 : 0);
+            highBytes = 4;
+            firstByteNumber++;
+        } else {
+            hB = bytesLen & 3;
+            highBytes = (hB == 0) ? 4 : hB;
+        }
+
+        digitIndex = iThis;
+        bytesLen -= iThis << 2;
+
+        if (sign < 0) {
+            digit = -temp.digits[digitIndex];
+            digitIndex++;
+            if (digitIndex == numberLength) {
+                bytesInInteger = highBytes;
+            }
+            for (int i = 0; i < bytesInInteger; i++, digit >>= 8) {
+                bytes[--bytesLen] = (byte) digit;
+            }
+            while (bytesLen > firstByteNumber) {
+                digit = ~temp.digits[digitIndex];
+                digitIndex++;
+                if (digitIndex == numberLength) {
+                    bytesInInteger = highBytes;
+                }
+                for (int i = 0; i < bytesInInteger; i++, digit >>= 8) {
+                    bytes[--bytesLen] = (byte) digit;
+                }
+            }
+        } else {
+            while (bytesLen > firstByteNumber) {
+                digit = temp.digits[digitIndex];
+                digitIndex++;
+                if (digitIndex == numberLength) {
+                    bytesInInteger = highBytes;
+                }
+                for (int i = 0; i < bytesInInteger; i++, digit >>= 8) {
+                    bytes[--bytesLen] = (byte) digit;
+                }
+            }
+        }
+        return bytes;
+    }
+
+    /**
      * Returns a (new) {@code BigInteger} whose value is the absolute value of
      * {@code this}.
      *
@@ -513,11 +515,9 @@ class TBigInteger  {
     /**
      * Returns a new {@code BigInteger} whose value is {@code this + val}.
      *
-     * @param val
-     *            value to be added to {@code this}.
+     * @param val value to be added to {@code this}.
      * @return {@code this + val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger add(TBigInteger val) {
         return TElementary.add(this, val);
@@ -526,11 +526,9 @@ class TBigInteger  {
     /**
      * Returns a new {@code BigInteger} whose value is {@code this - val}.
      *
-     * @param val
-     *            value to be subtracted from {@code this}.
+     * @param val value to be subtracted from {@code this}.
      * @return {@code this - val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger subtract(TBigInteger val) {
         return TElementary.subtract(this, val);
@@ -540,7 +538,7 @@ class TBigInteger  {
      * Returns the sign of this {@code BigInteger}.
      *
      * @return {@code -1} if {@code this < 0}, {@code 0} if {@code this == 0},
-     *         {@code 1} if {@code this > 0}.
+     * {@code 1} if {@code this > 0}.
      */
     public int signum() {
         return sign;
@@ -554,10 +552,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method on negative values is
      * not recommended as the current implementation is not efficient.
      *
-     * @param n
-     *            shift distance
+     * @param n shift distance
      * @return {@code this >> n} if {@code n >= 0}; {@code this << (-n)}
-     *         otherwise
+     * otherwise
      */
     public TBigInteger shiftRight(int n) {
         if ((n == 0) || (sign == 0)) {
@@ -575,10 +572,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method on negative values is
      * not recommended as the current implementation is not efficient.
      *
-     * @param n
-     *            shift distance.
+     * @param n shift distance.
      * @return {@code this << n} if {@code n >= 0}; {@code this >> (-n)}.
-     *         otherwise
+     * otherwise
      */
     public TBigInteger shiftLeft(int n) {
         if ((n == 0) || (sign == 0)) {
@@ -603,7 +599,7 @@ class TBigInteger  {
      * into a {@code long} if {@code bitLength() < 64}.
      *
      * @return the length of the minimal two's complement representation for
-     *         {@code this} without the sign bit.
+     * {@code this} without the sign bit.
      */
     public int bitLength() {
         return TBitLevel.bitLength(this);
@@ -616,11 +612,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param n
-     *            position where the bit in {@code this} has to be inspected.
+     * @param n position where the bit in {@code this} has to be inspected.
      * @return {@code this & (2^n) != 0}.
-     * @throws ArithmeticException
-     *             if {@code n < 0}.
+     * @throws ArithmeticException if {@code n < 0}.
      */
     public boolean testBit(int n) {
         if (n == 0) {
@@ -656,11 +650,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param n
-     *            position where the bit in {@code this} has to be set.
+     * @param n position where the bit in {@code this} has to be set.
      * @return {@code this | 2^n}.
-     * @throws ArithmeticException
-     *             if {@code n < 0}.
+     * @throws ArithmeticException if {@code n < 0}.
      */
     public TBigInteger setBit(int n) {
         if (!testBit(n)) {
@@ -677,11 +669,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param n
-     *            position where the bit in {@code this} has to be cleared.
+     * @param n position where the bit in {@code this} has to be cleared.
      * @return {@code this & ~(2^n)}.
-     * @throws ArithmeticException
-     *             if {@code n < 0}.
+     * @throws ArithmeticException if {@code n < 0}.
      */
     public TBigInteger clearBit(int n) {
         if (testBit(n)) {
@@ -698,11 +688,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param n
-     *            position where the bit in {@code this} has to be flipped.
+     * @param n position where the bit in {@code this} has to be flipped.
      * @return {@code this ^ 2^n}.
-     * @throws ArithmeticException
-     *             if {@code n < 0}.
+     * @throws ArithmeticException if {@code n < 0}.
      */
     public TBigInteger flipBit(int n) {
         if (n < 0) {
@@ -744,7 +732,7 @@ class TBigInteger  {
      * the current implementation is not efficient.
      *
      * @return number of bits in the binary representation of {@code this} which
-     *         differ from the sign bit
+     * differ from the sign bit
      */
     public int bitCount() {
         return TBitLevel.bitCount(this);
@@ -769,11 +757,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param val
-     *            value to be and'ed with {@code this}.
+     * @param val value to be and'ed with {@code this}.
      * @return {@code this & val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger and(TBigInteger val) {
         return TLogical.and(this, val);
@@ -785,11 +771,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param val
-     *            value to be or'ed with {@code this}.
+     * @param val value to be or'ed with {@code this}.
      * @return {@code this | val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger or(TBigInteger val) {
         return TLogical.or(this, val);
@@ -801,11 +785,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param val
-     *            value to be xor'ed with {@code this}
+     * @param val value to be xor'ed with {@code this}
      * @return {@code this ^ val}
-     * @throws NullPointerException
-     *             if {@code val == null}
+     * @throws NullPointerException if {@code val == null}
      */
     public TBigInteger xor(TBigInteger val) {
         return TLogical.xor(this, val);
@@ -819,11 +801,9 @@ class TBigInteger  {
      * <b>Implementation Note:</b> Usage of this method is not recommended as
      * the current implementation is not efficient.
      *
-     * @param val
-     *            value to be not'ed and then and'ed with {@code this}.
+     * @param val value to be not'ed and then and'ed with {@code this}.
      * @return {@code this & ~val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger andNot(TBigInteger val) {
         return TLogical.andNot(this, val);
@@ -848,7 +828,7 @@ class TBigInteger  {
      */
     //@Override
     public long longValue() {
-        long value = (numberLength > 1) ? (((long)digits[1]) << 32) | (digits[0] & 0xFFFFFFFFL)
+        long value = (numberLength > 1) ? (((long) digits[1]) << 32) | (digits[0] & 0xFFFFFFFFL)
                 : (digits[0] & 0xFFFFFFFFL);
         return (sign * value);
     }
@@ -865,7 +845,7 @@ class TBigInteger  {
      */
     //@Override
     public float floatValue() {
-        return (float)doubleValue();
+        return (float) doubleValue();
     }
 
     /**
@@ -888,12 +868,10 @@ class TBigInteger  {
      * Compares this {@code BigInteger} with {@code val}. Returns one of the
      * three values 1, 0, or -1.
      *
-     * @param val
-     *            value to be compared with {@code this}.
+     * @param val value to be compared with {@code this}.
      * @return {@code 1} if {@code this > val}, {@code -1} if {@code this < val}
-     *         , {@code 0} if {@code this == val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * , {@code 0} if {@code this == val}.
+     * @throws NullPointerException if {@code val == null}.
      */
     //@Override
     public int compareTo(TBigInteger val) {
@@ -916,11 +894,9 @@ class TBigInteger  {
     /**
      * Returns the minimum of this {@code BigInteger} and {@code val}.
      *
-     * @param val
-     *            value to be used to compute the minimum with {@code this}.
+     * @param val value to be used to compute the minimum with {@code this}.
      * @return {@code min(this, val)}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger min(TBigInteger val) {
         return ((this.compareTo(val) == LESS) ? this : val);
@@ -929,11 +905,9 @@ class TBigInteger  {
     /**
      * Returns the maximum of this {@code BigInteger} and {@code val}.
      *
-     * @param val
-     *            value to be used to compute the maximum with {@code this}
+     * @param val value to be used to compute the maximum with {@code this}
      * @return {@code max(this, val)}
-     * @throws NullPointerException
-     *             if {@code val == null}
+     * @throws NullPointerException if {@code val == null}
      */
     public TBigInteger max(TBigInteger val) {
         return ((this.compareTo(val) == GREATER) ? this : val);
@@ -960,10 +934,9 @@ class TBigInteger  {
      * Returns {@code true} if {@code x} is a BigInteger instance and if this
      * instance is equal to this {@code BigInteger}.
      *
-     * @param x
-     *            object to be compared with {@code this}.
+     * @param x object to be compared with {@code this}.
      * @return true if {@code x} is a BigInteger and {@code this == x},
-     *         {@code false} otherwise.
+     * {@code false} otherwise.
      */
     @Override
     public boolean equals(Object x) {
@@ -971,7 +944,7 @@ class TBigInteger  {
             return true;
         }
         if (x instanceof TBigInteger) {
-            TBigInteger x1 = (TBigInteger)x;
+            TBigInteger x1 = (TBigInteger) x;
             return sign == x1.sign && numberLength == x1.numberLength && equalsArrays(x1.digits);
         }
         return false;
@@ -1004,8 +977,7 @@ class TBigInteger  {
      * returned. The characters of the string representation are generated with
      * method {@code Character.forDigit}.
      *
-     * @param radix
-     *            base to be used for the string representation.
+     * @param radix base to be used for the string representation.
      * @return a string representation of this with radix 10.
      */
     public String toString(int radix) {
@@ -1017,11 +989,9 @@ class TBigInteger  {
      * of {@code this} and {@code val}. If {@code this==0} and {@code val==0}
      * then zero is returned, otherwise the result is positive.
      *
-     * @param val
-     *            value with which the greatest common divisor is computed.
+     * @param val value with which the greatest common divisor is computed.
      * @return {@code gcd(this, val)}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger gcd(TBigInteger val) {
         TBigInteger val1 = this.abs();
@@ -1047,11 +1017,9 @@ class TBigInteger  {
     /**
      * Returns a new {@code BigInteger} whose value is {@code this * val}.
      *
-     * @param val
-     *            value to be multiplied with {@code this}.
+     * @param val value to be multiplied with {@code this}.
      * @return {@code this * val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigInteger multiply(TBigInteger val) {
         // This let us to throw NullPointerException when val == null
@@ -1067,11 +1035,9 @@ class TBigInteger  {
     /**
      * Returns a new {@code BigInteger} whose value is {@code this ^ exp}.
      *
-     * @param exp
-     *            exponent to which {@code this} is raised.
+     * @param exp exponent to which {@code this} is raised.
      * @return {@code this ^ exp}.
-     * @throws ArithmeticException
-     *             if {@code exp < 0}.
+     * @throws ArithmeticException if {@code exp < 0}.
      */
     public TBigInteger pow(int exp) {
         if (exp < 0) {
@@ -1099,13 +1065,10 @@ class TBigInteger  {
      * Returns a {@code BigInteger} array which contains {@code this / divisor}
      * at index 0 and {@code this % divisor} at index 1.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
+     * @param divisor value by which {@code this} is divided.
      * @return {@code [this / divisor, this % divisor]}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
      * @see #divide
      * @see #remainder
      */
@@ -1125,7 +1088,7 @@ class TBigInteger  {
         int cmp = (thisLen != divisorLen) ? ((thisLen > divisorLen) ? 1 : -1) : TElementary.compareArrays(thisDigits,
                 divisorDigits, thisLen);
         if (cmp < 0) {
-            return new TBigInteger[] { ZERO, this };
+            return new TBigInteger[]{ZERO, this};
         }
         int thisSign = sign;
         int quotientLength = thisLen - divisorLen + 1;
@@ -1138,19 +1101,16 @@ class TBigInteger  {
         TBigInteger result1 = new TBigInteger(thisSign, remainderLength, remainderDigits);
         result0.cutOffLeadingZeroes();
         result1.cutOffLeadingZeroes();
-        return new TBigInteger[] { result0, result1 };
+        return new TBigInteger[]{result0, result1};
     }
 
     /**
      * Returns a new {@code BigInteger} whose value is {@code this / divisor}.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
+     * @param divisor value by which {@code this} is divided.
      * @return {@code this / divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
      */
     public TBigInteger divide(TBigInteger divisor) {
         if (divisor.sign == 0) {
@@ -1196,13 +1156,10 @@ class TBigInteger  {
      * Regarding signs this methods has the same behavior as the % operator on
      * int's, i.e. the sign of the remainder is the same as the sign of this.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
+     * @param divisor value by which {@code this} is divided.
      * @return {@code this % divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
      */
     public TBigInteger remainder(TBigInteger divisor) {
         if (divisor.sign == 0) {
@@ -1233,14 +1190,11 @@ class TBigInteger  {
      * interval {@code [0, m)} (0 inclusive, m exclusive). If {@code this} is
      * not relatively prime to m, then an exception is thrown.
      *
-     * @param m
-     *            the modulus.
+     * @param m the modulus.
      * @return {@code 1/this mod m}.
-     * @throws NullPointerException
-     *             if {@code m == null}
-     * @throws ArithmeticException
-     *             if {@code m < 0 or} if {@code this} is not relatively prime
-     *             to {@code m}
+     * @throws NullPointerException if {@code m == null}
+     * @throws ArithmeticException  if {@code m < 0 or} if {@code this} is not relatively prime
+     *                              to {@code m}
      */
     public TBigInteger modInverse(TBigInteger m) {
         if (m.sign <= 0) {
@@ -1273,16 +1227,12 @@ class TBigInteger  {
      * is computed. The inverse of this only exists if {@code this} is
      * relatively prime to m, otherwise an exception is thrown.
      *
-     * @param exponent
-     *            the exponent.
-     * @param m
-     *            the modulus.
+     * @param exponent the exponent.
+     * @param m        the modulus.
      * @return {@code this^exponent mod val}.
-     * @throws NullPointerException
-     *             if {@code m == null} or {@code exponent == null}.
-     * @throws ArithmeticException
-     *             if {@code m < 0} or if {@code exponent<0} and this is not
-     *             relatively prime to {@code m}.
+     * @throws NullPointerException if {@code m == null} or {@code exponent == null}.
+     * @throws ArithmeticException  if {@code m < 0} or if {@code exponent<0} and this is not
+     *                              relatively prime to {@code m}.
      */
     public TBigInteger modPow(TBigInteger exponent, TBigInteger m) {
         if (m.sign <= 0) {
@@ -1318,13 +1268,10 @@ class TBigInteger  {
      * function is not equivalent to the behavior of the % operator defined for
      * the built-in {@code int}'s.
      *
-     * @param m
-     *            the modulus.
+     * @param m the modulus.
      * @return {@code this mod m}.
-     * @throws NullPointerException
-     *             if {@code m == null}.
-     * @throws ArithmeticException
-     *             if {@code m < 0}.
+     * @throws NullPointerException if {@code m == null}.
+     * @throws ArithmeticException  if {@code m < 0}.
      */
     public TBigInteger mod(TBigInteger m) {
         if (m.sign <= 0) {
@@ -1341,14 +1288,15 @@ class TBigInteger  {
      * composite. If the argument {@code certainty} <= 0, then this method
      * returns true.
      *
-     * @param certainty
-     *            tolerated primality uncertainty.
+     * @param certainty tolerated primality uncertainty.
      * @return {@code true}, if {@code this} is probably prime, {@code false}
-     *         otherwise.
+     * otherwise.
      */
     public boolean isProbablePrime(int certainty) {
         return TPrimality.isProbablePrime(abs(), certainty);
     }
+
+    /* Private Methods */
 
     /**
      * Returns the smallest integer x > {@code this} which is probably prime as
@@ -1356,8 +1304,7 @@ class TBigInteger  {
      * {@code BigInteger} is prime is beyond (1-1/2^80).
      *
      * @return smallest integer > {@code this} which is robably prime.
-     * @throws ArithmeticException
-     *             if {@code this < 0}.
+     * @throws ArithmeticException if {@code this < 0}.
      */
     public TBigInteger nextProbablePrime() {
         if (sign < 0) {
@@ -1367,27 +1314,8 @@ class TBigInteger  {
     }
 
     /**
-     * Returns a random positive {@code BigInteger} instance in the range [0,
-     * 2^(bitLength)-1] which is probably prime. The probability that the
-     * returned {@code BigInteger} is prime is beyond (1-1/2^80).
-     * <p>
-     * <b>Implementation Note:</b> Currently {@code rnd} is ignored.
-     *
-     * @param bitLength
-     *            length of the new {@code BigInteger} in bits.
-     * @param rnd
-     *            random generator used to generate the new {@code BigInteger}.
-     * @return probably prime random {@code BigInteger} instance.
-     * @throws IllegalArgumentException
-     *             if {@code bitLength < 2}.
+     * Decreases {@code numberLength} if there are zero high elements.
      */
-    public static TBigInteger probablePrime(int bitLength, Random rnd) {
-        return new TBigInteger(bitLength, 100, rnd);
-    }
-
-    /* Private Methods */
-
-    /** Decreases {@code numberLength} if there are zero high elements. */
     final void cutOffLeadingZeroes() {
         while ((numberLength > 0) && (digits[--numberLength] == 0)) {
             // Empty
@@ -1397,7 +1325,9 @@ class TBigInteger  {
         }
     }
 
-    /** Tests if {@code this.abs()} is equals to {@code ONE} */
+    /**
+     * Tests if {@code this.abs()} is equals to {@code ONE}
+     */
     boolean isOne() {
         return ((numberLength == 1) && (digits[0] == 1));
     }
@@ -1494,16 +1424,5 @@ class TBigInteger  {
 
     void unCache() {
         firstNonzeroDigit = -2;
-    }
-
-    static TBigInteger getPowerOfTwo(int exp) {
-        if (exp < TWO_POWS.length) {
-            return TWO_POWS[exp];
-        }
-        int intCount = exp >> 5;
-        int bitN = exp & 31;
-        int resDigits[] = new int[intCount + 1];
-        resDigits[intCount] = 1 << bitN;
-        return new TBigInteger(1, intCount + 1, resDigits);
     }
 }

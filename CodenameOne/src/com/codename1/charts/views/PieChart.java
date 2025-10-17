@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
- *  
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *  
- *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,16 +15,11 @@
  */
 package com.codename1.charts.views;
 
-import java.util.ArrayList;
-import java.util.List;
 import com.codename1.charts.compat.Canvas;
 import com.codename1.charts.compat.GradientDrawable;
 import com.codename1.charts.compat.GradientDrawable.Orientation;
 import com.codename1.charts.compat.Paint;
 import com.codename1.charts.compat.Paint.Style;
-
-
-
 import com.codename1.charts.models.CategorySeries;
 import com.codename1.charts.models.Point;
 import com.codename1.charts.models.SeriesSelection;
@@ -33,37 +28,39 @@ import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.geom.Shape;
 
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
  * The pie chart rendering class.
  */
 public class PieChart extends RoundChart {
-  /** Handles returning values when tapping on PieChart. */
-  private PieMapper mPieMapper;
+    /** Handles returning values when tapping on PieChart. */
+    private PieMapper mPieMapper;
 
-  /**
-   * Builds a new pie chart instance.
-   * 
-   * @param dataset the series dataset
-   * @param renderer the series renderer
-   */
-  public PieChart(CategorySeries dataset, DefaultRenderer renderer) {
-    super(dataset, renderer);
-    mPieMapper = new PieMapper();
-  }
+    /**
+     * Builds a new pie chart instance.
+     *
+     * @param dataset the series dataset
+     * @param renderer the series renderer
+     */
+    public PieChart(CategorySeries dataset, DefaultRenderer renderer) {
+        super(dataset, renderer);
+        mPieMapper = new PieMapper();
+    }
 
-  /**
-   * The graphical representation of the pie chart.
-   * 
-   * @param canvas the canvas to paint to
-   * @param x the top left x value of the view to draw to
-   * @param y the top left y value of the view to draw to
-   * @param width the width of the view to draw to
-   * @param height the height of the view to draw to
-   * @param paint the paint
-   */
-  @Override
+    /**
+     * The graphical representation of the pie chart.
+     *
+     * @param canvas the canvas to paint to
+     * @param x the top left x value of the view to draw to
+     * @param y the top left y value of the view to draw to
+     * @param width the width of the view to draw to
+     * @param height the height of the view to draw to
+     * @param paint the paint
+     */
+    @Override
     public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
         paint.setAntiAlias(mRenderer.isAntialiasing());
         paint.setStyle(Style.FILL);
@@ -116,7 +113,7 @@ public class PieChart extends RoundChart {
             GradientDrawable gradientDrawable = null;
             if (seriesRenderer.isGradientEnabled()) {
                 gradient = true;
-                gradientDrawable = new GradientDrawable(Orientation.TOP_BOTTOM, new int[]{ seriesRenderer.getGradientStartColor(), seriesRenderer.getGradientStopColor()});
+                gradientDrawable = new GradientDrawable(Orientation.TOP_BOTTOM, new int[]{seriesRenderer.getGradientStartColor(), seriesRenderer.getGradientStopColor()});
                 paint.setColor(seriesRenderer.getGradientStartColor());
             } else {
                 paint.setColor(seriesRenderer.getColor());
@@ -167,18 +164,18 @@ public class PieChart extends RoundChart {
         drawTitle(canvas, x, y, width, paint);
     }
 
-  public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
-    return mPieMapper.getSeriesAndPointForScreenCoordinate(screenPoint);
-  }
-  
-  
-  /**
-   * Gets the shape of a pie segment given its point index.
-   * @param pointIndex The point index representing the pie segment.
-   * @return A shape of the outline of the segment.
-   */
-  public Shape getSegmentShape(int pointIndex){
-      return mPieMapper.getSegmentShape(pointIndex);
-  }
+    public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
+        return mPieMapper.getSeriesAndPointForScreenCoordinate(screenPoint);
+    }
+
+
+    /**
+     * Gets the shape of a pie segment given its point index.
+     * @param pointIndex The point index representing the pie segment.
+     * @return A shape of the outline of the segment.
+     */
+    public Shape getSegmentShape(int pointIndex) {
+        return mPieMapper.getSegmentShape(pointIndex);
+    }
 
 }

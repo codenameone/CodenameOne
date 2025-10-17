@@ -38,7 +38,7 @@ public class DocumentInfo {
     public final static String ENCODING_ISO = "ISO-8859-1";
 
     /**
-     *  UTF8 encoding, very common
+     * UTF8 encoding, very common
      */
     public final static String ENCODING_UTF8 = "UTF-8";
 
@@ -58,7 +58,7 @@ public class DocumentInfo {
     public static int TYPE_CSS = 2;
 
     private static String DEFAULT_ENCODING = ENCODING_ISO;
-    
+
     private String pageURL;
     private String baseURL;
     private String hostURL;
@@ -66,21 +66,12 @@ public class DocumentInfo {
 
     private String params;
     private boolean postRequest;
-    private String encoding=DEFAULT_ENCODING;
-    private int expectedContentType=TYPE_HTML;
+    private String encoding = DEFAULT_ENCODING;
+    private int expectedContentType = TYPE_HTML;
 
     /**
-     * Sets the default encoding for the document e.g. ENCODING_UTF8
-     * 
-     * @param encoding the encoding string matching ISO standards
-     */
-    public static void setDefaultEncoding(String encoding) {
-        DEFAULT_ENCODING = encoding;
-    }
-    
-    /**
      * Constructs the DocumentInfo with the given URL
-     * 
+     *
      * @param url The URL of the document
      */
     DocumentInfo(String url) {
@@ -92,22 +83,41 @@ public class DocumentInfo {
      *
      * @param url The URL of the document
      */
-    DocumentInfo(String url,int type) {
+    DocumentInfo(String url, int type) {
         setUrl(url);
-        expectedContentType=type;
+        expectedContentType = type;
     }
 
     /**
      * Constructs the DocumentInfo with the given URL
-     * 
-     * @param url The URL of the document
-     * @param params The parameters
+     *
+     * @param url         The URL of the document
+     * @param params      The parameters
      * @param postRequest true if this is a POST request, false otherwise (i.e. GET)
      */
     DocumentInfo(String url, String params, boolean postRequest) {
         this.params = params;
         this.postRequest = postRequest;
         setUrl(url);
+    }
+
+    /**
+     * Sets the default encoding for the document e.g. ENCODING_UTF8
+     *
+     * @param encoding the encoding string matching ISO standards
+     */
+    public static void setDefaultEncoding(String encoding) {
+        DEFAULT_ENCODING = encoding;
+    }
+
+    /**
+     * Check if the specified URL is an absolute URL
+     *
+     * @param url the URL to check
+     * @return true if the specified URL is an absolute URL, false otherwise
+     */
+    static boolean isAbsoluteURL(String url) {
+        return (url.substring(0, Math.min(10, url.length())).indexOf("://") != -1); //Absolute URL - check only the start of the string for a case where a    parameter is ....&url=http://..
     }
 
     /**
@@ -120,20 +130,6 @@ public class DocumentInfo {
     }
 
     /**
-     * Returns the full url string including parameters in GET request
-     * 
-     * @return the full url string including parameters in GET request
-     */
-    public String getFullUrl() {
-        if ((postRequest) || (params==null) || (params.equals(""))) {
-            return pageURL;
-        } else {
-            return pageURL+"?"+params;
-        }
-    }
-
-
-    /**
      * Sets the URL to the specified URL
      *
      * @param url the URL to set as the URL of the document
@@ -141,32 +137,45 @@ public class DocumentInfo {
     public void setUrl(String url) {
         pageURL = convertURL(url);
 
-        int index=pageURL.lastIndexOf('/');
-        if (index==-1) {
+        int index = pageURL.lastIndexOf('/');
+        if (index == -1) {
             setBaseURL("");
-            hostURL="";
-            protocol="";
+            hostURL = "";
+            protocol = "";
         } else {
-            int questionMark =pageURL.lastIndexOf('?');
-            if(questionMark > -1){
-                setBaseURL(pageURL.substring(0, questionMark));            
-            }else{
-                setBaseURL(pageURL.substring(0, index + 1));                        
-            }
-            index=pageURL.indexOf("://");
-            if (index!=-1) {
-                protocol=pageURL.substring(0, index+1); //The protocol will be http: , ftp: (without the //)
-            }
-            index=pageURL.indexOf('/', index+3);
-            if (index!=-1) {
-                hostURL=pageURL.substring(0, index);
+            int questionMark = pageURL.lastIndexOf('?');
+            if (questionMark > -1) {
+                setBaseURL(pageURL.substring(0, questionMark));
             } else {
-                hostURL=pageURL;
+                setBaseURL(pageURL.substring(0, index + 1));
+            }
+            index = pageURL.indexOf("://");
+            if (index != -1) {
+                protocol = pageURL.substring(0, index + 1); //The protocol will be http: , ftp: (without the //)
+            }
+            index = pageURL.indexOf('/', index + 3);
+            if (index != -1) {
+                hostURL = pageURL.substring(0, index);
+            } else {
+                hostURL = pageURL;
                 if (!protocol.startsWith("file")) { // for file the following is not relevant as "0file:///filename" means the base url is file:///
                     setBaseURL(pageURL + "/"); // The url was a domain without folder and missing a trailing / - i.e. http://www.sun.com
                 }
 
             }
+        }
+    }
+
+    /**
+     * Returns the full url string including parameters in GET request
+     *
+     * @return the full url string including parameters in GET request
+     */
+    public String getFullUrl() {
+        if ((postRequest) || (params == null) || (params.equals(""))) {
+            return pageURL;
+        } else {
+            return pageURL + "?" + params;
         }
     }
 
@@ -245,61 +254,51 @@ public class DocumentInfo {
     }
 
     /**
-     * Check if the specified URL is an absolute URL
-     * 
-     * @param url the URL to check
-     * @return true if the specified URL is an absolute URL, false otherwise
-     */
-    static boolean isAbsoluteURL(String url) {
-        return (url.substring(0, Math.min(10,url.length())).indexOf("://")!=-1); //Absolute URL - check only the start of the string for a case where a    parameter is ....&url=http://..
-    }
-
-    /**
      * Converts the given URL to an absolute URL based on the current page's URL
      *
      * @param url The url to convert (Can be relative)
      * @return The absolute URL representing the given URL in relation to the current one.
      */
     String convertURL(String url) {
-        if (url==null) {
+        if (url == null) {
             return pageURL; //Refresh
         }
         if (isAbsoluteURL(url)) {
             return url; //Absolute URL
         } else {
             if (url.startsWith("//")) { // Take just the protocol from the original url
-                return protocol+url;
+                return protocol + url;
             } else if (url.startsWith("/")) { // Host name root
-                return hostURL+url;
+                return hostURL + url;
             } else if (url.startsWith(".")) { // Back or current folder
-                int back=0;
-                while ((url.length()>0) && (url.charAt(0)=='.')) {
+                int back = 0;
+                while ((url.length() > 0) && (url.charAt(0) == '.')) {
                     if (url.startsWith("./")) { // Same folder
-                        url=url.substring(2);
+                        url = url.substring(2);
                     } else if (url.startsWith("../")) { // Go one folder up
-                        url=url.substring(3);
+                        url = url.substring(3);
                         back++;
                     } else if (url.equals("..")) {
-                        url="";
+                        url = "";
                         back++;
                     } else { // either "." or something else not-understandable (resting the URL gets us out of the loop)
-                        url="";
+                        url = "";
                     }
                 }
-                String folder=getBaseURL().substring(hostURL.length()+1); //+1 in order not to include the /
-                while ((back>0) && (folder.length()>0)) {
+                String folder = getBaseURL().substring(hostURL.length() + 1); //+1 in order not to include the /
+                while ((back > 0) && (folder.length() > 0)) {
                     back--;
-                    folder=folder.substring(0, folder.length()-1);
-                    int index=folder.lastIndexOf('/');
-                    if (index==-1) {
-                        folder="";
+                    folder = folder.substring(0, folder.length() - 1);
+                    int index = folder.lastIndexOf('/');
+                    if (index == -1) {
+                        folder = "";
                     } else {
-                        folder=folder.substring(0, index+1); // +1 to include the '/'
+                        folder = folder.substring(0, index + 1); // +1 to include the '/'
                     }
                 }
-                return hostURL+"/"+folder+url;
+                return hostURL + "/" + folder + url;
             } else { // Relative URL
-                return getBaseURL()+url;
+                return getBaseURL() + url;
             }
         }
     }

@@ -24,14 +24,14 @@
 
 package com.codename1.components;
 
-import com.codename1.ui.Display;
-import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Image;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+
 import java.io.InputStream;
-import java.util.Vector;
 
 /**
  * This class is identical to FileEncodedImage with the difference of using
@@ -42,6 +42,7 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class FileEncodedImageAsync extends EncodedImage {
+    private static final Object LOCK = new Object();
     private String fileName;
     private boolean changePending;
     private boolean imageCreated;
@@ -49,7 +50,7 @@ public class FileEncodedImageAsync extends EncodedImage {
     private byte[] placeholder;
     private Image placeholderImage;
     private boolean queued;
-    private static final Object LOCK = new Object();
+
     private FileEncodedImageAsync(String fileName, byte[] placeholder, int w, int h) {
         super(w, h);
         this.fileName = fileName;
@@ -63,6 +64,35 @@ public class FileEncodedImageAsync extends EncodedImage {
     }
 
     /**
+     * Creates an encoded image that maps to a local file thus allowing to
+     * seamlessly fetch files as needed. This only works reasonably well for very small
+     * files.
+     *
+     * @param fileName    the name of the file
+     * @param placeholder a placeholder image until the actual image loads
+     * @param width       the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height      the height of the file or -1 if unknown (notice that this will improve performance)
+     * @return image that will load the file seamlessly
+     * @deprecated use the version that accepts a name and a placeholderImage
+     */
+    public static FileEncodedImageAsync create(String fileName, byte[] placeholder, int width, int height) {
+        return new FileEncodedImageAsync(fileName, placeholder, width, height);
+    }
+
+    /**
+     * Creates an encoded image that maps to a local file thus allowing to
+     * seamlessly fetch files as needed. This only works reasonably well for very small
+     * files.
+     *
+     * @param fileName    the name of the file
+     * @param placeholder an image that will occupy the space
+     * @return image that will load the file seamlessly
+     */
+    public static FileEncodedImageAsync create(String fileName, Image placeholder) {
+        return new FileEncodedImageAsync(fileName, placeholder);
+    }
+
+    /**
      * {@inheritDoc}
      */
     protected void resetCache() {
@@ -73,8 +103,8 @@ public class FileEncodedImageAsync extends EncodedImage {
      * {@inheritDoc}
      */
     protected Image getInternal() {
-        if(imageData == null) {
-            if(!queued) {
+        if (imageData == null) {
+            if (!queued) {
                 getImageData();
             }
             return placeholderImage;
@@ -87,11 +117,11 @@ public class FileEncodedImageAsync extends EncodedImage {
      * {@inheritDoc}
      */
     public byte[] getImageData() {
-        if(imageData != null) {
+        if (imageData != null) {
             return imageData;
         }
-        synchronized(LOCK) {
-            if(queued) {
+        synchronized (LOCK) {
+            if (queued) {
                 return placeholder;
             }
             queued = true;
@@ -122,18 +152,18 @@ public class FileEncodedImageAsync extends EncodedImage {
                 }
             });
         }
-        if(placeholderImage != null) {
+        if (placeholderImage != null) {
             return null;
         }
         return placeholder;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public boolean animate() {
-        if(changePending) {
-            if(imageCreated) {
+        if (changePending) {
+            if (imageCreated) {
                 changePending = false;
             }
             return true;
@@ -146,34 +176,5 @@ public class FileEncodedImageAsync extends EncodedImage {
      */
     public boolean isAnimation() {
         return true;
-    }
-
-    /**
-     * Creates an encoded image that maps to a local file thus allowing to
-     * seamlessly fetch files as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName the name of the file
-     * @param placeholder a placeholder image until the actual image loads
-     * @param width the width of the file or -1 if unknown (notice that this will improve performance)
-     * @param height the height of the file or -1 if unknown (notice that this will improve performance)
-     * @return image that will load the file seamlessly
-     * @deprecated use the version that accepts a name and a placeholderImage
-     */
-    public static FileEncodedImageAsync create(String fileName, byte[] placeholder, int width, int height) {
-        return new FileEncodedImageAsync(fileName, placeholder, width, height);
-    }
-
-    /**
-     * Creates an encoded image that maps to a local file thus allowing to
-     * seamlessly fetch files as needed. This only works reasonably well for very small
-     * files.
-     *
-     * @param fileName the name of the file
-     * @param placeholder an image that will occupy the space
-     * @return image that will load the file seamlessly
-     */
-    public static FileEncodedImageAsync create(String fileName, Image placeholder) {
-        return new FileEncodedImageAsync(fileName, placeholder);
     }
 }

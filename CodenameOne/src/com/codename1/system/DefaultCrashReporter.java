@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.system;
@@ -34,7 +34,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
-import com.codename1.ui.util.UITimer;
+
 import java.util.TimerTask;
 
 /**
@@ -44,14 +44,18 @@ import java.util.TimerTask;
  * @author Shai Almog
  */
 public class DefaultCrashReporter implements CrashReport {
-    private boolean promptUser = false;
     private static String errorText = "The application encountered an error, do you wish to report it?";
     private static String sendButtonText = "Send";
     private static String dontSendButtonText = "Don't Send";
     private static String checkboxText = "Don't show this dialog again";
+    private boolean promptUser = false;
+
+    private DefaultCrashReporter() {
+    }
 
     /**
      * The text for the user prompt dialog
+     *
      * @return the errorText
      */
     public static String getErrorText() {
@@ -60,6 +64,7 @@ public class DefaultCrashReporter implements CrashReport {
 
     /**
      * The text for the user prompt dialog
+     *
      * @param aErrorText the errorText to set
      */
     public static void setErrorText(String aErrorText) {
@@ -68,6 +73,7 @@ public class DefaultCrashReporter implements CrashReport {
 
     /**
      * The text for the user prompt dialog
+     *
      * @return the sendButtonText
      */
     public static String getSendButtonText() {
@@ -76,6 +82,7 @@ public class DefaultCrashReporter implements CrashReport {
 
     /**
      * The text for the user prompt dialog
+     *
      * @param aSendButtonText the sendButtonText to set
      */
     public static void setSendButtonText(String aSendButtonText) {
@@ -84,6 +91,7 @@ public class DefaultCrashReporter implements CrashReport {
 
     /**
      * The text for the user prompt dialog
+     *
      * @return the dontSendButtonText
      */
     public static String getDontSendButtonText() {
@@ -92,6 +100,7 @@ public class DefaultCrashReporter implements CrashReport {
 
     /**
      * The text for the user prompt dialog
+     *
      * @param aDontSendButtonText the dontSendButtonText to set
      */
     public static void setDontSendButtonText(String aDontSendButtonText) {
@@ -100,6 +109,7 @@ public class DefaultCrashReporter implements CrashReport {
 
     /**
      * The text for the user prompt dialog
+     *
      * @return the checkboxText
      */
     public static String getCheckboxText() {
@@ -108,34 +118,34 @@ public class DefaultCrashReporter implements CrashReport {
 
     /**
      * The text for the user prompt dialog
+     *
      * @param aCheckboxText the checkboxText to set
      */
     public static void setCheckboxText(String aCheckboxText) {
         checkboxText = aCheckboxText;
     }
 
-    private DefaultCrashReporter() {}
-    
     /**
      * Installs a crash reporter within the system
+     *
      * @param promptUser indicates whether the user should be prompted on crash reporting
-     * @param frequency the frequency with which we send the log to the server in debug mode in minutes
-     * frequency must be at least 1. Any lower level automatically disables this feature
+     * @param frequency  the frequency with which we send the log to the server in debug mode in minutes
+     *                   frequency must be at least 1. Any lower level automatically disables this feature
      */
     public static void init(boolean promptUser, int frequency) {
-        if(Preferences.get("$CN1_crashBlocked", false) || Log.getReportingLevel() == Log.REPORTING_NONE) {
+        if (Preferences.get("$CN1_crashBlocked", false) || Log.getReportingLevel() == Log.REPORTING_NONE) {
             return;
         }
-        if(Preferences.get("$CN1_pendingCrash", false)) {
+        if (Preferences.get("$CN1_pendingCrash", false)) {
             // we must have crashed during a report, send it.
             Log.sendLog();
             Preferences.set("$CN1_pendingCrash", false);
         }
-        if(Log.getReportingLevel() == Log.REPORTING_DEBUG && frequency > 0) {
+        if (Log.getReportingLevel() == Log.REPORTING_DEBUG && frequency > 0) {
             java.util.Timer t = new java.util.Timer();
             t.schedule(new TimerTask() {
                 public void run() {
-                    if(!Display.getInstance().isEdt()) {
+                    if (!Display.getInstance().isEdt()) {
                         Display.getInstance().callSerially(this);
                         return;
                     }
@@ -153,7 +163,7 @@ public class DefaultCrashReporter implements CrashReport {
      */
     public void exception(Throwable t) {
         Preferences.set("$CN1_pendingCrash", true);
-        if(promptUser) {
+        if (promptUser) {
             Dialog error = new Dialog("Error");
             error.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
             TextArea txt = new TextArea(errorText);
@@ -172,14 +182,14 @@ public class DefaultCrashReporter implements CrashReport {
             grid.addComponent(send);
             grid.addComponent(dontSend);
             Command result = error.showPacked(BorderLayout.CENTER, true);
-            if(result == dont) {
-                if(cb.isSelected()) {
+            if (result == dont) {
+                if (cb.isSelected()) {
                     Preferences.set("$CN1_crashBlocked", true);
                 }
                 Preferences.set("$CN1_pendingCrash", false);
                 return;
             } else {
-                if(cb.isSelected()) {
+                if (cb.isSelected()) {
                     Preferences.set("$CN1_prompt", false);
                 }
             }

@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -45,7 +46,7 @@ import java.util.Vector;
  * <p>Main entry point for managing the connection requests, this is essentially a
  * threaded queue that makes sure to route all connections via the network thread
  * while sending the callbacks through the Codename One EDT.</p>
- * 
+ *
  * <p>The sample
  * code below fetches a page of data from the nestoria housing listing API.<br>
  * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
@@ -88,23 +89,7 @@ public class NetworkManager {
 
     private static final Object LOCK = new Object();
     private static final NetworkManager INSTANCE = new NetworkManager();
-
-    /**
-     * This URL is used to check whether an Internet connection is available
-     * @return the autoDetectURL
-     */
-    public static String getAutoDetectURL() {
-        return autoDetectURL;
-    }
-
-    /**
-     * This URL is used to check whether an Internet connection is available
-     * @param aAutoDetectURL the autoDetectURL to set
-     */
-    public static void setAutoDetectURL(String aAutoDetectURL) {
-        autoDetectURL = aAutoDetectURL;
-    }
-    
+    private static String autoDetectURL = "https://www.google.com/";
     private Vector pending = new Vector();
     private boolean running;
     private int threadCount = 1;
@@ -115,27 +100,43 @@ public class NetworkManager {
     private Hashtable threadAssignements = new Hashtable();
     private Hashtable userHeaders;
     private boolean autoDetected;
-    private static String autoDetectURL = "https://www.google.com/";
-    private int nextConnectionId=1;
-    
+    private int nextConnectionId = 1;
     private NetworkManager() {
     }
-    
+
+    /**
+     * This URL is used to check whether an Internet connection is available
+     *
+     * @return the autoDetectURL
+     */
+    public static String getAutoDetectURL() {
+        return autoDetectURL;
+    }
+
+    /**
+     * This URL is used to check whether an Internet connection is available
+     *
+     * @param aAutoDetectURL the autoDetectURL to set
+     */
+    public static void setAutoDetectURL(String aAutoDetectURL) {
+        autoDetectURL = aAutoDetectURL;
+    }
+
     /**
      * Callback for native layer to check the certificates of a connection request.
+     *
      * @param connectionId THe connection ID of the connection request to check.
      * @return True if the certificates check out, or if the ConnectionRequest is not set
      * to check certificates.
-     * 
+     * <p>
      * Currently this is only used by iOS.
      * To use this method in other ports, you need to implement the {@link CodenameOneImplementation#checkSSLCertificatesRequiresCallbackFromNative() } to return true.
-     * 
      * @see CodenameOneImplementation#checkSSLCertificatesRequiresCallbackFromNative()
      * @deprecated For internal use only
      */
     static boolean checkCertificatesNativeCallback(int connectionId) {
         ArrayList<NetworkThread> threads = new ArrayList<NetworkThread>();
-        synchronized(LOCK) {
+        synchronized (LOCK) {
             if (INSTANCE == null || INSTANCE.networkThreads == null) {
                 return true;
             }
@@ -157,22 +158,31 @@ public class NetworkManager {
         }
         return true;
     }
-    
+
+    /**
+     * Returns the singleton instance of this class
+     *
+     * @return instance of this class
+     */
+    public static NetworkManager getInstance() {
+        return INSTANCE;
+    }
+
     void resetAPN() {
         autoDetected = false;
     }
 
     boolean handleErrorCode(ConnectionRequest r, int code, String message) {
-        if(errorListeners != null) {
+        if (errorListeners != null) {
             ActionEvent ev = new NetworkEvent(r, code, message);
             errorListeners.fireActionEvent(ev);
             return ev.isConsumed();
         }
         return false;
     }
-    
+
     private boolean handleException(ConnectionRequest r, Exception o) {
-        if(errorListeners != null) {
+        if (errorListeners != null) {
             ActionEvent ev = new NetworkEvent(r, o);
             errorListeners.fireActionEvent(ev);
             return ev.isConsumed();
@@ -197,221 +207,25 @@ public class NetworkManager {
      *
      * @param threadCount the threadCount to set
      * @deprecated since the network is always running in Codename One this method is quite confusing
-     * unfortunately fixing it will probably break working code. You should migrate the code to use 
+     * unfortunately fixing it will probably break working code. You should migrate the code to use
      * {@link #updateThreadCount(int)}
      */
     public void setThreadCount(int threadCount) {
         // in auto detect mode multiple threads can break the detections
-        if(!Util.getImplementation().shouldAutoDetectAccessPoint()) {
+        if (!Util.getImplementation().shouldAutoDetectAccessPoint()) {
             this.threadCount = threadCount;
         }
     }
-    
+
     /**
      * Sets the number of network threads and restarts the network threads
+     *
      * @param threadCount the new number of threads
      */
     public void updateThreadCount(int threadCount) {
         this.threadCount = threadCount;
         shutdown();
         start();
-    }
-
-    class NetworkThread implements Runnable {
-        private ConnectionRequest currentRequest;
-        private Thread threadInstance;
-        boolean stopped = false;
-
-        public NetworkThread() {
-        }
-
-        public ConnectionRequest getCurrentRequest() {
-            return currentRequest;
-        }
-
-        public void join() {
-            try {
-                threadInstance.join();
-            } catch (InterruptedException ex) {
-                ex.printStackTrace();
-            }
-        }
-        
-        public void start() {
-            Util.getImplementation().startThread("Network Thread", this);
-        }
-
-        public void interrupt() {
-            if(threadInstance != null) {
-                threadInstance.interrupt();
-            }
-        }
-
-        public Thread getThreadInstance() {
-            return threadInstance;
-        }
-        
-        private boolean runCurrentRequest(@Async.Execute ConnectionRequest req) {
-            if(threadAssignements.size() > 0) {
-                String n = currentRequest.getClass().getName();
-                Integer threadOffset = (Integer)threadAssignements.get(n);
-                NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
-                if(networkThreads == null) {
-                    return false;
-                }
-                if(threadOffset != null && networkThreads[threadOffset.intValue()] != this) {
-                    synchronized(LOCK) {
-                        if(pending.size() > 0) {
-                            pending.insertElementAt(currentRequest, 1);
-                            return false;
-                        }
-                        pending.addElement(currentRequest);
-                        LOCK.notify();
-                        try {
-                            LOCK.wait(30);
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                }
-            }
-
-            int frameRate = -1;
-            boolean requestWasCompleted=true;
-                // Default this to true because if, for some reason an exception is thrown
-                // before calling performOperationComplete(), then the request
-                // won't be retried.
-            try {
-                // for higher priority tasks increase the thread priority, for lower
-                // prioirty tasks decrease it. In critical priority reduce the Codename One
-                // rendering thread speed for even faster download
-                switch(currentRequest.getPriority()) {
-                    case ConnectionRequest.PRIORITY_CRITICAL:
-                        frameRate = Display.getInstance().getFrameRate();
-                        Display.getInstance().setFramerate(4);
-                        Thread.currentThread().setPriority(Thread.MAX_PRIORITY - 1);
-                        break;
-                    case ConnectionRequest.PRIORITY_HIGH:
-                        Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 2);
-                        break;
-                    case ConnectionRequest.PRIORITY_NORMAL:
-                        break;
-                    case ConnectionRequest.PRIORITY_LOW:
-                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY + 2);
-                        break;
-                    case ConnectionRequest.PRIORITY_REDUNDANT:
-                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
-                        break;
-                }
-
-                if(progressListeners != null) {
-                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
-                }
-                if(currentRequest.getShowOnInit() != null) {
-                    currentRequest.getShowOnInit().showModeless();
-                }
-
-                requestWasCompleted = currentRequest.performOperationComplete();
-            } catch(IOException e) {
-                if(!currentRequest.isFailSilently()) {
-                    if(!handleException(currentRequest, e)) {
-                        currentRequest.handleIOException(e);
-                    }
-                } else {
-                    // for the record
-                    Log.e(e);
-                }
-            } catch(RuntimeException er) {
-                if(!currentRequest.isFailSilently()) {
-                    if(!handleException(currentRequest, er)) {
-                        currentRequest.handleRuntimeException(er);
-                    }
-                } else {
-                    // for the record
-                    Log.e(er);
-                }
-            } finally {
-                Thread.currentThread().setPriority(Thread.NORM_PRIORITY);
-                if(frameRate > -1) {
-                    Display.getInstance().setFramerate(frameRate);
-                }
-                if (requestWasCompleted) {
-                    currentRequest.complete = true;
-                }
-                if(progressListeners != null) {
-                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
-                }
-                if(currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
-                    // there may be a race condition where the dialog hasn't yet appeared but the
-                    // network request completed
-                    final ConnectionRequest finalReq = currentRequest;
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            Dialog dlg = finalReq.getDisposeOnCompletion();
-                            if (dlg != null) {
-                                dlg.dispose();
-                            }
-                        } 
-                    });
-                }
-            }
-            return true;
-        }
-        
-        public void run() {
-            threadInstance = Thread.currentThread();
-            while(running && !stopped) {
-                if(pending.size() > 0) {
-                    // the synchronization here isn't essential, only for good measure
-                    synchronized(LOCK) {
-                        //double lock to prevent a potential exception
-                        if(pending.size() == 0){
-                            continue;
-                        }
-                        currentRequest = (ConnectionRequest)pending.elementAt(0);
-                        pending.removeElementAt(0);
-                        currentRequest.prepare();
-                        if(currentRequest.isKilled()){
-                            continue;
-                        }
-                        currentRequest.setId(nextConnectionId++);
-                        if (nextConnectionId > 2000000000) {
-                            nextConnectionId = 1;
-                        }
-                    }
-                    if(userHeaders != null) {
-                        Enumeration e = userHeaders.keys();
-                        while(e.hasMoreElements()) {
-                            String key = (String)e.nextElement();
-                            String value = (String)userHeaders.get(key);
-                            currentRequest.addRequestHeaderDontRepleace(key, value);
-                        }
-                    }
-                    if (!runCurrentRequest(currentRequest)) {
-                        continue;
-                    }
-                    currentRequest = null;
-
-                    // wakeup threads waiting for the completion of this network operation
-                    synchronized(LOCK) {
-                        LOCK.notifyAll();
-                    }
-                } else {
-                    synchronized(LOCK) {
-                        try {
-                            // prevent waiting when there is still a pending request
-                            // this can occur with a race condition since the synchronize
-                            // scope is limited to prevent blocking on add...
-                            if(pending.size() == 0) {
-                                LOCK.wait();
-                            }
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                }
-            }
-        }
     }
 
     boolean hasProgressListeners() {
@@ -421,7 +235,7 @@ public class NetworkManager {
     void fireProgressEvent(ConnectionRequest c, int type, int length, int sentReceived) {
         // progressListeners might be made null by a separate thread
         EventDispatcher d = progressListeners;
-        if(d != null) {
+        if (d != null) {
             NetworkEvent n = new NetworkEvent(c, type);
             n.setLength(length);
             n.setSentReceived(sentReceived);
@@ -432,119 +246,48 @@ public class NetworkManager {
     private NetworkThread createNetworkThread() {
         return new NetworkThread();
     }
-    
-    class AutoDetectAPN extends ConnectionRequest {
-        private Vector aps = null;
-        private int currentAP;
-        protected void handleErrorResponseCode(int code, String message) {
-            retryWithDifferentAPN();
-        }
 
-        protected void handleException(Exception err) {
-            retryWithDifferentAPN();
-        }
-
-        protected void readResponse(InputStream input) throws IOException  {
-            String s = Util.readToString(input);
-            if(!s.equals("hi")) {
-                retryWithDifferentAPN();
-            }
-        }
-                
-        private String nextAP() {
-            if(aps == null) {
-                aps = new Vector();
-                String[] ids = getAPIds();
-                int idlen = ids.length;
-                for(int iter = 0 ; iter < idlen ; iter++) {
-                    int t = getAPType(ids[iter]);
-                    if(t == ACCESS_POINT_TYPE_WLAN) {
-                        aps.insertElementAt(ids[iter ], 0);
-                    } else {
-                        if(t == ACCESS_POINT_TYPE_CORPORATE || t == ACCESS_POINT_TYPE_NETWORK3G) {
-                            aps.addElement(ids[iter]);
-                        }
-                    }
-                }
-                
-                // add all the 2G networks at the end
-                for(int iter = 0 ; iter < idlen ; iter++) {
-                    int t = getAPType(ids[iter]);
-                    if(t == ACCESS_POINT_TYPE_NETWORK2G) {
-                        aps.addElement(ids[iter]);
-                    }
-                }
-            }
-            if(currentAP >= aps.size()) {
-                return null;
-            }
-            String s = (String)aps.elementAt(currentAP);
-            currentAP++;
-            return s;
-        }
-        
-        private void retryWithDifferentAPN() {
-            String n = nextAP();
-            if(n == null) {
-                return;
-            }
-            setCurrentAccessPoint(n);
-            AutoDetectAPN r = new AutoDetectAPN();
-            r.setPost(false);
-            r.currentAP = currentAP;
-            r.aps = aps;
-            r.setUrl(autoDetectURL);
-            r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
-            addToQueue(r);
-        }
-
-        public boolean equals(Object o) {
-            return false;
-        }
-        
-    }
-    
     /**
-     * There is no need to invoke this method since the network manager is started 
+     * There is no need to invoke this method since the network manager is started
      * implicitly. It is useful only if you explicitly stop the network manager.
      * Invoking this method otherwise will just do nothing.
      */
     public void start() {
-        if(networkThreads != null) {
+        if (networkThreads != null) {
             //throw new IllegalStateException("Network manager already initialized");
             return;
         }
         running = true;
         networkThreads = new NetworkThread[getThreadCount()];
-        for(int iter = 0 ; iter < getThreadCount() ; iter++) {
+        for (int iter = 0; iter < getThreadCount(); iter++) {
             networkThreads[iter] = createNetworkThread();
             networkThreads[iter].start();
-        }        
+        }
         // we need to implement a timeout thread of our own for this case...
-        if(!Util.getImplementation().isTimeoutSupported()) {
+        if (!Util.getImplementation().isTimeoutSupported()) {
             Util.getImplementation().startThread("Timeout Thread", new Runnable() {
                 public void run() {
                     // detect timeout violations by polling
-                    while(running) {
+                    while (running) {
                         try {
                             Thread.sleep(timeout / 10);
                         } catch (InterruptedException ex) {
                             ex.printStackTrace();
                         }
                         NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
-                        if(networkThreads == null) {
+                        if (networkThreads == null) {
                             return;
                         }
                         // check for timeout violations on the currently executing threads
                         int ntlen = networkThreads.length;
-                        for(int iter = 0 ; iter < ntlen ; iter++) {
+                        for (int iter = 0; iter < ntlen; iter++) {
                             ConnectionRequest c = networkThreads[iter].getCurrentRequest();
-                            if(c != null) {
+                            if (c != null) {
                                 int cTimeout = Math.min(timeout, c.getTimeout());
-                                if(c.getTimeout() < 0) {
+                                if (c.getTimeout() < 0) {
                                     cTimeout = timeout;
                                 }
-                                if(c.getTimeSinceLastActivity() > cTimeout) {
+                                if (c.getTimeSinceLastActivity() > cTimeout) {
                                     // we have a timeout problem on our hands! We need to try and kill!
                                     c.kill();
                                     networkThreads[iter].interrupt();
@@ -555,10 +298,10 @@ public class NetworkManager {
                                     }
 
                                     // did the attempt work?
-                                    if(networkThreads[iter].getCurrentRequest() == c) {
-                                        if(c.getTimeSinceLastActivity() > cTimeout) {
+                                    if (networkThreads[iter].getCurrentRequest() == c) {
+                                        if (c.getTimeSinceLastActivity() > cTimeout) {
                                             // we need to create a whole new network thread and abandon this one!
-                                            if(running) {
+                                            if (running) {
                                                 networkThreads[iter] = createNetworkThread();
                                                 networkThreads[iter].start();
                                             }
@@ -575,17 +318,18 @@ public class NetworkManager {
 
     /**
      * Shuts down the network thread, this will trigger failures if you have network requests
+     *
      * @deprecated This method is for internal use only
      */
     public void shutdown() {
         running = false;
-        if(networkThreads != null) {
-            for(NetworkThread n : networkThreads) {
+        if (networkThreads != null) {
+            for (NetworkThread n : networkThreads) {
                 n.stopped = true;
             }
         }
         networkThreads = null;
-        synchronized(LOCK) {
+        synchronized (LOCK) {
             LOCK.notifyAll();
         }
 
@@ -596,28 +340,19 @@ public class NetworkManager {
      */
     public void shutdownSync() {
         NetworkThread[] n = this.networkThreads;
-        if(n != null) {
+        if (n != null) {
             NetworkThread t = n[0];
-            if(t != null) {
+            if (t != null) {
                 shutdown();
                 t.join();
             }
         }
     }
 
-    /**
-     * Returns the singleton instance of this class
-     * 
-     * @return instance of this class
-     */
-    public static NetworkManager getInstance() {
-        return INSTANCE;
-    }
-
     private void addSortedToQueue(ConnectionRequest request, int priority) {
-        for(int iter = 0 ; iter < pending.size() ; iter++) {
-            ConnectionRequest r = (ConnectionRequest)pending.elementAt(iter);
-            if(r.getPriority() < priority) {
+        for (int iter = 0; iter < pending.size(); iter++) {
+            ConnectionRequest r = (ConnectionRequest) pending.elementAt(iter);
+            if (r.getPriority() < priority) {
                 pending.insertElementAt(request, iter);
                 return;
             }
@@ -626,15 +361,15 @@ public class NetworkManager {
     }
 
     /**
-     * Adds a header to the global default headers, this header will be implicitly added 
+     * Adds a header to the global default headers, this header will be implicitly added
      * to all requests going out from this point onwards. The main use case for this is
      * for authentication information communication via the header.
-     * 
-     * @param key the key of the header
+     *
+     * @param key   the key of the header
      * @param value the value of the header
      */
     public void addDefaultHeader(String key, String value) {
-        if(userHeaders == null) {
+        if (userHeaders == null) {
             userHeaders = new Hashtable();
         }
         userHeaders.put(key, value);
@@ -643,7 +378,7 @@ public class NetworkManager {
     /**
      * Identical to add to queue but returns an AsyncResource object that will resolve to
      * the ConnectionRequest.
-     * 
+     *
      * @param request the request object to add.
      * @return AsyncResource resolving to the connection request on complete.
      * @since 7.0
@@ -651,11 +386,11 @@ public class NetworkManager {
     public AsyncResource<ConnectionRequest> addToQueueAsync(final ConnectionRequest request) {
         final AsyncResource<ConnectionRequest> out = new AsyncResource<ConnectionRequest>();
         class WaitingClass implements ActionListener<NetworkEvent> {
-            
+
 
             public void actionPerformed(NetworkEvent e) {
-                if(e.getError() != null) {
-                    
+                if (e.getError() != null) {
+
                     removeProgressListener(this);
                     removeErrorListener(this);
                     if (!out.isDone()) {
@@ -663,13 +398,13 @@ public class NetworkManager {
                     }
                     return;
                 }
-                if(e.getConnectionRequest() == request) {
-                    if(e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
-                        if(request.retrying) {
+                if (e.getConnectionRequest() == request) {
+                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                        if (request.retrying) {
                             request.retrying = false;
                             return;
                         }
-                        
+
                         removeProgressListener(this);
                         removeErrorListener(this);
                         if (!out.isDone()) {
@@ -686,20 +421,21 @@ public class NetworkManager {
         addToQueue(request);
         return out;
     }
-    
+
     /**
      * Identical to add to queue but waits until the request is processed in the queue,
-     * this is useful for completely synchronous operations. 
-     * 
+     * this is useful for completely synchronous operations.
+     *
      * @param request the request object to add
      */
     public void addToQueueAndWait(final ConnectionRequest request) {
         class WaitingClass implements Runnable, ActionListener<NetworkEvent> {
             private boolean edt = CN.isEdt();
             private boolean finishedWaiting;
+
             public void run() {
                 if (edt) {
-                    while(!finishedWaiting) {
+                    while (!finishedWaiting) {
                         try {
                             Thread.sleep(30);
                         } catch (InterruptedException ex) {
@@ -707,7 +443,7 @@ public class NetworkManager {
                         }
                     }
                 } else {
-                    while(!request.complete) {
+                    while (!request.complete) {
                         try {
                             Thread.sleep(30);
                         } catch (InterruptedException ex) {
@@ -718,15 +454,15 @@ public class NetworkManager {
             }
 
             public void actionPerformed(NetworkEvent e) {
-                if(e.getError() != null) {
+                if (e.getError() != null) {
                     finishedWaiting = true;
                     removeProgressListener(this);
                     removeErrorListener(this);
                     return;
                 }
-                if(e.getConnectionRequest() == request) {
-                    if(e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
-                        if(request.retrying) {
+                if (e.getConnectionRequest() == request) {
+                    if (e.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                        if (request.retrying) {
                             request.retrying = false;
                             return;
                         }
@@ -739,7 +475,7 @@ public class NetworkManager {
             }
         }
         WaitingClass w = new WaitingClass();
-        if(Display.getInstance().isEdt()) {
+        if (Display.getInstance().isEdt()) {
             addProgressListener(w);
             addErrorListener(w);
             addToQueue(request);
@@ -763,16 +499,17 @@ public class NetworkManager {
      * Kills the given request and waits until the request is killed if it is
      * being processed by one of the threads. This method must not be invoked from
      * a network thread!
+     *
      * @param request
      */
     public void killAndWait(final ConnectionRequest request) {
         request.kill();
         class KillWaitingClass implements Runnable {
             public void run() {
-                for(int iter = 0 ; iter < threadCount ; iter++) {
-                    if(networkThreads[iter].currentRequest == request) {
-                        synchronized(LOCK) {
-                            while(networkThreads[iter].currentRequest == request) {
+                for (int iter = 0; iter < threadCount; iter++) {
+                    if (networkThreads[iter].currentRequest == request) {
+                        synchronized (LOCK) {
+                            while (networkThreads[iter].currentRequest == request) {
                                 try {
                                     LOCK.wait(20);
                                 } catch (InterruptedException ex) {
@@ -789,10 +526,10 @@ public class NetworkManager {
 
     void kill9(final ConnectionRequest request) {
         if (request.isKilled()) {
-            for(int iter = 0 ; iter < threadCount ; iter++) {
-                if(networkThreads[iter].currentRequest == request) {
-                    synchronized(LOCK) {
-                        if(networkThreads[iter].currentRequest == request) {
+            for (int iter = 0; iter < threadCount; iter++) {
+                if (networkThreads[iter].currentRequest == request) {
+                    synchronized (LOCK) {
+                        if (networkThreads[iter].currentRequest == request) {
                             networkThreads[iter].interrupt();
                             networkThreads[iter].stopped = true;
                             networkThreads[iter] = createNetworkThread();
@@ -803,7 +540,7 @@ public class NetworkManager {
             }
         }
     }
-    
+
     /**
      * Adds the given network connection to the queue of execution
      *
@@ -811,12 +548,12 @@ public class NetworkManager {
      */
     void addToQueue(@Async.Schedule ConnectionRequest request, boolean retry) {
         Util.getImplementation().addConnectionToQueue(request);
-        if(!running) {
+        if (!running) {
             start();
         }
-        if(!autoDetected) {
+        if (!autoDetected) {
             autoDetected = true;
-            if(Util.getImplementation().shouldAutoDetectAccessPoint()) {
+            if (Util.getImplementation().shouldAutoDetectAccessPoint()) {
                 AutoDetectAPN r = new AutoDetectAPN();
                 r.setPost(false);
                 r.setUrl(autoDetectURL);
@@ -825,16 +562,16 @@ public class NetworkManager {
             }
         }
         request.validateImpl();
-        synchronized(LOCK) {
+        synchronized (LOCK) {
             int i = request.getPriority();
-            if(!retry) {
-                if(!request.isDuplicateSupported()) {
-                    if(pending.contains(request)) {
+            if (!retry) {
+                if (!request.isDuplicateSupported()) {
+                    if (pending.contains(request)) {
                         System.out.println("Duplicate entry in the queue: " + request.getClass().getName() + ": " + request);
                         return;
                     }
                     ConnectionRequest currentRequest = networkThreads[0].getCurrentRequest();
-                    if(currentRequest != null && !currentRequest.retrying && currentRequest.equals(request)) {
+                    if (currentRequest != null && !currentRequest.retrying && currentRequest.equals(request)) {
                         System.out.println("Duplicate entry detected");
                         return;
                     }
@@ -842,12 +579,12 @@ public class NetworkManager {
             } else {
                 i = ConnectionRequest.PRIORITY_HIGH;
             }
-            switch(i) {
+            switch (i) {
                 case ConnectionRequest.PRIORITY_CRITICAL:
                     pending.insertElementAt(request, 0);
                     ConnectionRequest currentRequest = networkThreads[0].getCurrentRequest();
-                    if(currentRequest != null && currentRequest.getPriority() < ConnectionRequest.PRIORITY_CRITICAL) {
-                        if(currentRequest.isPausable()) {
+                    if (currentRequest != null && currentRequest.getPriority() < ConnectionRequest.PRIORITY_CRITICAL) {
+                        if (currentRequest.isPausable()) {
                             currentRequest.pause();
                             pending.insertElementAt(currentRequest, 1);
                         } else {
@@ -867,26 +604,26 @@ public class NetworkManager {
     }
 
     /**
-     * Sets the timeout in milliseconds for network connections, a timeout may be "faked"
-     * for platforms that don't support the notion of a timeout such as MIDP
-     * 
-     * @param t the timeout duration
-     */
-    public void setTimeout(int t) {
-        if(Util.getImplementation().isTimeoutSupported()) {
-            Util.getImplementation().setTimeout(t);
-        } else {
-            timeout = t;
-        }
-    }
-
-    /**
      * Returns the timeout duration
      *
      * @return timeout in milliseconds
      */
     public int getTimeout() {
         return timeout;
+    }
+
+    /**
+     * Sets the timeout in milliseconds for network connections, a timeout may be "faked"
+     * for platforms that don't support the notion of a timeout such as MIDP
+     *
+     * @param t the timeout duration
+     */
+    public void setTimeout(int t) {
+        if (Util.getImplementation().isTimeoutSupported()) {
+            Util.getImplementation().setTimeout(t);
+        } else {
+            timeout = t;
+        }
     }
 
     /**
@@ -898,7 +635,7 @@ public class NetworkManager {
      * @param e callback will be invoked with the Exception as the source object
      */
     public void addErrorListener(ActionListener<NetworkEvent> e) {
-        if(errorListeners == null) {
+        if (errorListeners == null) {
             errorListeners = new EventDispatcher();
             errorListeners.setBlocking(true);
         }
@@ -911,7 +648,7 @@ public class NetworkManager {
      * @param e callback to remove
      */
     public void removeErrorListener(ActionListener<NetworkEvent> e) {
-        if(errorListeners == null) {
+        if (errorListeners == null) {
             return;
         }
 
@@ -924,7 +661,7 @@ public class NetworkManager {
      * @param al action listener
      */
     public void addProgressListener(ActionListener<NetworkEvent> al) {
-        if(progressListeners == null) {
+        if (progressListeners == null) {
             progressListeners = new EventDispatcher();
             progressListeners.setBlocking(false);
         }
@@ -937,12 +674,12 @@ public class NetworkManager {
      * @param al action listener
      */
     public void removeProgressListener(ActionListener<NetworkEvent> al) {
-        if(progressListeners == null) {
+        if (progressListeners == null) {
             return;
         }
         progressListeners.removeListener(al);
         Collection v = progressListeners.getListenerCollection();
-        if(v == null || v.size() == 0) {
+        if (v == null || v.size() == 0) {
             progressListeners = null;
         }
     }
@@ -954,7 +691,7 @@ public class NetworkManager {
      * network thread (but doesn't stop like a low priority request would).
      *
      * @param requestType the class of the specific connection request
-     * @param offset the offset of the thread starting from 0 and smaller than thread count
+     * @param offset      the offset of the thread starting from 0 and smaller than thread count
      */
     public void assignToThread(Class requestType, int offset) {
         threadAssignements.put(requestType.getName(), new Integer(offset));
@@ -962,34 +699,35 @@ public class NetworkManager {
 
     /**
      * This method returns all pending ConnectioRequest connections.
+     *
      * @return the queue elements
      */
-    public Enumeration enumurateQueue(){
+    public Enumeration enumurateQueue() {
         Vector elements = new Vector();
-        synchronized(LOCK) {
+        synchronized (LOCK) {
             Enumeration e = pending.elements();
-            while(e.hasMoreElements()){
+            while (e.hasMoreElements()) {
                 elements.addElement(e.nextElement());
             }
         }
         return elements.elements();
     }
-    
+
     /**
      * Indicates that the network queue is idle
-     * 
+     *
      * @return true if no network activity is in progress or pending
      */
     public boolean isQueueIdle() {
-        return pending == null || 
-                networkThreads == null || 
-                networkThreads[0] == null || 
+        return pending == null ||
+                networkThreads == null ||
+                networkThreads[0] == null ||
                 (pending.size() == 0 && networkThreads[0].getCurrentRequest() == null);
     }
-    
+
     /**
      * Indicates whether looking up an access point is supported by this device
-     * 
+     *
      * @return true if access point lookup is supported
      */
     public boolean isAPSupported() {
@@ -1002,7 +740,7 @@ public class NetworkManager {
      * @return ids of access points
      */
     public String[] getAPIds() {
-       return Util.getImplementation().getAPIds();
+        return Util.getImplementation().getAPIds();
     }
 
     /**
@@ -1041,5 +779,274 @@ public class NetworkManager {
      */
     public void setCurrentAccessPoint(String id) {
         Util.getImplementation().setCurrentAccessPoint(id);
-    }    
+    }
+
+    class NetworkThread implements Runnable {
+        boolean stopped = false;
+        private ConnectionRequest currentRequest;
+        private Thread threadInstance;
+
+        public NetworkThread() {
+        }
+
+        public ConnectionRequest getCurrentRequest() {
+            return currentRequest;
+        }
+
+        public void join() {
+            try {
+                threadInstance.join();
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
+        }
+
+        public void start() {
+            Util.getImplementation().startThread("Network Thread", this);
+        }
+
+        public void interrupt() {
+            if (threadInstance != null) {
+                threadInstance.interrupt();
+            }
+        }
+
+        public Thread getThreadInstance() {
+            return threadInstance;
+        }
+
+        private boolean runCurrentRequest(@Async.Execute ConnectionRequest req) {
+            if (threadAssignements.size() > 0) {
+                String n = currentRequest.getClass().getName();
+                Integer threadOffset = (Integer) threadAssignements.get(n);
+                NetworkThread[] networkThreads = NetworkManager.this.networkThreads;
+                if (networkThreads == null) {
+                    return false;
+                }
+                if (threadOffset != null && networkThreads[threadOffset.intValue()] != this) {
+                    synchronized (LOCK) {
+                        if (pending.size() > 0) {
+                            pending.insertElementAt(currentRequest, 1);
+                            return false;
+                        }
+                        pending.addElement(currentRequest);
+                        LOCK.notify();
+                        try {
+                            LOCK.wait(30);
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            }
+
+            int frameRate = -1;
+            boolean requestWasCompleted = true;
+            // Default this to true because if, for some reason an exception is thrown
+            // before calling performOperationComplete(), then the request
+            // won't be retried.
+            try {
+                // for higher priority tasks increase the thread priority, for lower
+                // prioirty tasks decrease it. In critical priority reduce the Codename One
+                // rendering thread speed for even faster download
+                switch (currentRequest.getPriority()) {
+                    case ConnectionRequest.PRIORITY_CRITICAL:
+                        frameRate = Display.getInstance().getFrameRate();
+                        Display.getInstance().setFramerate(4);
+                        Thread.currentThread().setPriority(Thread.MAX_PRIORITY - 1);
+                        break;
+                    case ConnectionRequest.PRIORITY_HIGH:
+                        Thread.currentThread().setPriority(Thread.NORM_PRIORITY + 2);
+                        break;
+                    case ConnectionRequest.PRIORITY_NORMAL:
+                        break;
+                    case ConnectionRequest.PRIORITY_LOW:
+                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY + 2);
+                        break;
+                    case ConnectionRequest.PRIORITY_REDUNDANT:
+                        Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
+                        break;
+                }
+
+                if (progressListeners != null) {
+                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
+                }
+                if (currentRequest.getShowOnInit() != null) {
+                    currentRequest.getShowOnInit().showModeless();
+                }
+
+                requestWasCompleted = currentRequest.performOperationComplete();
+            } catch (IOException e) {
+                if (!currentRequest.isFailSilently()) {
+                    if (!handleException(currentRequest, e)) {
+                        currentRequest.handleIOException(e);
+                    }
+                } else {
+                    // for the record
+                    Log.e(e);
+                }
+            } catch (RuntimeException er) {
+                if (!currentRequest.isFailSilently()) {
+                    if (!handleException(currentRequest, er)) {
+                        currentRequest.handleRuntimeException(er);
+                    }
+                } else {
+                    // for the record
+                    Log.e(er);
+                }
+            } finally {
+                Thread.currentThread().setPriority(Thread.NORM_PRIORITY);
+                if (frameRate > -1) {
+                    Display.getInstance().setFramerate(frameRate);
+                }
+                if (requestWasCompleted) {
+                    currentRequest.complete = true;
+                }
+                if (progressListeners != null) {
+                    progressListeners.fireActionEvent(new NetworkEvent(currentRequest, NetworkEvent.PROGRESS_TYPE_COMPLETED));
+                }
+                if (currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
+                    // there may be a race condition where the dialog hasn't yet appeared but the
+                    // network request completed
+                    final ConnectionRequest finalReq = currentRequest;
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Dialog dlg = finalReq.getDisposeOnCompletion();
+                            if (dlg != null) {
+                                dlg.dispose();
+                            }
+                        }
+                    });
+                }
+            }
+            return true;
+        }
+
+        public void run() {
+            threadInstance = Thread.currentThread();
+            while (running && !stopped) {
+                if (pending.size() > 0) {
+                    // the synchronization here isn't essential, only for good measure
+                    synchronized (LOCK) {
+                        //double lock to prevent a potential exception
+                        if (pending.size() == 0) {
+                            continue;
+                        }
+                        currentRequest = (ConnectionRequest) pending.elementAt(0);
+                        pending.removeElementAt(0);
+                        currentRequest.prepare();
+                        if (currentRequest.isKilled()) {
+                            continue;
+                        }
+                        currentRequest.setId(nextConnectionId++);
+                        if (nextConnectionId > 2000000000) {
+                            nextConnectionId = 1;
+                        }
+                    }
+                    if (userHeaders != null) {
+                        Enumeration e = userHeaders.keys();
+                        while (e.hasMoreElements()) {
+                            String key = (String) e.nextElement();
+                            String value = (String) userHeaders.get(key);
+                            currentRequest.addRequestHeaderDontRepleace(key, value);
+                        }
+                    }
+                    if (!runCurrentRequest(currentRequest)) {
+                        continue;
+                    }
+                    currentRequest = null;
+
+                    // wakeup threads waiting for the completion of this network operation
+                    synchronized (LOCK) {
+                        LOCK.notifyAll();
+                    }
+                } else {
+                    synchronized (LOCK) {
+                        try {
+                            // prevent waiting when there is still a pending request
+                            // this can occur with a race condition since the synchronize
+                            // scope is limited to prevent blocking on add...
+                            if (pending.size() == 0) {
+                                LOCK.wait();
+                            }
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    class AutoDetectAPN extends ConnectionRequest {
+        private Vector aps = null;
+        private int currentAP;
+
+        protected void handleErrorResponseCode(int code, String message) {
+            retryWithDifferentAPN();
+        }
+
+        protected void handleException(Exception err) {
+            retryWithDifferentAPN();
+        }
+
+        protected void readResponse(InputStream input) throws IOException {
+            String s = Util.readToString(input);
+            if (!s.equals("hi")) {
+                retryWithDifferentAPN();
+            }
+        }
+
+        private String nextAP() {
+            if (aps == null) {
+                aps = new Vector();
+                String[] ids = getAPIds();
+                int idlen = ids.length;
+                for (int iter = 0; iter < idlen; iter++) {
+                    int t = getAPType(ids[iter]);
+                    if (t == ACCESS_POINT_TYPE_WLAN) {
+                        aps.insertElementAt(ids[iter], 0);
+                    } else {
+                        if (t == ACCESS_POINT_TYPE_CORPORATE || t == ACCESS_POINT_TYPE_NETWORK3G) {
+                            aps.addElement(ids[iter]);
+                        }
+                    }
+                }
+
+                // add all the 2G networks at the end
+                for (int iter = 0; iter < idlen; iter++) {
+                    int t = getAPType(ids[iter]);
+                    if (t == ACCESS_POINT_TYPE_NETWORK2G) {
+                        aps.addElement(ids[iter]);
+                    }
+                }
+            }
+            if (currentAP >= aps.size()) {
+                return null;
+            }
+            String s = (String) aps.elementAt(currentAP);
+            currentAP++;
+            return s;
+        }
+
+        private void retryWithDifferentAPN() {
+            String n = nextAP();
+            if (n == null) {
+                return;
+            }
+            setCurrentAccessPoint(n);
+            AutoDetectAPN r = new AutoDetectAPN();
+            r.setPost(false);
+            r.currentAP = currentAP;
+            r.aps = aps;
+            r.setUrl(autoDetectURL);
+            r.setPriority(ConnectionRequest.PRIORITY_CRITICAL);
+            addToQueue(r);
+        }
+
+        public boolean equals(Object o) {
+            return false;
+        }
+
+    }
 }

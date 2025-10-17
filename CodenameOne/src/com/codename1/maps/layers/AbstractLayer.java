@@ -21,22 +21,21 @@ package com.codename1.maps.layers;
 
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Projection;
-import com.codename1.maps.providers.MapProvider;
 
 /**
  * This class represents an abstract layer on the map.
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
-public abstract class AbstractLayer implements Layer{
+public abstract class AbstractLayer implements Layer {
 
     protected final String name;
     protected Projection projection;
 
     /**
      * Creates an abstract layer.
-     * 
-     * @param p the projection system of this Layer
+     *
+     * @param p    the projection system of this Layer
      * @param name the name of this Layer
      */
     public AbstractLayer(Projection p, String name) {
@@ -46,6 +45,7 @@ public abstract class AbstractLayer implements Layer{
 
     /**
      * Gets the name of this Layer
+     *
      * @return the name of this Layer
      */
     public String getName() {
@@ -54,16 +54,18 @@ public abstract class AbstractLayer implements Layer{
 
     /**
      * The projection of this Layer
+     *
      * @return the projection of this Layer
      */
     public Projection getProjection() {
         return projection;
     }
-    
+
     /**
      * The bounding box of this Layer
+     *
      * @return the Layer bounding box
      */
     public abstract BoundingBox boundingBox();
-    
+
 }

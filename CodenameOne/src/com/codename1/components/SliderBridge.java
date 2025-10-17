@@ -23,12 +23,13 @@
  */
 package com.codename1.components;
 
-import com.codename1.ui.Slider;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
+import com.codename1.ui.Slider;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
 import java.util.Vector;
 
 /**
@@ -37,7 +38,7 @@ import java.util.Vector;
  * <p>Important note: every time that a connectionRequest is retried with the .retry() method, SliderBridge.bindProgress(cr, progress) must be invoked again.</p>
  * <script src="https://gist.github.com/codenameone/051bfa054fd3024c8292.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/network-sliderbridge.png" alt="SliderBridge progress for downloading the image in the slow network mode" />
-  *
+ *
  * @author Shai Almog
  */
 public class SliderBridge extends Slider {
@@ -47,36 +48,60 @@ public class SliderBridge extends Slider {
      * Default constructor
      */
     public SliderBridge() {
-        bindProgress((ConnectionRequest[])null, this);
+        bindProgress((ConnectionRequest[]) null, this);
+    }
+
+    /**
+     * Displays progress only for the source object, every other object in the queue
+     * before completion will produce an infinite progress. After 100% the progress will
+     * no longer move.
+     *
+     * @param source the request whose progress should be followed
+     */
+    public SliderBridge(ConnectionRequest source) {
+        if (source != null) {
+            sources = new ConnectionRequest[]{source};
+        }
+        bindProgress(sources, this);
+    }
+
+    /**
+     * Allows displaying progress of multiple requests being sent
+     *
+     * @param sources the requests whose progress should be followed
+     */
+    public SliderBridge(ConnectionRequest[] sources) {
+        this.sources = sources;
+        bindProgress(sources, this);
     }
 
     /**
      * Allows binding progress to an arbitrary slider
      *
-     * @param source the source connection request 
-     * @param s the slider
+     * @param source the source connection request
+     * @param s      the slider
      */
     public static void bindProgress(final ConnectionRequest source, final Slider s) {
-        if(source == null) {
+        if (source == null) {
             bindProgress((ConnectionRequest[]) null, s);
         } else {
-            bindProgress(new ConnectionRequest[] {source}, s);
+            bindProgress(new ConnectionRequest[]{source}, s);
         }
     }
-    
+
     /**
      * Allows binding progress to an arbitrary slider
-     * 
+     *
      * @param sources the source connection request (null for all network activity)
-     * @param s the slider
+     * @param s       the slider
      */
     public static void bindProgress(final ConnectionRequest[] sources, final Slider s) {
         Vector v = null;
         int portions = 100;
-        if(sources != null) {
+        if (sources != null) {
             v = new Vector();
             int slen = sources.length;
-            for(int iter = 0 ; iter < slen ; iter++) {
+            for (int iter = 0; iter < slen; iter++) {
                 v.addElement(sources[iter]);
             }
             portions = portions / slen;
@@ -92,17 +117,17 @@ public class SliderBridge extends Slider {
              */
             public void actionPerformed(ActionEvent evt) {
                 // PMD Fix (CollapsibleIfStatements): Collapse the nested source checks into one conditional.
-                if(sources != null && !sourceVec.contains(evt.getSource())) {
+                if (sources != null && !sourceVec.contains(evt.getSource())) {
                     return;
                 }
-                NetworkEvent e = (NetworkEvent)evt;
-                switch(e.getProgressType()) {
+                NetworkEvent e = (NetworkEvent) evt;
+                switch (e.getProgressType()) {
                     case NetworkEvent.PROGRESS_TYPE_COMPLETED:
                         s.setInfinite(false);
                         //s.setProgress(s.getMaxValue());
                         soFar += portionPerSource;
                         s.setProgress(soFar);
-                        if(sources != null) {
+                        if (sources != null) {
                             NetworkManager.getInstance().removeProgressListener(this);
                         }
                         break;
@@ -111,13 +136,13 @@ public class SliderBridge extends Slider {
                         break;
                     case NetworkEvent.PROGRESS_TYPE_INPUT:
                     case NetworkEvent.PROGRESS_TYPE_OUTPUT:
-                        if(e.getLength() > 0) {
+                        if (e.getLength() > 0) {
                             currentLength = e.getLength();
                             //s.setMaxValue(1000);
                             s.setInfinite(false);
                             float sentReceived = e.getSentReceived();
                             sentReceived = sentReceived / currentLength * portionPerSource;
-                            s.setProgress((int)sentReceived + soFar);
+                            s.setProgress((int) sentReceived + soFar);
                             //s.setProgress(e.getSentReceived());
                             //s.setMaxValue(e.getLength());
                         } else {
@@ -127,29 +152,5 @@ public class SliderBridge extends Slider {
                 }
             }
         });
-    }
-
-    /**
-     * Displays progress only for the source object, every other object in the queue
-     * before completion will produce an infinite progress. After 100% the progress will
-     * no longer move.
-     *
-     * @param source the request whose progress should be followed
-     */
-    public SliderBridge(ConnectionRequest source) {
-        if(source != null) {
-            sources = new ConnectionRequest[] {source};
-        }
-        bindProgress(sources, this);
-    }
-
-    /**
-     * Allows displaying progress of multiple requests being sent
-     *
-     * @param sources the requests whose progress should be followed
-     */
-    public SliderBridge(ConnectionRequest[] sources) {
-        this.sources = sources;
-        bindProgress(sources, this);
     }
 }

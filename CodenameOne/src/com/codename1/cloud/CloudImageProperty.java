@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.cloud;
@@ -29,6 +29,7 @@ import com.codename1.io.NetworkManager;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,7 +38,7 @@ import java.util.Hashtable;
 
 /**
  * A custom property that converts a cloud file id value to an image
- * that is cached locally asynchronously. 
+ * that is cached locally asynchronously.
  *
  * @author Shai Almog
  * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
@@ -47,54 +48,57 @@ public class CloudImageProperty implements CustomProperty { // PMD Fix: Unnecess
     private String idProperty;
     private EncodedImage placeholderImage;
     private Hashtable<Object, ReplaceableImage> inProgress = new Hashtable<Object, ReplaceableImage>();
-    
+
     /**
      * Create an image property for the given id that will hold the place holder image
      * while downloading the actual image
-     * @param idProperty the id
+     *
+     * @param idProperty       the id
      * @param placeholderImage placeholder shown while id is downloaded
      */
     public CloudImageProperty(String idProperty, EncodedImage placeholderImage) {
         this.idProperty = idProperty;
         this.placeholderImage = placeholderImage;
     }
-            
+
     private CacheMap getCache() {
-        if(cloudImageCache == null) {
+        if (cloudImageCache == null) {
             cloudImageCache = new CacheMap("CN1CIP$");
         }
         return cloudImageCache;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public Object propertyValue(CloudObject obj, String propertyName) {
-        final String key = (String)obj.getObject(idProperty);
-        if(key == null) {
+        final String key = (String) obj.getObject(idProperty);
+        if (key == null) {
             return placeholderImage;
         }
-        Image image = (Image)getCache().get(key);
-        if(image == null) {
+        Image image = (Image) getCache().get(key);
+        if (image == null) {
             ReplaceableImage r = inProgress.get(key);
-            if(r != null) {
+            if (r != null) {
                 return r;
             }
             final ReplaceableImage rp = ReplaceableImage.create(placeholderImage);
             inProgress.put(key, rp);
             ConnectionRequest cr = new ConnectionRequest() {
                 private EncodedImage e;
-                protected void readResponse(InputStream input) throws IOException  {
+
+                protected void readResponse(InputStream input) throws IOException {
                     e = EncodedImage.create(input);
-                    if(e.getWidth() != placeholderImage.getWidth() || e.getHeight() != placeholderImage.getHeight()) {
+                    if (e.getWidth() != placeholderImage.getWidth() || e.getHeight() != placeholderImage.getHeight()) {
                         ImageIO io = ImageIO.getImageIO();
-                        if(io != null) {
+                        if (io != null) {
                             ByteArrayOutputStream bo = new ByteArrayOutputStream();
                             io.save(new ByteArrayInputStream(e.getImageData()), bo, ImageIO.FORMAT_JPEG, placeholderImage.getWidth(), placeholderImage.getHeight(), 0.9f);
                             e = EncodedImage.create(bo.toByteArray());
                         }
                     }
                 }
+
                 protected void postResponse() {
                     rp.replace(e);
                     getCache().put(key, e);
@@ -108,5 +112,5 @@ public class CloudImageProperty implements CustomProperty { // PMD Fix: Unnecess
         }
         return image;
     }
-    
+
 }

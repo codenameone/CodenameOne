@@ -22,11 +22,8 @@ package com.codename1.maps;
 import com.codename1.maps.providers.MapProvider;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.util.WeakHashMap;
-import java.util.Enumeration;
-import java.util.Hashtable;
 
 /**
- *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 class CacheProviderProxy extends MapProvider {
@@ -43,7 +40,7 @@ class CacheProviderProxy extends MapProvider {
         _time = 0;
         _maxSize = 100;
     }
-    
+
     public int maxZoomLevel() {
         return provider.maxZoomLevel();
     }
@@ -94,8 +91,8 @@ class CacheProviderProxy extends MapProvider {
 
     class AgeableTile extends Tile {
 
-        private Tile tile;
         public int age;
+        private Tile tile;
 
         public AgeableTile(Tile tile, int time) {
             super(tile.dimension(), tile.getBoundingBox(), null);

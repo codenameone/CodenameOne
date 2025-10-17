@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.payment;
@@ -31,21 +31,23 @@ package com.codename1.payment;
  */
 public interface PurchaseCallback {
     /**
-     * Indicates a the given SKU was purchased by a user. When purchasing multiple 
+     * Indicates a the given SKU was purchased by a user. When purchasing multiple
      * SKU's at once multiple calls to this method will be performed.
+     *
      * @param sku the sku purchased
      */
     public void itemPurchased(String sku);
-    
+
     /**
      * Callback indicating a the given SKU purchase failed
+     *
      * @param sku the id
      */
     public void itemPurchaseError(String sku, String errorMessage);
 
     /**
      * Invoked if a refund was granted for a purchase
-     * 
+     *
      * @param sku the sku purchased
      * @deprecated This callback is no longer used.  Use the Receipts API to check if the user currently "owns" a product.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
      * into how to set up in-app purchase for all scenarios including subscriptions.
@@ -54,7 +56,7 @@ public interface PurchaseCallback {
 
     /**
      * Invoked when a subscription SKU is started
-     * 
+     *
      * @param sku the sku purchased
      * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
      * into how to set up in-app purchase for all scenarios including subscriptions.
@@ -63,23 +65,23 @@ public interface PurchaseCallback {
 
     /**
      * Invoked when a subscription SKU is canceled
-     * 
+     *
      * @param sku the sku purchased
      * @deprecated Subscriptions should be handled directly in the associated store (iOS/Google Play, etc..).  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
      * into how to set up in-app purchase for all scenarios including subscriptions.
      */
     public void subscriptionCanceled(String sku);
-    
+
     /**
      * Indicates that a manual payment has failed
-     * 
+     *
      * @param paymentCode the transaction id of the payment
      */
     public void paymentFailed(String paymentCode, String failureReason);
-    
+
     /**
      * Indicates that a manual payment has passed
-     * 
+     *
      * @param paymentCode the transaction id of the payment
      */
     public void paymentSucceeded(String paymentCode, double amount, String currency);

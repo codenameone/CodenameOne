@@ -64,22 +64,22 @@ public class NetworkEvent extends ActionEvent {
      * Constructs an event for an error message
      *
      * @param source source of the error message
-     * @param error the exception
+     * @param error  the exception
      */
     public NetworkEvent(ConnectionRequest source, Exception error) {
-        super(source,ActionEvent.Type.Exception);
+        super(source, ActionEvent.Type.Exception);
         this.error = error;
     }
 
     /**
      * Constructs a response code even
      *
-     * @param request the connection request indicating progress
+     * @param request      the connection request indicating progress
      * @param responseCode the code
-     * @param message the error message
+     * @param message      the error message
      */
     public NetworkEvent(ConnectionRequest request, int responseCode, String message) {
-        super(request,ActionEvent.Type.Response);
+        super(request, ActionEvent.Type.Response);
         this.progressType = responseCode;
         this.message = message;
     }
@@ -88,23 +88,23 @@ public class NetworkEvent extends ActionEvent {
      * Constructs a network status update event used to update progress indicators
      * and application logic of the current state in the NetworkManager
      *
-     * @param request the connection request indicating progress
+     * @param request      the connection request indicating progress
      * @param progressType
      */
     public NetworkEvent(ConnectionRequest request, int progressType) {
-        super(request,ActionEvent.Type.Progress);
+        super(request, ActionEvent.Type.Progress);
         this.progressType = progressType;
     }
 
     /**
      * Constructs a callback event from a connection request with some arbitrary associated meta data
      *
-     * @param request the connection request 
+     * @param request  the connection request
      * @param metaData the data associated with the event
      */
     public NetworkEvent(ConnectionRequest request, Object metaData) {
-        super(request,ActionEvent.Type.Data);
-        if(request != null){
+        super(request, ActionEvent.Type.Data);
+        if (request != null) {
             this.progressType = request.getResponseCode();
         }
         this.metaData = metaData;
@@ -112,11 +112,11 @@ public class NetworkEvent extends ActionEvent {
 
     /**
      * Equivalent to getSource() casted to connection request
-     * 
+     *
      * @return the source connection request
      */
     public ConnectionRequest getConnectionRequest() {
-        return (ConnectionRequest)getSource();
+        return (ConnectionRequest) getSource();
     }
 
     /**
@@ -163,6 +163,13 @@ public class NetworkEvent extends ActionEvent {
     }
 
     /**
+     * @param length the length to set
+     */
+    void setLength(int length) {
+        this.length = length;
+    }
+
+    /**
      * Returns the amount of data received up to this event or sent up to this event (depending on the
      * event type).
      *
@@ -173,29 +180,22 @@ public class NetworkEvent extends ActionEvent {
     }
 
     /**
-     * Returns the percentage of progress for a download operation assuming length is known
-     * 
-     * @return the percentage of the download or -1
-     */
-    public int getProgressPercentage() {
-        if(length > 0) {
-            return (int)(((float)received) / ((float)length) * 100.0f);
-        }
-        return -1;
-    }
-
-    /**
-     * @param length the length to set
-     */
-    void setLength(int length) {
-        this.length = length;
-    }
-
-    /**
      * @param received the received to set
      */
     void setSentReceived(int received) {
         this.received = received;
+    }
+
+    /**
+     * Returns the percentage of progress for a download operation assuming length is known
+     *
+     * @return the percentage of the download or -1
+     */
+    public int getProgressPercentage() {
+        if (length > 0) {
+            return (int) (((float) received) / ((float) length) * 100.0f);
+        }
+        return -1;
     }
 
     /**
@@ -211,6 +211,6 @@ public class NetworkEvent extends ActionEvent {
     public String getMessage() {
         return message;
     }
-    
-    
+
+
 }

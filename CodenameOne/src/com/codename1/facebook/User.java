@@ -23,12 +23,12 @@
  */
 package com.codename1.facebook;
 
-import com.codename1.maps.Coord;
 import java.util.Hashtable;
 
 /**
  * This class represents a Facebook User objject
- *  http://developers.facebook.com/docs/reference/api/user/
+ * http://developers.facebook.com/docs/reference/api/user/
+ *
  * @author Chen Fishbein
  */
 public class User extends FBObject {
@@ -65,7 +65,7 @@ public class User extends FBObject {
         init(props);
     }
 
-    
+
     /**
      * @return the first_name
      */
@@ -149,6 +149,7 @@ public class User extends FBObject {
     public long getTimezone() {
         return timezone;
     }
+
     /**
      * @return the last_updated
      */
@@ -164,7 +165,7 @@ public class User extends FBObject {
     }
 
     /**
-     *  Returns the username
+     * Returns the username
      */
     public String getUsername() {
         return username;
@@ -172,27 +173,28 @@ public class User extends FBObject {
 
     /**
      * Gets the user City if available
-     * 
-     * @return 
+     *
+     * @return
      */
-    public FBObject getLocation(){
+    public FBObject getLocation() {
         return location;
     }
-    
+
     /**
      * Gets the user Hometown if available
-     * 
-     * @return 
+     *
+     * @return
      */
-    public FBObject getHometown(){
+    public FBObject getHometown() {
         return hometown;
     }
-    
+
     /**
      * copies the relevant values from the given hashtable
+     *
      * @param props an hashtable to copy from
      */
-    public void copy(Hashtable props){
+    public void copy(Hashtable props) {
         super.copy(props);
         init(props);
     }
@@ -213,12 +215,12 @@ public class User extends FBObject {
         //timezone = Long.parseLong((String) toCopy.get("timezone"));
         last_updated = (String) toCopy.get("last_updated");
         locale = (String) toCopy.get("locale");
-        Hashtable l = (Hashtable)toCopy.get("location");
-        if(l != null){
+        Hashtable l = (Hashtable) toCopy.get("location");
+        if (l != null) {
             location = new FBObject(l);
         }
-        Hashtable h = (Hashtable)toCopy.get("hometown");
-        if(h != null){
+        Hashtable h = (Hashtable) toCopy.get("hometown");
+        if (h != null) {
             hometown = new FBObject(h);
         }
     }

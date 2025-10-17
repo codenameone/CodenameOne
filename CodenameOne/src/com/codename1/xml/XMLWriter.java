@@ -6,63 +6,62 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 /*
  * Copyright 2013 Paul Harrison Williams. All rights reserved.
- * 
+ *
  * Please contact pwillcode@gmail.com if you have licensing questions.
  */
 /*
-* This was contributed as part of this issue: https://github.com/codenameone/CodenameOne/issues/753
-* The original contribution comments were partially modified with the migration from Google Code to github.
-*/
+ * This was contributed as part of this issue: https://github.com/codenameone/CodenameOne/issues/753
+ * The original contribution comments were partially modified with the migration from Google Code to github.
+ */
 package com.codename1.xml;
+
+import com.codename1.util.StringUtil;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
-import com.codename1.util.StringUtil;
-
 /**
  * <p>{@code XMLWriter} writes an XML {@link com.codename1.xml.Element} into an XML string/file
  * this allowing us to serialize previously parsed and modified XML.</p>
- * 
+ *
  * @author Paul Harrison Williams<pwillcode@gmail.com>
  */
 public class XMLWriter {
 
-    private boolean encodeText;
-
     private static final String[][] escapes = {
-        {"&", "&amp;"},
-        {"\"", "&quot;"},
-        {"<", "&lt;"},
-        {">", "&gt;"},
-        {"'", "&apos;"}
+            {"&", "&amp;"},
+            {"\"", "&quot;"},
+            {"<", "&lt;"},
+            {">", "&gt;"},
+            {"'", "&apos;"}
     };
+    private boolean encodeText;
 
     /**
      * Creates a new XMLWriter.
      *
      * @param encodeText Determines whether or not text components (text
-     * content, tag names, attribute names, and attribute values) should be
-     * encoded with escapes when written. Use false if these values are already
-     * encoded.
+     *                   content, tag names, attribute names, and attribute values) should be
+     *                   encoded with escapes when written. Use false if these values are already
+     *                   encoded.
      */
     public XMLWriter(boolean encodeText) {
         this.encodeText = encodeText;
@@ -72,16 +71,17 @@ public class XMLWriter {
      * Writes the XML of an Element to a Writer. Note: may output invalid XML if
      * you created text Elements using un-escaped Strings.
      *
-     * @param writer The Writer to which the XML will be written.
+     * @param writer  The Writer to which the XML will be written.
      * @param element The element whose XML will be written.
      * @throws IOException if a write operation fails.
      */
     public void writeXML(Writer writer, Element element) throws IOException {
         writeXML(writer, element, new StringBuilder(), false);
     }
-    
+
     /**
      * returns the XML as a String
+     *
      * @param element the element to write
      * @return the XML as a String
      */
@@ -96,11 +96,11 @@ public class XMLWriter {
      * indentation. Note: may output invalid XML if you created text Elements
      * using un-escaped Strings.
      *
-     * @param writer The StringBuilder that will contain the output
-     * @param element The element whose XML will be written.
+     * @param writer      The StringBuilder that will contain the output
+     * @param element     The element whose XML will be written.
      * @param indentation A starting indentation for the given Element.
-     * @param isInline Whether or not the given element Element should be
-     * treated as part of in-line content.
+     * @param isInline    Whether or not the given element Element should be
+     *                    treated as part of in-line content.
      */
     private void toXML(StringBuilder writer, Element element, StringBuilder indentation, boolean isInline) {
         if (!isInline) {
@@ -116,7 +116,7 @@ public class XMLWriter {
 
             Hashtable attributes = element.getAttributes();
             if (attributes != null) {
-                for (Enumeration keys = attributes.keys(); keys.hasMoreElements();) {
+                for (Enumeration keys = attributes.keys(); keys.hasMoreElements(); ) {
                     String attributeKey = (String) keys.nextElement();
                     String attributeValue = (String) attributes.get(attributeKey);
                     writer.append(' ');
@@ -170,15 +170,15 @@ public class XMLWriter {
      * indentation. Note: may output invalid XML if you created text Elements
      * using un-escaped Strings.
      *
-     * @param writer The Writer to which the XML will be written.
-     * @param element The element whose XML will be written.
+     * @param writer      The Writer to which the XML will be written.
+     * @param element     The element whose XML will be written.
      * @param indentation A starting indentation for the given Element.
-     * @param isInline Whether or not the given element Element should be
-     * treated as part of in-line content.
+     * @param isInline    Whether or not the given element Element should be
+     *                    treated as part of in-line content.
      * @throws IOException if a write operation fails.
      */
     private void writeXML(Writer writer, Element element,
-            StringBuilder indentation, boolean isInline) throws IOException {
+                          StringBuilder indentation, boolean isInline) throws IOException {
         if (!isInline) {
             writer.write(indentation.toString());
         }
@@ -192,7 +192,7 @@ public class XMLWriter {
 
             Hashtable attributes = element.getAttributes();
             if (attributes != null) {
-                for (Enumeration keys = attributes.keys(); keys.hasMoreElements();) {
+                for (Enumeration keys = attributes.keys(); keys.hasMoreElements(); ) {
                     String attributeKey = (String) keys.nextElement();
                     String attributeValue = (String) attributes.get(attributeKey);
                     writer.write(' ');

@@ -58,7 +58,7 @@ public interface TableModel {
     /**
      * Returns true if the cell at the given location is an editable cell
      *
-     * @param row the cell row
+     * @param row    the cell row
      * @param column the cell column
      * @return true if the cell at the given location is an editable cell
      */
@@ -67,7 +67,7 @@ public interface TableModel {
     /**
      * Returns the value of the cell at the given location
      *
-     * @param row the cell row
+     * @param row    the cell row
      * @param column the cell column
      * @return the value of the cell at the given location
      */
@@ -76,9 +76,9 @@ public interface TableModel {
     /**
      * Sets the value of the cell at the given location
      *
-     * @param row the cell row
+     * @param row    the cell row
      * @param column the cell column
-     * @param o the value of the cell at the given location 
+     * @param o      the value of the cell at the given location
      */
     public void setValueAt(int row, int column, Object o);
 
@@ -95,5 +95,5 @@ public interface TableModel {
      * @param d the listener to remove
      */
     public void removeDataChangeListener(DataChangedListener d);
-    
+
 }

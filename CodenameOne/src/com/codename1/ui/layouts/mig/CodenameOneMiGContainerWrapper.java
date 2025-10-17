@@ -35,52 +35,45 @@ package com.codename1.ui.layouts.mig;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.layouts.mig.ComponentWrapper;
-import com.codename1.ui.layouts.mig.ContainerWrapper;
 
 /**
+ *
  */
 final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrapper implements ContainerWrapper {
-	/** Debug color for cell outline.
-	 */
-	//private static final Color DB_CELL_OUTLINE = new Color(255, 0, 0);
+    /**
+     * Debug color for cell outline.
+     */
+    //private static final Color DB_CELL_OUTLINE = new Color(255, 0, 0);
+    public CodenameOneMiGContainerWrapper(Container c) {
+        super(c);
+    }
 
-	public CodenameOneMiGContainerWrapper(Container c)
-	{
-		super(c);
-	}
+    public ComponentWrapper[] getComponents() {
+        Container c = (Container) getComponent();
+        ComponentWrapper[] cws = new ComponentWrapper[c.getComponentCount()];
+        for (int i = 0; i < cws.length; i++)
+            cws[i] = new CodenameOneMiGComponentWrapper(c.getComponentAt(i));
+        return cws;
+    }
 
-	public ComponentWrapper[] getComponents()
-	{
-                Container c = (Container) getComponent();
-		ComponentWrapper[] cws = new ComponentWrapper[c.getComponentCount()];
-		for (int i = 0; i < cws.length; i++)
-			cws[i] = new CodenameOneMiGComponentWrapper(c.getComponentAt(i));
-		return cws;
-	}
+    public int getComponentCount() {
+        return ((Container) getComponent()).getComponentCount();
+    }
 
-	public int getComponentCount()
-	{
-		return ((Container) getComponent()).getComponentCount();
-	}
+    public Object getLayout() {
+        return ((Container) getComponent()).getLayout();
+    }
 
-	public Object getLayout()
-	{
-		return ((Container) getComponent()).getLayout();
-	}
+    public final boolean isLeftToRight() {
+        return !((Container) getComponent()).isRTL();
+    }
 
-	public final boolean isLeftToRight()
-	{
-		return !((Container) getComponent()).isRTL();
-	}
+    public final void paintDebugCell(int x, int y, int width, int height) {
+        Component c = (Component) getComponent();
+        if (c.isVisible() == false)
+            return;
 
-	public final void paintDebugCell(int x, int y, int width, int height)
-	{
-                Component c = (Component) getComponent();
-		if (c.isVisible()== false)
-			return;
-
-                // TODO: this can probably be done using glasspane
+        // TODO: this can probably be done using glasspane
 		/*Graphics2D g = (Graphics2D) c.getGraphics();
 		if (g == null)
 			return;
@@ -88,22 +81,20 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
 		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 10f, new float[] {2f, 3f}, 0));
 		g.setPaint(DB_CELL_OUTLINE);
 		g.drawRect(x, y, width - 1, height - 1);*/
-	}
+    }
 
-	public int getComponentType(boolean disregardScrollPane)
-	{
-		return TYPE_CONTAINER;
-	}
+    public int getComponentType(boolean disregardScrollPane) {
+        return TYPE_CONTAINER;
+    }
 
-	// Removed for 2.3 because the parent.isValid() in MigLayout will catch this instead.
-	public int getLayoutHashCode()
-	{
-		//long n = System.nanoTime();
-		int h = super.getLayoutHashCode();
+    // Removed for 2.3 because the parent.isValid() in MigLayout will catch this instead.
+    public int getLayoutHashCode() {
+        //long n = System.nanoTime();
+        int h = super.getLayoutHashCode();
 
-		if (isLeftToRight())
-			h += 416343;
+        if (isLeftToRight())
+            h += 416343;
 
-		return 0;
-	}
+        return 0;
+    }
 }

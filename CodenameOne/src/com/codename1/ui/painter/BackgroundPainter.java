@@ -37,16 +37,16 @@ import com.codename1.ui.plaf.Style;
  */
 public class BackgroundPainter implements Painter {
     private Component parent;
-    
+
     /**
      * Construct a background painter for the given component
-     * 
+     *
      * @param parent the parent component
      */
     public BackgroundPainter(Component parent) {
         this.parent = parent;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -72,8 +72,8 @@ public class BackgroundPainter implements Painter {
             } else {
                 int iW = bgImage.getWidth();
                 int iH = bgImage.getHeight();
-                for(int xPos = 0 ; xPos < width ; xPos += iW) { 
-                    for(int yPos = 0 ; yPos < height ; yPos += iH) { 
+                for (int xPos = 0; xPos < width; xPos += iW) {
+                    for (int yPos = 0; yPos < height; yPos += iH) {
                         g.drawImage(s.getBgImage(), x + xPos, y + yPos);
                     }
                 }

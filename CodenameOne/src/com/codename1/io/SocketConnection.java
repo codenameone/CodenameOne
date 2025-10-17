@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -29,7 +29,7 @@ import java.io.OutputStream;
 /**
  * Callback for establishment of a socket connection. Notice this callback
  * is always invoked on a new separate thread to allow uninterrupted IO.
- * 
+ *
  * @author Shai Almog
  */
 public abstract class SocketConnection {
@@ -42,60 +42,66 @@ public abstract class SocketConnection {
 
     private int connectTimeout;
     private boolean connected;
-    
+
     public SocketConnection() {
-        
+
     }
-    
+
     /**
      * Creates a socket connection, setting the connect timeout.  Timeout of 0 is infinite.
+     *
      * @param connectTimeout The connect timeout.  0 for infinite.
      * @since 7.0
      */
     public SocketConnection(int connectTimeout) {
         this.connectTimeout = connectTimeout;
     }
-    
+
     /**
      * Invoked in case of an error in the socket connection, this method is invoked off the EDT
+     *
      * @param errorCode the error code
-     * @param message error message if applicable
+     * @param message   error message if applicable
      */
     public abstract void connectionError(int errorCode, String message);
-    
+
     /**
      * Invoked when a socket connection is established, this method is invoked off the EDT
+     *
      * @param is input stream for the socket
      * @param os output stream for the socket
      */
     public abstract void connectionEstablished(InputStream is, OutputStream os);
-    
+
     /**
      * Returns true if this connection is currently active
+     *
      * @return true if connected
      */
     public boolean isConnected() {
         return connected;
     }
-    
+
     void setConnected(boolean b) {
         connected = b;
     }
-    
+
+    /**
+     * Gets the connect timeout.
+     *
+     * @return The connect timeout.  0 for infinite.
+     */
+    public int getConnectTimeout() {
+        return this.connectTimeout;
+    }
+
     /**
      * Sets the connect timeout.
+     *
      * @param connectTimeout The connect timeout.  0 for infinite timeout.
      * @since 7.0
      */
     public void setConnectTimeout(int connectTimeout) {
         this.connectTimeout = connectTimeout;
-    }
-    
-    /**
-     * Gets the connect timeout.
-     * @return The connect timeout.  0 for infinite.
-     */
-    public int getConnectTimeout() {
-        return this.connectTimeout;
     }
 }

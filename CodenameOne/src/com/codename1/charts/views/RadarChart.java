@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2019 dj6082013
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *            http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,6 +23,7 @@ import com.codename1.charts.renderers.DefaultRenderer;
 import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.ui.geom.Rectangle2D;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -73,7 +74,7 @@ public class RadarChart extends RoundChart {
         int right = x + width;
 
         int cLength = mDataset.getCategoriesCount();
-        if (cLength < 3){
+        if (cLength < 3) {
             return;
         }
         String[] categories = mDataset.getCategories();
@@ -116,11 +117,11 @@ public class RadarChart extends RoundChart {
             canvas.drawLine(centerX, centerY, centerX - (float) Math.sin(thisRad) * radius, centerY - (float) Math.cos(thisRad) * radius, paint);
 
             paint.setColor(ColorUtil.GRAY);
-            if(cLength % 2 == 0){
+            if (cLength % 2 == 0) {
                 drawLabel(canvas, categories[i], mRenderer, prevLabelsBounds, mCenterX, mCenterY,
-                    shortRadius, longRadius, currentAngle - angle / 2 , angle, left, right, mRenderer.getLabelsColor(),
-                    paint, true, false);
-            }else{
+                        shortRadius, longRadius, currentAngle - angle / 2, angle, left, right, mRenderer.getLabelsColor(),
+                        paint, true, false);
+            } else {
                 drawLabel(canvas, categories[i], mRenderer, prevLabelsBounds, mCenterX, mCenterY,
                         shortRadius, longRadius, currentAngle, angle, left, right, mRenderer.getLabelsColor(),
                         paint, true, false);

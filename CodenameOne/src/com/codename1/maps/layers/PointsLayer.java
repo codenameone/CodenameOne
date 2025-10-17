@@ -19,23 +19,24 @@
  */
 package com.codename1.maps.layers;
 
-import com.codename1.ui.Font;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
-import java.util.Vector;
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
 import com.codename1.maps.Mercator;
 import com.codename1.maps.Projection;
 import com.codename1.maps.Tile;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.util.EventDispatcher;
 
+import java.util.Vector;
+
 /**
  * This is a Points Layer
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public class PointsLayer extends AbstractLayer implements ActionSource {
@@ -44,6 +45,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
     private Image icon;
     private EventDispatcher dispatcher = new EventDispatcher();
     private Font f = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
+
     /**
      * Constructor with default projection Mercator.
      */
@@ -67,7 +69,8 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
 
     /**
      * Sets the Points icon
-     * @param icon 
+     *
+     * @param icon
      */
     public void setPointIcon(Image icon) {
         this.icon = icon;
@@ -90,16 +93,16 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
 
     /**
      * Adds a point to the PointsLayer
-     * 
+     *
      * @param point a point to add
      */
     public void addPoint(PointLayer point) {
-        
+
         Image pointIcon = point.getIcon();
         if (pointIcon == null) {
             point.setIcon(icon);
         }
-        if(!point.isProjected()){
+        if (!point.isProjected()) {
             Coord c = getProjection().fromWGS84(point);
             point.setLatitude(c.getLatitude());
             point.setLongitude(c.getLongitude());
@@ -110,11 +113,11 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
 
     /**
      * Removes a point from the PointsLayer
-     * 
+     *
      * @param point to remove from the PointsLayer
      */
-    public void removePoint(PointLayer point) {        
-        if(!point.isProjected()){
+    public void removePoint(PointLayer point) {
+        if (!point.isProjected()) {
             Coord c = getProjection().fromWGS84(point);
             point.setLatitude(c.getLatitude());
             point.setLongitude(c.getLongitude());
@@ -122,8 +125,8 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
         }
         points.removeElement(point);
     }
-    
-    
+
+
     /**
      * {@inheritDoc}
      */
@@ -132,9 +135,9 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
     }
 
     /**
-     * Adds a listener to the Points Layer which will cause an event to dispatch 
+     * Adds a listener to the Points Layer which will cause an event to dispatch
      * on click the ActionEvent will contain the pressed PointLayer unprojected
-     * 
+     *
      * @param l implementation of the action listener interface
      */
     public void addActionListener(ActionListener l) {
@@ -143,7 +146,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
 
     /**
      * Removes the given action listener Points Layer
-     * 
+     *
      * @param l implementation of the action listener interface
      */
     public void removeActionListener(ActionListener l) {
@@ -152,6 +155,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
 
     /**
      * Trigger an event for the points that in contained in the BoundingBox
+     *
      * @param box the BoundingBox to trigger event.
      */
     public void fireActionEvent(BoundingBox box) {

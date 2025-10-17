@@ -18,6 +18,7 @@ package com.codename1.ui.layouts;
 
 /**
  * Port of the GridBag code from Apache's Harmony
+ *
  * @author Michael Danilov
  */
 public class GridBagConstraints {
@@ -64,9 +65,8 @@ public class GridBagConstraints {
     public int ipady;
 
     public GridBagConstraints(int gridx, int gridy, int gridwidth,
-            int gridheight, double weightx, double weighty, int anchor,
-            int fill, Insets insets, int ipadx, int ipady)
-    {
+                              int gridheight, double weightx, double weighty, int anchor,
+                              int fill, Insets insets, int ipadx, int ipady) {
         this.gridx = gridx;
         this.gridy = gridy;
         this.gridwidth = gridwidth;
@@ -75,7 +75,7 @@ public class GridBagConstraints {
         this.weighty = weighty;
         this.anchor = anchor;
         this.fill = fill;
-        this.insets = (insets == null) ? null:(Insets) insets.clone();
+        this.insets = (insets == null) ? null : (Insets) insets.clone();
         this.ipadx = ipadx;
         this.ipady = ipady;
     }
@@ -111,20 +111,17 @@ public class GridBagConstraints {
             throw new IllegalArgumentException("wrong value of GridBagConstraints: " + gridy); //$NON-NLS-1$  //$NON-NLS-2$
         }
         if (((gridwidth != RELATIVE) && (gridwidth != REMAINDER) && (gridwidth < 0))
-                || (gridwidth > maxN))
-        {
+                || (gridwidth > maxN)) {
             // awt.9C={0}
             throw new IllegalArgumentException("wrong value of GridBagConstraints: " + gridwidth); //$NON-NLS-1$ //$NON-NLS-2$
         }
         if (((gridheight != RELATIVE) && (gridheight != REMAINDER) && (gridheight < 0))
-                || (gridheight > maxN))
-        {
+                || (gridheight > maxN)) {
             // awt.9C=
             throw new IllegalArgumentException("wrong value of GridBagConstraints: " + gridheight); //$NON-NLS-1$ //$NON-NLS-2$
         }
         if (((gridx >= 0) || (gridy >= 0))
-                && ((gridwidth <= 0) || (gridheight <= 0)))
-        {
+                && ((gridwidth <= 0) || (gridheight <= 0))) {
             throw new IllegalArgumentException("relative grid size parameter goes after absolute grid coordinate"); //$NON-NLS-1$
         }
         if ((gridx != RELATIVE) && ((gridwidth + gridx) > maxN)) {

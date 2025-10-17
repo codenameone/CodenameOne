@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -29,30 +29,31 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Timer;
-import java.util.TimerTask;
 
 /**
  * Class implementing the socket API
  *
  * @author Shai Almog
  */
-public class Socket {    
-    private Socket() {}
-        
+public class Socket {
+    private Socket() {
+    }
+
     /**
      * Returns true if sockets are supported in this port, false otherwise
+     *
      * @return true if sockets are supported in this port, false otherwise
      */
     public static boolean isSupported() {
         return Util.getImplementation().isSocketAvailable();
     }
-    
+
     /**
      * Returns true if server sockets are supported in this port, if this method returns
      * false invocations of listen will always fail
+     *
      * @return true if server sockets are supported in this port, false otherwise
-     * @deprecated server sockets are only supported on Android and Desktop and as such 
+     * @deprecated server sockets are only supported on Android and Desktop and as such
      * we recommend against using them
      */
     public static boolean isServerSocketSupported() {
@@ -61,25 +62,26 @@ public class Socket {
 
     /**
      * Connect to a remote host
+     *
      * @param host the host
      * @param port the connection port
-     * @param sc callback for when the connection is established or fails
+     * @param sc   callback for when the connection is established or fails
      */
     public static void connect(final String host, final int port, final SocketConnection sc) {
-        if(host.indexOf('.') > -1 && host.indexOf(':') > -1) {
+        if (host.indexOf('.') > -1 && host.indexOf(':') > -1) {
             throw new IllegalArgumentException("Port should be provided separately");
         }
         Display.getInstance().startThread(new Runnable() {
             public void run() {
                 Object connection = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
-                if(connection != null) {
+                if (connection != null) {
                     sc.setConnected(true);
                     sc.input = new SocketInputStream(connection, sc);
                     sc.output = new SocketOutputStream(connection, sc);
                     sc.connectionEstablished(sc.input, sc.output);
                 } else {
                     sc.setConnected(false);
-                    if(connection == null) {
+                    if (connection == null) {
                         sc.connectionError(-1, "Failed to connect");
                     } else {
                         sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
@@ -89,32 +91,29 @@ public class Socket {
         }, "Connection to " + host).start();
     }
 
-    interface Close {
-        void close() throws IOException;
-    }
-
     /**
      * Connect to a remote host
+     *
      * @param host the host
      * @param port the connection port
-     * @param sc callback for when the connection is established or fails
+     * @param sc   callback for when the connection is established or fails
      */
     public static Close connectWithClose(final String host, final int port, final SocketConnection sc) {
-        if(host.indexOf('.') > -1 && host.indexOf(':') > -1) {
+        if (host.indexOf('.') > -1 && host.indexOf(':') > -1) {
             throw new IllegalArgumentException("Port should be provided separately");
         }
         final Object[] connection = new Object[1];
         Display.getInstance().startThread(new Runnable() {
             public void run() {
                 connection[0] = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
-                if(connection[0] != null) {
+                if (connection[0] != null) {
                     sc.setConnected(true);
                     sc.input = new SocketInputStream(connection[0], sc);
                     sc.output = new SocketOutputStream(connection[0], sc);
                     sc.connectionEstablished(sc.input, sc.output);
                 } else {
                     sc.setConnected(false);
-                    if(connection[0] == null) {
+                    if (connection[0] == null) {
                         sc.connectionError(-1, "Failed to connect");
                     } else {
                         sc.connectionError(Util.getImplementation().getSocketErrorCode(connection[0]),
@@ -133,7 +132,7 @@ public class Socket {
                         throw new RuntimeException(e.getMessage());
                     }
                 }
-                if(Util.getImplementation().isSocketConnected(connection[0])) {
+                if (Util.getImplementation().isSocketConnected(connection[0])) {
                     Util.getImplementation().disconnectSocket(connection[0]);
                 }
                 connection[0] = null;
@@ -143,22 +142,24 @@ public class Socket {
 
     /**
      * Listen to incoming connections on port
-     * @param port the device port
+     *
+     * @param port    the device port
      * @param scClass class of callback for when the connection is established or fails, this class
-     * will be instantiated for every incoming connection and must have a public no argument constructor.
+     *                will be instantiated for every incoming connection and must have a public no argument constructor.
      * @return StopListening instance that allows the the caller to stop listening on a server socket
-     * @deprecated server sockets are only supported on Android and Desktop and as such 
+     * @deprecated server sockets are only supported on Android and Desktop and as such
      * we recommend against using them
      */
     public static StopListening listen(final int port, final Class scClass) {
         class Listener implements StopListening, Runnable {
             private boolean stopped;
+
             public void run() {
                 try {
-                    while(!stopped) {
+                    while (!stopped) {
                         final Object connection = Util.getImplementation().listenSocket(port);
-                        final SocketConnection sc = (SocketConnection)scClass.newInstance();
-                        if(connection != null) {
+                        final SocketConnection sc = (SocketConnection) scClass.newInstance();
+                        if (connection != null) {
                             sc.setConnected(true);
                             Display.getInstance().startThread(new Runnable() {
                                 public void run() {
@@ -172,7 +173,7 @@ public class Socket {
                             sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
                         }
                     }
-                } catch(Exception err) {
+                } catch (Exception err) {
                     // instansiating the class has caused a problem
                     Log.e(err);
                 }
@@ -181,19 +182,34 @@ public class Socket {
             public void stop() {
                 stopped = true;
             }
-            
+
         }
         Listener l = new Listener();
         Display.getInstance().startThread(l, "Listening on " + port).start();
         return l;
     }
-    
+
     /**
      * Returns the hostname or ip address of the device if available/applicable
+     *
      * @return the hostname or ip address of the device if available/applicable
      */
     public static String getHostOrIP() {
         return Util.getImplementation().getHostOrIP();
+    }
+
+    interface Close {
+        void close() throws IOException;
+    }
+
+    /**
+     * This interface can be invoked to stop listening on a server socket
+     */
+    public static interface StopListening {
+        /**
+         * Stop listening
+         */
+        public void stop();
     }
 
     static class SocketInputStream extends InputStream {
@@ -202,6 +218,7 @@ public class Socket {
         private int bufferOffset;
         private SocketConnection con;
         private boolean closed;
+
         SocketInputStream(Object impl, SocketConnection con) {
             this.impl = impl;
             this.con = con;
@@ -218,7 +235,7 @@ public class Socket {
 
         @Override
         public synchronized void close() throws IOException {
-            if(!closed) {
+            if (!closed) {
                 closed = true;
                 if (Util.getImplementation().isSocketConnected(impl)) {
                     Util.getImplementation().disconnectSocket(impl);
@@ -233,100 +250,95 @@ public class Socket {
         }
 
         private void throwEOF() throws IOException {
-            if(closed) {
+            if (closed) {
                 throw new EOFException();
             }
         }
-        
-        // [ddyer 12/2015] 
+
+        // [ddyer 12/2015]
         // try to read some data into the buffer if we think there is some
         // available, but don't wait if there is not.  This is used to get
         // additional data for a read that has more room in it's buffer.
         //
-        private boolean getDataIfAvailable() 
-        {	try {
-        	if(available()>0)
-        		{
-        		buffer = Util.getImplementation().readFromSocketStream(impl);
-          		bufferOffset = 0;
-          		return((buffer!=null) && (buffer.length>0));
-        		}
-        	}
-        	catch (IOException e) 
-        		{
-        		// we don't really expect an IOException here, but if one
-        		// does occur, leave peacefully so the caller can return the
-        		// data he has.
-        		}
-        	// we got nothing.
-        	return(false);
+        private boolean getDataIfAvailable() {
+            try {
+                if (available() > 0) {
+                    buffer = Util.getImplementation().readFromSocketStream(impl);
+                    bufferOffset = 0;
+                    return ((buffer != null) && (buffer.length > 0));
+                }
+            } catch (IOException e) {
+                // we don't really expect an IOException here, but if one
+                // does occur, leave peacefully so the caller can return the
+                // data he has.
+            }
+            // we got nothing.
+            return (false);
         }
+
         // get some data in the input buffer.  Return true if we did
         // and false if we can't and never can.  This does not return
         // until either data is available or it never will be.
         //
         // ddyer 12/2015.
-        // Observed on IOS, isSocketConnected returned true even though 
+        // Observed on IOS, isSocketConnected returned true even though
         // closing it has been tried.  Add closed to the set of conditions
         // ddyer 4/2017
-        private boolean getSomeData() 
-        {  	// upon entry, there may be data leftover from the previous call to read
-        	while(!closed
-        			&& ((buffer==null) 
-        					|| (bufferOffset>=buffer.length)))
-        	{	// we want new data, but if the socket is closed we won't get it.
-          		if(!Util.getImplementation().isSocketConnected(impl))
-          			{ return(false);	// we'll never get data
-          			}
-          		buffer = Util.getImplementation().readFromSocketStream(impl);
-          		bufferOffset = 0;
-          		
-        		if(((buffer==null) || (buffer.length==0))
-        			&& !closed
-        			&& Util.getImplementation().isSocketConnected(impl))
-         		{	// wait a while if there's still hope
-        			try {
+        private boolean getSomeData() {    // upon entry, there may be data leftover from the previous call to read
+            while (!closed
+                    && ((buffer == null)
+                    || (bufferOffset >= buffer.length))) {    // we want new data, but if the socket is closed we won't get it.
+                if (!Util.getImplementation().isSocketConnected(impl)) {
+                    return (false);    // we'll never get data
+                }
+                buffer = Util.getImplementation().readFromSocketStream(impl);
+                bufferOffset = 0;
+
+                if (((buffer == null) || (buffer.length == 0))
+                        && !closed
+                        && Util.getImplementation().isSocketConnected(impl)) {    // wait a while if there's still hope
+                    try {
                         Thread.sleep(10);
-                    } catch(InterruptedException err) {}	
-        		}
-        	}
-        	return((buffer!=null) && (buffer.length>0));
-        }         
-        // [ddyer 12/2015] 
-        // rewritten to fix a bug that caused data loss if the the output 
+                    } catch (InterruptedException err) {
+                    }
+                }
+            }
+            return ((buffer != null) && (buffer.length > 0));
+        }
+
+        // [ddyer 12/2015]
+        // rewritten to fix a bug that caused data loss if the the output
         // and input buffer both ran out at the same time, then rewritten
         // again for clarity and to avoid waiting forever when the data stream
         // is closed while waiting for the first batch of data.  The old version
-        // used a recursive call to read which might have gone an indefinite 
+        // used a recursive call to read which might have gone an indefinite
         // number of levels deep, but this version does not.
         @Override
-        public int read(byte[] b, int off, int len) throws IOException 
-        {
+        public int read(byte[] b, int off, int len) throws IOException {
             throwEOF();
             // eventually a read should timeout and return what it has
-            if(!getSomeData()) 
-            	{ return(-1);	// nothing available ever
-            	}
+            if (!getSomeData()) {
+                return (-1);    // nothing available ever
+            }
             int bytesRead = 0;
-            
-           // copy the available data, limited by whichever buffer is smaller
-           do {
-           while((bytesRead<len) && (bufferOffset<buffer.length))
-            	{
-                b[off + bytesRead++] = buffer[bufferOffset++];
-            	}
-           } 
-           		// if there's more room and data is already available, go for it.
-           while ((bytesRead<len) && getDataIfAvailable());
+
+            // copy the available data, limited by whichever buffer is smaller
+            do {
+                while ((bytesRead < len) && (bufferOffset < buffer.length)) {
+                    b[off + bytesRead++] = buffer[bufferOffset++];
+                }
+            }
+            // if there's more room and data is already available, go for it.
+            while ((bytesRead < len) && getDataIfAvailable());
 
             // otherwise return with what we have
-            return(bytesRead);
+            return (bytesRead);
         }
 
         @Override
         public int read(byte[] b) throws IOException {
             throwEOF();
-            return read(b, 0, b.length); 
+            return read(b, 0, b.length);
         }
 
         @Override
@@ -334,7 +346,7 @@ public class Socket {
             throwEOF();
             byte[] b = new byte[1];
             int v = read(b);
-            if(v == -1) {
+            if (v == -1) {
                 return -1;
             }
             return b[0] & 0xff;
@@ -348,15 +360,16 @@ public class Socket {
             }
         }
     }
-    
+
     static class SocketOutputStream extends OutputStream {
         private Object impl;
         private SocketConnection con;
+
         SocketOutputStream(Object impl, SocketConnection con) {
             this.impl = impl;
             this.con = con;
         }
-        
+
         @Override
         public synchronized void close() throws IOException {
             if (con.isConnected() && Util.getImplementation().isSocketConnected(impl)) {
@@ -372,14 +385,14 @@ public class Socket {
         private void handleSocketError() {
             int code = Util.getImplementation().getSocketErrorCode(impl);
             String msg = Util.getImplementation().getSocketErrorMessage(impl);
-            if(code > 0 || msg != null) {
+            if (code > 0 || msg != null) {
                 con.connectionError(code, msg);
             }
         }
-        
+
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
-            if(off == 0 && len == b.length) {
+            if (off == 0 && len == b.length) {
                 Util.getImplementation().writeToSocketStream(impl, b);
                 handleSocketError();
                 return;
@@ -398,7 +411,7 @@ public class Socket {
 
         @Override
         public void write(int b) throws IOException {
-            Util.getImplementation().writeToSocketStream(impl, new byte[] {(byte)b});
+            Util.getImplementation().writeToSocketStream(impl, new byte[]{(byte) b});
             handleSocketError();
         }
 
@@ -409,15 +422,5 @@ public class Socket {
                 Log.e(err);
             }
         }
-    }
-    
-    /**
-     * This interface can be invoked to stop listening on a server socket
-     */
-    public static interface StopListening {
-        /**
-         * Stop listening
-         */
-        public void stop();
     }
 }

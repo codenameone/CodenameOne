@@ -26,22 +26,35 @@ package com.codename1.ui.plaf;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.*;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.InputComponent;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.MenuBar;
+import com.codename1.ui.SideMenuBar;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextSelection;
 import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
-import com.codename1.ui.list.*;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.list.ListCellRenderer;
 
 /**
  * Allows a UI developer to completely customize the look of the application by
  * overriding drawing/sizing methods appropriately.
  *
  * @author Chen Fishbein
- * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate 
- * our desire to reduce usage/reliance on this class. 
+ * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate
+ * our desire to reduce usage/reliance on this class.
  */
 public abstract class LookAndFeel {
     private Component verticalScroll;
@@ -56,7 +69,7 @@ public abstract class LookAndFeel {
 
     private long tickerSpeed = 50;
     /**
-     * Tint color is set when a form is partially covered be it by a menu or by a 
+     * Tint color is set when a form is partially covered be it by a menu or by a
      * dialog. A look and feel can override this default value.
      */
     private int defaultFormTintColor = 0x77000000;
@@ -122,7 +135,7 @@ public abstract class LookAndFeel {
     private int textFieldCursorColor;
 
     private boolean backgroundImageDetermineSize;
-    
+
     /**
      * Indicates whether softbuttons should be reversed from their default orientation
      */
@@ -158,7 +171,8 @@ public abstract class LookAndFeel {
     /**
      * The MenuBar class
      */
-    private Class menuBar = MenuBar.class;;
+    private Class menuBar = MenuBar.class;
+    ;
 
     private boolean defaultSnapToGrid;
     private boolean defaultAlwaysTensile;
@@ -167,28 +181,29 @@ public abstract class LookAndFeel {
     private Image tensileHighlightBottomImage;
     private Image tensileGlowTopImage;
     private Image tensileGlowBottomImage;
-    
+
     private UIManager manager;
-    public LookAndFeel(UIManager manager){
+
+    public LookAndFeel(UIManager manager) {
         this.manager = manager;
     }
 
     /**
-     * Every component binds itself to the look and feel thus allowing the look 
+     * Every component binds itself to the look and feel thus allowing the look
      * and feel to customize the component.  Binding occurs at the end of the
      * constructor when the component is in a valid state and ready to be used.
-     * Notice that a component might be bound twice or more and it is the 
+     * Notice that a component might be bound twice or more and it is the
      * responsibility of the LookAndFeel to protect against that.
-     * 
+     *
      * @param cmp component instance that may be customized by the look and feel
      */
     public void bind(Component cmp) {
     }
 
     /**
-     * Invoked when a look and feel is removed, allows a look and feel to release 
+     * Invoked when a look and feel is removed, allows a look and feel to release
      * resources related to binding components.
-     * 
+     *
      * @see #bind(Component)
      */
     public void uninstall() {
@@ -196,7 +211,7 @@ public abstract class LookAndFeel {
 
     /**
      * Invoked for drawing a button widget
-     * 
+     *
      * @param g graphics context
      * @param b component to draw
      * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
@@ -205,42 +220,43 @@ public abstract class LookAndFeel {
 
     /**
      * Invoked for drawing a checkbox widget
-     * 
-     * @param g graphics context
+     *
+     * @param g  graphics context
      * @param cb component to draw
      */
     public abstract void drawCheckBox(Graphics g, Button cb);
 
     /**
      * Invoked for drawing a combo box widget
-     * 
-     * @param g graphics context
+     *
+     * @param g  graphics context
      * @param cb component to draw
      */
     public abstract void drawComboBox(Graphics g, List cb);
 
     /**
      * Invoked for drawing a label widget
-     * 
+     *
      * @param g graphics context
      * @param l component to draw
      * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public abstract void drawLabel(Graphics g, Label l);
-    
+
     /**
      * Calculates the text selection spans for a given label
+     *
      * @param sel TextSelection instance
-     * @param l Label
+     * @param l   Label
      * @return A span representing the positions of characters in the label
-     * @since 7.0
      * @see TextSelection
+     * @since 7.0
      */
     public abstract Span calculateLabelSpan(TextSelection sel, Label l);
 
     /**
      * Invoked for drawing a list widget
-     * 
+     *
      * @param g graphics context
      * @param l component to draw
      */
@@ -248,24 +264,25 @@ public abstract class LookAndFeel {
 
     /**
      * Invoked for drawing the radio button widget
-     * 
-     * @param g graphics context
+     *
+     * @param g  graphics context
      * @param rb component to draw
      */
     public abstract void drawRadioButton(Graphics g, Button rb);
 
     /**
      * Draw the given text area
-     * 
-     * @param g graphics context
+     *
+     * @param g  graphics context
      * @param ta component to draw
      */
     public abstract void drawTextArea(Graphics g, TextArea ta);
-    
+
     /**
      * Calculates the Spans used in text selection for a given text area.
+     *
      * @param sel The current TextSelection instance.
-     * @param ta The TextArea to calculate spans for.
+     * @param ta  The TextArea to calculate spans for.
      * @return The spans for the given text field.
      * @since 7.0
      */
@@ -274,32 +291,34 @@ public abstract class LookAndFeel {
     /**
      * Draws the text field without its cursor which is drawn in a separate method
      * input mode indication can also be drawn using this method.
-     * 
-     * @param g graphics context
+     *
+     * @param g  graphics context
      * @param ta component to draw
      */
     public abstract void drawTextField(Graphics g, TextArea ta);
-    
+
     /**
      * Calculates the Spans used in text selection for a given text field.
+     *
      * @param sel The current TextSelection instance.
-     * @param ta The textfield to calculate spans for.
+     * @param ta  The textfield to calculate spans for.
      * @return The spans for the given text field.
      * @since 7.0
      */
     public abstract Spans calculateTextFieldSpan(TextSelection sel, TextArea ta);
+
     /**
      * Draws the cursor of the text field, blinking is handled simply by avoiding
      * a call to this method.
-     * 
-     * @param g graphics context
+     *
+     * @param g  graphics context
      * @param ta component to draw
      */
     public abstract void drawTextFieldCursor(Graphics g, TextArea ta);
 
     /**
      * Calculate the preferred size of the component
-     * 
+     *
      * @param b component whose size should be calculated
      * @return the preferred size for the button
      */
@@ -307,7 +326,7 @@ public abstract class LookAndFeel {
 
     /**
      * Calculate the preferred size of the component
-     * 
+     *
      * @param cb component whose size should be calculated
      * @return the preferred size for the component
      */
@@ -315,7 +334,7 @@ public abstract class LookAndFeel {
 
     /**
      * Calculate the preferred size of the component
-     * 
+     *
      * @param l component whose size should be calculated
      * @return the preferred size for the component
      */
@@ -323,7 +342,7 @@ public abstract class LookAndFeel {
 
     /**
      * Calculate the preferred size of the component
-     * 
+     *
      * @param l component whose size should be calculated
      * @return the preferred size for the component
      */
@@ -331,17 +350,18 @@ public abstract class LookAndFeel {
 
     /**
      * Calculate the preferred size of the component
-     * 
+     *
      * @param rb component whose size should be calculated
      * @return the preferred size for the component
      */
     public abstract Dimension getRadioButtonPreferredSize(Button rb);
 
     //public abstract Dimension getSpinnerPreferredSize(Spinner sp);
+
     /**
      * Calculate the preferred size of the component
-     * 
-     * @param ta component whose size should be calculated
+     *
+     * @param ta   component whose size should be calculated
      * @param pref indicates whether preferred or scroll size should be returned
      * @return the preferred size for the component
      */
@@ -349,7 +369,7 @@ public abstract class LookAndFeel {
 
     /**
      * Calculate the preferred size of the component
-     * 
+     *
      * @param ta component whose size should be calculated
      * @return the preferred size for the component
      */
@@ -357,7 +377,7 @@ public abstract class LookAndFeel {
 
     /**
      * Calculate the preferred size of the component
-     * 
+     *
      * @param box component whose size should be calculated
      * @return the preferred size for the component
      */
@@ -365,39 +385,39 @@ public abstract class LookAndFeel {
 
     /**
      * Draws a vertical scroll bar in the given component
-     * 
-     * @param g graphics context
-     * @param c component to draw on
-     * @param offsetRatio ratio of the scroll bar from 0 to 1
+     *
+     * @param g              graphics context
+     * @param c              component to draw on
+     * @param offsetRatio    ratio of the scroll bar from 0 to 1
      * @param blockSizeRatio block size for the scroll from 0 to 1
      */
     public void drawVerticalScroll(Graphics g, Component c, float offsetRatio, float blockSizeRatio) {
-        if(verticalScroll == null) {
+        if (verticalScroll == null) {
             initScroll();
         }
         int borderW = 0;
-        if(c.getStyle().getBorder() != null){
+        if (c.getStyle().getBorder() != null) {
             borderW = c.getStyle().getBorder().getThickness();
         }
         int x = c.getX();
-        if(!c.isRTL()) {
+        if (!c.isRTL()) {
             x += c.getWidth() - getVerticalScrollWidth() - borderW;
-        }else{
+        } else {
             x += borderW;
         }
         int y = c.getY();
         int height = c.getHeight();
         int width = getVerticalScrollWidth();
         drawScroll(g, c, offsetRatio, blockSizeRatio, true, x, y, width, height, verticalScroll, verticalScrollThumb);
-        if(fadeScrollEdge) {
-            if(offsetRatio > 0) {
-                if(fadeScrollTop == null || Display.getInstance().getDisplayWidth() != fadeScrollTop.getWidth()) {
+        if (fadeScrollEdge) {
+            if (offsetRatio > 0) {
+                if (fadeScrollTop == null || Display.getInstance().getDisplayWidth() != fadeScrollTop.getWidth()) {
                     fadeScrollTop = generateFadeImage(fadeScrollEdgeStartAlpha, fadeScrollEdgeEndAlpha, c.getStyle().getBgColor(), false,
-                            Display.getInstance().getDisplayWidth(),fadeScrollEdgeLength);
+                            Display.getInstance().getDisplayWidth(), fadeScrollEdgeLength);
                 }
                 g.drawImage(fadeScrollTop, c.getX(), c.getY());
             }
-            if(offsetRatio < 1 - blockSizeRatio) {
+            if (offsetRatio < 1 - blockSizeRatio) {
                 // special case since when scrolling with the physical keys we leave
                 // the margin out of the equasion
                 int l = c.getScrollY() + c.getHeight() +
@@ -405,10 +425,10 @@ public abstract class LookAndFeel {
                         c.getStyle().getVerticalPadding();
 
                 int totalScroll = c.getScrollDimension().getHeight();
-                if(l >= totalScroll) {
+                if (l >= totalScroll) {
                     return;
                 }
-                if(fadeScrollBottom == null || Display.getInstance().getDisplayWidth() != fadeScrollBottom.getWidth()) {
+                if (fadeScrollBottom == null || Display.getInstance().getDisplayWidth() != fadeScrollBottom.getWidth()) {
                     fadeScrollBottom = generateFadeImage(fadeScrollEdgeEndAlpha, fadeScrollEdgeStartAlpha, c.getStyle().getBgColor(), false,
                             Display.getInstance().getDisplayWidth(), fadeScrollEdgeLength);
                 }
@@ -430,45 +450,45 @@ public abstract class LookAndFeel {
 
     /**
      * Draws a horizontal scroll bar in the given component
-     * 
-     * @param g graphics context
-     * @param c component to draw on
-     * @param offsetRatio ratio of the scroll bar from 0 to 1
+     *
+     * @param g              graphics context
+     * @param c              component to draw on
+     * @param offsetRatio    ratio of the scroll bar from 0 to 1
      * @param blockSizeRatio block size for the scroll from 0 to 1
      */
     public void drawHorizontalScroll(Graphics g, Component c, float offsetRatio, float blockSizeRatio) {
-        if(horizontalScroll == null) {
+        if (horizontalScroll == null) {
             initScroll();
         }
-        int borderH = 0;        
-        if(c.getStyle().getBorder() != null){
+        int borderH = 0;
+        if (c.getStyle().getBorder() != null) {
             borderH = c.getStyle().getBorder().getThickness();
         }
         int x = c.getX();
         int y = c.getY() + c.getHeight() - getHorizontalScrollHeight() - borderH;
-        
+
         int width = c.getWidth();
         int height = getHorizontalScrollHeight();
         drawScroll(g, c, offsetRatio, blockSizeRatio, false, x, y, width, height, horizontalScroll, horizontalScrollThumb);
-        if(fadeScrollEdge) {
-            if(offsetRatio > 0) {
-                if(fadeScrollLeft == null || Display.getInstance().getDisplayHeight() != fadeScrollLeft.getHeight()) {
+        if (fadeScrollEdge) {
+            if (offsetRatio > 0) {
+                if (fadeScrollLeft == null || Display.getInstance().getDisplayHeight() != fadeScrollLeft.getHeight()) {
                     fadeScrollLeft = generateFadeImage(fadeScrollEdgeStartAlpha, fadeScrollEdgeEndAlpha, c.getStyle().getBgColor(), true, fadeScrollEdgeLength,
                             Display.getInstance().getDisplayHeight());
                 }
                 g.drawImage(fadeScrollLeft, c.getX(), c.getY());
             }
-            if(offsetRatio < 1 - blockSizeRatio) {
+            if (offsetRatio < 1 - blockSizeRatio) {
                 // special case since when scrolling with the physical keys we leave
                 // the margin out of the equasion
                 int l = c.getScrollX() + c.getWidth() +
                         c.getStyle().getHorizontalMargins() +
                         c.getStyle().getHorizontalPadding();
                 int totalScroll = c.getScrollDimension().getWidth();
-                if(l >= totalScroll) {
+                if (l >= totalScroll) {
                     return;
                 }
-                if(fadeScrollRight == null || Display.getInstance().getDisplayHeight() != fadeScrollRight.getHeight()) {
+                if (fadeScrollRight == null || Display.getInstance().getDisplayHeight() != fadeScrollRight.getHeight()) {
                     fadeScrollRight = generateFadeImage(fadeScrollEdgeEndAlpha, fadeScrollEdgeStartAlpha, c.getStyle().getBgColor(), true, fadeScrollEdgeLength,
                             Display.getInstance().getDisplayHeight());
                 }
@@ -478,16 +498,16 @@ public abstract class LookAndFeel {
     }
 
     private void drawScroll(Graphics g, Component c, float offsetRatio,
-            float blockSizeRatio, boolean isVertical, int x, int y, int width, int height,
-            Component scroll, Component scrollThumb) {
+                            float blockSizeRatio, boolean isVertical, int x, int y, int width, int height,
+                            Component scroll, Component scrollThumb) {
         Style scrollStyle = scroll.getUnselectedStyle();
         Style scrollThumbStyle = scrollThumb.getUnselectedStyle();
 
         int alpha = scrollStyle.getBgTransparency() & 0xff;
         int thumbAlpha = scrollThumbStyle.getBgTransparency() & 0xff;
         int originalAlpha = g.getAlpha();
-        if(fadeScrollBar) {
-            if(scrollStyle.getBgTransparency() != 0) {
+        if (fadeScrollBar) {
+            if (scrollStyle.getBgTransparency() != 0) {
                 scrollStyle.setBgTransparency(c.getScrollOpacity(), true);
             }
             scrollThumbStyle.setBgTransparency(c.getScrollOpacity(), true);
@@ -529,7 +549,7 @@ public abstract class LookAndFeel {
             blockSize = (int) (c.getWidth() * blockSizeRatio) + 2;
             offset = (int) ((c.getWidth()) * offsetRatio);
         }
-        
+
         if (isVertical) {
             scrollThumb.setX(x);
             scrollThumb.setY(y + offset);
@@ -541,11 +561,11 @@ public abstract class LookAndFeel {
             scrollThumb.setWidth(blockSize);
             scrollThumb.setHeight(height);
         }
-        
+
         g.setClip(cx, cy, cw, ch);
         scrollThumb.paintComponent(g);
         g.setClip(cx, cy, cw, ch);
-        if(fadeScrollBar) {
+        if (fadeScrollBar) {
             scrollStyle.setBgTransparency(alpha, true);
             scrollThumbStyle.setBgTransparency(thumbAlpha, true);
             g.setAlpha(originalAlpha);
@@ -556,7 +576,7 @@ public abstract class LookAndFeel {
     /**
      * Sets the foreground color and font for a generic component, reuse-able by most component
      * drawing code
-     * 
+     *
      * @param g graphics context
      * @param c component from which fg styles should be set
      */
@@ -568,11 +588,11 @@ public abstract class LookAndFeel {
 
     /**
      * Returns the default width of a vertical scroll bar
-     * 
+     *
      * @return default width of a vertical scroll bar
      */
     public int getVerticalScrollWidth() {
-        if(verticalScroll == null) {
+        if (verticalScroll == null) {
             initScroll();
         }
         Style scrollStyle = verticalScroll.getStyle();
@@ -584,11 +604,11 @@ public abstract class LookAndFeel {
 
     /**
      * Returns the default height of a horizontal scroll bar
-     * 
+     *
      * @return default height of a horizontal scroll bar
      */
     public int getHorizontalScrollHeight() {
-        if(horizontalScroll == null) {
+        if (horizontalScroll == null) {
             initScroll();
         }
         Style scrollStyle = horizontalScroll.getStyle();
@@ -622,7 +642,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * entering a form
-     * 
+     *
      * @return default transition
      */
     public Transition getDefaultFormTransitionIn() {
@@ -632,7 +652,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * entering a form
-     * 
+     *
      * @param defaultFormTransitionIn the default transition
      */
     public void setDefaultFormTransitionIn(Transition defaultFormTransitionIn) {
@@ -642,7 +662,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * exiting a form
-     * 
+     *
      * @return default transition
      */
     public Transition getDefaultFormTransitionOut() {
@@ -652,7 +672,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * exiting a form
-     * 
+     *
      * @param defaultFormTransitionOut the default transition
      */
     public void setDefaultFormTransitionOut(Transition defaultFormTransitionOut) {
@@ -662,7 +682,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * entering a Menu
-     * 
+     *
      * @return default transition
      */
     public Transition getDefaultMenuTransitionIn() {
@@ -672,7 +692,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * entering a Menu
-     * 
+     *
      * @param defaultMenuTransitionIn the default transition
      */
     public void setDefaultMenuTransitionIn(Transition defaultMenuTransitionIn) {
@@ -682,7 +702,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * exiting a Menu
-     * 
+     *
      * @return default transition
      */
     public Transition getDefaultMenuTransitionOut() {
@@ -692,7 +712,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * exiting a Menu
-     * 
+     *
      * @param defaultMenuTransitionOut the default transition
      */
     public void setDefaultMenuTransitionOut(Transition defaultMenuTransitionOut) {
@@ -702,7 +722,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * entering a dialog
-     * 
+     *
      * @return default transition
      */
     public Transition getDefaultDialogTransitionIn() {
@@ -712,7 +732,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * entering a dialog
-     * 
+     *
      * @param defaultDialogTransitionIn the default transition
      */
     public void setDefaultDialogTransitionIn(Transition defaultDialogTransitionIn) {
@@ -722,7 +742,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * exiting a dialog
-     * 
+     *
      * @return default transition
      */
     public Transition getDefaultDialogTransitionOut() {
@@ -732,7 +752,7 @@ public abstract class LookAndFeel {
     /**
      * Allows us to define a default animation that will draw the transition for
      * exiting a dialog
-     * 
+     *
      * @param defaultDialogTransitionOut the default transition
      */
     public void setDefaultDialogTransitionOut(Transition defaultDialogTransitionOut) {
@@ -740,9 +760,9 @@ public abstract class LookAndFeel {
     }
 
     /**
-     * Tint color is set when a form is partially covered be it by a menu or by a 
+     * Tint color is set when a form is partially covered be it by a menu or by a
      * dialog. A look and feel can override this default value.
-     * 
+     *
      * @return default tint color
      */
     public int getDefaultFormTintColor() {
@@ -750,9 +770,9 @@ public abstract class LookAndFeel {
     }
 
     /**
-     * Tint color is set when a form is partially covered be it by a menu or by a 
+     * Tint color is set when a form is partially covered be it by a menu or by a
      * dialog. A look and feel can override this default value.
-     * 
+     *
      * @param defaultFormTintColor the default tint color
      */
     public void setDefaultFormTintColor(int defaultFormTintColor) {
@@ -761,7 +781,7 @@ public abstract class LookAndFeel {
 
     /**
      * This color is used to paint disable mode text color.
-    
+     *
      * @return the color value
      */
     public int getDisableColor() {
@@ -770,7 +790,7 @@ public abstract class LookAndFeel {
 
     /**
      * Simple setter to disable color
-     * 
+     *
      * @param disableColor the disable color value
      */
     public void setDisableColor(int disableColor) {
@@ -779,7 +799,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates whether lists and containers should have smooth scrolling by default
-     * 
+     *
      * @return true if smooth scrolling should be on by default
      */
     public boolean isDefaultSmoothScrolling() {
@@ -788,8 +808,8 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates whether lists and containers should have smooth scrolling by default
-     * 
-     * @param defaultSmoothScrolling  true if smooth scrolling should be on by default
+     *
+     * @param defaultSmoothScrolling true if smooth scrolling should be on by default
      */
     public void setDefaultSmoothScrolling(boolean defaultSmoothScrolling) {
         this.defaultSmoothScrolling = defaultSmoothScrolling;
@@ -797,7 +817,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates the default speed for smooth scrolling
-     * 
+     *
      * @return speed for smooth scrollin
      */
     public int getDefaultSmoothScrollingSpeed() {
@@ -806,7 +826,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates the default speed for smooth scrolling
-     * 
+     *
      * @param defaultSmoothScrollingSpeed speed for smooth scrollin
      */
     public void setDefaultSmoothScrollingSpeed(int defaultSmoothScrollingSpeed) {
@@ -815,7 +835,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates whether softbuttons should be reversed from their default orientation
-     * 
+     *
      * @return true if softbuttons should be reversed
      */
     public boolean isReverseSoftButtons() {
@@ -824,8 +844,8 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates whether softbuttons should be reversed from their default orientation
-     * 
-     * @param reverseSoftButtons  true if softbuttons should be reversed
+     *
+     * @param reverseSoftButtons true if softbuttons should be reversed
      */
     public void setReverseSoftButtons(boolean reverseSoftButtons) {
         this.reverseSoftButtons = reverseSoftButtons;
@@ -833,30 +853,30 @@ public abstract class LookAndFeel {
 
     /**
      * This method returns the MenuBar class.
-     * 
+     *
      * @return the MenuBar class.
-     * @deprecated this is no longer supported, Toolbar should be used as 
+     * @deprecated this is no longer supported, Toolbar should be used as
      * the extension point
      */
-    public Class getMenuBarClass(){
+    public Class getMenuBarClass() {
         return menuBar;
     }
 
     /**
      * Simple setter for the MenuBar Class
-     * 
+     *
      * @param menuBar
-     * @deprecated this is no longer supported, Toolbar should be used as 
+     * @deprecated this is no longer supported, Toolbar should be used as
      * the extension point
      */
     public void setMenuBarClass(Class menuBar) {
         this.menuBar = menuBar;
     }
 
-    
+
     /**
      * Returns the Menu default renderer
-     * 
+     *
      * @return default renderer for the menu
      */
     public ListCellRenderer getMenuRenderer() {
@@ -865,7 +885,7 @@ public abstract class LookAndFeel {
 
     /**
      * Sets the Menu default renderer
-     * 
+     *
      * @param menuRenderer default renderer for the menu
      */
     public void setMenuRenderer(ListCellRenderer menuRenderer) {
@@ -874,10 +894,10 @@ public abstract class LookAndFeel {
 
     /**
      * Sets globally the Menu icons
-     * 
+     *
      * @param select select icon
      * @param cancel cancel icon
-     * @param menu menu icon
+     * @param menu   menu icon
      */
     public void setMenuIcons(Image select, Image cancel, Image menu) {
         menuIcons[0] = select;
@@ -888,7 +908,7 @@ public abstract class LookAndFeel {
 
     /**
      * Simple getter for the menu icons
-     * 
+     *
      * @return an Image array at size of 3, where the first is the select image
      * the second is the cancel image and the last is the menu image.
      */
@@ -919,15 +939,17 @@ public abstract class LookAndFeel {
         verticalScroll.setUIID("Scroll");
         horizontalScroll = new Label();
         horizontalScroll.setUIID("HorizontalScroll");
-        verticalScrollThumb = new Label();;
+        verticalScrollThumb = new Label();
+        ;
         verticalScrollThumb.setUIID("ScrollThumb");
         horizontalScrollThumb = new Label();
         horizontalScrollThumb.setUIID("HorizontalScrollThumb");
     }
 
     /**
-     * This method is a callback to the LookAndFeel when a theme is being 
+     * This method is a callback to the LookAndFeel when a theme is being
      * changed in the UIManager
+     *
      * @param completeClear indicates that the theme is set and not added
      */
     public void refreshTheme(boolean completeClear) {
@@ -936,14 +958,14 @@ public abstract class LookAndFeel {
         fadeScrollRight = null;
         fadeScrollLeft = null;
         initScroll();
-        if(menuRenderer != null) {
-            if(menuRenderer instanceof Component) {
-                ((Component)menuRenderer).refreshTheme();
+        if (menuRenderer != null) {
+            if (menuRenderer instanceof Component) {
+                ((Component) menuRenderer).refreshTheme();
             }
         }
 
         Toolbar.setGlobalToolbar(manager.isThemeConstant("globalToobarBool", Toolbar.isGlobalToolbar()));
-        
+
         boolean isTouch = Display.getInstance().isTouchScreenDevice();
         scrollVisible = manager.isThemeConstant("scrollVisibleBool", true);
         fadeScrollEdge = manager.isThemeConstant("fadeScrollEdgeBool", false);
@@ -954,27 +976,27 @@ public abstract class LookAndFeel {
 
         try {
             tickerSpeed = Long.parseLong(manager.getThemeConstant("tickerSpeedInt", "" + tickerSpeed));
-            if(tickerSpeed < 1) {
+            if (tickerSpeed < 1) {
                 Label.setDefaultTickerEnabled(false);
             } else {
                 Label.setDefaultTickerEnabled(true);
             }
-        } catch(NumberFormatException err) {
+        } catch (NumberFormatException err) {
             Log.e(err);
         }
-        
+
         Button.setCapsTextDefault(manager.isThemeConstant("capsButtonTextBool", false));
         Button.setButtonRippleEffectDefault(manager.isThemeConstant("buttonRippleBool", false));
-        
-        defaultFormTintColor = (int)Long.parseLong(manager.getThemeConstant("tintColor", Integer.toHexString(defaultFormTintColor)), 16);
+
+        defaultFormTintColor = (int) Long.parseLong(manager.getThemeConstant("tintColor", Integer.toHexString(defaultFormTintColor)), 16);
         disableColor = Integer.parseInt(manager.getThemeConstant("disabledColor", Integer.toHexString(disableColor)), 16);
         Dialog.setDefaultDialogPosition(manager.getThemeConstant("dialogPosition", Dialog.getDefaultDialogPosition()));
         Dialog.setCommandsAsButtons(manager.isThemeConstant("dialogButtonCommandsBool", Dialog.isCommandsAsButtons()));
-        Dialog.setDefaultBlurBackgroundRadius(manager.getThemeConstant("dialogBlurRadiusInt", (int)Dialog.getDefaultBlurBackgroundRadius()));
+        Dialog.setDefaultBlurBackgroundRadius(manager.getThemeConstant("dialogBlurRadiusInt", (int) Dialog.getDefaultBlurBackgroundRadius()));
 
         List.setDefaultIgnoreFocusComponentWhenUnfocused(manager.isThemeConstant("ignorListFocusBool", List.isDefaultIgnoreFocusComponentWhenUnfocused()));
 
-        if(isTouch) {
+        if (isTouch) {
             Display.getInstance().setPureTouch(manager.isThemeConstant("pureTouchBool", Display.getInstance().isPureTouch()));
         }
 
@@ -997,17 +1019,17 @@ public abstract class LookAndFeel {
         initCommandBehaviorConstant(manager.getThemeConstant("commandBehavior", null), completeClear);
         reverseSoftButtons = manager.isThemeConstant("reverseSoftButtonsBool", reverseSoftButtons);
         textFieldCursorColor = manager.getThemeConstant("textFieldCursorColorInt", 0);
-        
+
         String gap = manager.getThemeConstant("labelGap", null);
-        if(gap != null) {
+        if (gap != null) {
             Label.setDefaultGap(Display.getInstance().convertToPixels(Util.toFloatValue(gap)));
         }
-        
+
         InfiniteProgress.setDefaultMaterialDesignMode(
-            manager.isThemeConstant("infiniteProgressMaterialModeBool", false));
+                manager.isThemeConstant("infiniteProgressMaterialModeBool", false));
         InfiniteProgress.setDefaultMaterialDesignColor(
-            manager.getThemeConstant("infiniteProgressMaterialColorInt", 0x6200ee));
-        
+                manager.getThemeConstant("infiniteProgressMaterialColorInt", 0x6200ee));
+
         TextArea.setDefaultValign(manager.getThemeConstant("textCmpVAlignInt", TextArea.getDefaultValign()));
         defaultSnapToGrid = manager.isThemeConstant("snapGridBool", false);
         defaultAlwaysTensile = manager.isThemeConstant("alwaysTensileBool", false);
@@ -1016,12 +1038,12 @@ public abstract class LookAndFeel {
         defaultTensileHighlight = manager.isThemeConstant("tensileHighlightBool", false);
         tensileHighlightBottomImage = null;
         tensileHighlightTopImage = null;
-        if(defaultTensileHighlight) {
+        if (defaultTensileHighlight) {
             tensileHighlightBottomImage = manager.getThemeImageConstant("tensileHighlightBottomImage");
             tensileHighlightTopImage = manager.getThemeImageConstant("tensileHighlightTopImage");
             tensileGlowBottomImage = manager.getThemeImageConstant("tensileGlowBottomImage");
             tensileGlowTopImage = manager.getThemeImageConstant("tensileGlowTopImage");
-            if(tensileHighlightBottomImage != null && tensileHighlightTopImage != null) {
+            if (tensileHighlightBottomImage != null && tensileHighlightTopImage != null) {
                 defaultTensileDrag = true;
                 defaultAlwaysTensile = false;
             } else {
@@ -1032,43 +1054,43 @@ public abstract class LookAndFeel {
     }
 
     private void initCommandBehaviorConstant(String c, boolean complete) {
-        if(c != null) {
-            if(c.equalsIgnoreCase("SoftKey")) {
+        if (c != null) {
+            if (c.equalsIgnoreCase("SoftKey")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SOFTKEY);
                 return;
             }
-            if(c.equalsIgnoreCase("Touch")) {
+            if (c.equalsIgnoreCase("Touch")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU);
                 return;
             }
-            if(c.equalsIgnoreCase("Bar")) {
+            if (c.equalsIgnoreCase("Bar")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR);
                 return;
             }
-            if(c.equalsIgnoreCase("Title")) {
+            if (c.equalsIgnoreCase("Title")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK);
                 return;
             }
-            if(c.equalsIgnoreCase("Right")) {
+            if (c.equalsIgnoreCase("Right")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT);
                 return;
             }
-            if(c.equalsIgnoreCase("Native")) {
+            if (c.equalsIgnoreCase("Native")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
                 return;
             }
-            if(c.equalsIgnoreCase("ICS")) {
+            if (c.equalsIgnoreCase("ICS")) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_ICS);
                 return;
             }
-            if(c.equalsIgnoreCase("SIDE")) {
+            if (c.equalsIgnoreCase("SIDE")) {
                 Log.p("WARNING: Theme sets the commandBehavior constant which is deprecated.  Please update the theme to NOT include this theme constant.  Using commandBehavior may cause your app to perform in unexpected ways.  In particular, using SIDE command behavior in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime exceptions.", Log.WARNING);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
                 setMenuBarClass(SideMenuBar.class);
                 return;
             }
         } else {
-            if(complete) {
+            if (complete) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
             }
         }
@@ -1076,54 +1098,54 @@ public abstract class LookAndFeel {
 
     private Transition getTransitionConstant(Transition t, String constant, String slideDir, int speed, boolean forward) {
         Image img = manager.getThemeImageConstant(constant + "Image");
-        if(img != null) {
+        if (img != null) {
             return CommonTransitions.createTimeline(img);
         }
         String val = manager.getThemeConstant(constant, null);
-        if(val == null) {
+        if (val == null) {
             return t;
         }
-        if(val.equalsIgnoreCase("empty")) {
+        if (val.equalsIgnoreCase("empty")) {
             return CommonTransitions.createEmpty();
         }
-        if(val.equalsIgnoreCase("slide")) {
-            if(slideDir.equalsIgnoreCase("horizontal")) {
+        if (val.equalsIgnoreCase("slide")) {
+            if (slideDir.equalsIgnoreCase("horizontal")) {
                 return CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if(val.equalsIgnoreCase("cover")) {
-            if(slideDir.equalsIgnoreCase("horizontal")) {
+        if (val.equalsIgnoreCase("cover")) {
+            if (slideDir.equalsIgnoreCase("horizontal")) {
                 return CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if(val.equalsIgnoreCase("uncover")) {
-            if(slideDir.equalsIgnoreCase("horizontal")) {
+        if (val.equalsIgnoreCase("uncover")) {
+            if (slideDir.equalsIgnoreCase("horizontal")) {
                 return CommonTransitions.createUncover(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createUncover(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if(val.equalsIgnoreCase("fslide")) {
-            if(slideDir.equalsIgnoreCase("horizontal")) {
+        if (val.equalsIgnoreCase("fslide")) {
+            if (slideDir.equalsIgnoreCase("horizontal")) {
                 return CommonTransitions.createFastSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createFastSlide(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if(val.equalsIgnoreCase("fade")) {
+        if (val.equalsIgnoreCase("fade")) {
             return CommonTransitions.createFade(speed);
         }
-        if(val.equalsIgnoreCase("slidefade")) {
+        if (val.equalsIgnoreCase("slidefade")) {
             return CommonTransitions.createSlideFadeTitle(forward, speed);
         }
-        if(val.equalsIgnoreCase("pulse")) {
+        if (val.equalsIgnoreCase("pulse")) {
             return CommonTransitions.createDialogPulsate();
         }
-        if(val.equalsIgnoreCase("bubble")) {
+        if (val.equalsIgnoreCase("bubble")) {
             BubbleTransition transition = new BubbleTransition(speed);
             transition.setRoundBubble(false);
             return transition;
@@ -1152,41 +1174,41 @@ public abstract class LookAndFeel {
      * @deprecated use Display.setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU)
      */
     public void setTouchMenus(boolean touchMenus) {
-        if(touchMenus) {
+        if (touchMenus) {
             Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU);
         } else {
             Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SOFTKEY);
         }
     }
 
-	/**
-	 * Sets this LookAndFeel to operate in right-to-left mode.
-	 *
-	 * @param rtl - true if right-to-left, false if left-to-right
-	 */
-	public void setRTL(boolean rtl) {
-        if(UIManager.localeAccessible) {
+    /**
+     * Use this to check if the LookAndFeel is in RTL mode
+     *
+     * @return true if the LookAndFeel is in right-to-left mode, false otherwise
+     */
+    public boolean isRTL() {
+        return rtl;
+    }
+
+    /**
+     * Sets this LookAndFeel to operate in right-to-left mode.
+     *
+     * @param rtl - true if right-to-left, false if left-to-right
+     */
+    public void setRTL(boolean rtl) {
+        if (UIManager.localeAccessible) {
             this.rtl = rtl;
-            if(rtl) {
+            if (rtl) {
                 Display.getInstance().setBidiAlgorithm(true);
             }
         }
-	}
-
-	/**
-	 * Use this to check if the LookAndFeel is in RTL mode
-	 *
-	 * @return true if the LookAndFeel is in right-to-left mode, false otherwise
-	 */
-	public boolean isRTL() {
-		return rtl;
-	}
+    }
 
     /**
      * Allows defining a tactile touch device that vibrates when the user presses a component
      * that should respond with tactile feedback on a touch device (e.g. vibrate).
      * Setting this to 0 disables tactile feedback completely
-
+     *
      * @return the tactileTouchDuration
      */
     public int getTactileTouchDuration() {
@@ -1271,7 +1293,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates whether the edge of a scrollable area should fade out
-     * 
+     *
      * @param fadeScrollEdge the fadeScrollEdge to set
      */
     public void setFadeScrollEdge(boolean fadeScrollEdge) {
@@ -1289,7 +1311,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates whether the scrollbar should fade when unused
-     * 
+     *
      * @param fadeScrollBar the fadeScrollBar to set
      */
     public void setFadeScrollBar(boolean fadeScrollBar) {
@@ -1307,7 +1329,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates the width/height of the fading edge to indicate scrolling
-     * 
+     *
      * @param fadeScrollEdgeLength the fadeScrollEdgeLength to set
      */
     public void setFadeScrollEdgeLength(int fadeScrollEdgeLength) {
@@ -1316,6 +1338,7 @@ public abstract class LookAndFeel {
 
     /**
      * The color of the text field cursor
+     *
      * @return the textFieldCursorColor
      */
     public int getTextFieldCursorColor() {
@@ -1324,6 +1347,7 @@ public abstract class LookAndFeel {
 
     /**
      * The color of the text field cursor
+     *
      * @param textFieldCursorColor the textFieldCursorColor to set
      */
     public void setTextFieldCursorColor(int textFieldCursorColor) {
@@ -1333,6 +1357,7 @@ public abstract class LookAndFeel {
     /**
      * Indicates whether scrolling this component should jump to a specific location
      * in a grid
+     *
      * @return the defaultSnapToGrid
      */
     public boolean isDefaultSnapToGrid() {
@@ -1342,6 +1367,7 @@ public abstract class LookAndFeel {
     /**
      * Indicates whether scrolling this component should jump to a specific location
      * in a grid
+     *
      * @param defaultSnapToGrid the defaultSnapToGrid to set
      */
     public void setDefaultSnapToGrid(boolean defaultSnapToGrid) {
@@ -1350,6 +1376,7 @@ public abstract class LookAndFeel {
 
     /**
      * Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
+     *
      * @return the defaultAlwaysTensile
      */
     public boolean isDefaultAlwaysTensile() {
@@ -1358,6 +1385,7 @@ public abstract class LookAndFeel {
 
     /**
      * Enable the tensile drag to work even when a component doesn't have a scroll showable (scrollable flag still needs to be set to true)
+     *
      * @param defaultAlwaysTensile the defaultAlwaysTensile to set
      */
     public void setDefaultAlwaysTensile(boolean defaultAlwaysTensile) {
@@ -1366,6 +1394,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates whether tensile highlight should be active by default
+     *
      * @return the defaultTensileHighlight
      */
     public boolean isDefaultTensileHighlight() {
@@ -1375,21 +1404,21 @@ public abstract class LookAndFeel {
     /**
      * Paints the tensile hightlight image
      *
-     * @param g graphics destination for the tensile highlight image
-     * @param top destination of the tensile highlight image
+     * @param g       graphics destination for the tensile highlight image
+     * @param top     destination of the tensile highlight image
      * @param opacity the opacity of the image
      */
-    public void paintTensileHighlight(Component t, Graphics  g, boolean top, int opacity) {
-        if(opacity > 0 && tensileHighlightTopImage != null && tensileHighlightBottomImage != null) {
+    public void paintTensileHighlight(Component t, Graphics g, boolean top, int opacity) {
+        if (opacity > 0 && tensileHighlightTopImage != null && tensileHighlightBottomImage != null) {
             int absX = t.getAbsoluteX();
             int absY = t.getAbsoluteY();
-            if(tensileGlowTopImage != null) {
+            if (tensileGlowTopImage != null) {
                 int a = g.getAlpha();
-                float aspect = ((float)tensileGlowTopImage.getWidth()) / ((float)Display.getInstance().getDisplayWidth());
-                int newHeight = (int)(((float)tensileGlowTopImage.getHeight()) * aspect);
-                if(top) {
+                float aspect = ((float) tensileGlowTopImage.getWidth()) / ((float) Display.getInstance().getDisplayWidth());
+                int newHeight = (int) (((float) tensileGlowTopImage.getHeight()) * aspect);
+                if (top) {
                     // this is a pull to refresh operation
-                    if(t.isAlwaysTensile()) {
+                    if (t.isAlwaysTensile()) {
                         return;
                     }
                     g.drawImage(tensileHighlightTopImage, absX, absY, t.getWidth(), tensileHighlightTopImage.getHeight());
@@ -1399,15 +1428,15 @@ public abstract class LookAndFeel {
                 } else {
                     g.drawImage(tensileHighlightBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - tensileHighlightBottomImage.getHeight()), t.getWidth(), tensileHighlightBottomImage.getHeight());
                     g.setAlpha(opacity / 3);
-                    g.drawImage(tensileGlowBottomImage, absX, absY + t.getScrollY() +(t.getHeight() - newHeight), t.getWidth(), newHeight);
+                    g.drawImage(tensileGlowBottomImage, absX, absY + t.getScrollY() + (t.getHeight() - newHeight), t.getWidth(), newHeight);
                     g.setAlpha(a);
                 }
             } else {
                 int a = g.getAlpha();
                 g.setAlpha(opacity);
-                if(top) {
+                if (top) {
                     // this is a pull to refresh operation
-                    if(t.isAlwaysTensile()) {
+                    if (t.isAlwaysTensile()) {
                         g.setAlpha(a);
                         return;
                     }
@@ -1419,9 +1448,9 @@ public abstract class LookAndFeel {
             }
         }
     }
-    
-    
-    UIManager getUIManager(){
+
+
+    UIManager getUIManager() {
         return manager;
     }
 
@@ -1433,13 +1462,6 @@ public abstract class LookAndFeel {
     }
 
     /**
-     * @return scrollVisible
-     */ 
-    public boolean isScrollVisible() {
-        return scrollVisible;
-    }
-    
-    /**
      * @param fadeScrollBarSpeed the fadeScrollBarSpeed to set
      */
     public void setFadeScrollBarSpeed(int fadeScrollBarSpeed) {
@@ -1447,7 +1469,15 @@ public abstract class LookAndFeel {
     }
 
     /**
+     * @return scrollVisible
+     */
+    public boolean isScrollVisible() {
+        return scrollVisible;
+    }
+
+    /**
      * Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+     *
      * @return the backgroundImageDetermineSize
      */
     public boolean isBackgroundImageDetermineSize() {
@@ -1456,6 +1486,7 @@ public abstract class LookAndFeel {
 
     /**
      * Indicates if the bg image of a style should determine the minimum preferred size according to the theme
+     *
      * @param backgroundImageDetermineSize the backgroundImageDetermineSize to set
      */
     public void setBackgroundImageDetermineSize(boolean backgroundImageDetermineSize) {
@@ -1463,16 +1494,17 @@ public abstract class LookAndFeel {
     }
 
     /**
-     * Paints the pull to refresh 
-     * @param g graphics context
-     * @param cmp the Component which we draw the pull to refresh beneath it
+     * Paints the pull to refresh
+     *
+     * @param g            graphics context
+     * @param cmp          the Component which we draw the pull to refresh beneath it
      * @param taskExecuted an indication if the refresh task is currently running
-     */ 
+     */
     public abstract void drawPullToRefresh(Graphics g, Component cmp, boolean taskExecuted);
-    
+
     /**
      * Returns the required height of the pull to refresh feature
-     */ 
+     */
     public abstract int getPullToRefreshHeight();
-    
+
 }

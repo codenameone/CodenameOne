@@ -32,7 +32,7 @@ import com.codename1.ui.tree.Tree;
  * @author Shai Almog
  */
 public class FileTree extends Tree {
-    
+
     /**
      * Default constructor
      */
@@ -48,13 +48,13 @@ public class FileTree extends Tree {
         super(model);
         setUIID("FileTree");
     }
-    
+
     protected String childToDisplayLabel(Object child) {
         String s = child.toString();
-        if(s.equals("/")) {
+        if (s.equals("/")) {
             return "Root";
         }
-        if(s.endsWith("/")) {
+        if (s.endsWith("/")) {
             s = s.substring(0, s.length() - 1);
         }
         int l = s.lastIndexOf('/');

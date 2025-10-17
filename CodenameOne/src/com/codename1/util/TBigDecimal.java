@@ -18,14 +18,13 @@
 package com.codename1.util;
 
 
-
 /**
  * This class represents immutable arbitrary precision decimal numbers. Each
  * {@code BigDecimal} instance is represented with a unscaled arbitrary
  * precision mantissa (the unscaled value) and a scale. The value of the {@code
  * BigDecimal} is {@code unscaledValue} 10^(-{@code scale}).
  */
-class TBigDecimal  {
+class TBigDecimal {
 
     /**
      * The constant zero as a {@code BigDecimal}.
@@ -108,104 +107,94 @@ class TBigDecimal  {
      */
     public static final int ROUND_UNNECESSARY = 7;
 
-    /** This is the serialVersionUID used by the sun implementation. */
+    /**
+     * This is the serialVersionUID used by the sun implementation.
+     */
     private static final long serialVersionUID = 6108874887143696463L;
 
-    /** The double closer to <code>Log10(2)</code>. */
+    /**
+     * The double closer to <code>Log10(2)</code>.
+     */
     private static final double LOG10_2 = 0.3010299956639812;
-
-    /** The <code>String</code> representation is cached. */
-    private transient String toStringImage = null;
-
-    /** Cache for the hash code. */
-    private transient int hashCode = 0;
-
     /**
      * An array with powers of five that fit in the type <code>long</code>
      * (<code>5^0,5^1,...,5^27</code>).
      */
     private static final TBigInteger FIVE_POW[];
-
     /**
      * An array with powers of ten that fit in the type <code>long</code>
      * (<code>10^0,10^1,...,10^18</code>).
      */
     private static final TBigInteger TEN_POW[];
-
     /**
      * An array with powers of ten that fit in the type <code>long</code>
      * (<code>10^0,10^1,...,10^18</code>).
      */
     private static final long[] LONG_TEN_POW = new long[]
-    {   1L,
-        10L,
-        100L,
-        1000L,
-        10000L,
-        100000L,
-        1000000L,
-        10000000L,
-        100000000L,
-        1000000000L,
-        10000000000L,
-        100000000000L,
-        1000000000000L,
-        10000000000000L,
-        100000000000000L,
-        1000000000000000L,
-        10000000000000000L,
-        100000000000000000L,
-        1000000000000000000L, };
-
-
+            {1L,
+                    10L,
+                    100L,
+                    1000L,
+                    10000L,
+                    100000L,
+                    1000000L,
+                    10000000L,
+                    100000000L,
+                    1000000000L,
+                    10000000000L,
+                    100000000000L,
+                    1000000000000L,
+                    10000000000000L,
+                    100000000000000L,
+                    1000000000000000L,
+                    10000000000000000L,
+                    100000000000000000L,
+                    1000000000000000000L,};
     private static final long[] LONG_FIVE_POW = new long[]
-    {   1L,
-        5L,
-        25L,
-        125L,
-        625L,
-        3125L,
-        15625L,
-        78125L,
-        390625L,
-        1953125L,
-        9765625L,
-        48828125L,
-        244140625L,
-        1220703125L,
-        6103515625L,
-        30517578125L,
-        152587890625L,
-        762939453125L,
-        3814697265625L,
-        19073486328125L,
-        95367431640625L,
-        476837158203125L,
-        2384185791015625L,
-        11920928955078125L,
-        59604644775390625L,
-        298023223876953125L,
-        1490116119384765625L,
-        7450580596923828125L, };
-
+            {1L,
+                    5L,
+                    25L,
+                    125L,
+                    625L,
+                    3125L,
+                    15625L,
+                    78125L,
+                    390625L,
+                    1953125L,
+                    9765625L,
+                    48828125L,
+                    244140625L,
+                    1220703125L,
+                    6103515625L,
+                    30517578125L,
+                    152587890625L,
+                    762939453125L,
+                    3814697265625L,
+                    19073486328125L,
+                    95367431640625L,
+                    476837158203125L,
+                    2384185791015625L,
+                    11920928955078125L,
+                    59604644775390625L,
+                    298023223876953125L,
+                    1490116119384765625L,
+                    7450580596923828125L,};
     private static final int[] LONG_FIVE_POW_BIT_LENGTH = new int[LONG_FIVE_POW.length];
     private static final int[] LONG_TEN_POW_BIT_LENGTH = new int[LONG_TEN_POW.length];
-
     private static final int BI_SCALED_BY_ZERO_LENGTH = 11;
-
     /**
      * An array with the first <code>BigInteger</code> scaled by zero.
      * (<code>[0,0],[1,0],...,[10,0]</code>).
      */
     private static final TBigDecimal BI_SCALED_BY_ZERO[] = new TBigDecimal[BI_SCALED_BY_ZERO_LENGTH];
-
     /**
      * An array with the zero number scaled by the first positive scales.
      * (<code>0*10^0, 0*10^1, ..., 0*10^10</code>).
      */
     private static final TBigDecimal ZERO_SCALED_BY[] = new TBigDecimal[11];
-
-    /** An array filled with characters <code>'0'</code>. */
+    /**
+     * An array filled with characters <code>'0'</code>.
+     */
     private static final char[] CH_ZEROS = new char[100];
 
     static {
@@ -221,10 +210,10 @@ class TBigDecimal  {
         for (; i < CH_ZEROS.length; i++) {
             CH_ZEROS[i] = '0';
         }
-        for(int j=0; j<LONG_FIVE_POW_BIT_LENGTH.length; j++) {
+        for (int j = 0; j < LONG_FIVE_POW_BIT_LENGTH.length; j++) {
             LONG_FIVE_POW_BIT_LENGTH[j] = bitLength(LONG_FIVE_POW[j]);
         }
-        for(int j=0; j<LONG_TEN_POW_BIT_LENGTH.length; j++) {
+        for (int j = 0; j < LONG_TEN_POW_BIT_LENGTH.length; j++) {
             LONG_TEN_POW_BIT_LENGTH[j] = bitLength(LONG_TEN_POW[j]);
         }
 
@@ -233,6 +222,14 @@ class TBigDecimal  {
         FIVE_POW = TMultiplication.bigFivePows;
     }
 
+    /**
+     * The <code>String</code> representation is cached.
+     */
+    private transient String toStringImage = null;
+    /**
+     * Cache for the hash code.
+     */
+    private transient int hashCode = 0;
     /**
      * The arbitrary precision integer (unscaled value) in the internal
      * representation of {@code BigDecimal}.
@@ -275,21 +272,15 @@ class TBigDecimal  {
      * Constructs a new {@code BigDecimal} instance from a string representation
      * given as a character array.
      *
-     * @param in
-     *            array of characters containing the string representation of
-     *            this {@code BigDecimal}.
-     * @param offset
-     *            first index to be copied.
-     * @param len
-     *            number of characters to be used.
-     * @throws NullPointerException
-     *             if {@code in == null}.
-     * @throws NumberFormatException
-     *             if {@code offset < 0} or {@code len <= 0} or {@code
-     *             offset+len-1 < 0} or {@code offset+len-1 >= in.length}.
-     * @throws NumberFormatException
-     *             if in does not contain a valid string representation of a big
-     *             decimal.
+     * @param in     array of characters containing the string representation of
+     *               this {@code BigDecimal}.
+     * @param offset first index to be copied.
+     * @param len    number of characters to be used.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code offset < 0} or {@code len <= 0} or {@code
+     *                               offset+len-1 < 0} or {@code offset+len-1 >= in.length}.
+     * @throws NumberFormatException if in does not contain a valid string representation of a big
+     *                               decimal.
      */
     public TBigDecimal(char[] in, int offset, int len) {
         int begin = offset; // first index to be copied
@@ -315,7 +306,7 @@ class TBigDecimal  {
         boolean wasNonZero = false;
         // Accumulating all digits until a possible decimal point
         for (; (offset <= last) && (in[offset] != '.')
-        && (in[offset] != 'e') && (in[offset] != 'E'); offset++) {
+                && (in[offset] != 'e') && (in[offset] != 'E'); offset++) {
             if (!wasNonZero) {
                 if (in[offset] == '0') {
                     counter++;
@@ -333,7 +324,7 @@ class TBigDecimal  {
             // Accumulating all digits until a possible exponent
             begin = offset;
             for (; (offset <= last) && (in[offset] != 'e')
-            && (in[offset] != 'E'); offset++) {
+                    && (in[offset] != 'E'); offset++) {
                 if (!wasNonZero) {
                     if (in[offset] == '0') {
                         counter++;
@@ -343,7 +334,7 @@ class TBigDecimal  {
                 }
             }
             scale = offset - begin;
-            bufLength +=scale;
+            bufLength += scale;
             unscaledBuffer.append(in, begin, scale);
         } else {
             scale = 0;
@@ -362,8 +353,8 @@ class TBigDecimal  {
             // Accumulating all remaining digits
             scaleString = String.valueOf(in, begin, last + 1 - begin);
             // Checking if the scale is defined
-            newScale = (long)scale - Integer.parseInt(scaleString);
-            scale = (int)newScale;
+            newScale = (long) scale - Integer.parseInt(scaleString);
+            scale = (int) newScale;
             if (newScale != scale) {
                 throw new NumberFormatException("Scale out of range.");
             }
@@ -377,7 +368,7 @@ class TBigDecimal  {
         }
         precision = unscaledBuffer.length() - counter;
         if (unscaledBuffer.charAt(0) == '-') {
-            precision --;
+            precision--;
         }
     }
 
@@ -385,27 +376,19 @@ class TBigDecimal  {
      * Constructs a new {@code BigDecimal} instance from a string representation
      * given as a character array.
      *
-     * @param in
-     *            array of characters containing the string representation of
-     *            this {@code BigDecimal}.
-     * @param offset
-     *            first index to be copied.
-     * @param len
-     *            number of characters to be used.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws NullPointerException
-     *             if {@code in == null}.
-     * @throws NumberFormatException
-     *             if {@code offset < 0} or {@code len <= 0} or {@code
-     *             offset+len-1 < 0} or {@code offset+len-1 >= in.length}.
-     * @throws NumberFormatException
-     *             if {@code in} does not contain a valid string representation
-     *             of a big decimal.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
+     * @param in     array of characters containing the string representation of
+     *               this {@code BigDecimal}.
+     * @param offset first index to be copied.
+     * @param len    number of characters to be used.
+     * @param mc     rounding mode and precision for the result of this operation.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code offset < 0} or {@code len <= 0} or {@code
+     *                               offset+len-1 < 0} or {@code offset+len-1 >= in.length}.
+     * @throws NumberFormatException if {@code in} does not contain a valid string representation
+     *                               of a big decimal.
+     * @throws ArithmeticException   if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
      */
     public TBigDecimal(char[] in, int offset, int len, TMathContext mc) {
         this(in, offset, len);
@@ -416,14 +399,11 @@ class TBigDecimal  {
      * Constructs a new {@code BigDecimal} instance from a string representation
      * given as a character array.
      *
-     * @param in
-     *            array of characters containing the string representation of
-     *            this {@code BigDecimal}.
-     * @throws NullPointerException
-     *             if {@code in == null}.
-     * @throws NumberFormatException
-     *             if {@code in} does not contain a valid string representation
-     *             of a big decimal.
+     * @param in array of characters containing the string representation of
+     *           this {@code BigDecimal}.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code in} does not contain a valid string representation
+     *                               of a big decimal.
      */
     public TBigDecimal(char[] in) {
         this(in, 0, in.length);
@@ -434,20 +414,15 @@ class TBigDecimal  {
      * given as a character array. The result is rounded according to the
      * specified math context.
      *
-     * @param in
-     *            array of characters containing the string representation of
-     *            this {@code BigDecimal}.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws NullPointerException
-     *             if {@code in == null}.
-     * @throws NumberFormatException
-     *             if {@code in} does not contain a valid string representation
-     *             of a big decimal.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
+     * @param in array of characters containing the string representation of
+     *           this {@code BigDecimal}.
+     * @param mc rounding mode and precision for the result of this operation.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code in} does not contain a valid string representation
+     *                               of a big decimal.
+     * @throws ArithmeticException   if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
      */
     public TBigDecimal(char[] in, TMathContext mc) {
         this(in, 0, in.length);
@@ -458,12 +433,10 @@ class TBigDecimal  {
      * Constructs a new {@code BigDecimal} instance from a string
      * representation.
      *
-     * @param val
-     *            string containing the string representation of this {@code
+     * @param val string containing the string representation of this {@code
      *            BigDecimal}.
-     * @throws NumberFormatException
-     *             if {@code val} does not contain a valid string representation
-     *             of a big decimal.
+     * @throws NumberFormatException if {@code val} does not contain a valid string representation
+     *                               of a big decimal.
      */
     public TBigDecimal(String val) {
         this(val.toCharArray(), 0, val.length());
@@ -474,128 +447,21 @@ class TBigDecimal  {
      * representation. The result is rounded according to the specified math
      * context.
      *
-     * @param val
-     *            string containing the string representation of this {@code
+     * @param val string containing the string representation of this {@code
      *            BigDecimal}.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws NumberFormatException
-     *             if {@code val} does not contain a valid string representation
-     *             of a big decimal.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws NumberFormatException if {@code val} does not contain a valid string representation
+     *                               of a big decimal.
+     * @throws ArithmeticException   if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
      */
     public TBigDecimal(String val, TMathContext mc) {
         this(val.toCharArray(), 0, val.length());
         inplaceRound(mc);
     }
 
-    
-    /**
-     * <p>
-     * Determines the number of trailing zeros in the <code>long</code> passed
-     * after the {@link #lowestOneBit(long) lowest one bit}.
-     * </p>
-     * 
-     * @param lng
-     *            The <code>long</code> to process.
-     * @return The number of trailing zeros.
-     * @since 1.5
-     */
-    static int numberOfTrailingZeros(long lng) {
-        return bitCount((lng & -lng) - 1);
-    }
-    
-    /**
-     * <p>
-     * Determines the number of leading zeros in the <code>long</code> passed
-     * prior to the {@link #highestOneBit(long) highest one bit}.
-     * </p>
-     * 
-     * @param lng
-     *            The <code>long</code> to process.
-     * @return The number of leading zeros.
-     * @since 1.5
-     */
-    public static int numberOfLeadingZeros(long lng) {
-        lng |= lng >> 1;
-        lng |= lng >> 2;
-        lng |= lng >> 4;
-        lng |= lng >> 8;
-        lng |= lng >> 16;
-        lng |= lng >> 32;
-        return bitCount(~lng);
-    }
 
-    /**
-     * <p>
-     * Counts the number of 1 bits in the <code>long</code> value passed; this
-     * is sometimes referred to as a population count.
-     * </p>
-     * 
-     * @param lng
-     *            The <code>long</code> value to process.
-     * @return The number of 1 bits.
-     * @since 1.5
-     */
-    static int bitCount(long lng) {
-        lng = (lng & 0x5555555555555555L) + ((lng >> 1) & 0x5555555555555555L);
-        lng = (lng & 0x3333333333333333L) + ((lng >> 2) & 0x3333333333333333L);
-        // adjust for 64-bit integer
-        int i = (int) ((lng >>> 32) + lng);
-        i = (i & 0x0F0F0F0F) + ((i >> 4) & 0x0F0F0F0F);
-        i = (i & 0x00FF00FF) + ((i >> 8) & 0x00FF00FF);
-        i = (i & 0x0000FFFF) + ((i >> 16) & 0x0000FFFF);
-        return i;
-    }
-
-    
-     /**
-     * <p>
-     * The <code>signum</code> function for <code>long</code> values. This
-     * method returns -1 for negative values, 1 for positive values and 0 for
-     * the value 0.
-     * </p>
-     * 
-     * @param lng
-     *            The <code>long</code> value.
-     * @return -1 if negative, 1 if positive otherwise 0.
-     * @since 1.5
-     */
-    static int signum(long lng) {
-        return (lng == 0 ? 0 : (lng < 0 ? -1 : 1));
-    }
-    
-    static char forDigit(int digit, int radix) {
-        if (radix < 2 || radix > 36 || digit >= radix) {
-            return '\0';
-        }
-        return digit < 10 ? (char)('0' + digit) : (char)('a' + digit - 10);
-    }
-    
-    /**
-     * <p>
-     * Determines the highest (leftmost) bit that is 1 and returns the value
-     * that is the bit mask for that bit. This is sometimes referred to as the
-     * Most Significant 1 Bit.
-     * </p>
-     * 
-     * @param i
-     *            The <code>int</code> to interrogate.
-     * @return The bit mask indicating the highest 1 bit.
-     * @since 1.5
-     */
-    static int highestOneBit(int i) {
-        i |= (i >> 1);
-        i |= (i >> 2);
-        i |= (i >> 4);
-        i |= (i >> 8);
-        i |= (i >> 16);
-        return (i & ~(i >>> 1));
-    }
-    
     /**
      * Constructs a new {@code BigDecimal} instance from the 64bit double
      * {@code val}. The constructed big decimal is equivalent to the given
@@ -606,10 +472,8 @@ class TBigDecimal  {
      * To generate a big decimal instance which is equivalent to {@code 0.1} use
      * the {@code BigDecimal(String)} constructor.
      *
-     * @param val
-     *            double value to be converted to a {@code BigDecimal} instance.
-     * @throws NumberFormatException
-     *             if {@code val} is infinity or not a number.
+     * @param val double value to be converted to a {@code BigDecimal} instance.
+     * @throws NumberFormatException if {@code val} is infinity or not a number.
      */
     public TBigDecimal(double val) {
         if (Double.isInfinite(val) || Double.isNaN(val)) {
@@ -619,7 +483,7 @@ class TBigDecimal  {
         long mantisa;
         int trailingZeros;
         // Extracting the exponent, note that the bias is 1023
-        scale = 1075 - (int)((bits >> 52) & 0x7FFL);
+        scale = 1075 - (int) ((bits >> 52) & 0x7FFL);
         // Extracting the 52 bits of the mantisa.
         mantisa = scale == 1075 ? (bits & 0xFFFFFFFFFFFFFL) << 1 : (bits & 0xFFFFFFFFFFFFFL) | 0x10000000000000L;
         if (mantisa == 0) {
@@ -633,13 +497,13 @@ class TBigDecimal  {
             scale -= trailingZeros;
         }
         // Calculating the new unscaled value and the new scale
-        if((bits >> 63) != 0) {
+        if ((bits >> 63) != 0) {
             mantisa = -mantisa;
         }
         int mantisaBits = bitLength(mantisa);
         if (scale < 0) {
             bitLength = mantisaBits == 0 ? 0 : mantisaBits - scale;
-            if(bitLength < 64) {
+            if (bitLength < 64) {
                 smallValue = mantisa << (-scale);
             } else {
                 intVal = TBigInteger.valueOf(mantisa).shiftLeft(-scale);
@@ -647,7 +511,7 @@ class TBigDecimal  {
             scale = 0;
         } else if (scale > 0) {
             // m * 2^e =  (m * 5^(-e)) * 10^e
-            if(scale < LONG_FIVE_POW.length && mantisaBits + LONG_FIVE_POW_BIT_LENGTH[scale] < 64) {
+            if (scale < LONG_FIVE_POW.length && mantisaBits + LONG_FIVE_POW_BIT_LENGTH[scale] < 64) {
                 smallValue = mantisa * LONG_FIVE_POW[scale];
                 bitLength = bitLength(smallValue);
             } else {
@@ -669,16 +533,12 @@ class TBigDecimal  {
      * To generate a big decimal instance which is equivalent to {@code 0.1} use
      * the {@code BigDecimal(String)} constructor.
      *
-     * @param val
-     *            double value to be converted to a {@code BigDecimal} instance.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws NumberFormatException
-     *             if {@code val} is infinity or not a number.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
+     * @param val double value to be converted to a {@code BigDecimal} instance.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws NumberFormatException if {@code val} is infinity or not a number.
+     * @throws ArithmeticException   if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
      */
     public TBigDecimal(double val, TMathContext mc) {
         this(val);
@@ -689,27 +549,24 @@ class TBigDecimal  {
      * Constructs a new {@code BigDecimal} instance from the given big integer
      * {@code val}. The scale of the result is {@code 0}.
      *
-     * @param val
-     *            {@code BigInteger} value to be converted to a {@code
+     * @param val {@code BigInteger} value to be converted to a {@code
      *            BigDecimal} instance.
      */
     public TBigDecimal(TBigInteger val) {
         this(val, 0);
     }
 
+
     /**
      * Constructs a new {@code BigDecimal} instance from the given big integer
      * {@code val}. The scale of the result is {@code 0}.
      *
-     * @param val
-     *            {@code BigInteger} value to be converted to a {@code
+     * @param val {@code BigInteger} value to be converted to a {@code
      *            BigDecimal} instance.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                             UNNECESSARY} and the new big decimal cannot be represented
+     *                             within the given precision without rounding.
      */
     public TBigDecimal(TBigInteger val, TMathContext mc) {
         this(val);
@@ -721,13 +578,10 @@ class TBigDecimal  {
      * {@code unscaledVal} and a given scale. The value of this instance is
      * {@code unscaledVal} 10^(-{@code scale}).
      *
-     * @param unscaledVal
-     *            {@code BigInteger} representing the unscaled value of this
-     *            {@code BigDecimal} instance.
-     * @param scale
-     *            scale of this {@code BigDecimal} instance.
-     * @throws NullPointerException
-     *             if {@code unscaledVal == null}.
+     * @param unscaledVal {@code BigInteger} representing the unscaled value of this
+     *                    {@code BigDecimal} instance.
+     * @param scale       scale of this {@code BigDecimal} instance.
+     * @throws NullPointerException if {@code unscaledVal == null}.
      */
     public TBigDecimal(TBigInteger unscaledVal, int scale) {
         if (unscaledVal == null) {
@@ -743,19 +597,14 @@ class TBigDecimal  {
      * {@code unscaledVal} 10^(-{@code scale}). The result is rounded according
      * to the specified math context.
      *
-     * @param unscaledVal
-     *            {@code BigInteger} representing the unscaled value of this
-     *            {@code BigDecimal} instance.
-     * @param scale
-     *            scale of this {@code BigDecimal} instance.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
-     * @throws NullPointerException
-     *             if {@code unscaledVal == null}.
+     * @param unscaledVal {@code BigInteger} representing the unscaled value of this
+     *                    {@code BigDecimal} instance.
+     * @param scale       scale of this {@code BigDecimal} instance.
+     * @param mc          rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException  if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                              UNNECESSARY} and the new big decimal cannot be represented
+     *                              within the given precision without rounding.
+     * @throws NullPointerException if {@code unscaledVal == null}.
      */
     public TBigDecimal(TBigInteger unscaledVal, int scale, TMathContext mc) {
         this(unscaledVal, scale);
@@ -766,11 +615,10 @@ class TBigDecimal  {
      * Constructs a new {@code BigDecimal} instance from the given int
      * {@code val}. The scale of the result is 0.
      *
-     * @param val
-     *            int value to be converted to a {@code BigDecimal} instance.
+     * @param val int value to be converted to a {@code BigDecimal} instance.
      */
     public TBigDecimal(int val) {
-        this(val,0);
+        this(val, 0);
     }
 
     /**
@@ -778,17 +626,14 @@ class TBigDecimal  {
      * val}. The scale of the result is {@code 0}. The result is rounded
      * according to the specified math context.
      *
-     * @param val
-     *            int value to be converted to a {@code BigDecimal} instance.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code c.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
+     * @param val int value to be converted to a {@code BigDecimal} instance.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException if {@code mc.precision > 0} and {@code c.roundingMode ==
+     *                             UNNECESSARY} and the new big decimal cannot be represented
+     *                             within the given precision without rounding.
      */
     public TBigDecimal(int val, TMathContext mc) {
-        this(val,0);
+        this(val, 0);
         inplaceRound(mc);
     }
 
@@ -796,11 +641,10 @@ class TBigDecimal  {
      * Constructs a new {@code BigDecimal} instance from the given long {@code
      * val}. The scale of the result is {@code 0}.
      *
-     * @param val
-     *            long value to be converted to a {@code BigDecimal} instance.
+     * @param val long value to be converted to a {@code BigDecimal} instance.
      */
     public TBigDecimal(long val) {
-        this(val,0);
+        this(val, 0);
     }
 
     /**
@@ -808,18 +652,112 @@ class TBigDecimal  {
      * val}. The scale of the result is {@code 0}. The result is rounded
      * according to the specified math context.
      *
-     * @param val
-     *            long value to be converted to a {@code BigDecimal} instance.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and the new big decimal cannot be represented
-     *             within the given precision without rounding.
+     * @param val long value to be converted to a {@code BigDecimal} instance.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                             UNNECESSARY} and the new big decimal cannot be represented
+     *                             within the given precision without rounding.
      */
     public TBigDecimal(long val, TMathContext mc) {
         this(val);
         inplaceRound(mc);
+    }
+
+    /**
+     * <p>
+     * Determines the number of trailing zeros in the <code>long</code> passed
+     * after the {@link #lowestOneBit(long) lowest one bit}.
+     * </p>
+     *
+     * @param lng The <code>long</code> to process.
+     * @return The number of trailing zeros.
+     * @since 1.5
+     */
+    static int numberOfTrailingZeros(long lng) {
+        return bitCount((lng & -lng) - 1);
+    }
+
+    /**
+     * <p>
+     * Determines the number of leading zeros in the <code>long</code> passed
+     * prior to the {@link #highestOneBit(long) highest one bit}.
+     * </p>
+     *
+     * @param lng The <code>long</code> to process.
+     * @return The number of leading zeros.
+     * @since 1.5
+     */
+    public static int numberOfLeadingZeros(long lng) {
+        lng |= lng >> 1;
+        lng |= lng >> 2;
+        lng |= lng >> 4;
+        lng |= lng >> 8;
+        lng |= lng >> 16;
+        lng |= lng >> 32;
+        return bitCount(~lng);
+    }
+
+    /**
+     * <p>
+     * Counts the number of 1 bits in the <code>long</code> value passed; this
+     * is sometimes referred to as a population count.
+     * </p>
+     *
+     * @param lng The <code>long</code> value to process.
+     * @return The number of 1 bits.
+     * @since 1.5
+     */
+    static int bitCount(long lng) {
+        lng = (lng & 0x5555555555555555L) + ((lng >> 1) & 0x5555555555555555L);
+        lng = (lng & 0x3333333333333333L) + ((lng >> 2) & 0x3333333333333333L);
+        // adjust for 64-bit integer
+        int i = (int) ((lng >>> 32) + lng);
+        i = (i & 0x0F0F0F0F) + ((i >> 4) & 0x0F0F0F0F);
+        i = (i & 0x00FF00FF) + ((i >> 8) & 0x00FF00FF);
+        i = (i & 0x0000FFFF) + ((i >> 16) & 0x0000FFFF);
+        return i;
+    }
+
+    /**
+     * <p>
+     * The <code>signum</code> function for <code>long</code> values. This
+     * method returns -1 for negative values, 1 for positive values and 0 for
+     * the value 0.
+     * </p>
+     *
+     * @param lng The <code>long</code> value.
+     * @return -1 if negative, 1 if positive otherwise 0.
+     * @since 1.5
+     */
+    static int signum(long lng) {
+        return (lng == 0 ? 0 : (lng < 0 ? -1 : 1));
+    }
+
+    static char forDigit(int digit, int radix) {
+        if (radix < 2 || radix > 36 || digit >= radix) {
+            return '\0';
+        }
+        return digit < 10 ? (char) ('0' + digit) : (char) ('a' + digit - 10);
+    }
+
+    /**
+     * <p>
+     * Determines the highest (leftmost) bit that is 1 and returns the value
+     * that is the bit mask for that bit. This is sometimes referred to as the
+     * Most Significant 1 Bit.
+     * </p>
+     *
+     * @param i The <code>int</code> to interrogate.
+     * @return The bit mask indicating the highest 1 bit.
+     * @since 1.5
+     */
+    static int highestOneBit(int i) {
+        i |= (i >> 1);
+        i |= (i >> 2);
+        i |= (i >> 4);
+        i |= (i >> 8);
+        i |= (i >> 16);
+        return (i & ~(i >>> 1));
     }
 
     /* Public Methods */
@@ -829,13 +767,11 @@ class TBigDecimal  {
      * unscaledVal} 10^(-{@code scale}). The scale of the result is {@code
      * scale}, and its unscaled value is {@code unscaledVal}.
      *
-     * @param unscaledVal
-     *            unscaled value to be used to construct the new {@code
-     *            BigDecimal}.
-     * @param scale
-     *            scale to be used to construct the new {@code BigDecimal}.
+     * @param unscaledVal unscaled value to be used to construct the new {@code
+     *                    BigDecimal}.
+     * @param scale       scale to be used to construct the new {@code BigDecimal}.
      * @return {@code BigDecimal} instance with the value {@code unscaledVal}*
-     *         10^(-{@code unscaledVal}).
+     * 10^(-{@code unscaledVal}).
      */
     public static TBigDecimal valueOf(long unscaledVal, int scale) {
         if (scale == 0) {
@@ -853,15 +789,14 @@ class TBigDecimal  {
      * unscaledVal}. The scale of the result is {@code 0}, and its unscaled
      * value is {@code unscaledVal}.
      *
-     * @param unscaledVal
-     *            value to be converted to a {@code BigDecimal}.
+     * @param unscaledVal value to be converted to a {@code BigDecimal}.
      * @return {@code BigDecimal} instance with the value {@code unscaledVal}.
      */
     public static TBigDecimal valueOf(long unscaledVal) {
         if ((unscaledVal >= 0) && (unscaledVal < BI_SCALED_BY_ZERO_LENGTH)) {
-            return BI_SCALED_BY_ZERO[(int)unscaledVal];
+            return BI_SCALED_BY_ZERO[(int) unscaledVal];
         }
-        return new TBigDecimal(unscaledVal,0);
+        return new TBigDecimal(unscaledVal, 0);
     }
 
     /**
@@ -876,11 +811,9 @@ class TBigDecimal  {
      * unscaled value {@code 1000000000000000055511151231257827021181583404541015625}
      * and the scale {@code 55}.
      *
-     * @param val
-     *            double value to be converted to a {@code BigDecimal}.
+     * @param val double value to be converted to a {@code BigDecimal}.
      * @return {@code BigDecimal} instance with the value {@code val}.
-     * @throws NumberFormatException
-     *             if {@code val} is infinite or {@code val} is not a number
+     * @throws NumberFormatException if {@code val} is infinite or {@code val} is not a number
      */
     public static TBigDecimal valueOf(double val) {
         if (Double.isInfinite(val) || Double.isNaN(val)) {
@@ -889,16 +822,184 @@ class TBigDecimal  {
         return new TBigDecimal(Double.toString(val));
     }
 
+    private static TBigDecimal addAndMult10(TBigDecimal thisValue, TBigDecimal augend, int diffScale) {
+        if (diffScale < LONG_TEN_POW.length &&
+                Math.max(thisValue.bitLength, augend.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale]) + 1 < 64) {
+            return valueOf(thisValue.smallValue + augend.smallValue * LONG_TEN_POW[diffScale], thisValue.scale);
+        }
+        return new TBigDecimal(thisValue.getUnscaledValue().add(
+                TMultiplication.multiplyByTenPow(augend.getUnscaledValue(), diffScale)), thisValue.scale);
+    }
+
+    private static TBigDecimal divideBigIntegers(TBigInteger scaledDividend, TBigInteger scaledDivisor, int scale,
+                                                 TRoundingMode roundingMode) {
+        TBigInteger[] quotAndRem = scaledDividend.divideAndRemainder(scaledDivisor);  // quotient and remainder
+        // If after division there is a remainder...
+        TBigInteger quotient = quotAndRem[0];
+        TBigInteger remainder = quotAndRem[1];
+        if (remainder.signum() == 0) {
+            return new TBigDecimal(quotient, scale);
+        }
+        int sign = scaledDividend.signum() * scaledDivisor.signum();
+        int compRem;                                      // 'compare to remainder'
+        if (scaledDivisor.bitLength() < 63) { // 63 in order to avoid out of long after <<1
+            long rem = remainder.longValue();
+            long divisor = scaledDivisor.longValue();
+            compRem = longCompareTo(Math.abs(rem) << 1, Math.abs(divisor));
+            // To look if there is a carry
+            compRem = roundingBehavior(quotient.testBit(0) ? 1 : 0,
+                    sign * (5 + compRem), roundingMode);
+
+        } else {
+            // Checking if:  remainder * 2 >= scaledDivisor
+            compRem = remainder.abs().shiftLeftOneBit().compareTo(scaledDivisor.abs());
+            compRem = roundingBehavior(quotient.testBit(0) ? 1 : 0, sign * (5 + compRem), roundingMode);
+        }
+        if (compRem != 0) {
+            if (quotient.bitLength() < 63) {
+                return valueOf(quotient.longValue() + compRem, scale);
+            }
+            quotient = quotient.add(TBigInteger.valueOf(compRem));
+            return new TBigDecimal(quotient, scale);
+        }
+        // Constructing the result with the appropriate unscaled value
+        return new TBigDecimal(quotient, scale);
+    }
+
+    private static TBigDecimal dividePrimitiveLongs(long scaledDividend, long scaledDivisor, int scale,
+                                                    TRoundingMode roundingMode) {
+        long quotient = scaledDividend / scaledDivisor;
+        long remainder = scaledDividend % scaledDivisor;
+        int sign = signum(scaledDividend) * signum(scaledDivisor);
+        if (remainder != 0) {
+            // Checking if:  remainder * 2 >= scaledDivisor
+            int compRem;                                      // 'compare to remainder'
+            compRem = longCompareTo(Math.abs(remainder) << 1, Math.abs(scaledDivisor));
+            // To look if there is a carry
+            quotient += roundingBehavior(((int) quotient) & 1, sign * (5 + compRem), roundingMode);
+        }
+        // Constructing the result with the appropriate unscaled value
+        return valueOf(quotient, scale);
+    }
+
+    private static int longCompareTo(long value1, long value2) {
+        return value1 > value2 ? 1 : (value1 < value2 ? -1 : 0);
+    }
+
+    /**
+     * Return an increment that can be -1,0 or 1, depending of
+     * {@code roundingMode}.
+     *
+     * @param parityBit    can be 0 or 1, it's only used in the case
+     *                     {@code HALF_EVEN}
+     * @param fraction     the mantisa to be analyzed
+     * @param roundingMode the type of rounding
+     * @return the carry propagated after rounding
+     */
+    private static int roundingBehavior(int parityBit, int fraction, TRoundingMode roundingMode) {
+        int increment = 0; // the carry after rounding
+
+        switch (roundingMode) {
+            case UNNECESSARY:
+                if (fraction != 0) {
+                    throw new ArithmeticException("Rounding necessary");
+                }
+                break;
+            case UP:
+                increment = signum(fraction);
+                break;
+            case DOWN:
+                break;
+            case CEILING:
+                increment = Math.max(signum(fraction), 0);
+                break;
+            case FLOOR:
+                increment = Math.min(signum(fraction), 0);
+                break;
+            case HALF_UP:
+                if (Math.abs(fraction) >= 5) {
+                    increment = signum(fraction);
+                }
+                break;
+            case HALF_DOWN:
+                if (Math.abs(fraction) > 5) {
+                    increment = signum(fraction);
+                }
+                break;
+            case HALF_EVEN:
+                if (Math.abs(fraction) + parityBit > 5) {
+                    increment = signum(fraction);
+                }
+                break;
+        }
+        return increment;
+    }
+
+    /**
+     * It tests if a scale of type {@code long} fits in 32 bits. It
+     * returns the same scale being casted to {@code int} type when is
+     * possible, otherwise throws an exception.
+     *
+     * @param longScale a 64 bit scale
+     * @return a 32 bit scale when is possible
+     * @throws ArithmeticException when {@code scale} doesn't
+     *                             fit in {@code int} type
+     * @see #scale
+     */
+    private static int toIntScale(long longScale) {
+        if (longScale < Integer.MIN_VALUE) {
+            throw new ArithmeticException("Overflow");
+        } else if (longScale > Integer.MAX_VALUE) {
+            throw new ArithmeticException("Underflow");
+        } else {
+            return (int) longScale;
+        }
+    }
+
+    /**
+     * It returns the value 0 with the most approximated scale of type
+     * {@code int}. if {@code longScale > Integer.MAX_VALUE} the
+     * scale will be {@code Integer.MAX_VALUE}; if
+     * {@code longScale < Integer.MIN_VALUE} the scale will be
+     * {@code Integer.MIN_VALUE}; otherwise {@code longScale} is
+     * casted to the type {@code int}.
+     *
+     * @param longScale the scale to which the value 0 will be scaled.
+     * @return the value 0 scaled by the closer scale of type {@code int}.
+     * @see #scale
+     */
+    private static TBigDecimal zeroScaledBy(long longScale) {
+        if (longScale == (int) longScale) {
+            return valueOf(0, (int) longScale);
+        }
+        if (longScale >= 0) {
+            return new TBigDecimal(0, Integer.MAX_VALUE);
+        }
+        return new TBigDecimal(0, Integer.MIN_VALUE);
+    }
+
+    private static int bitLength(long smallValue) {
+        if (smallValue < 0) {
+            smallValue = ~smallValue;
+        }
+        return 64 - numberOfLeadingZeros(smallValue);
+    }
+
+    private static int bitLength(int smallValue) {
+        if (smallValue < 0) {
+            smallValue = ~smallValue;
+        }
+        return 32 - numberOfLeadingZeros(smallValue);
+    }
+
     /**
      * Returns a new {@code BigDecimal} whose value is {@code this + augend}.
      * The scale of the result is the maximum of the scales of the two
      * arguments.
      *
-     * @param augend
-     *            value to be added to {@code this}.
+     * @param augend value to be added to {@code this}.
      * @return {@code this + augend}.
-     * @throws NullPointerException
-     *             if {@code augend == null}.
+     * @throws NullPointerException if {@code augend == null}.
      */
     public TBigDecimal add(TBigDecimal augend) {
         int diffScale = this.scale - augend.scale;
@@ -930,32 +1031,20 @@ class TBigDecimal  {
         }
     }
 
-    private static TBigDecimal addAndMult10(TBigDecimal thisValue,TBigDecimal augend, int diffScale) {
-        if(diffScale < LONG_TEN_POW.length &&
-                Math.max(thisValue.bitLength, augend.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale]) + 1 < 64) {
-            return valueOf(thisValue.smallValue + augend.smallValue * LONG_TEN_POW[diffScale], thisValue.scale);
-        }
-        return new TBigDecimal(thisValue.getUnscaledValue().add(
-                TMultiplication.multiplyByTenPow(augend.getUnscaledValue(),diffScale)), thisValue.scale);
-    }
-
     /**
      * Returns a new {@code BigDecimal} whose value is {@code this + augend}.
      * The result is rounded according to the passed context {@code mc}.
      *
-     * @param augend
-     *            value to be added to {@code this}.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param augend value to be added to {@code this}.
+     * @param mc     rounding mode and precision for the result of this operation.
      * @return {@code this + augend}.
-     * @throws NullPointerException
-     *             if {@code augend == null} or {@code mc == null}.
+     * @throws NullPointerException if {@code augend == null} or {@code mc == null}.
      */
     public TBigDecimal add(TBigDecimal augend, TMathContext mc) {
         TBigDecimal larger; // operand with the largest unscaled value
         TBigDecimal smaller; // operand with the smallest unscaled value
         TBigInteger tempBI;
-        long diffScale = (long)this.scale - augend.scale;
+        long diffScale = (long) this.scale - augend.scale;
         int largerSignum;
         // Some operand is zero or the precision is infinity
         if ((augend.isZero()) || (this.isZero()) || (mc.getPrecision() == 0)) {
@@ -993,11 +1082,9 @@ class TBigDecimal  {
      * Returns a new {@code BigDecimal} whose value is {@code this - subtrahend}.
      * The scale of the result is the maximum of the scales of the two arguments.
      *
-     * @param subtrahend
-     *            value to be subtracted from {@code this}.
+     * @param subtrahend value to be subtracted from {@code this}.
      * @return {@code this - subtrahend}.
-     * @throws NullPointerException
-     *             if {@code subtrahend == null}.
+     * @throws NullPointerException if {@code subtrahend == null}.
      */
     public TBigDecimal subtract(TBigDecimal subtrahend) {
         int diffScale = this.scale - subtrahend.scale;
@@ -1018,22 +1105,22 @@ class TBigDecimal  {
         if (diffScale == 0) {
             // case s1 = s2 : [u1 - u2 , s1]
             if (Math.max(this.bitLength, subtrahend.bitLength) + 1 < 64) {
-                return valueOf(this.smallValue - subtrahend.smallValue,this.scale);
+                return valueOf(this.smallValue - subtrahend.smallValue, this.scale);
             }
             return new TBigDecimal(this.getUnscaledValue().subtract(subtrahend.getUnscaledValue()), this.scale);
         } else if (diffScale > 0) {
             // case s1 > s2 : [ u1 - u2 * 10 ^ (s1 - s2) , s1 ]
-            if(diffScale < LONG_TEN_POW.length &&
+            if (diffScale < LONG_TEN_POW.length &&
                     Math.max(this.bitLength, subtrahend.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale]) + 1 < 64) {
                 return valueOf(this.smallValue - subtrahend.smallValue * LONG_TEN_POW[diffScale], this.scale);
             }
             return new TBigDecimal(this.getUnscaledValue().subtract(
-                    TMultiplication.multiplyByTenPow(subtrahend.getUnscaledValue(),diffScale)), this.scale);
+                    TMultiplication.multiplyByTenPow(subtrahend.getUnscaledValue(), diffScale)), this.scale);
         } else {// case s2 > s1 : [ u1 * 10 ^ (s2 - s1) - u2 , s2 ]
             diffScale = -diffScale;
-            if(diffScale < LONG_TEN_POW.length &&
+            if (diffScale < LONG_TEN_POW.length &&
                     Math.max(this.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale], subtrahend.bitLength) + 1 < 64) {
-                return valueOf(this.smallValue * LONG_TEN_POW[diffScale] - subtrahend.smallValue,subtrahend.scale);
+                return valueOf(this.smallValue * LONG_TEN_POW[diffScale] - subtrahend.smallValue, subtrahend.scale);
             }
             return new TBigDecimal(TMultiplication.multiplyByTenPow(this.getUnscaledValue(), diffScale)
                     .subtract(subtrahend.getUnscaledValue()), subtrahend.scale);
@@ -1044,16 +1131,13 @@ class TBigDecimal  {
      * Returns a new {@code BigDecimal} whose value is {@code this - subtrahend}.
      * The result is rounded according to the passed context {@code mc}.
      *
-     * @param subtrahend
-     *            value to be subtracted from {@code this}.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param subtrahend value to be subtracted from {@code this}.
+     * @param mc         rounding mode and precision for the result of this operation.
      * @return {@code this - subtrahend}.
-     * @throws NullPointerException
-     *             if {@code subtrahend == null} or {@code mc == null}.
+     * @throws NullPointerException if {@code subtrahend == null} or {@code mc == null}.
      */
     public TBigDecimal subtract(TBigDecimal subtrahend, TMathContext mc) {
-        long diffScale = subtrahend.scale - (long)this.scale;
+        long diffScale = subtrahend.scale - (long) this.scale;
         int thisSignum;
         TBigDecimal leftOperand; // it will be only the left operand (this)
         TBigInteger tempBI;
@@ -1088,22 +1172,20 @@ class TBigDecimal  {
      * multiplicand}. The scale of the result is the sum of the scales of the
      * two arguments.
      *
-     * @param multiplicand
-     *            value to be multiplied with {@code this}.
+     * @param multiplicand value to be multiplied with {@code this}.
      * @return {@code this * multiplicand}.
-     * @throws NullPointerException
-     *             if {@code multiplicand == null}.
+     * @throws NullPointerException if {@code multiplicand == null}.
      */
     public TBigDecimal multiply(TBigDecimal multiplicand) {
-        long newScale = (long)this.scale + multiplicand.scale;
+        long newScale = (long) this.scale + multiplicand.scale;
 
         if (isZero() || multiplicand.isZero()) {
             return zeroScaledBy(newScale);
         }
         /* Let be: this = [u1,s1] and multiplicand = [u2,s2] so:
          * this x multiplicand = [ s1 * s2 , s1 + s2 ] */
-        if(this.bitLength + multiplicand.bitLength < 64) {
-            return valueOf(this.smallValue*multiplicand.smallValue, toIntScale(newScale));
+        if (this.bitLength + multiplicand.bitLength < 64) {
+            return valueOf(this.smallValue * multiplicand.smallValue, toIntScale(newScale));
         }
         return new TBigDecimal(this.getUnscaledValue().multiply(
                 multiplicand.getUnscaledValue()), toIntScale(newScale));
@@ -1114,13 +1196,10 @@ class TBigDecimal  {
      * multiplicand}. The result is rounded according to the passed context
      * {@code mc}.
      *
-     * @param multiplicand
-     *            value to be multiplied with {@code this}.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param multiplicand value to be multiplied with {@code this}.
+     * @param mc           rounding mode and precision for the result of this operation.
      * @return {@code this * multiplicand}.
-     * @throws NullPointerException
-     *             if {@code multiplicand == null} or {@code mc == null}.
+     * @throws NullPointerException if {@code multiplicand == null} or {@code mc == null}.
      */
     public TBigDecimal multiply(TBigDecimal multiplicand, TMathContext mc) {
         TBigDecimal result = multiply(multiplicand);
@@ -1135,23 +1214,16 @@ class TBigDecimal  {
      * is required to meet the specified scale, then the specified rounding mode
      * {@code roundingMode} is applied.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param scale
-     *            the scale of the result returned.
-     * @param roundingMode
-     *            rounding mode to be used to round the result.
+     * @param divisor      value by which {@code this} is divided.
+     * @param scale        the scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
      * @return {@code this / divisor} rounded according to the given rounding
-     *         mode.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws IllegalArgumentException
-     *             if {@code roundingMode} is not a valid rounding mode.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
-     *             necessary according to the given scale.
+     * mode.
+     * @throws NullPointerException     if {@code divisor == null}.
+     * @throws IllegalArgumentException if {@code roundingMode} is not a valid rounding mode.
+     * @throws ArithmeticException      if {@code divisor == 0}.
+     * @throws ArithmeticException      if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                                  necessary according to the given scale.
      */
     public TBigDecimal divide(TBigDecimal divisor, int scale, int roundingMode) {
         return divide(divisor, scale, TRoundingMode.valueOf(roundingMode));
@@ -1163,22 +1235,16 @@ class TBigDecimal  {
      * is required to meet the specified scale, then the specified rounding mode
      * {@code roundingMode} is applied.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param scale
-     *            the scale of the result returned.
-     * @param roundingMode
-     *            rounding mode to be used to round the result.
+     * @param divisor      value by which {@code this} is divided.
+     * @param scale        the scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
      * @return {@code this / divisor} rounded according to the given rounding
-     *         mode.
-     * @throws NullPointerException
-     *             if {@code divisor == null} or {@code roundingMode == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if {@code roundingMode == RoundingMode.UNNECESSAR}Y and
-     *             rounding is necessary according to the given scale and given
-     *             precision.
+     * mode.
+     * @throws NullPointerException if {@code divisor == null} or {@code roundingMode == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code roundingMode == RoundingMode.UNNECESSAR}Y and
+     *                              rounding is necessary according to the given scale and given
+     *                              precision.
      */
     public TBigDecimal divide(TBigDecimal divisor, int scale, TRoundingMode roundingMode) {
         // Let be: this = [u1,s1]  and  divisor = [u2,s2]
@@ -1189,22 +1255,22 @@ class TBigDecimal  {
             throw new ArithmeticException("Division by zero");
         }
 
-        long diffScale = ((long)this.scale - divisor.scale) - scale;
-        if(this.bitLength < 64 && divisor.bitLength < 64 ) {
-            if(diffScale == 0) {
+        long diffScale = ((long) this.scale - divisor.scale) - scale;
+        if (this.bitLength < 64 && divisor.bitLength < 64) {
+            if (diffScale == 0) {
                 return dividePrimitiveLongs(this.smallValue, divisor.smallValue, scale, roundingMode);
-            } else if(diffScale > 0) {
-                if(diffScale < LONG_TEN_POW.length &&
-                        divisor.bitLength + LONG_TEN_POW_BIT_LENGTH[(int)diffScale] < 64) {
+            } else if (diffScale > 0) {
+                if (diffScale < LONG_TEN_POW.length &&
+                        divisor.bitLength + LONG_TEN_POW_BIT_LENGTH[(int) diffScale] < 64) {
                     return dividePrimitiveLongs(this.smallValue,
-                            divisor.smallValue*LONG_TEN_POW[(int)diffScale],
+                            divisor.smallValue * LONG_TEN_POW[(int) diffScale],
                             scale,
                             roundingMode);
                 }
             } else { // diffScale < 0
-                if(-diffScale < LONG_TEN_POW.length &&
-                        this.bitLength + LONG_TEN_POW_BIT_LENGTH[(int)-diffScale] < 64) {
-                    return dividePrimitiveLongs(this.smallValue*LONG_TEN_POW[(int)-diffScale],
+                if (-diffScale < LONG_TEN_POW.length &&
+                        this.bitLength + LONG_TEN_POW_BIT_LENGTH[(int) -diffScale] < 64) {
+                    return dividePrimitiveLongs(this.smallValue * LONG_TEN_POW[(int) -diffScale],
                             divisor.smallValue, scale, roundingMode);
                 }
             }
@@ -1214,63 +1280,12 @@ class TBigDecimal  {
 
         if (diffScale > 0) {
             // Multiply 'u2'  by:  10^((s1 - s2) - scale)
-            scaledDivisor = TMultiplication.multiplyByTenPow(scaledDivisor, (int)diffScale);
+            scaledDivisor = TMultiplication.multiplyByTenPow(scaledDivisor, (int) diffScale);
         } else if (diffScale < 0) {
             // Multiply 'u1'  by:  10^(scale - (s1 - s2))
-            scaledDividend  = TMultiplication.multiplyByTenPow(scaledDividend, (int)-diffScale);
+            scaledDividend = TMultiplication.multiplyByTenPow(scaledDividend, (int) -diffScale);
         }
         return divideBigIntegers(scaledDividend, scaledDivisor, scale, roundingMode);
-        }
-
-    private static TBigDecimal divideBigIntegers(TBigInteger scaledDividend, TBigInteger scaledDivisor, int scale,
-            TRoundingMode roundingMode) {
-        TBigInteger[] quotAndRem = scaledDividend.divideAndRemainder(scaledDivisor);  // quotient and remainder
-        // If after division there is a remainder...
-        TBigInteger quotient = quotAndRem[0];
-        TBigInteger remainder = quotAndRem[1];
-        if (remainder.signum() == 0) {
-            return new TBigDecimal(quotient, scale);
-        }
-        int sign = scaledDividend.signum() * scaledDivisor.signum();
-        int compRem;                                      // 'compare to remainder'
-        if(scaledDivisor.bitLength() < 63) { // 63 in order to avoid out of long after <<1
-            long rem = remainder.longValue();
-            long divisor = scaledDivisor.longValue();
-            compRem = longCompareTo(Math.abs(rem) << 1,Math.abs(divisor));
-            // To look if there is a carry
-            compRem = roundingBehavior(quotient.testBit(0) ? 1 : 0,
-                    sign * (5 + compRem), roundingMode);
-
-        } else {
-            // Checking if:  remainder * 2 >= scaledDivisor
-            compRem = remainder.abs().shiftLeftOneBit().compareTo(scaledDivisor.abs());
-            compRem = roundingBehavior(quotient.testBit(0) ? 1 : 0, sign * (5 + compRem), roundingMode);
-        }
-        if (compRem != 0) {
-            if(quotient.bitLength() < 63) {
-                return valueOf(quotient.longValue() + compRem,scale);
-            }
-            quotient = quotient.add(TBigInteger.valueOf(compRem));
-            return new TBigDecimal(quotient, scale);
-        }
-        // Constructing the result with the appropriate unscaled value
-        return new TBigDecimal(quotient, scale);
-    }
-
-    private static TBigDecimal dividePrimitiveLongs(long scaledDividend, long scaledDivisor, int scale,
-            TRoundingMode roundingMode) {
-        long quotient = scaledDividend / scaledDivisor;
-        long remainder = scaledDividend % scaledDivisor;
-        int sign = signum( scaledDividend ) * signum(scaledDivisor);
-        if (remainder != 0) {
-            // Checking if:  remainder * 2 >= scaledDivisor
-            int compRem;                                      // 'compare to remainder'
-            compRem = longCompareTo(Math.abs(remainder) << 1, Math.abs(scaledDivisor));
-            // To look if there is a carry
-            quotient += roundingBehavior(((int)quotient) & 1, sign * (5 + compRem), roundingMode);
-        }
-        // Constructing the result with the appropriate unscaled value
-        return valueOf(quotient, scale);
     }
 
     /**
@@ -1279,21 +1294,15 @@ class TBigDecimal  {
      * required to meet the specified scale, then the specified rounding mode
      * {@code roundingMode} is applied.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param roundingMode
-     *            rounding mode to be used to round the result.
+     * @param divisor      value by which {@code this} is divided.
+     * @param roundingMode rounding mode to be used to round the result.
      * @return {@code this / divisor} rounded according to the given rounding
-     *         mode.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws IllegalArgumentException
-     *             if {@code roundingMode} is not a valid rounding mode.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
-     *             necessary according to the scale of this.
+     * mode.
+     * @throws NullPointerException     if {@code divisor == null}.
+     * @throws IllegalArgumentException if {@code roundingMode} is not a valid rounding mode.
+     * @throws ArithmeticException      if {@code divisor == 0}.
+     * @throws ArithmeticException      if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                                  necessary according to the scale of this.
      */
     public TBigDecimal divide(TBigDecimal divisor, int roundingMode) {
         return divide(divisor, scale, TRoundingMode.valueOf(roundingMode));
@@ -1305,19 +1314,14 @@ class TBigDecimal  {
      * required to meet the specified scale, then the specified rounding mode
      * {@code roundingMode} is applied.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param roundingMode
-     *            rounding mode to be used to round the result.
+     * @param divisor      value by which {@code this} is divided.
+     * @param roundingMode rounding mode to be used to round the result.
      * @return {@code this / divisor} rounded according to the given rounding
-     *         mode.
-     * @throws NullPointerException
-     *             if {@code divisor == null} or {@code roundingMode == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if {@code roundingMode == RoundingMode.UNNECESSARY} and
-     *             rounding is necessary according to the scale of this.
+     * mode.
+     * @throws NullPointerException if {@code divisor == null} or {@code roundingMode == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code roundingMode == RoundingMode.UNNECESSARY} and
+     *                              rounding is necessary according to the scale of this.
      */
     public TBigDecimal divide(TBigDecimal divisor, TRoundingMode roundingMode) {
         return divide(divisor, scale, roundingMode);
@@ -1330,22 +1334,18 @@ class TBigDecimal  {
      * scale is adjusted accordingly. For example, {@code 1/128 = 0.0078125}
      * which has a scale of {@code 7} and precision {@code 5}.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
+     * @param divisor value by which {@code this} is divided.
      * @return {@code this / divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if the result cannot be represented exactly.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if the result cannot be represented exactly.
      */
     public TBigDecimal divide(TBigDecimal divisor) {
         TBigInteger p = this.getUnscaledValue();
         TBigInteger q = divisor.getUnscaledValue();
         TBigInteger gcd; // greatest common divisor between 'p' and 'q'
         TBigInteger quotAndRem[];
-        long diffScale = (long)scale - divisor.scale;
+        long diffScale = (long) scale - divisor.scale;
         int newScale; // the new scale for final quotient
         int k; // number of factors "2" in 'q'
         int l = 0; // number of factors "5" in 'q'
@@ -1395,7 +1395,7 @@ class TBigDecimal  {
         i = k - l;
 
         p = (i > 0) ? TMultiplication.multiplyByFivePow(p, i)
-        : p.shiftLeft(-i);
+                : p.shiftLeft(-i);
         return new TBigDecimal(p, newScale);
     }
 
@@ -1405,24 +1405,19 @@ class TBigDecimal  {
      * passed math context specifies precision {@code 0}, then this call is
      * equivalent to {@code this.divide(divisor)}.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      rounding mode and precision for the result of this operation.
      * @return {@code this / divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null} or {@code mc == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if {@code mc.getRoundingMode() == UNNECESSARY} and rounding
-     *             is necessary according {@code mc.getPrecision()}.
+     * @throws NullPointerException if {@code divisor == null} or {@code mc == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code mc.getRoundingMode() == UNNECESSARY} and rounding
+     *                              is necessary according {@code mc.getPrecision()}.
      */
     public TBigDecimal divide(TBigDecimal divisor, TMathContext mc) {
         /* Calculating how many zeros must be append to 'dividend'
          * to obtain a  quotient with at least 'mc.precision()' digits */
         long traillingZeros = mc.getPrecision() + 2L + divisor.aproxPrecision() - aproxPrecision();
-        long diffScale = (long)scale - divisor.scale;
+        long diffScale = (long) scale - divisor.scale;
         long newScale = diffScale; // scale of the final quotient
         int compRem; // to compare the remainder
         int i = 1; // index
@@ -1431,23 +1426,23 @@ class TBigDecimal  {
         TBigInteger quotAndRem[] = {getUnscaledValue()};
         // In special cases it reduces the problem to call the dual method
         if ((mc.getPrecision() == 0) || (this.isZero())
-        || (divisor.isZero())) {
+                || (divisor.isZero())) {
             return this.divide(divisor);
         }
         if (traillingZeros > 0) {
             // To append trailing zeros at end of dividend
-            quotAndRem[0] = getUnscaledValue().multiply( TMultiplication.powerOf10(traillingZeros) );
+            quotAndRem[0] = getUnscaledValue().multiply(TMultiplication.powerOf10(traillingZeros));
             newScale += traillingZeros;
         }
-        quotAndRem = quotAndRem[0].divideAndRemainder( divisor.getUnscaledValue() );
+        quotAndRem = quotAndRem[0].divideAndRemainder(divisor.getUnscaledValue());
         integerQuot = quotAndRem[0];
         // Calculating the exact quotient with at least 'mc.precision()' digits
         if (quotAndRem[1].signum() != 0) {
             // Checking if:   2 * remainder >= divisor ?
-            compRem = quotAndRem[1].shiftLeftOneBit().compareTo( divisor.getUnscaledValue() );
+            compRem = quotAndRem[1].shiftLeftOneBit().compareTo(divisor.getUnscaledValue());
             // quot := quot * 10 + r;     with 'r' in {-6,-5,-4, 0,+4,+5,+6}
             integerQuot = integerQuot.multiply(TBigInteger.TEN)
-            .add(TBigInteger.valueOf(quotAndRem[0].signum() * (5 + compRem)));
+                    .add(TBigInteger.valueOf(quotAndRem[0].signum() * (5 + compRem)));
             newScale++;
         } else {
             // To strip trailing zeros until the preferred scale is reached
@@ -1477,19 +1472,16 @@ class TBigDecimal  {
      * {@code this / divisor}. The quotient is rounded down towards zero to the
      * next integer. For example, {@code 0.5/0.2 = 2}.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
+     * @param divisor value by which {@code this} is divided.
      * @return integral part of {@code this / divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
      */
     public TBigDecimal divideToIntegralValue(TBigDecimal divisor) {
         TBigInteger integralValue; // the integer of result
         TBigInteger powerOfTen; // some power of ten
         TBigInteger quotAndRem[] = {getUnscaledValue()};
-        long newScale = (long)this.scale - divisor.scale;
+        long newScale = (long) this.scale - divisor.scale;
         long tempScale = 0;
         int i = 1;
         int lastPow = TEN_POW.length - 1;
@@ -1498,19 +1490,19 @@ class TBigDecimal  {
             throw new ArithmeticException("Division by zero");
         }
         if ((divisor.aproxPrecision() + newScale > this.aproxPrecision() + 1L)
-        || (this.isZero())) {
+                || (this.isZero())) {
             /* If the divisor's integer part is greater than this's integer part,
              * the result must be zero with the appropriate scale */
             integralValue = TBigInteger.ZERO;
         } else if (newScale == 0) {
-            integralValue = getUnscaledValue().divide( divisor.getUnscaledValue() );
+            integralValue = getUnscaledValue().divide(divisor.getUnscaledValue());
         } else if (newScale > 0) {
             powerOfTen = TMultiplication.powerOf10(newScale);
-            integralValue = getUnscaledValue().divide( divisor.getUnscaledValue().multiply(powerOfTen) );
+            integralValue = getUnscaledValue().divide(divisor.getUnscaledValue().multiply(powerOfTen));
             integralValue = integralValue.multiply(powerOfTen);
         } else {// (newScale < 0)
             powerOfTen = TMultiplication.powerOf10(-newScale);
-            integralValue = getUnscaledValue().multiply(powerOfTen).divide( divisor.getUnscaledValue() );
+            integralValue = getUnscaledValue().multiply(powerOfTen).divide(divisor.getUnscaledValue());
             // To strip trailing zeros approximating to the preferred scale
             while (!integralValue.testBit(0)) {
                 quotAndRem = integralValue.divideAndRemainder(TEN_POW[i]);
@@ -1531,7 +1523,7 @@ class TBigDecimal  {
             newScale = tempScale;
         }
         return ((integralValue.signum() == 0)
-        ? zeroScaledBy(newScale)
+                ? zeroScaledBy(newScale)
                 : new TBigDecimal(integralValue, toIntScale(newScale)));
     }
 
@@ -1542,25 +1534,20 @@ class TBigDecimal  {
      * not considered. But if the precision of {@code mc > 0} and the integral
      * part requires more digits, then an {@code ArithmeticException} is thrown.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param mc
-     *            math context which determines the maximal precision of the
-     *            result.
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      math context which determines the maximal precision of the
+     *                result.
      * @return integral part of {@code this / divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null} or {@code mc == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if {@code mc.getPrecision() > 0} and the result requires more
-     *             digits to be represented.
+     * @throws NullPointerException if {@code divisor == null} or {@code mc == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code mc.getPrecision() > 0} and the result requires more
+     *                              digits to be represented.
      */
     public TBigDecimal divideToIntegralValue(TBigDecimal divisor, TMathContext mc) {
         int mcPrecision = mc.getPrecision();
         int diffPrecision = this.precision() - divisor.precision();
         int lastPow = TEN_POW.length - 1;
-        long diffScale = (long)this.scale - divisor.scale;
+        long diffScale = (long) this.scale - divisor.scale;
         long newScale = diffScale;
         long quotPrecision = diffPrecision - diffScale + 1;
         TBigInteger quotAndRem[] = new TBigInteger[2];
@@ -1573,11 +1560,11 @@ class TBigDecimal  {
             quotAndRem[0] = TBigInteger.ZERO;
         } else if (diffScale == 0) {
             // CASE s1 == s2:  to calculate   u1 / u2
-            quotAndRem[0] = this.getUnscaledValue().divide( divisor.getUnscaledValue() );
+            quotAndRem[0] = this.getUnscaledValue().divide(divisor.getUnscaledValue());
         } else if (diffScale > 0) {
             // CASE s1 >= s2:  to calculate   u1 / (u2 * 10^(s1-s2)
             quotAndRem[0] = this.getUnscaledValue().divide(
-                    divisor.getUnscaledValue().multiply(TMultiplication.powerOf10(diffScale)) );
+                    divisor.getUnscaledValue().multiply(TMultiplication.powerOf10(diffScale)));
             // To chose  10^newScale  to get a quotient with at least 'mc.precision()' digits
             newScale = Math.min(diffScale, Math.max(mcPrecision - quotPrecision + 1, 0));
             // To calculate: (u1 / (u2 * 10^(s1-s2)) * 10^newScale
@@ -1585,7 +1572,7 @@ class TBigDecimal  {
         } else {// CASE s2 > s1:
             /* To calculate the minimum power of ten, such that the quotient
              *   (u1 * 10^exp) / u2   has at least 'mc.precision()' digits. */
-            long exp = Math.min(-diffScale, Math.max((long)mcPrecision - diffPrecision, 0));
+            long exp = Math.min(-diffScale, Math.max((long) mcPrecision - diffPrecision, 0));
             long compRemDiv;
             // Let be:   (u1 * 10^exp) / u2 = [q,r]
             quotAndRem = this.getUnscaledValue().multiply(TMultiplication.powerOf10(exp)).
@@ -1596,7 +1583,7 @@ class TBigDecimal  {
             if ((quotAndRem[1].signum() != 0) && (exp > 0)) {
                 // Log10(r) + ((s2 - s1) - exp) > mc.precision ?
                 compRemDiv = (new TBigDecimal(quotAndRem[1])).precision()
-                + exp - divisor.precision();
+                        + exp - divisor.precision();
                 if (compRemDiv == 0) {
                     // To calculate:  (r * 10^exp2) / u2
                     quotAndRem[1] = quotAndRem[1].multiply(TMultiplication.powerOf10(exp)).
@@ -1622,7 +1609,7 @@ class TBigDecimal  {
             quotAndRem = strippedBI.divideAndRemainder(TEN_POW[i]);
             if ((quotAndRem[1].signum() == 0) &&
                     ((resultPrecision - i >= mcPrecision)
-                    || (newScale - i >= diffScale)) ) {
+                            || (newScale - i >= diffScale))) {
                 resultPrecision -= i;
                 newScale -= i;
                 if (i < lastPow) {
@@ -1651,13 +1638,10 @@ class TBigDecimal  {
      * The remainder is defined as {@code this -
      * this.divideToIntegralValue(divisor) * divisor}.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
+     * @param divisor value by which {@code this} is divided.
      * @return {@code this % divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
      */
     public TBigDecimal remainder(TBigDecimal divisor) {
         return divideAndRemainder(divisor)[1];
@@ -1671,19 +1655,14 @@ class TBigDecimal  {
      * <p>
      * The specified rounding mode {@code mc} is used for the division only.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param mc
-     *            rounding mode and precision to be used.
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      rounding mode and precision to be used.
      * @return {@code this % divisor}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
-     * @throws ArithmeticException
-     *             if {@code mc.getPrecision() > 0} and the result of {@code
-     *             this.divideToIntegralValue(divisor, mc)} requires more digits
-     *             to be represented.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code mc.getPrecision() > 0} and the result of {@code
+     *                              this.divideToIntegralValue(divisor, mc)} requires more digits
+     *                              to be represented.
      */
     public TBigDecimal remainder(TBigDecimal divisor, TMathContext mc) {
         return divideAndRemainder(divisor, mc)[1];
@@ -1695,14 +1674,11 @@ class TBigDecimal  {
      * divisor} at index 1. The quotient is rounded down towards zero to the
      * next integer.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
+     * @param divisor value by which {@code this} is divided.
      * @return {@code [this.divideToIntegralValue(divisor),
-     *         this.remainder(divisor)]}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
+     * this.remainder(divisor)]}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
      * @see #divideToIntegralValue
      * @see #remainder
      */
@@ -1710,7 +1686,7 @@ class TBigDecimal  {
         TBigDecimal quotAndRem[] = new TBigDecimal[2];
 
         quotAndRem[0] = this.divideToIntegralValue(divisor);
-        quotAndRem[1] = this.subtract( quotAndRem[0].multiply(divisor) );
+        quotAndRem[1] = this.subtract(quotAndRem[0].multiply(divisor));
         return quotAndRem;
     }
 
@@ -1722,17 +1698,13 @@ class TBigDecimal  {
      * not considered. But if the precision of {@code mc > 0} and the integral
      * part requires more digits, then an {@code ArithmeticException} is thrown.
      *
-     * @param divisor
-     *            value by which {@code this} is divided.
-     * @param mc
-     *            math context which determines the maximal precision of the
-     *            result.
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      math context which determines the maximal precision of the
+     *                result.
      * @return {@code [this.divideToIntegralValue(divisor),
-     *         this.remainder(divisor)]}.
-     * @throws NullPointerException
-     *             if {@code divisor == null}.
-     * @throws ArithmeticException
-     *             if {@code divisor == 0}.
+     * this.remainder(divisor)]}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
      * @see #divideToIntegralValue
      * @see #remainder
      */
@@ -1740,7 +1712,7 @@ class TBigDecimal  {
         TBigDecimal quotAndRem[] = new TBigDecimal[2];
 
         quotAndRem[0] = this.divideToIntegralValue(divisor, mc);
-        quotAndRem[1] = this.subtract( quotAndRem[0].multiply(divisor) );
+        quotAndRem[1] = this.subtract(quotAndRem[0].multiply(divisor));
         return quotAndRem;
     }
 
@@ -1753,11 +1725,9 @@ class TBigDecimal  {
      * Implementation Note: The implementation is based on the ANSI standard
      * X3.274-1996 algorithm.
      *
-     * @param n
-     *            exponent to which {@code this} is raised.
+     * @param n exponent to which {@code this} is raised.
      * @return {@code this ^ n}.
-     * @throws ArithmeticException
-     *             if {@code n < 0} or {@code n > 999999999}.
+     * @throws ArithmeticException if {@code n < 0} or {@code n > 999999999}.
      */
     public TBigDecimal pow(int n) {
         if (n == 0) {
@@ -1766,11 +1736,11 @@ class TBigDecimal  {
         if ((n < 0) || (n > 999999999)) {
             throw new ArithmeticException("Invalid Operation");
         }
-        long newScale = scale * (long)n;
+        long newScale = scale * (long) n;
         // Let be: this = [u,s]   so:  this^n = [u^n, s*n]
         return ((isZero())
-        ? zeroScaledBy(newScale)
-        : new TBigDecimal(getUnscaledValue().pow(n), toIntScale(newScale)));
+                ? zeroScaledBy(newScale)
+                : new TBigDecimal(getUnscaledValue().pow(n), toIntScale(newScale)));
     }
 
     /**
@@ -1780,19 +1750,16 @@ class TBigDecimal  {
      * Implementation Note: The implementation is based on the ANSI standard
      * X3.274-1996 algorithm.
      *
-     * @param n
-     *            exponent to which {@code this} is raised.
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param n  exponent to which {@code this} is raised.
+     * @param mc rounding mode and precision for the result of this operation.
      * @return {@code this ^ n}.
-     * @throws ArithmeticException
-     *             if {@code n < 0} or {@code n > 999999999}.
+     * @throws ArithmeticException if {@code n < 0} or {@code n > 999999999}.
      */
     public TBigDecimal pow(int n, TMathContext mc) {
         // The ANSI standard X3.274-1996 algorithm
         int m = Math.abs(n);
         int mcPrecision = mc.getPrecision();
-        int elength = (int)MathUtil.log10(m) + 1;   // decimal digits in 'n'
+        int elength = (int) MathUtil.log10(m) + 1;   // decimal digits in 'n'
         int oneBitMask; // mask of bits
         TBigDecimal accum; // the single accumulator
         TMathContext newPrecision = mc; // MathContext by default
@@ -1806,7 +1773,7 @@ class TBigDecimal  {
             throw new ArithmeticException("Invalid Operation");
         }
         if (mcPrecision > 0) {
-            newPrecision = new TMathContext( mcPrecision + elength + 1,
+            newPrecision = new TMathContext(mcPrecision + elength + 1,
                     mc.getRoundingMode());
         }
         // The result is calculated as if 'n' were positive
@@ -1844,8 +1811,7 @@ class TBigDecimal  {
      * {@code this}. The result is rounded according to the passed context
      * {@code mc}.
      *
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param mc rounding mode and precision for the result of this operation.
      * @return {@code abs(this)}
      */
     public TBigDecimal abs(TMathContext mc) {
@@ -1859,8 +1825,8 @@ class TBigDecimal  {
      * @return {@code -this}
      */
     public TBigDecimal negate() {
-        if(bitLength < 63 || (bitLength == 63 && smallValue!=Long.MIN_VALUE)) {
-            return valueOf(-smallValue,scale);
+        if (bitLength < 63 || (bitLength == 63 && smallValue != Long.MIN_VALUE)) {
+            return valueOf(-smallValue, scale);
         }
         return new TBigDecimal(getUnscaledValue().negate(), scale);
     }
@@ -1869,8 +1835,7 @@ class TBigDecimal  {
      * Returns a new {@code BigDecimal} whose value is the {@code -this}. The
      * result is rounded according to the passed context {@code mc}.
      *
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param mc rounding mode and precision for the result of this operation.
      * @return {@code -this}
      */
     public TBigDecimal negate(TMathContext mc) {
@@ -1891,8 +1856,7 @@ class TBigDecimal  {
      * Returns a new {@code BigDecimal} whose value is {@code +this}. The result
      * is rounded according to the passed context {@code mc}.
      *
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param mc rounding mode and precision for the result of this operation.
      * @return {@code this}, rounded
      */
     public TBigDecimal plus(TMathContext mc) {
@@ -1903,11 +1867,12 @@ class TBigDecimal  {
      * Returns the sign of this {@code BigDecimal}.
      *
      * @return {@code -1} if {@code this < 0},
-     *         {@code 0} if {@code this == 0},
-     *         {@code 1} if {@code this > 0}.     */
+     * {@code 0} if {@code this == 0},
+     * {@code 1} if {@code this > 0}.
+     */
     public int signum() {
-        if( bitLength < 64) {
-            return signum( this.smallValue );
+        if (bitLength < 64) {
+            return signum(this.smallValue);
         }
         return getUnscaledValue().signum();
     }
@@ -1988,13 +1953,11 @@ class TBigDecimal  {
      * then an {@code ArithmeticException} is thrown if the result cannot be
      * represented exactly within the given precision.
      *
-     * @param mc
-     *            rounding mode and precision for the result of this operation.
+     * @param mc rounding mode and precision for the result of this operation.
      * @return {@code this} rounded according to the passed context.
-     * @throws ArithmeticException
-     *             if {@code mc.precision > 0} and {@code mc.roundingMode ==
-     *             UNNECESSARY} and this cannot be represented within the given
-     *             precision.
+     * @throws ArithmeticException if {@code mc.precision > 0} and {@code mc.roundingMode ==
+     *                             UNNECESSARY} and this cannot be represented within the given
+     *                             precision.
      */
     public TBigDecimal round(TMathContext mc) {
         TBigDecimal thisBD = new TBigDecimal(getUnscaledValue(), scale);
@@ -2014,40 +1977,36 @@ class TBigDecimal  {
      * unscaled value has to be rounded. For this rounding operation the
      * specified rounding mode is used.
      *
-     * @param newScale
-     *            scale of the result returned.
-     * @param roundingMode
-     *            rounding mode to be used to round the result.
+     * @param newScale     scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
      * @return a new {@code BigDecimal} instance with the specified scale.
-     * @throws NullPointerException
-     *             if {@code roundingMode == null}.
-     * @throws ArithmeticException
-     *             if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
-     *             necessary according to the given scale.
+     * @throws NullPointerException if {@code roundingMode == null}.
+     * @throws ArithmeticException  if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                              necessary according to the given scale.
      */
     public TBigDecimal setScale(int newScale, TRoundingMode roundingMode) {
         if (roundingMode == null) {
             throw new NullPointerException();
         }
-        long diffScale = newScale - (long)scale;
+        long diffScale = newScale - (long) scale;
         // Let be:  'this' = [u,s]
-        if(diffScale == 0) {
+        if (diffScale == 0) {
             return this;
         }
-        if(diffScale > 0) {
-        // return  [u * 10^(s2 - s), newScale]
-            if(diffScale < LONG_TEN_POW.length &&
-                    (this.bitLength + LONG_TEN_POW_BIT_LENGTH[(int)diffScale]) < 64 ) {
-                return valueOf(this.smallValue*LONG_TEN_POW[(int)diffScale],newScale);
+        if (diffScale > 0) {
+            // return  [u * 10^(s2 - s), newScale]
+            if (diffScale < LONG_TEN_POW.length &&
+                    (this.bitLength + LONG_TEN_POW_BIT_LENGTH[(int) diffScale]) < 64) {
+                return valueOf(this.smallValue * LONG_TEN_POW[(int) diffScale], newScale);
             }
-            return new TBigDecimal(TMultiplication.multiplyByTenPow(getUnscaledValue(),(int)diffScale), newScale);
+            return new TBigDecimal(TMultiplication.multiplyByTenPow(getUnscaledValue(), (int) diffScale), newScale);
         }
         // diffScale < 0
         // return  [u,s] / [1,newScale]  with the appropriate scale and rounding
-        if(this.bitLength < 64 && -diffScale < LONG_TEN_POW.length) {
-            return dividePrimitiveLongs(this.smallValue, LONG_TEN_POW[(int)-diffScale], newScale,roundingMode);
+        if (this.bitLength < 64 && -diffScale < LONG_TEN_POW.length) {
+            return dividePrimitiveLongs(this.smallValue, LONG_TEN_POW[(int) -diffScale], newScale, roundingMode);
         }
-        return divideBigIntegers(this.getUnscaledValue(),TMultiplication.powerOf10(-diffScale),newScale,roundingMode);
+        return divideBigIntegers(this.getUnscaledValue(), TMultiplication.powerOf10(-diffScale), newScale, roundingMode);
     }
 
     /**
@@ -2061,16 +2020,12 @@ class TBigDecimal  {
      * unscaled value has to be rounded. For this rounding operation the
      * specified rounding mode is used.
      *
-     * @param newScale
-     *            scale of the result returned.
-     * @param roundingMode
-     *            rounding mode to be used to round the result.
+     * @param newScale     scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
      * @return a new {@code BigDecimal} instance with the specified scale.
-     * @throws IllegalArgumentException
-     *             if {@code roundingMode} is not a valid rounding mode.
-     * @throws ArithmeticException
-     *             if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
-     *             necessary according to the given scale.
+     * @throws IllegalArgumentException if {@code roundingMode} is not a valid rounding mode.
+     * @throws ArithmeticException      if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                                  necessary according to the given scale.
      */
     public TBigDecimal setScale(int newScale, int roundingMode) {
         return setScale(newScale, TRoundingMode.valueOf(roundingMode));
@@ -2086,11 +2041,9 @@ class TBigDecimal  {
      * If no exception is thrown, then the following equation holds: {@code
      * x.setScale(s).compareTo(x) == 0}.
      *
-     * @param newScale
-     *            scale of the result returned.
+     * @param newScale scale of the result returned.
      * @return a new {@code BigDecimal} instance with the specified scale.
-     * @throws ArithmeticException
-     *             if rounding would be necessary.
+     * @throws ArithmeticException if rounding would be necessary.
      */
     public TBigDecimal setScale(int newScale) {
         return setScale(newScale, TRoundingMode.UNNECESSARY);
@@ -2108,12 +2061,11 @@ class TBigDecimal  {
      * Note, that {@code movePointLeft(0)} returns a result which is
      * mathematically equivalent, but which has {@code scale >= 0}.
      *
-     * @param n
-     *            number of placed the decimal point has to be moved.
+     * @param n number of placed the decimal point has to be moved.
      * @return {@code this * 10^(-n}).
      */
     public TBigDecimal movePointLeft(int n) {
-        return movePoint(scale + (long)n);
+        return movePoint(scale + (long) n);
     }
 
     private TBigDecimal movePoint(long newScale) {
@@ -2122,17 +2074,17 @@ class TBigDecimal  {
         }
         /* When:  'n'== Integer.MIN_VALUE  isn't possible to call to movePointRight(-n)
          * since  -Integer.MIN_VALUE == Integer.MIN_VALUE */
-        if(newScale >= 0) {
-            if(bitLength < 64) {
-                return valueOf(smallValue,toIntScale(newScale));
+        if (newScale >= 0) {
+            if (bitLength < 64) {
+                return valueOf(smallValue, toIntScale(newScale));
             }
             return new TBigDecimal(getUnscaledValue(), toIntScale(newScale));
         }
-        if(-newScale < LONG_TEN_POW.length &&
-                bitLength + LONG_TEN_POW_BIT_LENGTH[(int)-newScale] < 64 ) {
-            return valueOf(smallValue*LONG_TEN_POW[(int)-newScale],0);
+        if (-newScale < LONG_TEN_POW.length &&
+                bitLength + LONG_TEN_POW_BIT_LENGTH[(int) -newScale] < 64) {
+            return valueOf(smallValue * LONG_TEN_POW[(int) -newScale], 0);
         }
-        return new TBigDecimal(TMultiplication.multiplyByTenPow(getUnscaledValue(),(int)-newScale), 0);
+        return new TBigDecimal(TMultiplication.multiplyByTenPow(getUnscaledValue(), (int) -newScale), 0);
     }
 
     /**
@@ -2147,12 +2099,11 @@ class TBigDecimal  {
      * Note, that {@code movePointRight(0)} returns a result which is
      * mathematically equivalent, but which has scale >= 0.
      *
-     * @param n
-     *            number of placed the decimal point has to be moved.
+     * @param n number of placed the decimal point has to be moved.
      * @return {@code this * 10^n}.
      */
     public TBigDecimal movePointRight(int n) {
-        return movePoint(scale - (long)n);
+        return movePoint(scale - (long) n);
     }
 
     /**
@@ -2163,18 +2114,17 @@ class TBigDecimal  {
      * This method has the same effect as {@link #movePointRight}, except that
      * the precision is not changed.
      *
-     * @param n
-     *            number of places the decimal point has to be moved.
+     * @param n number of places the decimal point has to be moved.
      * @return {@code this * 10^n}
      */
     public TBigDecimal scaleByPowerOfTen(int n) {
-        long newScale = scale - (long)n;
-        if(bitLength < 64) {
+        long newScale = scale - (long) n;
+        if (bitLength < 64) {
             //Taking care when a 0 is to be scaled
-            if( smallValue==0  ){
-                return zeroScaledBy( newScale );
+            if (smallValue == 0) {
+                return zeroScaledBy(newScale);
             }
-            return valueOf(smallValue,toIntScale(newScale));
+            return valueOf(smallValue, toIntScale(newScale));
         }
         return new TBigDecimal(getUnscaledValue(), toIntScale(newScale));
     }
@@ -2186,7 +2136,7 @@ class TBigDecimal  {
      * the scale and the precision of the result has been reduced by n.
      *
      * @return a new {@code BigDecimal} instance equivalent to this where the
-     *         trailing zeros of the unscaled value have been removed.
+     * trailing zeros of the unscaled value have been removed.
      */
     public TBigDecimal stripTrailingZeros() {
         int i = 1; // 1 <= i <= 18
@@ -2233,23 +2183,21 @@ class TBigDecimal  {
      * instances are compared which are equal in value but differ in scale, then
      * these two instances are considered as equal.
      *
-     * @param val
-     *            value to be compared with {@code this}.
+     * @param val value to be compared with {@code this}.
      * @return {@code 1} if {@code this > val}, {@code -1} if {@code this < val},
-     *         {@code 0} if {@code this == val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * {@code 0} if {@code this == val}.
+     * @throws NullPointerException if {@code val == null}.
      */
     //@Override
     public int compareTo(TBigDecimal val) {
         int thisSign = signum();
         int valueSign = val.signum();
 
-        if( thisSign == valueSign) {
-            if(this.scale == val.scale && this.bitLength<64 && val.bitLength<64 ) {
+        if (thisSign == valueSign) {
+            if (this.scale == val.scale && this.bitLength < 64 && val.bitLength < 64) {
                 return (smallValue < val.smallValue) ? -1 : (smallValue > val.smallValue) ? 1 : 0;
             }
-            long diffScale = (long)this.scale - val.scale;
+            long diffScale = (long) this.scale - val.scale;
             int diffPrecision = this.aproxPrecision() - val.aproxPrecision();
             if (diffPrecision > diffScale + 1) {
                 return thisSign;
@@ -2268,7 +2216,7 @@ class TBigDecimal  {
             }
         } else if (thisSign < valueSign) {
             return -1;
-        } else  {
+        } else {
             return 1;
         }
     }
@@ -2280,8 +2228,7 @@ class TBigDecimal  {
      * (10*10^(-1)) is not equal to 1.00 (100*10^(-2)). Similarly, zero
      * instances are not equal if their scale differs.
      *
-     * @param x
-     *            object to be compared with {@code this}.
+     * @param x object to be compared with {@code this}.
      * @return true if {@code x} is a {@code BigDecimal} and {@code this == x}.
      */
     @Override
@@ -2292,7 +2239,7 @@ class TBigDecimal  {
         if (x instanceof TBigDecimal) {
             TBigDecimal x1 = (TBigDecimal) x;
             return x1.scale == scale
-                   && (bitLength < 64 ? (x1.smallValue == smallValue)
+                    && (bitLength < 64 ? (x1.smallValue == smallValue)
                     : intVal.equals(x1.intVal));
 
 
@@ -2303,11 +2250,9 @@ class TBigDecimal  {
     /**
      * Returns the minimum of this {@code BigDecimal} and {@code val}.
      *
-     * @param val
-     *            value to be used to compute the minimum with this.
+     * @param val value to be used to compute the minimum with this.
      * @return {@code min(this, val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigDecimal min(TBigDecimal val) {
         return ((compareTo(val) <= 0) ? this : val);
@@ -2316,11 +2261,9 @@ class TBigDecimal  {
     /**
      * Returns the maximum of this {@code BigDecimal} and {@code val}.
      *
-     * @param val
-     *            value to be used to compute the maximum with this.
+     * @param val value to be used to compute the maximum with this.
      * @return {@code max(this, val}.
-     * @throws NullPointerException
-     *             if {@code val == null}.
+     * @throws NullPointerException if {@code val == null}.
      */
     public TBigDecimal max(TBigDecimal val) {
         return ((compareTo(val) >= 0) ? this : val);
@@ -2337,8 +2280,8 @@ class TBigDecimal  {
             return hashCode;
         }
         if (bitLength < 64) {
-            hashCode = (int)(smallValue & 0xffffffff);
-            hashCode = 33 * hashCode +  (int)((smallValue >> 32) & 0xffffffff);
+            hashCode = (int) (smallValue & 0xffffffff);
+            hashCode = 33 * hashCode + (int) ((smallValue >> 32) & 0xffffffff);
             hashCode = 17 * hashCode + scale;
             return hashCode;
         }
@@ -2355,7 +2298,7 @@ class TBigDecimal  {
      * scientific notation is used.
      *
      * @return a string representation of {@code this} in scientific notation if
-     *         necessary.
+     * necessary.
      */
     @Override
     public String toString() {
@@ -2363,7 +2306,7 @@ class TBigDecimal  {
             return toStringImage;
         }
         if (bitLength < 32) {
-            toStringImage = TConversion.toDecimalScaledString(smallValue,scale);
+            toStringImage = TConversion.toDecimalScaledString(smallValue, scale);
             return toStringImage;
         }
         String intString = getUnscaledValue().toString();
@@ -2372,7 +2315,7 @@ class TBigDecimal  {
         }
         int begin = (getUnscaledValue().signum() < 0) ? 2 : 1;
         int end = intString.length();
-        long exponent = -(long)scale + end - begin;
+        long exponent = -(long) scale + end - begin;
         StringBuilder result = new StringBuilder();
 
         result.append(intString);
@@ -2381,8 +2324,8 @@ class TBigDecimal  {
                 result.insert(end - scale, '.');
             } else {
                 result.insert(begin - 1, "0.");
-                
-                result.insert(begin + 1, String.valueOf(CH_ZEROS).substring( 0, -(int)exponent - 1));
+
+                result.insert(begin + 1, String.valueOf(CH_ZEROS).substring(0, -(int) exponent - 1));
             }
         } else {
             if (end - begin >= 1) {
@@ -2409,7 +2352,7 @@ class TBigDecimal  {
      * 3 such that the integer part is >= 1 and < 1000.
      *
      * @return a string representation of {@code this} in engineering notation
-     *         if necessary.
+     * if necessary.
      */
     public String toEngineeringString() {
         String intString = getUnscaledValue().toString();
@@ -2418,7 +2361,7 @@ class TBigDecimal  {
         }
         int begin = (getUnscaledValue().signum() < 0) ? 2 : 1;
         int end = intString.length();
-        long exponent = -(long)scale + end - begin;
+        long exponent = -(long) scale + end - begin;
         StringBuilder result = new StringBuilder(intString);
 
         if ((scale > 0) && (exponent >= -6)) {
@@ -2426,11 +2369,11 @@ class TBigDecimal  {
                 result.insert(end - scale, '.');
             } else {
                 result.insert(begin - 1, "0."); //$NON-NLS-1$
-                result.insert(begin + 1, String.valueOf(CH_ZEROS).substring(0, -(int)exponent - 1));
+                result.insert(begin + 1, String.valueOf(CH_ZEROS).substring(0, -(int) exponent - 1));
             }
         } else {
             int delta = end - begin;
-            int rem = (int)(exponent % 3);
+            int rem = (int) (exponent % 3);
 
             if (rem != 0) {
                 // adjust exponent so it is a multiple of three
@@ -2531,7 +2474,7 @@ class TBigDecimal  {
         if ((scale == 0) || (isZero())) {
             return getUnscaledValue();
         } else if (scale < 0) {
-            return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long)scale));
+            return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long) scale));
         } else {// (scale > 0)
             return getUnscaledValue().divide(TMultiplication.powerOf10(scale));
         }
@@ -2543,14 +2486,13 @@ class TBigDecimal  {
      * if rounding would be necessary, an {@code ArithmeticException} is thrown.
      *
      * @return this {@code BigDecimal} as a big integer value.
-     * @throws ArithmeticException
-     *             if rounding is necessary.
+     * @throws ArithmeticException if rounding is necessary.
      */
     public TBigInteger toBigIntegerExact() {
         if ((scale == 0) || (isZero())) {
             return getUnscaledValue();
         } else if (scale < 0) {
-            return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long)scale));
+            return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long) scale));
         } else {// (scale > 0)
             TBigInteger[] integerAndFraction;
             // An optimization before do a heavy division
@@ -2578,7 +2520,7 @@ class TBigDecimal  {
         /* If scale <= -64 there are at least 64 trailing bits zero in 10^(-scale).
          * If the scale is positive and very large the long value could be zero. */
         return ((scale <= -64) || (scale > aproxPrecision())
-        ? 0L
+                ? 0L
                 : toBigInteger().longValue());
     }
 
@@ -2588,8 +2530,7 @@ class TBigDecimal  {
      * these conditions are not met, an {@code ArithmeticException} is thrown.
      *
      * @return this {@code BigDecimal} as a long value.
-     * @throws ArithmeticException
-     *             if rounding is necessary or the number doesn't fit in a long.
+     * @throws ArithmeticException if rounding is necessary or the number doesn't fit in a long.
      */
     public long longValueExact() {
         return valueExact(64);
@@ -2607,9 +2548,11 @@ class TBigDecimal  {
         /* If scale <= -32 there are at least 32 trailing bits zero in 10^(-scale).
          * If the scale is positive and very large the long value could be zero. */
         return ((scale <= -32) || (scale > aproxPrecision())
-        ? 0
+                ? 0
                 : toBigInteger().intValue());
     }
+
+    /* Private Methods */
 
     /**
      * Returns this {@code BigDecimal} as a int value if it has no fractional
@@ -2617,11 +2560,10 @@ class TBigDecimal  {
      * these conditions are not met, an {@code ArithmeticException} is thrown.
      *
      * @return this {@code BigDecimal} as a int value.
-     * @throws ArithmeticException
-     *             if rounding is necessary or the number doesn't fit in a int.
+     * @throws ArithmeticException if rounding is necessary or the number doesn't fit in a int.
      */
     public int intValueExact() {
-        return (int)valueExact(32);
+        return (int) valueExact(32);
     }
 
     /**
@@ -2630,12 +2572,11 @@ class TBigDecimal  {
      * these conditions are not met, an {@code ArithmeticException} is thrown.
      *
      * @return this {@code BigDecimal} as a short value.
-     * @throws ArithmeticException
-     *             if rounding is necessary of the number doesn't fit in a
-     *             short.
+     * @throws ArithmeticException if rounding is necessary of the number doesn't fit in a
+     *                             short.
      */
     public short shortValueExact() {
-        return (short)valueExact(16);
+        return (short) valueExact(16);
     }
 
     /**
@@ -2644,11 +2585,10 @@ class TBigDecimal  {
      * conditions are not met, an {@code ArithmeticException} is thrown.
      *
      * @return this {@code BigDecimal} as a byte value.
-     * @throws ArithmeticException
-     *             if rounding is necessary or the number doesn't fit in a byte.
+     * @throws ArithmeticException if rounding is necessary or the number doesn't fit in a byte.
      */
     public byte byteValueExact() {
-        return (byte)valueExact(8);
+        return (byte) valueExact(8);
     }
 
     /**
@@ -2674,7 +2614,7 @@ class TBigDecimal  {
         /* A similar code like in doubleValue() could be repeated here,
          * but this simple implementation is quite efficient. */
         float floatResult = signum();
-        long powerOfTwo = this.bitLength - (long)(scale / LOG10_2);
+        long powerOfTwo = this.bitLength - (long) (scale / LOG10_2);
         if ((powerOfTwo < -149) || (floatResult == 0.0f)) {
             // Cases which 'this' is very small
             floatResult *= 0.0f;
@@ -2682,7 +2622,7 @@ class TBigDecimal  {
             // Cases which 'this' is very large
             floatResult *= Float.POSITIVE_INFINITY;
         } else {
-            floatResult = (float)doubleValue();
+            floatResult = (float) doubleValue();
         }
         return floatResult;
     }
@@ -2712,7 +2652,7 @@ class TBigDecimal  {
         int exponent = 1076; // bias + 53
         int lowestSetBit;
         int discardedSize;
-        long powerOfTwo = this.bitLength - (long)(scale / LOG10_2);
+        long powerOfTwo = this.bitLength - (long) (scale / LOG10_2);
         long bits; // IEEE-754 Standard
         long tempBits; // for temporal calculations
         TBigInteger mantisa;
@@ -2732,7 +2672,7 @@ class TBigDecimal  {
         } else {// (scale > 0)
             TBigInteger quotAndRem[];
             TBigInteger powerOfTen = TMultiplication.powerOf10(scale);
-            int k = 100 - (int)powerOfTwo;
+            int k = 100 - (int) powerOfTwo;
             int compRem;
 
             if (k > 0) {
@@ -2792,17 +2732,17 @@ class TBigDecimal  {
             // To discard '- exponent + 1' bits
             bits = tempBits >> 1;
             tempBits = bits & (-1L >>> (63 + exponent));
-            bits >>= (-exponent );
+            bits >>= (-exponent);
             // To test if after discard bits, a new carry is generated
             if (((bits & 3) == 3) || (((bits & 1) == 1) && (tempBits != 0)
-            && (lowestSetBit < discardedSize))) {
+                    && (lowestSetBit < discardedSize))) {
                 bits += 1;
             }
             exponent = 0;
             bits >>= 1;
         }
         // Construct the 64 double bits: [sign(1), exponent(11), mantisa(52)]
-        bits = (sign & 0x8000000000000000L) | ((long)exponent << 52) | (bits & 0xFFFFFFFFFFFFFL);
+        bits = (sign & 0x8000000000000000L) | ((long) exponent << 52) | (bits & 0xFFFFFFFFFFFFFL);
         return Double.longBitsToDouble(bits);
     }
 
@@ -2825,15 +2765,12 @@ class TBigDecimal  {
         return valueOf(1, scale);
     }
 
-    /* Private Methods */
-
     /**
      * It does all rounding work of the public method
      * {@code round(MathContext)}, performing an inplace rounding
      * without creating a new object.
      *
-     * @param mc
-     *            the {@code MathContext} for perform the rounding.
+     * @param mc the {@code MathContext} for perform the rounding.
      * @see #round(TMathContext)
      */
     private void inplaceRound(TMathContext mc) {
@@ -2854,7 +2791,7 @@ class TBigDecimal  {
         // Getting the integer part and the discarded fraction
         TBigInteger sizeOfFraction = TMultiplication.powerOf10(discardedPrecision);
         TBigInteger[] integerAndFraction = getUnscaledValue().divideAndRemainder(sizeOfFraction);
-        long newScale = (long)scale - discardedPrecision;
+        long newScale = (long) scale - discardedPrecision;
         int compRem;
         TBigDecimal tempBD;
         // If the discarded fraction is non-zero, perform rounding
@@ -2862,7 +2799,7 @@ class TBigDecimal  {
             // To check if the discarded fraction >= 0.5
             compRem = (integerAndFraction[1].abs().shiftLeftOneBit().compareTo(sizeOfFraction));
             // To look if there is a carry
-            compRem =  roundingBehavior( integerAndFraction[0].testBit(0) ? 1 : 0,
+            compRem = roundingBehavior(integerAndFraction[0].testBit(0) ? 1 : 0,
                     integerAndFraction[1].signum() * (5 + compRem),
                     mc.getRoundingMode());
             if (compRem != 0) {
@@ -2881,22 +2818,17 @@ class TBigDecimal  {
         setUnscaledValue(integerAndFraction[0]);
     }
 
-    private static int longCompareTo(long value1, long value2) {
-        return value1 > value2 ? 1 : (value1 < value2 ? -1 : 0);
-    }
     /**
      * This method implements an efficient rounding for numbers which unscaled
      * value fits in the type {@code long}.
      *
-     * @param mc
-     *            the context to use
-     * @param discardedPrecision
-     *            the number of decimal digits that are discarded
+     * @param mc                 the context to use
+     * @param discardedPrecision the number of decimal digits that are discarded
      * @see #round(TMathContext)
      */
     private void smallRound(TMathContext mc, int discardedPrecision) {
         long sizeOfFraction = LONG_TEN_POW[discardedPrecision];
-        long newScale = (long)scale - discardedPrecision;
+        long newScale = (long) scale - discardedPrecision;
         long unscaledVal = smallValue;
         // Getting the integer part and the discarded fraction
         long integer = unscaledVal / sizeOfFraction;
@@ -2905,9 +2837,9 @@ class TBigDecimal  {
         // If the discarded fraction is non-zero perform rounding
         if (fraction != 0) {
             // To check if the discarded fraction >= 0.5
-            compRem = longCompareTo(Math.abs(fraction) << 1,sizeOfFraction);
+            compRem = longCompareTo(Math.abs(fraction) << 1, sizeOfFraction);
             // To look if there is a carry
-            integer += roundingBehavior( ((int)integer) & 1,
+            integer += roundingBehavior(((int) integer) & 1,
                     signum(fraction) * (5 + compRem),
                     mc.getRoundingMode());
             // If after to add the increment the precision changed, we normalize the size
@@ -2925,71 +2857,18 @@ class TBigDecimal  {
     }
 
     /**
-     * Return an increment that can be -1,0 or 1, depending of
-     * {@code roundingMode}.
-     *
-     * @param parityBit
-     *            can be 0 or 1, it's only used in the case
-     *            {@code HALF_EVEN}
-     * @param fraction
-     *            the mantisa to be analyzed
-     * @param roundingMode
-     *            the type of rounding
-     * @return the carry propagated after rounding
-     */
-    private static int roundingBehavior(int parityBit, int fraction, TRoundingMode roundingMode) {
-        int increment = 0; // the carry after rounding
-
-        switch (roundingMode) {
-            case UNNECESSARY:
-                if (fraction != 0) {
-                    throw new ArithmeticException("Rounding necessary");
-                }
-                break;
-            case UP:
-                increment = signum(fraction);
-                break;
-            case DOWN:
-                break;
-            case CEILING:
-                increment = Math.max(signum(fraction), 0);
-                break;
-            case FLOOR:
-                increment = Math.min(signum(fraction), 0);
-                break;
-            case HALF_UP:
-                if (Math.abs(fraction) >= 5) {
-                    increment = signum(fraction);
-                }
-                break;
-            case HALF_DOWN:
-                if (Math.abs(fraction) > 5) {
-                    increment = signum(fraction);
-                }
-                break;
-            case HALF_EVEN:
-                if (Math.abs(fraction) + parityBit > 5) {
-                    increment = signum(fraction);
-                }
-                break;
-        }
-        return increment;
-    }
-
-    /**
      * If {@code intVal} has a fractional part throws an exception,
      * otherwise it counts the number of bits of value and checks if it's out of
      * the range of the primitive type. If the number fits in the primitive type
      * returns this number as {@code long}, otherwise throws an
      * exception.
      *
-     * @param bitLengthOfType
-     *            number of bits of the type whose value will be calculated
-     *            exactly
+     * @param bitLengthOfType number of bits of the type whose value will be calculated
+     *                        exactly
      * @return the exact value of the integer part of {@code BigDecimal}
-     *         when is possible
+     * when is possible
      * @throws ArithmeticException when rounding is necessary or the
-     *             number don't fit in the primitive type
+     *                             number don't fit in the primitive type
      */
     private long valueExact(int bitLengthOfType) {
         TBigInteger bigInteger = toBigIntegerExact();
@@ -3014,53 +2893,8 @@ class TBigDecimal  {
                 : ((int) ((this.bitLength - 1) * LOG10_2)) + 1;
     }
 
-    /**
-     * It tests if a scale of type {@code long} fits in 32 bits. It
-     * returns the same scale being casted to {@code int} type when is
-     * possible, otherwise throws an exception.
-     *
-     * @param longScale
-     *            a 64 bit scale
-     * @return a 32 bit scale when is possible
-     * @throws ArithmeticException when {@code scale} doesn't
-     *             fit in {@code int} type
-     * @see #scale
-     */
-    private static int toIntScale(long longScale) {
-        if (longScale < Integer.MIN_VALUE) {
-            throw new ArithmeticException("Overflow");
-        } else if (longScale > Integer.MAX_VALUE) {
-            throw new ArithmeticException("Underflow");
-        } else {
-            return (int)longScale;
-        }
-    }
-
-    /**
-     * It returns the value 0 with the most approximated scale of type
-     * {@code int}. if {@code longScale > Integer.MAX_VALUE} the
-     * scale will be {@code Integer.MAX_VALUE}; if
-     * {@code longScale < Integer.MIN_VALUE} the scale will be
-     * {@code Integer.MIN_VALUE}; otherwise {@code longScale} is
-     * casted to the type {@code int}.
-     *
-     * @param longScale
-     *            the scale to which the value 0 will be scaled.
-     * @return the value 0 scaled by the closer scale of type {@code int}.
-     * @see #scale
-     */
-    private static TBigDecimal zeroScaledBy(long longScale) {
-        if (longScale == (int) longScale) {
-            return valueOf(0,(int)longScale);
-            }
-        if (longScale >= 0) {
-            return new TBigDecimal( 0, Integer.MAX_VALUE);
-        }
-        return new TBigDecimal( 0, Integer.MIN_VALUE);
-    }
-
     private TBigInteger getUnscaledValue() {
-        if(intVal == null) {
+        if (intVal == null) {
             intVal = TBigInteger.valueOf(smallValue);
         }
         return intVal;
@@ -3069,23 +2903,9 @@ class TBigDecimal  {
     private void setUnscaledValue(TBigInteger unscaledValue) {
         this.intVal = unscaledValue;
         this.bitLength = unscaledValue.bitLength();
-        if(this.bitLength < 64) {
+        if (this.bitLength < 64) {
             this.smallValue = unscaledValue.longValue();
         }
-    }
-
-    private static int bitLength(long smallValue) {
-        if(smallValue < 0) {
-            smallValue = ~smallValue;
-        }
-        return 64 - numberOfLeadingZeros(smallValue);
-    }
-
-    private static int bitLength(int smallValue) {
-        if(smallValue < 0) {
-            smallValue = ~smallValue;
-        }
-        return 32 - numberOfLeadingZeros(smallValue);
     }
 }
 

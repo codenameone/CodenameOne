@@ -52,18 +52,18 @@ interface CSSParserCallback {
     public static int ERROR_CSS_NO_BASE_URL = 203;
 
     /**
-     *  Called when encountering an error while parsing the HTML document.
-     *  When implementing this, the developer should return true if the error should be ignored and the document needs to be further parsed, or false to stop parsing and issue an error to the user
-     *  Note that this method is always called NOT on the EDT thread.
+     * Called when encountering an error while parsing the HTML document.
+     * When implementing this, the developer should return true if the error should be ignored and the document needs to be further parsed, or false to stop parsing and issue an error to the user
+     * Note that this method is always called NOT on the EDT thread.
      *
-     * @param errorId The error ID, one of the ERROR_* constants
-     * @param tag The tag in which the error occured (Can be null for non-tag related errors)
-     * @param attribute The attribute in which the error occured (Can be null for non-attribute related errors)
-     * @param value The value in which the error occured (Can be null for non-value related errors)
+     * @param errorId     The error ID, one of the ERROR_* constants
+     * @param tag         The tag in which the error occured (Can be null for non-tag related errors)
+     * @param attribute   The attribute in which the error occured (Can be null for non-attribute related errors)
+     * @param value       The value in which the error occured (Can be null for non-value related errors)
      * @param description A verbal description of the error
      * @return true to continue parsing, false to stop
      */
-    public boolean parsingError(int errorId,String tag,String attribute,String value,String description);
+    public boolean parsingError(int errorId, String tag, String attribute, String value, String description);
 
 
 }

@@ -34,12 +34,12 @@ class OptionItem {
     String text;
     String value;
 
-    OptionItem(String text,String value) {
-        this.text=text;
-        if (value==null) { // If no value was specified, the value is the display text
-            this.value=text;
+    OptionItem(String text, String value) {
+        this.text = text;
+        if (value == null) { // If no value was specified, the value is the display text
+            this.value = text;
         } else {
-            this.value=value;
+            this.value = value;
         }
     }
 

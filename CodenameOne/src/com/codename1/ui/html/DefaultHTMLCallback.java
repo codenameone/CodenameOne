@@ -32,7 +32,7 @@ import com.codename1.ui.events.ActionEvent;
 /**
  * This is a default implementation of HTMLCallback that basically doesn't do much but does keep the HTMLComponent work intact.
  * This class was created so developers will avoid pitfalls of HTMLCallback, as using the wrong return values.
- *
+ * <p>
  * Note that in any case an HTMLComponent doesn't have to use an HTMLCallback.
  *
  * @author Ofir Leitner

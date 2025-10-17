@@ -25,13 +25,14 @@
 package com.codename1.io.services;
 
 import com.codename1.io.CharArrayReader;
-import com.codename1.ui.Dialog;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Image;
 import com.codename1.xml.Element;
 import com.codename1.xml.ParserCallback;
 import com.codename1.xml.XMLParser;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -66,7 +67,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * Simple constructor accepting the RSS url
      *
-     * @param url rss link
+     * @param url   rss link
      * @param limit the limit on the number of RSS entries supported
      */
     public RSSService(String url, int limit) {
@@ -78,10 +79,10 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * Simple constructor accepting the RSS url
      *
-     * @param url rss link
-     * @param limit the limit on the number of RSS entries supported
+     * @param url         rss link
+     * @param limit       the limit on the number of RSS entries supported
      * @param startOffset indicates the entry offset which we are interested
-     * in, this is useful if previously the limit for RSS entries was reached.
+     *                    in, this is useful if previously the limit for RSS entries was reached.
      */
     public RSSService(String url, int limit, int startOffset) {
         this(url, limit);
@@ -100,13 +101,14 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             private String lastTag;
             private Hashtable current;
             private String url;
+
             protected boolean startTag(String tag) {
-                if("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {
-                    if(startOffset > 0) {
+                if ("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {
+                    if (startOffset > 0) {
                         return true;
                     }
                     current = new Hashtable();
-                    if(iconPlaceholder != null) {
+                    if (iconPlaceholder != null) {
                         current.put("icon", iconPlaceholder);
                     }
                 }
@@ -115,11 +117,11 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             }
 
             protected void attribute(String tag, String attributeName, String value) {
-                if(current != null) {
-                    if("media:thumbnail".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
+                if (current != null) {
+                    if ("media:thumbnail".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
                         current.put("thumb", value);
                     } else {
-                        if("media:player".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
+                        if ("media:player".equalsIgnoreCase(tag) && "url".equalsIgnoreCase(attributeName)) {
                             current.put("player", value);
                         }
                     }
@@ -127,12 +129,12 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             }
 
             protected void textElement(String text) {
-                if(lastTag != null && current != null) {
+                if (lastTag != null && current != null) {
                     // make "ATOM" seem like RSS
-                    if("summary".equals(lastTag)) {
+                    if ("summary".equals(lastTag)) {
                         current.put("details", text);
                     } else {
-                        if("content".equals(lastTag)) {
+                        if ("content".equals(lastTag)) {
                             current.put("description", text);
                         } else {
                             current.put(lastTag, text);
@@ -141,19 +143,19 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
                 }
             }
 
-            protected void endTag(String tag) {                
-                if("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {
-                    if(startOffset > 0) {
+            protected void endTag(String tag) {
+                if ("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {
+                    if (startOffset > 0) {
                         startOffset--;
                         return;
                     }
                     results.addElement(current);
                     current = null;
-                    if(limit > -1 && results.size() >= limit) {
+                    if (limit > -1 && results.size() >= limit) {
                         throw new FinishParsing();
                     }
                 }
-                if(tag.equals(lastTag)) {
+                if (tag.equals(lastTag)) {
                     lastTag = null;
                 }
             }
@@ -162,22 +164,22 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         input.mark(10);
 
         // Skip the bom marking UTF-8 in some streams
-        while(input.read() != '<') {
+        while (input.read() != '<') {
             //input.mark(4);
         }
         int question = input.read();
         String cType = "UTF-8";
-        if(question == '?') {
+        if (question == '?') {
             // we are in an XML header, check if the encoding section exists 
             StringBuilder cs = new StringBuilder();
             question = input.read();
-            while(question != '>') {
-                cs.append((char)question);
+            while (question != '>') {
+                cs.append((char) question);
                 question = input.read();
             }
             String str = cs.toString();
             int index = str.indexOf("encoding=\"") + 10;
-            if(index > -1) {
+            if (index > -1) {
                 cType = str.substring(index, Math.max(str.indexOf("\"", index), str.indexOf("'", index)));
             }
         } else {
@@ -186,37 +188,37 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         }
 
         String resultType = getResponseContentType();
-        if(resultType != null && resultType.indexOf("charset=") > -1) {
+        if (resultType != null && resultType.indexOf("charset=") > -1) {
             cType = resultType.substring(resultType.indexOf("charset=") + 8);
         }
         try {
             int pos2 = cType.indexOf(';');
-            if(pos2 > 0) {
+            if (pos2 > 0) {
                 cType = cType.substring(0, pos2);
             }
             p.eventParser(new InputStreamReader(input, cType));
-        } catch(FinishParsing ignor) {
+        } catch (FinishParsing ignor) {
             hasMore = true;
         }
 
-        if(isCreatePlainTextDetails()) {
+        if (isCreatePlainTextDetails()) {
             int elementCount = results.size();
-            for(int iter = 0 ; iter < elementCount ; iter++) {
-                Hashtable h = (Hashtable)results.elementAt(iter);
-                String s = (String)h.get("description");
-                if(s != null && !h.containsKey("details")) {
+            for (int iter = 0; iter < elementCount; iter++) {
+                Hashtable h = (Hashtable) results.elementAt(iter);
+                String s = (String) h.get("description");
+                if (s != null && !h.containsKey("details")) {
                     XMLParser x = new XMLParser();
                     Element e = x.parse(new CharArrayReader(("<xml>" + s + "</xml>").toCharArray()));
                     Vector results = e.getTextDescendants(null, false);
                     StringBuilder endResult = new StringBuilder();
-                    for(int i = 0 ; i < results.size() ; i++) {
-                        endResult.append(((Element)results.elementAt(i)).getText());
+                    for (int i = 0; i < results.size(); i++) {
+                        endResult.append(((Element) results.elementAt(i)).getText());
                     }
                     h.put("details", endResult.toString());
                 }
             }
         }
-        
+
         fireResponseListener(new NetworkEvent(this, results));
     }
 
@@ -259,7 +261,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * Creates an additional "details" attribute in the resulting hashtables
      * which effectively contains a plain text version of the description tag.
-     * 
+     *
      * @param createPlainTextDetails the createPlainTextDetails to set
      */
     public void setCreatePlainTextDetails(boolean createPlainTextDetails) {

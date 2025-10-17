@@ -29,15 +29,16 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -68,6 +69,9 @@ import java.util.Vector;
  */
 public class Calendar extends Container implements ActionSource {
 
+    private static final String[] MONTHS = new String[]{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    private static final String[] DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    private static final String[] LABELS = {"Su", "M", "Tu", "W", "Th", "F", "Sa"};
     /**
      * When set to true days will be rendered as 2 digits with 0 preceding
      * single digit days
@@ -77,9 +81,6 @@ public class Calendar extends Container implements ActionSource {
     private ComboBox year;
     private MonthView mv;
     private Label dateLabel;
-    private static final String[] MONTHS = new String[]{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    private static final String[] DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-    private static final String[] LABELS = {"Su", "M", "Tu", "W", "Th", "F", "Sa"};
     private EventDispatcher dispatcher = new EventDispatcher();
     private EventDispatcher dataChangedListeners = new EventDispatcher();
     private EventDispatcher monthChangedListeners = new EventDispatcher();
@@ -115,7 +116,7 @@ public class Calendar extends Container implements ActionSource {
      * since epoch (the java.util.Date convention)
      *
      * @param time time since epoch
-     * @param tmz a reference timezone
+     * @param tmz  a reference timezone
      */
     public Calendar(long time, TimeZone tmz) {
         this(time, java.util.TimeZone.getDefault(), null, null);
@@ -125,7 +126,7 @@ public class Calendar extends Container implements ActionSource {
      * Constructs a calendar with the current date and time with left and right
      * images set
      *
-     * @param leftArrowImage an image for calendar left arrow
+     * @param leftArrowImage  an image for calendar left arrow
      * @param rightArrowImage an image for calendar right arrow
      */
     public Calendar(Image leftArrowImage, Image rightArrowImage) {
@@ -136,9 +137,9 @@ public class Calendar extends Container implements ActionSource {
      * Creates a new instance of Calendar set to the given date based on time
      * since epoch (the java.util.Date convention)
      *
-     * @param time time since epoch
-     * @param tmz a reference timezone
-     * @param leftArrowImage an image for calendar left arrow
+     * @param time            time since epoch
+     * @param tmz             a reference timezone
+     * @param leftArrowImage  an image for calendar left arrow
      * @param rightArrowImage an image for calendar right arrow
      */
     public Calendar(long time, TimeZone tmz, Image leftArrowImage, Image rightArrowImage) {
@@ -342,6 +343,15 @@ public class Calendar extends Container implements ActionSource {
     }
 
     /**
+     * Returns the currently viewed date (as opposed to the selected date)
+     *
+     * @return the currently viewed date
+     */
+    public Date getCurrentDate() {
+        return new Date(mv.getCurrentDay());
+    }
+
+    /**
      * Sets the Calendar view on the given date, only the the month and year are
      * being considered.
      *
@@ -353,12 +363,12 @@ public class Calendar extends Container implements ActionSource {
     }
 
     /**
-     * Returns the currently viewed date (as opposed to the selected date)
+     * Gets the Calendar timezone
      *
-     * @return the currently viewed date
+     * @return Calendar TimeZone
      */
-    public Date getCurrentDate() {
-        return new Date(mv.getCurrentDay());
+    public TimeZone getTimeZone() {
+        return tmz;
     }
 
     /**
@@ -372,12 +382,12 @@ public class Calendar extends Container implements ActionSource {
     }
 
     /**
-     * Gets the Calendar timezone
+     * Gets the selected style of the month view component within the calendar
      *
-     * @return Calendar TimeZone
+     * @return the style of the month view
      */
-    public TimeZone getTimeZone() {
-        return tmz;
+    public Style getMonthViewSelectedStyle() {
+        return mv.getSelectedStyle();
     }
 
     /**
@@ -390,25 +400,6 @@ public class Calendar extends Container implements ActionSource {
     }
 
     /**
-     * Sets the un selected style of the month view component within the
-     * calendar
-     *
-     * @param s style for the month view
-     */
-    public void setMonthViewUnSelectedStyle(Style s) {
-        mv.setUnselectedStyle(s);
-    }
-
-    /**
-     * Gets the selected style of the month view component within the calendar
-     *
-     * @return the style of the month view
-     */
-    public Style getMonthViewSelectedStyle() {
-        return mv.getSelectedStyle();
-    }
-
-    /**
      * Gets the un selected style of the month view component within the
      * calendar
      *
@@ -416,6 +407,16 @@ public class Calendar extends Container implements ActionSource {
      */
     public Style getMonthViewUnSelectedStyle() {
         return mv.getUnselectedStyle();
+    }
+
+    /**
+     * Sets the un selected style of the month view component within the
+     * calendar
+     *
+     * @param s style for the month view
+     */
+    public void setMonthViewUnSelectedStyle(Style s) {
+        mv.setUnselectedStyle(s);
     }
 
     /**
@@ -516,21 +517,21 @@ public class Calendar extends Container implements ActionSource {
      * This flag determines if selected date can be changed by selecting an
      * alternative date
      *
-     * @param changesSelectedDateEnabled if true pressing on a date will cause
-     * the selected date to be changed to the pressed one
+     * @return true if enabled
      */
-    public void setChangesSelectedDateEnabled(boolean changesSelectedDateEnabled) {
-        this.changesSelectedDateEnabled = changesSelectedDateEnabled;
+    public boolean isChangesSelectedDateEnabled() {
+        return changesSelectedDateEnabled;
     }
 
     /**
      * This flag determines if selected date can be changed by selecting an
      * alternative date
      *
-     * @return true if enabled
+     * @param changesSelectedDateEnabled if true pressing on a date will cause
+     *                                   the selected date to be changed to the pressed one
      */
-    public boolean isChangesSelectedDateEnabled() {
-        return changesSelectedDateEnabled;
+    public void setChangesSelectedDateEnabled(boolean changesSelectedDateEnabled) {
+        this.changesSelectedDateEnabled = changesSelectedDateEnabled;
     }
 
     /**
@@ -564,10 +565,10 @@ public class Calendar extends Container implements ActionSource {
     /**
      * This method updates the Button day.
      *
-     * @param dayButton the button to be updated
-     * @param year the current year
+     * @param dayButton    the button to be updated
+     * @param year         the current year
      * @param currentMonth the current month
-     * @param day the new button day
+     * @param day          the new button day
      */
     protected void updateButtonDayDate(Component dayButton, int year, int currentMonth, int day) {
         if (dayButton instanceof Button) {
@@ -578,9 +579,9 @@ public class Calendar extends Container implements ActionSource {
     /**
      * This method updates the Button day.
      *
-     * @param dayButton the button to be updated
+     * @param dayButton    the button to be updated
      * @param currentMonth the current month
-     * @param day the new button day
+     * @param day          the new button day
      */
     protected void updateButtonDayDate(Component dayButton, int currentMonth, int day) {
         if (dayButton instanceof Button) {
@@ -591,10 +592,10 @@ public class Calendar extends Container implements ActionSource {
     /**
      * This method updates the Button day.
      *
-     * @param dayButton the button to be updated
-     * @param year the current year
+     * @param dayButton    the button to be updated
+     * @param year         the current year
      * @param currentMonth the current month
-     * @param day the new button day
+     * @param day          the new button day
      * @deprecated override the method that accepts a generic component
      */
     protected void updateButtonDayDate(Button dayButton, int year, int currentMonth, int day) {
@@ -604,9 +605,9 @@ public class Calendar extends Container implements ActionSource {
     /**
      * This method updates the Button day.
      *
-     * @param dayButton the button to be updated
+     * @param dayButton    the button to be updated
      * @param currentMonth the current month
-     * @param day the new button day
+     * @param day          the new button day
      * @deprecated override the method that accepts a generic component
      */
     protected void updateButtonDayDate(Button dayButton, int currentMonth, int day) {
@@ -681,7 +682,7 @@ public class Calendar extends Container implements ActionSource {
      * "{@code uiid} parameter"
      *
      * @param selectedDays the multipleDateSelection to set
-     * @param uiid a custom uiid to be used in the dates selected
+     * @param uiid         a custom uiid to be used in the dates selected
      */
     public void setSelectedDays(Collection<Date> selectedDays, String uiid) {
         for (Date selectedDay : selectedDays) {
@@ -700,7 +701,6 @@ public class Calendar extends Container implements ActionSource {
     }
 
     /**
-     *
      * @return selectedDays uiid
      */
     public String getSelectedDaysUIID() {
@@ -753,7 +753,7 @@ public class Calendar extends Container implements ActionSource {
      * uiid takes precedence over highlighted dates uiid)
      *
      * @param dates the dates to be highlighted
-     * @param uiid a custom uiid to be used in highlighting the dates
+     * @param uiid  a custom uiid to be used in highlighting the dates
      */
     public void highlightDates(Collection<Date> dates, String uiid) {
         for (Date selectedDay : dates) {
@@ -884,7 +884,7 @@ public class Calendar extends Container implements ActionSource {
      * method to add support for binding the click listener to the given
      * component.
      *
-     * @param l listener interface
+     * @param l   listener interface
      * @param cmp day component returned by createDayComponent()
      */
     protected void bindDayListener(Component cmp, ActionListener l) {
@@ -898,7 +898,7 @@ public class Calendar extends Container implements ActionSource {
      * method to add support for removing the click listener from the given
      * component.
      *
-     * @param l listener interface
+     * @param l   listener interface
      * @param cmp day component returned by createDayComponent()
      */
     private void unBindDayListener(Component cmp, ActionListener l) {
@@ -912,7 +912,7 @@ public class Calendar extends Container implements ActionSource {
      * method to add support for setting the displayed string.
      *
      * @param text the text set the component to
-     * @param cmp day component returned by createDayComponent()
+     * @param cmp  day component returned by createDayComponent()
      */
     protected void setDayText(Component cmp, String text) {
         if (cmp instanceof Button) {
@@ -939,7 +939,7 @@ public class Calendar extends Container implements ActionSource {
      * Since a day may be any component type, developers should override this
      * method to add support for setting the right component's UIID.
      *
-     * @param cmp day component returned by createDayComponent()
+     * @param cmp  day component returned by createDayComponent()
      * @param uiid the text set the component to
      */
     protected void setDayUIID(Component cmp, String uiid) {
@@ -950,7 +950,7 @@ public class Calendar extends Container implements ActionSource {
      * Since a day may be any component type, developers should override this
      * method to add support for enabling or disabling the right component.
      *
-     * @param cmp day component returned by createDayComponent()
+     * @param cmp    day component returned by createDayComponent()
      * @param enable the text set the component to
      */
     protected void setDayEnabled(Component cmp, boolean enable) {
@@ -959,15 +959,11 @@ public class Calendar extends Container implements ActionSource {
 
     class MonthView extends Container implements ActionListener {
 
-        long currentDay;
         private final Component[] components = new Component[42];
-        private Component selected;
         private final Container titles;
         private final Container days;
-
-        public long getCurrentDay() {
-            return currentDay;
-        }
+        long currentDay;
+        private Component selected;
 
         public MonthView(long time) {
             super(new BoxLayout(BoxLayout.Y_AXIS));
@@ -996,6 +992,10 @@ public class Calendar extends Container implements ActionSource {
             }
             setCurrentDay(time);
 
+        }
+
+        public long getCurrentDay() {
+            return currentDay;
         }
 
         public void setCurrentDay(long day) {
@@ -1063,7 +1063,7 @@ public class Calendar extends Container implements ActionSource {
                 }
                 //last day of current month
                 cal.set(java.util.Calendar.MONTH, (month + 1) % 12);
-                while(cal.get(java.util.Calendar.MONTH) != month) {
+                while (cal.get(java.util.Calendar.MONTH) != month) {
                     cal.add(java.util.Calendar.DAY_OF_MONTH, -1);
                 }
 

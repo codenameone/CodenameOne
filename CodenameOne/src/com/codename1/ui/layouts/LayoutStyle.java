@@ -24,7 +24,6 @@
 package com.codename1.ui.layouts;
 
 import com.codename1.ui.Component;
-
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 
@@ -53,7 +52,7 @@ public class LayoutStyle {
      * are not grouped together.
      */
     public static final int UNRELATED = 1;
-    
+
     /**
      * Possible argument to getPreferredGap.  Used to indicate the distance
      * to indent a component is being requested.  To visually indicate
@@ -68,25 +67,25 @@ public class LayoutStyle {
     //private static LookAndFeel laf;
 
     /**
-     * Sets the LayoutStyle instance to use for this look and feel.
-     * You generally don't need to invoke this, instead use the getter which
-     * will return the LayoutStyle appropriate for the current look and feel.
-     * 
-     * @param layout the LayoutStyle to use; a value of null indicates 
-     *        the default should be used
-     */
-    public static void setSharedInstance(LayoutStyle layout) {
-        layoutStyle = layout;
-    }
-    
-    /**
      * Factory methods for obtaining the current <code>LayoutStyle</code>
      * object appropriate for the current look and feel.
-     * 
+     *
      * @return the current LayoutStyle instance
      */
     public static LayoutStyle getSharedInstance() {
         return layoutStyle;
+    }
+
+    /**
+     * Sets the LayoutStyle instance to use for this look and feel.
+     * You generally don't need to invoke this, instead use the getter which
+     * will return the LayoutStyle appropriate for the current look and feel.
+     *
+     * @param layout the LayoutStyle to use; a value of null indicates
+     *               the default should be used
+     */
+    public static void setSharedInstance(LayoutStyle layout) {
+        layoutStyle = layout;
     }
 
     /**
@@ -102,7 +101,7 @@ public class LayoutStyle {
      *                             LayoutStyle.RELATED,
      *                             SwingConstants.NORTH, parent);
      * </pre>
-     * The <code>type</code> parameter indicates the type 
+     * The <code>type</code> parameter indicates the type
      * of gap being requested.  It can be one of the following values:
      * <table>
      * <tr><td><code>RELATED</code>
@@ -129,38 +128,38 @@ public class LayoutStyle {
      * consideration various properties of the components.  For
      * example, the space may vary based on font size, or the preferred
      * size of the component.
-     * 
+     *
      * @param component1 the <code>JComponent</code>
-     *               <code>component2</code> is being placed relative to
+     *                   <code>component2</code> is being placed relative to
      * @param component2 the <code>JComponent</code> being placed
-     * @param type how the two components are being placed
-     * @param position the position <code>component2</code> is being placed 
-     *        relative to <code>component1</code>; one of
-     *        <code>SwingConstants.NORTH</code>,
-     *        <code>SwingConstants.SOUTH</code>,
-     *        <code>SwingConstants.EAST</code> or
-     *        <code>SwingConstants.WEST</code>
-     * @param parent the parent of <code>component2</code>; this may differ
-     *        from the actual parent and may be null
+     * @param type       how the two components are being placed
+     * @param position   the position <code>component2</code> is being placed
+     *                   relative to <code>component1</code>; one of
+     *                   <code>SwingConstants.NORTH</code>,
+     *                   <code>SwingConstants.SOUTH</code>,
+     *                   <code>SwingConstants.EAST</code> or
+     *                   <code>SwingConstants.WEST</code>
+     * @param parent     the parent of <code>component2</code>; this may differ
+     *                   from the actual parent and may be null
      * @return the amount of space to place between the two components
      * @throws IllegalArgumentException if <code>position</code> is not
-     *         one of <code>SwingConstants.NORTH</code>,
-     *         <code>SwingConstants.SOUTH</code>,
-     *         <code>SwingConstants.EAST</code> or 
-     *         <code>SwingConstants.WEST</code>; <code>type</code> not one
-     *         of <code>INDENT</code>, <code>RELATED</code>
-     *         or <code>UNRELATED</code>; or <code>component1</code> or
-     *         <code>component2</code> is null
+     *                                  one of <code>SwingConstants.NORTH</code>,
+     *                                  <code>SwingConstants.SOUTH</code>,
+     *                                  <code>SwingConstants.EAST</code> or
+     *                                  <code>SwingConstants.WEST</code>; <code>type</code> not one
+     *                                  of <code>INDENT</code>, <code>RELATED</code>
+     *                                  or <code>UNRELATED</code>; or <code>component1</code> or
+     *                                  <code>component2</code> is null
      */
     public int getPreferredGap(Component component1, Component component2,
-                          int type, int position, Container parent) {
+                               int type, int position, Container parent) {
         if (position != GroupLayout.NORTH &&
-              position != GroupLayout.SOUTH &&
-              position != GroupLayout.WEST &&
-              position != GroupLayout.EAST) {
+                position != GroupLayout.SOUTH &&
+                position != GroupLayout.WEST &&
+                position != GroupLayout.EAST) {
             throw new IllegalArgumentException("Invalid position");
         }
-        if (component1 == null || component2== null) {
+        if (component1 == null || component2 == null) {
             throw new IllegalArgumentException("Components must be non-null");
         }
         if (type == RELATED) {
@@ -185,29 +184,29 @@ public class LayoutStyle {
      * parent.
      *
      * @param component the <code>Component</code> being positioned
-     * @param position the position <code>component</code> is being placed 
-     *        relative to its parent; one of
-     *        <code>SwingConstants.NORTH</code>,
-     *        <code>SwingConstants.SOUTH</code>,
-     *        <code>SwingConstants.EAST</code> or
-     *        <code>SwingConstants.WEST</code>
-     * @param parent the parent of <code>component</code>; this may differ
-     *        from the actual parent and may be null
+     * @param position  the position <code>component</code> is being placed
+     *                  relative to its parent; one of
+     *                  <code>SwingConstants.NORTH</code>,
+     *                  <code>SwingConstants.SOUTH</code>,
+     *                  <code>SwingConstants.EAST</code> or
+     *                  <code>SwingConstants.WEST</code>
+     * @param parent    the parent of <code>component</code>; this may differ
+     *                  from the actual parent and may be null
      * @return the amount of space to place between the component and specified
-     *         edge
+     * edge
      * @throws IllegalArgumentException if <code>position</code> is not
-     *         one of <code>SwingConstants.NORTH</code>,
-     *         <code>SwingConstants.SOUTH</code>,
-     *         <code>SwingConstants.EAST</code> or 
-     *         <code>SwingConstants.WEST</code>;
-     *         or <code>component</code> is null
+     *                                  one of <code>SwingConstants.NORTH</code>,
+     *                                  <code>SwingConstants.SOUTH</code>,
+     *                                  <code>SwingConstants.EAST</code> or
+     *                                  <code>SwingConstants.WEST</code>;
+     *                                  or <code>component</code> is null
      */
     public int getContainerGap(Component component, int position,
-            Container parent) {
+                               Container parent) {
         if (position != GroupLayout.NORTH &&
-              position != GroupLayout.SOUTH &&
-              position != GroupLayout.WEST &&
-              position != GroupLayout.EAST) {
+                position != GroupLayout.SOUTH &&
+                position != GroupLayout.WEST &&
+                position != GroupLayout.EAST) {
             throw new IllegalArgumentException("Invalid position");
         }
         if (component == null) {
@@ -222,10 +221,10 @@ public class LayoutStyle {
      * this space.  Use this method to subtract this space from the specified
      * components.
      *
-     * @param source First component
-     * @param target Second component
+     * @param source   First component
+     * @param target   Second component
      * @param position Position doing layout along.
-     * @param offset Ideal offset, not including border/margin
+     * @param offset   Ideal offset, not including border/margin
      * @return offset - border/margin around the component.
      */
     int getCBRBPadding(Component source, Component target, int position,
@@ -246,9 +245,9 @@ public class LayoutStyle {
      * this space.  Use this method to subtract this space from the specified
      * components.
      *
-     * @param source Component
+     * @param source   Component
      * @param position Position doing layout along.
-     * @param offset Ideal offset, not including border/margin
+     * @param offset   Ideal offset, not including border/margin
      * @return offset - border/margin around the component.
      */
     int getCBRBPadding(Component source, int position, int offset) {
@@ -257,17 +256,17 @@ public class LayoutStyle {
     }
 
     int flipDirection(int position) {
-        switch(position) {
-        case GroupLayout.NORTH:
-            return GroupLayout.SOUTH;
-        case GroupLayout.SOUTH:
-            return GroupLayout.NORTH;
-        case GroupLayout.EAST:
-            return GroupLayout.WEST;
-        case GroupLayout.WEST:
-            return GroupLayout.EAST;
-        default:
-            throw new IllegalArgumentException("Illegal position: " + position);
+        switch (position) {
+            case GroupLayout.NORTH:
+                return GroupLayout.SOUTH;
+            case GroupLayout.SOUTH:
+                return GroupLayout.NORTH;
+            case GroupLayout.EAST:
+                return GroupLayout.WEST;
+            case GroupLayout.WEST:
+                return GroupLayout.EAST;
+            default:
+                throw new IllegalArgumentException("Illegal position: " + position);
         }
     }
 
@@ -287,17 +286,17 @@ public class LayoutStyle {
         int insetTop = c.getStyle().getMarginTop();
         int insetRight = c.getStyle().getMarginRightNoRTL();
         int insetBottom = c.getStyle().getMarginBottom();
-        switch(position) {
-        case GroupLayout.NORTH:
-            return insetTop;
-        case GroupLayout.SOUTH:
-            return insetBottom;
-        case GroupLayout.EAST:
-            return insetRight;
-        case GroupLayout.WEST:
-            return insetLeft;
-        default:
-            throw new IllegalArgumentException("Illegal argument position: " + position);
+        switch (position) {
+            case GroupLayout.NORTH:
+                return insetTop;
+            case GroupLayout.SOUTH:
+                return insetBottom;
+            case GroupLayout.EAST:
+                return insetRight;
+            case GroupLayout.WEST:
+                return insetLeft;
+            default:
+                throw new IllegalArgumentException("Illegal argument position: " + position);
         }
     }
 

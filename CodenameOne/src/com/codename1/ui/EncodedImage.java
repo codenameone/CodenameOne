@@ -27,50 +27,51 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.util.ImageIO;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * <p>{@code EncodedImage} is the workhorse of Codename One. Images returned from resource files are 
+ * <p>{@code EncodedImage} is the workhorse of Codename One. Images returned from resource files are
  * {@code EncodedImage} and many API's expect it.</p>
- * 
- * <p>{@code EncodedImage} is effectively a an image that is "hidden" and extracted as needed to remove the 
- * memory overhead associated with loaded image. When creating an {@code EncodedImage} only the PNG 
- * (or JPEG etc.) is loaded to an array in RAM. Normally such images are very small (relatively) so they can be 
+ *
+ * <p>{@code EncodedImage} is effectively a an image that is "hidden" and extracted as needed to remove the
+ * memory overhead associated with loaded image. When creating an {@code EncodedImage} only the PNG
+ * (or JPEG etc.) is loaded to an array in RAM. Normally such images are very small (relatively) so they can be
  * kept in memory without much overhead.</p>
- * 
- * <p>When image information is needed (pixels) the image is decoded into RAM and kept in a weak/sort 
- * reference (see {@link com.codename1.ui.Display#createSoftWeakRef(java.lang.Object)}). This allows the 
- * image to be cached for performance and allows the garbage collector to reclaim it when the memory becomes 
+ *
+ * <p>When image information is needed (pixels) the image is decoded into RAM and kept in a weak/sort
+ * reference (see {@link com.codename1.ui.Display#createSoftWeakRef(java.lang.Object)}). This allows the
+ * image to be cached for performance and allows the garbage collector to reclaim it when the memory becomes
  * scarce.</p>
- * 
- * <p>Since the fully decoded image can be pretty big ({@code width X height X 4}) the ability to store just the 
- * encoded image can be pretty stark. E.g. A standard 50x100 image will take up 20,000 bytes of RAM for a 
+ *
+ * <p>Since the fully decoded image can be pretty big ({@code width X height X 4}) the ability to store just the
+ * encoded image can be pretty stark. E.g. A standard 50x100 image will take up 20,000 bytes of RAM for a
  * standard image but an {@code EncodedImage} can reduce that to 1kb-2kb of RAM.</p>
- * 
- * <p>When drawing an {@code EncodedImage} it checks the weak reference cache and if the image is cached then 
+ *
+ * <p>When drawing an {@code EncodedImage} it checks the weak reference cache and if the image is cached then
  * it is shown  otherwise the image is loaded the encoded image cache it then drawn.</p>
- * 
- * <p>{@code EncodedImage} is not final and can be derived to produce complex image fetching strategies 
+ *
+ * <p>{@code EncodedImage} is not final and can be derived to produce complex image fetching strategies
  * e.g. the {@link com.codename1.ui.URLImage} class that can dynamically download its content from the web.</p>
- * 
- * <p>{@code EncodedImage} can be instantiated via the create methods in the class. Pretty much any image 
- * can be converted into an `EncodedImage` via the  {@link #createFromImage(com.codename1.ui.Image, boolean)} 
+ *
+ * <p>{@code EncodedImage} can be instantiated via the create methods in the class. Pretty much any image
+ * can be converted into an `EncodedImage` via the  {@link #createFromImage(com.codename1.ui.Image, boolean)}
  * method.</p>
- * 
+ *
  * <h3>EncodedImage Locking</h3>
- * <p>Naturally loading the image is more expensive so we want the images that are on the current form to remain in 
- * cache (otherwise GC will thrash a lot). That's where {@link #lock()} kicks in, when {@link #lock()} is active we 
+ * <p>Naturally loading the image is more expensive so we want the images that are on the current form to remain in
+ * cache (otherwise GC will thrash a lot). That's where {@link #lock()} kicks in, when {@link #lock()} is active we
  * keep a hard reference to the actual native image so it won't get GC'd. This significantly improves performance!</p>
- * 
- * <p>Internally this is invoked automatically for background images, icons etc. which results in a huge performance 
- * boost. This makes sense since these images are currently showing and they will be in RAM anyway. However, 
+ *
+ * <p>Internally this is invoked automatically for background images, icons etc. which results in a huge performance
+ * boost. This makes sense since these images are currently showing and they will be in RAM anyway. However,
  * if you use a complex renderer or custom drawing UI you should {@link #lock()} your images where possible!</p>
- * 
- * <p>To verify that locking might be a problem you can launch the performance monitor tool (accessible from 
- * the simulator menu), if you get log messages that indicate that an unlocked image was drawn you might 
+ *
+ * <p>To verify that locking might be a problem you can launch the performance monitor tool (accessible from
+ * the simulator menu), if you get log messages that indicate that an unlocked image was drawn you might
  * have a problem.</p>
  *
  * @author Shai Almog
@@ -86,7 +87,7 @@ public class EncodedImage extends Image {
     private Object cache;
     private Image hardCache;
     private int locked;
-    
+
     private EncodedImage(byte[][] imageData) {
         super(null);
         this.imageData = imageData;
@@ -96,8 +97,8 @@ public class EncodedImage extends Image {
      * Allows subclasses to create more advanced variations of this class that
      * lazily store the data in an arbitrary location.
      *
-     * @param width -1 if unknown ideally the width/height should be known in advance
-     * @param height  -1 if unknown ideally the width/height should be known in advance
+     * @param width  -1 if unknown ideally the width/height should be known in advance
+     * @param height -1 if unknown ideally the width/height should be known in advance
      */
     protected EncodedImage(int width, int height) {
         super(null);
@@ -106,22 +107,14 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * A subclass might choose to load asynchroniously and reset the cache when the image is ready.
-     */
-    protected void resetCache() {
-        cache = null;
-        hardCache = null;
-    }
-
-    /**
      * Creates an encoded image that acts as a multi-image, DO NOT USE THIS METHOD. Its for internal
      * use to improve the user experience of the simulator
-     * 
+     *
      * @param dpis device DPI's
      * @param data the data matching each multi-image DPI
      * @return an encoded image that acts as a multi-image in runtime
      * @deprecated this method is meant for internal use only, it would be very expensive to use
-     * this method for real applications. Its here for simulators and development purposes where 
+     * this method for real applications. Its here for simulators and development purposes where
      * screen DPI/resolution can vary significantly in runtime (something that just doesn't happen on devices).
      */
     public static EncodedImage createMulti(int[] dpis, byte[][] data) {
@@ -129,28 +122,29 @@ public class EncodedImage extends Image {
         e.dpis = dpis;
         return e;
     }
-    
+
     /**
      * Converts an image to encoded image
-     * @param i image
+     *
+     * @param i    image
      * @param jpeg true to try and set jpeg, will do a best effort but this isn't guaranteed
      * @return an encoded image or null
      */
     public static EncodedImage createFromImage(Image i, boolean jpeg) {
-        if(i instanceof EncodedImage) {
-            return ((EncodedImage)i);
+        if (i instanceof EncodedImage) {
+            return ((EncodedImage) i);
         }
         ImageIO io = ImageIO.getImageIO();
-        if(io != null) {
+        if (io != null) {
             String format;
-            if(jpeg) {
-                if(!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
-                    format = ImageIO.FORMAT_PNG; 
+            if (jpeg) {
+                if (!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+                    format = ImageIO.FORMAT_PNG;
                 } else {
-                    format = ImageIO.FORMAT_JPEG; 
+                    format = ImageIO.FORMAT_JPEG;
                 }
             } else {
-                if(!io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                if (!io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                     format = ImageIO.FORMAT_JPEG;
                 } else {
                     format = ImageIO.FORMAT_PNG;
@@ -163,43 +157,43 @@ public class EncodedImage extends Image {
                 Util.cleanup(bo);
                 enc.width = i.getWidth();
                 enc.height = i.getHeight();
-                if(format == ImageIO.FORMAT_JPEG) {
+                if (format == ImageIO.FORMAT_JPEG) {
                     enc.opaque = true;
                     enc.opaqueChecked = true;
                 }
                 enc.cache = Display.getInstance().createSoftWeakRef(i);
                 return enc;
-            } catch(IOException err) {
+            } catch (IOException err) {
                 Log.e(err);
-            }            
+            }
         }
         return null;
     }
-    
+
     /**
      * Tries to create an encoded image from RGB which is more efficient,
      * however if this fails it falls back to regular RGB image. This method
      * is slower than creating an RGB image (not to be confused with the RGBImage class which is
      * something ENTIRELY different!).
-     * 
-     * @param argb an argb array
-     * @param width the width for the image
+     *
+     * @param argb   an argb array
+     * @param width  the width for the image
      * @param height the height for the image
-     * @param jpeg uses jpeg format internally which is opaque and could be faster/smaller
+     * @param jpeg   uses jpeg format internally which is opaque and could be faster/smaller
      * @return an image which we hope is an encoded image
      */
     public static Image createFromRGB(int[] argb, int width, int height, boolean jpeg) {
         Image i = Image.createImage(argb, width, height);
         ImageIO io = ImageIO.getImageIO();
-        if(io != null) {
+        if (io != null) {
             String format;
-            if(jpeg) {
-                if(!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+            if (jpeg) {
+                if (!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
                     return i;
                 }
                 format = ImageIO.FORMAT_JPEG;
             } else {
-                if(!io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                if (!io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                     return i;
                 }
                 format = ImageIO.FORMAT_PNG;
@@ -211,41 +205,126 @@ public class EncodedImage extends Image {
                 Util.cleanup(bo);
                 enc.width = width;
                 enc.height = height;
-                if(jpeg) {
+                if (jpeg) {
                     enc.opaque = true;
                     enc.opaqueChecked = true;
                 }
                 enc.cache = Display.getInstance().createSoftWeakRef(i);
                 return enc;
-            } catch(IOException err) {
+            } catch (IOException err) {
                 Log.e(err);
             }
-            
+
         }
         return i;
     }
-    
+
+    /**
+     * Creates an image from the given byte array
+     *
+     * @param data the data of the image
+     * @return newly created encoded image
+     */
+    public static EncodedImage create(byte[] data) {
+        if (data == null) {
+            throw new NullPointerException();
+        }
+        return new EncodedImage(new byte[][]{data});
+    }
+
+    /**
+     * Creates an image from the given byte array with the variables set appropriately.
+     * This saves LWUIT allot of resources since it doesn't need to actually traverse the
+     * pixels of an image to find out details about it.
+     *
+     * @param data    the data of the image
+     * @param width   the width of the image
+     * @param height  the height of the image
+     * @param opacity true for an opaque image
+     * @return newly created encoded image
+     */
+    public static EncodedImage create(byte[] data, int width, int height, boolean opacity) {
+        if (data == null) {
+            throw new NullPointerException();
+        }
+        EncodedImage e = new EncodedImage(new byte[][]{data});
+        e.width = width;
+        e.height = height;
+        e.opaque = opacity;
+        e.opaqueChecked = true;
+        return e;
+    }
+
+    /**
+     * Creates an image from the input stream
+     *
+     * @param i the input stream
+     * @return newly created encoded image
+     * @throws java.io.IOException if thrown by the input stream
+     */
+    public static EncodedImage create(InputStream i) throws IOException {
+        byte[] buffer = Util.readInputStream(i);
+        if (buffer.length > 200000) {
+            System.out.println("Warning: loading large images using EncodedImage.create(InputStream) might lead to memory issues, try using EncodedImage.create(InputStream, int)");
+        }
+        return new EncodedImage(new byte[][]{buffer});
+    }
+
+    /**
+     * Creates an image from the input stream, this version of the method is somewhat faster
+     * than the version that doesn't accept size
+     *
+     * @param i    the input stream
+     * @param size the size of the stream
+     * @return newly created encoded image
+     * @throws java.io.IOException if thrown by the input stream
+     */
+    public static EncodedImage create(InputStream i, int size) throws IOException {
+        byte[] buffer = new byte[size];
+        Util.readFully(i, buffer);
+        return new EncodedImage(new byte[][]{buffer});
+    }
+
+    /**
+     * Creates an image from the input stream
+     *
+     * @param i the resource
+     * @return newly created encoded image
+     * @throws java.io.IOException if thrown by the input stream
+     */
+    public static EncodedImage create(String i) throws IOException {
+        return create(Display.getInstance().getResourceAsStream(EncodedImage.class, i));
+    }
+
+    /**
+     * A subclass might choose to load asynchroniously and reset the cache when the image is ready.
+     */
+    protected void resetCache() {
+        cache = null;
+        hardCache = null;
+    }
+
     /**
      * Returns the byte array data backing the image allowing the image to be stored
      * and discarded completely from RAM.
-     * 
+     *
      * @return byte array used to create the image, e.g. encoded PNG, JPEG etc.
      */
     public byte[] getImageData() {
-        if(imageData.length == 1) {
+        if (imageData.length == 1) {
             return imageData[0];
         }
         int dpi = Display.getInstance().getDeviceDensity();
         int bestFitOffset = 0;
         int bestFitDPI = 0;
         int dlen = dpis.length;
-        for(int iter = 0 ; iter < dlen ; iter++) {
+        for (int iter = 0; iter < dlen; iter++) {
             int currentDPI = dpis[iter];
-            if(dpi == currentDPI) {
+            if (dpi == currentDPI) {
                 bestFitOffset = iter;
                 break;
             }
-            if(bestFitDPI != dpi && dpi >= currentDPI && currentDPI >= bestFitDPI) {
+            if (bestFitDPI != dpi && dpi >= currentDPI && currentDPI >= bestFitDPI) {
                 bestFitDPI = currentDPI;
                 bestFitOffset = iter;
             }
@@ -255,91 +334,25 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * Creates an image from the given byte array
-     * 
-     * @param data the data of the image
-     * @return newly created encoded image
-     */
-    public static EncodedImage create(byte[] data) {
-        if(data == null) {
-            throw new NullPointerException();
-        }
-        return new EncodedImage(new byte[][] {data});
-    }
-
-    /**
-     * Creates an image from the given byte array with the variables set appropriately.
-     * This saves LWUIT allot of resources since it doesn't need to actually traverse the 
-     * pixels of an image to find out details about it.
-     * 
-     * @param data the data of the image
-     * @param width the width of the image
-     * @param height the height of the image
-     * @param opacity true for an opaque image
-     * @return newly created encoded image
-     */
-    public static EncodedImage create(byte[] data, int width, int height, boolean opacity) {
-        if(data == null) {
-            throw new NullPointerException();
-        }
-        EncodedImage e = new EncodedImage(new byte[][] {data});
-        e.width = width;
-        e.height = height;
-        e.opaque = opacity;
-        e.opaqueChecked = true;
-        return e;
-    }
-    
-    /**
      * {@inheritDoc}
      */
     public Object getImage() {
         return getInternalImpl().getImage();
     }
-    
-    /**
-     * Creates an image from the input stream 
-     * 
-     * @param i the input stream
-     * @return newly created encoded image
-     * @throws java.io.IOException if thrown by the input stream
-     */
-    public static EncodedImage create(InputStream i) throws IOException {
-        byte[] buffer = Util.readInputStream(i);
-        if(buffer.length > 200000) {
-            System.out.println("Warning: loading large images using EncodedImage.create(InputStream) might lead to memory issues, try using EncodedImage.create(InputStream, int)");
-        }
-        return new EncodedImage(new byte[][] {buffer});
-    }
-
-    /**
-     * Creates an image from the input stream, this version of the method is somewhat faster
-     * than the version that doesn't accept size
-     * 
-     * @param i the input stream
-     * @param size the size of the stream
-     * @return newly created encoded image
-     * @throws java.io.IOException if thrown by the input stream
-     */
-    public static EncodedImage create(InputStream i, int size) throws IOException {
-        byte[] buffer = new byte[size];
-        Util.readFully(i, buffer);
-        return new EncodedImage(new byte[][] {buffer});
-    }
 
     private Image getInternalImpl() {
-        
-        if(imageData != null && imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDensity()) {
+
+        if (imageData != null && imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDensity()) {
             hardCache = null;
             cache = null;
             width = -1;
             height = -1;
         }
-        if(hardCache != null) {
+        if (hardCache != null) {
             return hardCache;
         }
         Image i = getInternal();
-        if(locked > 0) {
+        if (locked > 0) {
             hardCache = i;
         }
         return i;
@@ -354,9 +367,9 @@ public class EncodedImage extends Image {
      * @return drawable image instance
      */
     protected Image getInternal() {
-        if(cache != null) {
-            Image i = (Image)Display.getInstance().extractHardRef(cache);
-            if(i != null) {
+        if (cache != null) {
+            Image i = (Image) Display.getInstance().extractHardRef(cache);
+            if (i != null) {
                 return i;
             }
         }
@@ -364,12 +377,12 @@ public class EncodedImage extends Image {
         try {
             byte[] b = getImageData();
             i = Image.createImage(b, 0, b.length);
-            if(opaqueChecked) {
+            if (opaqueChecked) {
                 i.setOpaque(opaque);
             }
             CodenameOneImplementation impl = Display.impl;
             impl.setImageName(i.getImage(), getImageName());
-        } catch(Exception err) {
+        } catch (Exception err) {
             Log.e(err);
             i = Image.createImage(5, 5);
         }
@@ -383,16 +396,16 @@ public class EncodedImage extends Image {
     public boolean isLocked() {
         return locked > 0;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public void asyncLock(final Image internal) {
-        if(locked <= 0) {
+        if (locked <= 0) {
             locked = 1;
-            if(cache != null) {
-                hardCache = (Image)Display.getInstance().extractHardRef(cache);
-                if(hardCache != null) {
+            if (cache != null) {
+                hardCache = (Image) Display.getInstance().extractHardRef(cache);
+                if (hardCache != null) {
                     return;
                 }
             }
@@ -402,23 +415,23 @@ public class EncodedImage extends Image {
                     try {
                         byte[] b = getImageData();
                         final Image i = Image.createImage(b, 0, b.length);
-                        if(opaqueChecked) {
+                        if (opaqueChecked) {
                             i.setOpaque(opaque);
                         }
                         CodenameOneImplementation impl = Display.impl;
                         impl.setImageName(i.getImage(), getImageName());
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
-                                if(locked > 0) {
+                                if (locked > 0) {
                                     hardCache = i;
                                 }
                                 cache = Display.getInstance().createSoftWeakRef(i);
-                                Display.getInstance().getCurrent().repaint();                                
+                                Display.getInstance().getCurrent().repaint();
                                 width = i.getWidth();
                                 height = i.getHeight();
                             }
                         });
-                    } catch(Exception err) {
+                    } catch (Exception err) {
                         Log.e(err);
                     }
                 }
@@ -430,13 +443,13 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public void lock() {
-        if(locked < 1) {
+        if (locked < 1) {
             locked = 1;
-            if(cache != null) {
-                hardCache = (Image)Display.getInstance().extractHardRef(cache);
+            if (cache != null) {
+                hardCache = (Image) Display.getInstance().extractHardRef(cache);
             }
         } else {
-            locked ++;
+            locked++;
         }
     }
 
@@ -445,9 +458,9 @@ public class EncodedImage extends Image {
      */
     public void unlock() {
         locked--;
-        if(locked < 1) {
-            if(hardCache != null) {
-                if(cache == null || Display.getInstance().extractHardRef(cache) == null) {
+        if (locked < 1) {
+            if (hardCache != null) {
+                if (cache == null || Display.getInstance().extractHardRef(cache) == null) {
                     cache = Display.getInstance().createSoftWeakRef(hardCache);
                 }
                 hardCache = null;
@@ -457,20 +470,9 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * Creates an image from the input stream 
-     * 
-     * @param i the resource
-     * @return newly created encoded image
-     * @throws java.io.IOException if thrown by the input stream
-     */
-    public static EncodedImage create(String i) throws IOException {
-        return create(Display.getInstance().getResourceAsStream(EncodedImage.class, i));
-    }
-
-    /**
      * {@inheritDoc}
      */
-    public Image subImage(int x, int y, int width, int height, boolean processAlpha)  {
+    public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
         return getInternalImpl().subImage(x, y, width, height, processAlpha);
     }
 
@@ -480,14 +482,14 @@ public class EncodedImage extends Image {
     public Image rotate(int degrees) {
         return getInternalImpl().rotate(degrees);
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public Image modifyAlpha(byte alpha) {
         return getInternalImpl().modifyAlpha(alpha);
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -498,7 +500,7 @@ public class EncodedImage extends Image {
     /**
      * {@inheritDoc}
      */
-    public Graphics getGraphics() {        
+    public Graphics getGraphics() {
         return null;
     }
 
@@ -506,7 +508,7 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public int getWidth() {
-        if(width > -1) {
+        if (width > -1) {
             return width;
         }
         width = getInternalImpl().getWidth();
@@ -517,7 +519,7 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public int getHeight() {
-        if(height > -1) {
+        if (height > -1) {
             return height;
         }
         height = getInternalImpl().getHeight();
@@ -530,7 +532,7 @@ public class EncodedImage extends Image {
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         Display.impl.drawingEncodedImage(this);
         Image internal = getInternalImpl();
-        if(width > -1 && height > -1 && (internal.getWidth() != width || internal.getHeight() != height)) {
+        if (width > -1 && height > -1 && (internal.getWidth() != width || internal.getHeight() != height)) {
             internal.drawImage(g, nativeGraphics, x, y, width, height);
         } else {
             internal.drawImage(g, nativeGraphics, x, y);
@@ -549,11 +551,11 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     void getRGB(int[] rgbData,
-            int offset,
-            int x,
-            int y,
-            int width,
-            int height) {
+                int offset,
+                int x,
+                int y,
+                int width,
+                int height) {
         getInternalImpl().getRGB(rgbData, offset, x, y, width, height);
     }
 
@@ -561,12 +563,12 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public void toRGB(RGBImage image,
-            int destX,
-            int destY,
-            int x,
-            int y,
-            int width,
-            int height) {
+                      int destX,
+                      int destY,
+                      int x,
+                      int y,
+                      int width,
+                      int height) {
         getInternalImpl().toRGB(image, destX, destY, x, y, width, height);
     }
 
@@ -593,35 +595,36 @@ public class EncodedImage extends Image {
 
     /**
      * Performs scaling using ImageIO to generate an encoded Image
-     * @param width the width of the image, -1 to scale based on height and preserve aspect ratio
+     *
+     * @param width  the width of the image, -1 to scale based on height and preserve aspect ratio
      * @param height the height of the image, -1 to scale based on width and preserve aspect ratio
      * @return new encoded image
      */
     public EncodedImage scaledEncoded(int width, int height) {
-        if(width == getWidth() && height == getHeight()) {
+        if (width == getWidth() && height == getHeight()) {
             return this;
         }
-        
-        if(width < 0) {
-            float ratio = ((float)height) / ((float)getHeight());
-            width = Math.max(1, (int)(getWidth() * ratio));
+
+        if (width < 0) {
+            float ratio = ((float) height) / ((float) getHeight());
+            width = Math.max(1, (int) (getWidth() * ratio));
         } else {
-            if(height < 0) {
-                float ratio = ((float)width) / ((float)getWidth());
-                height = Math.max(1, (int)(getHeight() * ratio));
+            if (height < 0) {
+                float ratio = ((float) width) / ((float) getWidth());
+                height = Math.max(1, (int) (getHeight() * ratio));
             }
         }
-        
+
         try {
             ImageIO io = ImageIO.getImageIO();
-            if(io != null) {
+            if (io != null) {
                 String format = ImageIO.FORMAT_PNG;
-                if(isOpaque() || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
-                    if(io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
+                if (isOpaque() || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                    if (io.isFormatSupported(ImageIO.FORMAT_JPEG)) {
                         format = ImageIO.FORMAT_JPEG;
                     }
                 }
-                if(io.isFormatSupported(format)) {
+                if (io.isFormatSupported(format)) {
                     // do an image IO scale which is more efficient
                     ByteArrayOutputStream bo = new ByteArrayOutputStream();
                     io.save(new ByteArrayInputStream(getImageData()), bo, format, width, height, 0.9f);
@@ -629,27 +632,27 @@ public class EncodedImage extends Image {
                     Util.cleanup(bo);
                     img.opaque = opaque;
                     img.opaqueChecked = opaqueChecked;
-                    if(width > -1 && height > -1) {
+                    if (width > -1 && height > -1) {
                         img.width = width;
                         img.height = height;
                     }
                     return img;
                 }
             }
-        } catch(IOException err) {
+        } catch (IOException err) {
             // normally this shouldn't happen but this will keep falling back to the existing scaled code
             Log.e(err);
         }
         return null;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public Image scaled(int width, int height) {
         // J2ME/RIM don't support image IO and Windows Phone doesn't support PNG which prevents
         // scaling translucent images properly
-        if(Display.getInstance().getProperty("encodedImageScaling", "true").equals("true") && 
+        if (Display.getInstance().getProperty("encodedImageScaling", "true").equals("true") &&
                 ImageIO.getImageIO() != null && ImageIO.getImageIO().isFormatSupported(ImageIO.FORMAT_PNG)) {
             return scaledEncoded(width, height);
         }
@@ -674,7 +677,7 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public boolean isOpaque() {
-        if(opaqueChecked) {
+        if (opaqueChecked) {
             return opaque;
         }
         opaque = getInternalImpl().isOpaque();

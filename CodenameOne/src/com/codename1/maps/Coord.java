@@ -19,34 +19,34 @@
  */
 package com.codename1.maps;
 
-import com.codename1.ui.geom.Dimension;
-
 /**
  * This class declares a coordinate point on a map.
- * 
+ *
  * @author Roman Kamyk roman.kamyk@itiner.pl
  */
 public class Coord {
 
+    private static double DELTA = 0.0000001;
     private double longitude;
     private double latitude;
     // Projected to local coordinate system. False means WGS84
     private boolean projected;
-    private static double DELTA = 0.0000001;
 
     /**
      * Creates a isProjected Coord
-     * @param latitude the getLatitude of this Coordinate
+     *
+     * @param latitude  the getLatitude of this Coordinate
      * @param longitude the getLongitude of this Coordinate
      */
     public Coord(double latitude, double longitude) {
         this(latitude, longitude, false);
     }
 
-    
+
     /**
      * a Constructor with getLatitude, getLongitude
-     * @param latitude the Coordinate getLatitude
+     *
+     * @param latitude  the Coordinate getLatitude
      * @param longitude the Coordinate getLongitude
      * @param projected declares if this is a isProjected Coordinate
      */
@@ -58,6 +58,7 @@ public class Coord {
 
     /**
      * Copy Constructor
+     *
      * @param toClone to copy
      */
     public Coord(Coord toClone) {
@@ -68,18 +69,11 @@ public class Coord {
 
     /**
      * Gets the Coord Longitude.
+     *
      * @return the Coord Longitude
      */
     public double getLongitude() {
         return longitude;
-    }
-
-    /**
-     * Gets the Coord Latitude
-     * @return the Coord Latitude
-     */
-    public double getLatitude() {
-        return latitude;
     }
 
     /**
@@ -90,13 +84,22 @@ public class Coord {
     }
 
     /**
+     * Gets the Coord Latitude
+     *
+     * @return the Coord Latitude
+     */
+    public double getLatitude() {
+        return latitude;
+    }
+
+    /**
      * Sets the Coord Latitude.
      */
     public void setLatitude(double latitude) {
         this.latitude = latitude;
     }
 
-    
+
     /**
      * {@inheritDoc}
      */
@@ -107,7 +110,8 @@ public class Coord {
 
     /**
      * Create a new Coord object which is translated with the given coordinates
-     * @param latitude translate current latitude with this latitude
+     *
+     * @param latitude  translate current latitude with this latitude
      * @param longitude translate current longitude with this longitude
      * @return a new translated Coord object
      */
@@ -117,6 +121,7 @@ public class Coord {
 
     /**
      * Create a new Coord object which is translated with the given coordinates
+     *
      * @param coordinates translate current Coord with the given coordinates
      * @return a new translated Coord object
      */
@@ -147,6 +152,7 @@ public class Coord {
 
     /**
      * Returns true if this is a projected Coordinate
+     *
      * @return true if projected
      */
     public final boolean isProjected() {
@@ -155,6 +161,7 @@ public class Coord {
 
     /**
      * Sets Coord projected
+     *
      * @param projected flag
      */
     public void setProjected(boolean projected) {

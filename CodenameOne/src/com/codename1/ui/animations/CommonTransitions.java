@@ -37,7 +37,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.util.LazyValue;
 
 /**
- * <p>Contains common transition animations that can be applied to forms &amp; components 
+ * <p>Contains common transition animations that can be applied to forms &amp; components
  * including the following types:
  * <ol>
  * <li>Slide - the exiting form slides out of the screen while the new form slides in (can be vertical or horizontal). </li>
@@ -46,7 +46,7 @@ import com.codename1.util.LazyValue;
  * <li>Fade - components fade into/out of the screen</li>
  * <li>Timeline - uses an animation image as an alpha mask between the source/destination</li>
  * </ol>
- * 
+ *
  * <p>
  * The code below demonstrates the common transitions
  * </p>
@@ -54,22 +54,32 @@ import com.codename1.util.LazyValue;
  * <h4>Slide</h4>
  * <img src="https://www.codenameone.com/img/developer-guide/transition-slide.jpg" alt="Slide" />
  * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-vertical.jpg" alt="Slide" />
- * 
+ *
  * <h4>Slide Fade</h4>
  * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-fade.jpg" alt="Slide Fade" />
- * 
+ *
  * <h4>Cover/Uncover</h4>
  * <img src="https://www.codenameone.com/img/developer-guide/transition-cover.jpg" alt="Cover" />
  * <img src="https://www.codenameone.com/img/developer-guide/transition-uncover.jpg" alt="Uncover" />
- * 
+ *
  * <h4>Fade</h4>
  * <img src="https://www.codenameone.com/img/developer-guide/transition-fade.jpg" alt="Fade" />
- * 
+ *
  * @author Shai Almog, Chen Fishbein
  */
 public final class CommonTransitions extends Transition {
-    private Motion motion, motion2;
-    private LazyValue<Motion> lazyMotion;
+    /**
+     * Slide the transition horizontally
+     *
+     * @see #createSlide
+     */
+    public static final int SLIDE_HORIZONTAL = 0;
+    /**
+     * Slide the transition vertically
+     *
+     * @see #createSlide
+     */
+    public static final int SLIDE_VERTICAL = 1;
     private static final int TYPE_EMPTY = 0;
     private static final int TYPE_SLIDE = 1;
     private static final int TYPE_FADE = 2;
@@ -79,19 +89,9 @@ public final class CommonTransitions extends Transition {
     private static final int TYPE_PULSATE_DIALOG = 6;
     private static final int TYPE_COVER = 7;
     private static final int TYPE_UNCOVER = 8;
-    
-    /**
-     * Slide the transition horizontally
-     * @see #createSlide
-     */
-    public static final int SLIDE_HORIZONTAL = 0;
-
-    /**
-     * Slide the transition vertically
-     * @see #createSlide
-     */
-    public static final int SLIDE_VERTICAL = 1;
-    
+    private static boolean defaultLinearMotion = false;
+    private Motion motion, motion2;
+    private LazyValue<Motion> lazyMotion;
     private long startTime;
     private int slideType;
     private int speed;
@@ -101,11 +101,10 @@ public final class CommonTransitions extends Transition {
     private Image secondaryBuffer;
     private Image timeline;
     private byte pulseState;
-    private static boolean defaultLinearMotion = false;
     private boolean linearMotion = defaultLinearMotion;
     private boolean motionSetManually;
     private int originalWidth, originalHeight, originalX, originalY;
-    
+
 
     /**
      * The transition is a special case where we "keep" an allocated buffer
@@ -121,57 +120,9 @@ public final class CommonTransitions extends Transition {
     }
 
     /**
-     * Returns true if this is a horizontal slide transition
-     * @return true if this is a horizontal slide transition
-     */
-    public boolean isHorizontalSlide() {
-        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
-    }
-
-    /**
-     * Returns true if this is a vertical slide transition
-     * @return true if this is a vertical slide transition
-     */
-    public boolean isVerticalSlide() {
-        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
-    }
-    
-    /**
-     * Returns true if this is a horizontal cover transition
-     * @return true if this is a horizontal cover transition
-     */
-    public boolean isHorizontalCover() {
-        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
-    }
-
-    /**
-     * Returns true if this is a vertical cover transition
-     * @return true if this is a vertical cover transition
-     */
-    public boolean isVerticalCover() {
-        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
-    }
-
-    /**
-     * Indicates the slide/cover transition direction
-     * @return true for forward
-     */
-    public boolean isForwardSlide() {
-        return forward;
-    }
-    
-    /**
-     * Returns the speed of the transition in milliseconds
-     * @return The speed of the transition in milliseconds
-     */
-    public int getTransitionSpeed() {
-        return speed;
-    }
-    
-    /**
      * Creates an empty transition that does nothing. This has the same effect as
      * setting a transition to null.
-     * 
+     *
      * @return empty transition
      */
     public static CommonTransitions createEmpty() {
@@ -179,16 +130,15 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
-
     /**
      * Creates a slide transition for the body of the form that fades the title in while sliding
      *
-     * @param forward forward is a boolean value, represent the directions of
-     * switching forms, for example for a horizontally type, true means
-     * horizontally movement to right.
+     * @param forward  forward is a boolean value, represent the directions of
+     *                 switching forms, for example for a horizontally type, true means
+     *                 horizontally movement to right.
      * @param duration represent the time the transition should take in millisecond
      */
-    public static CommonTransitions createSlideFadeTitle(boolean forward, int duration)  {
+    public static CommonTransitions createSlideFadeTitle(boolean forward, int duration) {
         CommonTransitions c = new CommonTransitions(TYPE_SLIDE_AND_FADE);
         c.forward = forward;
         c.speed = duration;
@@ -198,7 +148,7 @@ public final class CommonTransitions extends Transition {
     /**
      * Creates a dialog pulsate transition
      */
-    public static CommonTransitions createDialogPulsate()  {
+    public static CommonTransitions createDialogPulsate() {
         CommonTransitions c = new CommonTransitions(TYPE_PULSATE_DIALOG);
         return c;
     }
@@ -210,17 +160,17 @@ public final class CommonTransitions extends Transition {
      * all devices however takes up more ram. Notice that this method of painting doesn't
      * support various basic CodenameOne abilities such as translucent menus/dialogs etc.
      *
-     * @param type type can be either vertically or horizontally, which means
-     * the movement direction of the transition
-     * @param forward forward is a boolean value, represent the directions of
-     * switching forms, for example for a horizontally type, true means
-     * horizontally movement to right.
+     * @param type     type can be either vertically or horizontally, which means
+     *                 the movement direction of the transition
+     * @param forward  forward is a boolean value, represent the directions of
+     *                 switching forms, for example for a horizontally type, true means
+     *                 horizontally movement to right.
      * @param duration represent the time the transition should take in millisecond
      * @return a transition object
      * @deprecated this is not faster than slide on modern devices, you should use that {@link #createSlide(int, boolean, int) }
      */
     public static CommonTransitions createFastSlide(int type, boolean forward, int duration) {
-        if(Display.getInstance().areMutableImagesFast()) {
+        if (Display.getInstance().areMutableImagesFast()) {
             return createFastSlide(type, forward, duration, false);
         }
         return createSlide(type, forward, duration);
@@ -228,12 +178,12 @@ public final class CommonTransitions extends Transition {
 
     /**
      * Creates a slide transition with the given duration and direction
-     * 
-     * @param type type can be either vertically or horizontally, which means 
-     * the movement direction of the transition
-     * @param forward forward is a boolean value, represent the directions of 
-     * switching forms, for example for a horizontally type, true means 
-     * horizontally movement to right.
+     *
+     * @param type     type can be either vertically or horizontally, which means
+     *                 the movement direction of the transition
+     * @param forward  forward is a boolean value, represent the directions of
+     *                 switching forms, for example for a horizontally type, true means
+     *                 horizontally movement to right.
      * @param duration represent the time the transition should take in millisecond
      * @return a transition object
      */
@@ -243,16 +193,16 @@ public final class CommonTransitions extends Transition {
 
     /**
      * Creates a slide transition with the given duration and direction
-     * 
-     * @param type type can be either vertically or horizontally, which means 
-     * the movement direction of the transition
-     * @param forward forward is a boolean value, represent the directions of 
-     * switching forms, for example for a horizontally type, true means 
-     * horizontally movement to right.
-     * @param duration represent the time the transition should take in millisecond
-     * @param drawDialogMenu indicates that the menu (softkey area) of the dialog 
-     * should be kept during a slide transition. This is only relevant for 
-     * dialog in/out transitions.
+     *
+     * @param type           type can be either vertically or horizontally, which means
+     *                       the movement direction of the transition
+     * @param forward        forward is a boolean value, represent the directions of
+     *                       switching forms, for example for a horizontally type, true means
+     *                       horizontally movement to right.
+     * @param duration       represent the time the transition should take in millisecond
+     * @param drawDialogMenu indicates that the menu (softkey area) of the dialog
+     *                       should be kept during a slide transition. This is only relevant for
+     *                       dialog in/out transitions.
      * @return a transition object
      */
     public static CommonTransitions createSlide(int type, boolean forward, int duration, boolean drawDialogMenu) {
@@ -267,12 +217,12 @@ public final class CommonTransitions extends Transition {
 
     /**
      * Creates a cover transition with the given duration and direction
-     * 
-     * @param type type can be either vertically or horizontally, which means 
-     * the movement direction of the transition
-     * @param forward forward is a boolean value, represent the directions of 
-     * switching forms, for example for a horizontally type, true means 
-     * horizontally movement to right.
+     *
+     * @param type     type can be either vertically or horizontally, which means
+     *                 the movement direction of the transition
+     * @param forward  forward is a boolean value, represent the directions of
+     *                 switching forms, for example for a horizontally type, true means
+     *                 horizontally movement to right.
      * @param duration represent the time the transition should take in millisecond
      * @return a transition object
      */
@@ -287,12 +237,12 @@ public final class CommonTransitions extends Transition {
 
     /**
      * Creates a uncover transition with the given duration and direction
-     * 
-     * @param type type can be either vertically or horizontally, which means 
-     * the movement direction of the transition
-     * @param forward forward is a boolean value, represent the directions of 
-     * switching forms, for example for a horizontally type, true means 
-     * horizontally movement to right.
+     *
+     * @param type     type can be either vertically or horizontally, which means
+     *                 the movement direction of the transition
+     * @param forward  forward is a boolean value, represent the directions of
+     *                 switching forms, for example for a horizontally type, true means
+     *                 horizontally movement to right.
      * @param duration represent the time the transition should take in millisecond
      * @return a transition object
      */
@@ -305,7 +255,6 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
-
     /**
      * Creates a slide transition with the given duration and direction, this differs from the
      * standard slide animation by focusing on speed rather than on minimizing heap usage
@@ -313,15 +262,15 @@ public final class CommonTransitions extends Transition {
      * all devices however takes up more ram. Notice that this method of painting doesn't
      * support various basic CodenameOne abilities such as translucent menus/dialogs etc.
      *
-     * @param type type can be either vertically or horizontally, which means
-     * the movement direction of the transition
-     * @param forward forward is a boolean value, represent the directions of
-     * switching forms, for example for a horizontally type, true means
-     * horizontally movement to right.
-     * @param duration represent the time the transition should take in millisecond
+     * @param type           type can be either vertically or horizontally, which means
+     *                       the movement direction of the transition
+     * @param forward        forward is a boolean value, represent the directions of
+     *                       switching forms, for example for a horizontally type, true means
+     *                       horizontally movement to right.
+     * @param duration       represent the time the transition should take in millisecond
      * @param drawDialogMenu indicates that the menu (softkey area) of the dialog
-     * should be kept during a slide transition. This is only relevant for
-     * dialog in/out transitions.
+     *                       should be kept during a slide transition. This is only relevant for
+     *                       dialog in/out transitions.
      * @return a transition object
      * @deprecated this is not faster than slide on modern devices, you should use that {@link #createSlide(int, boolean, int, boolean) }
      */
@@ -337,7 +286,7 @@ public final class CommonTransitions extends Transition {
 
     /**
      * Creates a transition for fading a form in while fading out the original form
-     * 
+     *
      * @param duration represent the time the transition should take in millisecond
      * @return a transition object
      */
@@ -361,8 +310,80 @@ public final class CommonTransitions extends Transition {
         return t;
     }
 
+    /**
+     * Indicates whether the motion associated with these transitions by default is linear or spline motion
+     *
+     * @return the defaultLinearMotion
+     */
+    public static boolean isDefaultLinearMotion() {
+        return defaultLinearMotion;
+    }
+
+    /**
+     * Indicates whether the motion associated with these transitions by default is linear or spline motion
+     *
+     * @param aDefaultLinearMotion the defaultLinearMotion to set
+     */
+    public static void setDefaultLinearMotion(boolean aDefaultLinearMotion) {
+        defaultLinearMotion = aDefaultLinearMotion;
+    }
+
+    /**
+     * Returns true if this is a horizontal slide transition
+     *
+     * @return true if this is a horizontal slide transition
+     */
+    public boolean isHorizontalSlide() {
+        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
+    }
+
+    /**
+     * Returns true if this is a vertical slide transition
+     *
+     * @return true if this is a vertical slide transition
+     */
+    public boolean isVerticalSlide() {
+        return (transitionType == TYPE_SLIDE || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
+    }
+
+    /**
+     * Returns true if this is a horizontal cover transition
+     *
+     * @return true if this is a horizontal cover transition
+     */
+    public boolean isHorizontalCover() {
+        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_HORIZONTAL;
+    }
+
+    /**
+     * Returns true if this is a vertical cover transition
+     *
+     * @return true if this is a vertical cover transition
+     */
+    public boolean isVerticalCover() {
+        return (transitionType == TYPE_COVER || transitionType == TYPE_FAST_SLIDE) && slideType == SLIDE_VERTICAL;
+    }
+
+    /**
+     * Indicates the slide/cover transition direction
+     *
+     * @return true for forward
+     */
+    public boolean isForwardSlide() {
+        return forward;
+    }
+
+    /**
+     * Returns the speed of the transition in milliseconds
+     *
+     * @return The speed of the transition in milliseconds
+     */
+    public int getTransitionSpeed() {
+        return speed;
+    }
+
     private Container getDialogParent(Component dlg) {
-        return ((Dialog)dlg).getDialogComponent();
+        return ((Dialog) dlg).getDialogComponent();
     }
 
     /**
@@ -370,7 +391,7 @@ public final class CommonTransitions extends Transition {
      */
     public void initTransition() {
         firstFinished = false;
-        if(transitionType == TYPE_EMPTY) {
+        if (transitionType == TYPE_EMPTY) {
             return;
         }
 
@@ -381,26 +402,26 @@ public final class CommonTransitions extends Transition {
         int w = source.getWidth();
         int h = source.getHeight();
 
-        // a transition might occur with illegal source or destination values (common with 
+        // a transition might occur with illegal source or destination values (common with
         // improper replace() calls, this may still be valid and shouldn't fail
-        if(w <= 0 || h <= 0) {
+        if (w <= 0 || h <= 0) {
             return;
         }
 
         // nothing to prepare in advance  for a shift fade transition
-        if(transitionType == TYPE_SLIDE_AND_FADE) {
-            if(getSource() instanceof Form && getDestination() instanceof Form) {
+        if (transitionType == TYPE_SLIDE_AND_FADE) {
+            if (getSource() instanceof Form && getDestination() instanceof Form) {
                 motion = createMotion(100, 200, speed);
                 motion2 = createMotion(0, getDestination().getWidth(), speed);
                 motion.start();
                 motion2.start();
                 return;
-            } 
+            }
             transitionType = TYPE_SLIDE;
         }
 
-        if(transitionType == TYPE_PULSATE_DIALOG) {
-            if(getDestination() instanceof Dialog) {
+        if (transitionType == TYPE_PULSATE_DIALOG) {
+            if (getDestination() instanceof Dialog) {
                 motion = createMotion(600, 1100, 150);
                 motion.start();
                 motion2 = createMotion(100, 255, 225);
@@ -412,12 +433,12 @@ public final class CommonTransitions extends Transition {
                 originalWidth = c.getWidth();
                 originalHeight = c.getHeight();
                 Display d = Display.getInstance();
-                Dialog dlg = (Dialog)destination;
+                Dialog dlg = (Dialog) destination;
 
                 // transparent image!
-                buffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()), 
+                buffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),
                         Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight() +
-                        getDialogTitleHeight(dlg)), 0);
+                                getDialogTitleHeight(dlg)), 0);
                 Graphics g = buffer.getGraphics();
                 Style stl = dlg.getDialogComponent().getStyle();
                 byte bgt = stl.getBgTransparency();
@@ -428,16 +449,16 @@ public final class CommonTransitions extends Transition {
             }
             transitionType = TYPE_EMPTY;
             motion = createMotion(0, 0, 0);
-            pulseState = (byte)3;
+            pulseState = (byte) 3;
             return;
         }
 
-        if(Display.getInstance().areMutableImagesFast() || transitionType == TYPE_TIMELINE) {
+        if (Display.getInstance().areMutableImagesFast() || transitionType == TYPE_TIMELINE) {
             if (buffer == null) {
                 buffer = createMutableImage(w, h);
             } else {
-                // this might happen when screen orientation changes 
-                if(buffer.getWidth() != w || buffer.getHeight() != h) {
+                // this might happen when screen orientation changes
+                if (buffer.getWidth() != w || buffer.getHeight() != h) {
                     buffer = createMutableImage(w, h);
                     rgbBuffer = null;
 
@@ -447,16 +468,16 @@ public final class CommonTransitions extends Transition {
             }
         }
 
-        if(transitionType == TYPE_FADE) {
+        if (transitionType == TYPE_FADE) {
             motion = createMotion(0, 256, speed);
             motion.start();
-            
-            if(Display.getInstance().areMutableImagesFast()) {
+
+            if (Display.getInstance().areMutableImagesFast()) {
                 hideInterformContainers();
                 Graphics g = buffer.getGraphics();
                 g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());
 
-                if(getSource().getComponentForm() != null){
+                if (getSource().getComponentForm() != null) {
                     getSource().getComponentForm().paintComponent(g);
                 } else {
                     getSource().paintBackgrounds(g);
@@ -465,7 +486,7 @@ public final class CommonTransitions extends Transition {
                 paint(g, getDestination(), 0, 0, false);
                 source.paintIntersectingComponentsAbove(g);
                 rgbBuffer = new RGBImage(buffer.getRGBCached(), buffer.getWidth(), buffer.getHeight());
-                if(getSource().getComponentForm() != null){
+                if (getSource().getComponentForm() != null) {
                     getSource().getComponentForm().paintComponent(g);
                 } else {
                     paint(g, getSource(), 0, 0, true);
@@ -477,23 +498,23 @@ public final class CommonTransitions extends Transition {
             }
             return;
         }
-        
 
-        if(transitionType == TYPE_TIMELINE) {
+
+        if (transitionType == TYPE_TIMELINE) {
             hideInterformContainers();
             Graphics g = buffer.getGraphics();
             g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());
 
-            g.setClip(0, 0, buffer.getWidth()+source.getAbsoluteX(), buffer.getHeight()+source.getAbsoluteY());
+            g.setClip(0, 0, buffer.getWidth() + source.getAbsoluteX(), buffer.getHeight() + source.getAbsoluteY());
 
-            if(timeline.getWidth() != buffer.getWidth() || timeline.getHeight() != buffer.getHeight()) {
+            if (timeline.getWidth() != buffer.getWidth() || timeline.getHeight() != buffer.getHeight()) {
                 timeline = timeline.scaled(buffer.getWidth(), buffer.getHeight());
             }
 
-            if(timeline instanceof Timeline) {
-                ((Timeline)timeline).setTime(0);
-                ((Timeline)timeline).setLoop(false);
-                ((Timeline)timeline).setAnimationDelay(0);
+            if (timeline instanceof Timeline) {
+                ((Timeline) timeline).setTime(0);
+                ((Timeline) timeline).setLoop(false);
+                ((Timeline) timeline).setAnimationDelay(0);
             }
 
             paint(g, getDestination(), 0, 0);
@@ -512,17 +533,17 @@ public final class CommonTransitions extends Transition {
             }
             if (slideType == SLIDE_HORIZONTAL) {
                 dest = w;
-                if(destination instanceof Dialog) {
+                if (destination instanceof Dialog) {
                     startOffset = w - getDialogParent(destination).getWidth();
-                    if(direction) {
+                    if (direction) {
                         startOffset -= getDialogParent(destination).getStyle().getMarginLeft(destination.isRTL());
                     } else {
                         startOffset -= getDialogParent(destination).getStyle().getMarginRight(destination.isRTL());
                     }
                 } else {
-                    if(source instanceof Dialog) {
+                    if (source instanceof Dialog) {
                         dest = getDialogParent(source).getWidth();
-                        if(direction) {
+                        if (direction) {
                             dest += getDialogParent(source).getStyle().getMarginLeft(source.isRTL());
                         } else {
                             dest += getDialogParent(source).getStyle().getMarginRight(source.isRTL());
@@ -531,33 +552,33 @@ public final class CommonTransitions extends Transition {
                 }
             } else {
                 dest = h;
-                if(destination instanceof Dialog) {
+                if (destination instanceof Dialog) {
                     startOffset = h - getDialogParent(destination).getHeight() -
-                        getDialogTitleHeight((Dialog)destination);
-                    if(direction) {
+                            getDialogTitleHeight((Dialog) destination);
+                    if (direction) {
                         startOffset -= getDialogParent(destination).getStyle().getMarginBottom();
                     } else {
                         startOffset -= getDialogParent(destination).getStyle().getMarginTop();
-                        startOffset -= ((Dialog)destination).getTitleStyle().getMarginTop();
-                        if(!drawDialogMenu && ((Dialog)destination).getCommandCount() > 0) {
-                            Container p = ((Dialog)destination).getSoftButton(0).getParent();
-                            if(p != null) {
+                        startOffset -= ((Dialog) destination).getTitleStyle().getMarginTop();
+                        if (!drawDialogMenu && ((Dialog) destination).getCommandCount() > 0) {
+                            Container p = ((Dialog) destination).getSoftButton(0).getParent();
+                            if (p != null) {
                                 startOffset -= p.getHeight();
                             }
                         }
                     }
                 } else {
-                    if(source instanceof Dialog) {
+                    if (source instanceof Dialog) {
                         dest = getDialogParent(source).getHeight() +
-                            getDialogTitleHeight((Dialog)source);
-                        if(direction) {
+                                getDialogTitleHeight((Dialog) source);
+                        if (direction) {
                             dest += getDialogParent(source).getStyle().getMarginBottom();
                         } else {
                             dest += getDialogParent(source).getStyle().getMarginTop();
-                            dest += ((Dialog)source).getTitleStyle().getMarginTop();
-                            if(((Dialog)source).getCommandCount() > 0) {
-                                Container p = ((Dialog)source).getSoftButton(0).getParent();
-                                if(p != null) {
+                            dest += ((Dialog) source).getTitleStyle().getMarginTop();
+                            if (((Dialog) source).getCommandCount() > 0) {
+                                Container p = ((Dialog) source).getSoftButton(0).getParent();
+                                if (p != null) {
                                     dest += p.getHeight();
                                 }
                             }
@@ -568,41 +589,41 @@ public final class CommonTransitions extends Transition {
 
             motion = createMotion(startOffset, dest, speed);
 
-            if(!Display.getInstance().areMutableImagesFast()) {
+            if (!Display.getInstance().areMutableImagesFast()) {
                 motion.start();
                 buffer = null;
                 return;
             }
-            
+
             // make sure the destination is painted fully at least once
             // we must use a full buffer otherwise the clipping will take effect
             Graphics g = buffer.getGraphics();
 
             // If this is a dialog render the tinted frame once since
             // tinting is expensive
-            if(getSource() instanceof Dialog) {
+            if (getSource() instanceof Dialog) {
                 paint(g, getDestination(), 0, 0);
-                if(transitionType == TYPE_FAST_SLIDE && !(destination instanceof Dialog)) {
-                    Dialog d = (Dialog)source;
+                if (transitionType == TYPE_FAST_SLIDE && !(destination instanceof Dialog)) {
+                    Dialog d = (Dialog) source;
                     secondaryBuffer = createMutableImage(getDialogParent(d).getWidth(),
                             getDialogParent(d).getHeight() +
-                            getDialogTitleHeight(d));
+                                    getDialogTitleHeight(d));
                     drawDialogCmp(secondaryBuffer.getGraphics(), d);
                 }
             } else {
-                if(getDestination() instanceof Dialog) {
+                if (getDestination() instanceof Dialog) {
                     paint(g, getSource(), 0, 0);
-                    if(transitionType == TYPE_FAST_SLIDE && !(source instanceof Dialog)) {
-                        Dialog d = (Dialog)destination;
+                    if (transitionType == TYPE_FAST_SLIDE && !(source instanceof Dialog)) {
+                        Dialog d = (Dialog) destination;
                         secondaryBuffer = createMutableImage(getDialogParent(d).getWidth(),
                                 d.getContentPane().getParent().getHeight() +
-                                getDialogTitleHeight(d));
+                                        getDialogTitleHeight(d));
                         drawDialogCmp(secondaryBuffer.getGraphics(), d);
                     }
                 } else {
                     hideInterformContainers();
                     paint(g, source, -source.getAbsoluteX(), -source.getAbsoluteY(), true);
-                    if(transitionType == TYPE_FAST_SLIDE) {
+                    if (transitionType == TYPE_FAST_SLIDE) {
                         secondaryBuffer = createMutableImage(destination.getWidth(), destination.getHeight());
                         paint(secondaryBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());
                     }
@@ -611,7 +632,7 @@ public final class CommonTransitions extends Transition {
             }
             motion.start();
         }
-        
+
     }
 
     private Image createMutableImage(int w, int h) {
@@ -623,18 +644,18 @@ public final class CommonTransitions extends Transition {
      * This method can be overriden by subclasses to create their own motion object on the fly
      *
      * @param startOffset the start offset for the menu
-     * @param dest the destination of the motion
-     * @param speed the speed of the motion
+     * @param dest        the destination of the motion
+     * @param speed       the speed of the motion
      * @return a motion instance
      */
     protected Motion createMotion(int startOffset, int dest, int speed) {
-        if(motionSetManually) {
-            if(lazyMotion != null) {
+        if (motionSetManually) {
+            if (lazyMotion != null) {
                 return lazyMotion.get(new Integer(startOffset), new Integer(dest), new Integer(speed));
             }
             return motion;
         }
-        if(linearMotion) {
+        if (linearMotion) {
             return Motion.createLinearMotion(startOffset, dest, speed);
         }
 
@@ -645,24 +666,24 @@ public final class CommonTransitions extends Transition {
      * {@inheritDoc}
      */
     public boolean animate() {
-        if(timeline != null) {
+        if (timeline != null) {
             boolean val = timeline.animate();
             return val;
         }
-        if(motion == null) {
+        if (motion == null) {
             return false;
         }
         position = motion.getValue();
-        
+
         // after the motion finished we need to paint one last time otherwise
         // there will be a "bump" in sliding
-        if(firstFinished) {
+        if (firstFinished) {
             return false;
         }
         boolean finished = motion.isFinished();
-        if(finished) {
-            if(transitionType == TYPE_PULSATE_DIALOG) {
-                switch(pulseState) {
+        if (finished) {
+            if (transitionType == TYPE_PULSATE_DIALOG) {
+                switch (pulseState) {
                     case 0:
                         pulseState = 1;
                         motion = createMotion(1100, 900, 70);
@@ -675,13 +696,13 @@ public final class CommonTransitions extends Transition {
                         return true;
                 }
             }
-            if(!firstFinished) {
+            if (!firstFinished) {
                 firstFinished = true;
             }
         }
         return true;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -709,7 +730,7 @@ public final class CommonTransitions extends Transition {
                         paintCoverAtPosition(g, 0, p);
                     }
                     paintInterformContainers(g);
-                    
+
                     return;
                 case TYPE_COVER:
                     hideInterformContainers();
@@ -733,87 +754,87 @@ public final class CommonTransitions extends Transition {
                     paintInterformContainers(g);
                     return;
                 case TYPE_SLIDE_AND_FADE: {
-                    
-                    Form sourceForm = (Form)getSource();
-                    Form destForm = (Form)getDestination();
+
+                    Form sourceForm = (Form) getSource();
+                    Form destForm = (Form) getDestination();
                     Container titleArea = sourceForm.getTitleArea();
                     Container destTitleArea = destForm.getTitleArea();
-                    if (titleArea == null || titleArea.isHidden(true)  || destTitleArea == null || destTitleArea.isHidden(true) ) {
+                    if (titleArea == null || titleArea.isHidden(true) || destTitleArea == null || destTitleArea.isHidden(true)) {
                         hideInterformContainers();
                         paintSlideAtPosition(g, motion2.getValue(), 0);
-                        
+
                         paintInterformContainers(g);
                         return;
                     }
-                    
+
                     int alpha = position;
                     int slidePos = motion2.getValue();
                     int clipX = g.getClipX();
                     int clipY = g.getClipY();
                     int clipW = g.getClipWidth();
                     int clipH = g.getClipHeight();
-                    if(clipW <= 0 || clipH <= 0) {
+                    if (clipW <= 0 || clipH <= 0) {
                         return;
                     }
                     g.translate(0, sourceForm.getTitleArea().getHeight());
-                    
-                    Container sourcePane = ((Form)getSource()).getContentPane();
-                    Container destPane = ((Form)getDestination()).getContentPane();
+
+                    Container sourcePane = ((Form) getSource()).getContentPane();
+                    Container destPane = ((Form) getDestination()).getContentPane();
                     boolean dir = forward;
-                    if(sourceForm != null && sourceForm.getUIManager().getLookAndFeel().isRTL()) {
+                    if (sourceForm != null && sourceForm.getUIManager().getLookAndFeel().isRTL()) {
                         dir = !dir;
                     }
                     hideInterformContainers();
-                    if(dir) {
+                    if (dir) {
                         g.translate(slidePos, 0);
-                        paint(g, sourcePane, -sourcePane.getAbsoluteX() -sourcePane.getScrollX(), -sourcePane.getAbsoluteY() -sourcePane.getScrollY(), true);
+                        paint(g, sourcePane, -sourcePane.getAbsoluteX() - sourcePane.getScrollX(), -sourcePane.getAbsoluteY() - sourcePane.getScrollY(), true);
                         g.translate(-destPane.getWidth(), 0);
-                        paint(g, destPane, -destPane.getAbsoluteX() -destPane.getScrollX(), -destPane.getAbsoluteY() -destPane.getScrollY(), true);
+                        paint(g, destPane, -destPane.getAbsoluteX() - destPane.getScrollX(), -destPane.getAbsoluteY() - destPane.getScrollY(), true);
                         g.translate(destPane.getWidth() - slidePos, 0);
                     } else {
                         g.translate(-slidePos, 0);
-                        paint(g, sourcePane, -sourcePane.getAbsoluteX() -sourcePane.getScrollX(), -sourcePane.getAbsoluteY() -sourcePane.getScrollY(), true);
+                        paint(g, sourcePane, -sourcePane.getAbsoluteX() - sourcePane.getScrollX(), -sourcePane.getAbsoluteY() - sourcePane.getScrollY(), true);
                         g.translate(destPane.getWidth(), 0);
-                        paint(g, destPane, -destPane.getAbsoluteX() -destPane.getScrollX(), -destPane.getAbsoluteY() -destPane.getScrollY(), true);
+                        paint(g, destPane, -destPane.getAbsoluteX() - destPane.getScrollX(), -destPane.getAbsoluteY() - destPane.getScrollY(), true);
                         g.translate(slidePos - destPane.getWidth(), 0);
                     }
                     g.translate(0, -sourceForm.getTitleArea().getHeight());
-                    
+
                     g.setClip(clipX, clipY, clipW, clipH);
                     paintInterformContainers(g);
 
-                    
+
                     titleArea.paintComponentBackground(g);
                     paintShiftFadeHierarchy(titleArea, 255 - alpha, g, false);
                     paintShiftFadeHierarchy(destTitleArea, alpha, g, true);
-                    
+
                     return;
                 }
                 case TYPE_PULSATE_DIALOG:
                     paint(g, getSource(), 0, 0);
                     int alpha = g.getAlpha();
-                    if(motion2 != null) {
+                    if (motion2 != null) {
                         g.setAlpha(motion2.getValue());
                     }
 
                     Component c = getDialogParent(getDestination());
-                    float ratio = ((float)position) / 1000.0f;
-                    if(g.isAffineSupported()) {
+                    float ratio = ((float) position) / 1000.0f;
+                    if (g.isAffineSupported()) {
                         g.scale(ratio, ratio);
-                        int w = (int)(originalWidth * ratio);
-                        int h = (int)(originalHeight * ratio);
+                        int w = (int) (originalWidth * ratio);
+                        int h = (int) (originalHeight * ratio);
                         c.setX(originalX + ((originalWidth - w) / 2));
                         c.setY(originalY + ((originalHeight - h) / 2));
 
                         int currentDlgX = getDialogParent(getDestination()).getX();
                         int currentDlgY = getDialogParent(getDestination()).getY();
                         g.drawImage(buffer, currentDlgX, currentDlgY);
-                        
+
                         //paint(g, c, 0, 0);
                         g.resetAffine();
                     } else {
-                        c.setWidth((int)(originalWidth * ratio));
-                        c.setHeight((int)(originalHeight * ratio));
+                        c.setWidth((int) (originalWidth * ratio));
+                        c.setHeight((int) (originalHeight * ratio));
                         c.setX(originalX + ((originalWidth - c.getWidth()) / 2));
                         c.setY(originalY + ((originalHeight - c.getHeight()) / 2));
                         paint(g, c, 0, 0);
@@ -821,7 +842,7 @@ public final class CommonTransitions extends Transition {
                     g.setAlpha(alpha);
                     return;
             }
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             // end the transition now just to be safe
             motion = null;
             Log.p("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
@@ -831,15 +852,15 @@ public final class CommonTransitions extends Transition {
 
     private void paintShiftFadeHierarchy(Container c, int alpha, Graphics g, boolean incoming) {
         int componentCount = c.getComponentCount();
-        for(int iter = 0 ; iter < componentCount ; iter++) {
+        for (int iter = 0; iter < componentCount; iter++) {
             Component current = c.getComponentAt(iter);
-            if(current instanceof Container) {
-                paintShiftFadeHierarchy((Container)current, alpha, g, incoming);
+            if (current instanceof Container) {
+                paintShiftFadeHierarchy((Container) current, alpha, g, incoming);
                 continue;
             }
             g.setAlpha(alpha);
             Motion m = getComponentShiftMotion(current, incoming);
-            if(m != null) {
+            if (m != null) {
                 int tval = m.getValue();
                 g.translate(tval, 0);
                 current.paintComponent(g, false);
@@ -850,29 +871,29 @@ public final class CommonTransitions extends Transition {
     }
 
     private Motion getComponentShiftMotion(Component c, boolean incoming) {
-        Motion m = (Motion)c.getClientProperty("$shm");
-        if(m == null) {
+        Motion m = (Motion) c.getClientProperty("$shm");
+        if (m == null) {
             Component dest = getDestination();
-            if(dest == null || c == null) {
+            if (dest == null || c == null) {
                 return m;
             }
             int travelDestination = dest.getWidth() - c.getWidth() - c.getAbsoluteX();
-            if(getDestination().getWidth() - c.getWidth() < 10) {
+            if (getDestination().getWidth() - c.getWidth() < 10) {
                 // big component that takes up all the space such as a title that occupies the entire title area
                 travelDestination = c.getWidth() / 2 - c.getPreferredW() / 2;
             }
             boolean dir = forward;
-            if(c.getUIManager().getLookAndFeel().isRTL()) {
+            if (c.getUIManager().getLookAndFeel().isRTL()) {
                 dir = !dir;
             }
-            if(incoming) {
-                if(dir) {
+            if (incoming) {
+                if (dir) {
                     m = createMotion(-travelDestination, 0, speed);
                 } else {
                     m = createMotion(travelDestination, 0, speed);
                 }
             } else {
-                if(dir) {
+                if (dir) {
                     m = createMotion(0, travelDestination, speed);
                 } else {
                     m = createMotion(0, -travelDestination, speed);
@@ -918,9 +939,9 @@ public final class CommonTransitions extends Transition {
             return;
         }
         // this will always be invoked on the EDT so there is no race condition risk
-        if(rgbBuffer != null || secondaryBuffer != null) {
-            if(secondaryBuffer != null) {
-                Component dest = getDestination();                
+        if (rgbBuffer != null || secondaryBuffer != null) {
+            if (secondaryBuffer != null) {
+                Component dest = getDestination();
                 int x = dest.getAbsoluteX();
                 int y = dest.getAbsoluteY();
 
@@ -932,26 +953,26 @@ public final class CommonTransitions extends Transition {
                 int alpha = position << 24;
                 int[] bufferArray = rgbBuffer.getRGB();
                 int size = bufferArray.length;
-                for (int iter = 0 ; iter < size ; iter++) {
+                for (int iter = 0; iter < size; iter++) {
                     bufferArray[iter] = ((bufferArray[iter] & 0xFFFFFF) | alpha);
                 }
-                Component dest = getDestination();                
+                Component dest = getDestination();
                 int x = dest.getAbsoluteX();
                 int y = dest.getAbsoluteY();
                 graphics.drawImage(buffer, x, y);
                 graphics.drawImage(rgbBuffer, x, y);
             }
-        } 
+        }
     }
 
     private void removeConstant(Container c) {
         int componentCount = c.getComponentCount();
         c.putClientProperty("$shm", null);
-        for(int iter = 0 ; iter < componentCount ; iter++) {
+        for (int iter = 0; iter < componentCount; iter++) {
             Component cmp = c.getComponentAt(iter);
             cmp.putClientProperty("$shm", null);
-            if(cmp instanceof Container) {
-                removeConstant((Container)cmp);
+            if (cmp instanceof Container) {
+                removeConstant((Container) cmp);
             }
         }
     }
@@ -960,14 +981,14 @@ public final class CommonTransitions extends Transition {
      * {@inheritDoc}
      */
     public void cleanup() {
-        if(transitionType == TYPE_SLIDE_AND_FADE) {
+        if (transitionType == TYPE_SLIDE_AND_FADE) {
             Component c = getSource();
-            if(c instanceof Container){
-                removeConstant((Container)c);
+            if (c instanceof Container) {
+                removeConstant((Container) c);
             }
             c = getDestination();
-            if(c instanceof Container){
-                removeConstant((Container)c);
+            if (c instanceof Container) {
+                removeConstant((Container) c);
             }
         }
         super.cleanup();
@@ -979,16 +1000,16 @@ public final class CommonTransitions extends Transition {
 
     private void paintSlideAtPosition(Graphics g, int slideX, int slideY) {
         Component source = getSource();
-        
+
         // if this is the first form we can't do a slide transition since we have no source form
-        if (source == null) { 
-            return;           
+        if (source == null) {
+            return;
         }
-        
-        Component dest = getDestination();                
+
+        Component dest = getDestination();
         int w = source.getWidth();
         int h = source.getHeight();
-                    
+
         if (slideType == SLIDE_HORIZONTAL) {
             h = 0;
         } else {
@@ -996,63 +1017,63 @@ public final class CommonTransitions extends Transition {
         }
 
         boolean dir = forward;
-        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL() && slideType == SLIDE_HORIZONTAL) {
+        if (dest != null && dest.getUIManager().getLookAndFeel().isRTL() && slideType == SLIDE_HORIZONTAL) {
             dir = !dir;
         }
-        if(dir) {
+        if (dir) {
             w = -w;
             h = -h;
         } else {
             slideX = -slideX;
             slideY = -slideY;
         }
-        g.setClip(source.getAbsoluteX()+source.getScrollX(), source.getAbsoluteY()+source.getScrollY(), source.getWidth(), source.getHeight());
-            
-        // dialog animation is slightly different... 
-        if(source instanceof Dialog) {
-            if(buffer != null) {
+        g.setClip(source.getAbsoluteX() + source.getScrollX(), source.getAbsoluteY() + source.getScrollY(), source.getWidth(), source.getHeight());
+
+        // dialog animation is slightly different...
+        if (source instanceof Dialog) {
+            if (buffer != null) {
                 g.drawImage(buffer, 0, 0);
             } else {
                 paint(g, dest, 0, 0);
             }
             paint(g, source, -slideX, -slideY);
             return;
-        } 
-        
-        if(dest instanceof Dialog) {
-            if(buffer != null) {
+        }
+
+        if (dest instanceof Dialog) {
+            if (buffer != null) {
                 g.drawImage(buffer, 0, 0);
             } else {
                 paint(g, source, 0, 0);
             }
             paint(g, dest, -slideX - w, -slideY - h);
             return;
-        } 
+        }
         //hideInterformContainers();
-        if(source.getParent() != null || buffer == null) {
+        if (source.getParent() != null || buffer == null) {
             source.paintBackgrounds(g);
-            paint(g, source, slideX , slideY );
+            paint(g, source, slideX, slideY);
         } else {
-            g.drawImage(buffer, slideX, slideY);        
+            g.drawImage(buffer, slideX, slideY);
         }
         paint(g, dest, slideX + w, slideY + h);
 
         //paintInterformContainers(g);
-        
+
     }
 
     private void paintCoverAtPosition(Graphics g, int slideX, int slideY) {
         Component source = getSource();
-        
+
         // if this is the first form we can't do a slide transition since we have no source form
-        if (source == null) { 
-            return;           
+        if (source == null) {
+            return;
         }
-        
-        Component dest = getDestination();                
+
+        Component dest = getDestination();
         int w = source.getWidth();
         int h = source.getHeight();
-                    
+
         if (slideType == SLIDE_HORIZONTAL) {
             h = 0;
         } else {
@@ -1060,58 +1081,58 @@ public final class CommonTransitions extends Transition {
         }
 
         boolean dir = forward;
-        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
+        if (dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
             dir = !dir;
         }
-        if(dir) {
+        if (dir) {
             w = -w;
             h = -h;
         } else {
             slideX = -slideX;
             slideY = -slideY;
         }
-        g.setClip(source.getAbsoluteX()+source.getScrollX(), source.getAbsoluteY()+source.getScrollY(), source.getWidth(), source.getHeight());
-            
-        // dialog animation is slightly different... 
-        if(source instanceof Dialog) {
-            if(buffer != null) {
+        g.setClip(source.getAbsoluteX() + source.getScrollX(), source.getAbsoluteY() + source.getScrollY(), source.getWidth(), source.getHeight());
+
+        // dialog animation is slightly different...
+        if (source instanceof Dialog) {
+            if (buffer != null) {
                 g.drawImage(buffer, 0, 0);
             } else {
                 paint(g, dest, 0, 0);
             }
             paint(g, source, -slideX, -slideY);
             return;
-        } 
-        
-        if(dest instanceof Dialog) {
-            if(buffer != null) {
+        }
+
+        if (dest instanceof Dialog) {
+            if (buffer != null) {
                 g.drawImage(buffer, 0, 0);
             } else {
                 paint(g, source, 0, 0);
             }
             paint(g, dest, -slideX - w, -slideY - h);
             return;
-        } 
+        }
 
-        if(transitionType == TYPE_UNCOVER) {
+        if (transitionType == TYPE_UNCOVER) {
             paint(g, dest, 0, 0);
-            if(source.getParent() != null || buffer == null) {
+            if (source.getParent() != null || buffer == null) {
                 source.paintBackgrounds(g);
                 paint(g, source, slideX + w, slideY + h);
             } else {
-                g.drawImage(buffer, slideX + w, slideY + h);        
+                g.drawImage(buffer, slideX + w, slideY + h);
             }
         } else {
-            if(source.getParent() != null || buffer == null) {
+            if (source.getParent() != null || buffer == null) {
                 source.paintBackgrounds(g);
-                paint(g, source, 0 , 0 );
+                paint(g, source, 0, 0);
             } else {
-                g.drawImage(buffer, 0, 0);        
+                g.drawImage(buffer, 0, 0);
             }
             paint(g, dest, slideX + w, slideY + h);
         }
     }
-    
+
     private int getDialogTitleHeight(Dialog d) {
         return 0;
     }
@@ -1122,9 +1143,9 @@ public final class CommonTransitions extends Transition {
         g.setClip(0, 0, dlg.getWidth(), dlg.getHeight());
         g.translate(-getDialogParent(dlg).getX(), -getDialogParent(dlg).getY() + getDialogTitleHeight(dlg));
         getDialogParent(dlg).paintComponent(g, false);
-        if(drawDialogMenu && dlg.getCommandCount() > 0) {
+        if (drawDialogMenu && dlg.getCommandCount() > 0) {
             Component menuBar = dlg.getSoftButton(0).getParent();
-            if(menuBar != null) {
+            if (menuBar != null) {
                 g.setClip(0, 0, dlg.getWidth(), dlg.getHeight());
                 menuBar.paintComponent(g, false);
             }
@@ -1138,7 +1159,7 @@ public final class CommonTransitions extends Transition {
     }
 
     private void paint(Graphics g, Component cmp, int x, int y, boolean background) {
-        
+
         boolean b = cmp.isVisible();
         cmp.setVisible(true);
         int cx = g.getClipX();
@@ -1168,25 +1189,25 @@ public final class CommonTransitions extends Transition {
                 }
                 g.setClip(cx, cy, cw, ch);
                 cmp.getStyle().setBgPainter(p);
-            }else{
-                cmp.paintComponent(g, background);            
+            } else {
+                cmp.paintComponent(g, background);
             }
             return;
         }
         //g.clipRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
-         g.translate(x, y);
+        g.translate(x, y);
         //g.clipRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
         cmp.paintComponent(g, background);
         g.translate(-x, -y);
-        
+
         g.setClip(cx, cy, cw, ch);
         cmp.setVisible(b);
     }
-    
+
     /**
      * Motion represents the physical movement within a transition, it can
      * be replaced by the user to provide a more appropriate physical feel
-     * 
+     *
      * @return the instanceo of the motion class used by this transition
      */
     public Motion getMotion() {
@@ -1196,31 +1217,31 @@ public final class CommonTransitions extends Transition {
     /**
      * Motion represents the physical movement within a transition, it can
      * be replaced by the user to provide a more appropriate physical feel
-     * 
+     *
      * @param motion new instance of the motion class that will be used by the transition
      */
     public void setMotion(Motion motion) {
         motionSetManually = true;
         this.motion = motion;
     }
-    
+
     /**
      * Motion represents the physical movement within a transition, it can
      * be replaced by the user to provide a more appropriate physical feel
-     * 
+     *
      * @param motion new instance of the motion class that will be used by the transition
      */
     public void setMotion(LazyValue<Motion> motion) {
         motionSetManually = true;
         this.lazyMotion = motion;
     }
-    
+
     /**
      * {@inheritDoc}
      */
-    public Transition copy(boolean reverse){
+    public Transition copy(boolean reverse) {
         CommonTransitions retVal = null;
-        switch(transitionType) {
+        switch (transitionType) {
             case TYPE_TIMELINE:
                 retVal = CommonTransitions.createTimeline(timeline);
                 break;
@@ -1228,9 +1249,9 @@ public final class CommonTransitions extends Transition {
                 retVal = CommonTransitions.createFade(speed);
                 break;
             case TYPE_SLIDE: {
-                boolean fwd=forward;
+                boolean fwd = forward;
 
-                if(reverse) {
+                if (reverse) {
                     retVal = CommonTransitions.createSlide(slideType, !fwd, speed, drawDialogMenu);
                 } else {
                     retVal = CommonTransitions.createSlide(slideType, fwd, speed, drawDialogMenu);
@@ -1238,9 +1259,9 @@ public final class CommonTransitions extends Transition {
                 break;
             }
             case TYPE_COVER: {
-                boolean fwd=forward;
+                boolean fwd = forward;
 
-                if(reverse) {
+                if (reverse) {
                     retVal = CommonTransitions.createCover(slideType, !fwd, speed);
                 } else {
                     retVal = CommonTransitions.createCover(slideType, fwd, speed);
@@ -1248,9 +1269,9 @@ public final class CommonTransitions extends Transition {
                 break;
             }
             case TYPE_UNCOVER: {
-                boolean fwd=forward;
+                boolean fwd = forward;
 
-                if(reverse) {
+                if (reverse) {
                     retVal = CommonTransitions.createUncover(slideType, !fwd, speed);
                 } else {
                     retVal = CommonTransitions.createUncover(slideType, fwd, speed);
@@ -1258,8 +1279,8 @@ public final class CommonTransitions extends Transition {
                 break;
             }
             case TYPE_SLIDE_AND_FADE: {
-                boolean fwd=forward;
-                if(reverse) {
+                boolean fwd = forward;
+                if (reverse) {
                     retVal = CommonTransitions.createSlideFadeTitle(!fwd, speed);
                 } else {
                     retVal = CommonTransitions.createSlideFadeTitle(fwd, speed);
@@ -1267,9 +1288,9 @@ public final class CommonTransitions extends Transition {
                 break;
             }
             case TYPE_FAST_SLIDE: {
-                boolean fwd=forward;
+                boolean fwd = forward;
 
-                if(reverse) {
+                if (reverse) {
                     retVal = CommonTransitions.createFastSlide(slideType, !fwd, speed, drawDialogMenu);
                 } else {
                     retVal = CommonTransitions.createFastSlide(slideType, fwd, speed, drawDialogMenu);
@@ -1303,23 +1324,5 @@ public final class CommonTransitions extends Transition {
      */
     public void setLinearMotion(boolean linearMotion) {
         this.linearMotion = linearMotion;
-    }
-
-    /**
-     * Indicates whether the motion associated with these transitions by default is linear or spline motion
-     *
-     * @return the defaultLinearMotion
-     */
-    public static boolean isDefaultLinearMotion() {
-        return defaultLinearMotion;
-    }
-
-    /**
-     * Indicates whether the motion associated with these transitions by default is linear or spline motion
-     *
-     * @param aDefaultLinearMotion the defaultLinearMotion to set
-     */
-    public static void setDefaultLinearMotion(boolean aDefaultLinearMotion) {
-        defaultLinearMotion = aDefaultLinearMotion;
     }
 }

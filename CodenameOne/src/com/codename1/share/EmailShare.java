@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.share;
@@ -26,18 +26,25 @@ import com.codename1.components.MultiButton;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.contacts.ContactsModel;
 import com.codename1.messaging.Message;
-import com.codename1.ui.*;
+import com.codename1.ui.Command;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.list.GenericListCellRenderer;
 import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.util.Resources;
+
 import java.util.Hashtable;
 
 /**
  * Email sharing service.
- * 
+ *
  * @author Chen
  */
 public class EmailShare extends ShareService {
@@ -48,11 +55,11 @@ public class EmailShare extends ShareService {
     public EmailShare() {
         super("Email", null);
     }
-    
+
     @Override
     public Image getIcon() {
         Image i = super.getIcon();
-        if(i == null) {
+        if (i == null) {
             i = Resources.getSystemResource().getImage("mail.png");
             setIcon(i);
         }
@@ -72,9 +79,9 @@ public class EmailShare extends ShareService {
         Display.getInstance().startThread(new Runnable() {
 
             public void run() {
-                
+
                 String[] ids = ContactsManager.getAllContacts();
-                if(ids == null || ids.length == 0){
+                if (ids == null || ids.length == 0) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             Dialog.show("Failed to Share", "No Contacts Found", "Ok", null);
@@ -93,14 +100,14 @@ public class EmailShare extends ShareService {
                         contacts.addActionListener(new ActionListener() {
 
                             public void actionPerformed(ActionEvent evt) {
-                                final ShareForm [] f = new ShareForm[1];
+                                final ShareForm[] f = new ShareForm[1];
                                 Hashtable contact = (Hashtable) contacts.getSelectedItem();
-                                if(image == null){
-                                    f[0] = new ShareForm(contactsForm, "Send Email", (String)contact.get("email"), toShare,
+                                if (image == null) {
+                                    f[0] = new ShareForm(contactsForm, "Send Email", (String) contact.get("email"), toShare,
                                             new ActionListener() {
 
                                                 public void actionPerformed(ActionEvent evt) {
-                                                    String [] recieptents = new String[1];
+                                                    String[] recieptents = new String[1];
                                                     recieptents[0] = f[0].getTo();
                                                     Message msg = new Message(toShare);
                                                     Message.sendMessage(recieptents, "share", msg);
@@ -108,12 +115,12 @@ public class EmailShare extends ShareService {
                                                 }
                                             });
                                     f[0].show();
-                                }else{
-                                    f[0] = new ShareForm(contactsForm, "Send Email", (String)contact.get("email"), toShare, image,
+                                } else {
+                                    f[0] = new ShareForm(contactsForm, "Send Email", (String) contact.get("email"), toShare, image,
                                             new ActionListener() {
 
                                                 public void actionPerformed(ActionEvent evt) {
-                                                    String [] recieptents = new String[1];
+                                                    String[] recieptents = new String[1];
                                                     recieptents[0] = f[0].getTo();
                                                     Message msg = new Message(toShare);
                                                     msg.setAttachment(image);
@@ -122,37 +129,36 @@ public class EmailShare extends ShareService {
                                                     finish();
                                                 }
                                             });
-                                    f[0].show();                                
+                                    f[0].show();
                                 }
                             }
                         });
                         contactsForm.addComponent(BorderLayout.CENTER, contacts);
-                        Command back = new Command("Back"){
+                        Command back = new Command("Back") {
 
                             public void actionPerformed(ActionEvent evt) {
                                 currentForm.showBack();
                             }
-                            
+
                         };
                         contactsForm.addCommand(back);
-                        contactsForm.setBackCommand(back);                        
+                        contactsForm.setBackCommand(back);
                         contactsForm.revalidate();
                     }
                 });
             }
         }, "Email Thread").start();
     }
-    
-    
-    
+
+
     /**
      * {@inheritDoc}
      */
     public void share(final String toShare) {
         share(toShare, null, null);
     }
-    
-    
+
+
     private MultiButton createRendererMultiButton() {
         MultiButton b = new MultiButton();
         b.setIconName("icon");
@@ -161,7 +167,7 @@ public class EmailShare extends ShareService {
         b.setUIID("Label");
         return b;
     }
-    
+
     private ListCellRenderer createListRenderer() {
         MultiButton sel = createRendererMultiButton();
         MultiButton unsel = createRendererMultiButton();
@@ -174,5 +180,5 @@ public class EmailShare extends ShareService {
     public boolean canShareImage() {
         return true;
     }
-    
+
 }

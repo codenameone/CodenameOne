@@ -19,11 +19,10 @@ package com.codename1.util.regex;
 import java.io.Reader;
 
 /**
- *
  * @author Nikolay Neizvesny
  */
 public class StringReader extends Reader {
-    
+
     private static final char NEW_LINE = '\n';
 
     private String str;
@@ -32,7 +31,7 @@ public class StringReader extends Reader {
     public StringReader(String str) {
         this.str = str;
     }
-    
+
     public int read() {
         if (pointer >= str.length()) {
             return -1;

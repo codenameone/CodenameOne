@@ -6,33 +6,34 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui;
 
 /**
  * A package-private utility class for working with working with lead components.
- * 
+ *
  * @author Steve Hannah
  * @since 7.0
  */
 class LeadUtil {
-    
+
     /**
      * Gets the lead parent for a component, or the component itself if there is
-     * no lead parent.   
+     * no lead parent.
+     *
      * @param cmp The component whose lead parent we wish to retrieve.
      * @return The component's lead parent if one exists.  Will fall back to just return {@literal cmp}
      * if no lead parent exists.
@@ -44,7 +45,7 @@ class LeadUtil {
         if (cmp.hasLead) {
             Component out;
             if (cmp instanceof Container) {
-                out = ((Container)cmp).getLeadParent();
+                out = ((Container) cmp).getLeadParent();
             } else {
                 out = cmp.getParent().getLeadParent();
             }
@@ -54,10 +55,11 @@ class LeadUtil {
         }
         return cmp;
     }
-    
+
     /**
-     * Gets the lead component for a component if one exists, or just passes through the 
+     * Gets the lead component for a component if one exists, or just passes through the
      * component provided in the argument.
+     *
      * @param cmp The component.
      * @return Either the lead component of the component, or the component itself.
      */
@@ -82,9 +84,10 @@ class LeadUtil {
 
     /**
      * Dispatches a pointer pressed event to the lead component of {@literal cmp}.
+     *
      * @param cmp A component whose lead component we will fire pointerPressed event on.
-     * @param x X-coord
-     * @param y Y-coord
+     * @param x   X-coord
+     * @param y   Y-coord
      */
     public static void pointerPressed(Component cmp, int x, int y) {
         if (cmp == null) {
@@ -100,14 +103,15 @@ class LeadUtil {
         if (cmp != lead) {
             leadParent.repaint();
         }
-        
+
     }
 
     /**
      * Dispatches a pointer dragged event to the lead component of {@literal cmp}.
+     *
      * @param cmp A component whose lead component we will fire pointerDragged event on.
-     * @param x X-coord
-     * @param y Y-coord
+     * @param x   X-coord
+     * @param y   Y-coord
      */
     public static void pointerDragged(Component cmp, int x, int y) {
         if (cmp == null) {
@@ -118,14 +122,15 @@ class LeadUtil {
         if (cmp != lead) {
             leadParentImpl(cmp).repaint();
         }
-        
+
     }
-    
+
     /**
      * Dispatches a pointer dragged event to the lead component of {@literal cmp}.
+     *
      * @param cmp A component whose lead component we will fire pointerDragged event on.
-     * @param x X-coords
-     * @param y Y-coords
+     * @param x   X-coords
+     * @param y   Y-coords
      */
     public static void pointerDragged(Component cmp, int[] x, int[] y) {
         if (cmp == null) {
@@ -136,14 +141,15 @@ class LeadUtil {
         if (cmp != lead) {
             leadParentImpl(cmp).repaint();
         }
-        
+
     }
 
     /**
      * Dispatches a pointer released event to the lead component of {@literal cmp}.
+     *
      * @param cmp A component whose lead component we will fire pointerReleased event on.
-     * @param x X-coord
-     * @param y Y-coord
+     * @param x   X-coord
+     * @param y   Y-coord
      */
     public static void pointerReleased(Component cmp, int x, int y) {
         if (cmp == null) {
@@ -155,12 +161,13 @@ class LeadUtil {
             leadParentImpl(cmp).repaint();
         }
     }
-    
+
     /**
      * Dispatches a pointer pressed event to the lead component of {@literal cmp}.
+     *
      * @param cmp A component whose lead component we will fire pointerPressed event on.
-     * @param x X-coord
-     * @param y Y-coord
+     * @param x   X-coord
+     * @param y   Y-coord
      */
     public static void pointerHoverReleased(Component cmp, int x[], int y[]) {
         if (cmp == null) {
@@ -171,7 +178,7 @@ class LeadUtil {
             leadParentImpl(cmp).repaint();
         }
     }
-    
+
     public static void pointerHoverPressed(Component cmp, int x[], int y[]) {
         if (cmp == null) {
             return;
@@ -182,7 +189,7 @@ class LeadUtil {
             leadParentImpl(cmp).repaint();
         }
     }
-    
+
     public static void pointerHover(Component cmp, int x[], int y[]) {
         if (cmp == null) {
             return;
@@ -204,7 +211,7 @@ class LeadUtil {
             leadParentImpl(cmp).repaint();
         }
     }
-    
+
     public static void longPointerPress(Component cmp, int x, int y) {
         if (cmp == null) {
             return;
@@ -215,7 +222,7 @@ class LeadUtil {
             leadParentImpl(cmp).repaint();
         }
     }
-    
+
     public static void dragInitiated(Component cmp) {
         if (cmp == null) {
             return;

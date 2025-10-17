@@ -33,48 +33,45 @@ import java.util.Hashtable;
  */
 public class HTMLUtils {
 
-    // Prevents instantiation - this class has static method only
-    private HTMLUtils() {
-
-    }
-
     /**
      * The char entities strings supported in XML. When a char entity is found these will be compared against first.
      */
     private static final String[] XML_CHAR_ENTITIES = {
-                                                          "lt", // lesser-than
-                                                          "gt", // greater-than
-                                                          "amp", // ampersand
-                                                          "quot", //quotation mark
-                                                          "apos", // apostrophe
-                                                          //"bull", //bullet
-                                                          //"euro" //euro
-                                                            };
-
+            "lt", // lesser-than
+            "gt", // greater-than
+            "amp", // ampersand
+            "quot", //quotation mark
+            "apos", // apostrophe
+            //"bull", //bullet
+            //"euro" //euro
+    };
     /**
      * The numericals value of char entities strings above.
      */
     private static final int[] XML_CHAR_ENTITIES_VALS = {
-                                                            60, // "lt", // lesser-than
-                                                            62, // "gt", // greater-than
-                                                            38, // "amp", // ampersand
-                                                            34, // "quot", //quotation mark
-                                                            39, // "apos", // apostrophe
-                                                            //8226, // "bull", //bullet
-                                                            //8364 // "euro"}; //euro
-                                                            };
-
-   /**
-    * This is a list of ISO 8859-1 Symbols that can be used as HTML char entities
-    */
+            60, // "lt", // lesser-than
+            62, // "gt", // greater-than
+            38, // "amp", // ampersand
+            34, // "quot", //quotation mark
+            39, // "apos", // apostrophe
+            //8226, // "bull", //bullet
+            //8364 // "euro"}; //euro
+    };
+    /**
+     * This is a list of ISO 8859-1 Symbols that can be used as HTML char entities
+     */
     private static final String[] HTML_BASIC_CHAR_ENTITY_STRINGS = {
-        "nbsp","iexcl","cent","pound","curren","yen","brvbar","sect","uml","copy","ordf","laquo","not","shy","reg","macr","deg","plusmn","sup2","sup3","acute",
-        "micro","para","middot","cedil","sup1","ordm","raquo","frac14","frac12","frac34","iquest","Agrave","Aacute","Acirc","Atilde","Auml","Aring","AElig",
-        "Ccedil","Egrave","Eacute","Ecirc","Euml","Igrave","Iacute","Icirc","Iuml","ETH","Ntilde","Ograve","Oacute","Ocirc","Otilde","Ouml","times","Oslash",
-        "Ugrave","Uacute","Ucirc","Uuml","Yacute","THORN","szlig","agrave","aacute","acirc","atilde","auml","aring","aelig","ccedil","egrave","eacute","ecirc",
-        "euml","igrave","iacute","icirc","iuml","eth","ntilde","ograve","oacute","ocirc","otilde","ouml","divide","oslash","ugrave","uacute","ucirc","uuml",
-        "yacute","thorn","yuml"};
+            "nbsp", "iexcl", "cent", "pound", "curren", "yen", "brvbar", "sect", "uml", "copy", "ordf", "laquo", "not", "shy", "reg", "macr", "deg", "plusmn", "sup2", "sup3", "acute",
+            "micro", "para", "middot", "cedil", "sup1", "ordm", "raquo", "frac14", "frac12", "frac34", "iquest", "Agrave", "Aacute", "Acirc", "Atilde", "Auml", "Aring", "AElig",
+            "Ccedil", "Egrave", "Eacute", "Ecirc", "Euml", "Igrave", "Iacute", "Icirc", "Iuml", "ETH", "Ntilde", "Ograve", "Oacute", "Ocirc", "Otilde", "Ouml", "times", "Oslash",
+            "Ugrave", "Uacute", "Ucirc", "Uuml", "Yacute", "THORN", "szlig", "agrave", "aacute", "acirc", "atilde", "auml", "aring", "aelig", "ccedil", "egrave", "eacute", "ecirc",
+            "euml", "igrave", "iacute", "icirc", "iuml", "eth", "ntilde", "ograve", "oacute", "ocirc", "otilde", "ouml", "divide", "oslash", "ugrave", "uacute", "ucirc", "uuml",
+            "yacute", "thorn", "yuml"};
 
+    // Prevents instantiation - this class has static method only
+    private HTMLUtils() {
+
+    }
 
     /**
      * Converts an XML char entity to the matching character or string.
@@ -103,65 +100,65 @@ public class HTMLUtils {
      * Converts a char entity to the matching character or string.
      * This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
      *
-     * @param charEntity The char entity to convert (Not including the &amp; and ;)
-      * @param lookupHTMLentities true to include the basic HTML named char entities (unicode 160-255), false otherwise
-      * @param userDefinedCharEntities A hashtable containing (String,int) dentoing the char entity name and its unicode
+     * @param charEntity              The char entity to convert (Not including the &amp; and ;)
+     * @param lookupHTMLentities      true to include the basic HTML named char entities (unicode 160-255), false otherwise
+     * @param userDefinedCharEntities A hashtable containing (String,int) dentoing the char entity name and its unicode
      * @return A string containing a single char, or the original char entity string  (with &amp; and ;) if the char entity couldn't be resolved
-      */
-    public static String convertCharEntity(String charEntity,boolean lookupHTMLentities,Hashtable userDefinedCharEntities) {
-        int charCode=-1;
+     */
+    public static String convertCharEntity(String charEntity, boolean lookupHTMLentities, Hashtable userDefinedCharEntities) {
+        int charCode = -1;
         if (charEntity.startsWith("#")) { //numbered char entity
             if (charEntity.startsWith("#x")) { //hex
                 try {
-                    charCode=Integer.parseInt(charEntity.substring(2),16);
+                    charCode = Integer.parseInt(charEntity.substring(2), 16);
                 } catch (NumberFormatException nfe) {
                     //if not a number - simply ignore char entity
                 }
             } else {
                 try {
-                    charCode=Integer.parseInt(charEntity.substring(1));
+                    charCode = Integer.parseInt(charEntity.substring(1));
                 } catch (NumberFormatException nfe) {
                     //if not a number - simply ignore char entity
                 }
             }
         } else { //not numbered, rather a symbol
-            charCode=getCharEntityCode(charEntity,lookupHTMLentities,userDefinedCharEntities);
+            charCode = getCharEntityCode(charEntity, lookupHTMLentities, userDefinedCharEntities);
         }
 
-        if (charCode!=-1) {
-            return ""+(char)charCode;
+        if (charCode != -1) {
+            return "" + (char) charCode;
         } else {
-            throw new IllegalArgumentException("Unknown character entity - "+charEntity);
+            throw new IllegalArgumentException("Unknown character entity - " + charEntity);
             //notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY,null,null,null, "Unrecognized char entity: "+charEntity);
             //return "&"+charEntity+";"; // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the & char (instead of &apos;)
         }
 
     }
 
-    private static int getCharEntityCode(String symbol,boolean html,Hashtable userDefined) {
+    private static int getCharEntityCode(String symbol, boolean html, Hashtable userDefined) {
         // First tries the XML basic char entities
-        int val=-1;
-        for (int i=0;i<XML_CHAR_ENTITIES.length;i++) {
+        int val = -1;
+        for (int i = 0; i < XML_CHAR_ENTITIES.length; i++) {
             if (symbol.equalsIgnoreCase(XML_CHAR_ENTITIES[i])) {
                 return XML_CHAR_ENTITIES_VALS[i];
             }
         }
-        if (val!=-1) {
+        if (val != -1) {
             return val;
         } else {
             if (html) {
                 // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
-                val=getStringVal(symbol, HTML_BASIC_CHAR_ENTITY_STRINGS);
-                if (val!=-1) {
-                    return val+160;
+                val = getStringVal(symbol, HTML_BASIC_CHAR_ENTITY_STRINGS);
+                if (val != -1) {
+                    return val + 160;
                 }
-           }
+            }
 
             // Not found in the standard symbol table, see if it is in the user defined symbols table
-            if (userDefined!=null) {
-                Object charObj=userDefined.get(symbol);
-                if (charObj!=null) {
-                    return ((Integer)charObj).intValue();
+            if (userDefined != null) {
+                Object charObj = userDefined.get(symbol);
+                if (charObj != null) {
+                    return ((Integer) charObj).intValue();
                 }
             }
 
@@ -178,33 +175,31 @@ public class HTMLUtils {
      * @return A percent-encoding of the string (safe characters remain the same)
      */
     public static String encodeString(String str) {
-        if (str==null) {
+        if (str == null) {
             return "";
         }
-        String encodedStr="";
-        for(int i=0;i<str.length();i++) {
-            char c=str.charAt(i);
+        String encodedStr = "";
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
             if (
                 // Checks for unreserved characters that RFC 3986 defines that shouldn't be encoded
-                ((c>='a') && (c<='z')) || ((c>='A') && (c<='Z')) ||
-                ((c>='0') && (c<='9')) ||
-                (c=='-') || (c=='.') || (c=='_') || (c=='~'))
-
-            {
-                encodedStr+=c;
-            } else if ((c>=0x80) && (c<=0xffff)) { // UTF encoding - See http://en.wikipedia.org/wiki/UTF-8
-                int firstLiteral = c/256;
-                int secLiteral = c%256;
-                if (c<=0x07ff) { // 2 literals unicode
-                    firstLiteral=192+(firstLiteral<<2)+(secLiteral>>6);
-                    secLiteral=128+(secLiteral & 63);
-                    encodedStr+="%"+Integer.toHexString(firstLiteral).toUpperCase()+"%"+Integer.toHexString(secLiteral).toUpperCase();
+                    ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) ||
+                            ((c >= '0') && (c <= '9')) ||
+                            (c == '-') || (c == '.') || (c == '_') || (c == '~')) {
+                encodedStr += c;
+            } else if ((c >= 0x80) && (c <= 0xffff)) { // UTF encoding - See http://en.wikipedia.org/wiki/UTF-8
+                int firstLiteral = c / 256;
+                int secLiteral = c % 256;
+                if (c <= 0x07ff) { // 2 literals unicode
+                    firstLiteral = 192 + (firstLiteral << 2) + (secLiteral >> 6);
+                    secLiteral = 128 + (secLiteral & 63);
+                    encodedStr += "%" + Integer.toHexString(firstLiteral).toUpperCase() + "%" + Integer.toHexString(secLiteral).toUpperCase();
                 } else { // 3 literals unicode
-                    int thirdLiteral=128+(secLiteral & 63);
-                    secLiteral=128+((firstLiteral%16)<<2)+(secLiteral>>6);
-                    firstLiteral=224+(firstLiteral>>4);
-                    encodedStr+="%"+Integer.toHexString(firstLiteral).toUpperCase()+"%"+Integer.toHexString(secLiteral).toUpperCase()
-                            +"%"+Integer.toHexString(thirdLiteral).toUpperCase();
+                    int thirdLiteral = 128 + (secLiteral & 63);
+                    secLiteral = 128 + ((firstLiteral % 16) << 2) + (secLiteral >> 6);
+                    firstLiteral = 224 + (firstLiteral >> 4);
+                    encodedStr += "%" + Integer.toHexString(firstLiteral).toUpperCase() + "%" + Integer.toHexString(secLiteral).toUpperCase()
+                            + "%" + Integer.toHexString(thirdLiteral).toUpperCase();
                 }
 //            The max value of a char is 0xffff, so though URL encoding supports values bigger than that, we can't provide for it
             /*} else if (c>0xffff) { // 4 literals unicode (CJK upper ranges and others)
@@ -221,11 +216,11 @@ public class HTMLUtils {
                     encodedStr+="%"+Integer.toHexString(literal[l]).toUpperCase();
                 }*/
             } else {
-                String prefix="%";
-                if (c<16) {
-                    prefix+="0"; //For a value lesser than 16, we'd like to get %0F and not %F
+                String prefix = "%";
+                if (c < 16) {
+                    prefix += "0"; //For a value lesser than 16, we'd like to get %0F and not %F
                 }
-                encodedStr+=prefix+Integer.toHexString((int)c).toUpperCase();
+                encodedStr += prefix + Integer.toHexString((int) c).toUpperCase();
 
             }
         }
@@ -236,52 +231,52 @@ public class HTMLUtils {
     /**
      * Matches the given string to the given options and returns the matching value, or -1 if none found.
      *
-     * @param str The string to compare
+     * @param str     The string to compare
      * @param options The options to match the string against
      * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options -1 is returned.
      */
-    static int getStringVal(String str,String[] options) {
+    static int getStringVal(String str, String[] options) {
         return getStringVal(str, options, null, -1);
     }
 
     /**
      * Matches the given string to the given options and returns the matching value, or -1 if none found.
      *
-     * @param str The string to compare
+     * @param str     The string to compare
      * @param options The options to match the string against
-     * @param vals The values to match to each option (According to the position in the array), this can be null.
+     * @param vals    The values to match to each option (According to the position in the array), this can be null.
      * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options -1 is returned.
      */
-    static int getStringVal(String str,String[] options,int[] vals) {
+    static int getStringVal(String str, String[] options, int[] vals) {
         return getStringVal(str, options, vals, -1);
     }
 
     /**
      * Matches the given string to the given options and returns the matching value, or the default one if none found.
      *
-     * @param str The string to compare
-     * @param options The options to match the string against
+     * @param str          The string to compare
+     * @param options      The options to match the string against
      * @param defaultValue The default value to return if the string was null or not found among the options
      * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options the defaultValue is returned.
      */
-    static int getStringVal(String str,String[] options,int defaultValue) {
+    static int getStringVal(String str, String[] options, int defaultValue) {
         return getStringVal(str, options, null, defaultValue);
     }
 
     /**
      * Matches the given string to the given options and returns the matching value, or the default one if none found.
      *
-     * @param str The string to compare
-     * @param options The options to match the string against
-     * @param vals The values to match to each option (According to the position in the array), this can be null.
+     * @param str          The string to compare
+     * @param options      The options to match the string against
+     * @param vals         The values to match to each option (According to the position in the array), this can be null.
      * @param defaultValue The default value to return if the string was null or not found among the options
      * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options the defaultValue is returned.
      */
-    static int getStringVal(String str,String[] options,int[] vals,int defaultValue) {
-        if (str!=null) {
-            for(int i=0;i<options.length;i++) {
+    static int getStringVal(String str, String[] options, int[] vals, int defaultValue) {
+        if (str != null) {
+            for (int i = 0; i < options.length; i++) {
                 if (str.equals(options[i])) {
-                    if (vals!=null) {
+                    if (vals != null) {
                         return vals[i];
                     } else {
                         return i;

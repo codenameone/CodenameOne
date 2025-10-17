@@ -29,33 +29,32 @@ import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.db.Database;
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.CodenameOneThread;
+import com.codename1.impl.ImplementationFactory;
+import com.codename1.impl.VirtualKeyboardInterface;
+import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
+import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.media.RemoteControlListener;
 import com.codename1.messaging.Message;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.payment.Purchase;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
 import com.codename1.plugin.event.OpenGalleryEvent;
+import com.codename1.system.CrashReport;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.impl.ImplementationFactory;
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.impl.CodenameOneThread;
-import com.codename1.impl.VirtualKeyboardInterface;
-import com.codename1.io.ConnectionRequest;
-import com.codename1.io.Log;
-import com.codename1.io.Preferences;
-import com.codename1.l10n.L10NManager;
-import com.codename1.media.Media;
-import com.codename1.media.MediaRecorderBuilder;
-import com.codename1.notifications.LocalNotification;
-import com.codename1.payment.Purchase;
-import com.codename1.system.CrashReport;
 import com.codename1.ui.events.MessageEvent;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -63,11 +62,11 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.RunnableWithResultSync;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -78,7 +77,7 @@ import java.util.TimerTask;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
- * level components ({@link Form}) on the "display". 
+ * level components ({@link Form}) on the "display".
  * <p>This class handles the main thread for the toolkit referenced here on as the EDT
  * (Event Dispatch Thread) similar to the Swing EDT. This thread encapsulates the platform
  * specific event delivery and painting semantics and enables threading features such as
@@ -94,70 +93,174 @@ import java.util.TimerTask;
  * @author Chen Fishbein, Shai Almog
  */
 public final class Display extends CN1Constants {
-    private CrashReport crashReporter;
-    private EventDispatcher errorHandler;
-    boolean codenameOneExited;
-    private boolean inNativeUI;
-    private Runnable bookmark;
-
-    private EventDispatcher messageListeners;
-    
     /**
      * A common sound type that can be used with playBuiltinSound
      */
     public static final String SOUND_TYPE_ALARM = "alarm";
-
     /**
      * A common sound type that can be used with playBuiltinSound
      */
     public static final String SOUND_TYPE_CONFIRMATION = "confirmation";
-
     /**
      * A common sound type that can be used with playBuiltinSound
      */
     public static final String SOUND_TYPE_ERROR = "error";
-
     /**
      * A common sound type that can be used with playBuiltinSound
      */
     public static final String SOUND_TYPE_INFO = "info";
-
     /**
      * A common sound type that can be used with playBuiltinSound
      */
     public static final String SOUND_TYPE_WARNING = "warning";
-
     /**
      * A common sound type that can be used with playBuiltinSound
      */
     public static final String SOUND_TYPE_BUTTON_PRESS = "press";
-
     /**
      * Unknown keyboard type is the default indicating the software should try
      * to detect the keyboard type if necessary
      */
     public static final int KEYBOARD_TYPE_UNKNOWN = 0;
-
     /**
      * Numeric keypad keyboard type
      */
     public static final int KEYBOARD_TYPE_NUMERIC = 1;
-
     /**
      * Full QWERTY keypad keyboard type, even if a numeric keyboard also exists
      */
     public static final int KEYBOARD_TYPE_QWERTY = 2;
-
     /**
      * Touch device without a physical keyboard that should popup a keyboad
      */
     public static final int KEYBOARD_TYPE_VIRTUAL = 3;
-
     /**
      * Half QWERTY which needs software assistance for completion
      */
     public static final int KEYBOARD_TYPE_HALF_QWERTY = 4;
-    
+    /**
+     * Game action for fire
+     */
+    public static final int GAME_FIRE = 8;
+    /**
+     * Game action for left key
+     */
+    public static final int GAME_LEFT = 2;
+    /**
+     * Game action for right key
+     */
+    public static final int GAME_RIGHT = 5;
+    /**
+     * Game action for UP key
+     */
+    public static final int GAME_UP = 1;
+    /**
+     * Game action for down key
+     */
+    public static final int GAME_DOWN = 6;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_SKIP_FORWARD = 20;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_SKIP_BACK = 21;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_PLAY = 22;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_STOP = 23;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_PLAY_STOP = 24;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_PLAY_PAUSE = 25;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_FAST_FORWARD = 26;
+    /**
+     * Special case game key used for media playback events
+     */
+    public static final int MEDIA_KEY_FAST_BACKWARD = 27;
+    /**
+     * An attribute that encapsulates '#' int value.
+     */
+    public static final int KEY_POUND = '#';
+    /**
+     * Ignore all calls to show occurring during edit, they are discarded immediately
+     */
+    public static final int SHOW_DURING_EDIT_IGNORE = 1;
+    /**
+     * If show is called while editing text in the native text box an exception is thrown
+     */
+    public static final int SHOW_DURING_EDIT_EXCEPTION = 2;
+    /**
+     * Allow show to occur during edit and discard all user input at this moment
+     */
+    public static final int SHOW_DURING_EDIT_ALLOW_DISCARD = 3;
+    /**
+     * Allow show to occur during edit and save all user input at this moment
+     */
+    public static final int SHOW_DURING_EDIT_ALLOW_SAVE = 4;
+    /**
+     * Show will update the current form to which the OK button of the text box
+     * will return
+     */
+    public static final int SHOW_DURING_EDIT_SET_AS_NEXT = 5;
+    /**
+     * Indicates that the Codename One implementation should decide internally the command
+     * behavior most appropriate for this platform.
+     */
+    public static final int COMMAND_BEHAVIOR_DEFAULT = 1;
+    /**
+     * Indicates the classic Codename One command behavior where the commands are placed in
+     * a list within a dialog. This is the most customizable approach for none touch devices.
+     */
+    public static final int COMMAND_BEHAVIOR_SOFTKEY = 2;
+    /**
+     * Indicates the touch menu dialog rendered by Codename One where commands are placed
+     * into a scrollable dialog
+     */
+    public static final int COMMAND_BEHAVIOR_TOUCH_MENU = 3;
+    /**
+     * Indicates that commands should be added to an always visible bar at the
+     * bottom of the form.
+     */
+    public static final int COMMAND_BEHAVIOR_BUTTON_BAR = 4;
+    /**
+     * Identical to the bar behavior, places the back command within the title bar
+     * of the form/dialg
+     */
+    public static final int COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK = 5;
+    /**
+     * Places all commands on the right side of the title bar with a uniform size
+     * grid layout
+     */
+    public static final int COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT = 6;
+    /**
+     * Commands are placed in the same was as they are in the ice cream sandwich Android
+     * OS update where the back button has a theme icon the application icon appears next
+     * to the
+     */
+    public static final int COMMAND_BEHAVIOR_ICS = 7;
+    /**
+     * Commands are placed in a side menu similar to Facebook/Google+ apps
+     */
+    public static final int COMMAND_BEHAVIOR_SIDE_NAVIGATION = 8;
+    /**
+     * Indicates that commands should try to add themselves to the native menus
+     */
+    public static final int COMMAND_BEHAVIOR_NATIVE = 10;
+    static final Display INSTANCE = new Display();
+    static final Object lock = new Object();
     private static final int POINTER_PRESSED = 1;
     private static final int POINTER_RELEASED = 2;
     private static final int POINTER_DRAGGED = 3;
@@ -173,42 +276,28 @@ public final class Display extends CN1Constants {
     private static final int POINTER_PRESSED_MULTI = 21;
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
+    private static final int MAX_ASYNC_EXCEPTION_DEPTH = 10;
+    private static final int[] xArray1 = new int[1];
+    private static final int[] yArray1 = new int[1];
+    static int transitionDelay = -1;
+    static CodenameOneImplementation impl;
+    private static String selectedVirtualKeyboard = null;
+    private static Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
+    private final LinkedList<Runnable> runningSerialCallsQueue = new LinkedList<Runnable>();
+    boolean codenameOneExited;
+    long time;
+    private CrashReport crashReporter;
+    private EventDispatcher errorHandler;
+    private boolean inNativeUI;
+    private Runnable bookmark;
+    private EventDispatcher messageListeners;
     private boolean disableInvokeAndBlock;
-    
-    
-    /**
-     * Sets a bookmark that can restore the app to a particular state.  This takes a 
-     * {@link Runnable} that will be run when {@link #restoreToBookmark()} () } is called.
-     * 
-     * <p>The primary purpose of this feature is live code refresh.</p>
-     * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
-     * @since 8.0
-     * 
-     */
-    public void setBookmark(Runnable bookmark) {
-        this.bookmark = bookmark;
-    }
-    
-    /**
-     * Runs the last bookmark that was set using {@link #setBookmark(java.lang.Runnable) }
-     * 
-     * @since 8.0
-     */
-    public void restoreToBookmark() {
-        if (this.bookmark != null) {
-            this.bookmark.run();
-        }
-    }
-    
-    
     /**
      * Enable Async stack traces.  This is disabled by default, but will cause
-     * stack traces of callSerially() calls to be stored, and logged if the 
+     * stack traces of callSerially() calls to be stored, and logged if the
      * Runnable throws an exception.
      */
     private boolean enableAsyncStackTraces;
-    
-    
     /**
      * A pure touch device has no focus showing when the user is using the touch
      * interface. Selection only shows when the user actually touches the screen
@@ -216,27 +305,21 @@ public final class Display extends CN1Constants {
      * is common in Android devices
      */
     private boolean pureTouch;
-
     private Graphics codenameOneGraphics;
-
     /**
      * Indicates whether this is a touch device
      */
     private boolean touchScreen;
-
     private HashMap<String, String> localProperties;
-
     /**
      * Indicates whether the edt should sleep between each loop
      */
     private boolean noSleep = false;
-
     /**
      * Normally Codename One folds the VKB when switching forms this field allows us
      * to block that behavior.
      */
     private boolean autoFoldVKBOnFormSwitch = true;
-
     /**
      * Indicates the maximum drawing speed of no more than 10 frames per second
      * by default (this can be increased or decreased) the advantage of limiting
@@ -245,145 +328,31 @@ public final class Display extends CN1Constants {
      * so a high/low FPS will have no effect then.
      */
     private int framerateLock = 15;
-
-    /**
-     * Game action for fire
-     */
-    public static final int GAME_FIRE = 8;
-
-    /**
-     * Game action for left key
-     */
-    public static final int GAME_LEFT = 2;
-
-    /**
-     * Game action for right key
-     */
-    public static final int GAME_RIGHT = 5;
-
-    /**
-     * Game action for UP key
-     */
-    public static final int GAME_UP = 1;
-
-    /**
-     * Game action for down key
-     */
-    public static final int GAME_DOWN = 6;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_SKIP_FORWARD = 20;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_SKIP_BACK = 21;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_PLAY = 22;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_STOP = 23;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_PLAY_STOP = 24;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_PLAY_PAUSE = 25;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_FAST_FORWARD = 26;
-
-    /**
-     * Special case game key used for media playback events
-     */
-    public static final int MEDIA_KEY_FAST_BACKWARD = 27;
-    
-    /**
-     * An attribute that encapsulates '#' int value.
-     */
-    public static final int KEY_POUND = '#';
-
-    static final Display INSTANCE = new Display();
-
-    static int transitionDelay = -1;
-
-    static CodenameOneImplementation impl;
-
     private boolean codenameOneRunning = false;
-
-
     /**
      * Contains the call serially pending elements
      */
     private ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
-
     /**
      * Contains the call serially idle elements
      */
     private ArrayList<Runnable> pendingIdleSerialCalls = new ArrayList<Runnable>();
-
-
     /**
      * This is the instance of the EDT used internally to indicate whether
      * we are executing on the EDT or some arbitrary thread
      */
     private Thread edt;
-
     /**
      * Contains animations that must be played in full by the EDT before anything further
      * may be processed. This is useful for transitions/intro's etc... that animate without
      * user interaction.
      */
     private ArrayList<Animation> animationQueue;
-
     /**
      * Indicates whether the 3rd softbutton should be supported on this device
      */
     private boolean thirdSoftButton = false;
-
-    /**
-     * Ignore all calls to show occurring during edit, they are discarded immediately
-     */
-    public static final int SHOW_DURING_EDIT_IGNORE = 1;
-
-    /**
-     * If show is called while editing text in the native text box an exception is thrown
-     */
-    public static final int SHOW_DURING_EDIT_EXCEPTION = 2;
-
-    /**
-     * Allow show to occur during edit and discard all user input at this moment
-     */
-    public static final int SHOW_DURING_EDIT_ALLOW_DISCARD = 3;
-
-    /**
-     * Allow show to occur during edit and save all user input at this moment
-     */
-    public static final int SHOW_DURING_EDIT_ALLOW_SAVE = 4;
-
-    /**
-     * Show will update the current form to which the OK button of the text box
-     * will return
-     */
-    public static final int SHOW_DURING_EDIT_SET_AS_NEXT = 5;
-
     private int showDuringEdit;
-
-    static final Object lock = new Object();
-
     /**
      * Events to broadcast on the EDT, we are using a handcoded stack for maximum
      * performance and minimal synchronization. We are using the switching algorithm
@@ -394,7 +363,6 @@ public final class Display extends CN1Constants {
     private int inputEventStackPointer;
     private int[] inputEventStackTmp = new int[1000];
     private int inputEventStackPointerTmp;
-
     private boolean longPointerCharged;
     private boolean pointerPressedAndNotReleasedOrDragged;
     private boolean recursivePointerReleaseA;
@@ -411,108 +379,45 @@ public final class Display extends CN1Constants {
     private boolean lastInteractionWasKeypad;
     private boolean dragOccured;
     private boolean processingSerialCalls;
-
     private int PATHLENGTH;
     private float[] dragPathX;
     private float[] dragPathY;
     private long[] dragPathTime;
     private int dragPathOffset = 0;
     private int dragPathLength = 0;
-    
     private Boolean darkMode;
-
     private PluginSupport pluginSupport;
-
-     /**
+    /**
      * Internally track display initialization time as a fixed point to allow tagging of pointer
      * events with an integer timestamp (System.currentTimeMillis() - displayInitTime)
      * and not a long value.
      */
     private long displayInitTime = 0;
-
-
     /**
      * Allows a Codename One application to minimize without forcing it to the front whenever
      * a new dialog is poped up
      */
     private boolean allowMinimizing;
-
-    /**
-     * Indicates that the Codename One implementation should decide internally the command
-     * behavior most appropriate for this platform.
-     */
-    public static final int COMMAND_BEHAVIOR_DEFAULT = 1;
-
-    /**
-     * Indicates the classic Codename One command behavior where the commands are placed in
-     * a list within a dialog. This is the most customizable approach for none touch devices.
-     */
-    public static final int COMMAND_BEHAVIOR_SOFTKEY = 2;
-
-    /**
-     * Indicates the touch menu dialog rendered by Codename One where commands are placed
-     * into a scrollable dialog
-     */
-    public static final int COMMAND_BEHAVIOR_TOUCH_MENU = 3;
-
-    /**
-     * Indicates that commands should be added to an always visible bar at the
-     * bottom of the form.
-     */
-    public static final int COMMAND_BEHAVIOR_BUTTON_BAR = 4;
-
-    /**
-     * Identical to the bar behavior, places the back command within the title bar
-     * of the form/dialg
-     */
-    public static final int COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK = 5;
-
-    /**
-     * Places all commands on the right side of the title bar with a uniform size
-     * grid layout
-     */
-    public static final int COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT = 6;
-
-    /**
-     * Commands are placed in the same was as they are in the ice cream sandwich Android
-     * OS update where the back button has a theme icon the application icon appears next
-     * to the 
-     */
-    public static final int COMMAND_BEHAVIOR_ICS = 7;
-
-    /**
-     * Commands are placed in a side menu similar to Facebook/Google+ apps
-     */
-    public static final int COMMAND_BEHAVIOR_SIDE_NAVIGATION = 8;
-    
-    /**
-     * Indicates that commands should try to add themselves to the native menus
-     */
-    public static final int COMMAND_BEHAVIOR_NATIVE = 10;
-
-    private static String selectedVirtualKeyboard = null;
-
-    private static Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
-
     private boolean dropEvents;
-    
     private ArrayList<Runnable> backgroundTasks;
     private Thread backgroundThread;
-
     private boolean multiKeyMode;
-    
     private ActionListener virtualKeyboardListener;
     private EventDispatcher virtualKeyboardListeners;
-    
     private int lastSizeChangeEventWH = -1;
-    
+    private DebugRunnable currentEdtContext;
+    private int previousKeyPressed;
+    private int lastKeyPressed;
+    private int lastDragOffset;
+    private Rectangle tmpRect = new Rectangle();
+    private Form eventForm;
 
     /**
      * Private constructor to prevent instanciation
      */
     private Display() {
     }
-    
+
     /**
      * This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
      * This method must be called before any Form is shown
@@ -521,17 +426,17 @@ public final class Display extends CN1Constants {
      * @deprecated this method is invoked internally do not invoke it!
      */
     public static void init(Object m) {
-        if(!INSTANCE.codenameOneRunning) {
+        if (!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
             INSTANCE.pluginSupport = new PluginSupport();
             INSTANCE.displayInitTime = System.currentTimeMillis();
-            
+
             //restore menu state from previous run if exists
             int commandBehaviour = COMMAND_BEHAVIOR_DEFAULT;
-            if(INSTANCE.impl != null){
+            if (INSTANCE.impl != null) {
                 commandBehaviour = INSTANCE.impl.getCommandBehavior();
             }
-            INSTANCE.impl = (CodenameOneImplementation)ImplementationFactory.getInstance().createImplementation();
+            INSTANCE.impl = (CodenameOneImplementation) ImplementationFactory.getInstance().createImplementation();
 
             INSTANCE.impl.setDisplayLock(lock);
             INSTANCE.impl.initImpl(m);
@@ -540,14 +445,14 @@ public final class Display extends CN1Constants {
             INSTANCE.impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
             // only enable but never disable the third softbutton
-            if(INSTANCE.impl.isThirdSoftButton()) {
+            if (INSTANCE.impl.isThirdSoftButton()) {
                 INSTANCE.thirdSoftButton = true;
             }
-            if(INSTANCE.impl.getSoftkeyCount() > 0) {
+            if (INSTANCE.impl.getSoftkeyCount() > 0) {
                 MenuBar.leftSK = INSTANCE.impl.getSoftkeyCode(0)[0];
-                if(INSTANCE.impl.getSoftkeyCount() > 1) {
+                if (INSTANCE.impl.getSoftkeyCount() > 1) {
                     MenuBar.rightSK = INSTANCE.impl.getSoftkeyCode(1)[0];
-                    if(INSTANCE.impl.getSoftkeyCode(1).length > 1){
+                    if (INSTANCE.impl.getSoftkeyCode(1).length > 1) {
                         MenuBar.rightSK2 = INSTANCE.impl.getSoftkeyCode(1)[1];
                     }
                 }
@@ -555,17 +460,17 @@ public final class Display extends CN1Constants {
             MenuBar.backSK = INSTANCE.impl.getBackKeyCode();
             MenuBar.backspaceSK = INSTANCE.impl.getBackspaceKeyCode();
             MenuBar.clearSK = INSTANCE.impl.getClearKeyCode();
-            
+
             INSTANCE.PATHLENGTH = INSTANCE.impl.getDragPathLength();
             INSTANCE.dragPathX = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathY = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathTime = new long[INSTANCE.PATHLENGTH];
             com.codename1.util.StringUtil.setImplementation(INSTANCE.impl);
             com.codename1.io.Util.setImplementation(INSTANCE.impl);
-            
+
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
-            if(INSTANCE.edt == null) {
+            if (INSTANCE.edt == null) {
                 INSTANCE.touchScreen = INSTANCE.impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
@@ -575,7 +480,7 @@ public final class Display extends CN1Constants {
             }
             INSTANCE.impl.postInit();
             INSTANCE.setCommandBehavior(commandBehaviour);
-        }else{
+        } else {
             INSTANCE.impl.confirmControlView();
         }
     }
@@ -589,18 +494,19 @@ public final class Display extends CN1Constants {
      * Notice that minimize (being a Codename One method) MUST be invoked before invoking this method!
      */
     public static void deinitialize() {
-        
+
         INSTANCE.codenameOneRunning = false;
-        synchronized(lock) {
+        synchronized (lock) {
             lock.notifyAll();
         }
     }
+
     /**
      * This method returns true if the Display is initialized.
      *
      * @return true if the EDT is running
      */
-    public static boolean isInitialized(){
+    public static boolean isInitialized() {
         return INSTANCE.codenameOneRunning && (INSTANCE.impl == null ? false : INSTANCE.impl.isInitialized());
     }
 
@@ -609,12 +515,37 @@ public final class Display extends CN1Constants {
      *
      * @return the Display instance
      */
-    public static Display getInstance(){
+    public static Display getInstance() {
         return INSTANCE;
     }
 
     /**
+     * Sets a bookmark that can restore the app to a particular state.  This takes a
+     * {@link Runnable} that will be run when {@link #restoreToBookmark()} () } is called.
+     *
+     * <p>The primary purpose of this feature is live code refresh.</p>
+     *
+     * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
+     * @since 8.0
+     */
+    public void setBookmark(Runnable bookmark) {
+        this.bookmark = bookmark;
+    }
+
+    /**
+     * Runs the last bookmark that was set using {@link #setBookmark(java.lang.Runnable) }
+     *
+     * @since 8.0
+     */
+    public void restoreToBookmark() {
+        if (this.bookmark != null) {
+            this.bookmark.run();
+        }
+    }
+
+    /**
      * Gets reference to plugin support object.
+     *
      * @return The plugin support object.
      * @since 8.0
      */
@@ -663,7 +594,7 @@ public final class Display extends CN1Constants {
     }
 
     /**
-     * Vibrates the device for the given length of time, notice that this might ignore the time value completely 
+     * Vibrates the device for the given length of time, notice that this might ignore the time value completely
      * on some OS's where this level of control isn't supported e.g. iOS see: https://github.com/codenameone/CodenameOne/issues/1904
      *
      * @param duration length of time to vibrate (might be ignored)
@@ -688,7 +619,7 @@ public final class Display extends CN1Constants {
      * component automatically when it gains focus; this method is intended for situations
      * where an announcement should occur independently of focus changes.
      *
-     * @param cmp the component related to this announcement or {@code null} for the root view
+     * @param cmp  the component related to this announcement or {@code null} for the root view
      * @param text the message to announce
      */
     public void announceForAccessibility(Component cmp, String text) {
@@ -705,21 +636,6 @@ public final class Display extends CN1Constants {
     }
 
     /**
-     * Invoking the show() method of a form/dialog while the user is editing
-     * text in the native text box can have several behaviors: SHOW_DURING_EDIT_IGNORE,
-     * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
-     * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
-     *
-     * @param showDuringEdit one of the following: SHOW_DURING_EDIT_IGNORE,
-     * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
-     * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
-     * @deprecated this method isn't applicable in modern devices
-     */
-    public void setShowDuringEditBehavior(int showDuringEdit) {
-        this.showDuringEdit = showDuringEdit;
-    }
-
-    /**
      * Returns the status of the show during edit flag
      *
      * @return one of the following: SHOW_DURING_EDIT_IGNORE,
@@ -729,6 +645,21 @@ public final class Display extends CN1Constants {
      */
     public int getShowDuringEditBehavior() {
         return showDuringEdit;
+    }
+
+    /**
+     * Invoking the show() method of a form/dialog while the user is editing
+     * text in the native text box can have several behaviors: SHOW_DURING_EDIT_IGNORE,
+     * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
+     * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     *
+     * @param showDuringEdit one of the following: SHOW_DURING_EDIT_IGNORE,
+     *                       SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
+     *                       SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     * @deprecated this method isn't applicable in modern devices
+     */
+    public void setShowDuringEditBehavior(int showDuringEdit) {
+        this.showDuringEdit = showDuringEdit;
     }
 
     /**
@@ -759,12 +690,11 @@ public final class Display extends CN1Constants {
         impl.playDialogSound(type);
     }
 
-    private DebugRunnable currentEdtContext;
-
     /**
      * Stops the remote control service.  This should be implemented in the platform
      * to handle unbinding the {@link com.codename1.media.RemoteControlListener} with the platform's remote control.
      * <p>This is executed when a new listener is registered using {@link com.codename1.media.MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     *
      * @since 7.0
      */
     public void stopRemoteControl() {
@@ -775,133 +705,45 @@ public final class Display extends CN1Constants {
      * Starts the remote control service.  This should be implemented
      * in the platform to handle binding the {@link RemoteControlListener} with
      * the platform's remote control.
-     * 
+     *
      * <p>This is executed when the user registers a new listener using {@link MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener) }</p>
+     *
      * @since 7.0
      */
     public void startRemoteControl() {
         impl.startRemoteControl();
     }
 
-    
     /**
      * Returns true if the platform is in dark mode, null is returned for
      * unknown status
-     * 
+     *
      * @return true in case of dark mode
-     */    
+     */
     public Boolean isDarkMode() {
-        if(darkMode != null) {
+        if (darkMode != null) {
             return darkMode;
         }
         return impl.isDarkMode();
     }
-    
+
     /**
      * Override the default dark mode setting
+     *
      * @param darkMode can be set to null to reset to platform default
      */
     public void setDarkMode(Boolean darkMode) {
         this.darkMode = darkMode;
     }
-    
-    private class EdtException extends RuntimeException {
-        private Throwable cause;
-        private EdtException parent;
-        public void setCause(Throwable t) {
-            this.cause = t;
-        }
 
-        public synchronized Throwable getCause() {
-            return cause;
-        }
-        
-        private void throwRoot(Throwable cause) {
-            HashSet<Throwable> circuitCheck = new HashSet<Throwable>();
-            circuitCheck.add(cause);
-            EdtException root = this;
-            if (root != cause) {
-                root.setCause(cause);
-                circuitCheck.add(root);
-            } else {
-                root = (EdtException)cause;
-            }
-            while (root.parent != null) {
-                if (circuitCheck.contains(root.parent)) {
-                    break;
-                }
-                root.parent.setCause(root);
-                circuitCheck.add(root.parent);
-                root = root.parent;
-            }
-            throw root;
-        }
-        
-    }
-    
-    private static final int MAX_ASYNC_EXCEPTION_DEPTH=10;
-    
-    /**
-     * A wrapper around Runnable that records the stack trace so that
-     * if an exception occurs, it is easier to track it back to the original
-     * source.
-     */
-    private class DebugRunnable implements Runnable {
-        private final Runnable internal;
-        private EdtException exceptionWrapper;
-        private DebugRunnable parentContext;
-        private int depth;
-        private int totalDepth;
-        
-        DebugRunnable(Runnable internal) {
-            this.internal = internal;
-            this.parentContext = currentEdtContext;
-            if (parentContext != null) {
-                depth = parentContext.depth+1;
-                totalDepth = parentContext.totalDepth+1;
-            }
-            
-            if (isEnableAsyncStackTraces()) {
-                exceptionWrapper = new EdtException();
-                
-                if (parentContext != null) {
-                    if (depth < MAX_ASYNC_EXCEPTION_DEPTH) {
-                        exceptionWrapper.parent = parentContext.exceptionWrapper;
-                        parentContext = null;
-                    } else {
-                        depth = 0;
-                    }
-                }
-            } else {
-                exceptionWrapper = null;
-                parentContext = null;
-            }
-        }
-        
-        
-        public void run() {
-            if (exceptionWrapper != null) {
-                try {
-                    currentEdtContext = this;
-                    internal.run();
-                } catch (RuntimeException t) {
-                    exceptionWrapper.throwRoot(t);
-                }
-            } else {
-                internal.run();
-            }
-        }
-        
-    }
-    
-    
     /**
      * Checks if async stack traces are enabled.  If enabled, the stack trace
-     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will
      * be recorded, and logged in the case that there is an uncaught exception.
      * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
-     * @return Whether async stack traces are enabled.  
-     * @see #setEnableAsyncStackTraces(boolean) 
+     *
+     * @return Whether async stack traces are enabled.
+     * @see #setEnableAsyncStackTraces(boolean)
      * @since 7.0
      */
     public boolean isEnableAsyncStackTraces() {
@@ -910,58 +752,59 @@ public final class Display extends CN1Constants {
 
     /**
      * Enables or disables async stack traces.  If enabled, the stack trace
-     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will
      * be recorded, and logged in the case that there is an uncaught exception.
-     * 
+     *
      * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
-     * @param enableAsyncStackTraces True to enable async stack traces.  
-     * @see #isEnableAsyncStackTraces() 
+     *
+     * @param enableAsyncStackTraces True to enable async stack traces.
+     * @see #isEnableAsyncStackTraces()
      * @since 7.0
      */
     public void setEnableAsyncStackTraces(boolean enableAsyncStackTraces) {
         this.enableAsyncStackTraces = enableAsyncStackTraces;
     }
-    
+
     /**
      * Causes the runnable to be invoked on the event dispatch thread. This method
      * returns immediately and will not wait for the serial call to occur
      *
      * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     *          the paint and key handling events
      */
-    public void callSerially(Runnable r){
+    public void callSerially(Runnable r) {
         // otherwise this will fail in an odd locaiton. Better it fails here...
-        if(r == null) {
+        if (r == null) {
             throw new NullPointerException();
         }
-        if(codenameOneRunning) {
-            synchronized(lock) {
-                scheduleSerialCall(isEnableAsyncStackTraces()?new DebugRunnable(r) : r);
+        if (codenameOneRunning) {
+            synchronized (lock) {
+                scheduleSerialCall(isEnableAsyncStackTraces() ? new DebugRunnable(r) : r);
                 lock.notifyAll();
             }
         } else {
             r.run();
         }
     }
-    
-    // We factor out the scheduling of a serial call so that we can 
+
+    // We factor out the scheduling of a serial call so that we can
     // use the Schedule annotation for IntelliJ async debugging https://www.jetbrains.com/help/idea/debug-asynchronous-code.html
     private void scheduleSerialCall(@Async.Schedule Runnable r) {
         pendingSerialCalls.add(r);
     }
 
     /**
-     * Causes the runnable to be invoked on the event dispatch thread when the event 
-     * dispatch thread is idle. This method returns immediately and will not wait for the serial call 
+     * Causes the runnable to be invoked on the event dispatch thread when the event
+     * dispatch thread is idle. This method returns immediately and will not wait for the serial call
      * to occur. Notice this method is identical to call serially but will perform the runnable only when
      * the EDT is idle
      *
      * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     *          the paint and key handling events
      */
-    public void callSeriallyOnIdle(Runnable r){
-        if(codenameOneRunning) {
-            synchronized(lock) {
+    public void callSeriallyOnIdle(Runnable r) {
+        if (codenameOneRunning) {
+            synchronized (lock) {
                 pendingIdleSerialCalls.add(r);
                 lock.notifyAll();
             }
@@ -973,35 +816,35 @@ public final class Display extends CN1Constants {
     public String getLineSeparator() {
         return impl.getLineSeparator();
     }
-    
+
     /**
      * Allows executing a background task in a separate low priority thread. Tasks are serialized
      * so they don't overload the CPU.
-     * 
+     *
      * @param r the task to perform in the background
      */
     public void scheduleBackgroundTask(@Async.Schedule Runnable r) {
-        synchronized(lock) {
-            if(backgroundTasks == null) {
+        synchronized (lock) {
+            if (backgroundTasks == null) {
                 backgroundTasks = new ArrayList<Runnable>();
             }
             backgroundTasks.add(r);
-            if(backgroundThread == null) {
+            if (backgroundThread == null) {
                 backgroundThread = new CodenameOneThread(new Runnable() {
                     public void run() {
                         // using while true to avoid double lock optimization with synchronized block
-                        while(true) {
+                        while (true) {
                             Runnable nextTask = null;
-                            synchronized(lock) {
-                                if(backgroundTasks.size() > 0) {
-                                    nextTask = (Runnable)backgroundTasks.get(0);
+                            synchronized (lock) {
+                                if (backgroundTasks.size() > 0) {
+                                    nextTask = (Runnable) backgroundTasks.get(0);
                                 } else {
                                     backgroundThread = null;
                                     return;
                                 }
                                 backgroundTasks.remove(0);
                             }
-                            //preent a runtime exception to crash the 
+                            //preent a runtime exception to crash the
                             //backgroundThread
                             try {
                                 executeBackgroundTaskRunnable(nextTask);
@@ -1020,39 +863,40 @@ public final class Display extends CN1Constants {
             }
         }
     }
-    
+
     private void executeBackgroundTaskRunnable(@Async.Execute Runnable r) {
         r.run();
     }
-    
 
     /**
      * Identical to callSerially with the added benefit of waiting for the Runnable method to complete.
      *
      * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     *          the paint and key handling events
      * @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-     * paint or event handling).
+     *                               paint or event handling).
      */
-    public void callSeriallyAndWait(Runnable r){
-        if(isEdt()) {
+    public void callSeriallyAndWait(Runnable r) {
+        if (isEdt()) {
             throw new RuntimeException("This method MUST NOT be invoked on the EDT");
         }
         RunnableWrapper c = new RunnableWrapper(r, 0);
         callSerially(c);
         flushEdt();
-        synchronized(lock) {
-            while(!c.isDone()) {
+        synchronized (lock) {
+            while (!c.isDone()) {
                 try {
                     // poll doneness to prevent potential race conditions
                     lock.wait(50);
-                } catch(InterruptedException err) {}
+                } catch (InterruptedException err) {
+                }
             }
         }
     }
-    
+
     /**
      * Checks if this platform uses input modes.  No current platforms return true for this.  It is a holdover from J2ME.
+     *
      * @return True if the platform supports input modes.  Only true for J2ME and RIM.
      */
     public boolean platformUsesInputMode() {
@@ -1062,23 +906,24 @@ public final class Display extends CN1Constants {
     /**
      * Identical to callSerially with the added benefit of waiting for the Runnable method to complete.
      *
-     * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     * @param r       runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+     *                the paint and key handling events
      * @param timeout timeout duration, on timeout the method just returns
      * @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-     * paint or event handling).
+     *                               paint or event handling).
      */
-    public void callSeriallyAndWait(Runnable r, int timeout){
+    public void callSeriallyAndWait(Runnable r, int timeout) {
         RunnableWrapper c = new RunnableWrapper(r, 0);
         callSerially(c);
-        synchronized(lock) {
+        synchronized (lock) {
             long t = System.currentTimeMillis();
-            while(!c.isDone()) {
+            while (!c.isDone()) {
                 try {
                     // poll doneness to prevent potential race conditions
                     lock.wait(20);
-                } catch(InterruptedException err) {}
-                if(System.currentTimeMillis() - t >= timeout) {
+                } catch (InterruptedException err) {
+                }
+                if (System.currentTimeMillis() - t >= timeout) {
                     return;
                 }
             }
@@ -1090,13 +935,13 @@ public final class Display extends CN1Constants {
      * by before continuing with our other tasks.
      */
     void flushEdt() {
-        if(!isEdt()){
+        if (!isEdt()) {
             return;
         }
-        while(!shouldEDTSleepNoFormAnimation()) {
+        while (!shouldEDTSleepNoFormAnimation()) {
             edtLoopImpl();
         }
-        while(animationQueue != null && animationQueue.size() > 0){
+        while (animationQueue != null && animationQueue.size() > 0) {
             edtLoopImpl();
         }
     }
@@ -1105,7 +950,7 @@ public final class Display extends CN1Constants {
      * Restores the menu in the given form
      */
     private void restoreMenu(Form f) {
-        if(f != null) {
+        if (f != null) {
             f.restoreMenu();
         }
     }
@@ -1113,7 +958,7 @@ public final class Display extends CN1Constants {
     /**
      * Returns true if the system is currently in the process of transitioning between
      * forms
-     * 
+     *
      * @return true if in the middle of form transition
      */
     public boolean isInTransition() {
@@ -1129,7 +974,7 @@ public final class Display extends CN1Constants {
         if (!ani.animate()) {
             animationQueue.remove(0);
             if (ani instanceof Transition) {
-                Form source = (Form) ((Transition)ani).getSource();
+                Form source = (Form) ((Transition) ani).getSource();
                 restoreMenu(source);
 
                 if (animationQueue.size() > 0) {
@@ -1137,8 +982,8 @@ public final class Display extends CN1Constants {
                     if (ani instanceof Transition) {
                         ((Transition) ani).initTransition();
                     }
-                }else{
-                    Form f = (Form) ((Transition)ani).getDestination();
+                } else {
+                    Form f = (Form) ((Transition) ani).getDestination();
                     restoreMenu(f);
                     if (source == null || source == impl.getCurrentForm() || source == getCurrent()) {
                         setCurrentForm(f);
@@ -1149,14 +994,14 @@ public final class Display extends CN1Constants {
             }
         }
         ani.paint(codenameOneGraphics);
-        
+
         impl.flushGraphics();
 
-        if(transitionDelay > 0) {
+        if (transitionDelay > 0) {
             // yield for a fraction, some devices don't "properly" implement
             // flush and so require the painting thread to get CPU too.
             try {
-                synchronized(lock){
+                synchronized (lock) {
                     lock.wait(transitionDelay);
                 }
             } catch (InterruptedException ex) {
@@ -1178,9 +1023,9 @@ public final class Display extends CN1Constants {
             // when there is no current form the EDT is useful only
             // for features such as call serially
             while (impl.getCurrentForm() == null) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
-                synchronized(lock){
-                    if(shouldEDTSleep()) {
-                        if(!pendingIdleSerialCalls.isEmpty()) {
+                synchronized (lock) {
+                    if (shouldEDTSleep()) {
+                        if (!pendingIdleSerialCalls.isEmpty()) {
                             Runnable r = pendingIdleSerialCalls.get(0);
                             pendingIdleSerialCalls.remove(0);
                             callSerially(r);
@@ -1191,21 +1036,21 @@ public final class Display extends CN1Constants {
 
                     // paint transition or intro animations and don't do anything else if such
                     // animations are in progress...
-                    if(animationQueue != null && animationQueue.size() > 0) {
+                    if (animationQueue != null && animationQueue.size() > 0) {
                         paintTransitionAnimation();
                         continue;
                     }
                 }
                 processSerialCalls();
             }
-        } catch(Throwable err) {
+        } catch (Throwable err) {
             Log.e(err);
-            if(crashReporter != null) {
+            if (crashReporter != null) {
                 crashReporter.exception(err);
             }
-            if(!impl.handleEDTException(err)) {
-                if(errorHandler != null) {
-                    errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
+            if (!impl.handleEDTException(err)) {
+                if (errorHandler != null) {
+                    errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
                 } else {
                     Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                 }
@@ -1216,33 +1061,33 @@ public final class Display extends CN1Constants {
             try {
                 // wait indefinetly Lock surrounds the should method to prevent serial calls from
                 // getting "lost"
-                 synchronized(lock){
-                    if(shouldEDTSleep()) {
-                         if(!pendingIdleSerialCalls.isEmpty()) {
+                synchronized (lock) {
+                    if (shouldEDTSleep()) {
+                        if (!pendingIdleSerialCalls.isEmpty()) {
                             Runnable r = pendingIdleSerialCalls.get(0);
                             pendingIdleSerialCalls.remove(0);
                             callSerially(r);
-                         } else {
+                        } else {
                             impl.edtIdle(true);
                             lock.wait();
                             impl.edtIdle(false);
-                         }
-                     }
-                 }
-                 
+                        }
+                    }
+                }
+
 
                 edtLoopImpl();
-            } catch(Throwable err) {
-                if(!codenameOneRunning) {
+            } catch (Throwable err) {
+                if (!codenameOneRunning) {
                     return;
                 }
                 Log.e(err);
-                if(crashReporter != null) {
+                if (crashReporter != null) {
                     CodenameOneThread.handleException(err);
                 }
-                if(!impl.handleEDTException(err)) {
-                    if(errorHandler != null) {
-                        errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
+                if (!impl.handleEDTException(err)) {
+                    if (errorHandler != null) {
+                        errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
                     } else {
                         Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                     }
@@ -1255,21 +1100,19 @@ public final class Display extends CN1Constants {
         INSTANCE.edt = null;
     }
 
-    long time;
-
     /**
      * Implementation of the event dispatch loop content
      */
     void edtLoopImpl() {
         try {
             // transitions shouldn't be bound by framerate
-            if(animationQueue == null || animationQueue.size() == 0) {
+            if (animationQueue == null || animationQueue.size() == 0) {
                 // prevents us from waking up the EDT too much and
                 // thus exhausting the systems resources. The + 1
                 // prevents us from ever waiting 0 milliseconds which
                 // is the same as waiting with no time limit
-                if(!noSleep){
-                    synchronized(lock){
+                if (!noSleep) {
+                    synchronized (lock) {
                         impl.edtIdle(true);
                         lock.wait(Math.max(1, framerateLock - (time)));
                         impl.edtIdle(false);
@@ -1281,23 +1124,23 @@ public final class Display extends CN1Constants {
                 paintTransitionAnimation();
                 return;
             }
-        } catch(Exception ignor) {
+        } catch (Exception ignor) {
             Log.e(ignor);
         }
         long currentTime = System.currentTimeMillis();
-        
+
         // minimal amount of sync, just flipping the stack pointers
-        synchronized(lock) {
+        synchronized (lock) {
             inputEventStackPointerTmp = inputEventStackPointer;
             inputEventStackPointer = 0;
             lastDragOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
 
-            // We have a special flag here for a case where the input event stack might still be processing this can 
+            // We have a special flag here for a case where the input event stack might still be processing this can
             // happen if an event callback calls something like invokeAndBlock while processing and might reach
             // this code again
-            if(qt[qt.length - 1] == Integer.MAX_VALUE) {
+            if (qt[qt.length - 1] == Integer.MAX_VALUE) {
                 inputEventStack = new int[qt.length];
             } else {
                 inputEventStack = qt;
@@ -1312,13 +1155,13 @@ public final class Display extends CN1Constants {
         int[] actualStack = inputEventStackTmp;
         int offset = 0;
         actualStack[actualStack.length - 1] = Integer.MAX_VALUE;
-        while(offset < actualTmpPointer) {            
+        while (offset < actualTmpPointer) {
             offset = handleEvent(offset, actualStack);
         }
-        
+
         actualStack[actualStack.length - 1] = 0;
 
-    if(!impl.isInitialized()){
+        if (!impl.isInitialized()) {
             return;
         }
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
@@ -1331,26 +1174,26 @@ public final class Display extends CN1Constants {
         impl.paintDirty();
 
         // draw the animations
-        
-        if(current != null){
+
+        if (current != null) {
             current.repaintAnimations();
             // check key repeat events
             long t = System.currentTimeMillis();
-            if(keyRepeatCharged && nextKeyRepeatEvent <= t) {
+            if (keyRepeatCharged && nextKeyRepeatEvent <= t) {
                 current.keyRepeated(keyRepeatValue);
                 nextKeyRepeatEvent = t + keyRepeatNextIntervalTime;
             }
-            if(longPressCharged && longPressInterval <= t - longKeyPressTime) {
+            if (longPressCharged && longPressInterval <= t - longKeyPressTime) {
                 longPressCharged = false;
                 current.longKeyPress(keyRepeatValue);
             }
-            if(longPointerCharged && longPressInterval <= t - longKeyPressTime) {
+            if (longPointerCharged && longPressInterval <= t - longKeyPressTime) {
                 longPointerCharged = false;
                 current.longPointerPress(pointerX, pointerY);
             }
         }
         processSerialCalls();
-        
+
         time = System.currentTimeMillis() - currentTime;
     }
 
@@ -1362,11 +1205,11 @@ public final class Display extends CN1Constants {
      * Called by the underlying implementation to indicate that editing in the native
      * system has completed and changes should propagate into Codename One
      *
-     * @param c edited component
+     * @param c    edited component
      * @param text new text for the component
      */
     public void onEditingComplete(final Component c, final String text) {
-        if(!isEdt() && codenameOneRunning) {
+        if (!isEdt() && codenameOneRunning) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     onEditingComplete(c, text);
@@ -1377,17 +1220,16 @@ public final class Display extends CN1Constants {
         c.onEditComplete(text);
         c.fireActionEvent();
     }
-    
-    private final LinkedList<Runnable> runningSerialCallsQueue = new LinkedList<Runnable>();
+
     /**
      * Used by the EDT to process all the calls submitted via call serially
      */
     void processSerialCalls() {
         processingSerialCalls = true;
         int size = pendingSerialCalls.size();
-        if(size > 0) {
+        if (size > 0) {
             //Runnable[] array = null;
-            synchronized(lock) {
+            synchronized (lock) {
                 size = pendingSerialCalls.size();
                 //array = new Runnable[size];
 
@@ -1396,12 +1238,12 @@ public final class Display extends CN1Constants {
                 //pendingSerialCalls.toArray(array);
                 runningSerialCallsQueue.addAll(pendingSerialCalls);
 
-                if(size == pendingSerialCalls.size()) {
+                if (size == pendingSerialCalls.size()) {
                     // this is faster
                     pendingSerialCalls.clear();
                 } else {
                     // this can occur if an element was added during the loop
-                    for(int iter = 0 ; iter < size ; iter++) {
+                    for (int iter = 0; iter < size; iter++) {
                         pendingSerialCalls.remove(0);
                     }
                 }
@@ -1412,14 +1254,14 @@ public final class Display extends CN1Constants {
 
             // after finishing an event cycle there might be serial calls waiting
             // to return.
-            synchronized(lock){
+            synchronized (lock) {
                 lock.notify();
             }
         }
         processingSerialCalls = false;
     }
-    
-    // Executes a Runnable from a pending serial call. We wrap it in its 
+
+    // Executes a Runnable from a pending serial call. We wrap it in its
     // own function so we can use the Async.Execute annotation for debugging.
     // https://www.jetbrains.com/help/idea/debug-asynchronous-code.html
     private void executeSerialCall(@Async.Execute Runnable r) {
@@ -1430,21 +1272,20 @@ public final class Display extends CN1Constants {
         return processingSerialCalls;
     }
 
-    void notifyDisplay(){
+    void notifyDisplay() {
         synchronized (lock) {
             lock.notify();
         }
     }
 
-    
     /**
      * Invokes a Runnable with blocking disabled.  If any attempt is made to block
      * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
      * it will result in a {@link BlockingDisallowedException} being thrown.
+     *
      * @param r Runnable to be run immediately.
      * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
-     * anywhere in the Runnable.
-     * 
+     *                                     anywhere in the Runnable.
      * @since 7.0
      */
     public void invokeWithoutBlocking(Runnable r) {
@@ -1459,15 +1300,15 @@ public final class Display extends CN1Constants {
             }
         }
     }
-    
+
     /**
      * Invokes a RunnableWithResultSync with blocking disabled.  If any attempt is made to block
      * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
      * it will result in a {@link BlockingDisallowedException} being thrown.
+     *
      * @param r RunnableWithResultSync to be run immediately.
      * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
-     * anywhere in the Runnable.
-     * 
+     *                                     anywhere in the Runnable.
      * @since 7.0
      */
     public <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
@@ -1482,25 +1323,24 @@ public final class Display extends CN1Constants {
             }
         }
     }
-    
+
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
      * EDT it will still be blocked in a way that doesn't break event dispatch .
      * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
      * See <a href="https://www.codenameone.com/manual/edt.html#_invoke_and_block">
      * this section</a> in the developer guide for further information.
-     * 
-     * @param r runnable (NOT A THREAD!) that will be invoked synchronously by this method
+     *
+     * @param r          runnable (NOT A THREAD!) that will be invoked synchronously by this method
      * @param dropEvents indicates if the display should drop all events
-     * while this runnable is running
-     * 
+     *                   while this runnable is running
      * @throws BlockingDisallowedException if this method is called while blocking is disabled (i.e. we are running
-     * inside a call to {@link #invokeWithoutBlocking(java.lang.Runnable) } on the EDT).
+     *                                     inside a call to {@link #invokeWithoutBlocking(java.lang.Runnable) } on the EDT).
      */
-    public void invokeAndBlock(Runnable r, boolean dropEvents){
+    public void invokeAndBlock(Runnable r, boolean dropEvents) {
         this.dropEvents = dropEvents;
         try {
-            if(isEdt()) {
+            if (isEdt()) {
                 if (disableInvokeAndBlock) {
                     throw new BlockingDisallowedException();
                 }
@@ -1509,9 +1349,9 @@ public final class Display extends CN1Constants {
                 RunnableWrapper w = new RunnableWrapper(r, 1);
                 RunnableWrapper.pushToThreadPool(w);
 
-                synchronized(lock) {
+                synchronized (lock) {
                     // prevent an invoke and block loop from breaking the ongoing event processing
-                    if(inputEventStackPointerTmp > 0) {
+                    if (inputEventStackPointerTmp > 0) {
                         inputEventStackPointerTmp = inputEventStackPointer;
                     }
                     try {
@@ -1526,38 +1366,37 @@ public final class Display extends CN1Constants {
                         pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
                     }
                 }
-                
 
 
                 // loop over the EDT until the thread completes then return
-                while(!w.isDone() && codenameOneRunning) {
-                     edtLoopImpl();
-                     synchronized(lock){
-                         if(shouldEDTSleep()) {
-                             impl.edtIdle(true);
-                             try {
+                while (!w.isDone() && codenameOneRunning) {
+                    edtLoopImpl();
+                    synchronized (lock) {
+                        if (shouldEDTSleep()) {
+                            impl.edtIdle(true);
+                            try {
                                 lock.wait(10);
-                             } catch (InterruptedException ex) {
-                             }
-                             impl.edtIdle(false);
-                         }
-                     }
+                            } catch (InterruptedException ex) {
+                            }
+                            impl.edtIdle(false);
+                        }
+                    }
                 }
                 // if the thread thew an exception we need to throw it onwards
-                if(w.getErr() != null) {
+                if (w.getErr() != null) {
                     throw w.getErr();
                 }
             } else {
                 r.run();
             }
-        } catch(RuntimeException re) {
+        } catch (RuntimeException re) {
             if (!(re instanceof BlockingDisallowedException)) {
                 Log.e(re);
             }
             throw re;
         } finally {
             this.dropEvents = false;
-        } 
+        }
     }
 
     /**
@@ -1569,7 +1408,7 @@ public final class Display extends CN1Constants {
      *
      * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
      */
-    public void invokeAndBlock(Runnable r){
+    public void invokeAndBlock(Runnable r) {
         invokeAndBlock(r, false);
     }
 
@@ -1593,12 +1432,13 @@ public final class Display extends CN1Constants {
     public void setTouchScreenDevice(boolean touchScreen) {
         this.touchScreen = touchScreen;
     }
+
     /**
      * Calling this method with noSleep=true will cause the edt to run without sleeping.
      *
      * @param noSleep causes the edt to stop the sleeping periods between 2 cycles
      */
-    public void setNoSleep(boolean noSleep){
+    public void setNoSleep(boolean noSleep) {
         this.noSleep = noSleep;
     }
 
@@ -1607,26 +1447,26 @@ public final class Display extends CN1Constants {
      *
      * @param newForm the Form to Display
      */
-    void setCurrent(final Form newForm, boolean reverse){
-        if(edt == null) {
+    void setCurrent(final Form newForm, boolean reverse) {
+        if (edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
         Form current = impl.getCurrentForm();
-        
-        
-        if(autoFoldVKBOnFormSwitch && !(newForm instanceof Dialog)) {
+
+
+        if (autoFoldVKBOnFormSwitch && !(newForm instanceof Dialog)) {
             setShowVirtualKeyboard(false);
         }
 
-        if(current == newForm){
+        if (current == newForm) {
             current.revalidate();
             current.repaint();
             current.onShowCompletedImpl();
             return;
         }
-        
-        if(impl.isEditingText()) {
-            switch(showDuringEdit) {
+
+        if (impl.isEditingText()) {
+            switch (showDuringEdit) {
                 case SHOW_DURING_EDIT_ALLOW_DISCARD:
                     break;
                 case SHOW_DURING_EDIT_ALLOW_SAVE:
@@ -1642,28 +1482,28 @@ public final class Display extends CN1Constants {
             }
         }
 
-        if(!isEdt()) {
+        if (!isEdt()) {
             callSerially(new RunnableWrapper(newForm, null, reverse));
             return;
         }
 
-        if(current != null){
-            if(current.isInitialized()) {
+        if (current != null) {
+            if (current.isInitialized()) {
                 current.deinitializeImpl();
             } else {
                 Form fg = getCurrentUpcoming();
-                if(fg != current) {
-                    if(fg.isInitialized()) {
+                if (fg != current) {
+                    if (fg.isInitialized()) {
                         fg.deinitializeImpl();
                     }
                 }
             }
         }
-        if(!newForm.isInitialized()) {
+        if (!newForm.isInitialized()) {
             newForm.initComponentImpl();
         }
 
-        if(newForm.getWidth() != getDisplayWidth() || newForm.getHeight() != getDisplayHeight()) {
+        if (newForm.getWidth() != getDisplayWidth() || newForm.getHeight() != getDisplayHeight()) {
             newForm.setSize(new Dimension(getDisplayWidth(), getDisplayHeight()));
             newForm.setShouldCalcPreferredSize(true);
             newForm.layoutContainer();
@@ -1672,62 +1512,62 @@ public final class Display extends CN1Constants {
             // if shouldLayout is true
             newForm.layoutContainer();
             newForm.revalidate();
-            
+
         }
 
         boolean transitionExists = false;
-        if(animationQueue != null && animationQueue.size() > 0) {
+        if (animationQueue != null && animationQueue.size() > 0) {
             Object o = animationQueue.get(animationQueue.size() - 1);
-            if(o instanceof Transition) {
-                current = (Form)((Transition)o).getDestination();
+            if (o instanceof Transition) {
+                current = (Form) ((Transition) o).getDestination();
                 impl.setCurrentForm(current);
             }
         }
 
-        if(current != null) {
+        if (current != null) {
             // make sure the fold menu occurs as expected then set the current
             // to the correct parent!
-            if(current instanceof Dialog && ((Dialog)current).isMenu()) {
+            if (current instanceof Dialog && ((Dialog) current).isMenu()) {
                 Transition t = current.getTransitionOutAnimator();
-                if(t != null) {
+                if (t != null) {
                     // go back to the parent form first
-                    if(((Dialog)current).getPreviousForm() != null) {
-                        initTransition(t.copy(false), current, ((Dialog)current).getPreviousForm());
+                    if (((Dialog) current).getPreviousForm() != null) {
+                        initTransition(t.copy(false), current, ((Dialog) current).getPreviousForm());
                     }
                 }
-                current = ((Dialog)current).getPreviousForm();
+                current = ((Dialog) current).getPreviousForm();
                 impl.setCurrentForm(current);
             }
 
             // prevent the transition from occurring from a form into itself
-            if(newForm != current) {
-                if((current != null && current.getTransitionOutAnimator() != null) || newForm.getTransitionInAnimator() != null) {
-                    if(animationQueue == null) {
+            if (newForm != current) {
+                if ((current != null && current.getTransitionOutAnimator() != null) || newForm.getTransitionInAnimator() != null) {
+                    if (animationQueue == null) {
                         animationQueue = new ArrayList<Animation>();
                     }
                     // prevent form transitions from breaking our dialog based
                     // transitions which are a bit sensitive
-                    if(current != null && (!(newForm instanceof Dialog))) {
+                    if (current != null && (!(newForm instanceof Dialog))) {
                         Transition t = current.getTransitionOutAnimator();
-                        if(current != null && t != null) {
+                        if (current != null && t != null) {
                             transitionExists = initTransition(t.copy(reverse), current, newForm);
                         }
                     }
-                    if(current != null && !(current instanceof Dialog)) {
+                    if (current != null && !(current instanceof Dialog)) {
                         Transition t = newForm.getTransitionInAnimator();
-                        if(t != null) {
+                        if (t != null) {
                             transitionExists = initTransition(t.copy(reverse), current, newForm);
                         }
                     }
                 }
             }
         }
-        synchronized(lock) {
+        synchronized (lock) {
             lock.notify();
         }
 
-        if(!transitionExists) {
-            if(animationQueue == null || animationQueue.size() == 0) {
+        if (!transitionExists) {
+            if (animationQueue == null || animationQueue.size() == 0) {
                 setCurrentForm(newForm);
             } else {
                 // we need to add an empty transition to "serialize" this
@@ -1742,16 +1582,16 @@ public final class Display extends CN1Constants {
      * Initialize the transition and add it to the queue
      */
     private boolean initTransition(Transition transition, Form source, Form dest) {
-         try {
+        try {
             dest.setVisible(true);
             transition.init(source, dest);
-            if(source != null) {
+            if (source != null) {
                 source.setLightweightMode(true);
             }
-            if(dest != null) {
+            if (dest != null) {
                 dest.setLightweightMode(true);
             }
-            
+
             // if a native transition implementation exists then substitute it into place
             transition = impl.getNativeTransition(transition);
             animationQueue.add(transition);
@@ -1768,10 +1608,10 @@ public final class Display extends CN1Constants {
         return true;
     }
 
-    void setCurrentForm(Form newForm){
+    void setCurrentForm(Form newForm) {
         boolean forceShow = false;
         Form current = impl.getCurrentForm();
-        if(current != null){
+        if (current != null) {
             current.setVisible(false);
         } else {
             forceShow = true;
@@ -1782,14 +1622,14 @@ public final class Display extends CN1Constants {
         current = newForm;
         impl.setCurrentForm(current);
         current.setVisible(true);
-        if(forceShow || !allowMinimizing || inNativeUI) {
+        if (forceShow || !allowMinimizing || inNativeUI) {
             impl.confirmControlView();
         }
         int w = current.getWidth();
         int h = current.getHeight();
-        if(isEdt() && ( w != impl.getDisplayWidth() || h != impl.getDisplayHeight())){
-           current.sizeChangedInternal(impl.getDisplayWidth(), impl.getDisplayHeight());
-        }else{
+        if (isEdt() && (w != impl.getDisplayWidth() || h != impl.getDisplayHeight())) {
+            current.sizeChangedInternal(impl.getDisplayWidth(), impl.getDisplayHeight());
+        } else {
             repaint(current);
         }
         lastKeyPressed = 0;
@@ -1811,28 +1651,28 @@ public final class Display extends CN1Constants {
     }
 
     /**
-     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead 
+     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead
      * use an API like {@link com.codename1.ui.TextArea#startEditingAsync()}, {@link com.codename1.ui.TextArea#startEditing()}
      * or {@link com.codename1.ui.Form#setEditOnShow(com.codename1.ui.TextArea)}.
      *
-     * @param cmp the {@link TextArea} component
-     * @param maxSize the maximum size from the text area
+     * @param cmp        the {@link TextArea} component
+     * @param maxSize    the maximum size from the text area
      * @param constraint the constraints of the text area
-     * @param text the string to edit
+     * @param text       the string to edit
      */
     public void editString(Component cmp, int maxSize, int constraint, String text) {
         editString(cmp, maxSize, constraint, text, 0);
     }
 
     /**
-     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead 
+     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead
      * use an API like {@link com.codename1.ui.TextArea#startEditingAsync()}, {@link com.codename1.ui.TextArea#startEditing()}
      * or {@link com.codename1.ui.Form#setEditOnShow(com.codename1.ui.TextArea)}.
      *
-     * @param cmp the {@link TextArea} component
-     * @param maxSize the maximum size from the text area
-     * @param constraint the constraints of the text area
-     * @param text the string to edit
+     * @param cmp               the {@link TextArea} component
+     * @param maxSize           the maximum size from the text area
+     * @param constraint        the constraints of the text area
+     * @param text              the string to edit
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
@@ -1841,13 +1681,13 @@ public final class Display extends CN1Constants {
         }
         cmp.requestFocus();
         if (cmp instanceof TextArea) {
-            ((TextArea)cmp).setSuppressActionEvent(false);
+            ((TextArea) cmp).setSuppressActionEvent(false);
         }
         Form f = cmp.getComponentForm();
-        
-        // this can happen in the spinner in the simulator where the key press should in theory start native 
-        // edit 
-        if(f == null) {
+
+        // this can happen in the spinner in the simulator where the key press should in theory start native
+        // edit
+        if (f == null) {
             return;
         }
         Component.setDisableSmoothScrolling(true);
@@ -1859,26 +1699,28 @@ public final class Display extends CN1Constants {
         previousKeyPressed = 0;
         impl.editStringImpl(cmp, maxSize, constraint, text, initiatingKeycode);
     }
-    
+
     /**
      * Allows us to stop editString on the given text component
+     *
      * @param cmp the text field/text area component
      */
     public void stopEditing(Component cmp) {
-        if(isTextEditing(cmp)) {
+        if (isTextEditing(cmp)) {
             impl.stopTextEditing();
         }
     }
-    
+
     /**
      * Allows us to stop editString on the given text component or Form.
      * If {@literal cmp} is a {@link Form}, it will stop editing in any active
      * component on the form, and close the keyboard if it is opened.
-     * @param cmp the text field/text area component
+     *
+     * @param cmp      the text field/text area component
      * @param onFinish invoked when editing stopped
      */
     public void stopEditing(Component cmp, Runnable onFinish) {
-        if(isTextEditing(cmp)) {
+        if (isTextEditing(cmp)) {
             impl.stopTextEditing(onFinish);
         } else {
             if (onFinish != null) {
@@ -1891,10 +1733,10 @@ public final class Display extends CN1Constants {
         if (c instanceof Form && c == getCurrent()) {
             return impl.isEditingText();
         }
-            
+
         return impl.isEditingText(c);
     }
-    
+
     boolean isNativeEditorVisible(Component c) {
         return impl.isNativeEditorVisible(c);
     }
@@ -1925,11 +1767,8 @@ public final class Display extends CN1Constants {
         getImplementation().restoreMinimizedApplication();
     }
 
-    private int previousKeyPressed;
-    private int lastKeyPressed;
-
     private void addSingleArgumentEvent(int type, int code) {
-        synchronized(lock) {
+        synchronized (lock) {
             if (this.dropEvents) {
                 return;
             }
@@ -1938,65 +1777,71 @@ public final class Display extends CN1Constants {
             inputEventStack[inputEventStackPointer] = code;
             inputEventStackPointer++;
             lock.notify();
-        }        
+        }
     }
-    
+
     /**
      * Checks if the control key is currently down.  Only relevant for desktop ports.
-     * @return 
+     *
+     * @return
      */
     public boolean isControlKeyDown() {
         return impl.isControlKeyDown();
     }
-    
+
     /**
      * Checks if the meta key is currently down.  Only relevant for desktop ports.
-     * @return 
+     *
+     * @return
      */
     public boolean isMetaKeyDown() {
         return impl.isMetaKeyDown();
     }
-    
+
     /**
      * Checks if the alt key is currently down.  Only relevant for desktop ports.
-     * @return 
+     *
+     * @return
      */
     public boolean isAltKeyDown() {
         return impl.isAltKeyDown();
     }
-    
+
     /**
      * Checks if the altgraph key is currently down.  Only relevant for desktop ports.
-     * @return 
+     *
+     * @return
      */
     public boolean isAltGraphKeyDown() {
         return impl.isAltGraphKeyDown();
     }
-    
+
     /**
      * Checks if the last mouse press was a right click.
+     *
      * @return True if the last mouse press was a right click.
      * @since 7.0
      */
     public boolean isRightMouseButtonDown() {
         return impl.isRightMouseButtonDown();
     }
-    
+
     /**
      * Checks if shift key is currently down.  Only relevant for desktop ports.
-     * @return 
+     *
+     * @return
      */
     public boolean isShiftKeyDown() {
         return impl.isShiftKeyDown();
     }
-    
+
     /**
      * Pushes a key press event with the given keycode into Codename One
      *
      * @param keyCode keycode of the key event
      */
-    public void keyPressed(final int keyCode){
-        if(impl.getCurrentForm() == null){
+    public void keyPressed(final int keyCode) {
+        if (impl.getCurrentForm() == null) {
             return;
         }
         addSingleArgumentEvent(KEY_PRESSED, keyCode);
@@ -2019,13 +1864,13 @@ public final class Display extends CN1Constants {
      *
      * @param keyCode keycode of the key event
      */
-    public void keyReleased(final int keyCode){
+    public void keyReleased(final int keyCode) {
         keyRepeatCharged = false;
         longPressCharged = false;
-        if(impl.getCurrentForm() == null){
+        if (impl.getCurrentForm() == null) {
             return;
         }
-        if(!multiKeyMode) {
+        if (!multiKeyMode) {
             // this can happen when traversing from the native form to the current form
             // caused by a keypress
             // We need the previous key press for Codename One issue 108 which can occur when typing into
@@ -2033,8 +1878,8 @@ public final class Display extends CN1Constants {
             // here specifically to the native edit but that patch doesn't work properly for
             // all native phone bugs (e.g. incoming phone call rejected and the key release is
             // sent to the java application).
-            if(keyCode != lastKeyPressed) {
-                if(keyCode != previousKeyPressed) {
+            if (keyCode != lastKeyPressed) {
+                if (keyCode != previousKeyPressed) {
                     return;
                 } else {
                     previousKeyPressed = 0;
@@ -2046,11 +1891,11 @@ public final class Display extends CN1Constants {
         addSingleArgumentEvent(KEY_RELEASED, keyCode);
     }
 
-    void keyRepeatedInternal(final int keyCode){
+    void keyRepeatedInternal(final int keyCode) {
     }
 
     private void addPointerEvent(int type, int x, int y) {
-        synchronized(lock) {
+        synchronized (lock) {
             if (this.dropEvents) {
                 return;
             }
@@ -2061,11 +1906,11 @@ public final class Display extends CN1Constants {
             inputEventStack[inputEventStackPointer] = y;
             inputEventStackPointer++;
             lock.notify();
-        }        
+        }
     }
-    
+
     private void addPointerEvent(int type, int[] x, int[] y) {
-        synchronized(lock) {
+        synchronized (lock) {
             if (this.dropEvents) {
                 return;
             }
@@ -2073,31 +1918,30 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = x.length;
             inputEventStackPointer++;
-            for(int iter = 0 ; iter < x.length ; iter++) {
+            for (int iter = 0; iter < x.length; iter++) {
                 inputEventStack[inputEventStackPointer] = x[iter];
                 inputEventStackPointer++;
             }
             inputEventStack[inputEventStackPointer] = y.length;
             inputEventStackPointer++;
-            for(int iter = 0 ; iter < y.length ; iter++) {
+            for (int iter = 0; iter < y.length; iter++) {
                 inputEventStack[inputEventStackPointer] = y[iter];
                 inputEventStackPointer++;
             }
             lock.notify();
-        }        
+        }
     }
-    
-    private int lastDragOffset;
+
     private void addPointerDragEventWithTimestamp(int x, int y) {
-        synchronized(lock) {
+        synchronized (lock) {
             if (this.dropEvents) {
                 return;
             }
             try {
-                if(lastDragOffset > -1) {
+                if (lastDragOffset > -1) {
                     inputEventStack[lastDragOffset] = x;
                     inputEventStack[lastDragOffset + 1] = y;
-                    inputEventStack[lastDragOffset + 2] = (int)(System.currentTimeMillis() - displayInitTime);
+                    inputEventStack[lastDragOffset + 2] = (int) (System.currentTimeMillis() - displayInitTime);
                 } else {
                     inputEventStack[inputEventStackPointer] = POINTER_DRAGGED;
                     inputEventStackPointer++;
@@ -2106,20 +1950,19 @@ public final class Display extends CN1Constants {
                     inputEventStackPointer++;
                     inputEventStack[inputEventStackPointer] = y;
                     inputEventStackPointer++;
-                    inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+                    inputEventStack[inputEventStackPointer] = (int) (System.currentTimeMillis() - displayInitTime);
                     inputEventStackPointer++;
                 }
-            } catch(ArrayIndexOutOfBoundsException err) {
+            } catch (ArrayIndexOutOfBoundsException err) {
                 Log.p("EDT performance is very slow triggering this exception!");
                 Log.e(err);
             }
             lock.notify();
-        }        
+        }
     }
-    
 
     private void addPointerEventWithTimestamp(int type, int x, int y) {
-        synchronized(lock) {
+        synchronized (lock) {
             if (this.dropEvents) {
                 return;
             }
@@ -2130,14 +1973,14 @@ public final class Display extends CN1Constants {
                 inputEventStackPointer++;
                 inputEventStack[inputEventStackPointer] = y;
                 inputEventStackPointer++;
-                inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+                inputEventStack[inputEventStackPointer] = (int) (System.currentTimeMillis() - displayInitTime);
                 inputEventStackPointer++;
-            } catch(ArrayIndexOutOfBoundsException err) {
+            } catch (ArrayIndexOutOfBoundsException err) {
                 Log.p("EDT performance is very slow triggering this exception!");
                 Log.e(err);
             }
             lock.notify();
-        }        
+        }
     }
 
     /**
@@ -2146,12 +1989,12 @@ public final class Display extends CN1Constants {
      * @param x the x position of the pointer
      * @param y the y position of the pointer
      */
-    public void pointerDragged(final int[] x, final int[] y){
-        if(impl.getCurrentForm() == null){
+    public void pointerDragged(final int[] x, final int[] y) {
+        if (impl.getCurrentForm() == null) {
             return;
         }
         longPointerCharged = false;
-        if(x.length == 1) {
+        if (x.length == 1) {
             addPointerDragEventWithTimestamp(x[0], y[0]);
         } else {
             addPointerEvent(POINTER_DRAGGED_MULTI, x, y);
@@ -2164,17 +2007,16 @@ public final class Display extends CN1Constants {
      * @param x the x position of the pointer
      * @param y the y position of the pointer
      */
-    public void pointerHover(final int[] x, final int[] y){
-        if(impl.getCurrentForm() == null){
+    public void pointerHover(final int[] x, final int[] y) {
+        if (impl.getCurrentForm() == null) {
             return;
         }
-        if(x.length == 1) {
+        if (x.length == 1) {
             addPointerEventWithTimestamp(POINTER_HOVER, x[0], y[0]);
         } else {
             addPointerEvent(POINTER_HOVER, x, y);
         }
     }
-
 
     /**
      * Pushes a pointer hover release event with the given coordinates into Codename One
@@ -2182,8 +2024,8 @@ public final class Display extends CN1Constants {
      * @param x the x position of the pointer
      * @param y the y position of the pointer
      */
-    public void pointerHoverPressed(final int[] x, final int[] y){
-        if(impl.getCurrentForm() == null){
+    public void pointerHoverPressed(final int[] x, final int[] y) {
+        if (impl.getCurrentForm() == null) {
             return;
         }
         addPointerEvent(POINTER_HOVER_PRESSED, x[0], y[0]);
@@ -2195,8 +2037,8 @@ public final class Display extends CN1Constants {
      * @param x the x position of the pointer
      * @param y the y position of the pointer
      */
-    public void pointerHoverReleased(final int[] x, final int[] y){
-        if(impl.getCurrentForm() == null){
+    public void pointerHoverReleased(final int[] x, final int[] y) {
+        if (impl.getCurrentForm() == null) {
             return;
         }
         addPointerEvent(POINTER_HOVER_RELEASED, x[0], y[0]);
@@ -2208,8 +2050,8 @@ public final class Display extends CN1Constants {
      * @param x the x position of the pointer
      * @param y the y position of the pointer
      */
-    public void pointerPressed(final int[] x,final int[] y){
-        if(impl.getCurrentForm() == null){
+    public void pointerPressed(final int[] x, final int[] y) {
+        if (impl.getCurrentForm() == null) {
             return;
         }
 
@@ -2218,7 +2060,7 @@ public final class Display extends CN1Constants {
         longKeyPressTime = System.currentTimeMillis();
         pointerX = x[0];
         pointerY = y[0];
-        if(x.length == 1) {
+        if (x.length == 1) {
             addPointerEvent(POINTER_PRESSED, x[0], y[0]);
         } else {
             addPointerEvent(POINTER_PRESSED_MULTI, x, y);
@@ -2231,12 +2073,12 @@ public final class Display extends CN1Constants {
      * @param x the x position of the pointer
      * @param y the y position of the pointer
      */
-    public void pointerReleased(final int[] x, final int[] y){
+    public void pointerReleased(final int[] x, final int[] y) {
         longPointerCharged = false;
-        if(impl.getCurrentForm() == null){
+        if (impl.getCurrentForm() == null) {
             return;
         }
-        if(x.length == 1) {
+        if (x.length == 1) {
             addPointerEvent(POINTER_RELEASED, x[0], y[0]);
         } else {
             addPointerEvent(POINTER_RELEASED_MULTI, x, y);
@@ -2244,7 +2086,7 @@ public final class Display extends CN1Constants {
     }
 
     private void addSizeChangeEvent(int type, int w, int h) {
-        synchronized(lock) {
+        synchronized (lock) {
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = w;
@@ -2252,11 +2094,9 @@ public final class Display extends CN1Constants {
             inputEventStack[inputEventStackPointer] = h;
             inputEventStackPointer++;
             lock.notify();
-        }        
+        }
     }
-    
-    private Rectangle tmpRect = new Rectangle();
-    
+
     /**
      * Notifies Codename One of display size changes, this method is invoked by the implementation
      * class and is for internal use
@@ -2264,35 +2104,35 @@ public final class Display extends CN1Constants {
      * @param w the width of the drawing surface
      * @param h the height of the drawing surface
      */
-    public void sizeChanged(int w, int h){
+    public void sizeChanged(int w, int h) {
         Form current = impl.getCurrentForm();
-        if(current == null) {
+        if (current == null) {
             return;
         }
-        if(w == current.getWidth() && h == current.getHeight()) {
-        // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
-            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
-                return;            
+        if (w == current.getWidth() && h == current.getHeight()) {
+            // a workaround for a race condition on pixel 2 where size change events can happen really quickly
+            if (lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == w + h) {
+                return;
             }
         }
-        
+
         lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
 
     private void addNotifyEvent(int type) {
-        synchronized(lock) {
+        synchronized (lock) {
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             lock.notify();
-        }        
+        }
     }
 
     /**
      * Broadcasts hide notify into Codename One, this method is invoked by the Codename One implementation
      * to notify Codename One of hideNotify events
      */
-    public void hideNotify(){
+    public void hideNotify() {
         keyRepeatCharged = false;
         longPressCharged = false;
         longPointerCharged = false;
@@ -2304,10 +2144,9 @@ public final class Display extends CN1Constants {
      * Broadcasts show notify into Codename One, this method is invoked by the Codename One implementation
      * to notify Codename One of showNotify events
      */
-    public void showNotify(){
+    public void showNotify() {
         addNotifyEvent(SHOW_NOTIFY);
     }
-
 
     /**
      * Used by the flush functionality which doesn't care much about component
@@ -2315,7 +2154,7 @@ public final class Display extends CN1Constants {
      */
     boolean shouldEDTSleepNoFormAnimation() {
         boolean b;
-        synchronized(lock){
+        synchronized (lock) {
             b = inputEventStackPointer == 0 &&
                     hasNoSerialCallsPending() &&
                     (!keyRepeatCharged || !longPressCharged);
@@ -2324,38 +2163,33 @@ public final class Display extends CN1Constants {
     }
 
     private void updateDragSpeedStatus(int x, int y, int timestamp) {
-            //save dragging input to calculate the dragging speed later
-            dragPathX[dragPathOffset] = x;
-            dragPathY[dragPathOffset] = y;
-            dragPathTime[dragPathOffset] = displayInitTime + (long) timestamp;
-            if (dragPathLength < PATHLENGTH) {
-                dragPathLength++;
-            }
-            dragPathOffset++;
-            if (dragPathOffset >= PATHLENGTH) {
-                dragPathOffset = 0;
-            }
+        //save dragging input to calculate the dragging speed later
+        dragPathX[dragPathOffset] = x;
+        dragPathY[dragPathOffset] = y;
+        dragPathTime[dragPathOffset] = displayInitTime + (long) timestamp;
+        if (dragPathLength < PATHLENGTH) {
+            dragPathLength++;
+        }
+        dragPathOffset++;
+        if (dragPathOffset >= PATHLENGTH) {
+            dragPathOffset = 0;
+        }
     }
 
-    private Form eventForm;
-    
     boolean isRecursivePointerRelease() {
         return recursivePointerReleaseB;
     }
-    
+
     private int[] readArrayStackArgument(int offset) {
         int[] a = new int[inputEventStackTmp[offset]];
         offset++;
         int alen = a.length;
-        for(int iter = 0 ; iter < alen ; iter++) {
+        for (int iter = 0; iter < alen; iter++) {
             a[iter] = inputEventStackTmp[offset + iter];
         }
         return a;
     }
-    
-    private static final int[] xArray1 = new int[1];
-    private static final int[] yArray1 = new int[1];
-    
+
     /**
      * Invoked on the EDT to propagate the event
      */
@@ -2363,178 +2197,178 @@ public final class Display extends CN1Constants {
         Form f = getCurrentUpcomingForm(true);
 
         // might happen when returning from a deinitialized version of Codename One
-        if(f == null) {
+        if (f == null) {
             return offset;
         }
 
         // no need to synchronize since we are reading only and modifying the stack frame offset
-        int type = inputEventStackTmp[offset]; 
+        int type = inputEventStackTmp[offset];
         offset++;
-        
-        switch(type) {
-        case KEY_PRESSED:
-            f.keyPressed(inputEventStackTmp[offset]);
-            offset++;
-            eventForm = f;
-            break;
-        case KEY_RELEASED:
-            // pointer release can cycle into invoke and block which will cause this method 
-            // to recurse if a pointer will be released while we are in an invoke and block state
-            // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-            Form xf = eventForm;
-            eventForm = null;
 
-            //make sure the released event is sent to the same Form who got a
-            //pressed event
-            if(xf == f || multiKeyMode){
-                f.keyReleased(inputEventStackTmp[offset]);                
+        switch (type) {
+            case KEY_PRESSED:
+                f.keyPressed(inputEventStackTmp[offset]);
                 offset++;
-            }
-            break;
-        case POINTER_PRESSED:
-            if(recursivePointerReleaseA) {
-                recursivePointerReleaseB = true;
-            } 
-            dragOccured = false;
-            dragPathLength = 0;
-            pointerPressedAndNotReleasedOrDragged = true;
-            xArray1[0] = inputEventStackTmp[offset];
-            offset++;
-            yArray1[0] = inputEventStackTmp[offset];
-            offset++;
-            f.pointerPressed(xArray1, yArray1);
-            eventForm = f;
-            break;
-        case POINTER_PRESSED_MULTI: {
-            if(recursivePointerReleaseA) {
-                recursivePointerReleaseB = true;
-            } 
-            dragOccured = false;
-            dragPathLength = 0;
-            pointerPressedAndNotReleasedOrDragged = true;
-            int[] array1 = readArrayStackArgument(offset);
-            offset += array1.length + 1;
-            int[] array2 = readArrayStackArgument(offset);
-            offset += array2.length + 1;
-            f.pointerPressed(array1, array2);
-            eventForm = f;
-            break;
-        }
-        case POINTER_RELEASED:
-            recursivePointerReleaseA = true;            
-            pointerPressedAndNotReleasedOrDragged = false;
-            
-            // pointer release can cycle into invoke and block which will cause this method 
-            // to recurse if a pointer will be released while we are in an invoke and block state
-            // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-            Form x = eventForm;
-            eventForm = null;
+                eventForm = f;
+                break;
+            case KEY_RELEASED:
+                // pointer release can cycle into invoke and block which will cause this method
+                // to recurse if a pointer will be released while we are in an invoke and block state
+                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                Form xf = eventForm;
+                eventForm = null;
 
-            // make sure the released event is sent to the same Form that got a
-            // pressed event
-            if(x == f || f.shouldSendPointerReleaseToOtherForm()){
+                //make sure the released event is sent to the same Form who got a
+                //pressed event
+                if (xf == f || multiKeyMode) {
+                    f.keyReleased(inputEventStackTmp[offset]);
+                    offset++;
+                }
+                break;
+            case POINTER_PRESSED:
+                if (recursivePointerReleaseA) {
+                    recursivePointerReleaseB = true;
+                }
+                dragOccured = false;
+                dragPathLength = 0;
+                pointerPressedAndNotReleasedOrDragged = true;
                 xArray1[0] = inputEventStackTmp[offset];
                 offset++;
                 yArray1[0] = inputEventStackTmp[offset];
                 offset++;
-                f.pointerReleased(xArray1, yArray1);
-            }
-            recursivePointerReleaseA = false;
-            recursivePointerReleaseB = false;
-            break;
-        case POINTER_RELEASED_MULTI:
-            recursivePointerReleaseA = true;            
-            pointerPressedAndNotReleasedOrDragged = false;
-            
-            // pointer release can cycle into invoke and block which will cause this method 
-            // to recurse if a pointer will be released while we are in an invoke and block state
-            // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-            Form xy = eventForm;
-            eventForm = null;
-
-            // make sure the released event is sent to the same Form that got a
-            // pressed event
-            if(xy == f || (f != null && f.shouldSendPointerReleaseToOtherForm())){
+                f.pointerPressed(xArray1, yArray1);
+                eventForm = f;
+                break;
+            case POINTER_PRESSED_MULTI: {
+                if (recursivePointerReleaseA) {
+                    recursivePointerReleaseB = true;
+                }
+                dragOccured = false;
+                dragPathLength = 0;
+                pointerPressedAndNotReleasedOrDragged = true;
                 int[] array1 = readArrayStackArgument(offset);
                 offset += array1.length + 1;
                 int[] array2 = readArrayStackArgument(offset);
                 offset += array2.length + 1;
-                f.pointerReleased(array1, array1);
+                f.pointerPressed(array1, array2);
+                eventForm = f;
+                break;
             }
-            recursivePointerReleaseA = false;
-            recursivePointerReleaseB = false;
-            break;
-        case POINTER_DRAGGED: {
-            dragOccured = true;
-            int arg1 = inputEventStackTmp[offset];
-            offset++;
-            int arg2 = inputEventStackTmp[offset];
-            offset++;
-            int timestamp = inputEventStackTmp[offset];
-            offset++;
-            updateDragSpeedStatus(arg1, arg2, timestamp);
-            pointerPressedAndNotReleasedOrDragged = false;
-            xArray1[0] = arg1;
-            yArray1[0] = arg2;
-            f.pointerDragged(xArray1, yArray1);
-            break;
-        }
-        case POINTER_DRAGGED_MULTI: {
-            dragOccured = true;
-            pointerPressedAndNotReleasedOrDragged = false;
-            int[] array1 = readArrayStackArgument(offset);
-            offset += array1.length + 1;
-            int[] array2 = readArrayStackArgument(offset);
-            offset += array2.length + 1;
-            f.pointerDragged(array1, array2);
-            break;
-        }
-        case POINTER_HOVER: {
-            int arg1 = inputEventStackTmp[offset];
-            offset++;
-            int arg2 = inputEventStackTmp[offset];
-            offset++;
-            int timestamp = inputEventStackTmp[offset];
-            offset++;
-            updateDragSpeedStatus(arg1, arg2, timestamp);
-            xArray1[0] = arg1;
-            yArray1[0] = arg2;
-            f.pointerHover(xArray1, yArray1);
-            break;
-        }
-        case POINTER_HOVER_RELEASED: {
-            int arg1 = inputEventStackTmp[offset];
-            offset++;
-            int arg2 = inputEventStackTmp[offset];
-            offset++;
-            xArray1[0] = arg1;
-            yArray1[0] = arg2;
-            f.pointerHoverReleased(xArray1, yArray1);
-            break;
-        }
-        case POINTER_HOVER_PRESSED: {
-            int arg1 = inputEventStackTmp[offset];
-            offset++;
-            int arg2 = inputEventStackTmp[offset];
-            offset++;
-            xArray1[0] = arg1;
-            yArray1[0] = arg2;
-            f.pointerHoverPressed(xArray1, yArray1);
-            break;
-        }
-        case SIZE_CHANGED:
-            int w = inputEventStackTmp[offset];
-            offset++;
-            int h = inputEventStackTmp[offset];
-            offset++;
-            f.sizeChangedInternal(w, h);
-            break;
-        case HIDE_NOTIFY:
-            f.hideNotify();
-            break;
-        case SHOW_NOTIFY:
-            f.showNotify();
-            break;
+            case POINTER_RELEASED:
+                recursivePointerReleaseA = true;
+                pointerPressedAndNotReleasedOrDragged = false;
+
+                // pointer release can cycle into invoke and block which will cause this method
+                // to recurse if a pointer will be released while we are in an invoke and block state
+                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                Form x = eventForm;
+                eventForm = null;
+
+                // make sure the released event is sent to the same Form that got a
+                // pressed event
+                if (x == f || f.shouldSendPointerReleaseToOtherForm()) {
+                    xArray1[0] = inputEventStackTmp[offset];
+                    offset++;
+                    yArray1[0] = inputEventStackTmp[offset];
+                    offset++;
+                    f.pointerReleased(xArray1, yArray1);
+                }
+                recursivePointerReleaseA = false;
+                recursivePointerReleaseB = false;
+                break;
+            case POINTER_RELEASED_MULTI:
+                recursivePointerReleaseA = true;
+                pointerPressedAndNotReleasedOrDragged = false;
+
+                // pointer release can cycle into invoke and block which will cause this method
+                // to recurse if a pointer will be released while we are in an invoke and block state
+                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                Form xy = eventForm;
+                eventForm = null;
+
+                // make sure the released event is sent to the same Form that got a
+                // pressed event
+                if (xy == f || (f != null && f.shouldSendPointerReleaseToOtherForm())) {
+                    int[] array1 = readArrayStackArgument(offset);
+                    offset += array1.length + 1;
+                    int[] array2 = readArrayStackArgument(offset);
+                    offset += array2.length + 1;
+                    f.pointerReleased(array1, array1);
+                }
+                recursivePointerReleaseA = false;
+                recursivePointerReleaseB = false;
+                break;
+            case POINTER_DRAGGED: {
+                dragOccured = true;
+                int arg1 = inputEventStackTmp[offset];
+                offset++;
+                int arg2 = inputEventStackTmp[offset];
+                offset++;
+                int timestamp = inputEventStackTmp[offset];
+                offset++;
+                updateDragSpeedStatus(arg1, arg2, timestamp);
+                pointerPressedAndNotReleasedOrDragged = false;
+                xArray1[0] = arg1;
+                yArray1[0] = arg2;
+                f.pointerDragged(xArray1, yArray1);
+                break;
+            }
+            case POINTER_DRAGGED_MULTI: {
+                dragOccured = true;
+                pointerPressedAndNotReleasedOrDragged = false;
+                int[] array1 = readArrayStackArgument(offset);
+                offset += array1.length + 1;
+                int[] array2 = readArrayStackArgument(offset);
+                offset += array2.length + 1;
+                f.pointerDragged(array1, array2);
+                break;
+            }
+            case POINTER_HOVER: {
+                int arg1 = inputEventStackTmp[offset];
+                offset++;
+                int arg2 = inputEventStackTmp[offset];
+                offset++;
+                int timestamp = inputEventStackTmp[offset];
+                offset++;
+                updateDragSpeedStatus(arg1, arg2, timestamp);
+                xArray1[0] = arg1;
+                yArray1[0] = arg2;
+                f.pointerHover(xArray1, yArray1);
+                break;
+            }
+            case POINTER_HOVER_RELEASED: {
+                int arg1 = inputEventStackTmp[offset];
+                offset++;
+                int arg2 = inputEventStackTmp[offset];
+                offset++;
+                xArray1[0] = arg1;
+                yArray1[0] = arg2;
+                f.pointerHoverReleased(xArray1, yArray1);
+                break;
+            }
+            case POINTER_HOVER_PRESSED: {
+                int arg1 = inputEventStackTmp[offset];
+                offset++;
+                int arg2 = inputEventStackTmp[offset];
+                offset++;
+                xArray1[0] = arg1;
+                yArray1[0] = arg2;
+                f.pointerHoverPressed(xArray1, yArray1);
+                break;
+            }
+            case SIZE_CHANGED:
+                int w = inputEventStackTmp[offset];
+                offset++;
+                int h = inputEventStackTmp[offset];
+                offset++;
+                f.sizeChangedInternal(w, h);
+                break;
+            case HIDE_NOTIFY:
+                f.hideNotify();
+                break;
+            case SHOW_NOTIFY:
+                f.showNotify();
+                break;
         }
         return offset;
     }
@@ -2547,7 +2381,7 @@ public final class Display extends CN1Constants {
      * @return true if a drag has occured since the last pointer pressed
      */
     public boolean hasDragOccured() {
-       return dragOccured;
+        return dragOccured;
     }
 
     private int[] pointerEvent(int off, int[] event) {
@@ -2570,9 +2404,8 @@ public final class Display extends CN1Constants {
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged ) || (isMinimized() && hasNoSerialCallsPending());
+                && !longPointerCharged) || (isMinimized() && hasNoSerialCallsPending());
     }
-
 
     Form getCurrentInternal() {
         return impl.getCurrentForm();
@@ -2594,25 +2427,25 @@ public final class Display extends CN1Constants {
         Form upcoming = null;
 
         // we are in the middle of a transition so we should extract the next form
-        if(animationQueue != null) {
+        if (animationQueue != null) {
             int size = animationQueue.size();
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0; iter < size; iter++) {
                 Animation o = animationQueue.get(iter);
-                if(o instanceof Transition) {
-                    upcoming = (Form)((Transition)o).getDestination();
+                if (o instanceof Transition) {
+                    upcoming = (Form) ((Transition) o).getDestination();
                 }
             }
         }
-        if(upcoming == null) {
-            if(includeMenus){
+        if (upcoming == null) {
+            if (includeMenus) {
                 Form f = impl.getCurrentForm();
-                if(f instanceof Dialog) {
-                    if(((Dialog)f).isDisposed()) {
+                if (f instanceof Dialog) {
+                    if (((Dialog) f).isDisposed()) {
                         return getCurrent();
                     }
                 }
                 return f;
-            }else{
+            } else {
                 return getCurrent();
             }
         }
@@ -2626,22 +2459,22 @@ public final class Display extends CN1Constants {
      * @return the form currently displayed on the screen or null if no form is
      * currently displayed
      */
-    public Form getCurrent(){
+    public Form getCurrent() {
         Form current = impl.getCurrentForm();
-        if(current != null && current instanceof Dialog) {
-            if(((Dialog)current).isMenu() || ((Dialog)current).isDisposed()) {
+        if (current != null && current instanceof Dialog) {
+            if (((Dialog) current).isMenu() || ((Dialog) current).isDisposed()) {
                 Form p = current.getPreviousForm();
-                if(p != null) {
+                if (p != null) {
                     return p;
                 }
 
                 // we are in the middle of a transition so we should extract the next form
-                if(animationQueue != null) {
+                if (animationQueue != null) {
                     int size = animationQueue.size();
-                    for(int iter = 0 ; iter < size ; iter++) {
+                    for (int iter = 0; iter < size; iter++) {
                         Animation o = animationQueue.get(iter);
-                        if(o instanceof Transition) {
-                            return (Form)((Transition)o).getDestination();
+                        if (o instanceof Transition) {
+                            return (Form) ((Transition) o).getDestination();
                         }
                     }
                 }
@@ -2656,7 +2489,7 @@ public final class Display extends CN1Constants {
      * @return the number of alpha levels supported by the implementation
      * @deprecated this method isn't implemented in most modern devices
      */
-    public int numAlphaLevels(){
+    public int numAlphaLevels() {
         return impl.numAlphaLevels();
     }
 
@@ -2676,7 +2509,7 @@ public final class Display extends CN1Constants {
      *
      * @return the width of the display
      */
-    public int getDisplayWidth(){
+    public int getDisplayWidth() {
         return impl.getDisplayWidth();
     }
 
@@ -2685,7 +2518,7 @@ public final class Display extends CN1Constants {
      *
      * @return the height of the display
      */
-    public int getDisplayHeight(){
+    public int getDisplayHeight() {
         return impl.getDisplayHeight();
     }
 
@@ -2694,15 +2527,15 @@ public final class Display extends CN1Constants {
      *
      * @param cmp the given component to repaint
      */
-    void repaint(final Animation cmp){
+    void repaint(final Animation cmp) {
         impl.repaint(cmp);
     }
 
     /**
      * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
      * to be relied upon
-     * 
-     * @param dipCount the dips that we will convert to pixels
+     *
+     * @param dipCount   the dips that we will convert to pixels
      * @param horizontal indicates pixels in the horizontal plane
      * @return value in pixels
      */
@@ -2710,13 +2543,13 @@ public final class Display extends CN1Constants {
         return impl.convertToPixels(dipCount, horizontal);
     }
 
-
     /**
      * Converts from specified unit to pixels.
-     * @param value The value to convert, expressed in unitType.
+     *
+     * @param value    The value to convert, expressed in unitType.
      * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
-     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
-     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     *                 {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     *                 {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
      * @return The value converted to pixels.
      * @since 8.0
      */
@@ -2726,10 +2559,11 @@ public final class Display extends CN1Constants {
 
     /**
      * Converts from specified unit to pixels.
-     * @param value The value to convert, expressed in unitType.
-     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
-     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
-     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     *
+     * @param value      The value to convert, expressed in unitType.
+     * @param unitType   The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     *                   {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     *                   {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
      * @param horizontal Whether screen percentage units should be based on horitonzal or vertical percentage.
      * @return The value converted to pixels.
      * @since 8.0
@@ -2737,62 +2571,62 @@ public final class Display extends CN1Constants {
     public int convertToPixels(float value, byte unitType, boolean horizontal) {
 
 
-        switch(unitType) {
+        switch (unitType) {
             case Style.UNIT_TYPE_REM:
-                return (int)Math.round(value * Font.getDefaultFont().getHeight());
+                return (int) Math.round(value * Font.getDefaultFont().getHeight());
             case Style.UNIT_TYPE_VH:
-                return (int)Math.round(value / 100f * CN.getDisplayHeight());
+                return (int) Math.round(value / 100f * CN.getDisplayHeight());
             case Style.UNIT_TYPE_VW:
-                return (int)Math.round(value / 100f * CN.getDisplayWidth());
+                return (int) Math.round(value / 100f * CN.getDisplayWidth());
             case Style.UNIT_TYPE_VMIN:
-                return (int)Math.round(value/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                return (int) Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
             case Style.UNIT_TYPE_VMAX:
-                return (int)Math.round(value/100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                return (int) Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
             case Style.UNIT_TYPE_DIPS:
                 return Display.getInstance().convertToPixels(value);
             case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
-                if(!horizontal) {
+                if (!horizontal) {
                     float h = Display.getInstance().getDisplayHeight();
                     h = h / 100.0f * value;
-                    return (int)h;
+                    return (int) h;
                 } else {
                     float w = Display.getInstance().getDisplayWidth();
                     w = w / 100.0f * value;
-                    return (int)w;
+                    return (int) w;
                 }
             default:
-                return (int)value;
+                return (int) value;
         }
 
     }
 
-
     /**
      * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
      * to be relied upon. This version of the method assumes square pixels which is pretty much the norm.
-     * 
+     *
      * @param dipCount the dips that we will convert to pixels
      * @return value in pixels
      */
     public int convertToPixels(float dipCount) {
-        return Math.round(impl.convertToPixels((int)(dipCount * 1000), true) / 1000.0f);
+        return Math.round(impl.convertToPixels((int) (dipCount * 1000), true) / 1000.0f);
     }
 
     /**
      * Checks to see if the platform supports a native image cache.
+     *
      * @return True on platforms that support a native image cache.  Currently only Javascript.
      */
     boolean supportsNativeImageCache() {
         return impl.supportsNativeImageCache();
     }
-    
+
     /**
      * Returns the game action code matching the given key combination
      *
      * @param keyCode key code received from the event
      * @return game action matching this keycode
      */
-    public int getGameAction(int keyCode){
+    public int getGameAction(int keyCode) {
         return impl.getGameAction(keyCode);
     }
 
@@ -2809,7 +2643,7 @@ public final class Display extends CN1Constants {
      * mostly for the case of unit testing. Do not use it for anything other than that! Do
      * not rely on getKeyCode(GAME_*) == keyCodeFromKeyEvent, this will never actually happen!
      */
-    public int getKeyCode(int gameAction){
+    public int getKeyCode(int gameAction) {
         return impl.getKeyCode(gameAction);
     }
 
@@ -2831,20 +2665,19 @@ public final class Display extends CN1Constants {
         this.thirdSoftButton = thirdSoftButton;
     }
 
-
     /**
      * Displays the virtual keyboard on devices that support manually poping up
      * the vitual keyboard
      *
      * @param show toggles the virtual keyboards visibility
-     * @deprecated this method was only relevant for feature phones. 
+     * @deprecated this method was only relevant for feature phones.
      * You should use {@link com.codename1.ui.TextArea#startEditingAsync()} or {@link com.codename1.ui.TextArea#stopEditing()}
      * to control text field editing/VKB visibility
      */
     public void setShowVirtualKeyboard(boolean show) {
-        if(isTouchScreenDevice()){
+        if (isTouchScreenDevice()) {
             VirtualKeyboardInterface vkb = getDefaultVirtualKeyboard();
-            if(vkb != null){
+            if (vkb != null) {
                 vkb.showKeyboard(show);
             }
         }
@@ -2854,11 +2687,11 @@ public final class Display extends CN1Constants {
      * Indicates if the virtual keyboard is currently showing or not
      *
      * @return true if the virtual keyboard is showing
-     * @deprecated this method was only relevant for feature phones. 
+     * @deprecated this method was only relevant for feature phones.
      * You should use {@link com.codename1.ui.TextArea#isEditing()} instead.
      */
     public boolean isVirtualKeyboardShowing() {
-        if(!isTouchScreenDevice()){
+        if (!isTouchScreenDevice()) {
             return false;
         }
         return getDefaultVirtualKeyboard() != null && getDefaultVirtualKeyboard().isVirtualKeyboardShowing();
@@ -2866,13 +2699,14 @@ public final class Display extends CN1Constants {
 
     /**
      * Returns all platform supported virtual keyboards names
+     *
      * @return all platform supported virtual keyboards names
      * @deprecated this method is only used in feature phones and has no modern equivalent
      */
-    public String [] getSupportedVirtualKeyboard(){
-        String [] retVal = new String[virtualKeyboards.size()];
+    public String[] getSupportedVirtualKeyboard() {
+        String[] retVal = new String[virtualKeyboards.size()];
         int index = 0;
-        for(String k : virtualKeyboards.keySet()) {
+        for (String k : virtualKeyboards.keySet()) {
             retVal[index++] = k;
         }
         return retVal;
@@ -2880,79 +2714,82 @@ public final class Display extends CN1Constants {
 
     /**
      * Register a virtual keyboard
+     *
      * @param vkb
      * @deprecated this method is only used in feature phones and has no modern equivalent
      */
-    public void registerVirtualKeyboard(VirtualKeyboardInterface vkb){
+    public void registerVirtualKeyboard(VirtualKeyboardInterface vkb) {
         virtualKeyboards.put(vkb.getVirtualKeyboardName(), vkb);
+    }
+
+    /**
+     * Get the default virtual keyboard or null if the VirtualKeyboard is disabled
+     *
+     * @return the default vkb
+     * @deprecated this method is only used in feature phones and has no modern equivalent
+     */
+    public VirtualKeyboardInterface getDefaultVirtualKeyboard() {
+        if (selectedVirtualKeyboard == null) {
+            return null;
+        }
+        return (VirtualKeyboardInterface) virtualKeyboards.get(selectedVirtualKeyboard);
     }
 
     /**
      * Sets the default virtual keyboard to be used by the platform
      *
      * @param vkb a VirtualKeyboard to be used or null to disable the
-     * VirtualKeyboard
+     *            VirtualKeyboard
      * @deprecated this method is only used in feature phones and has no modern equivalent
      */
-    public void setDefaultVirtualKeyboard(VirtualKeyboardInterface vkb){
-        if(vkb != null){
+    public void setDefaultVirtualKeyboard(VirtualKeyboardInterface vkb) {
+        if (vkb != null) {
             selectedVirtualKeyboard = vkb.getVirtualKeyboardName();
-            if(!virtualKeyboards.containsKey(selectedVirtualKeyboard)){
+            if (!virtualKeyboards.containsKey(selectedVirtualKeyboard)) {
                 registerVirtualKeyboard(vkb);
             }
-        }else{
+        } else {
             selectedVirtualKeyboard = null;
         }
     }
 
     /**
-     * Get the default virtual keyboard or null if the VirtualKeyboard is disabled
-     * @return the default vkb
-     * @deprecated this method is only used in feature phones and has no modern equivalent
+     * Gets the VirtualKeyboardListener Objects of exists.
+     *
+     * @return a Listener Object or null if not exists
+     * @deprecated Use {@link #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener) }
      */
-    public VirtualKeyboardInterface getDefaultVirtualKeyboard(){
-        if(selectedVirtualKeyboard == null){
-            return null;
-        }
-        return (VirtualKeyboardInterface)virtualKeyboards.get(selectedVirtualKeyboard);
+    public ActionListener getVirtualKeyboardListener() {
+        return virtualKeyboardListener;
     }
-    
+
     /**
      * Sets a listener for VirtualKeyboard hide/show events.
-     * The Listener will get an event once the keyboard is opened/closed with 
-     * a Boolean value that represents the state of the keyboard true for open 
-     * and false for closed getSource() on the ActionEvent will return the 
+     * The Listener will get an event once the keyboard is opened/closed with
+     * a Boolean value that represents the state of the keyboard true for open
+     * and false for closed getSource() on the ActionEvent will return the
      * Boolean value.
-     * 
-     * @param l the listener 
+     *
+     * @param l the listener
      * @deprecated Use {@link #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener) }
      */
-    public void setVirtualKeyboardListener(ActionListener l){
+    public void setVirtualKeyboardListener(ActionListener l) {
         if (virtualKeyboardListener != null) {
             removeVirtualKeyboardListener(l);
         }
         virtualKeyboardListener = l;
         addVirtualKeyboardListener(l);
     }
-    
-    /**
-     * Gets the VirtualKeyboardListener Objects of exists.
-     * 
-     * @return a Listener Object or null if not exists
-     * @deprecated Use {@link #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener) }
-     */ 
-    public ActionListener getVirtualKeyboardListener() {
-        return virtualKeyboardListener;
-    }
-    
+
     /**
      * Adds a listener for VirtualKeyboard hide/show events.  ActionEvents will return a Boolean
-     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE} 
+     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE}
      * on hide.
      * <p>Note: Keyboard events may not be 100% reliable as they use heuristics on most platforms to guess when the keyboard
      * is shown or hidden.</p>
-     * @param l The listener. 
-     * @see #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener) 
+     *
+     * @param l The listener.
+     * @see #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener)
      * @since 6.0
      */
     public synchronized void addVirtualKeyboardListener(ActionListener l) {
@@ -2961,15 +2798,16 @@ public final class Display extends CN1Constants {
         }
         virtualKeyboardListeners.addListener(l);
     }
-    
+
     /**
      * Removes a listener for VirtualKeyboard hide/show events.  ActionEvents will return a Boolean
-     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE} 
+     * value for {@link ActionEvent#getSource() }, with {@literal Boolean.TRUE} on show, and {@literal Boolean.FALSE}
      * on hide.
      * <p>Note: Keyboard events may not be 100% reliable as they use heuristics on most platforms to guess when the keyboard
      * is shown or hidden.</p>
-     * @param l The listener. 
-     * @see #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener) 
+     *
+     * @param l The listener.
+     * @see #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener)
      * @since 6.0
      */
     public synchronized void removeVirtualKeyboardListener(ActionListener l) {
@@ -2977,10 +2815,11 @@ public final class Display extends CN1Constants {
             virtualKeyboardListeners.removeListener(l);
         }
     }
-    
+
     /**
      * Fires a virtual keyboard show event.
-     * @param show 
+     *
+     * @param show
      * @since 6.0
      */
     public void fireVirtualKeyboardEvent(boolean show) {
@@ -2988,9 +2827,10 @@ public final class Display extends CN1Constants {
             virtualKeyboardListeners.fireActionEvent(new ActionEvent(show));
         }
     }
-    
+
     /**
      * Gets the invisible area under the Virtual Keyboard.
+     *
      * @return Height of the VKB that overlaps the screen.
      * @since 6.0
      */
@@ -2998,8 +2838,6 @@ public final class Display extends CN1Constants {
         return impl.getInvisibleAreaUnderVKB();
     }
 
-    
-    
     /**
      * Returns the type of the input device one of:
      * KEYBOARD_TYPE_UNKNOWN, KEYBOARD_TYPE_NUMERIC, KEYBOARD_TYPE_QWERTY,
@@ -3030,7 +2868,7 @@ public final class Display extends CN1Constants {
     public boolean isMultiTouch() {
         return impl.isMultiTouch();
     }
-    
+
     /**
      * Indicates whether the device has a double layer screen thus allowing two
      * stages to touch events: click and hover. This is true for devices such
@@ -3048,14 +2886,15 @@ public final class Display extends CN1Constants {
     /**
      * This method returns the dragging speed based on the latest dragged
      * events
+     *
      * @param yAxis indicates what axis speed is required
      * @return the dragging speed
      */
-    public float getDragSpeed(boolean yAxis){
+    public float getDragSpeed(boolean yAxis) {
         float speed;
-        if(yAxis){
+        if (yAxis) {
             speed = impl.getDragSpeed(dragPathY, dragPathTime, dragPathOffset, dragPathLength);
-        }else{
+        } else {
             speed = impl.getDragSpeed(dragPathX, dragPathTime, dragPathOffset, dragPathLength);
         }
         return speed;
@@ -3076,7 +2915,7 @@ public final class Display extends CN1Constants {
      * when drawing text or navigating with the text field cursor.
      *
      * @param activate set to true to activate the bidi algorithm, false to
-     * disable it
+     *                 disable it
      */
     public void setBidiAlgorithm(boolean activate) {
         impl.setBidiAlgorithm(activate);
@@ -3089,7 +2928,6 @@ public final class Display extends CN1Constants {
      * Sony Ericsson devices.
      * See <a href="http://www.w3.org/International/articles/inline-bidi-markup/#visual">this</a>
      * for more on visual vs. logical ordering.
-     *
      *
      * @param s a "logical" string with RTL characters
      * @return a "visual" renderable string
@@ -3105,7 +2943,7 @@ public final class Display extends CN1Constants {
      * for more on visual vs. logical ordering.
      *
      * @param source the string in which we are looking for the position
-     * @param index the "logical" location of the cursor
+     * @param index  the "logical" location of the cursor
      * @return the "visual" location of the cursor
      */
     public int getCharLocation(String source, int index) {
@@ -3127,14 +2965,13 @@ public final class Display extends CN1Constants {
      * however some platforms might define unique ways in which to load resources
      * within the implementation.
      *
-     * @param cls class to load the resource from
+     * @param cls      class to load the resource from
      * @param resource relative/absolute URL based on the Java convention
      * @return input stream for the resource or null if not found
      */
     public InputStream getResourceAsStream(Class cls, String resource) {
         return impl.getResourceAsStream(cls, resource);
     }
-
 
     /**
      * An error handler will receive an action event with the source exception from the EDT
@@ -3143,7 +2980,7 @@ public final class Display extends CN1Constants {
      * @param e listener receiving the errors
      */
     public void addEdtErrorHandler(ActionListener e) {
-        if(errorHandler == null) {
+        if (errorHandler == null) {
             errorHandler = new EventDispatcher();
         }
         errorHandler.addListener(e);
@@ -3156,13 +2993,23 @@ public final class Display extends CN1Constants {
      * @param e listener receiving the errors
      */
     public void removeEdtErrorHandler(ActionListener e) {
-        if(errorHandler != null) {
+        if (errorHandler != null) {
             errorHandler.removeListener(e);
             Collection v = errorHandler.getListenerCollection();
-            if(v == null || v.size() == 0) {
+            if (v == null || v.size() == 0) {
                 errorHandler = null;
             }
         }
+    }
+
+    /**
+     * Allows a Codename One application to minimize without forcing it to the front whenever
+     * a new dialog is poped up
+     *
+     * @return allowMinimizing value
+     */
+    public boolean isAllowMinimizing() {
+        return allowMinimizing;
     }
 
     /**
@@ -3173,17 +3020,6 @@ public final class Display extends CN1Constants {
      */
     public void setAllowMinimizing(boolean allowMinimizing) {
         this.allowMinimizing = allowMinimizing;
-    }
-
-
-    /**
-     * Allows a Codename One application to minimize without forcing it to the front whenever
-     * a new dialog is poped up
-     *
-     * @return allowMinimizing value
-     */
-    public boolean isAllowMinimizing() {
-        return allowMinimizing;
     }
 
     /**
@@ -3206,7 +3042,7 @@ public final class Display extends CN1Constants {
      * @return the shouldRenderSelection
      */
     public boolean shouldRenderSelection(Component c) {
-        if(c.isCellRenderer()) {
+        if (c.isCellRenderer()) {
             return shouldRenderSelection();
         }
         return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY)) || c.shouldRenderComponentSelection();
@@ -3268,74 +3104,76 @@ public final class Display extends CN1Constants {
      * Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
      * the {@link #requestFullScreen() }, {@link #exitFullScreen() }, and {@link #isInFullScreenMode() } methods
      * to enter and exit full-screen - and query the current state.
-     * 
+     *
      * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
      * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
      * for a list of browsers that support full-screen.</p>
-     * 
+     *
      * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     *
      * @return {@literal true} if Full-screen mode is supported on this platform.
+     * @see #requestFullScreen()
+     * @see #exitFullScreen()
+     * @see #isInFullScreenMode()
      * @since 6.0
-     * @see #requestFullScreen() 
-     * @see #exitFullScreen() 
-     * @see #isInFullScreenMode() 
      */
     public boolean isFullScreenSupported() {
         return impl.isFullScreenSupported();
     }
-    
+
     /**
      * Try to enter full-screen mode if the platform supports it.
-     * 
+     *
      * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
      * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
      * for a list of browsers that support full-screen.</p>
-     * 
+     *
      * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
-     * 
+     *
      * @return {@literal true} on success.  This will also return {@literal true} if the app is already running in full-screen mode.  It will return {@literal false}
      * if the app fails to enter full-screen mode.
-     * @see #exitFullScreen() 
-     * @see #isInFullScreenMode() 
-     * @see #isFullScreenSupported() 
+     * @see #exitFullScreen()
+     * @see #isInFullScreenMode()
+     * @see #isFullScreenSupported()
      * @since 6.0
      */
     public boolean requestFullScreen() {
         return impl.requestFullScreen();
     }
-    
+
     /**
      * Try to exit full-screen mode if the platform supports it.
-     * 
+     *
      * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
      * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
      * for a list of browsers that support full-screen.</p>
-     * 
+     *
      * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
-     * 
+     *
      * @return {@literal true} on success.  This will also return {@literal true} if the app is already NOT in full-screen mode.  It will return {@literal false}
      * if the app fails to exit full-screen mode.
-     * @see #requestFullScreen() 
-     * @see #isInFullScreenMode() 
-     * @see #isFullScreenSupported() 
+     * @see #requestFullScreen()
+     * @see #isInFullScreenMode()
+     * @see #isFullScreenSupported()
      * @since 6.0
      */
     public boolean exitFullScreen() {
         return impl.exitFullScreen();
     }
-    
+
     /**
      * Checks if the app is currently running in full-screen mode.
+     *
      * @return {@literal true} if the app is currently in full-screen mode.
+     * @see #requestFullScreen()
+     * @see #exitFullScreen()
+     * @see #isFullScreenSupported()
      * @since 6.0
-     * @see #requestFullScreen() 
-     * @see #exitFullScreen() 
-     * @see #isFullScreenSupported() 
      */
     public boolean isInFullScreenMode() {
         return impl.isInFullScreenMode();
     }
-    
+
     /**
      * Shows a native Form/Canvas or some other heavyweight native screen
      *
@@ -3349,6 +3187,7 @@ public final class Display extends CN1Constants {
     /**
      * Normally Codename One folds the VKB when switching forms this field allows us
      * to block that behavior.
+     *
      * @return the autoFoldVKBOnFormSwitch
      */
     public boolean isAutoFoldVKBOnFormSwitch() {
@@ -3358,6 +3197,7 @@ public final class Display extends CN1Constants {
     /**
      * Normally Codename One folds the VKB when switching forms this field allows us
      * to block that behavior.
+     *
      * @param autoFoldVKBOnFormSwitch the autoFoldVKBOnFormSwitch to set
      */
     public void setAutoFoldVKBOnFormSwitch(boolean autoFoldVKBOnFormSwitch) {
@@ -3375,62 +3215,7 @@ public final class Display extends CN1Constants {
     public int getCommandBehavior() {
         return impl.getCommandBehavior();
     }
-    
-    /**
-     * Posts a message to the native platform.  Different platforms may handle messages posted this
-     * way differently.  
-     * <p>The Javascript port will dispatch the message on the {@literal window} object
-     * as a custom DOM event named 'cn1outbox', with the event data containing a 'detail' key with the 
-     * message, and a 'code' key with the code.</p>
-     * @param message The message.
-     * @since 7.0
-     */
-    public void postMessage(MessageEvent message) {
-        impl.postMessage(message);
-    }
-    
-    /**
-     * Adds a listener to receive messages from the native platform.  This is one mechanism for the native
-     * platform to communicate with the Codename one app.  
-     * 
-     * <p>In the JavaScript port, listeners will be notified when DOM events named 'cn1inbox' are received on the 
-     * window object.  The event data 'detail' key will be the source of the message, and the 'code' key will be the
-     * source of the code.
-     * @param l The listener.
-     * @since 7.0
-     */
-    public void addMessageListener(ActionListener<MessageEvent> l) {
-        if (messageListeners == null) {
-            messageListeners = new EventDispatcher();
-        }
-        messageListeners.addListener(l);
-    }
-    
-    /**
-     * Removes a listener from receiving messages from the native platform.
-     * 
-     * @param l The listener.
-     * @since 7.0
-     */
-    public void removeMessageListener(ActionListener<MessageEvent> l) {
-        if (messageListeners != null) {
-            messageListeners.removeListener(l);
-        }
-    }
-    
-    /**
-     * Dispatches a message to all of the registered listeners.
-     * @param evt 
-     * @see #addMessageListener(com.codename1.ui.events.ActionListener) 
-     * @see #removeMessageListener(com.codename1.ui.events.ActionListener) 
-     * @since 7.0
-     */
-    public void dispatchMessage(MessageEvent evt) {
-        if (messageListeners != null && messageListeners.hasListeners()) {
-            messageListeners.fireActionEvent(evt);
-        }
-    }
-    
+
     /**
      * Indicates the way commands should be added to a form as one of the ocmmand constants defined
      * in this class
@@ -3448,6 +3233,64 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Posts a message to the native platform.  Different platforms may handle messages posted this
+     * way differently.
+     * <p>The Javascript port will dispatch the message on the {@literal window} object
+     * as a custom DOM event named 'cn1outbox', with the event data containing a 'detail' key with the
+     * message, and a 'code' key with the code.</p>
+     *
+     * @param message The message.
+     * @since 7.0
+     */
+    public void postMessage(MessageEvent message) {
+        impl.postMessage(message);
+    }
+
+    /**
+     * Adds a listener to receive messages from the native platform.  This is one mechanism for the native
+     * platform to communicate with the Codename one app.
+     *
+     * <p>In the JavaScript port, listeners will be notified when DOM events named 'cn1inbox' are received on the
+     * window object.  The event data 'detail' key will be the source of the message, and the 'code' key will be the
+     * source of the code.
+     *
+     * @param l The listener.
+     * @since 7.0
+     */
+    public void addMessageListener(ActionListener<MessageEvent> l) {
+        if (messageListeners == null) {
+            messageListeners = new EventDispatcher();
+        }
+        messageListeners.addListener(l);
+    }
+
+    /**
+     * Removes a listener from receiving messages from the native platform.
+     *
+     * @param l The listener.
+     * @since 7.0
+     */
+    public void removeMessageListener(ActionListener<MessageEvent> l) {
+        if (messageListeners != null) {
+            messageListeners.removeListener(l);
+        }
+    }
+
+    /**
+     * Dispatches a message to all of the registered listeners.
+     *
+     * @param evt
+     * @see #addMessageListener(com.codename1.ui.events.ActionListener)
+     * @see #removeMessageListener(com.codename1.ui.events.ActionListener)
+     * @since 7.0
+     */
+    public void dispatchMessage(MessageEvent evt) {
+        if (messageListeners != null && messageListeners.hasListeners()) {
+            messageListeners.fireActionEvent(evt);
+        }
+    }
+
+    /**
      * Returns the property from the underlying platform deployment or the default
      * value if no deployment values are supported. This is equivalent to the
      * getAppProperty from the jad file.
@@ -3462,7 +3305,8 @@ public final class Display extends CN1Constants {
      * <li>OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
      *
      * </ol>
-     * @param key the key of the property
+     *
+     * @param key          the key of the property
      * @param defaultValue a default return value
      * @return the value of the property
      */
@@ -3474,9 +3318,9 @@ public final class Display extends CN1Constants {
         if ("Component.revalidateOnStyleChange".equals(key)) {
             return Component.revalidateOnStyleChange ? "true" : "false";
         }
-        if(localProperties != null) {
-            String v = (String)localProperties.get(key);
-            if(v != null) {
+        if (localProperties != null) {
+            String v = (String) localProperties.get(key);
+            if (v != null) {
                 return v;
             }
         }
@@ -3488,7 +3332,7 @@ public final class Display extends CN1Constants {
      * implementation code and only allows the user to override the logic of getProperty
      * for internal application purposes.
      *
-     * @param key key the key of the property
+     * @param key   key the key of the property
      * @param value the value of the property
      */
     public void setProperty(String key, String value) {
@@ -3496,7 +3340,7 @@ public final class Display extends CN1Constants {
             impl.setAppArg(value);
             return;
         }
-        if("blockOverdraw".equals(key)) {
+        if ("blockOverdraw".equals(key)) {
             Container.blockOverdraw = true;
             return;
         }
@@ -3506,25 +3350,25 @@ public final class Display extends CN1Constants {
         if ("Component.revalidateOnStyleChange".equals(key)) {
             Component.revalidateOnStyleChange = "true".equalsIgnoreCase(value);
         }
-        if(key.startsWith("platformHint.")) {
+        if (key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
             return;
         }
-        if(localProperties == null) {
+        if (localProperties == null) {
             localProperties = new HashMap<String, String>();
         }
-        if(value == null) {
+        if (value == null) {
             localProperties.remove(key);
         } else {
             localProperties.put(key, value);
         }
     }
-    
+
     /**
      * <p>Returns true if executing this URL should work, returns false if it will not
      * and null if this is unknown.</p>
      * <script src="https://gist.github.com/codenameone/7aefb64909e75e10c396.js"></script>
-     * 
+     *
      * @param url the url that would be executed
      * @return true if executing this URL should work, returns false if it will not
      * and null if this is unknown
@@ -3542,22 +3386,21 @@ public final class Display extends CN1Constants {
     public void execute(String url) {
         impl.execute(url);
     }
-    
+
     /**
      * Executes the given URL on the native platform, this method is useful if
      * the platform has the ability to send an event to the app when the execution
      * has ended, currently this works only for Android platform to invoke other
      * intents.
-     * 
-     * @param url the url to execute
+     *
+     * @param url      the url to execute
      * @param response a callback from the platform when this execution returned
-     * to the application
+     *                 to the application
      */
-    public void execute(String url, ActionListener response){
+    public void execute(String url, ActionListener response) {
         impl.execute(url, response);
     }
 
-    
     /**
      * Returns one of the density variables appropriate for this device, notice that
      * density doesn't always correspond to resolution and an implementation might
@@ -3568,12 +3411,12 @@ public final class Display extends CN1Constants {
     public int getDeviceDensity() {
         return impl.getDeviceDensity();
     }
-    
+
     /**
      * Returns the device density as a string.
-     * 
+     *
      * <ul>
-     * 
+     *
      * <li>DENSITY_VERY_LOW : "very-low"</li>
      * <li>DENSITY_LOW : "low"</li>
      * <li>DENSITY_MEDIUM : "medium"</li>
@@ -3584,25 +3427,33 @@ public final class Display extends CN1Constants {
      * <li>DENSITY_2HD : "2hd"</li>
      * <li>DENSITY_4K : "4k";</li>
      * </ul>
-     * 
+     *
      * @return Device density as a string.
-     * @see #getDeviceDensity() 
+     * @see #getDeviceDensity()
      * @since 7.0
-     * 
      */
     public String getDensityStr() {
         switch (getDeviceDensity()) {
-            case DENSITY_VERY_LOW: return "very-low";
-            case DENSITY_LOW: return "low";
-            case DENSITY_MEDIUM: return "medium";
-            case DENSITY_HIGH: return "high";
-            case DENSITY_VERY_HIGH: return "very-high";
-            case DENSITY_HD: return "hd";
-            case DENSITY_560: return "560";
-            case DENSITY_2HD: return "2hd";
-            case DENSITY_4K: return "4k";
+            case DENSITY_VERY_LOW:
+                return "very-low";
+            case DENSITY_LOW:
+                return "low";
+            case DENSITY_MEDIUM:
+                return "medium";
+            case DENSITY_HIGH:
+                return "high";
+            case DENSITY_VERY_HIGH:
+                return "very-high";
+            case DENSITY_HD:
+                return "hd";
+            case DENSITY_560:
+                return "560";
+            case DENSITY_2HD:
+                return "2hd";
+            case DENSITY_4K:
+                return "4k";
             default:
-                throw new IllegalStateException("Unknown density "+getDeviceDensity());
+                throw new IllegalStateException("Unknown density " + getDeviceDensity());
         }
     }
 
@@ -3612,7 +3463,7 @@ public final class Display extends CN1Constants {
      * in.
      *
      * @param soundIdentifier the sound identifier which can match one of the
-     * common constants in this class or be a user/implementation defined sound
+     *                        common constants in this class or be a user/implementation defined sound
      * @deprecated this isn't supported on most platforms
      */
     public void playBuiltinSound(String soundIdentifier) {
@@ -3620,24 +3471,24 @@ public final class Display extends CN1Constants {
     }
 
     /**
-     * Gets the display safe area as a rectangle.  
+     * Gets the display safe area as a rectangle.
+     *
      * @param rect Out parameter that will store the display safe area.
      * @return The display safe area.
-     * @see Form#getSafeArea() 
+     * @see Form#getSafeArea()
      * @since 7.0
      */
     public Rectangle getDisplaySafeArea(Rectangle rect) {
         return impl.getDisplaySafeArea(rect);
     }
-    
-    
+
     /**
      * Installs a replacement sound as the builtin sound responsible for the given
      * sound identifier (this will override the system sound if such a sound exists).
      *
      * @param soundIdentifier the sound string passed to playBuiltinSound
-     * @param data an input stream containing platform specific audio file, its usually safe
-     * to assume that wav/mp3 would be supported.
+     * @param data            an input stream containing platform specific audio file, its usually safe
+     *                        to assume that wav/mp3 would be supported.
      * @throws IOException if the stream throws an exception
      */
     public void installBuiltinSound(String soundIdentifier, InputStream data) throws IOException {
@@ -3658,15 +3509,6 @@ public final class Display extends CN1Constants {
     /**
      * Allows muting/unmuting the builtin sounds easily
      *
-     * @param enabled indicates whether the sound is muted
-     */
-    public void setBuiltinSoundsEnabled(boolean enabled) {
-        impl.setBuiltinSoundsEnabled(enabled);
-    }
-
-    /**
-     * Allows muting/unmuting the builtin sounds easily
-     *
      * @return true if the sound is *not* muted
      */
     public boolean isBuiltinSoundsEnabled() {
@@ -3674,11 +3516,20 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Allows muting/unmuting the builtin sounds easily
+     *
+     * @param enabled indicates whether the sound is muted
+     */
+    public void setBuiltinSoundsEnabled(boolean enabled) {
+        impl.setBuiltinSoundsEnabled(enabled);
+    }
+
+    /**
      * Creates a sound in the given URI which is partially platform specific.
      * Notice that an audio is "auto destroyed" on completion and cannot be played
      * twice!
      *
-     * @param uri the platform specific location for the sound
+     * @param uri          the platform specific location for the sound
      * @param onCompletion invoked when the audio file finishes playing, may be null
      * @return a handle that can be used to control the playback of the audio
      * @throws java.io.IOException if the URI access fails
@@ -3686,11 +3537,11 @@ public final class Display extends CN1Constants {
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
-    
+
     /**
      * Creates media asynchronously.
      *
-     * @param uri the platform specific location for the sound
+     * @param uri          the platform specific location for the sound
      * @param onCompletion invoked when the audio file finishes playing, may be null
      * @return a handle that can be used to control the playback of the audio
      * @since 7.0
@@ -3699,35 +3550,35 @@ public final class Display extends CN1Constants {
         return impl.createMediaAsync(uri, video, onCompletion);
     }
 
-
     /**
      * Adds a callback to a Media element that will be called when the media finishes playing.
-     * 
-     * @param media The media to add the callback to.
+     *
+     * @param media        The media to add the callback to.
      * @param onCompletion The callback that will run on the EDT when the playback completes.
-     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
      */
     public void addCompletionHandler(Media media, Runnable onCompletion) {
         impl.addCompletionHandler(media, onCompletion);
     }
-    
+
     /**
      * Removes onComplete callback from Media element.
-     * @param media The media element.
+     *
+     * @param media        The media element.
      * @param onCompletion The callback.
-     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
      */
     public void removeCompletionHandler(Media media, Runnable onCompletion) {
         impl.removeCompletionHandler(media, onCompletion);
     }
-    
+
     /**
      * Create the sound in the given stream
      * Notice that an audio is "auto destroyed" on completion and cannot be played
      * twice!
      *
-     * @param stream the stream containing the media data
-     * @param mimeType the type of the data in the stream
+     * @param stream       the stream containing the media data
+     * @param mimeType     the type of the data in the stream
      * @param onCompletion invoked when the audio file finishes playing, may be null
      * @return a handle that can be used to control the playback of the audio
      * @throws java.io.IOException if the URI access fails
@@ -3738,9 +3589,8 @@ public final class Display extends CN1Constants {
 
     public AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
         return impl.createMediaAsync(stream, mimeType, onCompletion);
-        
-    }
 
+    }
 
     /**
      * Creates a soft/weak reference to an object that allows it to be collected
@@ -3786,7 +3636,7 @@ public final class Display extends CN1Constants {
      * Performs a clipboard copy operation, if the native clipboard is supported by the implementation it would be used
      *
      * @param obj object to copy, while this can be any arbitrary object it is recommended that only Strings or Codename One
-     * image objects be used to copy
+     *            image objects be used to copy
      */
     public void copyToClipboard(Object obj) {
         impl.copyToClipboard(obj);
@@ -3813,16 +3663,16 @@ public final class Display extends CN1Constants {
     /**
      * Returns true if the device allows forcing the orientation via code, feature phones do not allow this
      * although some include a jad property allowing for this feature
-     * 
+     *
      * <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
      * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
-     * 
+     *
      * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
      * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
      *
      * @return true if lockOrientation  would work
-     * @see #lockOrientation(boolean) 
-     * @see #unlockOrientation() 
+     * @see #lockOrientation(boolean)
+     * @see #unlockOrientation()
      */
     public boolean canForceOrientation() {
         return impl.canForceOrientation();
@@ -3831,16 +3681,16 @@ public final class Display extends CN1Constants {
     /**
      * On devices that return true for canForceOrientation() this method can lock the device orientation
      * either to portrait or landscape mode
-     * 
-     *  <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     *
+     * <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
      * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
-     * 
+     *
      * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
      * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
      *
      * @param portrait true to lock to portrait mode, false to lock to landscape mode
-     * @see #unlockOrientation() 
-     * @see #canForceOrientation() 
+     * @see #unlockOrientation()
+     * @see #canForceOrientation()
      */
     public void lockOrientation(boolean portrait) {
         impl.lockOrientation(portrait);
@@ -3848,20 +3698,20 @@ public final class Display extends CN1Constants {
 
     /**
      * This is the reverse method for lock orientation allowing orientation lock to be disabled
-     * 
-     *  <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
+     *
+     * <p>Since version 6.0, orientation lock is supported in Javascript builds in some browsers.  For a full
      * list of browsers the support locking orientation, see the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen/lockOrientation">MDN Lock Orientation docs</a>.</p>
-     * 
+     *
      * <p><strong>NOTE:</strong> In Javascript builds, orientation lock is only supported if the app is running in full-screen mode.  If the app is not
      * currently in full-screen mode, then {@link #canForceOrientation() } will return {@literal false} and {@link #lockOrientation(boolean) } will do nothing.</p>
-     * 
-     * @see #lockOrientation(boolean) 
-     * @see #canForceOrientation() 
+     *
+     * @see #lockOrientation(boolean)
+     * @see #canForceOrientation()
      */
     public void unlockOrientation() {
         impl.unlockOrientation();
     }
-    
+
     /**
      * Indicates whether the device is a tablet, notice that this is often a guess
      *
@@ -3870,29 +3720,31 @@ public final class Display extends CN1Constants {
     public boolean isTablet() {
         return impl.isTablet();
     }
-    
+
     /**
      * Returns true if this is a desktop application
+     *
      * @return true if this is a desktop application
      */
     public boolean isDesktop() {
         return impl.isDesktop();
     }
-    
+
     /**
      * Returns true if the device has dialing capabilities
+     *
      * @return false if it cannot dial
      */
     public boolean canDial() {
         return impl.canDial();
     }
-    
+
     /**
      * On most platforms it is quite fast to draw on a mutable image and then render that
      * image, however some platforms have much slower mutable images in comparison to just
      * drawing on the screen. These platforms should return false here and Codename One will try
      * to use less mutable image related optimizations in transitions and other operations.
-     * 
+     *
      * @return true if mutable images are fast on this platform
      */
     public boolean areMutableImagesFast() {
@@ -3900,32 +3752,32 @@ public final class Display extends CN1Constants {
     }
 
     /**
-     * This method returns the platform Location Manager used for geofencing. This allows tracking the 
+     * This method returns the platform Location Manager used for geofencing. This allows tracking the
      * user location in the background. Usage:
-     * 
+     *
      * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
-<noscript><pre>{@code public class GeofenceListenerImpl implements GeofenceListener {
-    public void onExit(String id) {
-        System.out.println("Exited "+id);
-    }
-
-    public void onEntered(String id) {
-        System.out.println("Entered "+id);
-    }
-}
-Form hi = new Form("Hi World");
-hi.addComponent(new Label("Hi World"));
-        
-Location loc = new Location();
-loc.setLatitude(51.5033630);
-loc.setLongitude(-0.1276250);
-        
-Geofence gf = new Geofence("test", loc, 100, 100000);
-        
-LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
-        
-hi.show();}</pre></noscript>
-     * 
+     * <noscript><pre>{@code public class GeofenceListenerImpl implements GeofenceListener {
+     * public void onExit(String id) {
+     * System.out.println("Exited "+id);
+     * }
+     *
+     * public void onEntered(String id) {
+     * System.out.println("Entered "+id);
+     * }
+     * }
+     * Form hi = new Form("Hi World");
+     * hi.addComponent(new Label("Hi World"));
+     *
+     * Location loc = new Location();
+     * loc.setLatitude(51.5033630);
+     * loc.setLongitude(-0.1276250);
+     *
+     * Geofence gf = new Geofence("test", loc, 100, 100000);
+     *
+     * LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
+     *
+     * hi.show();}</pre></noscript>
+     *
      * @return LocationManager Object
      */
     public LocationManager getLocationManager() {
@@ -3937,16 +3789,16 @@ hi.show();}</pre></noscript>
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
      * The image is saved as a jpeg to a file on the device.
-     * 
+     * <p>
      * use this in the actionPerformed to retrieve the file path
      * String path = (String) evt.getSource();
-     * 
+     * <p>
      * if evt returns null the image capture was cancelled by the user.
-     * 
+     *
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
-    public void capturePhoto(ActionListener response){    
+    public void capturePhoto(ActionListener response) {
         impl.capturePhoto(response);
     }
 
@@ -3955,28 +3807,28 @@ hi.show();}</pre></noscript>
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
      * The audio is saved to a file on the device.
-     * 
+     * <p>
      * use this in the actionPerformed to retrieve the file path
      * String path = (String) evt.getSource();
-     * 
+     *
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
     public void captureAudio(ActionListener response) {
         impl.captureAudio(response);
     }
-    
+
     /**
      * This method tries to invoke the device native hardware to capture audio.
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
      * The audio is saved to a file on the device.
-     * 
+     * <p>
      * use this in the actionPerformed to retrieve the file path
      * String path = (String) evt.getSource();
-     * 
+     *
      * @param recordingOptions Audio recording options.
-     * @param response a callback Object to retrieve the file path
+     * @param response         a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      * @since 7.0
      */
@@ -3989,91 +3841,92 @@ hi.show();}</pre></noscript>
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
      * The video is saved to a file on the device.
-     * 
+     * <p>
      * use this in the actionPerformed to retrieve the file path
      * String path = (String) evt.getSource();
-     * 
+     *
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
     public void captureVideo(ActionListener response) {
         impl.captureVideo(response);
     }
-    
+
     /**
      * Same as {@link #captureVideo(com.codename1.ui.events.ActionListener) }, except that it
-     * attempts to impose constraints on the capture.  Constraints include width, height, 
+     * attempts to impose constraints on the capture.  Constraints include width, height,
      * and max length.  Not all platforms support capture constraints.  Use the {@link VideoCaptureConstraints#isSupported()}
-     * to see if a constraint is supported.  If constraints are not supported at all, then this method 
+     * to see if a constraint is supported.  If constraints are not supported at all, then this method
      * will fall back to calling {@link #captureVideo(com.codename1.ui.events.ActionListener) }.
+     *
      * @param constraints Capture constraints to use.
-     * @param response a callback Object to retrieve the file path
-     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) 
+     * @param response    a callback Object to retrieve the file path
+     * @see com.codename1.capture.Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener)
      * @since 7.0
      */
     public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
         impl.captureVideo(constraints, response);
     }
-    
+
     /**
      * Opens the device image gallery
      * The method returns immediately and the response will be sent asynchronously
      * to the given ActionListener Object
-     * 
+     * <p>
      * use this in the actionPerformed to retrieve the file path
      * String path = (String) evt.getSource();
-     * 
+     *
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      * @deprecated see openGallery instead
      */
-    public void openImageGallery(ActionListener response){
+    public void openImageGallery(ActionListener response) {
         if (pluginSupport.firePluginEvent(new OpenGalleryEvent(response, Display.GALLERY_IMAGE)).isConsumed()) {
             return;
         }
         impl.openImageGallery(response);
     }
-    
+
     /**
      * <p>Opens the device gallery to pick an image or a video.<br>
      * The method returns immediately and the response is sent asynchronously
      * to the given ActionListener Object as the source value of the event (as a String)</p>
-     * 
+     *
      * <p>E.g. within the callback action performed call you can use this code: {@code String path = (String) evt.getSource();}.<br>
      * A more detailed sample of picking a video file can be seen here:
      * </p>
-     * 
+     *
      * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
-     * 
+     *
      * <p>Version 5.0 and higher support multi-selection (i.e. the types {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, and {@link #GALLERY_ALL_MULTI}).  When using one of the multiselection
      * types, the {@literal source} of the ActionEvent will be a {@code String[]}, containing the paths of the selected elements, or {@literal null} if the user cancelled the dialog.</p>
-     * 
+     *
      * <h4>Platform support</h4>
-     * <p>Currently (version 5.0 and higher), all platforms support the types {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.  On iOS, 
+     * <p>Currently (version 5.0 and higher), all platforms support the types {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.  On iOS,
      * multi-selection requires a deployment target of iOS 8.0 or higher, so it is disabled by default.   You can enable multi-selection on iOS, by adding the {@literal ios.enableGalleryMultiselect=true} build hint.  This
      * build hint will be added automatically for you if you run your app in the simulator, and it calls {@literal openGallery()} with one of the multiselect gallery types.</p>
-     * 
+     *
      * @param response a callback Object to retrieve the file path For multiselection types ({@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, and {@link #GALLERY_ALL_MULTI}), the {@literal source}
-     * of the ActionEvent sent this callback will be a {@literal String[]}.  For other types, it will be a {@literal String}.  If the dialog was cancelled, it will be {@literal null}.
-     * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.
+     *                 of the ActionEvent sent this callback will be a {@literal String[]}.  For other types, it will be a {@literal String}.  If the dialog was cancelled, it will be {@literal null}.
+     * @param type     one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.
      * @throws RuntimeException if this feature failed or unsupported on the platform.  Use {@link #isGalleryTypeSupported(int) } to check if the type is supported before calling this method.
      * @see #isGalleryTypeSupported(int) To see if a type is supported on the current platform.
      */
-    public void openGallery(ActionListener response, int type){
+    public void openGallery(ActionListener response, int type) {
         if (pluginSupport.firePluginEvent(new OpenGalleryEvent(response, type)).isConsumed()) {
             return;
         }
 
         impl.openGallery(response, type);
     }
-    
+
     /**
      * Checks to see if the given gallery type is supported on the current platform.
-     * 
+     *
      * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}, {@link #GALLERY_IMAGE_MULTI}, {@link #GALLERY_VIDEO_MULTI}, {@link #GALLERY_ALL_MULTI}.
      * @return True if the type is supported
-     * @see #openGallery(com.codename1.ui.events.ActionListener, int) 
+     * @see #openGallery(com.codename1.ui.events.ActionListener, int)
      */
     public boolean isGalleryTypeSupported(int type) {
         IsGalleryTypeSupportedEvent evt = new IsGalleryTypeSupportedEvent(type);
@@ -4085,16 +3938,16 @@ hi.show();}</pre></noscript>
 
     /**
      * Returns a 2-3 letter code representing the platform name for the platform override
-     * 
+     *
      * @return the name of the platform e.g. ios, rim, win, and, me, HTML5
      */
     public String getPlatformName() {
         return impl.getPlatformName();
-    }    
+    }
 
     /**
      * Returns the suffixes for ovr files that should be used when loading a layered resource file on this platform
-     * 
+     *
      * @return a string array with the proper order of resource override layers
      */
     public String[] getPlatformOverrides() {
@@ -4107,117 +3960,122 @@ hi.show();}</pre></noscript>
      * native email client:
      * </p>
      * <script src="https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js"></script>
+     *
      * @param recipients array of e-mail addresses
-     * @param subject e-mail subject
-     * @param msg the Message to send
+     * @param subject    e-mail subject
+     * @param msg        the Message to send
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
         impl.sendMessage(recipients, subject, msg);
     }
-    
+
     /**
      * Opens the device Dialer application with the given phone number
-     * @param phoneNumber 
+     *
+     * @param phoneNumber
      */
     public void dial(String phoneNumber) {
         impl.dial(phoneNumber);
-    }    
-    
+    }
+
     /**
-     * <p>Indicates the level of SMS support in the platform as one of: 
-     * {@link #SMS_NOT_SUPPORTED} (for desktop, tablet etc.), 
-     * {@link #SMS_SEAMLESS} (no UI interaction), {@link #SMS_INTERACTIVE} (with compose UI), 
+     * <p>Indicates the level of SMS support in the platform as one of:
+     * {@link #SMS_NOT_SUPPORTED} (for desktop, tablet etc.),
+     * {@link #SMS_SEAMLESS} (no UI interaction), {@link #SMS_INTERACTIVE} (with compose UI),
      * {@link #SMS_BOTH}.<br>
      * The sample below demonstrates the use case for this property:
      * </p>
      * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
-     * 
+     *
      * @return one of the SMS_* values
      */
     public int getSMSSupport() {
         return impl.getSMSSupport();
     }
 
-    
     /**
      * Sends a SMS message to the given phone number
+     *
      * @param phoneNumber to send the sms
-     * @param message the content of the sms
+     * @param message     the content of the sms
      */
-    public void sendSMS(String phoneNumber, String message) throws IOException{
+    public void sendSMS(String phoneNumber, String message) throws IOException {
         impl.sendSMS(phoneNumber, message, false);
     }
-    
+
     /**
      * <p>Sends a SMS message to the given phone number, the code below demonstrates the logic
      * of detecting platform behavior for sending SMS.</p>
      * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
-     * 
-     * @see #getSMSSupport() 
+     *
      * @param phoneNumber to send the sms
-     * @param message the content of the sms
+     * @param message     the content of the sms
      * @param interactive indicates the SMS should show a UI or should not show a UI if applicable see getSMSSupport
+     * @see #getSMSSupport()
      */
-    public void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException{
+    public void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException {
         impl.sendSMS(phoneNumber, message, interactive);
     }
-    
+
     /**
-     * Place a notification on the device status bar (if device has this 
+     * Place a notification on the device status bar (if device has this
      * functionality).
      * Clicking the notification might re-start the Application.
-     * 
-     * @param tickerText the ticker text of the Notification
+     *
+     * @param tickerText   the ticker text of the Notification
      * @param contentTitle the title of the Notification
-     * @param contentBody the content of the Notification
-     * @param vibrate enable/disable notification alert
-     * @param flashLights enable/disable notification flashing
+     * @param contentBody  the content of the Notification
+     * @param vibrate      enable/disable notification alert
+     * @param flashLights  enable/disable notification flashing
      * @deprecated there is a new version of this method with a slightly improved
      * signature
      */
-    public void notifyStatusBar(String tickerText, String contentTitle, 
-        String contentBody, boolean vibrate, boolean flashLights) {
+    public void notifyStatusBar(String tickerText, String contentTitle,
+                                String contentBody, boolean vibrate, boolean flashLights) {
         notifyStatusBar(tickerText, contentTitle, contentBody, vibrate, flashLights, null);
     }
-    
+
     /**
      * Indicates whether the notify status bar method will present a notification to the user
+     *
      * @return true if the notify status bar method will present a notification to the user
      */
     public boolean isNotificationSupported() {
         return impl.isNotificationSupported();
     }
-    
+
     /**
-     * Place a notification on the device status bar (if device has this 
+     * Place a notification on the device status bar (if device has this
      * functionality).
      * Clicking the notification might re-start the Application.
-     * 
-     * @param tickerText the ticker text of the Notification
+     *
+     * @param tickerText   the ticker text of the Notification
      * @param contentTitle the title of the Notification
-     * @param contentBody the content of the Notification
-     * @param vibrate enable/disable notification alert
-     * @param flashLights enable/disable notification flashing
-     * @param args additional arguments to the notification
+     * @param contentBody  the content of the Notification
+     * @param vibrate      enable/disable notification alert
+     * @param flashLights  enable/disable notification flashing
+     * @param args         additional arguments to the notification
      * @return a platform native object that allows modifying notification state
      * @deprecated use scheduleLocalNotification instead
      */
-    public Object notifyStatusBar(String tickerText, String contentTitle, 
-        String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
+    public Object notifyStatusBar(String tickerText, String contentTitle,
+                                  String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
         return impl.notifyStatusBar(tickerText, contentTitle, contentBody, vibrate, flashLights, args);
     }
-    
+
     /**
      * Removes the notification previously posted with the notify status bar method
+     *
      * @param o the object returned from the notifyStatusBar method
      */
     public void dismissNotification(Object o) {
         impl.dismissNotification(o);
     }
-    
+
     /**
      * Returns true if the underlying OS supports numeric badges on icons. Notice this is only available on iOS
      * and only when push notification is enabled
+     *
      * @return true if the underlying OS supports numeric badges
      */
     public boolean isBadgingSupported() {
@@ -4225,45 +4083,50 @@ hi.show();}</pre></noscript>
     }
 
     /**
-     * Sets the number that appears on the application icon in iOS 
+     * Sets the number that appears on the application icon in iOS
+     *
      * @param number number to show on the icon
      */
     public void setBadgeNumber(int number) {
         impl.setBadgeNumber(number);
     }
-    
+
     /**
      * Returns true if the underlying OS supports opening the native navigation
      * application
+     *
      * @return true if the underlying OS supports launch of native navigation app
      */
-    public boolean isOpenNativeNavigationAppSupported(){
+    public boolean isOpenNativeNavigationAppSupported() {
         return impl.isOpenNativeNavigationAppSupported();
     }
-    
+
     /**
      * Opens the native navigation app in the given coordinate.
-     * @param latitude 
-     * @param longitude 
-     */ 
-    public void openNativeNavigationApp(double latitude, double longitude){
+     *
+     * @param latitude
+     * @param longitude
+     */
+    public void openNativeNavigationApp(double latitude, double longitude) {
         impl.openNativeNavigationApp(latitude, longitude);
     }
-    
+
     /**
      * Opens the native navigation app with the given search location
+     *
      * @param location the location to search for in the native navigation map
-     */ 
-    public void openNativeNavigationApp(String location) {    
+     */
+    public void openNativeNavigationApp(String location) {
         impl.openNativeNavigationApp(location);
     }
-    
+
     /**
      * Gets all contacts from the address book of the device
+     *
      * @param withNumbers if true returns only contacts that has a number
      * @return array of contacts unique ids
      */
-    public String [] getAllContacts(boolean withNumbers) {
+    public String[] getAllContacts(boolean withNumbers) {
         return impl.getAllContacts(withNumbers);
     }
 
@@ -4273,16 +4136,16 @@ hi.show();}</pre></noscript>
      * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
      * information.<br>
      * The sample below demonstrates listing all the contacts within the device with their photos</p>
-     * 
+     *
      * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
-     * 
-     * @param withNumbers if true returns only contacts that has a number
+     *
+     * @param withNumbers      if true returns only contacts that has a number
      * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
-     * @param includesPicture if true try to fetch the Contact Picture if exists
-     * @param includesNumbers if true try to fetch all Contact numbers
-     * @param includesEmail if true try to fetch all Contact Emails
-     * @param includeAddress if true try to fetch all Contact Addresses
+     * @param includesPicture  if true try to fetch the Contact Picture if exists
+     * @param includesNumbers  if true try to fetch all Contact numbers
+     * @param includesEmail    if true try to fetch all Contact Emails
+     * @param includeAddress   if true try to fetch all Contact Addresses
      * @return array of the contacts
      */
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
@@ -4292,33 +4155,26 @@ hi.show();}</pre></noscript>
     /**
      * Indicates if the getAllContacts is platform optimized, notice that the method
      * might still take seconds or more to run so you should still use a separate thread!
+     *
      * @return true if getAllContacts will perform faster that just getting each contact
      */
     public boolean isGetAllContactsFast() {
         return impl.isGetAllContactsFast();
     }
-    
-    /**
-     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
-     * @param c The contact whose "linked" contacts are to be retrieved.
-     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
-     * @see ContactsManager#getLinkedContacts(com.codename1.contacts.Contact) 
-     */
-    //public Contact[] getLinkedContacts(Contact c) {
-    //    return impl.getLinkedContacts(c);
-    //}
-    
+
     /**
      * Gets IDs of all contacts that are linked to a given contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     *
      * @param c The contact whose "linked" contacts are to be retrieved.
      * @return IDs of linked contacts.
      */
     public String[] getLinkedContactIds(Contact c) {
         return impl.getLinkedContactIds(c);
     }
-    
+
     /**
      * Get a Contact according to it's contact id.
+     *
      * @param id unique id of the Contact
      * @return a Contact Object
      */
@@ -4327,166 +4183,172 @@ hi.show();}</pre></noscript>
     }
 
     /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     * @see ContactsManager#getLinkedContacts(com.codename1.contacts.Contact)
+     */
+    //public Contact[] getLinkedContacts(Contact c) {
+    //    return impl.getLinkedContacts(c);
+    //}
+
+    /**
      * <p>This method returns a Contact by the contact id and fills it's data
      * according to the given flags.<br>
      * The sample below demonstrates listing all the contacts within the device with their photos</p>
-     * 
+     *
      * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
-     * 
-     * @param id of the Contact
+     *
+     * @param id               of the Contact
      * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
-     * @param includesPicture if true try to fetch the Contact Picture if exists
-     * @param includesNumbers if true try to fetch all Contact numbers
-     * @param includesEmail if true try to fetch all Contact Emails
-     * @param includeAddress if true try to fetch all Contact Addresses
-     *  
+     * @param includesPicture  if true try to fetch the Contact Picture if exists
+     * @param includesNumbers  if true try to fetch all Contact numbers
+     * @param includesEmail    if true try to fetch all Contact Emails
+     * @param includeAddress   if true try to fetch all Contact Addresses
      * @return a Contact Object
-     */     
-    public Contact getContactById(String id, boolean includesFullName, 
-            boolean includesPicture, boolean includesNumbers, boolean includesEmail, 
-            boolean includeAddress) {
-        return impl.getContactById(id,includesFullName, includesPicture, 
+     */
+    public Contact getContactById(String id, boolean includesFullName,
+                                  boolean includesPicture, boolean includesNumbers, boolean includesEmail,
+                                  boolean includeAddress) {
+        return impl.getContactById(id, includesFullName, includesPicture,
                 includesNumbers, includesEmail, includeAddress);
     }
-    
+
     /**
      * Some platforms allow the user to block contacts access on a per application basis this method
      * returns true if the user denied permission to access contacts. This can allow you to customize the error
      * message presented to the user.
-     * 
+     *
      * @return true if contacts access is allowed or globally available, false otherwise
      */
     public boolean isContactsPermissionGranted() {
         return impl.isContactsPermissionGranted();
     }
-    
+
     /**
      * Create a contact to the device contacts book
-     * 
-     * @param firstName the Contact firstName
-     * @param familyName the Contact familyName
+     *
+     * @param firstName   the Contact firstName
+     * @param familyName  the Contact familyName
      * @param officePhone the Contact work phone or null
-     * @param homePhone the Contact home phone or null
-     * @param cellPhone the Contact mobile phone or null
-     * @param email the Contact email or null
-     * 
+     * @param homePhone   the Contact home phone or null
+     * @param cellPhone   the Contact mobile phone or null
+     * @param email       the Contact email or null
      * @return the contact id if creation succeeded or null  if failed
-     */ 
+     */
     public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
-         return impl.createContact(firstName, familyName, officePhone, homePhone, cellPhone, email);
+        return impl.createContact(firstName, familyName, officePhone, homePhone, cellPhone, email);
     }
 
     /**
      * removed a contact from the device contacts book
+     *
      * @param id the contact id to remove
      * @return true if deletion succeeded false otherwise
-     */ 
+     */
     public boolean deleteContact(String id) {
         return impl.deleteContact(id);
     }
-    
+
     /**
      * Indicates if the native video player includes its own play/pause etc. controls so the movie player
      * component doesn't need to include them
-     * 
+     *
      * @return true if the movie player component doesn't need to include such controls
      */
     public boolean isNativeVideoPlayerControlsIncluded() {
         return impl.isNativeVideoPlayerControlsIncluded();
-    }    
-    
+    }
+
     /**
      * Indicates if the underlying platform supports sharing capabilities
+     *
      * @return true if the underlying platform handles share.
      */
-    public boolean isNativeShareSupported(){
+    public boolean isNativeShareSupported() {
         return impl.isNativeShareSupported();
     }
-    
+
     /**
      * Share the required information using the platform sharing services.
      * a Sharing service can be: mail, sms, facebook, twitter,...
-     * This method is implemented if isNativeShareSupported() returned true for 
+     * This method is implemented if isNativeShareSupported() returned true for
      * a specific platform.
-     * 
+     *
      * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
      * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
-     * 
+     *
      * @param toShare String to share.
      * @deprecated use the method share that accepts an image and mime type
      */
-    public void share(String toShare){
+    public void share(String toShare) {
         share(toShare, null, null);
     }
-    
+
     /**
      * Share the required information using the platform sharing services.
      * a Sharing service can be: mail, sms, facebook, twitter,...
-     * This method is implemented if isNativeShareSupported() returned true for 
+     * This method is implemented if isNativeShareSupported() returned true for
      * a specific platform.
-     * 
+     *
      * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
      * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
-     * 
-     * @param text String to share.
-     * @param image file path to the image or null
+     *
+     * @param text     String to share.
+     * @param image    file path to the image or null
      * @param mimeType type of the image or null if no image to share
      */
-    public void share(String text, String image, String mimeType){
+    public void share(String text, String image, String mimeType) {
         share(text, image, mimeType, null);
-        
+
     }
-    
-    
-   /**
+
+    /**
      * Share the required information using the platform sharing services.
      * a Sharing service can be: mail, sms, facebook, twitter,...
-     * This method is implemented if isNativeShareSupported() returned true for 
+     * This method is implemented if isNativeShareSupported() returned true for
      * a specific platform.
-     * 
+     *
      * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
      * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
      *
      * <p>Since 8.0, you can share files using using the file path in the text parameter.  The file must exist in file system storage, and
-    * you must define the appropriate mimeType in the mimeType parameter.  E.g. {@code share("file:/.../myfile.pdf", null, "application.pdf") }</p>
-    *
+     * you must define the appropriate mimeType in the mimeType parameter.  E.g. {@code share("file:/.../myfile.pdf", null, "application.pdf") }</p>
+     *
      * @param textOrPath String to share, or path to file to share.
-     * @param image file path to the image or null
-     * @param mimeType type of the image or file.  null if just sharing text
+     * @param image      file path to the image or null
+     * @param mimeType   type of the image or file.  null if just sharing text
      * @param sourceRect The source rectangle of the button that originated the share request.  This is used on
-     * some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
-     * on the iPad with iOS 8 and higher.
+     *                   some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
+     *                   on the iPad with iOS 8 and higher.
      */
-    public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect){
+    public void share(String textOrPath, String image, String mimeType, Rectangle sourceRect) {
         impl.share(textOrPath, image, mimeType, sourceRect);
     }
-    
-    
-    
-     /**
+
+    /**
      * <p>The localization manager allows adapting values for display in different locales thru parsing and formatting
      * capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
      * related API's similar to Locale/currency API's from JavaSE.<br>
      * The sample code below just lists the various capabilities of the API:</p>
-     * 
+     *
      * <script src="https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/l10n-manager.png" alt="Localization formatting/parsing and information" />
-     * 
+     *
      * @return an instance of the localization manager
      */
     public L10NManager getLocalizationManager() {
         return impl.getLocalizationManager();
     }
 
-    
     /**
      * User register to receive push notification
-     * 
-     * @param id the id for the user
-     * @param noFallback some devices don't support an efficient push API and will resort to polling 
-     * to provide push like functionality. If this flag is set to true no polling will occur and 
-     * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+     *
+     * @param id         the id for the user
+     * @param noFallback some devices don't support an efficient push API and will resort to polling
+     *                   to provide push like functionality. If this flag is set to true no polling will occur and
+     *                   the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      * @deprecated use {@link #registerPush()} the Android push id should be set with the build hint {@code gcm.sender_id} which will work for Chrome JavaScript builds too
      */
     public void registerPush(String id, boolean noFallback) {
@@ -4498,16 +4360,16 @@ hi.show();}</pre></noscript>
     /**
      * Register to receive push notification, invoke this method once (ever) to receive push
      * notifications.
-     * 
-     * @param metaData meta data for push, this is relevant on some platforms such as google where 
-     * a push id is necessary,
-     * @param noFallback some devices don't support an efficient push API and will resort to polling 
-     * to provide push like functionality. If this flag is set to true no polling will occur and 
-     * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+     *
+     * @param metaData   meta data for push, this is relevant on some platforms such as google where
+     *                   a push id is necessary,
+     * @param noFallback some devices don't support an efficient push API and will resort to polling
+     *                   to provide push like functionality. If this flag is set to true no polling will occur and
+     *                   the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
      * @deprecated use {@link #registerPush()} the Android push id should be set with the build hint {@code gcm.sender_id} which will work for Chrome JavaScript builds too
      */
     public void registerPush(Hashtable metaData, boolean noFallback) {
-        if(Preferences.get("push_id", (long)-1) == -1) {
+        if (Preferences.get("push_id", (long) -1) == -1) {
             impl.registerPush(metaData, noFallback);
         }
     }
@@ -4519,7 +4381,7 @@ hi.show();}</pre></noscript>
     public void registerPush() {
         impl.registerPush(new Hashtable(), false);
     }
-    
+
     /**
      * Stop receiving push notifications to this client application
      */
@@ -4531,23 +4393,22 @@ hi.show();}</pre></noscript>
      * Creates a Media recorder Object which will record from the device mic to
      * a file in the given path.
      * The output format will be amr-nb if supported by the platform.
-     * 
+     *
      * @param path a file path to where to store the recording, if the file does
-     * not exists it will be created.
-     * @deprecated 
+     *             not exists it will be created.
+     * @deprecated
      */
     public Media createMediaRecorder(String path) throws IOException {
         return createMediaRecorder(path, getAvailableRecordingMimeTypes()[0]);
     }
-    
+
     /**
-     * 
      * @param builder A MediaRecorderBuilder
      * @return a MediaRecorder
-     * @throws IOException 
-     * @deprecated use MediaRecorderBuilder#build()
-     * @see MediaRecorderBuilder#build() 
+     * @throws IOException
+     * @see MediaRecorderBuilder#build()
      * @since 7.0
+     * @deprecated use MediaRecorderBuilder#build()
      */
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
         return impl.createMediaRecorder(builder);
@@ -4556,18 +4417,19 @@ hi.show();}</pre></noscript>
     /**
      * Creates a Media recorder Object which will record from the device mic to
      * a file in the given path.
-     * 
-     * @param path a file path to where to store the recording, if the file does
-     * not exists it will be created.
-     * @param mimeType the output mime type that is supported see 
-     * getAvailableRecordingMimeTypes() 
+     *
+     * @param path     a file path to where to store the recording, if the file does
+     *                 not exists it will be created.
+     * @param mimeType the output mime type that is supported see
+     *                 getAvailableRecordingMimeTypes()
      */
     public Media createMediaRecorder(String path, String mimeType) throws IOException {
         return impl.createMediaRecorder(path, mimeType);
     }
-    
+
     /**
      * Returns the image IO instance that allows scaling image files.
+     *
      * @return the image IO instance or null if image IO isn't supported for the given platform
      */
     public ImageIO getImageIO() {
@@ -4575,77 +4437,77 @@ hi.show();}</pre></noscript>
     }
 
     /**
-     * Gets the recording mime type for the returned Media from the 
+     * Gets the recording mime type for the returned Media from the
      * createMediaRecorder method
-     * 
+     *
      * @return the recording mime type
      * @deprecated see getAvailableRecordingMimeTypes() instead
      */
     public String getMediaRecorderingMimeType() {
         return impl.getAvailableRecordingMimeTypes()[0];
     }
-    
+
     /**
      * Opens a database or create one if not exists.  On platforms where {@link #isDatabaseCustomPathSupported() }
      * this method can optionally accept a file path.
-     * 
+     *
      * @param databaseName the name of the database
      * @return Database Object or null if not supported on the platform
-     * 
      * @throws IOException if database cannot be created
      */
-    public Database openOrCreate(String databaseName) throws IOException{
+    public Database openOrCreate(String databaseName) throws IOException {
         return impl.openOrCreateDB(databaseName);
     }
-    
+
     public boolean isDatabaseCustomPathSupported() {
         return impl.isDatabaseCustomPathSupported();
     }
-    
+
     /**
      * Deletes database
-     * 
+     *
      * @param databaseName the name of the database
      * @throws IOException if database cannot be deleted
      */
-    public void delete(String databaseName) throws IOException{
+    public void delete(String databaseName) throws IOException {
         impl.deleteDB(databaseName);
     }
-    
+
     /**
      * Indicates weather a database exists
-     * 
+     *
      * @param databaseName the name of the database
      * @return true if database exists
      */
-    public boolean exists(String databaseName){
+    public boolean exists(String databaseName) {
         return impl.existsDB(databaseName);
     }
-    
+
     /**
-     * Returns the file path of the Database if support for database exists 
+     * Returns the file path of the Database if support for database exists
      * on the platform.
-     * @param databaseName the name of the database with out / or path 
-     * elements e.g. {@code mydatabase.db}
+     *
+     * @param databaseName the name of the database with out / or path
+     *                     elements e.g. {@code mydatabase.db}
      * @return the file path of the database or null if database isn't supported
      */
     public String getDatabasePath(String databaseName) {
         return impl.getDatabasePath(databaseName);
     }
-    
+
     /**
      * Sets the frequency for polling the server in case of polling based push notification
-     * 
+     *
      * @param freq the frequency in milliseconds
      */
     public void setPollingFrequency(int freq) {
         impl.setPollingFrequency(freq);
     }
-    
 
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
-     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     *
+     * @param r    runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
      */
@@ -4655,7 +4517,8 @@ hi.show();}</pre></noscript>
 
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
-     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     *
+     * @param r    runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
      * @deprecated confusing name use {@link #createThread(java.lang.Runnable, java.lang.String)} instead
@@ -4668,22 +4531,24 @@ hi.show();}</pre></noscript>
      * Indicates if the title of the Form is native title(in android ICS devices
      * if the command behavior is native the ActionBar is used to display the title
      * and the menu)
+     *
      * @return true if platform would like to show the Form title
      */
     public boolean isNativeTitle() {
         return impl.isNativeTitle();
     }
-    
+
     /**
      * if the title is native(e.g the android action bar), notify the native title
      * that is needs to be refreshed
      */
-    public void refreshNativeTitle(){
+    public void refreshNativeTitle() {
         impl.refreshNativeTitle();
     }
 
     /**
      * The crash reporter gets invoked when an uncaught exception is intercepted
+     *
      * @return the crashReporter
      */
     public CrashReport getCrashReporter() {
@@ -4692,23 +4557,25 @@ hi.show();}</pre></noscript>
 
     /**
      * The crash reporter gets invoked when an uncaught exception is intercepted
+     *
      * @param crashReporter the crashReporter to set
      */
     public void setCrashReporter(CrashReport crashReporter) {
         this.crashReporter = crashReporter;
     }
-    
+
     /**
      * Returns the UDID for devices that support it
-     * 
+     *
      * @return the UDID or null
      */
     public String getUdid() {
         return impl.getUdid();
     }
-    
+
     /**
      * Returns the MSISDN for devices that expose it
+     *
      * @return the msisdn or null
      */
     public String getMsisdn() {
@@ -4718,14 +4585,14 @@ hi.show();}</pre></noscript>
     /**
      * Returns the native OS purchase implementation if applicable, if unavailable this
      * method will try to fallback to a custom purchase implementation and failing that
-     * will return null 
-     * 
+     * will return null
+     *
      * @return instance of the purchase class or null
      */
     public Purchase getInAppPurchase() {
         return impl.getInAppPurchase();
     }
-    
+
     /**
      * @deprecated use the version that accepts no arguments, the physical goods purchase is always
      * manual payment if applicable
@@ -4733,30 +4600,31 @@ hi.show();}</pre></noscript>
     public Purchase getInAppPurchase(boolean d) {
         return getInAppPurchase();
     }
-    
+
     /**
      * Returns the native implementation of the code scanner or null
+     *
      * @return code scanner instance
      * @deprecated Use the cn1-codescanner cn1lib.
      */
     public CodeScanner getCodeScanner() {
-        if(!hasCamera()) {
+        if (!hasCamera()) {
             return null;
         }
         return impl.getCodeScanner();
     }
- 
+
     /**
      * Gets the available recording MimeTypes
-     */ 
+     */
     public String[] getAvailableRecordingMimeTypes() {
         return impl.getAvailableRecordingMimeTypes();
     }
-    
+
     /**
-     * Checks if the device supports disabling the screen display from dimming, allowing 
+     * Checks if the device supports disabling the screen display from dimming, allowing
      * the developer to keep the screen display on.
-     */ 
+     */
     public boolean isScreenSaverDisableSupported() {
         return impl.isScreenLockSupported();
     }
@@ -4765,6 +4633,7 @@ hi.show();}</pre></noscript>
      * Checks is the scroll-wheel mouse is currently scrolling.  The scroll-wheel simulates pointer presses and drags
      * so there are cases when you are processing pointer events when you may want to know if it was driggered by
      * a scroll wheel.
+     *
      * @return True if the scroll-wheel is responsible for current pointer events.
      * @since 8.0
      */
@@ -4772,15 +4641,16 @@ hi.show();}</pre></noscript>
         return impl.isScrollWheeling();
     }
 
-    /** 
-     * If isScreenSaverDisableSupported() returns true calling this method will 
+    /**
+     * If isScreenSaverDisableSupported() returns true calling this method will
      * lock the screen display on
+     *
      * @param e when set to true the screen saver will work as usual and when set to false the screen
-     * will not turn off automatically
+     *          will not turn off automatically
      */
-    public void setScreenSaverEnabled(boolean e){
-        if(e) {
-            impl.unlockScreen();    
+    public void setScreenSaverEnabled(boolean e) {
+        if (e) {
+            impl.unlockScreen();
         } else {
             impl.lockScreen();
         }
@@ -4788,29 +4658,31 @@ hi.show();}</pre></noscript>
 
     /**
      * Returns true if the device has camera false otherwise.
-     */ 
+     */
     public boolean hasCamera() {
         return impl.hasCamera();
     }
 
     /**
-     * Indicates whether the native picker dialog is supported for the given type 
+     * Indicates whether the native picker dialog is supported for the given type
      * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+     *
      * @param pickerType the picker type constant
      * @return true if the native platform supports this picker type
      */
     public boolean isNativePickerTypeSupported(int pickerType) {
         return impl.isNativePickerTypeSupported(pickerType);
     }
-    
+
     /**
-     * Shows a native modal dialog allowing us to perform the picking for the given type 
+     * Shows a native modal dialog allowing us to perform the picking for the given type
      * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
-     * @param type the picker type constant
-     * @param source the source component (optional) the native dialog will be placed in relation to this
-     * component if applicable
+     *
+     * @param type         the picker type constant
+     * @param source       the source component (optional) the native dialog will be placed in relation to this
+     *                     component if applicable
      * @param currentValue the currently selected value
-     * @param data additional meta data specific to the picker type when applicable
+     * @param data         additional meta data specific to the picker type when applicable
      * @return the value from the picker or null if the operation was canceled.
      */
     public Object showNativePicker(int type, Component source, Object currentValue, Object data) {
@@ -4821,6 +4693,7 @@ hi.show();}</pre></noscript>
      * When set to true Codename One allows multiple hardware keys to be pressed at once,
      * this isn't on by default since it can trigger some complexities with UI navigation to/from
      * native code
+     *
      * @return the multiKeyMode
      */
     public boolean isMultiKeyMode() {
@@ -4831,14 +4704,25 @@ hi.show();}</pre></noscript>
      * When set to true Codename One allows multiple hardware keys to be pressed at once,
      * this isn't on by default since it can trigger some complexities with UI navigation to/from
      * native code
+     *
      * @param multiKeyMode the multiKeyMode to set
      */
     public void setMultiKeyMode(boolean multiKeyMode) {
         this.multiKeyMode = multiKeyMode;
     }
-    
+
     /**
      * Long pointer press is invoked after the given interval, this allows making long press events shorter/longer
+     *
+     * @return time in milliseconds
+     */
+    public int getLongPointerPressInterval() {
+        return longPressInterval;
+    }
+
+    /**
+     * Long pointer press is invoked after the given interval, this allows making long press events shorter/longer
+     *
      * @param v time in milliseconds
      */
     public void setLongPointerPressInterval(int v) {
@@ -4846,80 +4730,75 @@ hi.show();}</pre></noscript>
     }
 
     /**
-     * Long pointer press is invoked after the given interval, this allows making long press events shorter/longer
-     * @return time in milliseconds
-     */
-    public int getLongPointerPressInterval() {
-        return longPressInterval;
-    }
-    
-    /**
      * <p>Schedules a local notification that will occur after the given time elapsed.<br>
      * The sample below combines this with the geofence API to show a local notification
      * when entering a radius with the app in the background:</p>
      * <script src="https://gist.github.com/shannah/a5592313da97e085822120af16518874.js"></script>
-     * 
-     * @param n The notification to schedule.
+     *
+     * @param n         The notification to schedule.
      * @param firstTime time in milliseconds when to schedule the notification
-     * @param repeat repeat one of the following: REPEAT_NONE, REPEAT_FIFTEEN_MINUTES, 
-     * REPEAT_HALF_HOUR, REPEAT_HOUR, REPEAT_DAY, REPEAT_WEEK
+     * @param repeat    repeat one of the following: REPEAT_NONE, REPEAT_FIFTEEN_MINUTES,
+     *                  REPEAT_HALF_HOUR, REPEAT_HOUR, REPEAT_DAY, REPEAT_WEEK
      */
     public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
         if (n.getId() == null || n.getId().length() == 0) {
             throw new IllegalArgumentException("Notification ID must be set");
         }
-        if(firstTime < System.currentTimeMillis()){
-            throw new IllegalArgumentException("Cannot schedule a notification to a past time");        
+        if (firstTime < System.currentTimeMillis()) {
+            throw new IllegalArgumentException("Cannot schedule a notification to a past time");
         }
-        if (n.getAlertSound() != null && n.getAlertSound().length() > 0 && !n.getAlertSound().startsWith("/notification_sound") ) {
+        if (n.getAlertSound() != null && n.getAlertSound().length() > 0 && !n.getAlertSound().startsWith("/notification_sound")) {
             throw new IllegalArgumentException("Alert sound file name must start with the 'notification_sound' prefix");
         }
         impl.scheduleLocalNotification(n, firstTime, repeat);
     }
-    
+
     /**
      * Cancels a local notification by ID.
-     * @param notificationId 
+     *
+     * @param notificationId
      * @see com.codename1.notifications.LocalNotification
      */
     public void cancelLocalNotification(String notificationId) {
         impl.cancelLocalNotification(notificationId);
     }
-    
+
     /**
      * Sets the preferred time interval between background fetches.  This is only a
-     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign 
+     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign
      * control over when and if background fetches will be allowed. This number is used
      * only as a guideline.
-     * 
+     *
      * <p><strong>This method must be called in order to activate background fetch.</strong>></p>
      * <p>Note: If the platform doesn't support background fetch (i.e. {@link #isBackgroundFetchSupported() } returns {@code false},
      * then this method does nothing.</p>
+     *
      * @param seconds The time interval in seconds.
-     * 
-     * @see #isBackgroundFetchSupported() 
-     * @see #getPreferredBackgroundFetchInterval(int) () 
+     * @see #isBackgroundFetchSupported()
+     * @see #getPreferredBackgroundFetchInterval(int) ()
      * @see com.codename1.background.BackgroundFetch
      */
     public void setPreferredBackgroundFetchInterval(int seconds) {
         impl.setPreferredBackgroundFetchInterval(seconds);
     }
-    
+
     /**
      * Gets the preferred time (in seconds) between background fetches.
+     *
      * @return The time interval in seconds.
-     * @see #isBackgroundFetchSupported() 
-     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see #isBackgroundFetchSupported()
+     * @see #setPreferredBackgroundFetchInterval(int)
      * @see com.codename1.background.BackgroundFetch
      */
     public int getPreferredBackgroundFetchInterval(int seconds) {
         return impl.getPreferredBackgroundFetchInterval();
     }
-    
+
     /**
      * Checks to see if the current platform supports background fetch.
+     *
      * @return True if the current platform supports background fetch.
-     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see #setPreferredBackgroundFetchInterval(int)
      * @see #getPreferredBackgroundFetchInterval(int) ()
      * @see com.codename1.background.BackgroundFetch
      */
@@ -4929,6 +4808,7 @@ hi.show();}</pre></noscript>
 
     /**
      * Allows detecting development mode so debugging code and special cases can be used to simplify flow
+     *
      * @return true if we are running in the simulator, false otherwise
      */
     public boolean isSimulator() {
@@ -4937,30 +4817,26 @@ hi.show();}</pre></noscript>
 
     /**
      * Creates an audio media that can be played in the background.
-     * 
-     * @param uri the uri of the media can start with jar://, file://, http:// 
-     * (can also use rtsp:// if supported on the platform)
-     * 
-     * @return Media a Media Object that can be used to control the playback 
+     *
+     * @param uri the uri of the media can start with jar://, file://, http://
+     *            (can also use rtsp:// if supported on the platform)
+     * @return Media a Media Object that can be used to control the playback
      * of the media or null if background playing is not supported on the platform
-     * 
      * @throws IOException if creation of media from the given URI has failed
-     */ 
-    public Media createBackgroundMedia(String uri) throws IOException{
+     */
+    public Media createBackgroundMedia(String uri) throws IOException {
         return impl.createBackgroundMedia(uri);
     }
-    
+
     /**
      * Creates an audio media that can be played in the background.  This call is
      * asynchronous, so that it will return perhaps before the media object is ready.
-     * 
-     * @param uri the uri of the media can start with jar://, file://, http:// 
-     * (can also use rtsp:// if supported on the platform)
-     * 
-     * @return Media a Media Object that can be used to control the playback 
+     *
+     * @param uri the uri of the media can start with jar://, file://, http://
+     *            (can also use rtsp:// if supported on the platform)
+     * @return Media a Media Object that can be used to control the playback
      * of the media or null if background playing is not supported on the platform
-     * 
-     */ 
+     */
     public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
         return impl.createBackgroundMediaAsync(uri);
     }
@@ -4968,19 +4844,19 @@ hi.show();}</pre></noscript>
     /**
      * Create a blur image from the given image.
      * The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
-     * 
-     * @param image the image to blur
+     *
+     * @param image  the image to blur
      * @param radius the radius to be used in the algorithm
-     */ 
+     */
     public Image gaussianBlurImage(Image image, float radius) {
         return impl.gaussianBlurImage(image, radius);
     }
 
     /**
      * Returns true if gaussian blur is supported on this platform
-     * 
+     *
      * @return true if gaussian blur is supported.
-     */ 
+     */
     public boolean isGaussianBlurSupported() {
         return impl.isGaussianBlurSupported();
     }
@@ -4995,15 +4871,17 @@ hi.show();}</pre></noscript>
     /**
      * Returns true if this device is jailbroken or rooted, false if not or unknown. Notice that this method isn't
      * accurate and can't detect all jailbreak/rooting cases
-     * @return true if this device is jailbroken or rooted, false if not or unknown. 
+     *
+     * @return true if this device is jailbroken or rooted, false if not or unknown.
      */
     public boolean isJailbrokenDevice() {
         return impl.isJailbrokenDevice();
     }
-    
+
     /**
-     * Returns the build hints for the simulator, this will only work in the debug environment and it's 
+     * Returns the build hints for the simulator, this will only work in the debug environment and it's
      * designed to allow extensions/API's to verify user settings/build hints exist
+     *
      * @return map of the build hints that isn't modified without the codename1.arg. prefix
      */
     public Map<String, String> getProjectBuildHints() {
@@ -5011,28 +4889,29 @@ hi.show();}</pre></noscript>
     }
 
     /**
-     * Sets a build hint into the settings while overwriting any previous value. This will only work in the 
+     * Sets a build hint into the settings while overwriting any previous value. This will only work in the
      * debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
      * Important: this will throw an exception outside of the simulator!
-     * @param key the build hint without the codename1.arg. prefix
+     *
+     * @param key   the build hint without the codename1.arg. prefix
      * @param value the value for the hint
      */
     public void setProjectBuildHint(String key, String value) {
         impl.setProjectBuildHint(key, value);
     }
-    
+
     /**
      * Checks to see if you can prompt the user to install the app on their homescreen.
-     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it 
+     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it
      * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
-     * previously prompted the user and they have declined, then this will return false.  
-     * 
-     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified 
+     * previously prompted the user and they have declined, then this will return false.
+     *
+     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified
      * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
      * inside that method - or sometime after.</p>
-     * 
+     *
      * <h3>Example</h3>
-     * <pre>{@code 
+     * <pre>{@code
      * onCanInstallOnHomescreen(()->{
      *      if (canInstallOnHomescreen()) {
      *           if (promptInstallOnHomescreen()) {
@@ -5043,33 +4922,36 @@ hi.show();}</pre></noscript>
      *      }
      * });
      * }</pre>
-     * 
+     * <p>
      * https://developers.google.com/web/fundamentals/app-install-banners/
-     * @return True if you are able to prompt the user to install the app on their homescreen.  
-     * @see #promptInstallOnHomescreen() 
-     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     *
+     * @return True if you are able to prompt the user to install the app on their homescreen.
+     * @see #promptInstallOnHomescreen()
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable)
      */
     public boolean canInstallOnHomescreen() {
         return impl.canInstallOnHomescreen();
     }
-    
+
     /**
-     * Prompts the user to install this app on their homescreen.  This is only relevant in the 
-     * javascript port. 
+     * Prompts the user to install this app on their homescreen.  This is only relevant in the
+     * javascript port.
+     *
      * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
      * {@literal false} if they reject it.
-     * @see #canInstallOnHomescreen() 
-     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     * @see #canInstallOnHomescreen()
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable)
      */
     public boolean promptInstallOnHomescreen() {
         return impl.promptInstallOnHomescreen();
     }
-    
+
     /**
      * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
      * Only relevant in the javascript port.
+     *
      * @param r Runnable that will be run when/if you are permitted to prompt the user to install
-     * the app on their homescreen.
+     *          the app on their homescreen.
      */
     public void onCanInstallOnHomescreen(Runnable r) {
         impl.onCanInstallOnHomescreen(r);
@@ -5077,6 +4959,7 @@ hi.show();}</pre></noscript>
 
     /**
      * Captures a screenshot of the screen.
+     *
      * @return An image of the screen, or null if it failed.
      * @since 7.0
      */
@@ -5086,64 +4969,154 @@ hi.show();}</pre></noscript>
 
     /**
      * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     *
      * @param timeout The timeout in milliseconds.
-     * @param r The task to run.
+     * @param r       The task to run.
      * @return The Timer object that can be used to cancel the task.
+     * @see #setInterval(int, java.lang.Runnable)
      * @since 7.0
-     * @see #setInterval(int, java.lang.Runnable) 
      */
     public Timer setTimeout(int timeout, @Async.Schedule final Runnable r) {
-        
+
         Timer t = new Timer();
         t.schedule(new TimerTask() {
             public void run() {
                 executeTimeoutRunnable(r);
             }
-        }, (long)timeout);
+        }, (long) timeout);
         return t;
     }
-    
+
     private void executeTimeoutRunnable(@Async.Execute Runnable r) {
         CN.callSerially(r);
     }
-    
+
     /**
      * Convenience method to schedule a task to run on the EDT after {@literal period}ms
      * repeating every {@literal period}ms.
+     *
      * @param period The delay and repeat in milliseconds.
-     * @param r The runnable to run on the EDT.
+     * @param r      The runnable to run on the EDT.
      * @return The timer object which can be used to cancel the task.
+     * @see #setTimeout(int, java.lang.Runnable)
      * @since 7.0
-     * @see #setTimeout(int, java.lang.Runnable) 
      */
     public Timer setInterval(int period, @Async.Schedule final Runnable r) {
         Timer t = new Timer();
-        t.schedule(new TimerTask(){
+        t.schedule(new TimerTask() {
             public void run() {
                 executeTimeoutRunnable(r);
             }
         }, period, period);
-        
-        
+
+
         return t;
     }
-    
+
     /**
      * Gets a reference to an application-wide shared Javascript context that can be used for running
      * Javascript commands.  When running in the Javascript port, this Javascript context will be the
-     * same context in which the application itself is running, so it gives you the ability to interact 
+     * same context in which the application itself is running, so it gives you the ability to interact
      * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
-     * 
+     *
      * <p>When running on other platforms, this shared context will be an off-screen browser component.</p>
-     * 
+     *
      * <p>Sample code allowing user to execute arbitrary Javascript code inside the shared context:</p>
      * <script src="https://gist.github.com/shannah/60040d9b3cc520b28bc1fef5e31afd31.js"></script>
-     * 
+     *
      * @return A shared BrowserComponent
      * @since 7.0
      */
     public BrowserComponent getSharedJavascriptContext() {
         return impl.getSharedJavscriptContext();
     }
-    
+
+    private class EdtException extends RuntimeException {
+        private Throwable cause;
+        private EdtException parent;
+
+        public synchronized Throwable getCause() {
+            return cause;
+        }
+
+        public void setCause(Throwable t) {
+            this.cause = t;
+        }
+
+        private void throwRoot(Throwable cause) {
+            HashSet<Throwable> circuitCheck = new HashSet<Throwable>();
+            circuitCheck.add(cause);
+            EdtException root = this;
+            if (root != cause) {
+                root.setCause(cause);
+                circuitCheck.add(root);
+            } else {
+                root = (EdtException) cause;
+            }
+            while (root.parent != null) {
+                if (circuitCheck.contains(root.parent)) {
+                    break;
+                }
+                root.parent.setCause(root);
+                circuitCheck.add(root.parent);
+                root = root.parent;
+            }
+            throw root;
+        }
+
+    }
+
+    /**
+     * A wrapper around Runnable that records the stack trace so that
+     * if an exception occurs, it is easier to track it back to the original
+     * source.
+     */
+    private class DebugRunnable implements Runnable {
+        private final Runnable internal;
+        private EdtException exceptionWrapper;
+        private DebugRunnable parentContext;
+        private int depth;
+        private int totalDepth;
+
+        DebugRunnable(Runnable internal) {
+            this.internal = internal;
+            this.parentContext = currentEdtContext;
+            if (parentContext != null) {
+                depth = parentContext.depth + 1;
+                totalDepth = parentContext.totalDepth + 1;
+            }
+
+            if (isEnableAsyncStackTraces()) {
+                exceptionWrapper = new EdtException();
+
+                if (parentContext != null) {
+                    if (depth < MAX_ASYNC_EXCEPTION_DEPTH) {
+                        exceptionWrapper.parent = parentContext.exceptionWrapper;
+                        parentContext = null;
+                    } else {
+                        depth = 0;
+                    }
+                }
+            } else {
+                exceptionWrapper = null;
+                parentContext = null;
+            }
+        }
+
+
+        public void run() {
+            if (exceptionWrapper != null) {
+                try {
+                    currentEdtContext = this;
+                    internal.run();
+                } catch (RuntimeException t) {
+                    exceptionWrapper.throwRoot(t);
+                }
+            } else {
+                internal.run();
+            }
+        }
+
+    }
+
 }

@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.facebook.ui;
@@ -27,6 +27,7 @@ import com.codename1.io.Log;
 import com.codename1.ui.Button;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+
 import java.io.IOException;
 
 /**
@@ -34,9 +35,9 @@ import java.io.IOException;
  * required for the like functionality you will need to use a tool such as:
  * <a href="https://developers.facebook.com/tools/explorer/?method=GET&amp;path=me%2Fposts">https://developers.facebook.com/tools/explorer/?method=GET&amp;path=me%2Fposts</a>
  * You can ask it to list your posts and then seek the correct id within the returned JSON
- * 
+ *
  * @author Chen Fishbein
- * @deprecated This functionality is no longer possible open a BrowserComponent 
+ * @deprecated This functionality is no longer possible open a BrowserComponent
  * with the link instead, this class will be removed in next version
  */
 public class LikeButton extends Button implements ActionListener {
@@ -45,11 +46,11 @@ public class LikeButton extends Button implements ActionListener {
     private String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
     private String[] permissions;
     private String postId = "290052831046005_244933438934534";
-    
+
     /**
      * Constructor accepting the post id
-     * 
-     * @param postId 
+     *
+     * @param postId
      */
     public LikeButton(String postId) {
         this.postId = postId;
@@ -68,17 +69,17 @@ public class LikeButton extends Button implements ActionListener {
      * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt) {
-        if(!FaceBookAccess.getInstance().isAuthenticated()) {
+        if (!FaceBookAccess.getInstance().isAuthenticated()) {
             FaceBookAccess.setClientId(appId);
             FaceBookAccess.setRedirectURI(redirectURI);
             FaceBookAccess.setClientSecret(clientSecret);
-            if(permissions != null) {
-                FaceBookAccess.setPermissions(permissions);            
+            if (permissions != null) {
+                FaceBookAccess.setPermissions(permissions);
             }
             FaceBookAccess.getInstance().showAuthentication(this);
             return;
         }
-        if(evt.getSource() instanceof Exception) {
+        if (evt.getSource() instanceof Exception) {
             return;
         }
         try {
@@ -101,8 +102,8 @@ public class LikeButton extends Button implements ActionListener {
     public void setPostId(String postId) {
         this.postId = postId;
     }
-    
-    
+
+
     /**
      * {@inheritDoc}
      */
@@ -121,7 +122,7 @@ public class LikeButton extends Button implements ActionListener {
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"String", "String", "String", "String", "String[]"};
+        return new String[]{"String", "String", "String", "String", "String[]"};
     }
 
     /**

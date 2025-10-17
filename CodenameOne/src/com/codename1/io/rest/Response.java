@@ -23,8 +23,6 @@
  */
 package com.codename1.io.rest;
 
-import java.io.InputStream;
-
 /**
  * The http Response class
  *
@@ -40,27 +38,28 @@ public class Response<T> {
         this.responseData = responseData;
         this.responseMessage = responseMessage;
     }
-    
+
     /**
      * The http response data
-     * 
+     *
      * @return the data
-     */ 
+     */
     public T getResponseData() {
         return responseData;
     }
-    
+
     /**
      * The http response code
-     * 
+     *
      * @return the code
-     */ 
+     */
     public int getResponseCode() {
         return responseCode;
     }
-    
+
     /**
      * Returns the error message that accompanies the response
+     *
      * @return the response
      */
     public String getResponseErrorMessage() {

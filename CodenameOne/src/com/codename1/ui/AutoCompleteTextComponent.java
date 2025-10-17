@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -30,44 +30,21 @@ import com.codename1.ui.list.ListModel;
 
 /**
  * A {@link TextComponent} version of {@link com.codename1.ui.AutoCompleteTextField}
- * 
+ * <p>
  * This component was contributed here https://github.com/codenameone/CodenameOne/issues/2705
- * 
- * @author Francesco Galgani 
- */ 
+ *
+ * @author Francesco Galgani
+ */
 public class AutoCompleteTextComponent extends TextComponent {
+    private static int animationSpeed = 100;
     private final AutoCompleteTextField field;
-
     private Container animationLayer;
     private Boolean focusAnimation;
-    private static int animationSpeed = 100;
-        
-    /**
-     * Allows us to invoke setters/getters and bind listeners to the text field
-     * @return the text field instance
-     */
-    @Override
-    public TextField getField() {
-        return field;
-    }
-    
-
-    /**
-     * Allows filtering the entries in the auto complete
-     */
-    public static interface AutoCompleteFilter {
-        /**
-         * Callback to filter based on this given text
-         * @param text the text for filtering
-         * @return true if the entry should be filtered in
-         */
-        boolean filter(String text);
-    }
-    
 
     /**
      * This constructor allows us to create an AutoCompleteTextComponent with the
      * given listModel and customFilter
+     *
      * @param listModel
      * @param customFilter
      */
@@ -145,13 +122,23 @@ public class AutoCompleteTextComponent extends TextComponent {
                     }
                 }
             }
-            
+
             @Override
             protected boolean filter(String text) {
                 return customFilter.filter(text);
             }
         };
         initInput();
+    }
+
+    /**
+     * Allows us to invoke setters/getters and bind listeners to the text field
+     *
+     * @return the text field instance
+     */
+    @Override
+    public TextField getField() {
+        return field;
     }
 
     void constructUI() {
@@ -161,10 +148,10 @@ public class AutoCompleteTextComponent extends TextComponent {
                 setLayout(new LayeredLayout());
                 Container tfContainer = BorderLayout.center(field).
                         add(BorderLayout.NORTH, getLabel()).
-                        add(BorderLayout.SOUTH, 
-                            LayeredLayout.encloseIn(
-                                getErrorMessage(), 
-                                getDescriptionMessage()));
+                        add(BorderLayout.SOUTH,
+                                LayeredLayout.encloseIn(
+                                        getErrorMessage(),
+                                        getDescriptionMessage()));
                 add(tfContainer);
 
                 Label errorMessageFiller = new Label();
@@ -226,7 +213,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * that is set to false...
      *
      * @param focusAnimation true for the label to animate into place on focus,
-     * false otherwise
+     *                       false otherwise
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
@@ -264,7 +251,7 @@ public class AutoCompleteTextComponent extends TextComponent {
         super.descriptionMessage(descriptionMessage);
         return this;
     }
-    
+
     /**
      * Overridden for covariant return type {@inheritDoc}
      */
@@ -275,7 +262,7 @@ public class AutoCompleteTextComponent extends TextComponent {
 
     /**
      * Overridden for covariant return type      * {@inheritDoc}
- }
+     * }
      */
     public AutoCompleteTextComponent label(String text) {
         super.label(text);
@@ -338,7 +325,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * Sets the columns in the text field
      *
      * @param columns the number of columns which is used for preferred size
-     * calculations
+     *                calculations
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
@@ -352,7 +339,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * Sets the rows in the text field
      *
      * @param rows the number of rows which is used for preferred size
-     * calculations
+     *             calculations
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
@@ -367,8 +354,8 @@ public class AutoCompleteTextComponent extends TextComponent {
      * area class
      *
      * @param constraint one of the constants from the
-     * {@link com.codename1.ui.TextArea} class see
-     * {@link com.codename1.ui.TextArea#setConstraint(int)}
+     *                   {@link com.codename1.ui.TextArea} class see
+     *                   {@link com.codename1.ui.TextArea#setConstraint(int)}
      * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text("Text").label("Label");
      * }
      */
@@ -472,5 +459,18 @@ public class AutoCompleteTextComponent extends TextComponent {
     @Override
     public String getText() {
         return field.getText();
+    }
+
+    /**
+     * Allows filtering the entries in the auto complete
+     */
+    public static interface AutoCompleteFilter {
+        /**
+         * Callback to filter based on this given text
+         *
+         * @param text the text for filtering
+         * @return true if the entry should be filtered in
+         */
+        boolean filter(String text);
     }
 }

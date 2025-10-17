@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.io;
@@ -34,7 +34,7 @@ import java.util.Vector;
  * that is supported by all spreadsheets and most databases for data exchange. <br>
  * The sample below lists a simple hardcoded CSV within the table:
  * </p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/e60d45dcd79c91be9d31.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/csv-parsing.png" alt="CSV parsing results, notice the properly escaped parentheses and comma" />
  *
@@ -46,9 +46,9 @@ public class CSVParser {
     private char[] buffer = new char[8192];
     private int bufferSize = -1;
     private int bufferOffset;
-    
+
     /**
-     * Initializes a parser with the default comma (',') separator char 
+     * Initializes a parser with the default comma (',') separator char
      */
     public CSVParser() {
         this(',');
@@ -56,55 +56,55 @@ public class CSVParser {
 
     /**
      * Allows creating a parser with a custom separator char
-     * 
+     *
      * @param separatorChar custom separator character such as semi-colon (';') etc.
      */
     public CSVParser(char separatorChar) {
         this.separatorChar = separatorChar;
     }
-    
+
     /**
      * Parses input from the given stream and returns the tokens broken into rows and columns
-     * 
+     *
      * @param r the input stream
      * @return array of rows and columns
      */
     public String[][] parse(InputStream r) throws IOException {
         return parse(new InputStreamReader(r));
     }
-    
+
     /**
      * Parses input from the given stream and returns the tokens broken into rows and columns
-     * 
-     * @param r the input stream
+     *
+     * @param r        the input stream
      * @param encoding the encoding of the stream
      * @return array of rows and columns
      */
     public String[][] parse(InputStream r, String encoding) throws IOException {
         return parse(new InputStreamReader(r, encoding));
     }
-    
+
     private int nextChar() throws IOException {
         int response = peekNextChar();
         bufferOffset++;
         return response;
     }
-    
+
     private int peekNextChar() throws IOException {
-        if(bufferOffset >= bufferSize) {
+        if (bufferOffset >= bufferSize) {
             bufferSize = currentReader.read(buffer);
-            if(bufferSize == -1) {
+            if (bufferSize == -1) {
                 return -1;
             }
             bufferOffset = 0;
         }
         int response = buffer[bufferOffset];
-        return response;        
+        return response;
     }
-    
+
     /**
      * Parses input from the given reader and returns the tokens broken into rows and columns
-     * 
+     *
      * @param r the reader stream
      * @return array of rows and columns
      */
@@ -116,35 +116,35 @@ public class CSVParser {
         Vector currentVector = new Vector();
         returnValue.addElement(currentVector);
         int currentChar = nextChar();
-        while(currentChar > -1) {
-            if(isQuoteMode) {
-                if(currentChar == '"') {
+        while (currentChar > -1) {
+            if (isQuoteMode) {
+                if (currentChar == '"') {
                     int next = peekNextChar();
-                    if(next == '"') {
+                    if (next == '"') {
                         stringBuf.append('"');
                         nextChar();
                     } else {
                         isQuoteMode = false;
                     }
                 } else {
-                    stringBuf.append((char)currentChar);
+                    stringBuf.append((char) currentChar);
                 }
             } else {
-                if(stringBuf.length() == 0) {
-                    if(currentChar == '"') {
+                if (stringBuf.length() == 0) {
+                    if (currentChar == '"') {
                         isQuoteMode = true;
                         currentChar = nextChar();
                         continue;
                     }
                 }
-                if(currentChar == separatorChar) {
+                if (currentChar == separatorChar) {
                     currentVector.addElement(stringBuf.toString());
                     stringBuf.setLength(0);
                     currentChar = nextChar();
                     continue;
-                } 
-                if(currentChar == 10 || currentChar == 13) {
-                    while(currentChar == 10 || currentChar == 13) {
+                }
+                if (currentChar == 10 || currentChar == 13) {
+                    while (currentChar == 10 || currentChar == 13) {
                         currentChar = nextChar();
                     }
                     currentVector.addElement(stringBuf.toString());
@@ -153,21 +153,21 @@ public class CSVParser {
                     returnValue.addElement(currentVector);
                     continue;
                 }
-                stringBuf.append((char)currentChar);
+                stringBuf.append((char) currentChar);
             }
             currentChar = nextChar();
         }
-        if(stringBuf.length() > 0) {
+        if (stringBuf.length() > 0) {
             currentVector.addElement(stringBuf.toString());
         }
         String[][] actualReturnValue = new String[returnValue.size()][];
         int arlen = actualReturnValue.length;
-        for(int iter = 0 ; iter < arlen ; iter++) {
-            Vector e = (Vector)returnValue.elementAt(iter);
+        for (int iter = 0; iter < arlen; iter++) {
+            Vector e = (Vector) returnValue.elementAt(iter);
             actualReturnValue[iter] = new String[e.size()];
             int arlen2 = actualReturnValue[iter].length;
-            for(int i = 0 ; i < arlen2 ; i++) {
-                actualReturnValue[iter][i] = (String)e.elementAt(i);
+            for (int i = 0; i < arlen2; i++) {
+                actualReturnValue[iter][i] = (String) e.elementAt(i);
             }
         }
         currentReader.close();

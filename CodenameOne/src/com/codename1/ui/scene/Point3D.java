@@ -6,32 +6,34 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Codename One in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui.scene;
 
 /**
  * Encapsulates a point in 3D space.
+ *
  * @author Steve Hannah
  * @deprecated For internal use only
  */
 public class Point3D {
     private double x, y, z;
-    
+
     /**
      * Creates a new point.
+     *
      * @param x The x-coord
      * @param y The y-coord
      * @param z The z-coord
@@ -44,6 +46,7 @@ public class Point3D {
 
     /**
      * Gets x coordinate.
+     *
      * @return the x
      */
     public double getX() {
@@ -52,6 +55,7 @@ public class Point3D {
 
     /**
      * Sets the x coordinate
+     *
      * @param x the x to set
      */
     public void setX(double x) {
@@ -60,6 +64,7 @@ public class Point3D {
 
     /**
      * Gets the y-coordinate.
+     *
      * @return the y
      */
     public double getY() {
@@ -68,6 +73,7 @@ public class Point3D {
 
     /**
      * Sets the y coordinate.
+     *
      * @param y the y to set
      */
     public void setY(double y) {
@@ -76,6 +82,7 @@ public class Point3D {
 
     /**
      * Gets the z-coordinate.
+     *
      * @return the z
      */
     public double getZ() {
@@ -84,11 +91,12 @@ public class Point3D {
 
     /**
      * Sets the z-coordinate
+     *
      * @param z the z to set
      */
     public void setZ(double z) {
         this.z = z;
     }
-    
-    
+
+
 }

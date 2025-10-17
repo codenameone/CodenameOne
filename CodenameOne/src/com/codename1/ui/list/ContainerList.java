@@ -23,11 +23,11 @@
  */
 package com.codename1.ui.list;
 
-import com.codename1.ui.Container;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
@@ -35,8 +35,8 @@ import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
+
 import java.util.Collection;
 import java.util.Vector;
 
@@ -77,12 +77,6 @@ public class ContainerList extends Container {
     public ContainerList(ListModel m) {
         init(m);
     }
-    
-    private void init(ListModel m) {
-        setModel(m);
-        setUIID("ContainerList");
-        setScrollableY(true);
-    }
 
     /**
      * Constructs a container list with the given model and layout
@@ -95,20 +89,10 @@ public class ContainerList extends Container {
         init(m);
     }
 
-    /**
-     * The renderer used to draw the container list elements
-     * 
-     * @param r renderer instance
-     */
-    public void setRenderer(CellRenderer r) {
-        renderer = r;
-        for(int iter = 0 ; iter < getComponentCount() ; iter++) {
-            getComponentAt(iter).setShouldCalcPreferredSize(true);
-        }
-        setScrollSize(null);
-        if(isInitialized()) {
-            revalidate();
-        }
+    private void init(ListModel m) {
+        setModel(m);
+        setUIID("ContainerList");
+        setScrollableY(true);
     }
 
     /**
@@ -118,21 +102,37 @@ public class ContainerList extends Container {
         return renderer;
     }
 
+    /**
+     * The renderer used to draw the container list elements
+     *
+     * @param r renderer instance
+     */
+    public void setRenderer(CellRenderer r) {
+        renderer = r;
+        for (int iter = 0; iter < getComponentCount(); iter++) {
+            getComponentAt(iter).setShouldCalcPreferredSize(true);
+        }
+        setScrollSize(null);
+        if (isInitialized()) {
+            revalidate();
+        }
+    }
+
     private void updateComponentCount() {
         int cc = getComponentCount();
         int modelCount = model.getSize();
-        if(cc != modelCount) {
-            if(cc < modelCount) {
-                for(int iter = cc ; iter < modelCount ; iter++) {
+        if (cc != modelCount) {
+            if (cc < modelCount) {
+                for (int iter = cc; iter < modelCount; iter++) {
                     addComponent(new Entry(iter));
                 }
             } else {
-                while(getComponentCount() > modelCount) {
+                while (getComponentCount() > modelCount) {
                     removeComponent(getComponentAt(getComponentCount() - 1));
                 }
             }
             Form f = getComponentForm();
-            if(f != null) {
+            if (f != null) {
                 f.revalidate();
             }
         }
@@ -140,11 +140,33 @@ public class ContainerList extends Container {
 
     /**
      * Returns the list model
-     * 
+     *
      * @return the list model
      */
     public ListModel getModel() {
         return model;
+    }
+
+    /**
+     * Set the model for the container list
+     *
+     * @param model a model class that is mapped into the internal components
+     */
+    public void setModel(ListModel model) {
+        if (this.model != null && listener != null) {
+            this.model.removeDataChangedListener(listener);
+            this.model.removeSelectionListener(listener);
+            listener = null;
+        }
+        this.model = model;
+        updateComponentCount();
+        if (model.getSelectedIndex() > 0) {
+            getComponentAt(model.getSelectedIndex()).requestFocus();
+        }
+        if (isInitialized()) {
+            bindListeners();
+        }
+        repaint();
     }
 
     /**
@@ -188,15 +210,15 @@ public class ContainerList extends Container {
      * {@inheritDoc}
      */
     protected void initComponent() {
-        if(model != null) {
+        if (model != null) {
             int i = model.getSelectedIndex();
-            if(i > 0) {
+            if (i > 0) {
                 getComponentAt(i).requestFocus();
             }
             bindListeners();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -206,28 +228,6 @@ public class ContainerList extends Container {
             this.model.removeSelectionListener(listener);
             listener = null;
         }
-    }
-    
-    /**
-     * Set the model for the container list
-     *
-     * @param model a model class that is mapped into the internal components
-     */
-    public void setModel(ListModel model) {
-        if (this.model != null && listener != null) {
-            this.model.removeDataChangedListener(listener);
-            this.model.removeSelectionListener(listener);
-            listener = null;
-        }
-        this.model = model;
-        updateComponentCount();
-        if(model.getSelectedIndex() > 0) {
-            getComponentAt(model.getSelectedIndex()).requestFocus();
-        }
-        if (isInitialized()) {
-            bindListeners();
-        }
-        repaint();
     }
 
     private void bindListeners() {
@@ -240,11 +240,12 @@ public class ContainerList extends Container {
 
     /**
      * Returns the current/last selected item
+     *
      * @return selected item or null
      */
     public Object getSelectedItem() {
         int i = model.getSelectedIndex();
-        if(i > -1) {
+        if (i > -1) {
             return model.getItemAt(i);
         }
         return null;
@@ -269,55 +270,56 @@ public class ContainerList extends Container {
     public void setSelectedIndex(int index) {
         if (index < 0) {
             throw new IllegalArgumentException("Selection index is negative:" + index);
-        }        
+        }
         getComponentAt(index).requestFocus();
         model.setSelectedIndex(index);
     }
-    
+
     /**
      * Triggers the event to the listeners
+     *
      * @param evt the event to fire
-     */ 
+     */
     protected void fireActionEvent(ActionEvent evt) {
-        if(isEnabled() && !Display.getInstance().hasDragOccured()){
+        if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             dispatcher.fireActionEvent(evt);
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"ListItems", "Renderer"};
+        return new String[]{"ListItems", "Renderer"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {com.codename1.impl.CodenameOneImplementation.getObjectArrayClass(), CellRenderer.class};
+        return new Class[]{com.codename1.impl.CodenameOneImplementation.getObjectArrayClass(), CellRenderer.class};
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"Object[]", "CellRenderer"};
+        return new String[]{"Object[]", "CellRenderer"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("ListItems")) {
+        if (name.equals("ListItems")) {
             Object[] obj = new Object[model.getSize()];
             int olen = obj.length;
-            for(int iter = 0 ; iter < olen ; iter++) {
+            for (int iter = 0; iter < olen; iter++) {
                 obj[iter] = model.getItemAt(iter);
             }
             return obj;
         }
-        if(name.equals("Renderer")) {
+        if (name.equals("Renderer")) {
             return getRenderer();
         }
         return null;
@@ -327,12 +329,12 @@ public class ContainerList extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("ListItems")) {
-            setModel(new DefaultListModel((Object[])value));
+        if (name.equals("ListItems")) {
+            setModel(new DefaultListModel((Object[]) value));
             return null;
         }
-        if(name.equals("Renderer")) {
-            setRenderer((CellRenderer)value);
+        if (name.equals("Renderer")) {
+            setRenderer((CellRenderer) value);
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -348,18 +350,18 @@ public class ContainerList extends Container {
      * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
-        if(!isScrollable()) {
+        if (!isScrollable()) {
             return DRAG_REGION_NOT_DRAGGABLE;
         }
-        if(isScrollableX()) {
-            if(isScrollableY()) {
-            return DRAG_REGION_POSSIBLE_DRAG_XY;
+        if (isScrollableX()) {
+            if (isScrollableY()) {
+                return DRAG_REGION_POSSIBLE_DRAG_XY;
             }
             return DRAG_REGION_POSSIBLE_DRAG_X;
         }
         return DRAG_REGION_POSSIBLE_DRAG_Y;
     }
-    
+
 
     /**
      * This class is an internal implementation detail
@@ -383,7 +385,7 @@ public class ContainerList extends Container {
 
         public void paintBackground(Graphics g) {
         }
-        
+
         public void paintBorder(Graphics g) {
         }
 
@@ -393,8 +395,8 @@ public class ContainerList extends Container {
             cmp.setY(getY());
             cmp.setWidth(getWidth());
             cmp.setHeight(getHeight());
-            if(cmp instanceof Container) {
-                ((Container)cmp).revalidate();
+            if (cmp instanceof Container) {
+                ((Container) cmp).revalidate();
             }
             cmp.setFocus(hasFocus());
             cmp.paintComponent(g);
@@ -410,7 +412,7 @@ public class ContainerList extends Container {
             pointerReleasedImpl(x, y, false);
         }
 
-        
+
         /**
          * {@inheritDoc}
          */
@@ -418,20 +420,20 @@ public class ContainerList extends Container {
             if (!isDragActivated()) {
                 // fire the action event into the selected component
                 Component cmp = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
-                if(cmp instanceof Container) {
+                if (cmp instanceof Container) {
                     int absX = getAbsoluteX();
                     int absY = getAbsoluteY();
                     int newX = x - absX + cmp.getX();
                     int newY = y - absY + cmp.getY();
                     Component selectionCmp = ((Container) cmp).getComponentAt(newX, newY);
-                    if(selectionCmp != null) {
+                    if (selectionCmp != null) {
                         selectionCmp.setX(0);
                         selectionCmp.setY(0);
-                        if(longPress){
+                        if (longPress) {
                             selectionCmp.longPointerPress(newX, newY);
                             fireActionEvent(new ActionEvent(ContainerList.this, x, y, true));
                             return;
-                        }else{
+                        } else {
                             selectionCmp.pointerPressed(newX, newY);
                             selectionCmp.pointerReleased(newX, newY);
                         }
@@ -440,17 +442,17 @@ public class ContainerList extends Container {
                 fireActionEvent(new ActionEvent(ContainerList.this, x, y, longPress));
             }
         }
-        
+
         /**
          * {@inheritDoc}
          */
         public void keyReleased(int keyCode) {
             super.keyReleased(keyCode);
-            if(Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
+            if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
                 fireActionEvent(new ActionEvent(ContainerList.this, keyCode));
             }
         }
-                
+
         @Override
         public Dimension getPreferredSize() {
             ContainerList.this.setScrollSize(null);
@@ -459,15 +461,15 @@ public class ContainerList extends Container {
 
         public Dimension calcPreferredSize() {
             Component c = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
-            if(getWidth() <= 0) {
+            if (getWidth() <= 0) {
                 c.setWidth(Display.getInstance().getDisplayWidth());
                 c.setHeight(Display.getInstance().getDisplayHeight());
             } else {
                 c.setWidth(getWidth());
                 c.setHeight(getHeight());
             }
-            if(c instanceof Container) {
-                ((Container)c).revalidate();
+            if (c instanceof Container) {
+                ((Container) c).revalidate();
             }
             Dimension d = c.getPreferredSize();
             return d;

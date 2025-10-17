@@ -28,7 +28,7 @@ import java.util.Vector;
 
 /**
  * This class represents a Facebook Photo Object
- *  http://developers.facebook.com/docs/reference/api/photo/
+ * http://developers.facebook.com/docs/reference/api/photo/
  *
  * @author Chen Fishbein
  */
@@ -44,7 +44,7 @@ public class Photo extends FBObject {
     private String created_time;
     private String updated_time;
     private int position;
-    private  Vector images;
+    private Vector images;
     private Vector comments;
 
     /**
@@ -62,7 +62,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get created_time
+     * Get created_time
+     *
      * @return created_time
      */
     public String getCreated_time() {
@@ -70,7 +71,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get from
+     * Get from
+     *
      * @return from
      */
     public User getFrom() {
@@ -78,7 +80,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get height
+     * Get height
+     *
      * @return height
      */
     public int getHeight() {
@@ -86,7 +89,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get iconUrl
+     * Get iconUrl
+     *
      * @return iconUrl
      */
     public String getIconUrl() {
@@ -94,7 +98,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get link
+     * Get link
+     *
      * @return link
      */
     public String getLink() {
@@ -102,7 +107,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get pictureUrl
+     * Get pictureUrl
+     *
      * @return pictureUrl
      */
     public String getPictureUrl() {
@@ -110,7 +116,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get position
+     * Get position
+     *
      * @return position
      */
     public int getPosition() {
@@ -118,7 +125,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get sourceUrl
+     * Get sourceUrl
+     *
      * @return sourceUrl
      */
     public String getSourceUrl() {
@@ -126,7 +134,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get updated_time
+     * Get updated_time
+     *
      * @return updated_time
      */
     public String getUpdated_time() {
@@ -134,7 +143,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get width
+     * Get width
+     *
      * @return width
      */
     public int getWidth() {
@@ -142,7 +152,8 @@ public class Photo extends FBObject {
     }
 
     /**
-     *  Get images vector where each entry is a String of a url
+     * Get images vector where each entry is a String of a url
+     *
      * @return images
      */
     public Vector getImages() {
@@ -152,17 +163,19 @@ public class Photo extends FBObject {
     /**
      * Gets the comments on this Photos, where each
      * entry is a Post Object
+     *
      * @return a Vector of Post Objects
      */
     public Vector getComments() {
         return comments;
     }
-    
+
     /**
      * copies the relevant values from the given hashtable
+     *
      * @param props an hashtable to copy from
      */
-    public void copy(Hashtable props){
+    public void copy(Hashtable props) {
         super.copy(props);
         init(props);
     }
@@ -177,24 +190,24 @@ public class Photo extends FBObject {
         pictureUrl = (String) toCopy.get("picture");
         sourceUrl = (String) toCopy.get("source");
         String heightStr = (String) toCopy.get("height");
-        if(heightStr != null){
+        if (heightStr != null) {
             height = Integer.parseInt(heightStr);
         }
         String widthStr = (String) toCopy.get("width");
-        if(widthStr != null){
+        if (widthStr != null) {
             width = Integer.parseInt(widthStr);
         }
         link = (String) toCopy.get("link");
         created_time = (String) toCopy.get("created_time");
         updated_time = (String) toCopy.get("updated_time");
         String positionStr = (String) toCopy.get("position");
-         if(positionStr != null){
+        if (positionStr != null) {
             position = Integer.parseInt(positionStr);
         }
 
         images = (Vector) toCopy.get("images");
 
-       Hashtable data = (Hashtable) toCopy.get("comments");
+        Hashtable data = (Hashtable) toCopy.get("comments");
         if (data != null) {
             comments = new Vector();
             Vector commentsArray = (Vector) data.get("data");

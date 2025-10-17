@@ -6,21 +6,21 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  *
- * This code was adapted from TeaVM's class library. 
+ * This code was adapted from TeaVM's class library.
  */
 
 package com.codename1.compat.java.util;
@@ -31,16 +31,18 @@ import java.util.Comparator;
 /**
  * This is a compatibility class which supports the java.util.Objects API.  On platforms that don't support this class (e.g. Android)
  * the build server will automatically remap all uses of java.util.Objects to use this implementation instead.
- * 
+ * <p>
  * This class consists of static utility methods for operating on objects. These utilities include null-safe or null-tolerant methods for computing the hash code of an object, returning a string for an object, and comparing two objects.
+ *
  * @author shannah
  */
 public final class Objects {
     /**
      * Returns true if the arguments are equal to each other and false otherwise. Consequently, if both arguments are null, true is returned and if exactly one argument is null, false is returned. Otherwise, equality is determined by using the equals method of the first argument.
+     *
      * @param a
      * @param b
-     * @return 
+     * @return
      */
     public static boolean equals(Object a, Object b) {
         if (a == b) {
@@ -51,8 +53,9 @@ public final class Objects {
 
     /**
      * Returns the hash code of a non-null argument and 0 for a null argument.
+     *
      * @param o
-     * @return 
+     * @return
      */
     public static int hashCode(Object o) {
         return o == null ? 0 : o.hashCode();

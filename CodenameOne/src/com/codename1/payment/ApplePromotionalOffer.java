@@ -37,7 +37,7 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A string used to uniquely identify a discount offer for a product.
-     *
+     * <p>
      * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc">Apple docs</a>.
      *
      * @return The offer identifier.
@@ -48,9 +48,10 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A string used to uniquely identify a discount offer for a product.
-     * @param offerIdentifier The offer identifier.
      *
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc">Apple docs</a>.
+     * @param offerIdentifier The offer identifier.
+     *                        <p>
+     *                        See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043528-identifier?language=objc">Apple docs</a>.
      */
     public void setOfferIdentifier(String offerIdentifier) {
         this.offerIdentifier = offerIdentifier;
@@ -58,7 +59,7 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A string that identifies the key used to generate the signature.
-     *
+     * <p>
      * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc">Apple's docs</a>.
      *
      * @return The key identifier.
@@ -69,9 +70,10 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A string that identifies the key used to generate the signature.
-     * @param keyIdentifier The key identifier.
      *
-     * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc">Apple's docs</a>.
+     * @param keyIdentifier The key identifier.
+     *                      <p>
+     *                      See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043530-keyidentifier?language=objc">Apple's docs</a>.
      */
     public void setKeyIdentifier(String keyIdentifier) {
         this.keyIdentifier = keyIdentifier;
@@ -79,8 +81,9 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A universally unique ID (UUID) value that you define. (As a string).
-     *
+     * <p>
      * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043531-nonce?language=objc">Apple's docs</a>.
+     *
      * @return The nonce
      */
     public String getNonce() {
@@ -89,7 +92,7 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A universally unique ID (UUID) value that you define. (As a string).
-     *
+     * <p>
      * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043531-nonce?language=objc">Apple's docs</a>.
      *
      * @param nonce The nonce
@@ -100,8 +103,9 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A string representing the properties of a specific promotional offer, cryptographically signed.
-     *
+     * <p>
      * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043532-signature?language=objc">Apple's docs</a>
+     *
      * @return The signature.
      */
     public String getSignature() {
@@ -110,7 +114,7 @@ public class ApplePromotionalOffer implements PromotionalOffer {
 
     /**
      * A string representing the properties of a specific promotional offer, cryptographically signed.
-     *
+     * <p>
      * See <a href="https://developer.apple.com/documentation/storekit/skpaymentdiscount/3043532-signature?language=objc">Apple's docs</a>
      *
      * @param signature The signature.

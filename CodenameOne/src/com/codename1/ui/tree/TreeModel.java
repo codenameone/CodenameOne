@@ -31,7 +31,7 @@ import java.util.Vector;
  *
  * <script src="https://gist.github.com/codenameone/870d4412694bca3092c4.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/tree.png" alt="Tree sample code" />
- * 
+ *
  * <p>
  * And heres a more "real world" example showing an XML hierarchy in a {@code Tree}:
  * </p>
@@ -41,9 +41,9 @@ import java.util.Vector;
  * <p>
  * Another real world example showing the {@link com.codename1.io.FileSystemStorage} as a tree:
  * </p>
- * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>            
+ * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
- * 
+ *
  * @author Shai Almog
  */
 public interface TreeModel {
@@ -52,7 +52,7 @@ public interface TreeModel {
      * the root objects
      *
      * @param parent the parent object whose children should be returned, null would return the
-     * tree roots
+     *               tree roots
      * @return the children of the given node within the tree
      */
     public Vector getChildren(Object parent);

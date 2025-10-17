@@ -26,16 +26,16 @@ package com.codename1.plugin.event;
  * Plugin event fired when {@link Display#isGalleryTypeSupported(int)} method is called to give
  * plugins an opportunity to answer this question.
  *
- * @since 8.0
  * @author Steve Hannah
+ * @since 8.0
  */
 public class IsGalleryTypeSupportedEvent extends PluginEvent<Boolean> {
     private int type;
 
     /**
      * Creates a new event with the given type.
-     * @param type The type of the gallery.  This is one of the constants defined in {@link Display}.
      *
+     * @param type The type of the gallery.  This is one of the constants defined in {@link Display}.
      */
     public IsGalleryTypeSupportedEvent(int type) {
         super(null, Type.IsGalleryTypeSupported);
@@ -44,9 +44,10 @@ public class IsGalleryTypeSupportedEvent extends PluginEvent<Boolean> {
 
     /**
      * Gets the type of gallery to open.
+     *
      * @return The type of gallery to open.  This is one of the constants defined in {@link Display}.
-     * @since 8.0
      * @see Display#openGallery(com.codename1.ui.events.ActionListener, int)
+     * @since 8.0
      */
     public int getType() {
         return type;

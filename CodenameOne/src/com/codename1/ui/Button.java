@@ -24,14 +24,14 @@
 
 package com.codename1.ui;
 
-import com.codename1.ui.util.EventDispatcher;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.UIManager;
-import java.util.ArrayList;
+import com.codename1.ui.util.EventDispatcher;
+
 import java.util.Collection;
 import java.util.Vector;
 
@@ -39,8 +39,8 @@ import java.util.Vector;
 /**
  * <p>Button is the base class for several UI widgets allowing clickability.
  * It has 3 states: rollover, pressed and the default state. {@code Button}
- * can also have an {@link com.codename1.ui.events.ActionListener} that react when the 
- * {@code Button} is clicked or handle actions via a 
+ * can also have an {@link com.codename1.ui.events.ActionListener} that react when the
+ * {@code Button} is clicked or handle actions via a
  * {@link com.codename1.ui.Command}.<br>
  * Button has the "Button" UIID by default.</p>
  * <p>
@@ -48,121 +48,82 @@ import java.util.Vector;
  * </p>
  * <script src="https://gist.github.com/codenameone/99cdefe0c73096ebdbfb.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-button.png" alt="Simple Button" />
- * 
+ *
  * <p>
  * This code shows a common use case of making a button look like a hyperlink
  * </p>
  * <script src="https://gist.github.com/codenameone/2627b4edc5d3d340ce90.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-link-button.png" alt="Hyperlink Button" />
- * 
+ *
  * @author Chen Fishbein
  */
 public class Button extends Label implements ReleasableComponent, ActionSource, SelectableIconHolder {
-    /**
-     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
-     */
-    private static boolean buttonRippleEffectDefault;
-
-    /**
-     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
-     */
-    private static boolean capsTextDefault;
-
-    /**
-     * Indicates whether text on the button should be drawn capitalized by default to match the Android design.
-     * This value can be set by the {@code capsButtonTextBool} theme constant
-     * @return the capsTextDefault
-     */
-    public static boolean isCapsTextDefault() {
-        return capsTextDefault;
-    }
-
-    /**
-     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
-     * This value can be set by the {@code capsButtonTextBool} theme constant
-     * @param aCapsTextDefault the capsTextDefault to set
-     */
-    public static void setCapsTextDefault(boolean aCapsTextDefault) {
-        capsTextDefault = aCapsTextDefault;
-    }
-
-    /**
-     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
-     * @return the buttonRippleEffectDefault
-     */
-    public static boolean isButtonRippleEffectDefault() {
-        return buttonRippleEffectDefault;
-    }
-
-    /**
-     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
-     * @param aButtonRippleEffectDefault the buttonRippleEffectDefault to set
-     */
-    public static void setButtonRippleEffectDefault(boolean aButtonRippleEffectDefault) {
-        buttonRippleEffectDefault = aButtonRippleEffectDefault;
-    }
-    
-    /**
-     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
-     */
-    private Boolean capsText;
-    
     /**
      * Indicates the rollover state of a button which is equivalent to focused for
      * most uses
      */
     public static final int STATE_ROLLOVER = 0;
-    
     /**
-     * Indicates the pressed state of a button 
+     * Indicates the pressed state of a button
      */
     public static final int STATE_PRESSED = 1;
-    
     /**
      * Indicates the default state of a button which is neither pressed nor focused
      */
     public static final int STATE_DEFAULT = 2;
-    
+    /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     */
+    private static boolean buttonRippleEffectDefault;
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     */
+    private static boolean capsTextDefault;
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     */
+    private Boolean capsText;
     private EventDispatcher dispatcher = new EventDispatcher();
     private EventDispatcher stateChangeListeners;
-    
     private int state = STATE_DEFAULT;
-    
     private Image pressedIcon;
-    
     private Image rolloverIcon;
     private Image rolloverPressedIcon;
-  
     private Image disabledIcon;
     private Command cmd;
-
     private boolean toggle;
-
     private int releaseRadius;
-
     private boolean autoRelease;
+    /**
+     * A listener used to bind the state with another button.  When that button's state
+     * changes, then this button state will also change.
+     *
+     * @since 7.0
+     */
+    private ActionListener bindListener;
+    private int pressedX, pressedY;
 
-    /** 
+    /**
      * Constructs a button with an empty string for its text.
      */
     public Button() {
         this("");
     }
-    
+
     /**
      * Constructs a button with the specified text.
-     * 
+     *
      * @param text label appearing on the button
      */
     public Button(String text) {
         this(text, null, "Button");
     }
-    
+
     /**
      * Allows binding a command to a button for ease of use
-     * 
+     *
      * @param cmd command whose text would be used for the button and would recive action events
-     * from the button
+     *            from the button
      */
     public Button(Command cmd) {
         this(cmd.getCommandName(), cmd.getIcon());
@@ -172,55 +133,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         updateCommand();
     }
 
-    private void updateCommand() {
-        if(cmd.getMaterialIcon() == 0) {
-            setRolloverIcon(cmd.getRolloverIcon());
-            setDisabledIcon(cmd.getDisabledIcon());
-            setPressedIcon(cmd.getPressedIcon());
-        } else {
-            if(cmd.getIconFont() != null) {
-                setFontIcon(cmd.getIconFont(), cmd.getMaterialIcon(), cmd.getMaterialIconSize());
-            } else {
-                setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
-            }
-        }
-        if(cmd.getIconGapMM() > -1) {
-            setGap(Display.INSTANCE.convertToPixels(cmd.getIconGapMM()));
-        }
-    }
-
-    /**
-     * Applies the given command to this button
-     *
-     * @param  cmd the command on the button
-     */
-    public void setCommand(Command cmd) {
-        if(this.cmd != null) {
-            removeActionListener(this.cmd);
-        }
-        this.cmd = cmd;
-        if(cmd != null) {
-            setText(cmd.getCommandName());
-            if(cmd.getIcon() == null) {
-                if(cmd.getMaterialIcon() != 0) {
-                    if(cmd.getIconFont() != null) {
-                        setFontIcon(cmd.getIconFont(),cmd.getMaterialIcon(), cmd.getMaterialIconSize());
-                    } else {
-                        setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
-                    }
-                }
-            } else {
-                setIcon(cmd.getIcon());
-            }
-            setEnabled(cmd.isEnabled());
-            updateCommand();
-            addActionListener(cmd);
-        }
-    }
-
     /**
      * Constructs a button with the specified image.
-     * 
+     *
      * @param icon appearing on the button
      */
     public Button(Image icon) {
@@ -229,7 +144,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     /**
      * Constructs a button with the specified material image icon.
-     * 
+     *
      * @param icon appearing on the button
      */
     public Button(char icon) {
@@ -239,10 +154,10 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     /**
      * Constructor a button with text, material image and uiid
-     * 
+     *
      * @param text label appearing on the button
      * @param icon image appearing on the button
-     * @param id UIID unique identifier for button
+     * @param id   UIID unique identifier for button
      */
     public Button(String text, char icon, String id) {
         this(text, null, id);
@@ -251,23 +166,23 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     /**
      * Constructor a button with text, material image and uiid
-     * 
-     * @param text label appearing on the button
-     * @param icon image appearing on the button
+     *
+     * @param text     label appearing on the button
+     * @param icon     image appearing on the button
      * @param iconSize image size in millimeters
-     * @param id UIID unique identifier for button
+     * @param id       UIID unique identifier for button
      */
     public Button(String text, char icon, float iconSize, String id) {
         this(text, null, id);
         setMaterialIcon(icon, iconSize);
     }
-    
+
     /**
      * Constructor a button with text, image and uiid
-     * 
+     *
      * @param text label appearing on the button
      * @param icon image appearing on the button
-     * @param id UIID unique identifier for button
+     * @param id   UIID unique identifier for button
      */
     public Button(String text, Image icon, String id) {
         super(text);
@@ -277,79 +192,128 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         this.pressedIcon = icon;
         this.rolloverIcon = icon;
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
-        setRippleEffect(buttonRippleEffectDefault);        
-        if(isCapsText() && text != null) {
+        setRippleEffect(buttonRippleEffectDefault);
+        if (isCapsText() && text != null) {
             putClientProperty("cn1$origText", text);
             super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
-        } 
+        }
         setCursor(HAND_CURSOR);
     }
-    
+
     /**
      * Constructor a button with text and image
-     * 
+     *
      * @param text label appearing on the button
      * @param icon image appearing on the button
      */
     public Button(String text, Image icon) {
         this(text, icon, "Button");
     }
-    
+
     /**
      * Constructor a button with image and UIID
-     * 
+     *
      * @param icon image appearing on the button
-     * @param id UIID unique identifier for button
+     * @param id   UIID unique identifier for button
      */
     public Button(Image icon, String id) {
         this("", icon, id);
     }
-    
+
     /**
      * Constructor a button with material image icon and UIID
-     * 
+     *
      * @param icon image appearing on the button
-     * @param id UIID unique identifier for button
+     * @param id   UIID unique identifier for button
      */
     public Button(char icon, String id) {
         this("", id);
         setMaterialIcon(icon);
     }
-    
+
     /**
      * Constructor a button with material image icon and UIID
-     * 
-     * @param icon image appearing on the button
+     *
+     * @param icon     image appearing on the button
      * @param iconSize the size of the icon in millimeters
-     * @param id UIID unique identifier for button
+     * @param id       UIID unique identifier for button
      */
     public Button(char icon, float iconSize, String id) {
         this("", id);
         setMaterialIcon(icon, iconSize);
     }
-    
+
     /**
      * Constructor a button with text and UIID
-     * 
+     *
      * @param text label appearing on the button
-     * @param id UIID unique identifier for button
+     * @param id   UIID unique identifier for button
      */
     public Button(String text, String id) {
         this(text, null, id);
     }
-    
+
     /**
-     * A listener used to bind the state with another button.  When that button's state
-     * changes, then this button state will also change.
-     * @since 7.0
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design.
+     * This value can be set by the {@code capsButtonTextBool} theme constant
+     *
+     * @return the capsTextDefault
      */
-    private ActionListener bindListener;
+    public static boolean isCapsTextDefault() {
+        return capsTextDefault;
+    }
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * This value can be set by the {@code capsButtonTextBool} theme constant
+     *
+     * @param aCapsTextDefault the capsTextDefault to set
+     */
+    public static void setCapsTextDefault(boolean aCapsTextDefault) {
+        capsTextDefault = aCapsTextDefault;
+    }
+
+    /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     *
+     * @return the buttonRippleEffectDefault
+     */
+    public static boolean isButtonRippleEffectDefault() {
+        return buttonRippleEffectDefault;
+    }
+
+    /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     *
+     * @param aButtonRippleEffectDefault the buttonRippleEffectDefault to set
+     */
+    public static void setButtonRippleEffectDefault(boolean aButtonRippleEffectDefault) {
+        buttonRippleEffectDefault = aButtonRippleEffectDefault;
+    }
+
+    private void updateCommand() {
+        if (cmd.getMaterialIcon() == 0) {
+            setRolloverIcon(cmd.getRolloverIcon());
+            setDisabledIcon(cmd.getDisabledIcon());
+            setPressedIcon(cmd.getPressedIcon());
+        } else {
+            if (cmd.getIconFont() != null) {
+                setFontIcon(cmd.getIconFont(), cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+            } else {
+                setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+            }
+        }
+        if (cmd.getIconGapMM() > -1) {
+            setGap(Display.INSTANCE.convertToPixels(cmd.getIconGapMM()));
+        }
+    }
+
     private ActionListener bindListener() {
         if (bindListener == null) {
             bindListener = new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
                     if (e.getSource() instanceof Button) {
-                        Button b = (Button)e.getSource();
+                        Button b = (Button) e.getSource();
                         if (state != b.getState()) {
                             setState(b.getState());
                             repaint();
@@ -360,23 +324,25 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         }
         return bindListener;
     }
-    
+
     /**
      * Bind the state of this button to another button's state.  Once bound, when the other
      * button's state changes, this button will change its state to match.
+     *
      * @param button The button whose state to bind to.
-     * @see #unbindStateFrom(com.codename1.ui.Button) 
+     * @see #unbindStateFrom(com.codename1.ui.Button)
      * @since 7.0
      */
     public void bindStateTo(Button button) {
         button.addStateChangeListener(bindListener());
     }
-    
+
     /**
      * Unbinds the state of this button from another button.
+     *
      * @param button The button to unbind state from.
+     * @see #bindStateTo(com.codename1.ui.Button)
      * @since 7.0
-     * @see #bindStateTo(com.codename1.ui.Button) 
      */
     public void unbindStateFrom(Button button) {
         if (bindListener != null) {
@@ -396,12 +362,12 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      */
     void focusGainedInternal() {
         super.focusGainedInternal();
-        if(state != STATE_PRESSED) {
+        if (state != STATE_PRESSED) {
             state = STATE_ROLLOVER;
             fireStateChange();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -411,43 +377,58 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
             state = STATE_DEFAULT;
             fireStateChange();
         }
-        
+
     }
-    
+
     /**
      * Returns the button state
-     * 
+     *
      * @return One of STATE_ROLLOVER, STATE_DEAFULT, STATE_PRESSED
      */
     public int getState() {
         return state;
     }
-    
+
     void setState(int state) {
         if (state != this.state) {
             this.state = state;
             fireStateChange();
         }
     }
-    
+
     /**
      * Set the button in released and unfocused state
      */
     public void setReleased() {
-    	setState(Button.STATE_DEFAULT);
-    	repaint();
+        setState(Button.STATE_DEFAULT);
+        repaint();
     }
-    
+
     /**
-     * Indicates the icon that is displayed on the button when the button is in 
+     * Indicates the icon that is displayed on the button when the button is in
      * pressed state
-     * 
+     *
      * @return icon used
      * @see #STATE_PRESSED
      */
     @Override
     public Image getPressedIcon() {
         return pressedIcon;
+    }
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * pressed state
+     *
+     * @param pressedIcon icon used
+     * @see #STATE_PRESSED
+     */
+    @Override
+    public void setPressedIcon(Image pressedIcon) {
+        this.pressedIcon = pressedIcon;
+        setShouldCalcPreferredSize(true);
+        checkAnimation();
+        repaint();
     }
 
     /**
@@ -460,7 +441,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     public Image getRolloverPressedIcon() {
         return rolloverPressedIcon;
     }
-    
+
     /**
      * Indicates the icon that is displayed on the button when the button is in
      * pressed state and is selected. This is ONLY applicable to toggle buttons
@@ -484,48 +465,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     }
 
     /**
-     * Indicates the icon that is displayed on the button when the button is in 
-     * rolled over state
-     * 
-     * @return icon used
-     * @see #STATE_ROLLOVER
-     */
-    @Override
-    public Image getRolloverIcon() {
-        return rolloverIcon;
-    }
-    
-    /**
-     * Indicates the icon that is displayed on the button when the button is in 
-     * rolled over state
-     * 
-     * @param rolloverIcon icon to use
-     * @see #STATE_ROLLOVER
-     */
-    @Override
-    public void setRolloverIcon(Image rolloverIcon) {
-        this.rolloverIcon = rolloverIcon;
-        setShouldCalcPreferredSize(true);
-        checkAnimation();
-        repaint();        
-    }
-    
-    /**
-     * Indicates the icon that is displayed on the button when the button is in 
-     * pressed state
-     * 
-     * @param pressedIcon icon used
-     * @see #STATE_PRESSED
-     */
-    @Override
-    public void setPressedIcon(Image pressedIcon) {
-        this.pressedIcon = pressedIcon;
-        setShouldCalcPreferredSize(true);
-        checkAnimation();
-        repaint();
-    }
-
-    /**
      * Indicates the icon that is displayed on the button when the button is in
      * the disabled state
      *
@@ -539,26 +478,54 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         repaint();
     }
 
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * rolled over state
+     *
+     * @return icon used
+     * @see #STATE_ROLLOVER
+     */
+    @Override
+    public Image getRolloverIcon() {
+        return rolloverIcon;
+    }
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * rolled over state
+     *
+     * @param rolloverIcon icon to use
+     * @see #STATE_ROLLOVER
+     */
+    @Override
+    public void setRolloverIcon(Image rolloverIcon) {
+        this.rolloverIcon = rolloverIcon;
+        setShouldCalcPreferredSize(true);
+        checkAnimation();
+        repaint();
+    }
+
     void checkAnimation() {
         super.checkAnimation();
-        if((pressedIcon != null && pressedIcon.isAnimation()) || 
-            (rolloverIcon != null && rolloverIcon.isAnimation()) ||
-            (disabledIcon != null && disabledIcon.isAnimation())) {
+        if ((pressedIcon != null && pressedIcon.isAnimation()) ||
+                (rolloverIcon != null && rolloverIcon.isAnimation()) ||
+                (disabledIcon != null && disabledIcon.isAnimation())) {
             Form parent = getComponentForm();
-            if(parent != null) {
+            if (parent != null) {
                 // animations are always running so the internal animation isn't
                 // good enough. We never want to stop this sort of animation
                 parent.registerAnimated(this);
             }
         }
     }
-    
+
     /**
-     * Adds a listener to be notified when the button state changes. 
+     * Adds a listener to be notified when the button state changes.
+     *
      * @param l Listener to be notified when state changes
-     * @see #getState() 
-     * @see #setState(int) 
-     * @see #removeStateChangeListener(com.codename1.ui.events.ActionListener) 
+     * @see #getState()
+     * @see #setState(int)
+     * @see #removeStateChangeListener(com.codename1.ui.events.ActionListener)
      * @since 7.0
      */
     public void addStateChangeListener(ActionListener l) {
@@ -567,13 +534,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         }
         stateChangeListeners.addListener(l);
     }
-    
+
     /**
      * Removes state change listener.
+     *
      * @param l State change listener to remove.
-     * @see #addStateChangeListener(com.codename1.ui.events.ActionListener) 
-     * @see #getState() 
-     * @see #setState(int) 
+     * @see #addStateChangeListener(com.codename1.ui.events.ActionListener)
+     * @see #getState()
+     * @see #setState(int)
      * @since 7.0
      */
     public void removeStateChangeListener(ActionListener l) {
@@ -581,48 +549,50 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
             stateChangeListeners.removeListener(l);
         }
     }
-    
+
     private void fireStateChange() {
         if (stateChangeListeners != null && stateChangeListeners.hasListeners()) {
             stateChangeListeners.fireActionEvent(new ActionEvent(this));
         }
     }
-    
+
     /**
      * Adds a listener to the button which will cause an event to dispatch on click
-     * 
+     *
      * @param l implementation of the action listener interface
      */
-    public void addActionListener(ActionListener l){
+    public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
-    
+
     /**
      * Removes the given action listener from the button
-     * 
+     *
      * @param l implementation of the action listener interface
      */
-    public void removeActionListener(ActionListener l){
+    public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
 
     /**
      * Returns a vector containing the action listeners for this button
+     *
      * @return the action listeners
      * @deprecated use getListeners instead
      */
     public Vector getActionListeners() {
         return dispatcher.getListenerVector();
     }
-    
+
     /**
      * Returns a collection containing the action listeners for this button
+     *
      * @return the action listeners
      */
     public Collection getListeners() {
         return dispatcher.getListenerCollection();
     }
-    
+
     /**
      * Returns the icon for the button based on its current state
      *
@@ -631,12 +601,12 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     @Override
     public Image getIconFromState() {
         Image icon = getMaskedIcon();
-        if(!isEnabled() && getDisabledIcon() != null) {
+        if (!isEnabled() && getDisabledIcon() != null) {
             return getDisabledIcon();
         }
-        if(isToggle() && isSelected()) {
+        if (isToggle() && isSelected()) {
             icon = rolloverPressedIcon;
-            if(icon == null) {
+            if (icon == null) {
                 icon = getPressedIcon();
                 if (icon == null) {
                     icon = getMaskedIcon();
@@ -654,7 +624,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
                 }
                 break;
             case Button.STATE_ROLLOVER:
-                if(Display.getInstance().shouldRenderSelection(this)) {
+                if (Display.getInstance().shouldRenderSelection(this)) {
                     icon = getRolloverIcon();
                     if (icon == null) {
                         icon = getMaskedIcon();
@@ -666,52 +636,52 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     }
 
     /**
-     * Allows subclasses to override action event behavior 
+     * Allows subclasses to override action event behavior
      * {@inheritDoc}
-     * 
+     *
      * @param x the x position of the click if applicable (can be 0 or -1 otherwise)
      * @param y the y position of the click if applicable (can be 0 or -1 otherwise)
      */
-    protected void fireActionEvent(int x, int y){
+    protected void fireActionEvent(int x, int y) {
         super.fireActionEvent();
-        if(cmd != null) {
+        if (cmd != null) {
             ActionEvent ev = new ActionEvent(cmd, this, x, y);
             dispatcher.fireActionEvent(ev);
-            if(!ev.isConsumed()) {
+            if (!ev.isConsumed()) {
                 Form f = getComponentForm();
-                if(f != null) {
+                if (f != null) {
                     f.actionCommandImplNoRecurseComponent(cmd, ev);
                 }
             }
         } else {
-            dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed,x, y));
+            dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         Display d = Display.getInstance();
-        if(d.isBuiltinSoundsEnabled()) {
+        if (d.isBuiltinSoundsEnabled()) {
             d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);
         }
     }
-    
+
     /**
      * Invoked to change the state of the button to the pressed state
      */
-    public void pressed(){
+    public void pressed() {
         if (!Display.impl.isScrollWheeling()) {
             if (state != STATE_PRESSED) {
-                state=STATE_PRESSED;
+                state = STATE_PRESSED;
                 fireStateChange();
             }
             repaint();
         }
     }
-    
+
     /**
      * Invoked to change the state of the button to the released state
      */
     public void released() {
         released(-1, -1);
     }
-    
+
     /**
      * Invoked to change the state of the button to the released state
      *
@@ -721,43 +691,43 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     public void released(int x, int y) {
         if (!Display.impl.isScrollWheeling()) {
             if (state != STATE_ROLLOVER) {
-                state=STATE_ROLLOVER;
+                state = STATE_ROLLOVER;
                 fireStateChange();
             }
             //if (releaseRadius > 0 || (Math.abs(x - pressedX) < CN.convertToPixels(1) && Math.abs(y-pressedY) < CN.convertToPixels(1))) {
             fireActionEvent(x, y);
             //}
-            
+
             repaint();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
-        if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE){
+        if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
             pressedX = -1;
             pressedY = -1;
             pressed();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
-        if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE){
+        if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
             released();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public void keyRepeated(int keyCode) {
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -765,7 +735,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         pressed();
         released();
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -781,7 +751,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
             requestFocus();
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -791,8 +761,6 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         }
     }
 
-    private int pressedX, pressedY;
-    
     /**
      * {@inheritDoc}
      */
@@ -808,11 +776,11 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         pressed();
         Form f = getComponentForm();
         // might happen when programmatically triggering press
-        if(f != null) {
-        	f.addComponentAwaitingRelease(this);
+        if (f != null) {
+            f.addComponentAwaitingRelease(this);
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -820,37 +788,37 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
-            if(ev.isConsumed()) {
+            if (ev.isConsumed()) {
                 return;
             }
         }
         Form f = getComponentForm();
         // might happen when programmatically triggering press
-        if(f != null) {
+        if (f != null) {
             f.removeComponentAwaitingRelease(this);
         }
 
         // button shouldn't fire an event when a pointer is dragged into it
-        if(state == STATE_PRESSED) {
+        if (state == STATE_PRESSED) {
             released(x, y);
-         }
-        if(restoreDragPercentage > -1) {
+        }
+        if (restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
     protected void dragInitiated() {
-        if(Display.getInstance().shouldRenderSelection(this)) {
+        if (Display.getInstance().shouldRenderSelection(this)) {
             if (state != STATE_ROLLOVER) {
-                state=STATE_ROLLOVER;
+                state = STATE_ROLLOVER;
                 fireStateChange();
             }
         } else {
             if (state != STATE_DEFAULT) {
-                state=STATE_DEFAULT;
+                state = STATE_DEFAULT;
                 fireStateChange();
             }
         }
@@ -859,17 +827,17 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     @Override
     void initComponentImpl() {
-        super.initComponentImpl(); 
-        if(pressedIcon != null) {
+        super.initComponentImpl();
+        if (pressedIcon != null) {
             pressedIcon.lock();
         }
-        if(rolloverIcon != null) {
+        if (rolloverIcon != null) {
             rolloverIcon.lock();
         }
-        if(rolloverPressedIcon != null) {
+        if (rolloverPressedIcon != null) {
             rolloverPressedIcon.lock();
         }
-        if(disabledIcon != null) {
+        if (disabledIcon != null) {
             disabledIcon.lock();
         }
     }
@@ -879,28 +847,28 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         if (state == STATE_PRESSED) {
             setReleased();
         }
-        super.deinitializeImpl(); 
-        if(pressedIcon != null) {
+        super.deinitializeImpl();
+        if (pressedIcon != null) {
             pressedIcon.unlock();
         }
-        if(rolloverIcon != null) {
+        if (rolloverIcon != null) {
             rolloverIcon.unlock();
         }
-        if(rolloverPressedIcon != null) {
+        if (rolloverPressedIcon != null) {
             rolloverPressedIcon.unlock();
         }
-        if(disabledIcon != null) {
+        if (disabledIcon != null) {
             disabledIcon.unlock();
         }
     }
-   
+
     /**
      * {@inheritDoc}
      */
-    protected Dimension calcPreferredSize(){
+    protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -912,8 +880,8 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         // if a toggle button has focus we should draw the selected state not the pressed state
         // however if shouldRenderSelection is false the selected state won't be painted so
         // we should draw the pressed state
-        if(toggle && isSelected()) {
-            if(hasFocus()) {
+        if (toggle && isSelected()) {
+            if (hasFocus()) {
                 return !Display.getInstance().shouldRenderSelection(this);
             }
             return true;
@@ -923,11 +891,40 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     /**
      * This method return the Button Command if exists
-     * 
+     *
      * @return Command Object or null if a Command not exists
      */
     public Command getCommand() {
         return cmd;
+    }
+
+    /**
+     * Applies the given command to this button
+     *
+     * @param cmd the command on the button
+     */
+    public void setCommand(Command cmd) {
+        if (this.cmd != null) {
+            removeActionListener(this.cmd);
+        }
+        this.cmd = cmd;
+        if (cmd != null) {
+            setText(cmd.getCommandName());
+            if (cmd.getIcon() == null) {
+                if (cmd.getMaterialIcon() != 0) {
+                    if (cmd.getIconFont() != null) {
+                        setFontIcon(cmd.getIconFont(), cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+                    } else {
+                        setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());
+                    }
+                }
+            } else {
+                setIcon(cmd.getIcon());
+            }
+            setEnabled(cmd.isEnabled());
+            updateCommand();
+            addActionListener(cmd);
+        }
     }
 
     /**
@@ -941,9 +938,10 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
 
     /**
      * {@inheritDoc}
+     *
      * @deprecated use the Style alignment instead
      */
-    public void setAlignment(int align){
+    public void setAlignment(int align) {
         super.setAlignment(align);
         getPressedStyle().setAlignment(align);
     }
@@ -967,7 +965,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      */
     public void setToggle(boolean toggle) {
         this.toggle = toggle;
-        if(toggle && getUIID().equals("CheckBox") || getUIID().equals("RadioButton")) {
+        if (toggle && getUIID().equals("CheckBox") || getUIID().equals("RadioButton")) {
             setUIID("ToggleButton");
         }
     }
@@ -979,28 +977,27 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
-        String t = (String)getClientProperty("cn1$origText");
-        if(t != null) {
-            if(isCapsText()) {
+        String t = (String) getClientProperty("cn1$origText");
+        if (t != null) {
+            if (isCapsText()) {
                 super.setText(UIManager.getInstance().localize(t, t).toUpperCase());
             } else {
                 super.setText(UIManager.getInstance().localize(t, t));
                 putClientProperty("cn1$origText", null);
             }
-        } 
+        }
     }
-    
-    
+
 
     /**
      * {@inheritDoc}
      */
     public boolean animate() {
         boolean a = super.animate();
-        if(!isEnabled() && disabledIcon != null) {
+        if (!isEnabled() && disabledIcon != null) {
             a |= disabledIcon.isAnimation() && disabledIcon.animate();
         } else {
-            switch(state) {
+            switch (state) {
                 case STATE_ROLLOVER:
                     a |= rolloverIcon != null && rolloverIcon.isAnimation() && rolloverIcon.animate();
                     break;
@@ -1024,6 +1021,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     /**
      * Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
      * pointer release events and not to pointer press events
+     *
      * @return the releaseRadius
      */
     public int getReleaseRadius() {
@@ -1033,34 +1031,35 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     /**
      * Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
      * pointer release events and not to pointer press events
+     *
      * @param releaseRadius the releaseRadius to set
      */
     public void setReleaseRadius(int releaseRadius) {
         this.releaseRadius = releaseRadius;
     }
-    
+
     /**
      * Returns if this is an auto released Button.
-     * Auto released Buttons will are been disarmed when a drag is happening 
+     * Auto released Buttons will are been disarmed when a drag is happening
      * within the Button.
-     * 
+     *
      * @return true if it's an auto released Button.
-     */ 
-    public boolean isAutoRelease(){
+     */
+    public boolean isAutoRelease() {
         return autoRelease;
     }
-    
+
     /**
-     * Sets the auto released mode of this button, by default it's not an auto 
+     * Sets the auto released mode of this button, by default it's not an auto
      * released Button
-     */ 
-    public void setAutoRelease(boolean autoRelease){
+     */
+    public void setAutoRelease(boolean autoRelease) {
         this.autoRelease = autoRelease;
     }
 
     @Override
     public void paint(Graphics g) {
-        if(isLegacyRenderer()) {
+        if (isLegacyRenderer()) {
             initAutoResize();
             getUIManager().getLookAndFeel().drawButton(g, this);
             return;
@@ -1069,19 +1068,20 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     }
 
     /**
-     * Indicates whether text on the button should be drawn capitalized by 
+     * Indicates whether text on the button should be drawn capitalized by
      * default to match the Android design. By default only {@code Button} and
      * {@code RaisedButton} will be capped to keep compatibility. You can add
-     * additional UIID's to the mix by using the theme constant 
-     * {@code capsButtonUiids} which can include a separated list of the 
+     * additional UIID's to the mix by using the theme constant
+     * {@code capsButtonUiids} which can include a separated list of the
      * UIID's to capitalize
+     *
      * @return the capsText
      */
     public final boolean isCapsText() {
-        if(capsText == null) {
-            if(capsTextDefault) {
+        if (capsText == null) {
+            if (capsTextDefault) {
                 String uiid = getUIID();
-                return uiid.equals("Button") || uiid.equals("RaisedButton") || 
+                return uiid.equals("Button") || uiid.equals("RaisedButton") ||
                         getUIManager().getThemeConstant("capsButtonUiids", "").indexOf(uiid) > -1;
             }
             return false;
@@ -1090,12 +1090,13 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
     }
 
     /**
-     * Indicates whether text on the button should be drawn capitalized by 
+     * Indicates whether text on the button should be drawn capitalized by
      * default to match the Android design. By default only {@code Button} and
      * {@code RaisedButton} will be capped to keep compatibility. You can add
-     * additional UIID's to the mix by using the theme constant 
-     * {@code capsButtonUiids} which can include a separated list of the 
+     * additional UIID's to the mix by using the theme constant
+     * {@code capsButtonUiids} which can include a separated list of the
      * UIID's to capitalize
+     *
      * @param capsText the capsText to set
      */
     public void setCapsText(boolean capsText) {
@@ -1108,13 +1109,13 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      */
     @Override
     public void setText(String t) {
-        if(isCapsText()) {
+        if (isCapsText()) {
             putClientProperty("cn1$origText", t);
-            if(t != null) {
+            if (t != null) {
                 super.setText(getUIManager().localize(t, t).toUpperCase());
                 return;
-            } 
+            }
         }
         super.setText(t);
-    }    
+    }
 }

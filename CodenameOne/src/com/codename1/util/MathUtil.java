@@ -16,21 +16,20 @@ package com.codename1.util;
  * This fills the gap in Java ME Math with a port of Sun's public FDLIBM C-library for IEEE-754.
  *
  * @author kmashint
- *
  * @see <a href="http://www.netlib.org/fdlibm/readme">http://www.netlib.org/fdlibm/readme</a>
- *    For the Freely Distributable C-library conforming to IEEE-754 floating point math.
+ * For the Freely Distributable C-library conforming to IEEE-754 floating point math.
  * @see <a href="http://web.mit.edu/source/third/gcc/libjava/java/lang/">http://web.mit.edu/source/third/gcc/libjava/java/lang/</a>
- *    For the GNU C variant of the same IEEE-754 routines.
+ * For the GNU C variant of the same IEEE-754 routines.
  * @see <a href="http://www.dclausen.net/projects/microfloat/">http://www.dclausen.net/projects/microfloat/</a>
- *    Another take on the IEEE-754 routines.
+ * Another take on the IEEE-754 routines.
  * @see <a href="http://real-java.sourceforge.net/Real.html">http://real-java.sourceforge.net/Real.html</a>
- *    Yet another take on the IEEE-754 routines.
+ * Yet another take on the IEEE-754 routines.
  * @see <a href="http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html">http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html</a>
- *    For other approximations.
+ * For other approximations.
  * @see <a href="http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/">http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/</a>
- *    For fast but rough approximations.
+ * For fast but rough approximations.
  * @see <a href="http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/">http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/</a>
- *    For more fast but rough approximations.
+ * For more fast but rough approximations.
  */
 public abstract class MathUtil {
 
@@ -52,8 +51,8 @@ public abstract class MathUtil {
     private static final double pio2_hi = 1.57079632679489655800e+00, /* 0x3FF921FB, 0x54442D18 */
             pio2_lo = 6.12323399573676603587e-17, /* 0x3C91A626, 0x33145C07 */
             pio4_hi = 7.85398163397448278999e-01, /* 0x3FE921FB, 0x54442D18 */
-            /* coefficient for R(x^2) */
-            pS0 = 1.66666666666666657415e-01, /* 0x3FC55555, 0x55555555 */
+    /* coefficient for R(x^2) */
+    pS0 = 1.66666666666666657415e-01, /* 0x3FC55555, 0x55555555 */
             pS1 = -3.25565818622400915405e-01, /* 0xBFD4D612, 0x03EB6F7D */
             pS2 = 2.01212532134862925881e-01, /* 0x3FC9C155, 0x0E884455 */
             pS3 = -4.00555345006794114027e-02, /* 0xBFA48228, 0xB5688F3B */
@@ -74,74 +73,6 @@ public abstract class MathUtil {
     private static final long HI_MASK = 0xffffffff00000000L,
             LO_MASK = 0x00000000ffffffffL;
     private static final int HI_SHIFT = 32;
-
-    /**
-     * Return Math.E to the exponent a.
-     * This in turn uses ieee7854_exp(double).
-     */
-    public static final double exp(double a) {
-        return ieee754_exp(a);
-    }
-
-    /**
-     * Return the natural logarithm, ln(a), as it relates to Math.E.
-     * This in turn uses ieee7854_log(double).
-     */
-    public static final double log(double a) {
-        return ieee754_log(a);
-    }
-
-    /**
-     * Return the common base-10 logarithm, log10(a).
-     * This in turn uses ieee7854_log(double)/ieee7854_log(10.0).
-     */
-    public static final double log10(double a) {
-        return ieee754_log(a) / log10;
-    }
-
-    /**
-     * Return a to the power of b, sometimes written as a ** b
-     * but not to be confused with the bitwise ^ operator.
-     * This in turn uses ieee7854_log(double).
-     */
-    public static final double pow(double a, double b) {
-        return ieee754_pow(a, b);
-    }
-
-    /**
-     * Return the arcsine of a.
-     */
-    public static final double asin(double a) {
-        return ieee754_asin(a);
-    }
-
-    
-    /**
-     * Return the arccosine of a.
-     */
-    public static final double acos(double a) {
-        return ieee754_acos(a);
-    }
-
-    /**
-     * Return the arctangent of a, call it b, where a = tan(b).
-     */
-    public static final double atan(double a) {
-        return ieee754_atan(a);
-    }
-
-    /**
-     * For any real arguments x and y not both equal to zero, atan2(y, x)
-     * is the angle in radians between the positive x-axis of a plane
-     * and the point given by the coordinates (x, y) on it.
-     * The angle is positive for counter-clockwise angles (upper half-plane, y > 0),
-     * and negative for clockwise angles (lower half-plane, y < 0).
-     * This in turn uses ieee7854_arctan2(double).
-     */
-    public static final double atan2(double b, double a) {
-        return ieee754_atan2(a, b);
-    }
-
     /* __ieee754_exp(x)
      * Returns the exponential of x.
      *
@@ -208,13 +139,245 @@ public abstract class MathUtil {
             o_threshold = 7.09782712893383973096e+02, /* 0x40862E42, 0xFEFA39EF */
             u_threshold = -7.45133219101941108420e+02, /* 0xc0874910, 0xD52D3051 */
             invln2 = 1.44269504088896338700e+00; /* 0x3ff71547, 0x652b82fe */
-
     private static final double[] halF = new double[]{0.5, -0.5},
             ln2HI = new double[]{6.93147180369123816490e-01, /* 0x3fe62e42, 0xfee00000 */
-        -6.93147180369123816490e-01}, /* 0xbfe62e42, 0xfee00000 */
+                    -6.93147180369123816490e-01}, /* 0xbfe62e42, 0xfee00000 */
             ln2LO = new double[]{1.90821492927058770002e-10, /* 0x3dea39ef, 0x35793c76 */
-        -1.90821492927058770002e-10}; /* 0xbdea39ef, 0x35793c76 */
+                    -1.90821492927058770002e-10}; /* 0xbdea39ef, 0x35793c76 */
+    /* __ieee754_log(x)
+     * Return the logrithm of x
+     *
+     * Method :
+     *   1. Argument Reduction: find k and f such that
+     *      x = 2^k * (1+f),
+     *     where  sqrt(2)/2 < 1+f < sqrt(2) .
+     *
+     *   2. Approximation of log(1+f).
+     *  Let s = f/(2+f) ; based on log(1+f) = log(1+s) - log(1-s)
+     *     = 2s + 2/3 s**3 + 2/5 s**5 + .....,
+     *         = 2s + s*R
+     *      We use a special Reme algorithm on [0,0.1716] to generate
+     *  a polynomial of degree 14 to approximate R The maximum error
+     *  of this polynomial approximation is bounded by 2**-58.45. In
+     *  other words,
+     *            2      4      6      8      10      12      14
+     *      R(z) ~ Lg1*s +Lg2*s +Lg3*s +Lg4*s +Lg5*s  +Lg6*s  +Lg7*s
+     *    (the values of Lg1 to Lg7 are listed in the program)
+     *  and
+     *      |      2          14          |     -58.45
+     *      | Lg1*s +...+Lg7*s    -  R(z) | <= 2
+     *      |                             |
+     *  Note that 2s = f - s*f = f - hfsq + s*hfsq, where hfsq = f*f/2.
+     *  In order to guarantee error in log below 1ulp, we compute log
+     *  by
+     *    log(1+f) = f - s*(f - R)  (if f is not too large)
+     *    log(1+f) = f - (hfsq - s*(hfsq+R)). (better accuracy)
+     *
+     *  3. Finally,  log(x) = k*ln2 + log(1+f).
+     *          = k*ln2_hi+(f-(hfsq-(s*(hfsq+R)+k*ln2_lo)))
+     *     Here ln2 is split into two floating point number:
+     *      ln2_hi + ln2_lo,
+     *     where n*ln2_hi is always exact for |n| < 2000.
+     *
+     * Special cases:
+     *  log(x) is NaN with signal if x < 0 (including -INF) ;
+     *  log(+INF) is +INF; log(0) is -INF with signal;
+     *  log(NaN) is that NaN with no signal.
+     *
+     * Accuracy:
+     *  according to an error analysis, the error is always less than
+     *  1 ulp (unit in the last place).
+     *
+     * Constants:
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+    private static final double ln2_hi = 6.93147180369123816490e-01, /* 3fe62e42 fee00000 */
+            ln2_lo = 1.90821492927058770002e-10, /* 3dea39ef 35793c76 */
+            Lg1 = 6.666666666666735130e-01, /* 3FE55555 55555593 */
+            Lg2 = 3.999999999940941908e-01, /* 3FD99999 9997FA04 */
+            Lg3 = 2.857142874366239149e-01, /* 3FD24924 94229359 */
+            Lg4 = 2.222219843214978396e-01, /* 3FCC71C5 1D8E78AF */
+            Lg5 = 1.818357216161805012e-01, /* 3FC74664 96CB03DE */
+            Lg6 = 1.531383769920937332e-01, /* 3FC39A09 D078C69F */
+            Lg7 = 1.479819860511658591e-01;  /* 3FC2F112 DF3E5244 */
+    /* __ieee754_pow(x,y) return x**y
+     *
+     *          n
+     * Method:  Let x =  2   * (1+f)
+     *  1. Compute and return log2(x) in two pieces:
+     *    log2(x) = w1 + w2,
+     *     where w1 has 53-24 = 29 bit trailing zeros.
+     *  2. Perform y*log2(x) = n+y' by simulating muti-precision
+     *     arithmetic, where |y'|<=0.5.
+     *  3. Return x**y = 2**n*exp(y'*log2)
+     *
+     * Special cases:
+     *  1.  (anything) ** 0  is 1
+     *  2.  (anything) ** 1  is itself
+     *  3.  (anything) ** NAN is NAN
+     *  4.  NAN ** (anything except 0) is NAN
+     *  5.  +-(|x| > 1) **  +INF is +INF
+     *  6.  +-(|x| > 1) **  -INF is +0
+     *  7.  +-(|x| < 1) **  +INF is +0
+     *  8.  +-(|x| < 1) **  -INF is +INF
+     *  9.  +-1         ** +-INF is NAN
+     *  10. +0 ** (+anything except 0, NAN)               is +0
+     *  11. -0 ** (+anything except 0, NAN, odd integer)  is +0
+     *  12. +0 ** (-anything except 0, NAN)               is +INF
+     *  13. -0 ** (-anything except 0, NAN, odd integer)  is +INF
+     *  14. -0 ** (odd integer) = -( +0 ** (odd integer) )
+     *  15. +INF ** (+anything except 0,NAN) is +INF
+     *  16. +INF ** (-anything except 0,NAN) is +0
+     *  17. -INF ** (anything)  = -0 ** (-anything)
+     *  18. (-anything) ** (integer) is (-1)**(integer)*(+anything**integer)
+     *  19. (-anything except 0 and inf) ** (non-integer) is NAN
+     *
+     * Accuracy:
+     *  pow(x,y) returns x**y nearly rounded. In particular
+     *      pow(integer,integer)
+     *  always returns the correct integer provided it is
+     *  representable.
+     *
+     * Constants :
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+    private static final double bp[] = {1.0, 1.5,},
+            dp_h[] = {0.0, 5.84962487220764160156e-01,}, /* 0x3FE2B803, 0x40000000 */
+            dp_l[] = {0.0, 1.35003920212974897128e-08,}, /* 0x3E4CFDEB, 0x43CFD006 */
+    /* poly coefs for (3/2)*(log(x)-2s-2/3*s**3 */
+    L1 = 5.99999999999994648725e-01, /* 0x3FE33333, 0x33333303 */
+            L2 = 4.28571428578550184252e-01, /* 0x3FDB6DB6, 0xDB6FABFF */
+            L3 = 3.33333329818377432918e-01, /* 0x3FD55555, 0x518F264D */
+            L4 = 2.72728123808534006489e-01, /* 0x3FD17460, 0xA91D4101 */
+            L5 = 2.30660745775561754067e-01, /* 0x3FCD864A, 0x93C9DB65 */
+            L6 = 2.06975017800338417784e-01, /* 0x3FCA7E28, 0x4A454EEF */
+            lg2 = 6.93147180559945286227e-01, /* 0x3FE62E42, 0xFEFA39EF */
+            lg2_h = 6.93147182464599609375e-01, /* 0x3FE62E43, 0x00000000 */
+            lg2_l = -1.90465429995776804525e-09, /* 0xBE205C61, 0x0CA86C39 */
+            ovt = 8.0085662595372944372e-0017, /* -(1024-log2(ovfl+.5ulp)) */
+            cp = 9.61796693925975554329e-01, /* 0x3FEEC709, 0xDC3A03FD =2/(3ln2) */
+            cp_h = 9.61796700954437255859e-01, /* 0x3FEEC709, 0xE0000000 =(float)cp */
+            cp_l = -7.02846165095275826516e-09, /* 0xBE3E2FE0, 0x145B01F5 =tail of cp_h*/
+            ivln2 = 1.44269504088896338700e+00, /* 0x3FF71547, 0x652B82FE =1/ln2 */
+            ivln2_h = 1.44269502162933349609e+00, /* 0x3FF71547, 0x60000000 =24b 1/ln2*/
+            ivln2_l = 1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
+    /* atan(x)
+     * Method
+     *   1. Reduce x to positive by atan(x) = -atan(-x).
+     *   2. According to the integer k=4t+0.25 chopped, t=x, the argument
+     *      is further reduced to one of the following intervals and the
+     *      arctangent of t is evaluated by the corresponding formula:
+     *
+     *      [0,7/16]      atan(x) = t-t^3*(a1+t^2*(a2+...(a10+t^2*a11)...)
+     *      [7/16,11/16]  atan(x) = atan(1/2) + atan( (t-0.5)/(1+t/2) )
+     *      [11/16.19/16] atan(x) = atan( 1 ) + atan( (t-1)/(1+t) )
+     *      [19/16,39/16] atan(x) = atan(3/2) + atan( (t-1.5)/(1+1.5t) )
+     *      [39/16,INF]   atan(x) = atan(INF) + atan( -1/t )
+     *
+     * Constants:
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+    private static final double atanhi[] = {
+            4.63647609000806093515e-01, /* atan(0.5)hi 0x3FDDAC67, 0x0561BB4F */
+            7.85398163397448278999e-01, /* atan(1.0)hi 0x3FE921FB, 0x54442D18 */
+            9.82793723247329054082e-01, /* atan(1.5)hi 0x3FEF730B, 0xD281F69B */
+            1.57079632679489655800e+00, /* atan(inf)hi 0x3FF921FB, 0x54442D18 */};
+    private static final double atanlo[] = {
+            2.26987774529616870924e-17, /* atan(0.5)lo 0x3C7A2B7F, 0x222F65E2 */
+            3.06161699786838301793e-17, /* atan(1.0)lo 0x3C81A626, 0x33145C07 */
+            1.39033110312309984516e-17, /* atan(1.5)lo 0x3C700788, 0x7AF0CBBD */
+            6.12323399573676603587e-17, /* atan(inf)lo 0x3C91A626, 0x33145C07 */};
+    private static final double aT[] = {
+            3.33333333333329318027e-01, /* 0x3FD55555, 0x5555550D */
+            -1.99999999998764832476e-01, /* 0xBFC99999, 0x9998EBC4 */
+            1.42857142725034663711e-01, /* 0x3FC24924, 0x920083FF */
+            -1.11111104054623557880e-01, /* 0xBFBC71C6, 0xFE231671 */
+            9.09088713343650656196e-02, /* 0x3FB745CD, 0xC54C206E */
+            -7.69187620504482999495e-02, /* 0xBFB3B0F2, 0xAF749A6D */
+            6.66107313738753120669e-02, /* 0x3FB10D66, 0xA0D03D51 */
+            -5.83357013379057348645e-02, /* 0xBFADDE2D, 0x52DEFD9A */
+            4.97687799461593236017e-02, /* 0x3FA97B4B, 0x24760DEB */
+            -3.65315727442169155270e-02, /* 0xBFA2B444, 0x2C6A6C2F */
+            1.62858201153657823623e-02, /* 0x3F90AD3A, 0xE322DA11 */};
+    /*
+     * use a precalculated value for the ulp of Double.MAX_VALUE
+     */
+    private static final double MAX_ULP = 1.9958403095347198E292;
 
+    /**
+     * Return Math.E to the exponent a.
+     * This in turn uses ieee7854_exp(double).
+     */
+    public static final double exp(double a) {
+        return ieee754_exp(a);
+    }
+
+    /**
+     * Return the natural logarithm, ln(a), as it relates to Math.E.
+     * This in turn uses ieee7854_log(double).
+     */
+    public static final double log(double a) {
+        return ieee754_log(a);
+    }
+
+    /**
+     * Return the common base-10 logarithm, log10(a).
+     * This in turn uses ieee7854_log(double)/ieee7854_log(10.0).
+     */
+    public static final double log10(double a) {
+        return ieee754_log(a) / log10;
+    }
+
+    /**
+     * Return a to the power of b, sometimes written as a ** b
+     * but not to be confused with the bitwise ^ operator.
+     * This in turn uses ieee7854_log(double).
+     */
+    public static final double pow(double a, double b) {
+        return ieee754_pow(a, b);
+    }
+
+    /**
+     * Return the arcsine of a.
+     */
+    public static final double asin(double a) {
+        return ieee754_asin(a);
+    }
+
+    /**
+     * Return the arccosine of a.
+     */
+    public static final double acos(double a) {
+        return ieee754_acos(a);
+    }
+
+    /**
+     * Return the arctangent of a, call it b, where a = tan(b).
+     */
+    public static final double atan(double a) {
+        return ieee754_atan(a);
+    }
+
+    /**
+     * For any real arguments x and y not both equal to zero, atan2(y, x)
+     * is the angle in radians between the positive x-axis of a plane
+     * and the point given by the coordinates (x, y) on it.
+     * The angle is positive for counter-clockwise angles (upper half-plane, y > 0),
+     * and negative for clockwise angles (lower half-plane, y < 0).
+     * This in turn uses ieee7854_arctan2(double).
+     */
+    public static final double atan2(double b, double a) {
+        return ieee754_atan2(a, b);
+    }
 
     private static final double ieee754_exp(double x) {
         double y, c, t;
@@ -283,67 +446,6 @@ public abstract class MathUtil {
             return Double.longBitsToDouble(yl) * twom1000;
         }
     }
-
-    /* __ieee754_log(x)
-     * Return the logrithm of x
-     *
-     * Method :
-     *   1. Argument Reduction: find k and f such that
-     *      x = 2^k * (1+f),
-     *     where  sqrt(2)/2 < 1+f < sqrt(2) .
-     *
-     *   2. Approximation of log(1+f).
-     *  Let s = f/(2+f) ; based on log(1+f) = log(1+s) - log(1-s)
-     *     = 2s + 2/3 s**3 + 2/5 s**5 + .....,
-     *         = 2s + s*R
-     *      We use a special Reme algorithm on [0,0.1716] to generate
-     *  a polynomial of degree 14 to approximate R The maximum error
-     *  of this polynomial approximation is bounded by 2**-58.45. In
-     *  other words,
-     *            2      4      6      8      10      12      14
-     *      R(z) ~ Lg1*s +Lg2*s +Lg3*s +Lg4*s +Lg5*s  +Lg6*s  +Lg7*s
-     *    (the values of Lg1 to Lg7 are listed in the program)
-     *  and
-     *      |      2          14          |     -58.45
-     *      | Lg1*s +...+Lg7*s    -  R(z) | <= 2
-     *      |                             |
-     *  Note that 2s = f - s*f = f - hfsq + s*hfsq, where hfsq = f*f/2.
-     *  In order to guarantee error in log below 1ulp, we compute log
-     *  by
-     *    log(1+f) = f - s*(f - R)  (if f is not too large)
-     *    log(1+f) = f - (hfsq - s*(hfsq+R)). (better accuracy)
-     *
-     *  3. Finally,  log(x) = k*ln2 + log(1+f).
-     *          = k*ln2_hi+(f-(hfsq-(s*(hfsq+R)+k*ln2_lo)))
-     *     Here ln2 is split into two floating point number:
-     *      ln2_hi + ln2_lo,
-     *     where n*ln2_hi is always exact for |n| < 2000.
-     *
-     * Special cases:
-     *  log(x) is NaN with signal if x < 0 (including -INF) ;
-     *  log(+INF) is +INF; log(0) is -INF with signal;
-     *  log(NaN) is that NaN with no signal.
-     *
-     * Accuracy:
-     *  according to an error analysis, the error is always less than
-     *  1 ulp (unit in the last place).
-     *
-     * Constants:
-     * The hexadecimal values are the intended ones for the following
-     * constants. The decimal values may be used, provided that the
-     * compiler will convert from decimal to binary accurately enough
-     * to produce the hexadecimal values shown.
-     */
-    private static final double ln2_hi = 6.93147180369123816490e-01, /* 3fe62e42 fee00000 */
-            ln2_lo = 1.90821492927058770002e-10, /* 3dea39ef 35793c76 */
-            Lg1 = 6.666666666666735130e-01, /* 3FE55555 55555593 */
-            Lg2 = 3.999999999940941908e-01, /* 3FD99999 9997FA04 */
-            Lg3 = 2.857142874366239149e-01, /* 3FD24924 94229359 */
-            Lg4 = 2.222219843214978396e-01, /* 3FCC71C5 1D8E78AF */
-            Lg5 = 1.818357216161805012e-01, /* 3FC74664 96CB03DE */
-            Lg6 = 1.531383769920937332e-01, /* 3FC39A09 D078C69F */
-            Lg7 = 1.479819860511658591e-01;  /* 3FC2F112 DF3E5244 */
-
 
     private static final double ieee754_log(double x) {
         double hfsq, f, s, z, R, w, t1, t2, dk;
@@ -417,72 +519,6 @@ public abstract class MathUtil {
             }
         }
     }
-
-    /* __ieee754_pow(x,y) return x**y
-     *
-     *          n
-     * Method:  Let x =  2   * (1+f)
-     *  1. Compute and return log2(x) in two pieces:
-     *    log2(x) = w1 + w2,
-     *     where w1 has 53-24 = 29 bit trailing zeros.
-     *  2. Perform y*log2(x) = n+y' by simulating muti-precision
-     *     arithmetic, where |y'|<=0.5.
-     *  3. Return x**y = 2**n*exp(y'*log2)
-     *
-     * Special cases:
-     *  1.  (anything) ** 0  is 1
-     *  2.  (anything) ** 1  is itself
-     *  3.  (anything) ** NAN is NAN
-     *  4.  NAN ** (anything except 0) is NAN
-     *  5.  +-(|x| > 1) **  +INF is +INF
-     *  6.  +-(|x| > 1) **  -INF is +0
-     *  7.  +-(|x| < 1) **  +INF is +0
-     *  8.  +-(|x| < 1) **  -INF is +INF
-     *  9.  +-1         ** +-INF is NAN
-     *  10. +0 ** (+anything except 0, NAN)               is +0
-     *  11. -0 ** (+anything except 0, NAN, odd integer)  is +0
-     *  12. +0 ** (-anything except 0, NAN)               is +INF
-     *  13. -0 ** (-anything except 0, NAN, odd integer)  is +INF
-     *  14. -0 ** (odd integer) = -( +0 ** (odd integer) )
-     *  15. +INF ** (+anything except 0,NAN) is +INF
-     *  16. +INF ** (-anything except 0,NAN) is +0
-     *  17. -INF ** (anything)  = -0 ** (-anything)
-     *  18. (-anything) ** (integer) is (-1)**(integer)*(+anything**integer)
-     *  19. (-anything except 0 and inf) ** (non-integer) is NAN
-     *
-     * Accuracy:
-     *  pow(x,y) returns x**y nearly rounded. In particular
-     *      pow(integer,integer)
-     *  always returns the correct integer provided it is
-     *  representable.
-     *
-     * Constants :
-     * The hexadecimal values are the intended ones for the following
-     * constants. The decimal values may be used, provided that the
-     * compiler will convert from decimal to binary accurately enough
-     * to produce the hexadecimal values shown.
-     */
-    private static final double bp[] = {1.0, 1.5,},
-            dp_h[] = {0.0, 5.84962487220764160156e-01,}, /* 0x3FE2B803, 0x40000000 */
-            dp_l[] = {0.0, 1.35003920212974897128e-08,}, /* 0x3E4CFDEB, 0x43CFD006 */
-            /* poly coefs for (3/2)*(log(x)-2s-2/3*s**3 */
-            L1 = 5.99999999999994648725e-01, /* 0x3FE33333, 0x33333303 */
-            L2 = 4.28571428578550184252e-01, /* 0x3FDB6DB6, 0xDB6FABFF */
-            L3 = 3.33333329818377432918e-01, /* 0x3FD55555, 0x518F264D */
-            L4 = 2.72728123808534006489e-01, /* 0x3FD17460, 0xA91D4101 */
-            L5 = 2.30660745775561754067e-01, /* 0x3FCD864A, 0x93C9DB65 */
-            L6 = 2.06975017800338417784e-01, /* 0x3FCA7E28, 0x4A454EEF */
-            lg2 = 6.93147180559945286227e-01, /* 0x3FE62E42, 0xFEFA39EF */
-            lg2_h = 6.93147182464599609375e-01, /* 0x3FE62E43, 0x00000000 */
-            lg2_l = -1.90465429995776804525e-09, /* 0xBE205C61, 0x0CA86C39 */
-            ovt = 8.0085662595372944372e-0017, /* -(1024-log2(ovfl+.5ulp)) */
-            cp = 9.61796693925975554329e-01, /* 0x3FEEC709, 0xDC3A03FD =2/(3ln2) */
-            cp_h = 9.61796700954437255859e-01, /* 0x3FEEC709, 0xE0000000 =(float)cp */
-            cp_l = -7.02846165095275826516e-09, /* 0xBE3E2FE0, 0x145B01F5 =tail of cp_h*/
-            ivln2 = 1.44269504088896338700e+00, /* 0x3FF71547, 0x652B82FE =1/ln2 */
-            ivln2_h = 1.44269502162933349609e+00, /* 0x3FF71547, 0x60000000 =24b 1/ln2*/
-            ivln2_l = 1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
-
 
     private static final double ieee754_pow(double x, double y) {
         double z, ax, z_h, z_l, p_h, p_l;
@@ -754,7 +790,6 @@ public abstract class MathUtil {
         return s * z;
     }
 
-
     /* __ieee754_acos(x)
      * Method :
      *  acos(x)  = pi/2 - asin(x)
@@ -824,7 +859,6 @@ public abstract class MathUtil {
             return 2.0 * (df + w);
         }
     }
-
 
     /* __ieee754_asin(x)
      * Method :
@@ -903,47 +937,6 @@ public abstract class MathUtil {
             return -t;
         }
     }
-    /* atan(x)
-     * Method
-     *   1. Reduce x to positive by atan(x) = -atan(-x).
-     *   2. According to the integer k=4t+0.25 chopped, t=x, the argument
-     *      is further reduced to one of the following intervals and the
-     *      arctangent of t is evaluated by the corresponding formula:
-     *
-     *      [0,7/16]      atan(x) = t-t^3*(a1+t^2*(a2+...(a10+t^2*a11)...)
-     *      [7/16,11/16]  atan(x) = atan(1/2) + atan( (t-0.5)/(1+t/2) )
-     *      [11/16.19/16] atan(x) = atan( 1 ) + atan( (t-1)/(1+t) )
-     *      [19/16,39/16] atan(x) = atan(3/2) + atan( (t-1.5)/(1+1.5t) )
-     *      [39/16,INF]   atan(x) = atan(INF) + atan( -1/t )
-     *
-     * Constants:
-     * The hexadecimal values are the intended ones for the following
-     * constants. The decimal values may be used, provided that the
-     * compiler will convert from decimal to binary accurately enough
-     * to produce the hexadecimal values shown.
-     */
-    private static final double atanhi[] = {
-        4.63647609000806093515e-01, /* atan(0.5)hi 0x3FDDAC67, 0x0561BB4F */
-        7.85398163397448278999e-01, /* atan(1.0)hi 0x3FE921FB, 0x54442D18 */
-        9.82793723247329054082e-01, /* atan(1.5)hi 0x3FEF730B, 0xD281F69B */
-        1.57079632679489655800e+00, /* atan(inf)hi 0x3FF921FB, 0x54442D18 */};
-    private static final double atanlo[] = {
-        2.26987774529616870924e-17, /* atan(0.5)lo 0x3C7A2B7F, 0x222F65E2 */
-        3.06161699786838301793e-17, /* atan(1.0)lo 0x3C81A626, 0x33145C07 */
-        1.39033110312309984516e-17, /* atan(1.5)lo 0x3C700788, 0x7AF0CBBD */
-        6.12323399573676603587e-17, /* atan(inf)lo 0x3C91A626, 0x33145C07 */};
-    private static final double aT[] = {
-        3.33333333333329318027e-01, /* 0x3FD55555, 0x5555550D */
-        -1.99999999998764832476e-01, /* 0xBFC99999, 0x9998EBC4 */
-        1.42857142725034663711e-01, /* 0x3FC24924, 0x920083FF */
-        -1.11111104054623557880e-01, /* 0xBFBC71C6, 0xFE231671 */
-        9.09088713343650656196e-02, /* 0x3FB745CD, 0xC54C206E */
-        -7.69187620504482999495e-02, /* 0xBFB3B0F2, 0xAF749A6D */
-        6.66107313738753120669e-02, /* 0x3FB10D66, 0xA0D03D51 */
-        -5.83357013379057348645e-02, /* 0xBFADDE2D, 0x52DEFD9A */
-        4.97687799461593236017e-02, /* 0x3FA97B4B, 0x24760DEB */
-        -3.65315727442169155270e-02, /* 0xBFA2B444, 0x2C6A6C2F */
-        1.62858201153657823623e-02, /* 0x3F90AD3A, 0xE322DA11 */};
 
     private static final double ieee754_atan(double x) {
         double w, s1, s2, z;
@@ -1002,7 +995,6 @@ public abstract class MathUtil {
             return (hx < 0) ? -z : z;
         }
     }
-
 
     /* __ieee754_atan2(y,x)
      * Method :
@@ -1172,15 +1164,16 @@ public abstract class MathUtil {
 
     /**
      * Please update your code to use scalb
+     *
      * @param x
      * @param n
-     * @return scalb(x,n)
+     * @return scalb(x, n)
      * @deprecated Please update your code to use scalb
      */
     public static final double scalbn(double x, int n) {
         return scalb(x, n);
     }
-    
+
     /*
      * copySign(double x, double y)
      * copySign(x,y) returns a value with the magnitude of x and
@@ -1191,17 +1184,6 @@ public abstract class MathUtil {
         // The below is actually about 30% faster than doing greater/less comparisons.
         return Double.longBitsToDouble((Double.doubleToLongBits(x) & 0x7fffffffffffffffL)
                 | (Double.doubleToLongBits(y) & 0x8000000000000000L));
-    }
-
-    /**
-     * Please update your code to use copySign
-     * @param x
-     * @param y
-     * @return copySign(x,y)
-     * @deprecated Please update your code to use copySign
-     */
-    public static final double copysign(final double x, final double y) {
-        return copySign(x, y);
     }
     
     
@@ -1215,13 +1197,21 @@ public abstract class MathUtil {
     }
      */
 
-    /*
-     * use a precalculated value for the ulp of Double.MAX_VALUE
+    /**
+     * Please update your code to use copySign
+     *
+     * @param x
+     * @param y
+     * @return copySign(x, y)
+     * @deprecated Please update your code to use copySign
      */
-    private static final double MAX_ULP = 1.9958403095347198E292;
+    public static final double copysign(final double x, final double y) {
+        return copySign(x, y);
+    }
 
     /**
      * Returns the size of an ulp (units in the last place) of the argument.
+     *
      * @param d value whose ulp is to be returned
      * @return size of an ulp for the argument
      */
@@ -1259,9 +1249,9 @@ public abstract class MathUtil {
      * Returns the next representable floating point number after the first
      * argument in the direction of the second argument.
      *
-     * @param start starting value
+     * @param start     starting value
      * @param direction value indicating which of the neighboring representable
-     *  floating point number to return
+     *                  floating point number to return
      * @return The floating-point number next to {@code start} in the
      * direction of {@direction}.
      */
@@ -1300,9 +1290,10 @@ public abstract class MathUtil {
             return copySign(Double.longBitsToDouble(Double.doubleToLongBits(absStart) + 1L), start);
         }
     }
-    
+
     /**
      * Rounds the number to the closest integer
+     *
      * @param a the number
      * @return the closest integer
      */
@@ -1312,30 +1303,33 @@ public abstract class MathUtil {
 
     /**
      * Rounds the number to the closest integer
+     *
      * @param a the number
      * @return the closest integer
      */
     public static long round(double a) {
         return Math.round(a);
     }
-    
+
     /**
      * Rounds the number down
+     *
      * @param a the number
      * @return a rounded down number
      */
     public static int floor(float a) {
-        return (int)a;
+        return (int) a;
     }
 
     /**
      * Rounds the number down
+     *
      * @param a the number
      * @return a rounded down number
      */
     public static long floor(double a) {
-        return (long)a;
+        return (long) a;
     }
-    
-    
+
+
 }

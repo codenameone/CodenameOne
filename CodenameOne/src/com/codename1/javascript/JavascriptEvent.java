@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.javascript;
@@ -31,33 +31,34 @@ import com.codename1.ui.events.ActionEvent;
  * received in a JavascriptContext via the BrowserNavigationCallback mechanism,
  * the requests are parsed and wrapped in a JavascriptEvent, which is then fired
  * and ultimately handled by another event handler to actually call the method.
- * 
- *  <p><strong>NOTE:</strong> The {@link com.codename1.javascript } package is now deprecated.  The preferred method of 
- * Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) }, 
- * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these work asynchronously (except in the XXXAndWait() variants, which 
+ *
+ * <p><strong>NOTE:</strong> The {@link com.codename1.javascript } package is now deprecated.  The preferred method of
+ * Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
+ * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these work asynchronously (except in the XXXAndWait() variants, which
  * use invokeAndBlock() to make the calls synchronously.</p>
- * 
+ *
  * @author shannah
  */
 class JavascriptEvent extends ActionEvent {
-    
+
     Object[] args;
     String method;
-    public JavascriptEvent(JSObject source, String method, Object[] args){
-        super(source,ActionEvent.Type.JavaScript);
+
+    public JavascriptEvent(JSObject source, String method, Object[] args) {
+        super(source, ActionEvent.Type.JavaScript);
         this.args = args;
         this.method = method;
     }
-    
-    public Object[] getArgs(){
+
+    public Object[] getArgs() {
         return args;
     }
-    
-    public String getMethod(){
+
+    public String getMethod() {
         return method;
     }
-    
-    public JSObject getSelf(){
-        return (JSObject)this.getSource();
+
+    public JSObject getSelf() {
+        return (JSObject) this.getSource();
     }
 }

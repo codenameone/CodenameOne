@@ -26,65 +26,58 @@ import java.util.HashMap;
  * with RE.  For a description of the syntax accepted by RECompiler and what you can
  * do with regular expressions, see the documentation for the RE matcher class.
  *
- * @see RE
- *
  * @author <a href="mailto:jonl@muppetlabs.com">Jonathan Locke</a>
  * @author <a href="mailto:gholam@xtra.co.nz">Michael McCallum</a>
  * @version $Id: RECompiler.java 518156 2007-03-14 14:31:26Z vgritsenko $
+ * @see RE
  */
-public class RECompiler
-{
+public class RECompiler {
+    // Node flags
+    static final int NODE_NORMAL = 0;                 // No flags (nothing special)
+    static final int NODE_NULLABLE = 1;                 // True if node is potentially null
+    static final int NODE_TOPLEVEL = 2;                 // True if top level expr
+    // Special types of 'escapes'
+    static final int ESC_MASK = 0xffff0;           // Escape complexity mask
+    static final int ESC_BACKREF = 0xfffff;           // Escape is really a backreference
+    static final int ESC_COMPLEX = 0xffffe;           // Escape isn't really a true character
+    static final int ESC_CLASS = 0xffffd;           // Escape represents a whole class of characters
+    // {m,n} stacks
+    static final int bracketUnbounded = -1;             // Unbounded value
+    // Lookup table for POSIX character class names
+    static final HashMap hashPOSIX = new HashMap();
+
+    static {
+        hashPOSIX.put("alnum", new Character(RE.POSIX_CLASS_ALNUM));
+        hashPOSIX.put("alpha", new Character(RE.POSIX_CLASS_ALPHA));
+        hashPOSIX.put("blank", new Character(RE.POSIX_CLASS_BLANK));
+        hashPOSIX.put("cntrl", new Character(RE.POSIX_CLASS_CNTRL));
+        hashPOSIX.put("digit", new Character(RE.POSIX_CLASS_DIGIT));
+        hashPOSIX.put("graph", new Character(RE.POSIX_CLASS_GRAPH));
+        hashPOSIX.put("lower", new Character(RE.POSIX_CLASS_LOWER));
+        hashPOSIX.put("print", new Character(RE.POSIX_CLASS_PRINT));
+        hashPOSIX.put("punct", new Character(RE.POSIX_CLASS_PUNCT));
+        hashPOSIX.put("space", new Character(RE.POSIX_CLASS_SPACE));
+        hashPOSIX.put("upper", new Character(RE.POSIX_CLASS_UPPER));
+        hashPOSIX.put("xdigit", new Character(RE.POSIX_CLASS_XDIGIT));
+        hashPOSIX.put("javastart", new Character(RE.POSIX_CLASS_JSTART));
+        hashPOSIX.put("javapart", new Character(RE.POSIX_CLASS_JPART));
+    }
+
     // The compiled program
     char[] instruction;                                 // The compiled RE 'program' instruction buffer
     int lenInstruction;                                 // The amount of the program buffer currently in use
-
     // Input state for compiling regular expression
     String pattern;                                     // Input string
     int len;                                            // Length of the pattern string
     int idx;                                            // Current input index into ac
     int parens;                                         // Total number of paren pairs
-
-    // Node flags
-    static final int NODE_NORMAL   = 0;                 // No flags (nothing special)
-    static final int NODE_NULLABLE = 1;                 // True if node is potentially null
-    static final int NODE_TOPLEVEL = 2;                 // True if top level expr
-
-    // Special types of 'escapes'
-    static final int ESC_MASK      = 0xffff0;           // Escape complexity mask
-    static final int ESC_BACKREF   = 0xfffff;           // Escape is really a backreference
-    static final int ESC_COMPLEX   = 0xffffe;           // Escape isn't really a true character
-    static final int ESC_CLASS     = 0xffffd;           // Escape represents a whole class of characters
-
-    // {m,n} stacks
-    static final int bracketUnbounded = -1;             // Unbounded value
     int bracketMin;                                     // Minimum number of matches
     int bracketOpt;                                     // Additional optional matches
-
-    // Lookup table for POSIX character class names
-    static final HashMap hashPOSIX = new HashMap();
-    static
-    {
-        hashPOSIX.put("alnum",     new Character(RE.POSIX_CLASS_ALNUM));
-        hashPOSIX.put("alpha",     new Character(RE.POSIX_CLASS_ALPHA));
-        hashPOSIX.put("blank",     new Character(RE.POSIX_CLASS_BLANK));
-        hashPOSIX.put("cntrl",     new Character(RE.POSIX_CLASS_CNTRL));
-        hashPOSIX.put("digit",     new Character(RE.POSIX_CLASS_DIGIT));
-        hashPOSIX.put("graph",     new Character(RE.POSIX_CLASS_GRAPH));
-        hashPOSIX.put("lower",     new Character(RE.POSIX_CLASS_LOWER));
-        hashPOSIX.put("print",     new Character(RE.POSIX_CLASS_PRINT));
-        hashPOSIX.put("punct",     new Character(RE.POSIX_CLASS_PUNCT));
-        hashPOSIX.put("space",     new Character(RE.POSIX_CLASS_SPACE));
-        hashPOSIX.put("upper",     new Character(RE.POSIX_CLASS_UPPER));
-        hashPOSIX.put("xdigit",    new Character(RE.POSIX_CLASS_XDIGIT));
-        hashPOSIX.put("javastart", new Character(RE.POSIX_CLASS_JSTART));
-        hashPOSIX.put("javapart",  new Character(RE.POSIX_CLASS_JPART));
-    }
 
     /**
      * Constructor.  Creates (initially empty) storage for a regular expression program.
      */
-    public RECompiler()
-    {
+    public RECompiler() {
         // Start off with a generous, yet reasonable, initial size
         instruction = new char[128];
         lenInstruction = 0;
@@ -93,19 +86,17 @@ public class RECompiler
     /**
      * Ensures that n more characters can fit in the program buffer.
      * If n more can't fit, then the size is doubled until it can.
+     *
      * @param n Number of additional characters to ensure will fit.
      */
-    void ensure(int n)
-    {
+    void ensure(int n) {
         // Get current program length
         int curlen = instruction.length;
 
         // If the current length + n more is too much
-        if (lenInstruction + n >= curlen)
-        {
+        if (lenInstruction + n >= curlen) {
             // Double the size of the program array until n more will fit
-            while (lenInstruction + n >= curlen)
-            {
+            while (lenInstruction + n >= curlen) {
                 curlen *= 2;
             }
 
@@ -118,10 +109,10 @@ public class RECompiler
 
     /**
      * Emit a single character into the program stream.
+     *
      * @param c Character to add
      */
-    void emit(char c)
-    {
+    void emit(char c) {
         // Make room for character
         ensure(1);
 
@@ -132,36 +123,35 @@ public class RECompiler
     /**
      * Inserts a node with a given opcode and opdata at insertAt.  The node relative next
      * pointer is initialized to 0.
-     * @param opcode Opcode for new node
-     * @param opdata Opdata for new node (only the low 16 bits are currently used)
+     *
+     * @param opcode   Opcode for new node
+     * @param opdata   Opdata for new node (only the low 16 bits are currently used)
      * @param insertAt Index at which to insert the new node in the program
      */
-    void nodeInsert(char opcode, int opdata, int insertAt)
-    {
+    void nodeInsert(char opcode, int opdata, int insertAt) {
         // Make room for a new node
         ensure(RE.nodeSize);
 
         // Move everything from insertAt to the end down nodeSize elements
         System.arraycopy(instruction, insertAt, instruction, insertAt + RE.nodeSize, lenInstruction - insertAt);
         instruction[insertAt /* + RE.offsetOpcode */] = opcode;
-        instruction[insertAt    + RE.offsetOpdata   ] = (char) opdata;
-        instruction[insertAt    + RE.offsetNext     ] = 0;
+        instruction[insertAt + RE.offsetOpdata] = (char) opdata;
+        instruction[insertAt + RE.offsetNext] = 0;
         lenInstruction += RE.nodeSize;
     }
 
     /**
      * Appends a node to the end of a node chain
-     * @param node Start of node chain to traverse
+     *
+     * @param node    Start of node chain to traverse
      * @param pointTo Node to have the tail of the chain point to
      */
-    void setNextOfEnd(int node, int pointTo)
-    {
+    void setNextOfEnd(int node, int pointTo) {
         // Traverse the chain until the next offset is 0
         int next = instruction[node + RE.offsetNext];
         // while the 'node' is not the last in the chain
         // and the 'node' is not the last in the program.
-        while ( next != 0 && node < lenInstruction )
-        {
+        while (next != 0 && node < lenInstruction) {
             // if the node we are supposed to point to is in the chain then
             // point to the end of the program instead.
             // Michael McCallum <gholam@xtra.co.nz>
@@ -177,7 +167,7 @@ public class RECompiler
 
         // if we have reached the end of the program then dont set the pointTo.
         // im not sure if this will break any thing but passes all the tests.
-        if ( node < lenInstruction ) {
+        if (node < lenInstruction) {
             // Some patterns result in very large programs which exceed
             // capacity of the short used for specifying signed offset of the
             // next instruction. Example: a{1638}
@@ -193,19 +183,19 @@ public class RECompiler
 
     /**
      * Adds a new node
+     *
      * @param opcode Opcode for node
      * @param opdata Opdata for node (only the low 16 bits are currently used)
      * @return Index of new node in program
      */
-    int node(char opcode, int opdata)
-    {
+    int node(char opcode, int opdata) {
         // Make room for a new node
         ensure(RE.nodeSize);
 
         // Add new node at end
         instruction[lenInstruction /* + RE.offsetOpcode */] = opcode;
-        instruction[lenInstruction    + RE.offsetOpdata   ] = (char) opdata;
-        instruction[lenInstruction    + RE.offsetNext     ] = 0;
+        instruction[lenInstruction + RE.offsetOpdata] = (char) opdata;
+        instruction[lenInstruction + RE.offsetNext] = 0;
         lenInstruction += RE.nodeSize;
 
         // Return index of new node
@@ -215,119 +205,101 @@ public class RECompiler
 
     /**
      * Throws a new internal error exception
-     * @exception Error Thrown in the event of an internal error.
+     *
+     * @throws Error Thrown in the event of an internal error.
      */
-    void internalError() throws Error
-    {
+    void internalError() throws Error {
         throw new Error("Internal error!");
     }
 
     /**
      * Throws a new syntax error exception
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     *
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    void syntaxError(String s) throws RESyntaxException
-    {
+    void syntaxError(String s) throws RESyntaxException {
         throw new RESyntaxException(s);
     }
 
     /**
      * Match bracket {m,n} expression put results in bracket member variables
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     *
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    void bracket() throws RESyntaxException
-    {
+    void bracket() throws RESyntaxException {
         // Current character must be a '{'
-        if (idx >= len || pattern.charAt(idx++) != '{')
-        {
+        if (idx >= len || pattern.charAt(idx++) != '{') {
             internalError();
         }
 
         // Next char must be a digit
-        if (idx >= len || !Character.isDigit(pattern.charAt(idx)))
-        {
+        if (idx >= len || !Character.isDigit(pattern.charAt(idx))) {
             syntaxError("Expected digit");
         }
 
         // Get min ('m' of {m,n}) number
         StringBuffer number = new StringBuffer();
-        while (idx < len && Character.isDigit(pattern.charAt(idx)))
-        {
+        while (idx < len && Character.isDigit(pattern.charAt(idx))) {
             number.append(pattern.charAt(idx++));
         }
-        try
-        {
+        try {
             bracketMin = Integer.parseInt(number.toString());
-        }
-        catch (NumberFormatException e)
-        {
+        } catch (NumberFormatException e) {
             syntaxError("Expected valid number");
         }
 
         // If out of input, fail
-        if (idx >= len)
-        {
+        if (idx >= len) {
             syntaxError("Expected comma or right bracket");
         }
 
         // If end of expr, optional limit is 0
-        if (pattern.charAt(idx) == '}')
-        {
+        if (pattern.charAt(idx) == '}') {
             idx++;
             bracketOpt = 0;
             return;
         }
 
         // Must have at least {m,} and maybe {m,n}.
-        if (idx >= len || pattern.charAt(idx++) != ',')
-        {
+        if (idx >= len || pattern.charAt(idx++) != ',') {
             syntaxError("Expected comma");
         }
 
         // If out of input, fail
-        if (idx >= len)
-        {
+        if (idx >= len) {
             syntaxError("Expected comma or right bracket");
         }
 
         // If {m,} max is unlimited
-        if (pattern.charAt(idx) == '}')
-        {
+        if (pattern.charAt(idx) == '}') {
             idx++;
             bracketOpt = bracketUnbounded;
             return;
         }
 
         // Next char must be a digit
-        if (idx >= len || !Character.isDigit(pattern.charAt(idx)))
-        {
+        if (idx >= len || !Character.isDigit(pattern.charAt(idx))) {
             syntaxError("Expected digit");
         }
 
         // Get max number
         number.setLength(0);
-        while (idx < len && Character.isDigit(pattern.charAt(idx)))
-        {
+        while (idx < len && Character.isDigit(pattern.charAt(idx))) {
             number.append(pattern.charAt(idx++));
         }
-        try
-        {
+        try {
             bracketOpt = Integer.parseInt(number.toString()) - bracketMin;
-        }
-        catch (NumberFormatException e)
-        {
+        } catch (NumberFormatException e) {
             syntaxError("Expected valid number");
         }
 
         // Optional repetitions must be >= 0
-        if (bracketOpt < 0)
-        {
+        if (bracketOpt < 0) {
             syntaxError("Bad range");
         }
 
         // Must have close brace
-        if (idx >= len || pattern.charAt(idx++) != '}')
-        {
+        if (idx >= len || pattern.charAt(idx++) != '}') {
             syntaxError("Missing close brace");
         }
     }
@@ -338,28 +310,25 @@ public class RECompiler
      * right amount. This code "understands" the subtle difference between an
      * octal escape and a backref.  You can access the type of ESC_CLASS or
      * ESC_COMPLEX or ESC_BACKREF by looking at pattern[idx - 1].
+     *
      * @return ESC_* code or character if simple escape
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    int escape() throws RESyntaxException
-    {
+    int escape() throws RESyntaxException {
         // "Shouldn't" happen
-        if (pattern.charAt(idx) != '\\')
-        {
+        if (pattern.charAt(idx) != '\\') {
             internalError();
         }
 
         // Escape shouldn't occur as last character in string!
-        if (idx + 1 == len)
-        {
+        if (idx + 1 == len) {
             syntaxError("Escape terminates string");
         }
 
         // Switch on character after backslash
         idx += 2;
         char escapeChar = pattern.charAt(idx - 1);
-        switch (escapeChar)
-        {
+        switch (escapeChar) {
             case RE.E_BOUND:
             case RE.E_NBOUND:
                 return ESC_COMPLEX;
@@ -373,43 +342,35 @@ public class RECompiler
                 return ESC_CLASS;
 
             case 'u':
-            case 'x':
-                {
-                    // Exact required hex digits for escape type
-                    int hexDigits = (escapeChar == 'u' ? 4 : 2);
+            case 'x': {
+                // Exact required hex digits for escape type
+                int hexDigits = (escapeChar == 'u' ? 4 : 2);
 
-                    // Parse up to hexDigits characters from input
-                    int val = 0;
-                    for ( ; idx < len && hexDigits-- > 0; idx++)
-                    {
-                        // Get char
-                        char c = pattern.charAt(idx);
+                // Parse up to hexDigits characters from input
+                int val = 0;
+                for (; idx < len && hexDigits-- > 0; idx++) {
+                    // Get char
+                    char c = pattern.charAt(idx);
 
-                        // If it's a hexadecimal digit (0-9)
-                        if (c >= '0' && c <= '9')
-                        {
+                    // If it's a hexadecimal digit (0-9)
+                    if (c >= '0' && c <= '9') {
+                        // Compute new value
+                        val = (val << 4) + c - '0';
+                    } else {
+                        // If it's a hexadecimal letter (a-f)
+                        c = Character.toLowerCase(c);
+                        if (c >= 'a' && c <= 'f') {
                             // Compute new value
-                            val = (val << 4) + c - '0';
-                        }
-                        else
-                        {
-                            // If it's a hexadecimal letter (a-f)
-                            c = Character.toLowerCase(c);
-                            if (c >= 'a' && c <= 'f')
-                            {
-                                // Compute new value
-                                val = (val << 4) + (c - 'a') + 10;
-                            }
-                            else
-                            {
-                                // If it's not a valid digit or hex letter, the escape must be invalid
-                                // because hexDigits of input have not been absorbed yet.
-                                syntaxError("Expected " + hexDigits + " hexadecimal digits after \\" + escapeChar);
-                            }
+                            val = (val << 4) + (c - 'a') + 10;
+                        } else {
+                            // If it's not a valid digit or hex letter, the escape must be invalid
+                            // because hexDigits of input have not been absorbed yet.
+                            syntaxError("Expected " + hexDigits + " hexadecimal digits after \\" + escapeChar);
                         }
                     }
-                    return val;
                 }
+                return val;
+            }
 
             case 't':
                 return '\t';
@@ -435,15 +396,12 @@ public class RECompiler
             case '9':
 
                 // An octal escape starts with a 0 or has two digits in a row
-                if ((idx < len && Character.isDigit(pattern.charAt(idx))) || escapeChar == '0')
-                {
+                if ((idx < len && Character.isDigit(pattern.charAt(idx))) || escapeChar == '0') {
                     // Handle \nnn octal escapes
                     int val = escapeChar - '0';
-                    if (idx < len && Character.isDigit(pattern.charAt(idx)))
-                    {
+                    if (idx < len && Character.isDigit(pattern.charAt(idx))) {
                         val = ((val << 3) + (pattern.charAt(idx++) - '0'));
-                        if (idx < len && Character.isDigit(pattern.charAt(idx)))
-                        {
+                        if (idx < len && Character.isDigit(pattern.charAt(idx))) {
                             val = ((val << 3) + (pattern.charAt(idx++) - '0'));
                         }
                     }
@@ -462,46 +420,40 @@ public class RECompiler
 
     /**
      * Compile a character class
+     *
      * @return Index of class node
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    int characterClass() throws RESyntaxException
-    {
+    int characterClass() throws RESyntaxException {
         // Check for bad calling or empty class
-        if (pattern.charAt(idx) != '[')
-        {
+        if (pattern.charAt(idx) != '[') {
             internalError();
         }
 
         // Check for unterminated or empty class
-        if ((idx + 1) >= len || pattern.charAt(++idx) == ']')
-        {
+        if ((idx + 1) >= len || pattern.charAt(++idx) == ']') {
             syntaxError("Empty or unterminated class");
         }
 
         // Check for POSIX character class
-        if (idx < len && pattern.charAt(idx) == ':')
-        {
+        if (idx < len && pattern.charAt(idx) == ':') {
             // Skip colon
             idx++;
 
             // POSIX character classes are denoted with lowercase ASCII strings
             int idxStart = idx;
-            while (idx < len && pattern.charAt(idx) >= 'a' && pattern.charAt(idx) <= 'z')
-            {
+            while (idx < len && pattern.charAt(idx) >= 'a' && pattern.charAt(idx) <= 'z') {
                 idx++;
             }
 
             // Should be a ":]" to terminate the POSIX character class
-            if ((idx + 1) < len && pattern.charAt(idx) == ':' && pattern.charAt(idx + 1) == ']')
-            {
+            if ((idx + 1) < len && pattern.charAt(idx) == ':' && pattern.charAt(idx + 1) == ']') {
                 // Get character class
                 String charClass = pattern.substring(idxStart, idx);
 
                 // Select the POSIX class id
-                Character i = (Character)hashPOSIX.get(charClass);
-                if (i != null)
-                {
+                Character i = (Character) hashPOSIX.get(charClass);
+                if (i != null) {
                     // Move past colon and right bracket
                     idx += 2;
 
@@ -526,29 +478,24 @@ public class RECompiler
         char rangeStart = Character.MIN_VALUE;
         char rangeEnd;
         RERange range = new RERange();
-        while (idx < len && pattern.charAt(idx) != ']')
-        {
+        while (idx < len && pattern.charAt(idx) != ']') {
 
             switchOnCharacter:
 
             // Switch on character
-            switch (pattern.charAt(idx))
-            {
+            switch (pattern.charAt(idx)) {
                 case '^':
                     include = !include;
-                    if (idx == idxFirst)
-                    {
+                    if (idx == idxFirst) {
                         range.include(Character.MIN_VALUE, Character.MAX_VALUE, true);
                     }
                     idx++;
                     continue;
 
-                case '\\':
-                {
+                case '\\': {
                     // Escape always advances the stream
                     int c;
-                    switch (c = escape ())
-                    {
+                    switch (c = escape()) {
                         case ESC_COMPLEX:
                         case ESC_BACKREF:
 
@@ -558,14 +505,12 @@ public class RECompiler
                         case ESC_CLASS:
 
                             // Classes can't be an endpoint of a range
-                            if (definingRange)
-                            {
+                            if (definingRange) {
                                 syntaxError("Bad character class");
                             }
 
                             // Handle specific type of class (some are ok)
-                            switch (pattern.charAt(idx - 1))
-                            {
+                            switch (pattern.charAt(idx - 1)) {
                                 case RE.E_NSPACE:
                                     range.include(Character.MIN_VALUE, 7, include);   // [Min - \b )
                                     range.include((char) 11, include);                // ( \n - \f )
@@ -623,8 +568,7 @@ public class RECompiler
                 case '-':
 
                     // Start a range if one isn't already started
-                    if (definingRange)
-                    {
+                    if (definingRange) {
                         syntaxError("Bad class range");
                     }
                     definingRange = true;
@@ -633,8 +577,7 @@ public class RECompiler
                     rangeStart = (last == CHAR_INVALID ? 0 : last);
 
                     // Premature end of range. define up to Character.MAX_VALUE
-                    if ((idx + 1) < len && pattern.charAt(++idx) == ']')
-                    {
+                    if ((idx + 1) < len && pattern.charAt(++idx) == ']') {
                         simpleChar = Character.MAX_VALUE;
                         break;
                     }
@@ -646,14 +589,12 @@ public class RECompiler
             }
 
             // Handle simple character simpleChar
-            if (definingRange)
-            {
+            if (definingRange) {
                 // if we are defining a range make it now
                 rangeEnd = simpleChar;
 
                 // Actually create a range if the range is ok
-                if (rangeStart >= rangeEnd)
-                {
+                if (rangeStart >= rangeEnd) {
                     syntaxError("Bad character class");
                 }
                 range.include(rangeStart, rangeEnd, include);
@@ -661,12 +602,9 @@ public class RECompiler
                 // We are done defining the range
                 last = CHAR_INVALID;
                 definingRange = false;
-            }
-            else
-            {
+            } else {
                 // If simple character and not start of range, include it
-                if (idx >= len || pattern.charAt(idx) != '-')
-                {
+                if (idx >= len || pattern.charAt(idx) != '-') {
                     range.include(simpleChar, include);
                 }
                 last = simpleChar;
@@ -674,8 +612,7 @@ public class RECompiler
         }
 
         // Shouldn't be out of input
-        if (idx == len)
-        {
+        if (idx == len) {
             syntaxError("Unterminated character class");
         }
 
@@ -683,11 +620,10 @@ public class RECompiler
         idx++;
 
         // Emit character class definition
-        instruction[ret + RE.offsetOpdata] = (char)range.num;
-        for (int i = 0; i < range.num; i++)
-        {
-            emit((char)range.minRange[i]);
-            emit((char)range.maxRange[i]);
+        instruction[ret + RE.offsetOpdata] = (char) range.num;
+        for (int i = 0; i < range.num; i++) {
+            emit((char) range.minRange[i]);
+            emit((char) range.maxRange[i]);
         }
         return ret;
     }
@@ -697,11 +633,11 @@ public class RECompiler
      * it can un-include the last character of string if a closure operator follows.
      * This is correct because *+? have higher precedence than concatentation (thus
      * ABC* means AB(C*) and NOT (ABC)*).
+     *
      * @return Index of new atom node
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    int atom() throws RESyntaxException
-    {
+    int atom() throws RESyntaxException {
         // Create a string node
         int ret = node(RE.OP_ATOM, 0);
 
@@ -712,28 +648,23 @@ public class RECompiler
 
         atomLoop:
 
-        while (idx < len)
-        {
+        while (idx < len) {
             // Is there a next char?
-            if ((idx + 1) < len)
-            {
+            if ((idx + 1) < len) {
                 char c = pattern.charAt(idx + 1);
 
                 // If the next 'char' is an escape, look past the whole escape
-                if (pattern.charAt(idx) == '\\')
-                {
+                if (pattern.charAt(idx) == '\\') {
                     int idxEscape = idx;
                     escape();
-                    if (idx < len)
-                    {
+                    if (idx < len) {
                         c = pattern.charAt(idx);
                     }
                     idx = idxEscape;
                 }
 
                 // Switch on next char
-                switch (c)
-                {
+                switch (c) {
                     case '{':
                     case '?':
                     case '*':
@@ -741,16 +672,14 @@ public class RECompiler
 
                         // If the next character is a closure operator and our atom is non-empty, the
                         // current character should bind to the closure operator rather than the atom
-                        if (lenAtom != 0)
-                        {
+                        if (lenAtom != 0) {
                             break atomLoop;
                         }
                 }
             }
 
             // Switch on current char
-            switch (pattern.charAt(idx))
-            {
+            switch (pattern.charAt(idx)) {
                 case ']':
                 case '^':
                 case '$':
@@ -767,33 +696,29 @@ public class RECompiler
                 case '+':
 
                     // We should have an atom by now
-                    if (lenAtom == 0)
-                    {
+                    if (lenAtom == 0) {
                         // No atom before closure
                         syntaxError("Missing operand to closure");
                     }
                     break atomLoop;
 
-                case '\\':
+                case '\\': {
+                    // Get the escaped character (advances input automatically)
+                    int idxBeforeEscape = idx;
+                    int c = escape();
 
-                    {
-                        // Get the escaped character (advances input automatically)
-                        int idxBeforeEscape = idx;
-                        int c = escape();
-
-                        // Check if it's a simple escape (as opposed to, say, a backreference)
-                        if ((c & ESC_MASK) == ESC_MASK)
-                        {
-                            // Not a simple escape, so backup to where we were before the escape.
-                            idx = idxBeforeEscape;
-                            break atomLoop;
-                        }
-
-                        // Add escaped char to atom
-                        emit((char) c);
-                        lenAtom++;
+                    // Check if it's a simple escape (as opposed to, say, a backreference)
+                    if ((c & ESC_MASK) == ESC_MASK) {
+                        // Not a simple escape, so backup to where we were before the escape.
+                        idx = idxBeforeEscape;
+                        break atomLoop;
                     }
-                    break;
+
+                    // Add escaped char to atom
+                    emit((char) c);
+                    lenAtom++;
+                }
+                break;
 
                 default:
 
@@ -805,78 +730,72 @@ public class RECompiler
         }
 
         // This "shouldn't" happen
-        if (lenAtom == 0)
-        {
+        if (lenAtom == 0) {
             internalError();
         }
 
         // Emit the atom length into the program
-        instruction[ret + RE.offsetOpdata] = (char)lenAtom;
+        instruction[ret + RE.offsetOpdata] = (char) lenAtom;
         return ret;
     }
 
     /**
      * Match a terminal node.
+     *
      * @param flags Flags
      * @return Index of terminal node (closeable)
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    int terminal(int[] flags) throws RESyntaxException
-    {
-        switch (pattern.charAt(idx))
-        {
-        case RE.OP_EOL:
-        case RE.OP_BOL:
-        case RE.OP_ANY:
-            return node(pattern.charAt(idx++), 0);
+    int terminal(int[] flags) throws RESyntaxException {
+        switch (pattern.charAt(idx)) {
+            case RE.OP_EOL:
+            case RE.OP_BOL:
+            case RE.OP_ANY:
+                return node(pattern.charAt(idx++), 0);
 
-        case '[':
-            return characterClass();
+            case '[':
+                return characterClass();
 
-        case '(':
-            return expr(flags);
+            case '(':
+                return expr(flags);
 
-        case ')':
-            syntaxError("Unexpected close paren");
+            case ')':
+                syntaxError("Unexpected close paren");
 
-        case '|':
-            internalError();
+            case '|':
+                internalError();
 
-        case ']':
-            syntaxError("Mismatched class");
+            case ']':
+                syntaxError("Mismatched class");
 
-        case 0:
-            syntaxError("Unexpected end of input");
+            case 0:
+                syntaxError("Unexpected end of input");
 
-        case '?':
-        case '+':
-        case '{':
-        case '*':
-            syntaxError("Missing operand to closure");
+            case '?':
+            case '+':
+            case '{':
+            case '*':
+                syntaxError("Missing operand to closure");
 
-        case '\\':
-            {
+            case '\\': {
                 // Don't forget, escape() advances the input stream!
                 int idxBeforeEscape = idx;
 
                 // Switch on escaped character
-                switch (escape())
-                {
+                switch (escape()) {
                     case ESC_CLASS:
                     case ESC_COMPLEX:
                         flags[0] &= ~NODE_NULLABLE;
                         return node(RE.OP_ESCAPE, pattern.charAt(idx - 1));
 
-                    case ESC_BACKREF:
-                        {
-                            char backreference = (char)(pattern.charAt(idx - 1) - '0');
-                            if (parens <= backreference)
-                            {
-                                syntaxError("Bad backreference");
-                            }
-                            flags[0] |= NODE_NULLABLE;
-                            return node(RE.OP_BACKREF, backreference);
+                    case ESC_BACKREF: {
+                        char backreference = (char) (pattern.charAt(idx - 1) - '0');
+                        if (parens <= backreference) {
+                            syntaxError("Bad backreference");
                         }
+                        flags[0] |= NODE_NULLABLE;
+                        return node(RE.OP_BACKREF, backreference);
+                    }
 
                     default:
 
@@ -897,17 +816,17 @@ public class RECompiler
 
     /**
      * Compile a possibly closured terminal
+     *
      * @param flags Flags passed by reference
      * @return Index of closured node
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    int closure(int[] flags) throws RESyntaxException
-    {
+    int closure(int[] flags) throws RESyntaxException {
         // Before terminal
         int idxBeforeTerminal = idx;
 
         // Values to pass by reference to terminal()
-        int[] terminalFlags = { NODE_NORMAL };
+        int[] terminalFlags = {NODE_NORMAL};
 
         // Get terminal symbol
         int ret = terminal(terminalFlags);
@@ -916,15 +835,13 @@ public class RECompiler
         flags[0] |= terminalFlags[0];
 
         // Advance input, set NODE_NULLABLE flag and do sanity checks
-        if (idx >= len)
-        {
+        if (idx >= len) {
             return ret;
         }
 
         boolean greedy = true;
         char closureType = pattern.charAt(idx);
-        switch (closureType)
-        {
+        switch (closureType) {
             case '?':
             case '*':
 
@@ -944,30 +861,24 @@ public class RECompiler
 
                 // Don't allow blantant stupidity
                 int opcode = instruction[ret /* + RE.offsetOpcode */];
-                if (opcode == RE.OP_BOL || opcode == RE.OP_EOL)
-                {
+                if (opcode == RE.OP_BOL || opcode == RE.OP_EOL) {
                     syntaxError("Bad closure operand");
                 }
-                if ((terminalFlags[0] & NODE_NULLABLE) != 0)
-                {
+                if ((terminalFlags[0] & NODE_NULLABLE) != 0) {
                     syntaxError("Closure operand can't be nullable");
                 }
         }
 
         // If the next character is a '?', make the closure non-greedy (reluctant)
-        if (idx < len && pattern.charAt(idx) == '?')
-        {
+        if (idx < len && pattern.charAt(idx) == '?') {
             idx++;
             greedy = false;
         }
 
-        if (greedy)
-        {
+        if (greedy) {
             // Actually do the closure now
-            switch (closureType)
-            {
-                case '{':
-                {
+            switch (closureType) {
+                case '{': {
                     bracket();
                     int bracketEnd = idx;
                     int bracketMin = this.bracketMin;
@@ -977,33 +888,28 @@ public class RECompiler
                     int pos = ret;
 
                     // Process min first
-                    for (int c = 0; c < bracketMin; c++)
-                    {
+                    for (int c = 0; c < bracketMin; c++) {
                         // Rewind stream and run it through again - more matchers coming
                         idx = idxBeforeTerminal;
                         setNextOfEnd(pos, pos = terminal(terminalFlags));
                     }
 
                     // Do the right thing for maximum ({m,})
-                    if (bracketOpt == bracketUnbounded)
-                    {
+                    if (bracketOpt == bracketUnbounded) {
                         // Drop through now and closure expression.
                         // We are done with the {m,} expr, so skip rest
                         idx = bracketEnd;
                         nodeInsert(RE.OP_STAR, 0, pos);
                         setNextOfEnd(pos + RE.nodeSize, pos);
                         break;
-                    }
-                    else if (bracketOpt > 0)
-                    {
+                    } else if (bracketOpt > 0) {
                         int opt[] = new int[bracketOpt + 1];
                         // Surround first optional terminal with MAYBE
                         nodeInsert(RE.OP_MAYBE, 0, pos);
                         opt[0] = pos;
 
                         // Add all the rest optional terminals with preceeding MAYBEs
-                        for (int c = 1; c < bracketOpt; c++)
-                        {
+                        for (int c = 1; c < bracketOpt; c++) {
                             opt[c] = node(RE.OP_MAYBE, 0);
                             // Rewind stream and run it through again - more matchers coming
                             idx = idxBeforeTerminal;
@@ -1012,14 +918,11 @@ public class RECompiler
 
                         // Tie ends together
                         int end = opt[bracketOpt] = node(RE.OP_NOTHING, 0);
-                        for (int c = 0; c < bracketOpt; c++)
-                        {
+                        for (int c = 0; c < bracketOpt; c++) {
                             setNextOfEnd(opt[c], end);
                             setNextOfEnd(opt[c] + RE.nodeSize, opt[c + 1]);
                         }
-                    }
-                    else
-                    {
+                    } else {
                         // Rollback terminal - no opt matchers present
                         lenInstruction = pos;
                         node(RE.OP_NOTHING, 0);
@@ -1030,8 +933,7 @@ public class RECompiler
                     break;
                 }
 
-                case '?':
-                {
+                case '?': {
                     nodeInsert(RE.OP_MAYBE, 0, ret);
                     int n = node(RE.OP_NOTHING, 0);
                     setNextOfEnd(ret, n);
@@ -1039,15 +941,13 @@ public class RECompiler
                     break;
                 }
 
-                case '*':
-                {
+                case '*': {
                     nodeInsert(RE.OP_STAR, 0, ret);
                     setNextOfEnd(ret + RE.nodeSize, ret);
                     break;
                 }
 
-                case '+':
-                {
+                case '+': {
                     nodeInsert(RE.OP_CONTINUE, 0, ret);
                     int n = node(RE.OP_PLUS, 0);
                     setNextOfEnd(ret + RE.nodeSize, n);
@@ -1055,14 +955,10 @@ public class RECompiler
                     break;
                 }
             }
-        }
-        else
-        {
+        } else {
             // Actually do the closure now
-            switch (closureType)
-            {
-                case '?':
-                {
+            switch (closureType) {
+                case '?': {
                     nodeInsert(RE.OP_RELUCTANTMAYBE, 0, ret);
                     int n = node(RE.OP_NOTHING, 0);
                     setNextOfEnd(ret, n);
@@ -1070,15 +966,13 @@ public class RECompiler
                     break;
                 }
 
-                case '*':
-                {
+                case '*': {
                     nodeInsert(RE.OP_RELUCTANTSTAR, 0, ret);
                     setNextOfEnd(ret + RE.nodeSize, ret);
                     break;
                 }
 
-                case '+':
-                {
+                case '+': {
                     nodeInsert(RE.OP_CONTINUE, 0, ret);
                     int n = node(RE.OP_RELUCTANTPLUS, 0);
                     setNextOfEnd(n, ret);
@@ -1096,29 +990,25 @@ public class RECompiler
      *
      * @param flags Flags passed by reference
      * @return Pointer to first node in the branch
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    int branch(int[] flags) throws RESyntaxException
-    {
+    int branch(int[] flags) throws RESyntaxException {
         // Get each possibly closured piece and concat
         int node;
         int ret = -1;
         int chain = -1;
         int[] closureFlags = new int[1];
         boolean nullable = true;
-        while (idx < len && pattern.charAt(idx) != '|' && pattern.charAt(idx) != ')')
-        {
+        while (idx < len && pattern.charAt(idx) != '|' && pattern.charAt(idx) != ')') {
             // Get new node
             closureFlags[0] = NODE_NORMAL;
             node = closure(closureFlags);
-            if (closureFlags[0] == NODE_NORMAL)
-            {
+            if (closureFlags[0] == NODE_NORMAL) {
                 nullable = false;
             }
 
             // If there's a chain, append to the end
-            if (chain != -1)
-            {
+            if (chain != -1) {
                 setNextOfEnd(chain, node);
             }
 
@@ -1130,14 +1020,12 @@ public class RECompiler
         }
 
         // If we don't run loop, make a nothing node
-        if (ret == -1)
-        {
+        if (ret == -1) {
             ret = node(RE.OP_NOTHING, 0);
         }
 
         // Set nullable flag for this branch
-        if (nullable)
-        {
+        if (nullable) {
             flags[0] |= NODE_NULLABLE;
         }
 
@@ -1150,25 +1038,20 @@ public class RECompiler
      *
      * @param flags Flag value passed by reference
      * @return Node index of expression in instruction array
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      */
-    int expr(int[] flags) throws RESyntaxException
-    {
+    int expr(int[] flags) throws RESyntaxException {
         // Create open paren node unless we were called from the top level (which has no parens)
         int paren = -1;
         int ret = -1;
         int closeParens = parens;
-        if ((flags[0] & NODE_TOPLEVEL) == 0 && pattern.charAt(idx) == '(')
-        {
+        if ((flags[0] & NODE_TOPLEVEL) == 0 && pattern.charAt(idx) == '(') {
             // if its a cluster ( rather than a proper subexpression ie with backrefs )
-            if (idx + 2 < len && pattern.charAt(idx + 1) == '?' && pattern.charAt(idx + 2) == ':')
-            {
+            if (idx + 2 < len && pattern.charAt(idx + 1) == '?' && pattern.charAt(idx + 2) == ':') {
                 paren = 2;
                 idx += 3;
                 ret = node(RE.OP_OPEN_CLUSTER, 0);
-            }
-            else
-            {
+            } else {
                 paren = 1;
                 idx++;
                 ret = node(RE.OP_OPEN, parens++);
@@ -1179,18 +1062,14 @@ public class RECompiler
         // Process contents of first branch node
         boolean open = false;
         int branch = branch(flags);
-        if (ret == -1)
-        {
+        if (ret == -1) {
             ret = branch;
-        }
-        else
-        {
+        } else {
             setNextOfEnd(ret, branch);
         }
 
         // Loop through branches
-        while (idx < len && pattern.charAt(idx) == '|')
-        {
+        while (idx < len && pattern.charAt(idx) == '|') {
             // Now open the first branch since there are more than one
             if (!open) {
                 nodeInsert(RE.OP_BRANCH, 0, branch);
@@ -1204,27 +1083,18 @@ public class RECompiler
 
         // Create an ending node (either a close paren or an OP_END)
         int end;
-        if (paren > 0)
-        {
-            if (idx < len && pattern.charAt(idx) == ')')
-            {
+        if (paren > 0) {
+            if (idx < len && pattern.charAt(idx) == ')') {
                 idx++;
-            }
-            else
-            {
+            } else {
                 syntaxError("Missing close paren");
             }
-            if (paren == 1)
-            {
+            if (paren == 1) {
                 end = node(RE.OP_CLOSE, closeParens);
-            }
-            else
-            {
+            } else {
                 end = node(RE.OP_CLOSE_CLUSTER, 0);
             }
-        }
-        else
-        {
+        } else {
             end = node(RE.OP_END, 0);
         }
 
@@ -1235,11 +1105,9 @@ public class RECompiler
         int currentNode = ret;
         int nextNodeOffset = instruction[currentNode + RE.offsetNext];
         // while the next node o
-        while (nextNodeOffset != 0 && currentNode < lenInstruction)
-        {
+        while (nextNodeOffset != 0 && currentNode < lenInstruction) {
             // If branch, make the end of the branch's operand chain point to the end node.
-            if (instruction[currentNode /* + RE.offsetOpcode */] == RE.OP_BRANCH)
-            {
+            if (instruction[currentNode /* + RE.offsetOpcode */] == RE.OP_BRANCH) {
                 setNextOfEnd(currentNode + RE.nodeSize, end);
             }
             nextNodeOffset = instruction[currentNode + RE.offsetNext];
@@ -1253,15 +1121,15 @@ public class RECompiler
     /**
      * Compiles a regular expression pattern into a program runnable by the pattern
      * matcher class 'RE'.
+     *
      * @param pattern Regular expression pattern to compile (see RECompiler class
-     * for details).
+     *                for details).
      * @return A compiled regular expression program.
-     * @exception RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
      * @see RECompiler
      * @see RE
      */
-    public REProgram compile(String pattern) throws RESyntaxException
-    {
+    public REProgram compile(String pattern) throws RESyntaxException {
         // Initialize variables for compilation
         this.pattern = pattern;                         // Save pattern in instance variable
         len = pattern.length();                         // Precompute pattern length for speed
@@ -1270,16 +1138,14 @@ public class RECompiler
         parens = 1;                                     // Set paren level to 1 (the implicit outer parens)
 
         // Initialize pass by reference flags value
-        int[] flags = { NODE_TOPLEVEL };
+        int[] flags = {NODE_TOPLEVEL};
 
         // Parse expression
         expr(flags);
 
         // Should be at end of input
-        if (idx != len)
-        {
-            if (pattern.charAt(idx) == ')')
-            {
+        if (idx != len) {
+            if (pattern.charAt(idx) == ')') {
                 syntaxError("Unmatched close paren");
             }
             syntaxError("Unexpected input remains");
@@ -1294,8 +1160,7 @@ public class RECompiler
     /**
      * Local, nested class for maintaining character ranges for character classes.
      */
-    class RERange
-    {
+    class RERange {
         int size = 16;                      // Capacity of current range arrays
         int[] minRange = new int[size];     // Range minima
         int[] maxRange = new int[size];     // Range maxima
@@ -1303,23 +1168,20 @@ public class RECompiler
 
         /**
          * Deletes the range at a given index from the range lists
+         *
          * @param index Index of range to delete from minRange and maxRange arrays.
          */
-        void delete(int index)
-        {
+        void delete(int index) {
             // Return if no elements left or index is out of range
-            if (num == 0 || index >= num)
-            {
+            if (num == 0 || index >= num) {
                 return;
             }
 
             // Move elements down
-            while (++index < num)
-            {
-                if (index - 1 >= 0)
-                {
-                    minRange[index-1] = minRange[index];
-                    maxRange[index-1] = maxRange[index];
+            while (++index < num) {
+                if (index - 1 >= 0) {
+                    minRange[index - 1] = minRange[index];
+                    maxRange[index - 1] = maxRange[index];
                 }
             }
 
@@ -1329,31 +1191,27 @@ public class RECompiler
 
         /**
          * Merges a range into the range list, coalescing ranges if possible.
+         *
          * @param min Minimum end of range
          * @param max Maximum end of range
          */
-        void merge(int min, int max)
-        {
+        void merge(int min, int max) {
             // Loop through ranges
-            for (int i = 0; i < num; i++)
-            {
+            for (int i = 0; i < num; i++) {
                 // Min-max is subsumed by minRange[i]-maxRange[i]
-                if (min >= minRange[i] && max <= maxRange[i])
-                {
+                if (min >= minRange[i] && max <= maxRange[i]) {
                     return;
                 }
 
                 // Min-max subsumes minRange[i]-maxRange[i]
-                else if (min <= minRange[i] && max >= maxRange[i])
-                {
+                else if (min <= minRange[i] && max >= maxRange[i]) {
                     delete(i);
                     merge(min, max);
                     return;
                 }
 
                 // Min is in the range, but max is outside
-                else if (min >= minRange[i] && min <= maxRange[i])
-                {
+                else if (min >= minRange[i] && min <= maxRange[i]) {
                     min = minRange[i];
                     delete(i);
                     merge(min, max);
@@ -1361,8 +1219,7 @@ public class RECompiler
                 }
 
                 // Max is in the range, but min is outside
-                else if (max >= minRange[i] && max <= maxRange[i])
-                {
+                else if (max >= minRange[i] && max <= maxRange[i]) {
                     max = maxRange[i];
                     delete(i);
                     merge(min, max);
@@ -1371,8 +1228,7 @@ public class RECompiler
             }
 
             // Must not overlap any other ranges
-            if (num >= size)
-            {
+            if (num >= size) {
                 size *= 2;
                 int[] newMin = new int[size];
                 int[] newMax = new int[size];
@@ -1388,48 +1244,41 @@ public class RECompiler
 
         /**
          * Removes a range by deleting or shrinking all other ranges
+         *
          * @param min Minimum end of range
          * @param max Maximum end of range
          */
-        void remove(int min, int max)
-        {
+        void remove(int min, int max) {
             // Loop through ranges
-            for (int i = 0; i < num; i++)
-            {
+            for (int i = 0; i < num; i++) {
                 // minRange[i]-maxRange[i] is subsumed by min-max
-                if (minRange[i] >= min && maxRange[i] <= max)
-                {
+                if (minRange[i] >= min && maxRange[i] <= max) {
                     delete(i);
                     return;
                 }
 
                 // min-max is subsumed by minRange[i]-maxRange[i]
-                else if (min >= minRange[i] && max <= maxRange[i])
-                {
+                else if (min >= minRange[i] && max <= maxRange[i]) {
                     int minr = minRange[i];
                     int maxr = maxRange[i];
                     delete(i);
-                    if (minr < min)
-                    {
+                    if (minr < min) {
                         merge(minr, min - 1);
                     }
-                    if (max < maxr)
-                    {
+                    if (max < maxr) {
                         merge(max + 1, maxr);
                     }
                     return;
                 }
 
                 // minRange is in the range, but maxRange is outside
-                else if (minRange[i] >= min && minRange[i] <= max)
-                {
+                else if (minRange[i] >= min && minRange[i] <= max) {
                     minRange[i] = max + 1;
                     return;
                 }
 
                 // maxRange is in the range, but minRange is outside
-                else if (maxRange[i] >= min && maxRange[i] <= max)
-                {
+                else if (maxRange[i] >= min && maxRange[i] <= max) {
                     maxRange[i] = min - 1;
                     return;
                 }
@@ -1438,29 +1287,26 @@ public class RECompiler
 
         /**
          * Includes (or excludes) the range from min to max, inclusive.
-         * @param min Minimum end of range
-         * @param max Maximum end of range
+         *
+         * @param min     Minimum end of range
+         * @param max     Maximum end of range
          * @param include True if range should be included.  False otherwise.
          */
-        void include(int min, int max, boolean include)
-        {
-            if (include)
-            {
+        void include(int min, int max, boolean include) {
+            if (include) {
                 merge(min, max);
-            }
-            else
-            {
+            } else {
                 remove(min, max);
             }
         }
 
         /**
          * Includes a range with the same min and max
-         * @param minmax Minimum and maximum end of range (inclusive)
+         *
+         * @param minmax  Minimum and maximum end of range (inclusive)
          * @param include True if range should be included.  False otherwise.
          */
-        void include(char minmax, boolean include)
-        {
+        void include(char minmax, boolean include) {
             include(minmax, minmax, include);
         }
     }

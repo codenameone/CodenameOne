@@ -23,7 +23,7 @@ import java.util.Vector;
 
 /**
  * This class declares a bounding box of coordinates on the map.
- * 
+ *
  * @author Roman Kamyk roman.kamyk@itiner.pl
  */
 public class BoundingBox {
@@ -33,7 +33,8 @@ public class BoundingBox {
 
     /**
      * Creates a bounding box around a coordinate with a given radius.
-     * @param c The coordinate at the center of the bounding box.
+     *
+     * @param c    The coordinate at the center of the bounding box.
      * @param rLat The latitude radius of the box (in degrees).
      * @param rLng The longitude radius of the box (in degrees).
      */
@@ -41,10 +42,10 @@ public class BoundingBox {
         _southWest = new Coord(c.getLatitude() - rLat, c.getLongitude() - rLng);
         _northEast = new Coord(c.getLatitude() + rLat, c.getLongitude() + rLng);
     }
-    
+
     /**
      * Constructor with 2 coordinates for south west and north east
-     * 
+     *
      * @param southWest coordinate
      * @param northEast coordinate
      */
@@ -54,8 +55,55 @@ public class BoundingBox {
     }
 
     /**
+     * create a smallest bounding box that contains all of the given coordinates
+     *
+     * @param coords given coordinates to create a wrapping bounding box.
+     * @return a bounding box that contains all of the coordinates
+     */
+    public static BoundingBox create(Coord[] coords) {
+        if (coords.length <= 0) {
+            throw new RuntimeException("There must be at least 1 coordinate.");
+        }
+
+        double north = coords[0].getLatitude();
+        double south = coords[0].getLatitude();
+        double east = coords[0].getLongitude();
+        double west = coords[0].getLongitude();
+
+        boolean projected = true;
+        int clen = coords.length;
+        for (int i = 0; i < clen; i++) {
+            Coord c = coords[i];
+            projected = c.isProjected();
+            north = Math.max(north, c.getLatitude());
+            east = Math.max(east, c.getLongitude());
+            south = Math.min(south, c.getLatitude());
+            west = Math.min(west, c.getLongitude());
+        }
+        return new BoundingBox(new Coord(south, west, projected), new Coord(north, east, projected));
+    }
+
+    /**
+     * /**
+     * create a smallest bounding box that contains all of the given coordinates
+     *
+     * @param coords given coordinates to create a wrapping bounding box.
+     * @return a bounding box that contains all of the coordinates
+     */
+    public static BoundingBox create(Vector coords) {
+        int length = coords.size();
+        if (length <= 0) {
+            throw new RuntimeException("There must be at least 1 coordinate.");
+        }
+        Coord[] coordsArray = new Coord[length];
+        coords.copyInto(coordsArray);
+        return create(coordsArray);
+    }
+
+    /**
      * Gets the /south west coordinate
-     * @return 
+     *
+     * @return
      */
     public Coord getSouthWest() {
         return _southWest;
@@ -63,7 +111,8 @@ public class BoundingBox {
 
     /**
      * Gets the north east coordinate
-     * @return 
+     *
+     * @return
      */
     public Coord getNorthEast() {
         return _northEast;
@@ -92,6 +141,7 @@ public class BoundingBox {
 
     /**
      * indicates if the given coordinate is inside the counding box
+     *
      * @param cur coordinate to check
      * @return true if the given coordinate is contained in the bounding box
      */
@@ -129,52 +179,9 @@ public class BoundingBox {
     }
 
     /**
-     * create a smallest bounding box that contains all of the given coordinates
-     * @param coords given coordinates to create a wrapping bounding box.
-     * @return a bounding box that contains all of the coordinates
-     */
-    public static BoundingBox create(Coord[] coords) {
-        if (coords.length <= 0) {
-            throw new RuntimeException("There must be at least 1 coordinate.");
-        }
-        
-        double north = coords[0].getLatitude();
-        double south = coords[0].getLatitude();
-        double east = coords[0].getLongitude();
-        double west = coords[0].getLongitude();
-
-        boolean projected = true;
-        int clen = coords.length;
-        for (int i = 0; i < clen; i++) {
-            Coord c = coords[i];
-            projected = c.isProjected();
-            north = Math.max(north, c.getLatitude());
-            east = Math.max(east, c.getLongitude());
-            south = Math.min(south, c.getLatitude());
-            west = Math.min(west, c.getLongitude());
-        }
-        return new BoundingBox(new Coord(south, west, projected), new Coord(north, east, projected));
-    }
-
-    /**
-    /**
-     * create a smallest bounding box that contains all of the given coordinates
-     * @param coords given coordinates to create a wrapping bounding box.
-     * @return a bounding box that contains all of the coordinates
-     */
-    public static BoundingBox create(Vector coords) {
-        int length = coords.size();
-        if (length <= 0) {
-            throw new RuntimeException("There must be at least 1 coordinate.");
-        }
-        Coord[] coordsArray = new Coord[length];
-        coords.copyInto(coordsArray);        
-        return create(coordsArray);
-    }
-
-    /**
-     * create a new bounding box that extends this bounding box with the given 
+     * create a new bounding box that extends this bounding box with the given
      * bounding box
+     *
      * @param other a bounding box that needs to extends the current bounding box
      * @return a new bounding box that was extended from the current and the other
      */
@@ -188,6 +195,7 @@ public class BoundingBox {
 
     /**
      * Indicates if this bounding box is isProjected
+     *
      * @return true if it's a isProjected bounding box
      */
     public boolean projected() {

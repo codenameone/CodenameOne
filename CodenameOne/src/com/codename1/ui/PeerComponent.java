@@ -54,58 +54,61 @@ public class PeerComponent extends Component {
     }
 
     /**
-     * The peer image is drawn when the component doesn't exist or during transition
-     * a placeholder image can be placed in the beginning to show something while
-     * the peer is being created asynchronously. This image might be replaced by
-     * an internal image representing the actual content of the peer
-     * @return an image
-     */
-    protected Image getPeerImage() {
-        if(peerImage == null) {
-            peerImage = generatePeerImage();
-        }
-        return peerImage;
-    }
-    
-    /**
-     * The native implementation should implement this method to generate a native peer
-     * image representing the component
-     * @return a screenshot of the component
-     */
-    protected Image generatePeerImage() {
-        return null;
-    }
-    
-    /**
-     * The peer image is drawn when the component doesn't exist or during transition
-     * a placeholder image can be placed in the beginning to show something while
-     * the peer is being created asynchronously. This image might be replaced by
-     * an internal image representing the actual content of the peer
-     * 
-     * @param i the peer image
-     */
-    protected void setPeerImage(Image i) {
-        peerImage = i;
-    }
-    
-    /**
-     * Subclasses should return true here if the peer image should be rendered instead of the actual peer
-     * @return true to render the peer image
-     */
-    protected boolean shouldRenderPeerImage() {
-        return false;
-    }
-    
-    /**
      * Use this method to encapsulate a native UI object
      *
      * @param nativePeer the native platform specific peer component.
      */
     public static PeerComponent create(Object nativePeer) {
-        if(nativePeer == null) {
+        if (nativePeer == null) {
             return null;
         }
         return Display.impl.createNativePeer(nativePeer);
+    }
+
+    /**
+     * The peer image is drawn when the component doesn't exist or during transition
+     * a placeholder image can be placed in the beginning to show something while
+     * the peer is being created asynchronously. This image might be replaced by
+     * an internal image representing the actual content of the peer
+     *
+     * @return an image
+     */
+    protected Image getPeerImage() {
+        if (peerImage == null) {
+            peerImage = generatePeerImage();
+        }
+        return peerImage;
+    }
+
+    /**
+     * The peer image is drawn when the component doesn't exist or during transition
+     * a placeholder image can be placed in the beginning to show something while
+     * the peer is being created asynchronously. This image might be replaced by
+     * an internal image representing the actual content of the peer
+     *
+     * @param i the peer image
+     */
+    protected void setPeerImage(Image i) {
+        peerImage = i;
+    }
+
+    /**
+     * The native implementation should implement this method to generate a native peer
+     * image representing the component
+     *
+     * @return a screenshot of the component
+     */
+    protected Image generatePeerImage() {
+        return null;
+    }
+
+    /**
+     * Subclasses should return true here if the peer image should be rendered instead of the actual peer
+     *
+     * @return true to render the peer image
+     */
+    protected boolean shouldRenderPeerImage() {
+        return false;
     }
 
     /**
@@ -208,40 +211,40 @@ public class PeerComponent extends Component {
      */
     public void paint(Graphics g) {
         onPositionSizeChangeImpl();
-        if(shouldRenderPeerImage() && getWidth() > 0 && getHeight() > 0) {
+        if (shouldRenderPeerImage() && getWidth() > 0 && getHeight() > 0) {
             Image img = getPeerImage();
-            if(img != null) {
+            if (img != null) {
                 g.drawImage(img, getX(), getY(), getWidth(), getHeight());
             }
         } else {
             super.paint(g);
             g.drawPeerComponent(this);
-            
+
         }
     }
-    
+
     private void onPositionSizeChangeImpl() {
         int w = getWidth();
         int h = getHeight();
-        if(isInitialized() && w > 0 && h > 0) {
+        if (isInitialized() && w > 0 && h > 0) {
             int scrollX = getScrollX();
             int scrollY = getScrollY();
             int x = getAbsoluteX() + scrollX;
             int y = getAbsoluteY() + scrollY;
-            if(x != lastPos.getX() || y != lastPos.getY() || w != lastPos.getSize().getWidth() || h != lastPos.getSize().getHeight()) {
+            if (x != lastPos.getX() || y != lastPos.getY() || w != lastPos.getSize().getWidth() || h != lastPos.getSize().getHeight()) {
                 lastPos.setX(x);
                 lastPos.setY(y);
                 lastPos.getSize().setWidth(w);
                 lastPos.getSize().setHeight(h);
                 onPositionSizeChange();
-            }        
+            }
         }
     }
-    
+
     /**
      * {@inheritDoc}
      */
-    void onParentPositionChange() {        
+    void onParentPositionChange() {
         onPositionSizeChangeImpl();
     }
 
@@ -343,13 +346,13 @@ public class PeerComponent extends Component {
      */
     protected void onPositionSizeChange() {
     }
-    
+
     /**
      * An optional callback for peers indicating that the peer is now rendered as part of
      * a transition or some other state and is thus not truly visible. In this case the
      * peer should either make itself invisible or render itself as an image instead of
      * natively
-     * 
+     *
      * @param l true to enable lightweight mode, false to disable it
      */
     protected void setLightweightMode(boolean l) {

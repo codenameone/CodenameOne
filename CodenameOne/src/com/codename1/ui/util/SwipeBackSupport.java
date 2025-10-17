@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -53,30 +53,30 @@ public class SwipeBackSupport {
     ActionListener pointerPressed;
     ActionListener pointerReleased;
     Form destinationForm;
-    
+
     /**
      * Binds support for swiping to the given forms
-     * 
+     *
      * @param currentForm the current form
      * @param destination the destination form which can be created lazily
      */
     public static void bindBack(Form currentForm, LazyValue<Form> destination) {
         new SwipeBackSupport().bind(currentForm, destination);
-    } 
-    
+    }
+
     /**
      * Binds support for swiping to the current form
-     * 
+     *
      * @param destination the destination form which can be created lazily
      */
     public static void bindBack(LazyValue<Form> destination) {
         new SwipeBackSupport().bind(Display.getInstance().getCurrent(), destination);
-    } 
-    
-    
+    }
+
+
     /**
      * Binds support for swiping to the given forms
-     * 
+     *
      * @param currentForm the current form
      * @param destination the destination form which can be created lazily
      */
@@ -91,14 +91,14 @@ public class SwipeBackSupport {
                         return;
                     }
                     evt.consume();
-                    if(dragActivated) {
+                    if (dragActivated) {
                         currentX = x;
                         Display.getInstance().getCurrent().repaint();
                     } else {
                         if (x - initialDragX > Display.getInstance().convertToPixels(currentForm.getUIManager().getThemeConstant("backGestureThresholdInt", 5), true)) {
                             dragActivated = true;
                             destinationForm = destination.get();
-                            if(destinationForm!=null) { //allow destination form to be null to disable swipeback, e.g. if conditions to exit Form are not fulfilled
+                            if (destinationForm != null) { //allow destination form to be null to disable swipeback, e.g. if conditions to exit Form are not fulfilled
                                 startBackTransition(currentForm, destinationForm);
                             }
                         }
@@ -108,10 +108,10 @@ public class SwipeBackSupport {
         };
         pointerReleased = new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
-                if(dragActivated) {
+                if (dragActivated) {
                     int destNumberX = Display.getInstance().getDisplayWidth();
                     int incrementsX = Display.getInstance().convertToPixels(3, true);
-                    if(currentX < destNumberX / 2) {
+                    if (currentX < destNumberX / 2) {
                         destinationForm = currentForm;
                         destNumberX = 0;
                         incrementsX *= -1;
@@ -121,7 +121,7 @@ public class SwipeBackSupport {
                     Display.getInstance().getCurrent().registerAnimated(new Animation() {
                         public boolean animate() {
                             currentX += increments;
-                            if(currentX > 0 && currentX >= destNumber || currentX < 0 && currentX <= destNumber) {
+                            if (currentX > 0 && currentX >= destNumber || currentX < 0 && currentX <= destNumber) {
                                 currentX = destNumber;
                                 Transition t = destinationForm.getTransitionInAnimator();
                                 destinationForm.setTransitionInAnimator(CommonTransitions.createEmpty());
@@ -158,11 +158,11 @@ public class SwipeBackSupport {
         currentForm.addPointerDraggedListener(pointerDragged);
         currentForm.addPointerReleasedListener(pointerReleased);
         currentForm.addPointerPressedListener(pointerPressed);
-    } 
-    
+    }
+
     void startBackTransition(final Form currentForm, Form destination) {
         final Transition t = destination.getTransitionOutAnimator().copy(true);
-        if(t instanceof CommonTransitions) {
+        if (t instanceof CommonTransitions) {
             Transition originalTransition = currentForm.getTransitionOutAnimator();
             currentForm.setTransitionOutAnimator(CommonTransitions.createEmpty());
             Form blank = new Form() {
@@ -177,9 +177,9 @@ public class SwipeBackSupport {
             blank.setTransitionOutAnimator(CommonTransitions.createEmpty());
             blank.show();
             currentForm.setTransitionOutAnimator(originalTransition);
-            ((CommonTransitions)t).setMotion(new LazyValue<Motion>() {
+            ((CommonTransitions) t).setMotion(new LazyValue<Motion>() {
                 public Motion get(Object... args) {
-                    return new ManualMotion(((Integer)args[0]).intValue(), ((Integer)args[1]).intValue(), ((Integer)args[2]).intValue());
+                    return new ManualMotion(((Integer) args[0]).intValue(), ((Integer) args[1]).intValue(), ((Integer) args[2]).intValue());
                 }
             });
             t.init(currentForm, destination);
@@ -192,7 +192,7 @@ public class SwipeBackSupport {
             });
         }
     }
-    
+
     class ManualMotion extends Motion {
         protected ManualMotion(int sourceValue, int destinationValue, int duration) {
             super(sourceValue, destinationValue, duration);
@@ -201,17 +201,17 @@ public class SwipeBackSupport {
         public int getValue() {
             int destinationValue = getDestinationValue();
             int sourceValue = getSourceValue();
-            float ratio = ((float)currentX) / ((float)Display.getInstance().getDisplayWidth());
+            float ratio = ((float) currentX) / ((float) Display.getInstance().getDisplayWidth());
             int dis = destinationValue - sourceValue;
-            int val = (int)(sourceValue + (ratio * dis));
+            int val = (int) (sourceValue + (ratio * dis));
 
-            if(destinationValue < sourceValue) {
+            if (destinationValue < sourceValue) {
                 return Math.max(destinationValue, val);
             } else {
                 return Math.min(destinationValue, val);
             }
         }
-        
+
         public boolean isFinished() {
             return false;
         }

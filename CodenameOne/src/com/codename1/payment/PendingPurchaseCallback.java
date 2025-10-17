@@ -28,7 +28,7 @@ package com.codename1.payment;
  * the native platform has been received, but the state of the purchase is "pending".  This
  * occurs if the user has opted to pay with cash, for example on Android.  When the payment
  * is completed, the app will call the {@link PurchaseCallback#itemPurchased(String)} callback.
- *
+ * <p>
  * Currently only supported on Android.
  *
  * @author Steve Hannah

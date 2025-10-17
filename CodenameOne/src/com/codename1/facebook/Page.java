@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.facebook;
@@ -27,6 +27,7 @@ import java.util.Hashtable;
 /**
  * This class represents a Facebook Page object
  * https://developers.facebook.com/docs/reference/api/page/
+ *
  * @author Chen Fishbein
  */
 public class Page extends FBObject {
@@ -40,7 +41,7 @@ public class Page extends FBObject {
     private String website;
     private String coverId;
     private String coverLink;
-    
+
     /**
      * Empty Contructor
      */
@@ -57,63 +58,63 @@ public class Page extends FBObject {
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getAbout() {
         return about;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getCategory() {
         return category;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getCoverId() {
         return coverId;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getCoverLink() {
         return coverLink;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getFounded() {
         return founded;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public int getLikesCount() {
         return likesCount;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getLink() {
         return link;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getUsername() {
         return username;
     }
 
     /**
      * Simple Getter
-     */ 
+     */
     public String getWebsite() {
         return website;
     }
@@ -137,7 +138,7 @@ public class Page extends FBObject {
         founded = (String) toCopy.get("founded");
         website = (String) toCopy.get("website");
         String l = (String) toCopy.get("likes");
-        if(l != null) {
+        if (l != null) {
             likesCount = Integer.parseInt(l);
         } else {
             likesCount = -1;

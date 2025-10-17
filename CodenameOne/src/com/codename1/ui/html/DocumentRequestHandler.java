@@ -29,7 +29,7 @@ import java.io.InputStream;
  * The DocumentRequestHandler interface should be implemented so it returns documents in requested URLs.<br>
  * Concrete classes should handle in its single method all necessary networking and IO issues.<br>
  * Implementations of this interface are used by HTMLComponent to obtain links and form results<br>
- * 
+ *
  * @author Ofir Leitner
  */
 public interface DocumentRequestHandler {

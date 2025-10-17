@@ -6,34 +6,33 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.processing;
 
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 
 /**
  * Internal class, do not use.
- *
+ * <p>
  * An accessor implementation for working with subset of data.
  *
  * @author Eric Coolman
- *
  */
 class SubContent implements StructuredContent {
 
@@ -54,7 +53,7 @@ class SubContent implements StructuredContent {
      * required.
      *
      * @param content a subset of data.
-     * @param parent the parent element of content.
+     * @param parent  the parent element of content.
      */
     SubContent(List<StructuredContent> content, StructuredContent parent) {
         this.root = content;
@@ -63,7 +62,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
      * com.codename1.processing.StructuredContent#getChildren(java.lang.String)
      */
@@ -82,7 +81,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see com.codename1.processing.StructuredContent#getChild(int)
      */
     public StructuredContent getChild(int index) {
@@ -94,7 +93,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
      * com.codename1.processing.StructuredContent#getDescendants(java.lang.String
      * )
@@ -114,7 +113,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
      * com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
      */
@@ -124,7 +123,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see com.codename1.processing.StructuredContent#getAttributes()
      */
     public Map getAttributes() {
@@ -133,7 +132,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see com.codename1.processing.StructuredContent#getParent()
      */
     public StructuredContent getParent() {
@@ -142,7 +141,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see com.codename1.processing.StructuredContent#getText()
      */
     public String getText() {
@@ -151,7 +150,7 @@ class SubContent implements StructuredContent {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see com.codename1.processing.StructuredContent#getNativeRoot()
      */
     public Object getNativeRoot() {

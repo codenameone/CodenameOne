@@ -30,7 +30,9 @@ package com.codename1.util;
  */
 class TElementary {
 
-    /** Just to denote that this class can't be instantiated */
+    /**
+     * Just to denote that this class can't be instantiated
+     */
     private TElementary() {
     }
 
@@ -38,12 +40,9 @@ class TElementary {
      * Compares two arrays. All elements are treated as unsigned integers. The
      * magnitude is the bit chain of elements in big-endian order.
      *
-     * @param a
-     *            the first array
-     * @param b
-     *            the second array
-     * @param size
-     *            the size of arrays
+     * @param a    the first array
+     * @param b    the second array
+     * @param size the size of arrays
      * @return 1 if a > b, -1 if a < b, 0 if a == b
      */
     static int compareArrays(final int[] a, final int[] b, final int size) {
@@ -55,7 +54,9 @@ class TElementary {
                 : TBigInteger.GREATER);
     }
 
-    /** @see TBigInteger#add(TBigInteger) */
+    /**
+     * @see TBigInteger#add(TBigInteger)
+     */
     static TBigInteger add(TBigInteger op1, TBigInteger op2) {
         int resDigits[];
         int resSign;
@@ -82,8 +83,8 @@ class TElementary {
                 res = a + b;
                 valueLo = (int) res;
                 valueHi = (int) (res >>> 32);
-                return ((valueHi == 0) ? new TBigInteger(op1Sign, valueLo) : new TBigInteger(op1Sign, 2, new int[] {
-                        valueLo, valueHi }));
+                return ((valueHi == 0) ? new TBigInteger(op1Sign, valueLo) : new TBigInteger(op1Sign, 2, new int[]{
+                        valueLo, valueHi}));
             }
             return TBigInteger.valueOf((op1Sign < 0) ? (b - a) : (a - b));
         } else if (op1Sign == op2Sign) {
@@ -152,7 +153,9 @@ class TElementary {
         }
     }
 
-    /** @see TBigInteger#subtract(TBigInteger) */
+    /**
+     * @see TBigInteger#subtract(TBigInteger)
+     */
     static TBigInteger subtract(TBigInteger op1, TBigInteger op2) {
         int resSign;
         int resDigits[];
@@ -241,10 +244,8 @@ class TElementary {
      * the result (i.e. {@code op1.bitLength() >= op2.bitLength()}). Both should
      * be positive (i.e. {@code op1 >= op2}).
      *
-     * @param op1
-     *            the input minuend, and the output result.
-     * @param op2
-     *            the addend
+     * @param op1 the input minuend, and the output result.
+     * @param op2 the addend
      */
     static void inplaceAdd(TBigInteger op1, TBigInteger op2) {
         // PRE: op1 >= op2 > 0
@@ -288,10 +289,8 @@ class TElementary {
      * the result (i.e. {@code op1.bitLength() >= op2.bitLength()}). Both should
      * be positive (what implies that {@code op1 >= op2}).
      *
-     * @param op1
-     *            the input minuend, and the output result.
-     * @param op2
-     *            the subtrahend
+     * @param op1 the input minuend, and the output result.
+     * @param op2 the subtrahend
      */
     static void inplaceSubtract(TBigInteger op1, TBigInteger op2) {
         // PRE: op1 >= op2 > 0
@@ -349,9 +348,9 @@ class TElementary {
     /**
      * Same as
      * {@link #inplaceSubtract(TBigInteger, TBigInteger)}, but without the
-     *       restriction of non-positive values
-     * @param op1
-     *            should have enough space to save the result
+     * restriction of non-positive values
+     *
+     * @param op1 should have enough space to save the result
      * @param op2
      */
     static void completeInPlaceSubtract(TBigInteger op1, TBigInteger op2) {
@@ -381,10 +380,8 @@ class TElementary {
      * Same as @link #inplaceAdd(BigInteger, BigInteger), but without the
      * restriction of non-positive values
      *
-     * @param op1
-     *            any number
-     * @param op2
-     *            any number
+     * @param op1 any number
+     * @param op2 any number
      */
     static void completeInPlaceAdd(TBigInteger op1, TBigInteger op2) {
         if (op1.sign == 0)

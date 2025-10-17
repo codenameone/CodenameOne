@@ -16,8 +16,8 @@
  */
 
 /**
-* @author Alexander Y. Kleymenov
-*/
+ * @author Alexander Y. Kleymenov
+ */
 
 package com.codename1.util;
 
@@ -26,11 +26,18 @@ package com.codename1.util;
  * as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
  */
 public class Base64 {
-    
+
+    private static final byte[] map = new byte[]
+            {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+                    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b',
+                    'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+                    'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                    '4', '5', '6', '7', '8', '9', '+', '/'};
+
     public static byte[] decode(byte[] in) {
         return decode(in, in.length);
     }
-    
+
     /**
      * Decodes an array of bytes containing a Base64 ascii string into binary data
      * @param in the array
@@ -51,10 +58,10 @@ public class Base64 {
         byte chr;
         // compute the number of the padding characters
         // and adjust the length of the input
-        for (;;len--) {
-            chr = in[len-1];
+        for (; ; len--) {
+            chr = in[len - 1];
             // skip the neutral characters
-            if ((chr == '\n') || (chr == '\r') || 
+            if ((chr == '\n') || (chr == '\r') ||
                     (chr == ' ') || (chr == '\t')) {
                 continue;
             }
@@ -72,13 +79,13 @@ public class Base64 {
         int bits = 0;
         // holds the value of the input quantum
         int quantum = 0;
-        for (int i=0; i<len; i++) {
+        for (int i = 0; i < len; i++) {
             chr = in[i];
             if (chr == '=') {
                 break;
             }
             // skip the neutral characters
-            if ((chr == '\n') || (chr == '\r') || 
+            if ((chr == '\n') || (chr == '\r') ||
                     (chr == ' ') || (chr == '\t')) {
                 continue;
             }
@@ -106,7 +113,7 @@ public class Base64 {
             }
             // append the value to the quantum
             quantum = (quantum << 6) | (byte) bits;
-            if (in_index%4 == 3) {
+            if (in_index % 4 == 3) {
                 // 4 characters were read, so make the output:
                 out[out_index++] = (byte) ((quantum & 0x00FF0000) >> 16);
                 out[out_index++] = (byte) ((quantum & 0x0000FF00) >> 8);
@@ -116,7 +123,7 @@ public class Base64 {
         }
         if (pad > 0) {
             // adjust the quantum value according to the padding
-            quantum = quantum << (6*pad);
+            quantum = quantum << (6 * pad);
             // make output
             out[out_index++] = (byte) ((quantum & 0x00FF0000) >> 16);
             if (pad == 1) {
@@ -129,13 +136,6 @@ public class Base64 {
         return result;
     }
 
-    private static final byte[] map = new byte[]
-        {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 
-         'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 
-         'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 
-         'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', 
-         '4', '5', '6', '7', '8', '9', '+', '/'};
-
     /**
      * Encodes the given array as a base64 string
      * @param in the array to encode
@@ -145,15 +145,15 @@ public class Base64 {
         int length = in.length * 4 / 3;
         length += length / 76 + 3; // for crlr
         byte[] out = new byte[length];
-        int index = 0, i, crlr = 0, end = in.length - in.length%3;
-        for (i=0; i<end; i+=3) {
+        int index = 0, i, crlr = 0, end = in.length - in.length % 3;
+        for (i = 0; i < end; i += 3) {
             out[index++] = map[(in[i] & 0xff) >> 2];
-            out[index++] = map[((in[i] & 0x03) << 4) 
-                                | ((in[i+1] & 0xff) >> 4)];
-            out[index++] = map[((in[i+1] & 0x0f) << 2) 
-                                | ((in[i+2] & 0xff) >> 6)];
-            out[index++] = map[(in[i+2] & 0x3f)];
-            if (((index - crlr)%76 == 0) && (index != 0)) {
+            out[index++] = map[((in[i] & 0x03) << 4)
+                    | ((in[i + 1] & 0xff) >> 4)];
+            out[index++] = map[((in[i + 1] & 0x0f) << 2)
+                    | ((in[i + 2] & 0xff) >> 6)];
+            out[index++] = map[(in[i + 2] & 0x3f)];
+            if (((index - crlr) % 76 == 0) && (index != 0)) {
                 out[index++] = '\n';
                 crlr++;
                 //out[index++] = '\r';
@@ -169,9 +169,9 @@ public class Base64 {
                 break;
             case 2:
                 out[index++] = map[(in[end] & 0xff) >> 2];
-                out[index++] = map[((in[end] & 0x03) << 4) 
-                                    | ((in[end+1] & 0xff) >> 4)];
-                out[index++] = map[((in[end+1] & 0x0f) << 2)];     
+                out[index++] = map[((in[end] & 0x03) << 4)
+                        | ((in[end + 1] & 0xff) >> 4)];
+                out[index++] = map[((in[end + 1] & 0x0f) << 2)];
                 out[index++] = '=';
                 break;
         }
@@ -186,16 +186,16 @@ public class Base64 {
     public static String encodeNoNewline(byte[] in) {
         // notice that this method isn't genric to increase performance slightly
         int length = in.length * 4 / 3;
-        length += length / 76 + 3; 
+        length += length / 76 + 3;
         byte[] out = new byte[length];
-        int index = 0, i, end = in.length - in.length%3;
-        for (i=0; i<end; i+=3) {
+        int index = 0, i, end = in.length - in.length % 3;
+        for (i = 0; i < end; i += 3) {
             out[index++] = map[(in[i] & 0xff) >> 2];
-            out[index++] = map[((in[i] & 0x03) << 4) 
-                                | ((in[i+1] & 0xff) >> 4)];
-            out[index++] = map[((in[i+1] & 0x0f) << 2) 
-                                | ((in[i+2] & 0xff) >> 6)];
-            out[index++] = map[(in[i+2] & 0x3f)];
+            out[index++] = map[((in[i] & 0x03) << 4)
+                    | ((in[i + 1] & 0xff) >> 4)];
+            out[index++] = map[((in[i + 1] & 0x0f) << 2)
+                    | ((in[i + 2] & 0xff) >> 6)];
+            out[index++] = map[(in[i + 2] & 0x3f)];
         }
         switch (in.length % 3) {
             case 1:
@@ -206,9 +206,9 @@ public class Base64 {
                 break;
             case 2:
                 out[index++] = map[(in[end] & 0xff) >> 2];
-                out[index++] = map[((in[end] & 0x03) << 4) 
-                                    | ((in[end+1] & 0xff) >> 4)];
-                out[index++] = map[((in[end+1] & 0x0f) << 2)];     
+                out[index++] = map[((in[end] & 0x03) << 4)
+                        | ((in[end + 1] & 0xff) >> 4)];
+                out[index++] = map[((in[end + 1] & 0x0f) << 2)];
                 out[index++] = '=';
                 break;
         }

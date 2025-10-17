@@ -25,6 +25,7 @@ package com.codename1.ui.table;
 
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.util.EventDispatcher;
+
 import java.util.ArrayList;
 
 /**
@@ -32,23 +33,23 @@ import java.util.ArrayList;
  * </p>
  *
  * <script src="https://gist.github.com/codenameone/6b106772ad1d58c50270.js"></script>
- * 
+ *
  * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" alt="Table with customize cells using the pinstripe effect" />
  * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png" alt="Picker table cell during edit" />
- * 
+ *
  * @author Shai Almog
  */
 public class DefaultTableModel extends AbstractTableModel {
     ArrayList<Object[]> data = new ArrayList<Object[]>();
     String[] columnNames;
-    private EventDispatcher dispatcher = new EventDispatcher();
     boolean editable;
+    private EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Constructs a new table with a 2 dimensional array for row/column data
      *
      * @param columnNames the names of the columns
-     * @param data the data within the table
+     * @param data        the data within the table
      */
     public DefaultTableModel(String[] columnNames, Object[][] data) {
         this(columnNames, data, false);
@@ -58,12 +59,12 @@ public class DefaultTableModel extends AbstractTableModel {
      * Constructs a new table with a 2 dimensional array for row/column data
      *
      * @param columnNames the names of the columns
-     * @param data the data within the table
-     * @param editable indicates whether table cells are editable or not by default
-     * @see #isCellEditable(int, int) 
+     * @param data        the data within the table
+     * @param editable    indicates whether table cells are editable or not by default
+     * @see #isCellEditable(int, int)
      */
     public DefaultTableModel(String[] columnNames, Object[][] data, boolean editable) {
-        for(Object[] o : data) {
+        for (Object[] o : data) {
             this.data.add(o);
         }
         this.columnNames = columnNames;
@@ -110,7 +111,7 @@ public class DefaultTableModel extends AbstractTableModel {
     public Object getValueAt(int row, int column) {
         try {
             return data.get(row)[column];
-        } catch(ArrayIndexOutOfBoundsException err) {
+        } catch (ArrayIndexOutOfBoundsException err) {
             // not the best situation but quite useful for the resource editor
             //err.printStackTrace();
             return "";
@@ -141,37 +142,37 @@ public class DefaultTableModel extends AbstractTableModel {
 
     /**
      * Adds the given row to the table data
-     * 
+     *
      * @param row array or row items, notice that row.length should match the column count exactly!
      */
     public void addRow(Object... row) {
-       data.add(row);
-       for(int col = 0 ; col < row.length ; col++) {
-           dispatcher.fireDataChangeEvent(col, data.size() - 1);
-       }
+        data.add(row);
+        for (int col = 0; col < row.length; col++) {
+            dispatcher.fireDataChangeEvent(col, data.size() - 1);
+        }
     }
 
     /**
      * Inserts the given row to the table data at the given offset
-     * 
+     *
      * @param offset position within the table that is 0 or larger yet smaller than the row count
-     * @param row array or row items, notice that row.length should match the column count exactly!
+     * @param row    array or row items, notice that row.length should match the column count exactly!
      */
     public void insertRow(int offset, Object... row) {
-       data.add(offset, row);
-       for(int col = 0 ; col < row.length ; col++) {
-           dispatcher.fireDataChangeEvent(col, data.size() - 1);
-           dispatcher.fireDataChangeEvent(col, offset);
-       }
+        data.add(offset, row);
+        for (int col = 0; col < row.length; col++) {
+            dispatcher.fireDataChangeEvent(col, data.size() - 1);
+            dispatcher.fireDataChangeEvent(col, offset);
+        }
     }
 
     /**
      * Removes the given row offset from the table
-     * 
+     *
      * @param offset position within the table that is 0 or larger yet smaller than the row count
      */
     public void removeRow(int offset) {
-       data.remove(offset);
-       dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
+        data.remove(offset);
+        dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
     }
 }

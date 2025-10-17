@@ -30,14 +30,16 @@ import java.util.List;
 
 /**
  * Support class for implementing plugins in codename one.
- * @since 8.0
+ *
  * @author Steve Hannah
+ * @since 8.0
  */
 public class PluginSupport {
     private final List<Plugin> plugins = new ArrayList<Plugin>();
 
     /**
      * Registers a plugin with the Codename One runtime.
+     *
      * @param plugin The plugin to register.
      * @since 8.0
      */
@@ -50,6 +52,7 @@ public class PluginSupport {
 
     /**
      * Deregisters a plugin from the Codename One runtime.
+     *
      * @param plugin The plugin to deregister
      * @since 8.0
      */
@@ -64,22 +67,22 @@ public class PluginSupport {
      * is resumed.
      *
      * @param event The event to fire.
+     * @param <T>   The event class
      * @return The event
-     * @param <T> The event class
      */
-     public <T extends PluginEvent> T firePluginEvent(T event) {
-         List<Plugin> localListeners;
+    public <T extends PluginEvent> T firePluginEvent(T event) {
+        List<Plugin> localListeners;
 
-         synchronized (this) {
-             localListeners = new ArrayList<Plugin>(plugins);
-         }
-         for (Plugin plugin : localListeners) {
-             if (event.isConsumed()) {
-                 return event;
-             }
-             plugin.actionPerformed(event);
-         }
+        synchronized (this) {
+            localListeners = new ArrayList<Plugin>(plugins);
+        }
+        for (Plugin plugin : localListeners) {
+            if (event.isConsumed()) {
+                return event;
+            }
+            plugin.actionPerformed(event);
+        }
 
-         return event;
+        return event;
     }
 }

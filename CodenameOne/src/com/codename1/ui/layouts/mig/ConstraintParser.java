@@ -2,9 +2,9 @@ package com.codename1.ui.layouts.mig;
 
 import com.codename1.io.Log;
 import com.codename1.util.StringUtil;
+
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 /*
  * License (BSD):
@@ -53,9 +53,9 @@ public final class ConstraintParser {
      * transient (cache) member varables.
      *
      * @param s The String to parse. Should not be <code>null</code> and <b>must
-     * be lower case and trimmed</b>.
-     * @throws RuntimeException if the constaint was not valid.
+     *          be lower case and trimmed</b>.
      * @return The parsed constraint. Never <code>null</code>.
+     * @throws RuntimeException if the constaint was not valid.
      */
     public static LC parseLayoutConstraint(String s) {
         LC lc = new LC();
@@ -319,7 +319,7 @@ public final class ConstraintParser {
      * Parses the column or rows constraints. They normally looks something like
      * <code>"[min:pref]rel[10px][]"</code>.
      *
-     * @param s The string to parse. Not <code>null</code>.
+     * @param s      The string to parse. Not <code>null</code>.
      * @param isCols If this for columns rather than rows.
      * @return An array of {@link DimConstraint}s that is as many are there
      * exist "[...]" sections in the string that is parsed.
@@ -359,15 +359,15 @@ public final class ConstraintParser {
     /**
      * Parses a single column or row constraint.
      *
-     * @param s The single constraint to parse. May look something like
-     * <code>"min:pref,fill,grow"</code>. Should not be <code>null</code> and
-     * <b>must be lower case and trimmed</b>.
+     * @param s         The single constraint to parse. May look something like
+     *                  <code>"min:pref,fill,grow"</code>. Should not be <code>null</code> and
+     *                  <b>must be lower case and trimmed</b>.
      * @param gapBefore The default gap "before" the column/row constraint. Can
-     * be overridden with a <code>"gap"</code> section within <code>s</code>.
-     * @param gapAfter The default gap "after" the column/row constraint. Can be
-     * overridden with a <code>"gap"</code> section within <code>s</code>.
-     * @param isCols If the constraints are column constraints rather than row
-     * constraints.
+     *                  be overridden with a <code>"gap"</code> section within <code>s</code>.
+     * @param gapAfter  The default gap "after" the column/row constraint. Can be
+     *                  overridden with a <code>"gap"</code> section within <code>s</code>.
+     * @param isCols    If the constraints are column constraints rather than row
+     *                  constraints.
      * @return A single constraint. Never <code>null</code>.
      * @throws RuntimeException if the constraint was not valid.
      */
@@ -465,7 +465,7 @@ public final class ConstraintParser {
      * transient (cache) member variables.
      *
      * @param constrMap The constraints as <code>String</code>s. Strings <b>must
-     * be lower case and trimmed</b>
+     *                  be lower case and trimmed</b>
      * @return The parsed constraints. Never <code>null</code>.
      */
     public static Map<ComponentWrapper, CC> parseComponentConstraints(Map<ComponentWrapper, String> constrMap) {
@@ -482,9 +482,9 @@ public final class ConstraintParser {
      * Parses one component constraint and returns the parsed value.
      *
      * @param s The string to parse. Should not be <code>null</code> and <b>must
-     * be lower case and trimmed</b>.
-     * @throws RuntimeException if the constraint was not valid.
+     *          be lower case and trimmed</b>.
      * @return The parsed constraint. Never <code>null</code>.
+     * @throws RuntimeException if the constraint was not valid.
      */
     public static CC parseComponentConstraint(String s) {
         CC cc = new CC();
@@ -760,10 +760,10 @@ public final class ConstraintParser {
                     if (ix > -1) {
                         UnitValue[] p = parseInsets(part.substring(ix).trim(), false);
                         cc.setPadding(new UnitValue[]{
-                            p[0],
-                            p.length > 1 ? p[1] : null,
-                            p.length > 2 ? p[2] : null,
-                            p.length > 3 ? p[3] : null});
+                                p[0],
+                                p.length > 1 ? p[1] : null,
+                                p.length > 2 ? p[2] : null,
+                                p.length > 3 ? p[3] : null});
                         continue;
                     }
 
@@ -911,10 +911,10 @@ public final class ConstraintParser {
                     if (ix > -1) {
                         UnitValue[] p = parseInsets(part.substring(ix).trim(), false);
                         cc.setVisualPadding(new UnitValue[]{
-                            p[0],
-                            p.length > 1 ? p[1] : null,
-                            p.length > 2 ? p[2] : null,
-                            p.length > 3 ? p[3] : null});
+                                p[0],
+                                p.length > 1 ? p[1] : null,
+                                p.length > 2 ? p[2] : null,
+                                p.length > 3 ? p[3] : null});
                         continue;
                     }
                 }
@@ -946,10 +946,10 @@ public final class ConstraintParser {
     /**
      * Parses insets which consists of 1-4 <code>UnitValue</code>s.
      *
-     * @param s The string to parse. E.g. "10 10 10 10" or "20". If less than 4
-     * groups the last will be used for the missing.
+     * @param s           The string to parse. E.g. "10 10 10 10" or "20". If less than 4
+     *                    groups the last will be used for the missing.
      * @param acceptPanel If "panel" and "dialog" should be accepted. They are
-     * used to access platform defaults.
+     *                    used to access platform defaults.
      * @return An array of length 4 with the parsed insets.
      * @throws IllegalArgumentException if the parsing could not be done.
      */
@@ -981,7 +981,7 @@ public final class ConstraintParser {
      * Parses gaps.
      *
      * @param s The string that contains gap information. Should start with
-     * "gap".
+     *          "gap".
      * @return The gaps as specified in <code>s</code>. Indexed:
      * <code>[top,left,bottom,right][min,pref,max]</code> or
      * [before,after][min,pref,max] if <code>oneDim</code> is true.
@@ -1074,9 +1074,9 @@ public final class ConstraintParser {
      * Parses a single "min:pref:max" value. May look something like
      * <code>"10px:20lp:30%"</code> or <code>"pref!"</code>.
      *
-     * @param s The string to parse. Not <code>null</code>.
+     * @param s     The string to parse. Not <code>null</code>.
      * @param isGap If this bound size is a gap (different empty string
-     * handling).
+     *              handling).
      * @param isHor If the size is for the horizontal dimension.
      * @return A bound size that may be <code>null</code> if the string was
      * "null", "n" or <code>null</code>.
@@ -1121,11 +1121,11 @@ public final class ConstraintParser {
      * Parses a single unit value that may also be an alignment as parsed by
      * {@link #parseAlignKeywords(String, boolean)}.
      *
-     * @param s The string to parse. Not <code>null</code>. May look something
-     * like <code>"10px"</code> or <code>"5dlu"</code>.
-     * @param isHor If the value is for the horizontal dimension.
+     * @param s                The string to parse. Not <code>null</code>. May look something
+     *                         like <code>"10px"</code> or <code>"5dlu"</code>.
+     * @param isHor            If the value is for the horizontal dimension.
      * @param emptyReplacement A replacement if <code>s</code> is empty. May be
-     * <code>null</code>.
+     *                         <code>null</code>.
      * @return The parsed unit value. May be <code>null</code>.
      */
     public static UnitValue parseUnitValueOrAlign(String s, boolean isHor, UnitValue emptyReplacement) {
@@ -1144,8 +1144,8 @@ public final class ConstraintParser {
     /**
      * Parses a single unit value. E.g. "10px" or "5in"
      *
-     * @param s The string to parse. Not <code>null</code>. May look something
-     * like <code>"10px"</code> or <code>"5dlu"</code>.
+     * @param s     The string to parse. Not <code>null</code>. May look something
+     *              like <code>"10px"</code> or <code>"5dlu"</code>.
      * @param isHor If the value is for the horizontal dimension.
      * @return The parsed unit value. <code>null</code> is empty string,
      */
@@ -1156,11 +1156,11 @@ public final class ConstraintParser {
     /**
      * Parses a single unit value.
      *
-     * @param s The string to parse. May be <code>null</code>. May look
-     * something like <code>"10px"</code> or <code>"5dlu"</code>.
+     * @param s                The string to parse. May be <code>null</code>. May look
+     *                         something like <code>"10px"</code> or <code>"5dlu"</code>.
      * @param emptyReplacement A replacement <code>s</code> is empty or
-     * <code>null</code>. May be <code>null</code>.
-     * @param isHor If the value is for the horizontal dimension.
+     *                         <code>null</code>. May be <code>null</code>.
+     * @param isHor            If the value is for the horizontal dimension.
      * @return The parsed unit value. May be <code>null</code>.
      */
     private static UnitValue parseUnitValue(String s, UnitValue emptyReplacement, boolean isHor) {
@@ -1245,9 +1245,9 @@ public final class ConstraintParser {
      * Parses alignment keywords and returns the appropriate
      * <code>UnitValue</code>.
      *
-     * @param s The string to parse. Not <code>null</code>.
+     * @param s     The string to parse. Not <code>null</code>.
      * @param isHor If alignments for horizontal is checked. <code>false</code>
-     * means vertical.
+     *              means vertical.
      * @return The unit value or <code>null</code> if not recognized (no
      * exception).
      */
@@ -1300,8 +1300,8 @@ public final class ConstraintParser {
      * <code>{"hello", "10.0"}</code>.
      *
      * @param s The string to split. Not <code>null</code>. Needs be be
-     * reasonably formatted since the method only finds the first 0-9 or . and
-     * cuts the string in half there.
+     *          reasonably formatted since the method only finds the first 0-9 or . and
+     *          cuts the string in half there.
      * @return Always length 2 and no <code>null</code> elements. Elements are
      * "" if no part found.
      */
@@ -1384,15 +1384,15 @@ public final class ConstraintParser {
      * {@link #startsWithLenient(String, String, int, boolean)} with every one
      * of <code>matches</code> and <code>minChars</code>.
      *
-     * @param s The string to check. Not <code>null</code>.
-     * @param matches A number of possible starts for <code>s</code>.
-     * @param minChars The minimum number of characters to match for every
-     * element in <code>matches</code>. Needs to be of same length as
-     * <code>matches</code>. Can be <code>null</code>.
+     * @param s              The string to check. Not <code>null</code>.
+     * @param matches        A number of possible starts for <code>s</code>.
+     * @param minChars       The minimum number of characters to match for every
+     *                       element in <code>matches</code>. Needs to be of same length as
+     *                       <code>matches</code>. Can be <code>null</code>.
      * @param acceptTrailing If after the required number of characters are
-     * matched on recognized characters that are not in one of the the
-     * <code>matches</code> string should be accepted. For instance if "abczz"
-     * should be matched with "abcdef" and min chars 3.
+     *                       matched on recognized characters that are not in one of the the
+     *                       <code>matches</code> string should be accepted. For instance if "abczz"
+     *                       should be matched with "abcdef" and min chars 3.
      * @return The index of the first unmatched character if
      * <code>minChars</code> was reached or <code>-1</code> if a match was not
      * found.
@@ -1412,16 +1412,16 @@ public final class ConstraintParser {
      * Returns if a string shares at least a specified numbers starting
      * characters with a match.
      *
-     * @param s The string to check. Not <code>null</code> and must be trimmed.
-     * @param match The possible start for <code>s</code>. Not <code>null</code>
-     * and must be trimmed.
-     * @param minChars The mimimum number of characters to match to
-     * <code>s</code> for it this to be considered a match. -1 means the full
-     * length of <code>match</code>.
+     * @param s              The string to check. Not <code>null</code> and must be trimmed.
+     * @param match          The possible start for <code>s</code>. Not <code>null</code>
+     *                       and must be trimmed.
+     * @param minChars       The mimimum number of characters to match to
+     *                       <code>s</code> for it this to be considered a match. -1 means the full
+     *                       length of <code>match</code>.
      * @param acceptTrailing If after the required number of charecters are
-     * matched unrecognized characters that are not in one of the the
-     * <code>matches</code> string should be accepted. For instance if "abczz"
-     * should be matched with "abcdef" and min chars 3.
+     *                       matched unrecognized characters that are not in one of the the
+     *                       <code>matches</code> string should be accepted. For instance if "abczz"
+     *                       should be matched with "abcdef" and min chars 3.
      * @return The index of the first unmatched character if
      * <code>minChars</code> was reached or <code>-1</code> if a match was not
      * found.
@@ -1466,11 +1466,11 @@ public final class ConstraintParser {
      * A space separator will be a hit to one or more spaces and thus not return
      * empty strings.
      *
-     * @param s The string to parse. If it starts and/or ends with a
-     * <code>sep</code> the first and/or last element returned will be "". If
-     * two <code>sep</code> are next to each other and empty element will be
-     * "between" the periods. The <code>sep</code> themselves will never be
-     * returned.
+     * @param s   The string to parse. If it starts and/or ends with a
+     *            <code>sep</code> the first and/or last element returned will be "". If
+     *            two <code>sep</code> are next to each other and empty element will be
+     *            "between" the periods. The <code>sep</code> themselves will never be
+     *            returned.
      * @param sep The separator char.
      * @return Those parts of the string that are separated with
      * <code>sep</code>. Never null and at least of size 1
@@ -1542,7 +1542,7 @@ public final class ConstraintParser {
      * @return The string divided into elements. Never <code>null</code> and at
      * least of length 3.
      * @throws IllegalArgumentException If a [] mismatch of some kind. (If not
-     * same [ as ] count or if the interleave.)
+     *                                  same [ as ] count or if the interleave.)
      */
     private static ArrayList<String> getRowColAndGapsTrimmed(String s) {
         if (s.indexOf('|') != -1) {

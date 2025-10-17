@@ -27,6 +27,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.table.TableModel;
 import com.codename1.ui.util.EventDispatcher;
+
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -41,55 +42,54 @@ import java.util.Vector;
  *
  * @author Ofir Leitner
  */
-class HTMLTableModel implements TableModel{
-
-    Vector rows=new Vector();
-    Vector headers=new Vector();
-    int maxColumn;
-    Vector currentRow = new Vector();
-    Vector lastCommittedRow;
-    Hashtable constraints = new Hashtable();
-    private EventDispatcher dispatcher = new EventDispatcher();
-    HTMLElement captionTextTag;
-    Vector segmentEnds;
-    int curSegmentType=SEGMENT_TBODY;
-    int rowInsretionPos=-1;
-    int bodyInsertionPos=0;
-    boolean hasTHead,hasTFoot;
+class HTMLTableModel implements TableModel {
 
     static final int SEGMENT_THEAD = 0;
     static final int SEGMENT_TBODY = 1;
     static final int SEGMENT_TFOOT = 2;
+    Vector rows = new Vector();
+    Vector headers = new Vector();
+    int maxColumn;
+    Vector currentRow = new Vector();
+    Vector lastCommittedRow;
+    Hashtable constraints = new Hashtable();
+    HTMLElement captionTextTag;
+    Vector segmentEnds;
+    int curSegmentType = SEGMENT_TBODY;
+    int rowInsretionPos = -1;
+    int bodyInsertionPos = 0;
+    boolean hasTHead, hasTFoot;
+    private EventDispatcher dispatcher = new EventDispatcher();
 
     /**
      * Adds the given component as a cell to the end of the current row of the table
      *
-     * @param cell The component to add
-     * @param isHeader true if this is a header cell (Element.TAG_TH), false otherwise
+     * @param cell       The component to add
+     * @param isHeader   true if this is a header cell (Element.TAG_TH), false otherwise
      * @param constraint Specific constraints for this cell (alignment, spanning)
      */
-    void addCell(Component cell,boolean isHeader,CellConstraint constraint) {
+    void addCell(Component cell, boolean isHeader, CellConstraint constraint) {
         if (isHeader) {
             headers.addElement(cell);
         }
         currentRow.addElement(cell);
-        if (currentRow.size()>maxColumn) {
-            maxColumn=currentRow.size();
+        if (currentRow.size() > maxColumn) {
+            maxColumn = currentRow.size();
         }
-        if (constraint!=null) {
-            constraints.put(cell,constraint);
+        if (constraint != null) {
+            constraints.put(cell, constraint);
         }
     }
 
     /**
      * Sets the given alignment as a constraint to all cells in the table
-     * 
+     *
      * @param isHorizontal true to set horizontal alignment, false for vertical
-     * @param align The requested alignment
+     * @param align        The requested alignment
      */
-    void setAlignToAll(boolean isHorizontal,int align) {
-        for (Enumeration e=constraints.elements();e.hasMoreElements();) {
-            CellConstraint cc=(CellConstraint)e.nextElement();
+    void setAlignToAll(boolean isHorizontal, int align) {
+        for (Enumeration e = constraints.elements(); e.hasMoreElements(); ) {
+            CellConstraint cc = (CellConstraint) e.nextElement();
             if (isHorizontal) {
                 cc.setHorizontalAlign(align);
             } else {
@@ -100,17 +100,17 @@ class HTMLTableModel implements TableModel{
 
     /**
      * Returns the constraint for the specified object/cell
-     * 
-     * @param object The object/cell 
+     *
+     * @param object The object/cell
      * @return the constraint for the specified object/cell
      */
     CellConstraint getConstraint(Object object) {
-        return (CellConstraint)constraints.get(object);
+        return (CellConstraint) constraints.get(object);
     }
 
     /**
      * Checks if the object is a header
-     * 
+     *
      * @param object The object/cell in question
      * @return true if object is a header, false otherwise
      */
@@ -122,23 +122,23 @@ class HTMLTableModel implements TableModel{
      * Commits the current row. This opens a new empty row.
      */
     void commitRow() {
-        if (rowInsretionPos==-1) {
+        if (rowInsretionPos == -1) {
             rows.addElement(currentRow);
         } else {
-            rows.insertElementAt(currentRow,rowInsretionPos++);
+            rows.insertElementAt(currentRow, rowInsretionPos++);
         }
-        if (curSegmentType!=SEGMENT_TFOOT) {
+        if (curSegmentType != SEGMENT_TFOOT) {
             bodyInsertionPos++;
         }
-        lastCommittedRow=currentRow;
-        currentRow=new Vector();
+        lastCommittedRow = currentRow;
+        currentRow = new Vector();
     }
 
-   /**
-    *  Commits the current row only if it is not empty
-    */
+    /**
+     * Commits the current row only if it is not empty
+     */
     void commitRowIfNotEmpty() {
-        if (currentRow.size()>0) {
+        if (currentRow.size() > 0) {
             commitRow();
         }
     }
@@ -149,17 +149,17 @@ class HTMLTableModel implements TableModel{
      * @param segmentType The segment type
      */
     void startSegment(int segmentType) {
-        if ((segmentType==SEGMENT_THEAD) && (!hasTHead)) { // Can only have one THEAD, second one will be considered as TBODY
-            rowInsretionPos=0;
-            hasTHead=true;
-            curSegmentType=SEGMENT_THEAD;
-        } else if ((segmentType==SEGMENT_TFOOT) && (!hasTFoot)) { // Can only have one TFOOT, second one will be considered as TBODY
-            rowInsretionPos=-1;
-            hasTFoot=true;
-            curSegmentType=SEGMENT_TFOOT;
+        if ((segmentType == SEGMENT_THEAD) && (!hasTHead)) { // Can only have one THEAD, second one will be considered as TBODY
+            rowInsretionPos = 0;
+            hasTHead = true;
+            curSegmentType = SEGMENT_THEAD;
+        } else if ((segmentType == SEGMENT_TFOOT) && (!hasTFoot)) { // Can only have one TFOOT, second one will be considered as TBODY
+            rowInsretionPos = -1;
+            hasTFoot = true;
+            curSegmentType = SEGMENT_TFOOT;
         } else { //body
-            rowInsretionPos=bodyInsertionPos;
-            curSegmentType=SEGMENT_TBODY;
+            rowInsretionPos = bodyInsertionPos;
+            curSegmentType = SEGMENT_TBODY;
         }
 
     }
@@ -168,16 +168,15 @@ class HTMLTableModel implements TableModel{
      * Signals the end of the current segment
      */
     void endSegment() {
-        if (lastCommittedRow!=null) {
-            if (segmentEnds==null) {
-                segmentEnds=new Vector();
+        if (lastCommittedRow != null) {
+            if (segmentEnds == null) {
+                segmentEnds = new Vector();
             }
             segmentEnds.addElement(lastCommittedRow);
         }
-        curSegmentType=SEGMENT_TBODY; //-1;
-        rowInsretionPos=bodyInsertionPos;
+        curSegmentType = SEGMENT_TBODY; //-1;
+        rowInsretionPos = bodyInsertionPos;
     }
-
 
 
     // TableModel methods:
@@ -214,11 +213,11 @@ class HTMLTableModel implements TableModel{
      * {{@inheritDoc}}
      */
     public Object getValueAt(int row, int column) {
-        if (row>=rows.size()) {
+        if (row >= rows.size()) {
             return null;
         }
-        Vector columns=(Vector)rows.elementAt(row);
-        if (column>=columns.size()) {
+        Vector columns = (Vector) rows.elementAt(row);
+        if (column >= columns.size()) {
             return null;
         }
         return columns.elementAt(column);
@@ -228,7 +227,7 @@ class HTMLTableModel implements TableModel{
      * {{@inheritDoc}}
      */
     public void setValueAt(int row, int column, Object o) {
-        Vector columns=(Vector)rows.elementAt(row);
+        Vector columns = (Vector) rows.elementAt(row);
         columns.removeElementAt(column);
         columns.setElementAt(o, column);
         dispatcher.fireDataChangeEvent(column, row);
@@ -256,11 +255,11 @@ class HTMLTableModel implements TableModel{
      * @return true if the specified row ends a segment in the table, false otherwise
      */
     boolean isSegmentEnd(int row) {
-        if ((segmentEnds==null) || (row<0) || (row>=rows.size())) {
+        if ((segmentEnds == null) || (row < 0) || (row >= rows.size())) {
             return false;
         }
         return segmentEnds.contains(rows.elementAt(row));
-        
+
     }
 
 }

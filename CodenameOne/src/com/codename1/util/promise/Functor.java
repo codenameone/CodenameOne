@@ -28,10 +28,11 @@ package com.codename1.util.promise;
  * @author shannah
  * @since 8.0
  */
-public interface Functor<T,V> {
+public interface Functor<T, V> {
 
     /**
      * Calls the function.
+     *
      * @param arg Argument for the function.
      * @return Function return value.
      */

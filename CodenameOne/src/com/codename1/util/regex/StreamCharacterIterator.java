@@ -17,8 +17,8 @@
 
 package com.codename1.util.regex;
 
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Encapsulates java.io.InputStream as CharacterIterator.
@@ -26,101 +26,95 @@ import java.io.IOException;
  * @author <a href="mailto:ales.novak@netbeans.com">Ales Novak</a>
  * @version CVS $Id: StreamCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
  */
-public final class StreamCharacterIterator implements CharacterIterator
-{
-    /** Underlying is */
+public final class StreamCharacterIterator implements CharacterIterator {
+    /**
+     * Underlying is
+     */
     private final InputStream is;
 
-    /** Buffer of read chars */
+    /**
+     * Buffer of read chars
+     */
     private final StringBuffer buff;
 
-    /** read end? */
+    /**
+     * read end?
+     */
     private boolean closed;
 
-    /** @param is an InputStream, which is parsed */
-    public StreamCharacterIterator(InputStream is)
-    {
+    /**
+     * @param is an InputStream, which is parsed
+     */
+    public StreamCharacterIterator(InputStream is) {
         this.is = is;
         this.buff = new StringBuffer(512);
         this.closed = false;
     }
 
-    /** @return a substring */
-    public String substring(int beginIndex, int endIndex)
-    {
-        try
-        {
+    /**
+     * @return a substring
+     */
+    public String substring(int beginIndex, int endIndex) {
+        try {
             ensure(endIndex);
             return buff.toString().substring(beginIndex, endIndex);
-        }
-        catch (IOException e)
-        {
+        } catch (IOException e) {
             throw new StringIndexOutOfBoundsException(e.getMessage());
         }
     }
 
-    /** @return a substring */
-    public String substring(int beginIndex)
-    {
-        try
-        {
+    /**
+     * @return a substring
+     */
+    public String substring(int beginIndex) {
+        try {
             readAll();
             return buff.toString().substring(beginIndex);
-        }
-        catch (IOException e)
-        {
+        } catch (IOException e) {
             throw new StringIndexOutOfBoundsException(e.getMessage());
         }
     }
 
 
-    /** @return a character at the specified position. */
-    public char charAt(int pos)
-    {
-        try
-        {
+    /**
+     * @return a character at the specified position.
+     */
+    public char charAt(int pos) {
+        try {
             ensure(pos);
             return buff.charAt(pos);
-        }
-        catch (IOException e)
-        {
+        } catch (IOException e) {
             throw new StringIndexOutOfBoundsException(e.getMessage());
         }
     }
 
-    /** @return <tt>true</tt> iff if the specified index is after the end of the character stream */
-    public boolean isEnd(int pos)
-    {
-        if (buff.length() > pos)
-        {
+    /**
+     * @return <tt>true</tt> iff if the specified index is after the end of the character stream
+     */
+    public boolean isEnd(int pos) {
+        if (buff.length() > pos) {
             return false;
-        }
-        else
-        {
-            try
-            {
+        } else {
+            try {
                 ensure(pos);
                 return (buff.length() <= pos);
-            }
-            catch (IOException e)
-            {
+            } catch (IOException e) {
                 throw new StringIndexOutOfBoundsException(e.getMessage());
             }
         }
     }
 
-    /** Reads n characters from the stream and appends them to the buffer */
-    private int read(int n) throws IOException
-    {
-        if (closed)
-        {
+    /**
+     * Reads n characters from the stream and appends them to the buffer
+     */
+    private int read(int n) throws IOException {
+        if (closed) {
             return 0;
         }
 
         int c;
         int i = n;
-        while (--i >= 0)
-        {
+        while (--i >= 0) {
             c = is.read();
             if (c < 0) // EOF
             {
@@ -132,25 +126,24 @@ public final class StreamCharacterIterator implements CharacterIterator
         return n - i;
     }
 
-    /** Reads rest of the stream. */
-    private void readAll() throws IOException
-    {
-        while(! closed)
-        {
+    /**
+     * Reads rest of the stream.
+     */
+    private void readAll() throws IOException {
+        while (!closed) {
             read(1000);
         }
     }
 
-    /** Reads chars up to the idx */
-    private void ensure(int idx) throws IOException
-    {
-        if (closed)
-        {
+    /**
+     * Reads chars up to the idx
+     */
+    private void ensure(int idx) throws IOException {
+        if (closed) {
             return;
         }
 
-        if (idx < buff.length())
-        {
+        if (idx < buff.length()) {
             return;
         }
 

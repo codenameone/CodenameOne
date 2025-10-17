@@ -24,42 +24,45 @@
 package com.codename1.impl;
 
 /**
- * Virtual keyboards needs to implement this interface to be registered as a platform 
+ * Virtual keyboards needs to implement this interface to be registered as a platform
  * keyboard.
- * 
+ *
  * @author Chen Fishbein
  */
 public interface VirtualKeyboardInterface {
-    
+
     /**
      * This can be used to indicate to the VirtualKeyboard what type of input
      * to display.
-     * 
-     * @param inputType one of TextArea.ANY, TextArea.EMAILADDR, 
-     * TextArea.NUMERIC, TextArea.PHONENUMBER, TextArea.URL, TextArea.DECIMAL
-     * it can be bitwised or'd with one of TextArea.PASSWORD, 
-     * TextArea.UNEDITABLE, TextArea.SENSITIVE, TextArea.NON_PREDICTIVE,
-     * INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
+     *
+     * @param inputType one of TextArea.ANY, TextArea.EMAILADDR,
+     *                  TextArea.NUMERIC, TextArea.PHONENUMBER, TextArea.URL, TextArea.DECIMAL
+     *                  it can be bitwised or'd with one of TextArea.PASSWORD,
+     *                  TextArea.UNEDITABLE, TextArea.SENSITIVE, TextArea.NON_PREDICTIVE,
+     *                  INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
      */
     public void setInputType(int inputType);
 
     /**
      * Returns the Virtual Keyboard name.
      * This is a unique indentifier for the Virtual Keyboard implementation
+     *
      * @return a unique id that represents this virtual keyboard.
      */
     public String getVirtualKeyboardName();
-    
+
     /**
      * Shows or dispose the virtual keyboard
+     *
      * @param show if true shows the virtual keyboard
      */
     public void showKeyboard(boolean show);
-    
+
     /**
      * Indicates if the Virtual Keyboard is currently showing.
+     *
      * @return true if the Virtual Keyboard is currently showing
      */
     public boolean isVirtualKeyboardShowing();
-            
+
 }

@@ -6,32 +6,33 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
 package com.codename1.ui;
 
 import com.codename1.ui.spinner.Picker;
+
 import java.util.Date;
 
 /**
  * <p>A picker component similar to {@link com.codename1.ui.TextComponent} that adapts to native UI
- * conventions and leverages the {@link com.codename1.ui.spinner.Picker} API. See the docs for 
+ * conventions and leverages the {@link com.codename1.ui.spinner.Picker} API. See the docs for
  * {@link com.codename1.ui.InputComponent} for more options and coverage.</p>
  * <p>
- * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with 
+ * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
  * validation errors
  * </p>
  * <script src="https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js"></script>
@@ -43,7 +44,7 @@ import java.util.Date;
  */
 public class PickerComponent extends InputComponent {
     private final Picker picker = createPickerInstance();
-    
+
     /**
      * Allows subclassing the picker component for customization
      */
@@ -51,18 +52,10 @@ public class PickerComponent extends InputComponent {
         initInput();
         picker.setTickerEnabled(false);
     }
-    
-    /**
-     * Allows developers to subclass the Picker component instance to customize
-     * behaviors of the subclass
-     * @return the picker instance
-     */
-    protected Picker createPickerInstance() {
-        return new Picker();
-    }
-    
+
     /**
      * Creates a strings picker component
+     *
      * @param values the values for the picker
      * @return a strings version of the picker component
      */
@@ -73,9 +66,10 @@ public class PickerComponent extends InputComponent {
         p.picker.setSelectedString(values[0]);
         return p;
     }
-    
+
     /**
      * Creates a date picker component
+     *
      * @param date the initial date in the picker
      * @return a date version of the picker component
      */
@@ -85,9 +79,10 @@ public class PickerComponent extends InputComponent {
         p.picker.setDate(date);
         return p;
     }
-        
+
     /**
      * Creates a date + time picker component
+     *
      * @param date the initial date in the picker
      * @return a date + time version of the picker component
      */
@@ -100,6 +95,7 @@ public class PickerComponent extends InputComponent {
 
     /**
      * Creates a time picker component
+     *
      * @param minutes minutes since midnight as a time of day
      * @return a time version of the picker component
      */
@@ -112,6 +108,7 @@ public class PickerComponent extends InputComponent {
 
     /**
      * Creates a duration minutes picker component
+     *
      * @param ms the duration value in milliseconds
      * @return a duration version of the picker component
      */
@@ -124,7 +121,8 @@ public class PickerComponent extends InputComponent {
 
     /**
      * Creates a duration hours + minutes picker component
-     * @param hours the number of hours 
+     *
+     * @param hours   the number of hours
      * @param minutes the number of minutes
      * @return a duration version of the picker component
      */
@@ -136,15 +134,26 @@ public class PickerComponent extends InputComponent {
     }
 
     /**
+     * Allows developers to subclass the Picker component instance to customize
+     * behaviors of the subclass
+     *
+     * @return the picker instance
+     */
+    protected Picker createPickerInstance() {
+        return new Picker();
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
     public Component getEditor() {
         return picker;
     }
-    
+
     /**
      * Returns the picker instance
+     *
      * @return the picker
      */
     public Picker getPicker() {
@@ -168,11 +177,11 @@ public class PickerComponent extends InputComponent {
         super.errorMessage(errorMessage);
         return this;
     }
-    
+
     /**
      * Overridden for covariant return type
      * {@inheritDoc}
- }
+     * }
      */
     public PickerComponent label(String text) {
         super.label(text);

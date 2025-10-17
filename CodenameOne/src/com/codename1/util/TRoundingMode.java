@@ -81,11 +81,15 @@ enum TRoundingMode {
      */
     UNNECESSARY(TBigDecimal.ROUND_UNNECESSARY);
 
-    /** The old constant of <code>BigDecimal</code>. */
+    /**
+     * The old constant of <code>BigDecimal</code>.
+     */
     @SuppressWarnings("unused")
     private final int bigDecimalRM;
 
-    /** It sets the old constant. */
+    /**
+     * It sets the old constant.
+     */
     TRoundingMode(int rm) {
         bigDecimalRM = rm;
     }
@@ -94,8 +98,7 @@ enum TRoundingMode {
      * Converts rounding mode constants from class {@code BigDecimal} into
      * {@code RoundingMode} values.
      *
-     * @param mode
-     *            rounding mode constant as defined in class {@code BigDecimal}
+     * @param mode rounding mode constant as defined in class {@code BigDecimal}
      * @return corresponding rounding mode object
      */
     public static TRoundingMode valueOf(int mode) {

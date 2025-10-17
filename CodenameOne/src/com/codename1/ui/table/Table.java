@@ -43,20 +43,21 @@ import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.validation.Constraint;
 import com.codename1.ui.validation.Validator;
 import com.codename1.util.CaseInsensitiveOrder;
+
 import java.util.Comparator;
 import java.util.Date;
 
 /**
  * <p>The {@code Table} class represents a grid of data that can be used for rendering a grid
  * of components/labels. The table reflects and updates the underlying model data.
- * {@code Table} relies heavily on the {@link com.codename1.ui.table.TableLayout} class and 
- * {@link com.codename1.ui.table.TableModel} interface to present its UI. Unlike a 
+ * {@code Table} relies heavily on the {@link com.codename1.ui.table.TableLayout} class and
+ * {@link com.codename1.ui.table.TableModel} interface to present its UI. Unlike a
  * {@link com.codename1.ui.List} a {@code Table} doesn't feature a separate renderer
  * and instead allows developers to derive the class.
  * </p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/6b106772ad1d58c50270.js"></script>
- * 
+ *
  * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" alt="Table with customize cells using the pinstripe effect" />
  * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png" alt="Picker table cell during edit" />
  *
@@ -96,14 +97,14 @@ public class Table extends Container {
 
     /**
      * Indicates the alignment of the title see label alignment for details
-     * 
-     * @see com.codename1.ui.Label#setAlignment(int) 
+     *
+     * @see com.codename1.ui.Label#setAlignment(int)
      */
     private int titleAlignment = Label.CENTER;
 
     /**
      * Indicates the alignment of the cells see label alignment for details
-     * 
+     *
      * @see com.codename1.ui.Label#setAlignment(int)
      */
     private int cellAlignment = Label.LEFT;
@@ -117,18 +118,18 @@ public class Table extends Container {
      * Sort support can be toggled with this flag
      */
     private boolean sortSupported;
-    
+
     private int sortedColumn = -1;
     private boolean ascending;
-    
+
     /**
      * Constructor for usage by GUI builder and automated tools, normally one
      * should use the version that accepts the model
      */
     public Table() {
         this(new DefaultTableModel(new String[]{"Col1", "Col2"}, new String[][]{
-            {"1", "2"},
-            {"3", "4"}}));
+                {"1", "2"},
+                {"3", "4"}}));
     }
 
 
@@ -146,7 +147,7 @@ public class Table extends Container {
     /**
      * Create a table with a new model
      *
-     * @param model the model underlying this table
+     * @param model         the model underlying this table
      * @param includeHeader Indicates whether the table should render a table header as the first row
      */
     public Table(TableModel model, boolean includeHeader) {
@@ -163,9 +164,9 @@ public class Table extends Container {
      */
     public int getSelectedRow() {
         Form f = getComponentForm();
-        if(f != null) {
+        if (f != null) {
             Component c = f.getFocused();
-            if(c != null) {
+            if (c != null) {
                 return getCellRow(c);
             }
         }
@@ -175,12 +176,13 @@ public class Table extends Container {
     /**
      * By default createCell/constraint won't be invoked for null values by overriding this method to return true
      * you can replace this behavior
+     *
      * @return false by default
      */
     protected boolean includeNullValues() {
         return false;
     }
-    
+
     /**
      * Returns the selected column in the table
      *
@@ -188,9 +190,9 @@ public class Table extends Container {
      */
     public int getSelectedColumn() {
         Form f = getComponentForm();
-        if(f != null) {
+        if (f != null) {
             Component c = f.getFocused();
-            if(c != null) {
+            if (c != null) {
                 return getCellColumn(c);
             }
         }
@@ -200,9 +202,9 @@ public class Table extends Container {
     private void updateModel() {
         int selectionRow = -1, selectionColumn = -1;
         Form f = getComponentForm();
-        if(f != null) {
+        if (f != null) {
             Component c = f.getFocused();
-            if(c != null) {
+            if (c != null) {
                 selectionRow = getCellRow(c);
                 selectionColumn = getCellColumn(c);
             }
@@ -211,9 +213,9 @@ public class Table extends Container {
         int columnCount = model.getColumnCount();
 
         // another row for the table header
-        if(includeHeader) {
+        if (includeHeader) {
             setLayout(new TableLayout(model.getRowCount() + 1, columnCount));
-            for(int iter = 0 ; iter < columnCount ; iter++) {
+            for (int iter = 0; iter < columnCount; iter++) {
                 String name = model.getColumnName(iter);
                 Component header = createCellImpl(name, -1, iter, false);
                 TableLayout.Constraint con = createCellConstraint(name, -1, iter);
@@ -223,25 +225,25 @@ public class Table extends Container {
             setLayout(new TableLayout(model.getRowCount(), columnCount));
         }
 
-        for(int r = 0 ; r < model.getRowCount() ; r++) {
-            for(int c = 0 ; c < columnCount ; c++) {
+        for (int r = 0; r < model.getRowCount(); r++) {
+            for (int c = 0; c < columnCount; c++) {
                 Object value = model.getValueAt(r, c);
 
                 // null should be returned for spanned over values
-                if(value != null || includeNullValues()) {
+                if (value != null || includeNullValues()) {
                     boolean e = model.isCellEditable(r, c);
                     Component cell = createCellImpl(value, r, c, e);
-                    if(cell != null) {
+                    if (cell != null) {
                         TableLayout.Constraint con = createCellConstraint(value, r, c);
 
                         // returns the current row we iterate about
-                        int currentRow = ((TableLayout)getLayout()).getNextRow();
-                        
-                        if(r > model.getRowCount()) {
+                        int currentRow = ((TableLayout) getLayout()).getNextRow();
+
+                        if (r > model.getRowCount()) {
                             return;
                         }
                         addComponent(con, cell);
-                        if(r == selectionRow && c == selectionColumn) {
+                        if (r == selectionRow && c == selectionColumn) {
                             cell.requestFocus();
                         }
                     }
@@ -254,33 +256,33 @@ public class Table extends Container {
      * {@inheritDoc}
      */
     protected void paintGlass(Graphics g) {
-        if ((drawBorder) && (innerBorder!=INNER_BORDERS_NONE)) {
+        if ((drawBorder) && (innerBorder != INNER_BORDERS_NONE)) {
             int xPos = getAbsoluteX();
             int yPos = getAbsoluteY();
             g.translate(xPos, yPos);
             int rows = model.getRowCount();
             int cols = model.getColumnCount();
-            if(includeHeader) {
+            if (includeHeader) {
                 rows++;
             }
             g.setColor(getStyle().getFgColor());
             int alpha = g.concatenateAlpha(getStyle().getFgAlpha());
-            TableLayout t = (TableLayout)getLayout();
+            TableLayout t = (TableLayout) getLayout();
             int actualWidth = Math.max(getWidth(), getScrollDimension().getWidth());
             int actualHeight = Math.max(getHeight(), getScrollDimension().getHeight());
 
-            if ((collapseBorder) || (innerBorder!=INNER_BORDERS_ALL) || // inner borders cols/rows are supported only in collapsed mode
-                (t.hasHorizontalSpanning()) || (t.hasVerticalSpanning())) { // TODO - We currently don't support separate borders for tables with spanned cells
-                if ((innerBorder==INNER_BORDERS_ALL) || (innerBorder==INNER_BORDERS_ROWS)) {
-                    if(t.hasVerticalSpanning()) {
+            if ((collapseBorder) || (innerBorder != INNER_BORDERS_ALL) || // inner borders cols/rows are supported only in collapsed mode
+                    (t.hasHorizontalSpanning()) || (t.hasVerticalSpanning())) { // TODO - We currently don't support separate borders for tables with spanned cells
+                if ((innerBorder == INNER_BORDERS_ALL) || (innerBorder == INNER_BORDERS_ROWS)) {
+                    if (t.hasVerticalSpanning()) {
                         // iterate over the components and draw a line on the side of all
                         // the components other than the ones that are at the last column.
-                        for(int cellRow = 0 ; cellRow < rows - 1; cellRow++) {
-                            for(int cellColumn = 0 ; cellColumn < cols ; cellColumn++) {
+                        for (int cellRow = 0; cellRow < rows - 1; cellRow++) {
+                            for (int cellColumn = 0; cellColumn < cols; cellColumn++) {
                                 // if this isn't the last row
-                                if(cellRow + t.getCellVerticalSpan(cellRow, cellColumn) - 1 != rows - 1) {
+                                if (cellRow + t.getCellVerticalSpan(cellRow, cellColumn) - 1 != rows - 1) {
                                     // if this is a spanned through cell we don't want to draw a line here
-                                    if(t.isCellSpannedThroughHorizontally(cellRow, cellColumn)) {
+                                    if (t.isCellSpannedThroughHorizontally(cellRow, cellColumn)) {
                                         continue;
                                     }
 
@@ -288,13 +290,13 @@ public class Table extends Container {
                                     int y = t.getRowPosition(cellRow);
                                     int rowHeight = t.getRowPosition(cellRow + t.getCellVerticalSpan(cellRow, cellColumn)) - y;
                                     int columnWidth;
-                                    if(cellColumn < getModel().getColumnCount() - 1) {
+                                    if (cellColumn < getModel().getColumnCount() - 1) {
                                         columnWidth = t.getColumnPosition(cellColumn + 1) - x;
                                     } else {
                                         columnWidth = getWidth() - y;
                                     }
 
-                                    if ((innerBorder!=INNER_BORDERS_ROWS) || (shouldDrawInnerBorderAfterRow(cellRow))) {
+                                    if ((innerBorder != INNER_BORDERS_ROWS) || (shouldDrawInnerBorderAfterRow(cellRow))) {
                                         g.drawLine(x, y + rowHeight, x + columnWidth, y + rowHeight);
                                     }
                                 }
@@ -302,9 +304,9 @@ public class Table extends Container {
                         }
                     } else {
                         // this is much faster since we don't need to check spanning
-                        for(int row = 1 ; row < rows; row++) {
+                        for (int row = 1; row < rows; row++) {
                             int y = t.getRowPosition(row);
-                            if ((innerBorder!=INNER_BORDERS_ROWS) || (shouldDrawInnerBorderAfterRow(row-1))) {
+                            if ((innerBorder != INNER_BORDERS_ROWS) || (shouldDrawInnerBorderAfterRow(row - 1))) {
                                 g.drawLine(0, y, actualWidth, y);
                             }
                             //g.drawLine(0+2, y+2, actualWidth-2, y+2);
@@ -313,16 +315,16 @@ public class Table extends Container {
                     }
                 }
 
-                if ((innerBorder==INNER_BORDERS_ALL) || (innerBorder==INNER_BORDERS_COLS)) {
-                    if(t.hasHorizontalSpanning()) {
+                if ((innerBorder == INNER_BORDERS_ALL) || (innerBorder == INNER_BORDERS_COLS)) {
+                    if (t.hasHorizontalSpanning()) {
                         // iterate over the components and draw a line on the side of all
                         // the components other than the ones that are at the last column.
-                        for(int cellRow = 0 ; cellRow < rows ; cellRow++) {
-                            for(int cellColumn = 0 ; cellColumn < cols - 1 ; cellColumn++) {
+                        for (int cellRow = 0; cellRow < rows; cellRow++) {
+                            for (int cellColumn = 0; cellColumn < cols - 1; cellColumn++) {
                                 // if this isn't the last column
-                                if(cellColumn + t.getCellHorizontalSpan(cellRow, cellColumn) - 1 != cols - 1) {
+                                if (cellColumn + t.getCellHorizontalSpan(cellRow, cellColumn) - 1 != cols - 1) {
                                     // if this is a spanned through cell we don't want to draw a line here
-                                    if(t.isCellSpannedThroughVertically(cellRow, cellColumn)) {
+                                    if (t.isCellSpannedThroughVertically(cellRow, cellColumn)) {
                                         continue;
                                     }
 
@@ -330,7 +332,7 @@ public class Table extends Container {
                                     int y = t.getRowPosition(cellRow);
                                     int rowHeight;
                                     int columnWidth = t.getColumnPosition(cellColumn + t.getCellHorizontalSpan(cellRow, cellColumn)) - x;
-                                    if(cellRow < getModel().getRowCount() - 1) {
+                                    if (cellRow < getModel().getRowCount() - 1) {
                                         rowHeight = t.getRowPosition(cellRow + 1) - y;
                                     } else {
                                         rowHeight = getHeight() - y;
@@ -338,13 +340,13 @@ public class Table extends Container {
 
                                     g.drawLine(x + columnWidth, y, x + columnWidth, y + rowHeight);
                                 }
-                                if(t.getCellHorizontalSpan(cellRow, cellColumn) > 1){
+                                if (t.getCellHorizontalSpan(cellRow, cellColumn) > 1) {
                                     cellColumn += t.getCellHorizontalSpan(cellRow, cellColumn) - 1;
                                 }
                             }
                         }
                     } else {
-                        for(int col = 1 ; col < cols ; col++) {
+                        for (int col = 1; col < cols; col++) {
                             int x = t.getColumnPosition(col);
                             g.drawLine(x, 0, x, actualHeight);
                             //g.drawLine(x+2, 0+2, x+2, actualHeight-2);
@@ -353,39 +355,39 @@ public class Table extends Container {
                 }
             } else { // separate border
                 //if ((!t.hasHorizontalSpanning()) && (!t.hasVerticalSpanning())) {
-                    for(int row = 0 ; row < rows; row++) {
-                        int y = t.getRowPosition(row);
-                        int h;
-                        if (row+1<rows) {
-                            h=t.getRowPosition(row+1)-y;
+                for (int row = 0; row < rows; row++) {
+                    int y = t.getRowPosition(row);
+                    int h;
+                    if (row + 1 < rows) {
+                        h = t.getRowPosition(row + 1) - y;
+                    } else {
+                        h = getY() + actualHeight - y - 2;
+                    }
+                    for (int col = 0; col < cols; col++) {
+                        int x = t.getColumnPosition(col);
+                        int w;
+                        if (col + 1 < cols) {
+                            w = t.getColumnPosition(col + 1) - x;
                         } else {
-                            h=getY()+actualHeight-y-2;
+                            w = getX() + actualWidth - x - 2;
                         }
-                        for(int col = 0 ; col < cols ; col++) {
-                            int x = t.getColumnPosition(col);
-                            int w;
-                            if (col+1<cols) {
-                                w=t.getColumnPosition(col+1)-x;
-                            } else {
-                                w=getX()+actualWidth-x-2;
+                        Component comp = t.getComponentAt(row, col);
+                        if ((comp.isVisible()) &&
+                                ((drawEmptyCellsBorder) ||
+                                        ((comp.getWidth() - comp.getStyle().getPaddingRightNoRTL() - comp.getStyle().getPaddingLeftNoRTL() > 0) &&
+                                                (comp.getHeight() - comp.getStyle().getPaddingTop() - comp.getStyle().getPaddingBottom() > 0)))) {
+                            int rightMargin = comp.getStyle().getMarginRightNoRTL();
+                            int bottomMargin = comp.getStyle().getMarginBottom();
+                            if (col == 0) {
+                                rightMargin *= 2; // Since the first cell includes margins from both sides (left/right) so the next cell location is farther away - but we don't want to paint the border up to it
                             }
-                            Component comp=t.getComponentAt(row, col);
-                            if ((comp.isVisible()) &&
-                                    ((drawEmptyCellsBorder) ||
-                                     ((comp.getWidth()-comp.getStyle().getPaddingRightNoRTL() - comp.getStyle().getPaddingLeftNoRTL()>0) &&
-                                      (comp.getHeight()-comp.getStyle().getPaddingTop() - comp.getStyle().getPaddingBottom()>0)))) {
-                                int rightMargin=comp.getStyle().getMarginRightNoRTL();
-                                int bottomMargin=comp.getStyle().getMarginBottom();
-                                if (col==0) {
-                                    rightMargin*=2; // Since the first cell includes margins from both sides (left/right) so the next cell location is farther away - but we don't want to paint the border up to it
-                                }
-                                if (row==0) {
-                                    bottomMargin*=2;
-                                }
-                                g.drawRect(x+comp.getStyle().getMarginLeftNoRTL(), y+comp.getStyle().getMarginTop(), w-2-rightMargin, h-2-bottomMargin);
+                            if (row == 0) {
+                                bottomMargin *= 2;
                             }
+                            g.drawRect(x + comp.getStyle().getMarginLeftNoRTL(), y + comp.getStyle().getMarginTop(), w - 2 - rightMargin, h - 2 - bottomMargin);
                         }
                     }
+                }
             }
 
             g.translate(-xPos, -yPos);
@@ -397,20 +399,20 @@ public class Table extends Container {
         Component c = createCell(value, row, column, editable);
         c.putClientProperty("row", new Integer(row));
         c.putClientProperty("column", new Integer(column));
-        
+
         // we do this here to allow subclasses to return a text area or its subclass
-        if(c instanceof TextArea) {
-            ((TextArea)c).addActionListener(listener);
+        if (c instanceof TextArea) {
+            ((TextArea) c).addActionListener(listener);
         } else {
-            if(c instanceof Button) {
-                ((Button)c).addActionListener(listener);
-            } 
+            if (c instanceof Button) {
+                ((Button) c).addActionListener(listener);
+            }
         }
 
         Style s = c.getSelectedStyle();
         //s.setMargin(0, 0, 0, 0);
         s.setMargin(verticalBorderSpacing, verticalBorderSpacing, horizontalBorderSpacing, horizontalBorderSpacing);
-        if ((drawBorder) && (innerBorder!=INNER_BORDERS_NONE)) {
+        if ((drawBorder) && (innerBorder != INNER_BORDERS_NONE)) {
             s.setBorder(null);
             s = c.getUnselectedStyle();
             s.setBorder(null);
@@ -425,9 +427,9 @@ public class Table extends Container {
 
     /**
      * Returns a generic comparator that tries to work in a way that will sort columns with similar object types.
-     * This method can be overriden to create custom sort orders or return null and thus disable sorting for a 
+     * This method can be overriden to create custom sort orders or return null and thus disable sorting for a
      * specific column
-     * 
+     *
      * @param column the column that's sorted
      * @return the comparator instance
      */
@@ -435,88 +437,89 @@ public class Table extends Container {
         final CaseInsensitiveOrder ccmp = new CaseInsensitiveOrder();
         return new Comparator() {
             public int compare(Object o1, Object o2) {
-                if(o1 == null) {
-                    if(o2 == null) {
+                if (o1 == null) {
+                    if (o2 == null) {
                         return 0;
                     }
                     return -1;
                 } else {
-                    if(o2 == null) {
+                    if (o2 == null) {
                         return 1;
                     }
                 }
-                if(o1 instanceof String && o2 instanceof String) {
-                    return ccmp.compare((String)o1, (String)o2);
+                if (o1 instanceof String && o2 instanceof String) {
+                    return ccmp.compare((String) o1, (String) o2);
                 }
                 try {
                     double d = Util.toDoubleValue(o1) - Util.toDoubleValue(o2);
-                    if(d > 0) {
+                    if (d > 0) {
                         return 1;
                     }
-                    if(d < 0) {
+                    if (d < 0) {
                         return -1;
                     }
-                } catch(IllegalArgumentException err) {
+                } catch (IllegalArgumentException err) {
                     long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
-                    return (int)dd;
+                    return (int) dd;
                 }
                 return 0;
             }
         };
     }
-    
+
     /**
      * Sorts the given column programmatically
-     * @param column the column to sort
+     *
+     * @param column    the column to sort
      * @param ascending true to sort in ascending order
      */
     public void sort(int column, boolean ascending) {
         sortedColumn = column;
         Comparator cmp = createColumnSortComparator(column);
-        if(model instanceof SortableTableModel) {
-            model = ((SortableTableModel)model).getUnderlying();
+        if (model instanceof SortableTableModel) {
+            model = ((SortableTableModel) model).getUnderlying();
         }
         setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));
     }
-    
+
     /**
      * Creates a cell based on the given value
      *
-     * @param value the new value object
-     * @param row row number, -1 for the header rows
-     * @param column column number
+     * @param value    the new value object
+     * @param row      row number, -1 for the header rows
+     * @param column   column number
      * @param editable true if the cell is editable
      * @return cell component instance
      */
     protected Component createCell(Object value, int row, final int column, boolean editable) {
-        if(row == -1) {
-            Button header = new Button((String)value, getUIID() + "Header");
-            header.getAllStyles().setAlignment(titleAlignment);            
+        if (row == -1) {
+            Button header = new Button((String) value, getUIID() + "Header");
+            header.getAllStyles().setAlignment(titleAlignment);
             header.setTextPosition(LEFT);
-            if(isSortSupported()) {
+            if (isSortSupported()) {
                 header.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
                         Comparator cmp = createColumnSortComparator(column);
-                        if(cmp == null) {
+                        if (cmp == null) {
                             return;
                         }
-                        if(column == sortedColumn) {
+                        if (column == sortedColumn) {
                             ascending = !ascending;
                         } else {
                             sortedColumn = column;
                             ascending = false;
                         }
-                        if(model instanceof SortableTableModel) {
-                            model = ((SortableTableModel)model).getUnderlying();
+                        if (model instanceof SortableTableModel) {
+                            model = ((SortableTableModel) model).getUnderlying();
                         }
-                        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));  
+                        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));
                     }
                 });
-                if(sortedColumn == column) {
-                    if(ascending) {
+                if (sortedColumn == column) {
+                    if (ascending) {
                         FontImage.setMaterialIcon(header, FontImage.MATERIAL_ARROW_DROP_UP);
                     } else {
-                        FontImage.setMaterialIcon(header, FontImage.MATERIAL_ARROW_DROP_DOWN);                            
+                        FontImage.setMaterialIcon(header, FontImage.MATERIAL_ARROW_DROP_DOWN);
                     }
                 }
             }
@@ -524,55 +527,55 @@ public class Table extends Container {
         }
         int constraint = TextArea.ANY;
         Constraint validation = null;
-        if(isAbstractTableModel()) {
-            Class type = ((AbstractTableModel)model).getCellType(row, column);
-            if(type == Boolean.class) {
+        if (isAbstractTableModel()) {
+            Class type = ((AbstractTableModel) model).getCellType(row, column);
+            if (type == Boolean.class) {
                 CheckBox cell = new CheckBox();
                 cell.setSelected(Util.toBooleanValue(value));
                 cell.setUIID(getUIID() + "Cell");
                 cell.setEnabled(editable);
                 return cell;
             }
-            if(editable && (type == null || type == String.class)) {
-                String[] multiChoice = ((AbstractTableModel)model).getMultipleChoiceOptions(row, column);
-                if(multiChoice != null) {
+            if (editable && (type == null || type == String.class)) {
+                String[] multiChoice = ((AbstractTableModel) model).getMultipleChoiceOptions(row, column);
+                if (multiChoice != null) {
                     Picker cell = new Picker();
                     cell.setStrings(multiChoice);
-                    if(value != null) {
-                        cell.setSelectedString((String)value);
+                    if (value != null) {
+                        cell.setSelectedString((String) value);
                     }
                     cell.setUIID(getUIID() + "Cell");
                     return cell;
                 }
             }
-            if(editable && type == Date.class) {
+            if (editable && type == Date.class) {
                 Picker cell = new Picker();
                 cell.setType(Display.PICKER_TYPE_DATE);
-                if(value != null) {
-                    cell.setDate((Date)value);
+                if (value != null) {
+                    cell.setDate((Date) value);
                 }
                 cell.setUIID(getUIID() + "Cell");
                 return cell;
             }
-            if(type == Integer.class || type == Long.class || type == Short.class ||
-                type == Byte.class) {
+            if (type == Integer.class || type == Long.class || type == Short.class ||
+                    type == Byte.class) {
                 constraint = TextArea.NUMERIC;
             } else {
-                if(type == Float.class || type == Double.class) {
+                if (type == Float.class || type == Double.class) {
                     constraint = TextArea.DECIMAL;
                 }
             }
-            if(((AbstractTableModel)model).getValidator() != null) {
-                validation = ((AbstractTableModel)model).getValidationConstraint(row, column);
+            if (((AbstractTableModel) model).getValidator() != null) {
+                validation = ((AbstractTableModel) model).getValidationConstraint(row, column);
             }
         }
-        if(editable) {
+        if (editable) {
             TextField cell = new TextField(value == null ? "" : "" + value, -1);
             cell.setConstraint(constraint);
             cell.setLeftAndRightEditingTrigger(false);
             cell.setUIID(getUIID() + "Cell");
-            if(validation != null) {
-                Validator v = ((AbstractTableModel)model).getValidator();
+            if (validation != null) {
+                Validator v = ((AbstractTableModel) model).getValidator();
                 v.addConstraint(cell, validation);
             }
             return cell;
@@ -591,7 +594,7 @@ public class Table extends Container {
     public void initComponent() {
         // this can happen if deinitialize is invoked due to a menu command which modifies
         // the content of the table while the listener wasn't bound
-        if(potentiallyDirtyModel) {
+        if (potentiallyDirtyModel) {
             updateModel();
             potentiallyDirtyModel = false;
         }
@@ -605,12 +608,24 @@ public class Table extends Container {
         // we unbind the listener to prevent a memory leak for the use case of keeping
         // the model while discarding the component
         // Prevent the model listener from being removed when the VKB is shown
-        if(!Display.getInstance().isVirtualKeyboardShowing()) {
+        if (!Display.getInstance().isVirtualKeyboardShowing()) {
             potentiallyDirtyModel = true;
             model.removeDataChangeListener(listener);
         } else {
             potentiallyDirtyModel = false;
         }
+    }
+
+    /**
+     * Returns the model instance
+     *
+     * @return the model instance
+     */
+    public TableModel getModel() {
+        if (sortedColumn > -1) {
+            return ((SortableTableModel) model).getUnderlying();
+        }
+        return model;
     }
 
     /**
@@ -622,18 +637,6 @@ public class Table extends Container {
         this.model = model;
         updateModel();
         revalidate();
-    }
-
-    /**
-     * Returns the model instance
-     *
-     * @return the model instance
-     */
-    public TableModel getModel() {
-        if(sortedColumn > -1) {
-            return ((SortableTableModel)model).getUnderlying();
-        }
-        return model;
     }
 
     /**
@@ -651,7 +654,7 @@ public class Table extends Container {
      * @param drawBorder the drawBorder to set
      */
     public void setDrawBorder(boolean drawBorder) {
-        if(this.drawBorder != drawBorder) {
+        if (this.drawBorder != drawBorder) {
             this.drawBorder = drawBorder;
             updateModel();
             revalidate();
@@ -659,26 +662,8 @@ public class Table extends Container {
     }
 
     /**
-     * Sets how to draw the inner border (All of it, only rows/columns, none, groups)
-     * Note that setting to any mode other than NONE/ALL will result in the border drawing as collapsed whether this is a collpased border or not
-     * 
-     * @param innerBorder one of the INNER_BORDER_* constants
-     */
-    public void setInnerBorderMode(int innerBorder) {
-        if ((innerBorder<INNER_BORDERS_NONE) || (innerBorder>INNER_BORDERS_ALL)) {
-            throw new IllegalArgumentException("Inner border mode must be one of the INNER_BORDER_* constants");
-        }
-
-        if(this.innerBorder != innerBorder) {
-            this.innerBorder=innerBorder;
-            updateModel();
-            revalidate();
-        }
-    }
-
-    /**
      * Returns the current inner border mode
-     * 
+     *
      * @return the current inner border mode (one of the INNER_BORDER_* constants)
      */
     public int getInnerBorderMode() {
@@ -686,10 +671,28 @@ public class Table extends Container {
     }
 
     /**
+     * Sets how to draw the inner border (All of it, only rows/columns, none, groups)
+     * Note that setting to any mode other than NONE/ALL will result in the border drawing as collapsed whether this is a collpased border or not
+     *
+     * @param innerBorder one of the INNER_BORDER_* constants
+     */
+    public void setInnerBorderMode(int innerBorder) {
+        if ((innerBorder < INNER_BORDERS_NONE) || (innerBorder > INNER_BORDERS_ALL)) {
+            throw new IllegalArgumentException("Inner border mode must be one of the INNER_BORDER_* constants");
+        }
+
+        if (this.innerBorder != innerBorder) {
+            this.innerBorder = innerBorder;
+            updateModel();
+            revalidate();
+        }
+    }
+
+    /**
      * Returns whether an inner border should be drawn after the specified row.
      * This allows customization in subclasses to create for example the effects of segments in atable, i.e. instead of a line after each row - lines after "chunks" of rows.
      * Note that this is queried only when the inner border mode is set to INNER_BORDER_ROWS
-     * 
+     *
      * @param row The row in question
      * @return true to draw inner border, false otherwise
      */
@@ -703,9 +706,9 @@ public class Table extends Container {
      * @param collapseBorder true to collapse (default), false for separate borders
      */
     public void setCollapseBorder(boolean collapseBorder) {
-        if (this.collapseBorder!=collapseBorder) {
+        if (this.collapseBorder != collapseBorder) {
             this.collapseBorder = collapseBorder;
-            if ((horizontalBorderSpacing!=0) || (verticalBorderSpacing!=0)) { // Only if one of the spacing was not 0, then we need to update, since otherwise the margin is 0 for both collapse and separate modes
+            if ((horizontalBorderSpacing != 0) || (verticalBorderSpacing != 0)) { // Only if one of the spacing was not 0, then we need to update, since otherwise the margin is 0 for both collapse and separate modes
                 updateMargins();
             }
             repaint();
@@ -714,7 +717,7 @@ public class Table extends Container {
 
     /**
      * Indicates whether empty cells should have borders (relevant only for separate borders and not for collapsed)
-     * 
+     *
      * @param drawEmptyCellsBorder - true to draw (default), false otherwise
      */
     public void setDrawEmptyCellsBorder(boolean drawEmptyCellsBorder) {
@@ -726,34 +729,34 @@ public class Table extends Container {
      * Sets the spacing of cells border (relevant only for separate borders and not for collapsed)
      *
      * @param horizontal - The horizontal spacing
-     * @param vertical - The vertical spacing
+     * @param vertical   - The vertical spacing
      */
     public void setBorderSpacing(int horizontal, int vertical) {
-        horizontalBorderSpacing=horizontal;
-        verticalBorderSpacing=vertical;
+        horizontalBorderSpacing = horizontal;
+        verticalBorderSpacing = vertical;
         updateMargins();
     }
 
     private void updateMargins() {
-        TableLayout t = (TableLayout)getLayout();
-        int hSpace=horizontalBorderSpacing;
-        int vSpace=verticalBorderSpacing;
+        TableLayout t = (TableLayout) getLayout();
+        int hSpace = horizontalBorderSpacing;
+        int vSpace = verticalBorderSpacing;
         if (collapseBorder) { // not relevant for collapse border
-            hSpace=0;
-            vSpace=0;
+            hSpace = 0;
+            vSpace = 0;
         }
         if ((!t.hasHorizontalSpanning()) && (!t.hasVerticalSpanning())) {
-            for(int row = 0 ; row < t.getRows(); row++) {
-                for(int col = 0 ; col < t.getColumns() ; col++) {
-                    Component cmp=null;
+            for (int row = 0; row < t.getRows(); row++) {
+                for (int col = 0; col < t.getColumns(); col++) {
+                    Component cmp = null;
                     try {
-                        cmp=t.getComponentAt(row, col);
-                    } catch (Exception  e) {
+                        cmp = t.getComponentAt(row, col);
+                    } catch (Exception e) {
                         // parent of cmp can be null as well - TODO - check why
                     }
-                    if (cmp!=null) {
-                        int leftMargin=(col==0)?hSpace:0;
-                        int topMargin=(row==0)?vSpace:0;
+                    if (cmp != null) {
+                        int leftMargin = (col == 0) ? hSpace : 0;
+                        int topMargin = (row == 0) ? vSpace : 0;
                         cmp.getUnselectedStyle().setMargin(topMargin, vSpace, leftMargin, hSpace);
                         cmp.getSelectedStyle().setMargin(topMargin, vSpace, leftMargin, hSpace);
                     }
@@ -782,7 +785,7 @@ public class Table extends Container {
      */
     public void setTitleAlignment(int titleAlignment) {
         this.titleAlignment = titleAlignment;
-        for(int iter = 0 ; iter < model.getColumnCount() ; iter++) {
+        for (int iter = 0; iter < model.getColumnCount(); iter++) {
             listener.dataChanged(-1, iter);
         }
     }
@@ -790,13 +793,13 @@ public class Table extends Container {
 
     /**
      * Returns the column in which the given cell is placed
-     * 
+     *
      * @param cell the component representing the cell placed in the table
      * @return the column in which the cell was placed in the table
      */
     public int getCellColumn(Component cell) {
-        Integer i = ((Integer)cell.getClientProperty("column"));
-        if(i != null) {
+        Integer i = ((Integer) cell.getClientProperty("column"));
+        if (i != null) {
             return i.intValue();
         }
         return -1;
@@ -804,13 +807,13 @@ public class Table extends Container {
 
     /**
      * Returns the row in which the given cell is placed
-     * 
+     *
      * @param cell the component representing the cell placed in the table
      * @return the row in which the cell was placed in the table
      */
     public int getCellRow(Component cell) {
-        Integer i = ((Integer)cell.getClientProperty("row"));
-        if(i != null) {
+        Integer i = ((Integer) cell.getClientProperty("row"));
+        if (i != null) {
             return i.intValue();
         }
         return -1;
@@ -819,8 +822,8 @@ public class Table extends Container {
     /**
      * Indicates the alignment of the cells see label alignment for details
      *
-     * @see com.codename1.ui.Label#setAlignment(int)
      * @return the cell alignment
+     * @see com.codename1.ui.Label#setAlignment(int)
      */
     public int getCellAlignment() {
         return cellAlignment;
@@ -848,7 +851,7 @@ public class Table extends Container {
 
     /**
      * Indicates whether the table should render a table header as the first row
-     * 
+     *
      * @param includeHeader the includeHeader to set
      */
     public void setIncludeHeader(boolean includeHeader) {
@@ -860,16 +863,16 @@ public class Table extends Container {
      * Creates the table cell constraint for the given cell, this method can be overriden for
      * the purposes of modifying the table constraints.
      *
-     * @param value the value of the cell
-     * @param row the table row
+     * @param value  the value of the cell
+     * @param row    the table row
      * @param column the table column
      * @return the table constraint
      */
     protected TableLayout.Constraint createCellConstraint(Object value, int row, int column) {
-        if(includeHeader) {
+        if (includeHeader) {
             row++;
         }
-        TableLayout t = (TableLayout)getLayout();
+        TableLayout t = (TableLayout) getLayout();
         return t.createConstraint(row, column);
     }
 
@@ -877,40 +880,40 @@ public class Table extends Container {
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"data", "header"};
+        return new String[]{"data", "header"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArray2DClass(), 
-           com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
+        return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArray2DClass(),
+                com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
-        return new String[] {"String[][]", "String[]"};
+        return new String[]{"String[][]", "String[]"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("data")) {
-            String[][] result = new String[((DefaultTableModel)model).data.size()][];
-            for(int iter = 0 ; iter < result.length ; iter++) {
-                Object[] o = ((DefaultTableModel)model).data.get(iter);
+        if (name.equals("data")) {
+            String[][] result = new String[((DefaultTableModel) model).data.size()][];
+            for (int iter = 0; iter < result.length; iter++) {
+                Object[] o = ((DefaultTableModel) model).data.get(iter);
                 String[] arr = new String[o.length];
                 result[iter] = arr;
-                for(int ai = 0 ; ai < arr.length ; ai++) {
+                for (int ai = 0; ai < arr.length; ai++) {
                     Object current = o[ai];
-                    if(current instanceof String) {
-                        arr[ai] = (String)current;
+                    if (current instanceof String) {
+                        arr[ai] = (String) current;
                     } else {
-                        if(current != null) {
+                        if (current != null) {
                             arr[iter] = current.toString();
                         }
                     }
@@ -918,8 +921,8 @@ public class Table extends Container {
             }
             return result;
         }
-        if(name.equals("header")) {
-            return ((DefaultTableModel)model).columnNames;
+        if (name.equals("header")) {
+            return ((DefaultTableModel) model).columnNames;
         }
         return null;
     }
@@ -928,12 +931,12 @@ public class Table extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("data")) {
-            setModel(new DefaultTableModel(((DefaultTableModel)model).columnNames, (Object[][])value));
+        if (name.equals("data")) {
+            setModel(new DefaultTableModel(((DefaultTableModel) model).columnNames, (Object[][]) value));
             return null;
         }
-        if(name.equals("header")) {
-            setModel(new DefaultTableModel((String[])value, ((DefaultTableModel)model).data, ((DefaultTableModel)model).editable));
+        if (name.equals("header")) {
+            setModel(new DefaultTableModel((String[]) value, ((DefaultTableModel) model).data, ((DefaultTableModel) model).editable));
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -942,20 +945,22 @@ public class Table extends Container {
     /**
      * If the table is sorted returns the position of the row in the actual
      * underlying model
-     * @param row the row as it visually appears in the table or in the 
-     * {@code createCell} method
-     * @return the position of the row in the physical model, this will be 
+     *
+     * @param row the row as it visually appears in the table or in the
+     *            {@code createCell} method
+     * @return the position of the row in the physical model, this will be
      * the same value if the table isn't sorted
      */
     public int translateSortedRowToModelRow(int row) {
-        if(model instanceof SortableTableModel) {
-            return ((SortableTableModel)model).getSortedPosition(row);
+        if (model instanceof SortableTableModel) {
+            return ((SortableTableModel) model).getSortedPosition(row);
         }
         return row;
     }
-    
+
     /**
      * Sort support can be toggled with this flag
+     *
      * @return the sortSupported
      */
     public boolean isSortSupported() {
@@ -964,38 +969,47 @@ public class Table extends Container {
 
     /**
      * Sort support can be toggled with this flag
+     *
      * @param sortSupported the sortSupported to set
      */
     public void setSortSupported(boolean sortSupported) {
-        if(this.sortSupported != sortSupported) {
+        if (this.sortSupported != sortSupported) {
             this.sortSupported = sortSupported;
             setModel(getModel());
         }
     }
 
+    private boolean isAbstractTableModel() {
+        if (model instanceof SortableTableModel) {
+            return ((SortableTableModel) model).getUnderlying() instanceof AbstractTableModel;
+        }
+        return model instanceof AbstractTableModel;
+    }
+
     class Listener implements DataChangedListener, ActionListener {
         private int editingColumn = -1;
         private int editingRow = -1;
+
         /**
          * {@inheritDoc}
          */
         public final void dataChanged(int row, int column) {
-            if(row == Integer.MIN_VALUE) {
+            if (row == Integer.MIN_VALUE) {
                 // special case... Rebuild the table
                 updateModel();
                 revalidate();
                 return;
             }
-            // prevents the table from rebuilding on every text field edit which makes the table 
+            // prevents the table from rebuilding on every text field edit which makes the table
             // more usable on iOS devices with the VKB/Native editing
-            if(editingColumn == column && editingRow == row) {
+            if (editingColumn == column && editingRow == row) {
                 editingColumn = -1;
                 editingRow = -1;
                 return;
             }
             Object value;
             boolean e;
-            if(row < 0) {
+            if (row < 0) {
                 e = false;
                 value = model.getColumnName(column);
             } else {
@@ -1004,16 +1018,16 @@ public class Table extends Container {
             }
             Component cell = createCellImpl(value, row, column, e);
 
-            TableLayout t = (TableLayout)getLayout();
+            TableLayout t = (TableLayout) getLayout();
             TableLayout.Constraint con = createCellConstraint(value, row, column);
-            if(includeHeader) {
+            if (includeHeader) {
                 row++;
             }
 
             Component c = t.getComponentAt(row, column);
-            if(c != null) {
+            if (c != null) {
                 removeComponent(c);
-                
+
                 // a repaint sent right before this might result in an artifact for some use cases so
                 // removing visibility essentially cancels repaints
                 c.setVisible(false);
@@ -1026,41 +1040,41 @@ public class Table extends Container {
         }
 
         public void actionPerformed(ActionEvent evt) {
-            Component c = (Component)evt.getSource();
+            Component c = (Component) evt.getSource();
             int row = getCellRow(c);
             int column = getCellColumn(c);
-            if(c instanceof TextArea) {
-                TextArea t = (TextArea)c;
+            if (c instanceof TextArea) {
+                TextArea t = (TextArea) c;
                 editingColumn = column;
                 editingRow = row;
-                if(isAbstractTableModel()) {
-                    Class type = ((AbstractTableModel)model).getCellType(row, column);
-                    if(type == Integer.class) {
+                if (isAbstractTableModel()) {
+                    Class type = ((AbstractTableModel) model).getCellType(row, column);
+                    if (type == Integer.class) {
                         model.setValueAt(row, column, t.getAsInt(0));
                         return;
                     }
-                    if(type == Long.class) {
+                    if (type == Long.class) {
                         model.setValueAt(row, column, t.getAsLong(0));
                         return;
                     }
-                    if(type == Short.class) {
-                        model.setValueAt(row, column, (short)t.getAsInt(0));
+                    if (type == Short.class) {
+                        model.setValueAt(row, column, (short) t.getAsInt(0));
                         return;
                     }
-                    if(type == Byte.class) {
-                        model.setValueAt(row, column, (byte)t.getAsInt(0));
+                    if (type == Byte.class) {
+                        model.setValueAt(row, column, (byte) t.getAsInt(0));
                         return;
                     }
-                    if(type == Float.class) {
-                        model.setValueAt(row, column, (float)t.getAsDouble(0));
+                    if (type == Float.class) {
+                        model.setValueAt(row, column, (float) t.getAsDouble(0));
                         return;
                     }
-                    if(type == Double.class) {
+                    if (type == Double.class) {
                         model.setValueAt(row, column, t.getAsDouble(0));
                         return;
                     }
-                    if(type == Character.class) {
-                        if(t.getText().length() > 0) {
+                    if (type == Character.class) {
+                        if (t.getText().length() > 0) {
                             model.setValueAt(row, column, t.getText().charAt(0));
                         }
                         return;
@@ -1068,29 +1082,22 @@ public class Table extends Container {
                 }
                 model.setValueAt(row, column, t.getText());
             } else {
-                if(c instanceof Picker) {
-                    switch(((Picker)c).getType()) {
+                if (c instanceof Picker) {
+                    switch (((Picker) c).getType()) {
                         case Display.PICKER_TYPE_DATE:
-                            model.setValueAt(row, column, ((Picker)c).getDate());              
+                            model.setValueAt(row, column, ((Picker) c).getDate());
                             break;
-                            
+
                         case Display.PICKER_TYPE_STRINGS:
-                            model.setValueAt(row, column, ((Picker)c).getSelectedString());
+                            model.setValueAt(row, column, ((Picker) c).getSelectedString());
                             break;
                     }
                 } else {
-                    if(c instanceof CheckBox) {
-                        model.setValueAt(row, column, ((CheckBox)c).isSelected());
+                    if (c instanceof CheckBox) {
+                        model.setValueAt(row, column, ((CheckBox) c).isSelected());
                     }
                 }
             }
         }
-    }
-    
-    private boolean isAbstractTableModel() {
-        if(model instanceof SortableTableModel) {
-            return ((SortableTableModel)model).getUnderlying() instanceof AbstractTableModel;
-        }
-        return model instanceof AbstractTableModel;
     }
 }

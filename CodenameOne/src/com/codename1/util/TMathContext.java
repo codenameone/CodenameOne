@@ -22,7 +22,7 @@ package com.codename1.util;
  * Immutable objects describing settings such as rounding mode and digit
  * precision for the numerical operations provided by class {@link TBigDecimal}.
  */
-final class TMathContext  {
+final class TMathContext {
 
     /**
      * A {@code MathContext} which corresponds to the IEEE 754r quadruple
@@ -54,19 +54,6 @@ final class TMathContext  {
      */
     public static final TMathContext UNLIMITED = new TMathContext(0,
             TRoundingMode.HALF_UP);
-
-    /**
-     * The number of digits to be used for an operation; results are rounded to
-     * this precision.
-     */
-    private int precision;
-
-    /**
-     * A {@code RoundingMode} object which specifies the algorithm to be used
-     * for rounding.
-     */
-    private TRoundingMode roundingMode;
-
     /**
      * An array of {@code char} containing: {@code
      * 'p','r','e','c','i','s','i','o','n','='}. It's used to improve the
@@ -75,9 +62,8 @@ final class TMathContext  {
      * @see #MathContext(String)
      * @see #toString()
      */
-    private final static char[] chPrecision = { 'p', 'r', 'e', 'c', 'i', 's',
-            'i', 'o', 'n', '=' };
-
+    private final static char[] chPrecision = {'p', 'r', 'e', 'c', 'i', 's',
+            'i', 'o', 'n', '='};
     /**
      * An array of {@code char} containing: {@code
      * 'r','o','u','n','d','i','n','g','M','o','d','e','='}. It's used to
@@ -86,8 +72,18 @@ final class TMathContext  {
      * @see #MathContext(String)
      * @see #toString()
      */
-    private final static char[] chRoundingMode = { 'r', 'o', 'u', 'n', 'd',
-            'i', 'n', 'g', 'M', 'o', 'd', 'e', '=' };
+    private final static char[] chRoundingMode = {'r', 'o', 'u', 'n', 'd',
+            'i', 'n', 'g', 'M', 'o', 'd', 'e', '='};
+    /**
+     * The number of digits to be used for an operation; results are rounded to
+     * this precision.
+     */
+    private int precision;
+    /**
+     * A {@code RoundingMode} object which specifies the algorithm to be used
+     * for rounding.
+     */
+    private TRoundingMode roundingMode;
 
     /**
      * Constructs a new {@code MathContext} with the specified precision and
@@ -95,10 +91,8 @@ final class TMathContext  {
      * precision passed is zero, then this implies that the computations have to
      * be performed exact, the rounding mode in this case is irrelevant.
      *
-     * @param precision
-     *            the precision for the new {@code MathContext}.
-     * @throws IllegalArgumentException
-     *             if {@code precision < 0}.
+     * @param precision the precision for the new {@code MathContext}.
+     * @throws IllegalArgumentException if {@code precision < 0}.
      */
     public TMathContext(int precision) {
         this(precision, TRoundingMode.HALF_UP);
@@ -110,14 +104,10 @@ final class TMathContext  {
      * this implies that the computations have to be performed exact, the
      * rounding mode in this case is irrelevant.
      *
-     * @param precision
-     *            the precision for the new {@code MathContext}.
-     * @param roundingMode
-     *            the rounding mode for the new {@code MathContext}.
-     * @throws IllegalArgumentException
-     *             if {@code precision < 0}.
-     * @throws NullPointerException
-     *             if {@code roundingMode} is {@code null}.
+     * @param precision    the precision for the new {@code MathContext}.
+     * @param roundingMode the rounding mode for the new {@code MathContext}.
+     * @throws IllegalArgumentException if {@code precision < 0}.
+     * @throws NullPointerException     if {@code roundingMode} is {@code null}.
      */
     public TMathContext(int precision, TRoundingMode roundingMode) {
         if (precision < 0) {
@@ -137,12 +127,10 @@ final class TMathContext  {
      * This is the same form as the one returned by the {@link #toString}
      * method.
      *
-     * @param val
-     *            a string describing the precision and rounding mode for the
+     * @param val a string describing the precision and rounding mode for the
      *            new {@code MathContext}.
-     * @throws IllegalArgumentException
-     *             if the string is not in the correct format or if the
-     *             precision specified is < 0.
+     * @throws IllegalArgumentException if the string is not in the correct format or if the
+     *                                  precision specified is < 0.
      */
     public TMathContext(String val) {
         char[] charVal = val.toCharArray();
@@ -238,10 +226,9 @@ final class TMathContext  {
      * Returns true if x is a {@code MathContext} with the same precision
      * setting and the same rounding mode as this {@code MathContext} instance.
      *
-     * @param x
-     *            object to be compared.
+     * @param x object to be compared.
      * @return {@code true} if this {@code MathContext} instance is equal to the
-     *         {@code x} argument; {@code false} otherwise.
+     * {@code x} argument; {@code false} otherwise.
      */
     @Override
     public boolean equals(Object x) {

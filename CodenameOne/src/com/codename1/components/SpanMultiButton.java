@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.components;
@@ -27,7 +27,6 @@ import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
-import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
@@ -43,18 +42,20 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
 
+import static com.codename1.ui.ComponentSelector.$;
+
 /**
  * <p>A powerful button like component that allows multiple rows/and an icon to be added
  * every row/icon can have its own UIID. Internally the multi-button is a container with
  * a lead component. Up to 4 rows are supported.</p>
  * <p>It's like {@link MultiButton}, but it breaks lines.</p>
- * 
+ *
  * <script src="https://gist.github.com/jsfan3/83586d7b6db9b66772d02d25898f1bad.js"></script>
  * <img src="https://user-images.githubusercontent.com/1997316/74588488-e4f38300-4ff4-11ea-9b6f-f6c0a4fea173.png" alt="SpanMultiButton usages Sample 1" /><br />
  * <img src="https://user-images.githubusercontent.com/1997316/74588489-e58c1980-4ff4-11ea-8e19-d7c8904b2926.png" alt="SpanMultiButton usages Sample 2" />
  *
- * @see MultiButton
  * @author Francesco Galgani
+ * @see MultiButton
  */
 public class SpanMultiButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
     private final TextArea firstRow = new TextArea();
@@ -64,53 +65,54 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     private final Button icon = new Button();
     private Button emblem = new Button();
     private boolean invert;
-    private String group;  
+    private String group;
     private boolean shouldLocalize;
     private int gap;
-    
+
     /**
      * Initializes a multibutton with the first line of text
+     *
      * @param line1 first line of text
      */
     public SpanMultiButton(String line1) {
         this();
         setTextLine1(line1);
     }
-    
+
     /**
      * Default constructor allowing the designer to create an instance of this class
      */
     public SpanMultiButton() {
         setUIID("MultiButton");
-        
+
         firstRow.setActAsLabel(true);
         firstRow.setGrowByContent(true);
         firstRow.setUIID("MultiLine1");
         firstRow.setEditable(false);
         firstRow.setFocusable(false);
-        
+
         secondRow.setActAsLabel(true);
         secondRow.setGrowByContent(true);
         secondRow.setUIID("MultiLine2");
         secondRow.setEditable(false);
         secondRow.setFocusable(false);
-        
+
         thirdRow.setActAsLabel(true);
         thirdRow.setGrowByContent(true);
         thirdRow.setUIID("MultiLine3");
         thirdRow.setEditable(false);
         thirdRow.setFocusable(false);
-        
+
         forthRow.setActAsLabel(true);
         forthRow.setGrowByContent(true);
         forthRow.setUIID("MultiLine4");
         forthRow.setEditable(false);
         forthRow.setFocusable(false);
-        
+
         secondRow.setHidden(true);
         thirdRow.setHidden(true);
         forthRow.setHidden(true);
-        
+
         setLayout(new BorderLayout());
         setFocusable(true);
         BorderLayout bl = new BorderLayout();
@@ -141,20 +143,30 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         emblem.setUIID("Emblem");
         setLeadComponent(emblem);
         Image i = UIManager.getInstance().getThemeImageConstant("defaultEmblemImage");
-        if(i != null) {
+        if (i != null) {
             emblem.setIcon(i);
         }
         icon.bindStateTo(emblem);
         updateGap();
     }
-    
+
+    /**
+     * Indicates if the lines are grouped together on this button
+     *
+     * @return
+     */
+    public boolean isLinesTogetherMode() {
+        return firstRow.getParent() == secondRow.getParent();
+    }
+
     /**
      * Changes the layout so the lines of the button are grouped together
+     *
      * @param l true to group the lines together
      */
     public void setLinesTogetherMode(boolean l) {
-        if(l != isLinesTogetherMode()) {
-            if(l) {
+        if (l != isLinesTogetherMode()) {
+            if (l) {
                 firstRow.getParent().removeComponent(firstRow);
                 Container p = secondRow.getParent();
                 p.addComponent(0, firstRow);
@@ -167,66 +179,21 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
             }
         }
     }
-    
-    /**
-     * Indicates if the lines are grouped together on this button
-     * @return 
-     */
-    public boolean isLinesTogetherMode() {
-        return firstRow.getParent() == secondRow.getParent();
-    }
-    
+
     /**
      * Allows us to gain direct access to the icon component so we can set it directly without going
      * via the other methods, this is especially useful for classes such as the ImageDownloadService
      * which can then update the icon seamlessly.
+     *
      * @return the component used internally to represent the icon
      */
     public Label getIconComponent() {
         return icon;
     }
-    
-    /**
-     * Turns the multi-button into a checkbox multi-button
-     * 
-     * @param b true for a checkbox multi-button
-     */
-    public void setCheckBox(boolean b) {
-        if(b != isCheckBox()) {
-            Container par = emblem.getParent();
-            Button old = emblem;
-            if(b) {
-                emblem = new CheckBox();
-            } else {
-                emblem = new Button();
-            }
-            emblem.setUIID(old.getUIID());
-            emblem.setName(old.getName());
-            java.util.List actionListeners = (java.util.List)old.getListeners();
-            if(actionListeners != null) {
-                for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
-                    emblem.addActionListener((ActionListener)actionListeners.get(iter));
-                }
-            }
-            if(old.getCommand() != null) {
-                Image img = old.getIcon();
-                emblem.setCommand(old.getCommand());
-                emblem.setText("");
-                emblem.setIcon(img);
-            } else {
-                emblem.setText(old.getText());
-                if(old.getIcon() != null) {
-                    emblem.setIcon(old.getIcon());
-                }
-            }
-            par.replace(old, emblem, null);
-            setLeadComponent(emblem);
-        }
-    }
-    
+
     /**
      * Adds an action listener
-     * 
+     *
      * @param al the action listener
      */
     public void addActionListener(ActionListener al) {
@@ -235,7 +202,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * Removes an action listener
-     * 
+     *
      * @param al the action listener
      */
     public void removeActionListener(ActionListener al) {
@@ -244,7 +211,8 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc }
-     * @param l 
+     *
+     * @param l
      */
     @Override
     public void addLongPressListener(ActionListener l) {
@@ -253,7 +221,8 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc}
-     * @param l 
+     *
+     * @param l
      */
     @Override
     public void removeLongPressListener(ActionListener l) {
@@ -262,7 +231,8 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc}
-     * @param l 
+     *
+     * @param l
      */
     @Override
     public void addPointerPressedListener(ActionListener l) {
@@ -271,32 +241,44 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc}
-     * @param l 
+     *
+     * @param l
      */
     @Override
     public void removePointerPressedListener(ActionListener l) {
         emblem.removePointerPressedListener(l);
     }
-    
+
     /**
      * {@inheritDoc}
-     * @param l 
+     *
+     * @param l
      */
     public void addPointerReleasedListener(ActionListener l) {
         emblem.addPointerReleasedListener(l);
     }
-    
+
     /**
      * {@inheritDoc}
-     * @param l 
+     *
+     * @param l
      */
     public void removePointerReleasedListener(ActionListener l) {
         emblem.removePointerReleasedListener(l);
     }
-    
+
+    /**
+     * Returns the command for the emblem
+     *
+     * @return the command instance
+     */
+    public Command getCommand() {
+        return emblem.getCommand();
+    }
+
     /**
      * Sets the command for the component, it doesn't affe
-     * 
+     *
      * @param c the command
      */
     public void setCommand(Command c) {
@@ -307,49 +289,87 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Returns the command for the emblem
-     * 
-     * @return the command instance
-     */
-    public Command getCommand() {
-        return emblem.getCommand();
-    }
-    
-    /**
      * Returns true if this is a checkbox button
-     * 
+     *
      * @return true for a checkbox button
      */
     public boolean isCheckBox() {
         return emblem instanceof CheckBox;
     }
-    
+
+    /**
+     * Turns the multi-button into a checkbox multi-button
+     *
+     * @param b true for a checkbox multi-button
+     */
+    public void setCheckBox(boolean b) {
+        if (b != isCheckBox()) {
+            Container par = emblem.getParent();
+            Button old = emblem;
+            if (b) {
+                emblem = new CheckBox();
+            } else {
+                emblem = new Button();
+            }
+            emblem.setUIID(old.getUIID());
+            emblem.setName(old.getName());
+            java.util.List actionListeners = (java.util.List) old.getListeners();
+            if (actionListeners != null) {
+                for (int iter = 0; iter < actionListeners.size(); iter++) {
+                    emblem.addActionListener((ActionListener) actionListeners.get(iter));
+                }
+            }
+            if (old.getCommand() != null) {
+                Image img = old.getIcon();
+                emblem.setCommand(old.getCommand());
+                emblem.setText("");
+                emblem.setIcon(img);
+            } else {
+                emblem.setText(old.getText());
+                if (old.getIcon() != null) {
+                    emblem.setIcon(old.getIcon());
+                }
+            }
+            par.replace(old, emblem, null);
+            setLeadComponent(emblem);
+        }
+    }
+
+    /**
+     * Returns true if this is a radio button
+     *
+     * @return true for a radio button
+     */
+    public boolean isRadioButton() {
+        return emblem instanceof RadioButton;
+    }
+
     /**
      * Turns the multi-button into a radio multi-button
-     * 
+     *
      * @param b true for a radio multi-button
      */
     public void setRadioButton(boolean b) {
-        if(b != isRadioButton()) {
+        if (b != isRadioButton()) {
             Container par = emblem.getParent();
             Button old = emblem;
-            if(b) {
+            if (b) {
                 emblem = new RadioButton();
-                if(group != null) {
-                    ((RadioButton)emblem).setGroup(group);
+                if (group != null) {
+                    ((RadioButton) emblem).setGroup(group);
                 }
             } else {
                 emblem = new Button();
             }
             emblem.setName(old.getName());
             emblem.setUIID(old.getUIID());
-            java.util.List actionListeners = (java.util.List)old.getListeners();
-            if(actionListeners != null) {
-                for(int iter = 0 ; iter < actionListeners.size() ; iter++) {
-                    emblem.addActionListener((ActionListener)actionListeners.get(iter));
+            java.util.List actionListeners = (java.util.List) old.getListeners();
+            if (actionListeners != null) {
+                for (int iter = 0; iter < actionListeners.size(); iter++) {
+                    emblem.addActionListener((ActionListener) actionListeners.get(iter));
                 }
             }
-            if(old.getCommand() != null) {
+            if (old.getCommand() != null) {
                 Image img = old.getIcon();
                 emblem.setCommand(old.getCommand());
                 emblem.setText("");
@@ -360,51 +380,53 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
             emblem.setShowEvenIfBlank(true);
         }
     }
-    
-    /**
-     * Returns true if this is a radio button
-     * 
-     * @return true for a radio button
-     */
-    public boolean isRadioButton() {
-        return emblem instanceof RadioButton;
-    }
-    
+
     /**
      * Returns true if the checkbox/radio button is selected
+     *
      * @return true if the checkbox/radio button is selected
      */
     public boolean isSelected() {
         return (emblem instanceof RadioButton || emblem instanceof CheckBox) && emblem.isSelected();
     }
-    
+
     /**
      * Toggles the selected state for the radio button/check box modes
+     *
      * @param b true for checked false for unchecked
      */
     public void setSelected(boolean b) {
-        if(emblem instanceof RadioButton) {
-            ((RadioButton)emblem).setSelected(b);
+        if (emblem instanceof RadioButton) {
+            ((RadioButton) emblem).setSelected(b);
             return;
         }
-        if(emblem instanceof CheckBox) {
-            ((CheckBox)emblem).setSelected(b);
+        if (emblem instanceof CheckBox) {
+            ((CheckBox) emblem).setSelected(b);
             return;
         }
     }
-    
+
+    /**
+     * Indicates whether the first two labels are be side by side
+     *
+     * @return true if the first two labels are side by side
+     */
+    public boolean isHorizontalLayout() {
+        return secondRow.getParent().getLayout() instanceof FlowLayout;
+    }
+
     /**
      * Indicates the first two labels should be side by side
-     * 
+     *
      * @param b true to place the first two labels side by side
      */
     public void setHorizontalLayout(boolean b) {
-        if(isHorizontalLayout() != b) {
-            if(isHorizontalLayout()) {
+        if (isHorizontalLayout() != b) {
+            if (isHorizontalLayout()) {
                 secondRow.getParent().getParent().removeComponent(secondRow.getParent());
             }
             secondRow.getParent().removeComponent(secondRow);
-            if(b) {
+            if (b) {
                 Container wrapper = new Container();
                 Container c = firstRow.getParent();
                 wrapper.addComponent(secondRow);
@@ -415,29 +437,30 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
             }
         }
     }
-    
+
     /**
-     * Indicates whether the first two labels are be side by side
-     * 
-     * @return true if the first two labels are side by side
-     */
-    public boolean isHorizontalLayout() {
-        return secondRow.getParent().getLayout() instanceof FlowLayout;
-    }
-    
-    /**
-     * Inverts the order of the first two entries so the second line appears first. 
+     * Inverts the order of the first two entries so the second line appears first.
      * This only works in horizontal mode!
-     * 
+     *
+     * @return true when the second row entry should be placed before the first entry
+     */
+    public boolean isInvertFirstTwoEntries() {
+        return invert;
+    }
+
+    /**
+     * Inverts the order of the first two entries so the second line appears first.
+     * This only works in horizontal mode!
+     *
      * @param b true to place the second row entry as the first entry
      */
     public void setInvertFirstTwoEntries(boolean b) {
-        if(b != invert) {
+        if (b != invert) {
             invert = b;
-            if(isHorizontalLayout()) {
+            if (isHorizontalLayout()) {
                 Container c = firstRow.getParent();
                 c.removeComponent(secondRow);
-                if(invert) {
+                if (invert) {
                     c.addComponent(BorderLayout.WEST, secondRow);
                 } else {
                     c.addComponent(BorderLayout.EAST, secondRow);
@@ -445,20 +468,19 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
             }
         }
     }
-    
+
     /**
-     * Inverts the order of the first two entries so the second line appears first. 
-     * This only works in horizontal mode!
-     * 
-     * @return true when the second row entry should be placed before the first entry
+     * Returns the content of the row
+     *
+     * @return the text
      */
-    public boolean isInvertFirstTwoEntries() {
-        return invert;
+    public String getTextLine1() {
+        return firstRow.getText();
     }
-    
+
     /**
      * Sets the content of the row
-     * 
+     *
      * @param t text to set
      */
     public void setTextLine1(String t) {
@@ -467,55 +489,55 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         firstRow.setColumns(t.length() + 1);
         firstRow.setHidden(false);
     }
-    
-    /**
-     * Returns the content of the row
-     * 
-     * @return the text 
-     */
-    public String getTextLine1() {
-        return firstRow.getText();
-    }
 
     /**
-     * Sets the name of the row (important for use in generic renderers)
-     * 
-     * @param t name to set
-     */
-    public void setNameLine1(String t) {
-        firstRow.setName(t);
-    }
-    
-    /**
      * Returns the name of the row
-     * 
+     *
      * @return the name
      */
     public String getNameLine1() {
         return firstRow.getName();
     }
-    
+
     /**
-     * Sets the UIID of the row
-     * 
-     * @param t UIID to set
+     * Sets the name of the row (important for use in generic renderers)
+     *
+     * @param t name to set
      */
-    public void setUIIDLine1(String t) {
-        firstRow.setUIID(t);
+    public void setNameLine1(String t) {
+        firstRow.setName(t);
     }
-    
+
     /**
      * Returns the UIID of the row
-     * 
-     * @return the UIID 
+     *
+     * @return the UIID
      */
     public String getUIIDLine1() {
         return firstRow.getUIID();
     }
 
     /**
+     * Sets the UIID of the row
+     *
+     * @param t UIID to set
+     */
+    public void setUIIDLine1(String t) {
+        firstRow.setUIID(t);
+    }
+
+    /**
+     * Returns the content of the row
+     *
+     * @return the text
+     */
+    public String getTextLine2() {
+        return secondRow.getText();
+    }
+
+    /**
      * Sets the content of the row
-     * 
+     *
      * @param t text to set
      */
     public void setTextLine2(String t) {
@@ -524,28 +546,10 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         secondRow.setColumns(t.length() + 1);
         secondRow.setHidden(false);
     }
-    
-    /**
-     * Returns the content of the row
-     * 
-     * @return the text 
-     */
-    public String getTextLine2() {
-        return secondRow.getText();
-    }
 
     /**
-     * Sets the name of the row (important for use in generic renderers
-     * 
-     * @param t name to set
-     */
-    public void setNameLine2(String t) {
-        secondRow.setName(t);
-    }
-    
-    /**
      * Returns the name of the row
-     * 
+     *
      * @return the name
      */
     public String getNameLine2() {
@@ -553,26 +557,76 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Sets the UIID of the row
-     * 
-     * @param t UIID to set
+     * Sets the name of the row (important for use in generic renderers
+     *
+     * @param t name to set
      */
-    public void setUIIDLine2(String t) {
-        secondRow.setUIID(t);
+    public void setNameLine2(String t) {
+        secondRow.setName(t);
     }
-    
+
     /**
      * Returns the UIID of the row
-     * 
-     * @return the UIID 
+     *
+     * @return the UIID
      */
     public String getUIIDLine2() {
         return secondRow.getUIID();
     }
 
     /**
+     * Sets the UIID of the row
+     *
+     * @param t UIID to set
+     */
+    public void setUIIDLine2(String t) {
+        secondRow.setUIID(t);
+    }
+
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine1() {
+        firstRow.setText("");
+        firstRow.setHidden(true);
+    }
+
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine2() {
+        secondRow.setText("");
+        secondRow.setHidden(true);
+    }
+
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine3() {
+        thirdRow.setText("");
+        thirdRow.setHidden(true);
+    }
+
+    /**
+     * Removes the content of the row
+     */
+    public void removeTextLine4() {
+        forthRow.setText("");
+        forthRow.setHidden(true);
+    }
+
+    /**
+     * Returns the content of the row
+     *
+     * @return the text
+     */
+    public String getTextLine3() {
+        return thirdRow.getText();
+    }
+
+    /**
      * Sets the content of the row
-     * 
+     *
      * @param t text to set
      */
     public void setTextLine3(String t) {
@@ -581,60 +635,10 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         thirdRow.setColumns(t.length() + 1);
         thirdRow.setHidden(false);
     }
-    
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine1() {
-        firstRow.setText("");
-        firstRow.setHidden(true);
-    }
-    
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine2() {
-        secondRow.setText("");
-        secondRow.setHidden(true);
-    }
-    
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine3() {
-        thirdRow.setText("");
-        thirdRow.setHidden(true);
-    }
-    
-    /**
-     * Removes the content of the row
-     */
-    public void removeTextLine4() {
-        forthRow.setText("");
-        forthRow.setHidden(true);
-    }
-    
-    /**
-     * Returns the content of the row
-     * 
-     * @return the text 
-     */
-    public String getTextLine3() {
-        return thirdRow.getText();
-    }
 
     /**
-     * Sets the name of the row (important for use in generic renderers
-     * 
-     * @param t name to set
-     */
-    public void setNameLine3(String t) {
-        thirdRow.setName(t);
-    }
-    
-    /**
      * Returns the name of the row
-     * 
+     *
      * @return the name
      */
     public String getNameLine3() {
@@ -642,26 +646,44 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Sets the UIID of the row
-     * 
-     * @param t UIID to set
+     * Sets the name of the row (important for use in generic renderers
+     *
+     * @param t name to set
      */
-    public void setUIIDLine3(String t) {
-        thirdRow.setUIID(t);
+    public void setNameLine3(String t) {
+        thirdRow.setName(t);
     }
-    
+
     /**
      * Returns the UIID of the row
-     * 
-     * @return the UIID 
+     *
+     * @return the UIID
      */
     public String getUIIDLine3() {
         return thirdRow.getUIID();
     }
 
     /**
+     * Sets the UIID of the row
+     *
+     * @param t UIID to set
+     */
+    public void setUIIDLine3(String t) {
+        thirdRow.setUIID(t);
+    }
+
+    /**
+     * Returns the content of the row
+     *
+     * @return the text
+     */
+    public String getTextLine4() {
+        return forthRow.getText();
+    }
+
+    /**
      * Sets the content of the row
-     * 
+     *
      * @param t text to set
      */
     public void setTextLine4(String t) {
@@ -670,28 +692,10 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         forthRow.setColumns(t.length() + 1);
         forthRow.setHidden(false);
     }
-    
-    /**
-     * Returns the content of the row
-     * 
-     * @return the text 
-     */
-    public String getTextLine4() {
-        return forthRow.getText();
-    }
 
     /**
-     * Sets the name of the row (important for use in generic renderers
-     * 
-     * @param t name to set
-     */
-    public void setNameLine4(String t) {
-        forthRow.setName(t);
-    }
-    
-    /**
      * Returns the name of the row
-     * 
+     *
      * @return the name
      */
     public String getNameLine4() {
@@ -699,37 +703,35 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Sets the UIID of the row
-     * 
-     * @param t UIID to set
+     * Sets the name of the row (important for use in generic renderers
+     *
+     * @param t name to set
      */
-    public void setUIIDLine4(String t) {
-        forthRow.setUIID(t);
+    public void setNameLine4(String t) {
+        forthRow.setName(t);
     }
-    
+
     /**
      * Returns the UIID of the row
-     * 
-     * @return the UIID 
+     *
+     * @return the UIID
      */
     public String getUIIDLine4() {
         return forthRow.getUIID();
     }
 
+    /**
+     * Sets the UIID of the row
+     *
+     * @param t UIID to set
+     */
+    public void setUIIDLine4(String t) {
+        forthRow.setUIID(t);
+    }
 
     /**
-     * Sets the icon
-     * 
-     * @param i the icon
-     */
-    public void setIcon(Image i) {
-        icon.setIcon(i);
-        updateGap();
-    }
-    
-    /**
      * Returns the icon image
-     * 
+     *
      * @return the image instance
      */
     public Image getIcon() {
@@ -737,31 +739,50 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Sets the emblem
-     * 
+     * Sets the icon
+     *
      * @param i the icon
      */
-    public void setEmblem(Image i) {
-        emblem.setIcon(i);
+    public void setIcon(Image i) {
+        icon.setIcon(i);
+        updateGap();
     }
-    
+
     /**
      * Returns the emblem image
-     * 
+     *
      * @return the image instance
      */
     public Image getEmblem() {
         return emblem.getIcon();
     }
-    
+
+    /**
+     * Sets the emblem
+     *
+     * @param i the icon
+     */
+    public void setEmblem(Image i) {
+        emblem.setIcon(i);
+    }
+
+    /**
+     * Returns the icon position based on border layout constraints
+     *
+     * @return position either North/South/East/West
+     */
+    public String getIconPosition() {
+        return (String) getLayout().getComponentConstraint(icon.getParent());
+    }
+
     /**
      * Sets the icon position based on border layout constraints
-     * 
+     *
      * @param t position either North/South/East/West
      */
     public void setIconPosition(String t) {
         String ip = getEmblemPosition();
-        if(ip != null && ip.equals(t)) {
+        if (ip != null && ip.equals(t)) {
             String ep = getIconPosition();
             removeComponent(icon.getParent());
             setEmblemPosition(ep);
@@ -772,25 +793,24 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         updateGap();
         revalidateLater();
     }
-    
+
     /**
-     * Returns the icon position based on border layout constraints
-     * 
+     * Returns the emblem position based on border layout constraints
+     *
      * @return position either North/South/East/West
      */
-    public String getIconPosition() {
-        return (String)getLayout().getComponentConstraint(icon.getParent());
+    public String getEmblemPosition() {
+        return (String) getLayout().getComponentConstraint(emblem.getParent());
     }
-
 
     /**
      * Sets the emblem position based on border layout constraints
-     * 
+     *
      * @param t position either North/South/East/West
      */
     public void setEmblemPosition(String t) {
         String ip = getIconPosition();
-        if(ip != null && ip.equals(t)) {
+        if (ip != null && ip.equals(t)) {
             String ep = getEmblemPosition();
             removeComponent(emblem.getParent());
             setIconPosition(ep);
@@ -800,28 +820,10 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         addComponent(t, emblem.getParent());
         revalidateLater();
     }
-    
-    /**
-     * Returns the emblem position based on border layout constraints
-     * 
-     * @return position either North/South/East/West
-     */
-    public String getEmblemPosition() {
-        return (String)getLayout().getComponentConstraint(emblem.getParent());
-    }
-    
-    /**
-     * Sets the name of the icon (important for use in generic renderers
-     * 
-     * @param t name to set
-     */
-    public void setIconName(String t) {
-        icon.setName(t);
-    }
-    
+
     /**
      * Returns the name of the icon
-     * 
+     *
      * @return the name
      */
     public String getIconName() {
@@ -829,36 +831,36 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Sets the UIID of the icon
-     * 
-     * @param t UIID to set
+     * Sets the name of the icon (important for use in generic renderers
+     *
+     * @param t name to set
      */
-    public void setIconUIID(String t) {
-        icon.setUIID(t);
-        updateGap();
+    public void setIconName(String t) {
+        icon.setName(t);
     }
-    
+
     /**
      * Returns the UIID of the Icon
-     * 
-     * @return the UIID 
+     *
+     * @return the UIID
      */
     public String getIconUIID() {
         return icon.getUIID();
     }
 
     /**
-     * Sets the name of the emblem (important for use in generic renderers
-     * 
-     * @param t name to set
+     * Sets the UIID of the icon
+     *
+     * @param t UIID to set
      */
-    public void setEmblemName(String t) {
-        emblem.setName(t);
+    public void setIconUIID(String t) {
+        icon.setUIID(t);
+        updateGap();
     }
-    
+
     /**
      * Returns the name of the emblem
-     * 
+     *
      * @return the name
      */
     public String getEmblemName() {
@@ -866,34 +868,42 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Sets the UIID of the emblem
-     * 
-     * @param t UIID to set
+     * Sets the name of the emblem (important for use in generic renderers
+     *
+     * @param t name to set
      */
-    public void setEmblemUIID(String t) {
-        emblem.setUIID(t);
+    public void setEmblemName(String t) {
+        emblem.setName(t);
     }
-    
+
     /**
      * Returns the UIID of the Emblem
-     * 
-     * @return the UIID 
+     *
+     * @return the UIID
      */
     public String getEmblemUIID() {
         return emblem.getUIID();
     }
 
+    /**
+     * Sets the UIID of the emblem
+     *
+     * @param t UIID to set
+     */
+    public void setEmblemUIID(String t) {
+        emblem.setUIID(t);
+    }
 
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {
-            "line1", "line2", "line3", "line4", "name1", "name2", "name3", "name4", 
-            "uiid1", "uiid2", "uiid3", "uiid4", "icon", "iconName", "iconUiid", "iconPosition",
-            "emblem", "emblemName", "emblemUiid", "emblemPosition", "horizontalLayout", 
-            "invertFirstTwoEntries", "checkBox", "radioButton", "group", "selected",
-            "maskName"
+        return new String[]{
+                "line1", "line2", "line3", "line4", "name1", "name2", "name3", "name4",
+                "uiid1", "uiid2", "uiid3", "uiid4", "icon", "iconName", "iconUiid", "iconPosition",
+                "emblem", "emblemName", "emblemUiid", "emblemPosition", "horizontalLayout",
+                "invertFirstTwoEntries", "checkBox", "radioButton", "group", "selected",
+                "maskName"
         };
     }
 
@@ -901,138 +911,147 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {
-           String.class,// line1
-           String.class,// line2
-           String.class,// line3
-           String.class,// line4
-           String.class,// name1
-           String.class,// name2
-           String.class,// name3
-           String.class,// name4
-           String.class,// uiid1
-           String.class,// uiid2
-           String.class,// uiid3
-           String.class,// uiid4
-           Image.class,// icon
-           String.class,// iconName
-           String.class,// iconUiid
-           String.class,// iconPosition
-           Image.class,// emblem
-           String.class,// emblemName
-           String.class,// emblemUiid
-           String.class,// emblemPosition
-           Boolean.class,
-           Boolean.class,
-           Boolean.class,
-           Boolean.class,
-           String.class,// group
-           Boolean.class, // selected
-           String.class
-       };
+        return new Class[]{
+                String.class,// line1
+                String.class,// line2
+                String.class,// line3
+                String.class,// line4
+                String.class,// name1
+                String.class,// name2
+                String.class,// name3
+                String.class,// name4
+                String.class,// uiid1
+                String.class,// uiid2
+                String.class,// uiid3
+                String.class,// uiid4
+                Image.class,// icon
+                String.class,// iconName
+                String.class,// iconUiid
+                String.class,// iconPosition
+                Image.class,// emblem
+                String.class,// emblemName
+                String.class,// emblemUiid
+                String.class,// emblemPosition
+                Boolean.class,
+                Boolean.class,
+                Boolean.class,
+                Boolean.class,
+                String.class,// group
+                Boolean.class, // selected
+                String.class
+        };
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("line1")) {
+        if (name.equals("line1")) {
             return getTextLine1();
         }
-        if(name.equals("line2")) {
+        if (name.equals("line2")) {
             return getTextLine2();
         }
-        if(name.equals("line3")) {
+        if (name.equals("line3")) {
             return getTextLine3();
         }
-        if(name.equals("line4")) {
+        if (name.equals("line4")) {
             return getTextLine4();
         }
-        if(name.equals("name1")) {
+        if (name.equals("name1")) {
             return getNameLine1();
         }
-        if(name.equals("name2")) {
+        if (name.equals("name2")) {
             return getNameLine2();
         }
-        if(name.equals("name3")) {
+        if (name.equals("name3")) {
             return getNameLine3();
         }
-        if(name.equals("name4")) {
+        if (name.equals("name4")) {
             return getNameLine4();
         }
-        if(name.equals("uiid1")) {
+        if (name.equals("uiid1")) {
             return getUIIDLine1();
         }
-        if(name.equals("uiid2")) {
+        if (name.equals("uiid2")) {
             return getUIIDLine2();
         }
-        if(name.equals("uiid3")) {
+        if (name.equals("uiid3")) {
             return getUIIDLine3();
         }
-        if(name.equals("uiid4")) {
+        if (name.equals("uiid4")) {
             return getUIIDLine4();
         }
-        if(name.equals("icon")) {
+        if (name.equals("icon")) {
             return getIcon();
         }
-        if(name.equals("iconName")) {
+        if (name.equals("iconName")) {
             return getIconName();
         }
-        if(name.equals("iconUiid")) {
+        if (name.equals("iconUiid")) {
             return getIconUIID();
         }
-        if(name.equals("iconPosition")) {
+        if (name.equals("iconPosition")) {
             return getIconPosition();
         }
-        if(name.equals("emblem")) {
+        if (name.equals("emblem")) {
             return getEmblem();
         }
-        if(name.equals("emblemName")) {
+        if (name.equals("emblemName")) {
             return getEmblemName();
         }
-        if(name.equals("emblemUiid")) {
+        if (name.equals("emblemUiid")) {
             return getEmblemUIID();
         }
-        if(name.equals("emblemPosition")) {
+        if (name.equals("emblemPosition")) {
             return getEmblemPosition();
         }
-        if(name.equals("horizontalLayout")) {
-            if(isHorizontalLayout()) {
+        if (name.equals("horizontalLayout")) {
+            if (isHorizontalLayout()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(name.equals("invertFirstTwoEntries")) {
-            if(isInvertFirstTwoEntries()) {
+        if (name.equals("invertFirstTwoEntries")) {
+            if (isInvertFirstTwoEntries()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(name.equals("checkBox")) {
-            if(isCheckBox()) {
+        if (name.equals("checkBox")) {
+            if (isCheckBox()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(name.equals("radioButton")) {
-            if(isRadioButton()) {
+        if (name.equals("radioButton")) {
+            if (isRadioButton()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(name.equals("group")) {
+        if (name.equals("group")) {
             return getGroup();
         }
-        if(name.equals("selected")) {
-            if(isSelected()) {
+        if (name.equals("selected")) {
+            if (isSelected()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if(name.equals("maskName")) {
+        if (name.equals("maskName")) {
             return getMaskName();
         }
         return null;
+    }
+
+    /**
+     * Sets the line 1 text
+     * {@inheritDoc}
+     */
+    @Override
+    public String getText() {
+        return getTextLine1();
     }
 
     /**
@@ -1045,125 +1064,115 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * Sets the line 1 text
-     * {@inheritDoc}
-     */
-    @Override
-    public String getText() {
-        return getTextLine1();
-    }
-
-    
-    /**
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("line1")) {
-            setTextLine1((String)value);
+        if (name.equals("line1")) {
+            setTextLine1((String) value);
             return null;
         }
-        if(name.equals("line2")) {
-            setTextLine2((String)value);
+        if (name.equals("line2")) {
+            setTextLine2((String) value);
             return null;
         }
-        if(name.equals("line3")) {
-            setTextLine3((String)value);
+        if (name.equals("line3")) {
+            setTextLine3((String) value);
             return null;
         }
-        if(name.equals("line4")) {
-            setTextLine4((String)value);
+        if (name.equals("line4")) {
+            setTextLine4((String) value);
             return null;
         }
-        if(name.equals("name1")) {
-            setNameLine1((String)value);
+        if (name.equals("name1")) {
+            setNameLine1((String) value);
             return null;
         }
-        if(name.equals("name2")) {
-            setNameLine2((String)value);
+        if (name.equals("name2")) {
+            setNameLine2((String) value);
             return null;
         }
-        if(name.equals("name3")) {
-            setNameLine3((String)value);
+        if (name.equals("name3")) {
+            setNameLine3((String) value);
             return null;
         }
-        if(name.equals("name4")) {
-            setNameLine4((String)value);
+        if (name.equals("name4")) {
+            setNameLine4((String) value);
             return null;
         }
-        if(name.equals("uiid1")) {
-            setUIIDLine1((String)value);
+        if (name.equals("uiid1")) {
+            setUIIDLine1((String) value);
             return null;
         }
-        if(name.equals("uiid2")) {
-            setUIIDLine2((String)value);
+        if (name.equals("uiid2")) {
+            setUIIDLine2((String) value);
             return null;
         }
-        if(name.equals("uiid3")) {
-            setUIIDLine3((String)value);
+        if (name.equals("uiid3")) {
+            setUIIDLine3((String) value);
             return null;
         }
-        if(name.equals("uiid4")) {
-            setUIIDLine4((String)value);
+        if (name.equals("uiid4")) {
+            setUIIDLine4((String) value);
             return null;
         }
-        if(name.equals("icon")) {
-            setIcon((Image)value);
+        if (name.equals("icon")) {
+            setIcon((Image) value);
             return null;
         }
-        if(name.equals("iconUiid")) {
-            setIconUIID((String)value);
+        if (name.equals("iconUiid")) {
+            setIconUIID((String) value);
             return null;
         }
-        if(name.equals("iconName")) {
-            setIconName((String)value);
+        if (name.equals("iconName")) {
+            setIconName((String) value);
             return null;
         }
-        if(name.equals("iconPosition")) {
-            setIconPosition((String)value);
+        if (name.equals("iconPosition")) {
+            setIconPosition((String) value);
             return null;
         }
-        if(name.equals("emblem")) {
-            setEmblem((Image)value);
+        if (name.equals("emblem")) {
+            setEmblem((Image) value);
             return null;
         }
-        if(name.equals("emblemUiid")) {
-            setEmblemUIID((String)value);
+        if (name.equals("emblemUiid")) {
+            setEmblemUIID((String) value);
             return null;
         }
-        if(name.equals("emblemName")) {
-            setEmblemName((String)value);
+        if (name.equals("emblemName")) {
+            setEmblemName((String) value);
             return null;
         }
-        if(name.equals("emblemPosition")) {
-            setEmblemPosition((String)value);
+        if (name.equals("emblemPosition")) {
+            setEmblemPosition((String) value);
             return null;
         }
-        if(name.equals("horizontalLayout")) {
-            setHorizontalLayout(((Boolean)value).booleanValue());
+        if (name.equals("horizontalLayout")) {
+            setHorizontalLayout(((Boolean) value).booleanValue());
             return null;
         }
-        if(name.equals("invertFirstTwoEntries")) {
-            setInvertFirstTwoEntries(((Boolean)value).booleanValue());
+        if (name.equals("invertFirstTwoEntries")) {
+            setInvertFirstTwoEntries(((Boolean) value).booleanValue());
             return null;
         }
-        if(name.equals("checkBox")) {
-            setCheckBox(((Boolean)value).booleanValue());
+        if (name.equals("checkBox")) {
+            setCheckBox(((Boolean) value).booleanValue());
             return null;
         }
-        if(name.equals("radioButton")) {
-            setRadioButton(((Boolean)value).booleanValue());
+        if (name.equals("radioButton")) {
+            setRadioButton(((Boolean) value).booleanValue());
             return null;
         }
-        if(name.equals("group")) {
-            setGroup((String)value);
+        if (name.equals("group")) {
+            setGroup((String) value);
             return null;
         }
-        if(name.equals("selected")) {
-            setSelected(((Boolean)value).booleanValue());
+        if (name.equals("selected")) {
+            setSelected(((Boolean) value).booleanValue());
             return null;
         }
-        if(name.equals("maskName")) {
-            setMaskName((String)value);
+        if (name.equals("maskName")) {
+            setMaskName((String) value);
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -1171,6 +1180,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * Indicates the group for the radio button
+     *
      * @return the group
      */
     public String getGroup() {
@@ -1179,17 +1189,28 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * Indicates the group for the radio button
+     *
      * @param group the group to set
      */
     public void setGroup(String group) {
         this.group = group;
-        if(emblem instanceof RadioButton) {
-            ((RadioButton)emblem).setGroup(group);
+        if (emblem instanceof RadioButton) {
+            ((RadioButton) emblem).setGroup(group);
         }
     }
 
     /**
+     * Sets the button group for a radio button mode multibutton
+     *
+     * @param bg the button group
+     */
+    public void setGroup(ButtonGroup bg) {
+        bg.add((RadioButton) emblem);
+    }
+
+    /**
      * Set the mask name for the icon
+     *
      * @return the maskName
      */
     public String getMaskName() {
@@ -1198,16 +1219,18 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * The mask name for the icon
+     *
      * @param maskName the maskName to set
      */
     public void setMaskName(String maskName) {
         icon.setMaskName(maskName);
     }
-    
+
     /**
      * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for 
+     * all text is localized so this allows disabling automatic localization for
      * a specific component.
+     *
      * @return the shouldLocalize value
      */
     public boolean isShouldLocalize() {
@@ -1216,26 +1239,29 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * Indicates if text should be localized when set to the component, by default
-     * all text is localized so this allows disabling automatic localization for 
+     * all text is localized so this allows disabling automatic localization for
      * a specific component.
+     *
      * @param shouldLocalize the shouldLocalize to set
      */
     public void setShouldLocalize(boolean shouldLocalize) {
         this.shouldLocalize = shouldLocalize;
     }
-    
+
     /**
-     * Sets the button group for a radio button mode multibutton
-     * @param bg the button group
+     * {@inheritDoc }
+     *
+     * @since 7.0
      */
-    public void setGroup(ButtonGroup bg) {
-        bg.add((RadioButton)emblem);
+    @Override
+    public int getGap() {
+        return gap;
     }
 
     /**
      * {@inheritDoc }
+     *
      * @since 7.0
-     * 
      */
     @Override
     public void setGap(int gap) {
@@ -1247,15 +1273,31 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
-    public int getGap() {
-        return gap;
+    public int getTextPosition() {
+        String iconPosition = getIconPosition();
+        if (BorderLayout.NORTH.equals(iconPosition)) {
+            return Component.BOTTOM;
+        }
+        if (BorderLayout.SOUTH.equals(iconPosition)) {
+            return Component.TOP;
+        }
+        if (BorderLayout.EAST.equals(iconPosition)) {
+            return Component.LEFT;
+        }
+        if (BorderLayout.WEST.equals(iconPosition)) {
+            return Component.RIGHT;
+        }
+        return Component.LEFT;
+
     }
 
     /**
      * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
@@ -1276,33 +1318,9 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
             default:
                 setIconPosition(BorderLayout.EAST);
         }
-        
+
     }
 
-    /**
-     * {@inheritDoc }
-     * @since 7.0
-     */
-    @Override
-    public int getTextPosition() {
-        String iconPosition = getIconPosition();
-        if (BorderLayout.NORTH.equals(iconPosition)) {
-            return Component.BOTTOM;
-        }
-        if (BorderLayout.SOUTH.equals(iconPosition)) {
-            return Component.TOP;
-        }
-        if (BorderLayout.EAST.equals(iconPosition)) {
-            return Component.LEFT;
-        }
-        if (BorderLayout.WEST.equals(iconPosition)) {
-            return Component.RIGHT;
-        }
-        return Component.LEFT;
-        
-    }
-    
-    
     private void updateGap() {
         if (getIcon() == null) {
             $(icon).setMargin(0);
@@ -1316,7 +1334,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
             $(icon).selectAllStyles().setMargin(0, gap, 0, 0);
         }
     }
-    
+
 
     @Override
     public Component getIconStyleComponent() {
@@ -1325,6 +1343,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc}
+     *
      * @since 8.0
      */
     @Override
@@ -1334,6 +1353,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc}
+     *
      * @since 8.0
      */
     @Override
@@ -1343,6 +1363,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
@@ -1350,9 +1371,29 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         return icon.getRolloverIcon();
     }
 
-    
     /**
      * {@inheritDoc }
+     *
+     * @since 7.0
+     */
+    @Override
+    public void setRolloverIcon(Image arg0) {
+        icon.setRolloverIcon(arg0);
+    }
+
+    /**
+     * {@inheritDoc }
+     *
+     * @since 7.0
+     */
+    @Override
+    public Image getPressedIcon() {
+        return icon.getPressedIcon();
+    }
+
+    /**
+     * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
@@ -1362,26 +1403,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc }
-     * @since 7.0
-     */
-    @Override
-    public Image getPressedIcon() {
-        return icon.getPressedIcon();
-    }
-
-    /**
-     * 
-     * {@inheritDoc }
-     * @since 7.0
-     */
-    @Override
-    public void setDisabledIcon(Image arg0) {
-        icon.setDisabledIcon(arg0);
-    }
-
-    /**
-     * 
-     * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
@@ -1390,18 +1412,18 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     }
 
     /**
-     * 
      * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
-    public void setRolloverPressedIcon(Image icn) {
-        icon.setRolloverPressedIcon(icn);
+    public void setDisabledIcon(Image arg0) {
+        icon.setDisabledIcon(arg0);
     }
 
     /**
-     * 
      * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
@@ -1411,6 +1433,17 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /**
      * {@inheritDoc }
+     *
+     * @since 7.0
+     */
+    @Override
+    public void setRolloverPressedIcon(Image icn) {
+        icon.setRolloverPressedIcon(icn);
+    }
+
+    /**
+     * {@inheritDoc }
+     *
      * @since 7.0
      */
     @Override
@@ -1418,13 +1451,4 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         return icon.getIconFromState();
     }
 
-    /**
-     * {@inheritDoc }
-     * @since 7.0
-     */
-    @Override
-    public void setRolloverIcon(Image arg0) {
-        icon.setRolloverIcon(arg0);
-    }
-    
 }

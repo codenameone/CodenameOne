@@ -19,25 +19,25 @@
  */
 package com.codename1.maps.layers;
 
-import com.codename1.ui.Graphics;
-import java.util.Vector;
 import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Coord;
 import com.codename1.maps.Mercator;
 import com.codename1.maps.Projection;
-import com.codename1.ui.geom.Point;
-import com.codename1.maps.providers.MapProvider;
 import com.codename1.maps.Tile;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Point;
+
+import java.util.Vector;
 
 /**
  * This is a Lines Layer
- * 
+ *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
  */
 public class LinesLayer extends AbstractLayer {
 
-    private Vector _lineSegments;
     protected int _lineColor;
+    private Vector _lineSegments;
 
     /**
      * Constructor with default projection Mercator.
@@ -45,14 +45,14 @@ public class LinesLayer extends AbstractLayer {
     public LinesLayer() {
         this(new Mercator(), "");
     }
-    
+
     /**
      * Constructor with default projection Mercator.
      */
     public LinesLayer(String name) {
         this(new Mercator(), name);
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -76,10 +76,10 @@ public class LinesLayer extends AbstractLayer {
 
     /**
      * Paint a segment.
-     * 
-     * @param g a Graphics Object to paint on
+     *
+     * @param g       a Graphics Object to paint on
      * @param segment array of Coord to draw a Line.
-     * @param tile 
+     * @param tile
      */
     protected void paintSegment(Graphics g, Coord[] segment, Tile tile) {
         int pointsNo = segment.length;
@@ -99,7 +99,8 @@ public class LinesLayer extends AbstractLayer {
 
     /**
      * Adds a Line segment to the Layer
-     * @param coords 
+     *
+     * @param coords
      */
     public void addLineSegment(Coord[] coords) {
         if (coords == null || coords.length <= 1) {
@@ -113,7 +114,8 @@ public class LinesLayer extends AbstractLayer {
 
     /**
      * Sets the color of the Lines
-     * @param rgb 
+     *
+     * @param rgb
      */
     public void lineColor(int rgb) {
         _lineColor = rgb;

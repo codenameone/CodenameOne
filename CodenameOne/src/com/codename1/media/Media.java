@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.media;
@@ -26,33 +26,33 @@ import com.codename1.ui.Component;
 
 
 /**
- *<p> Media control interface allows for media playback, recording. To get an instance
+ * <p> Media control interface allows for media playback, recording. To get an instance
  * of this interface (implemented by the native port) see the MediaManager class.</p>
  * <p>
  * The sample code below demonstrates simple video playback.
  * </p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
- * 
+ *
  * <p>
- *     The code below demonstrates capturing audio using the Capture API and playing back audio files using the Media API:
+ * The code below demonstrates capturing audio using the Capture API and playing back audio files using the Media API:
  * </p>
  * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  *
  * <p>
- *     The code below demonstrates capturing audio and playing back audio using the Media, MediaManager and MediaRecorderBuilder APIs,
- *     as alternative and more customizable approach than using the Capture API:
+ * The code below demonstrates capturing audio and playing back audio using the Media, MediaManager and MediaRecorderBuilder APIs,
+ * as alternative and more customizable approach than using the Capture API:
  * </p>
  * <script src="https://gist.github.com/jsfan3/419f44a9ad49d8fc1c1e3e325d1e5422.js"></script>
  * <img src="https://user-images.githubusercontent.com/1997316/78480286-02131b00-7735-11ea-8a70-5ca5512e7d92.png" alt="Demonstrates capturing of audio files and their playback using the Codename One APIs Media, MediaManager and MediaRecorderBuilder" />
- * 
+ *
  * @see MediaManager
  */
 public interface Media {
     /**
-     * Write only variable that can be used with setVariable to pass a title for the 
+     * Write only variable that can be used with setVariable to pass a title for the
      * native layer so the currently playing media title will be displayed in the lock screen
      * where applicable
      */
@@ -87,18 +87,18 @@ public interface Media {
     public static final String VARIABLE_BACKGROUND_POSITION = "bgPosition";
 
     /**
-     * Read only variable that can be used with getVariable to query whether the 
-     * native layer supports displaying the currently playing media information 
+     * Read only variable that can be used with getVariable to query whether the
+     * native layer supports displaying the currently playing media information
      * in the lock screen. This will return null or Boolean.TRUE.
      */
     public static final String VARIABLE_BACKGROUND_SUPPORTED = "bgInfoSupported";
-    
+
     /**
      * Write-only variable that can be used with getVariable() to set whether this
      * video should include embedded native controls.
      */
     public static final String VARIABLE_NATIVE_CONTRLOLS_EMBEDDED = "nativeControlsVisible";
-            
+
     /**
      * Starts playing or recording the media file
      */
@@ -108,16 +108,16 @@ public interface Media {
      * Pauses (actually stops) the playback or the recording of the media file
      */
     public void pause();
-    
+
     /**
      * Optional call that allows the caller to prepare the upcoming media player. This is useful
      * when streaming multiple streams one after another.
-     * 
+     *
      * <p>Note: On some platforms (iOS), the poster frame and native embedded controls will not appear
      * for the video until you call this method, otherwise.</p>
      */
     public void prepare();
-    
+
     /**
      * Stops the audio playback and cleans up the resources related to it immediately.
      */
@@ -131,7 +131,7 @@ public interface Media {
     public int getTime();
 
     /**
-     * Sets the position in the audio file or doesn't effect if not supported 
+     * Sets the position in the audio file or doesn't effect if not supported
      *
      * @param time in milliseconds
      */
@@ -145,6 +145,13 @@ public interface Media {
     public int getDuration();
 
     /**
+     * Returns the media playback volume in percentage
+     *
+     * @return the volume percentage
+     */
+    public int getVolume();
+
+    /**
      * Sets the media playback volume in percentage
      *
      * @param vol the volume for media playback
@@ -152,46 +159,54 @@ public interface Media {
     public void setVolume(int vol);
 
     /**
-     * Returns the media playback volume in percentage
-     *
-     * @return the volume percentage
-     */
-    public int getVolume();
-    
-    /**
      * Returns true if the media is currently playing or recording
+     *
      * @return true if playing
      */
     public boolean isPlaying();
-    
+
     /**
      * Gets the VideoComponent of this Video.
-     * 
+     *
      * @return a Component of the video to be placed on a Form or null if this
      * Media is not a Video
      */
     public Component getVideoComponent();
-    
+
     /**
      * This method returns true if this is a Video Media
+     *
      * @return true if video
      */
     public boolean isVideo();
-    
+
     /**
      * This method returns true if this video is in full screen mode.
+     *
      * @return true if full screen
      */
     public boolean isFullScreen();
 
     /**
-     * Sets the Media to be displayed full screen, make sure the 
-     * getVideoComponent() is called on the Video Component is added to the 
+     * Sets the Media to be displayed full screen, make sure the
+     * getVideoComponent() is called on the Video Component is added to the
      * current Form
-     * @param fullScreen 
+     *
+     * @param fullScreen
      */
     public void setFullScreen(boolean fullScreen);
-    
+
+    /**
+     * Returns true if this Video Media is in Native player mode.
+     * Some platforms such as BlackBerry is able to play video only on the native
+     * player on those platforms isNativePlayerMode() will always return true
+     * If Media supports native playing by calling to play() the video will start
+     * playing in the native player in full screen.
+     *
+     * @return true if the player is in native mode
+     */
+    public boolean isNativePlayerMode();
+
     /**
      * By calling this the Media (if it's a Video) will be played full screen
      * on the native Player of the device.
@@ -202,26 +217,18 @@ public interface Media {
      * player on those platforms isNativePlayerMode() will always return true
      */
     public void setNativePlayerMode(boolean nativePlayer);
-    
-    /**
-     * Returns true if this Video Media is in Native player mode.
-     * Some platforms such as BlackBerry is able to play video only on the native
-     * player on those platforms isNativePlayerMode() will always return true
-     * If Media supports native playing by calling to play() the video will start
-     * playing in the native player in full screen.
-     * @return  true if the player is in native mode
-     */
-    public boolean isNativePlayerMode();
-        
+
     /**
      * Allows for platform specific enhancements for media playback
-     * @param key the key to set to the media that is platform specific
+     *
+     * @param key   the key to set to the media that is platform specific
      * @param value the value
      */
     public void setVariable(String key, Object value);
-    
+
     /**
      * Allows querying platform specific information from the media object
+     *
      * @param key the key query
      * @return the value or null
      */

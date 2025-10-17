@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ads;
@@ -27,43 +27,29 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.html.HTMLComponent;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 /**
  * This is an abstract Ads Service.
- * Each supported Ad network needs to extend this Service and to implement 
+ * Each supported Ad network needs to extend this Service and to implement
  * the initService method
- * 
+ *
  * @author Chen Fishbein
  */
 public abstract class AdsService extends ConnectionRequest {
 
+    private static Class service = InnerActive.class;
     private String currentAd;
     private boolean initialized = false;
-    private static Class service = InnerActive.class;
 
     /**
      * Empty constructor
      */
     protected AdsService() {
     }
-
-    /**
-     * Initialize the ads service.
-     */
-    public void initialize(Ads adsComponent) {
-        if (!initialized) {
-            initService(adsComponent);
-            initialized = true;
-        }
-    }
-    
-    /**
-     * init the service requests.
-     */
-    public abstract void initService(Ads adsComponent);
 
     /**
      * Creates a new AdsService to be used by the Ads Component
@@ -83,12 +69,28 @@ public abstract class AdsService extends ConnectionRequest {
 
     /**
      * Sets the provider of the ads service.
+     *
      * @param provider this class needs to extend the AdsService class
      */
-    public static void setAdsProvider(Class provider){
+    public static void setAdsProvider(Class provider) {
         service = provider;
     }
-    
+
+    /**
+     * Initialize the ads service.
+     */
+    public void initialize(Ads adsComponent) {
+        if (!initialized) {
+            initService(adsComponent);
+            initialized = true;
+        }
+    }
+
+    /**
+     * init the service requests.
+     */
+    public abstract void initService(Ads adsComponent);
+
     /**
      * Returns the last requested ad
      */
@@ -118,13 +120,14 @@ public abstract class AdsService extends ConnectionRequest {
         if (size > 0) {
             String s = new String(out.toByteArray(), 0, size, "UTF-8");
             currentAd = s;
-            fireResponseListener(new ActionEvent(currentAd,ActionEvent.Type.Response));
+            fireResponseListener(new ActionEvent(currentAd, ActionEvent.Type.Response));
         }
     }
 
     /**
      * This a callback method to inform to the service the Ad is displayed
-     * @param cmp 
+     *
+     * @param cmp
      */
     public void onAdDisplay(HTMLComponent cmp) {
     }

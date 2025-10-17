@@ -30,7 +30,6 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.Label;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -41,6 +40,7 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.Style;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,13 +48,13 @@ import java.util.List;
  * <p>Floating action buttons are a material design element used to promote a special action in a Form.
  * They are represented as a floating circle with a flat icon floating above the UI typically in the bottom right
  * area.</p>
- * 
+ *
  * <p>
  * Simple use cases include just the button as a standalone:
  * </p>
  * <script src="https://gist.github.com/codenameone/f6820a6b0c781e5bb5ffa8004c5b5f2e.js"></script>
-
-* <p>
+ *
+ * <p>
  * The button can also nest sub actions
  * </p>
  * <script src="https://gist.github.com/codenameone/aa4180054368f61176c55979010d757b.js"></script>
@@ -65,43 +65,16 @@ import java.util.List;
 public class FloatingActionButton extends Button {
 
     /**
-     * The default icon size for the fab icon in millimeters 
-     * @return the fabDefaultSize
-     */
-    public static float getIconDefaultSize() {
-        return fabDefaultSize;
-    }
-
-    /**
-     * The default icon size for the fab icon in millimeters 
-     * @param aFabDefaultSize the fabDefaultSize to set
-     */
-    public static void setIconDefaultSize(float aFabDefaultSize) {
-        fabDefaultSize = aFabDefaultSize;
-    }
-
-    /**
      * The FloatingActionButton tries to size/pad itself automatically but
      * this means that manual padding is ignored. Setting this to false
      * disables that behavior
-     * @return the autoSizing
      */
-    public static boolean isAutoSizing() {
-        return autoSizing;
-    }
-
+    private static boolean autoSizing = true;
     /**
-     * The FloatingActionButton tries to size/pad itself automatically but
-     * this means that manual padding is ignored. Setting this to false
-     * disables that behavior
-     * @param aAutoSizing the autoSizing to set
+     * The default icon size for the fab
      */
-    public static void setAutoSizing(boolean aAutoSizing) {
-        autoSizing = aAutoSizing;
-    }
-
+    private static float fabDefaultSize = 3.8f;
     private List<FloatingActionButton> subMenu;
-
     /**
      * The UIID of the sub action texts can be overriden. It defaults to {@code FloatingActionText}
      */
@@ -111,21 +84,7 @@ public class FloatingActionButton extends Button {
     private Dialog current;
     private boolean rectangle;
     private boolean isBadge;
-
-    /**
-     * The FloatingActionButton tries to size/pad itself automatically but
-     * this means that manual padding is ignored. Setting this to false 
-     * disables that behavior
-     */
-    private static boolean autoSizing = true;
-    
-    /**
-     * The default icon size for the fab
-     */
-    private static float fabDefaultSize = 3.8f;
-
     private float sizeMm = fabDefaultSize;
-    
     /**
      * Constructor
      *
@@ -136,7 +95,7 @@ public class FloatingActionButton extends Button {
     protected FloatingActionButton(char icon, String text, float size) {
         this(icon, text, "FloatingActionButton", size);
     }
-    
+
     /**
      * Constructor
      *
@@ -160,24 +119,6 @@ public class FloatingActionButton extends Button {
     }
 
     /**
-     * Overriden to update the icon
-     * {@inheritDoc}
-     */
-    @Override
-    public void setUIID(String id) {
-        super.setUIID(id);
-        FontImage i = (FontImage)getIcon();
-        if(i != null) {
-            Style all = getAllStyles();
-            all.setAlignment(CENTER);
-            updateBorder();
-            FontImage image = FontImage.createMaterial(i.getText().charAt(0), id, sizeMm);
-            image.setBgTransparency(0);
-            setIcon(image);
-        }
-    }
-    
-    /**
      * This constructor is used by text badges
      */
     private FloatingActionButton(String text) {
@@ -188,46 +129,57 @@ public class FloatingActionButton extends Button {
         updateBorder();
         isBadge = true;
     }
-    
-    private void updateBorder() {
-        getUnselectedStyle().setBorder(RoundBorder.create().
-                color(getUnselectedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity).rectangle(rectangle));
-        getSelectedStyle().setBorder(RoundBorder.create().
-                color(getSelectedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity).rectangle(rectangle));
-        getPressedStyle().setBorder(RoundBorder.create().
-                color(getPressedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity).rectangle(rectangle));
-    }
-        
+
     /**
-     * We override this method to track style changes to the background color and map them to the border
-     * 
-     * {@inheritDoc}
+     * The default icon size for the fab icon in millimeters
+     *
+     * @return the fabDefaultSize
      */
-    @Override
-    public void styleChanged(String propertyName, Style source) {
-        if(propertyName.equals(Style.BG_COLOR)) {
-            updateBorder();
-        }
-        if(getIcon() instanceof FontImage && propertyName.equals(Style.FG_COLOR)) {
-            FontImage i = (FontImage)getIcon();
-            FontImage image = FontImage.createMaterial(i.getText().charAt(0), "FloatingActionButton", sizeMm);
-            image.setBgTransparency(0);
-            setIcon(image);
-        }
-    }    
-    
+    public static float getIconDefaultSize() {
+        return fabDefaultSize;
+    }
+
+    /**
+     * The default icon size for the fab icon in millimeters
+     *
+     * @param aFabDefaultSize the fabDefaultSize to set
+     */
+    public static void setIconDefaultSize(float aFabDefaultSize) {
+        fabDefaultSize = aFabDefaultSize;
+    }
+
+    /**
+     * The FloatingActionButton tries to size/pad itself automatically but
+     * this means that manual padding is ignored. Setting this to false
+     * disables that behavior
+     *
+     * @return the autoSizing
+     */
+    public static boolean isAutoSizing() {
+        return autoSizing;
+    }
+
+    /**
+     * The FloatingActionButton tries to size/pad itself automatically but
+     * this means that manual padding is ignored. Setting this to false
+     * disables that behavior
+     *
+     * @param aAutoSizing the autoSizing to set
+     */
+    public static void setAutoSizing(boolean aAutoSizing) {
+        autoSizing = aAutoSizing;
+    }
+
     /**
      * Creates a text badge
+     *
      * @param text the text of the badge
      * @return a badge component
      */
     public static FloatingActionButton createBadge(String text) {
         return new FloatingActionButton(text);
     }
-    
+
     /**
      * a factory method to create a FloatingActionButton.
      *
@@ -250,12 +202,59 @@ public class FloatingActionButton extends Button {
     }
 
     /**
+     * Overriden to update the icon
+     * {@inheritDoc}
+     */
+    @Override
+    public void setUIID(String id) {
+        super.setUIID(id);
+        FontImage i = (FontImage) getIcon();
+        if (i != null) {
+            Style all = getAllStyles();
+            all.setAlignment(CENTER);
+            updateBorder();
+            FontImage image = FontImage.createMaterial(i.getText().charAt(0), id, sizeMm);
+            image.setBgTransparency(0);
+            setIcon(image);
+        }
+    }
+
+    private void updateBorder() {
+        getUnselectedStyle().setBorder(RoundBorder.create().
+                color(getUnselectedStyle().getBgColor()).
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
+        getSelectedStyle().setBorder(RoundBorder.create().
+                color(getSelectedStyle().getBgColor()).
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
+        getPressedStyle().setBorder(RoundBorder.create().
+                color(getPressedStyle().getBgColor()).
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
+    }
+
+    /**
+     * We override this method to track style changes to the background color and map them to the border
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        if (propertyName.equals(Style.BG_COLOR)) {
+            updateBorder();
+        }
+        if (getIcon() instanceof FontImage && propertyName.equals(Style.FG_COLOR)) {
+            FontImage i = (FontImage) getIcon();
+            FontImage image = FontImage.createMaterial(i.getText().charAt(0), "FloatingActionButton", sizeMm);
+            image.setBgTransparency(0);
+            setIcon(image);
+        }
+    }
+
+    /**
      * Adds a sub FAB to the FloatingActionButton instance. Once pressed all its
      * sub FAB's are displayed.
      *
      * @param icon one of the FontImage.MATERIAL_* constants
      * @param text the text of the sub FloatingActionButton
-     *
      * @return a FloatingActionButton instance for the sub FAB added
      */
     public FloatingActionButton createSubFAB(char icon, String text) {
@@ -269,12 +268,12 @@ public class FloatingActionButton extends Button {
 
     @Override
     protected Dimension calcPreferredSize() {
-        if(autoSizing && getIcon() != null) {
+        if (autoSizing && getIcon() != null) {
             return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
-        } 
+        }
         return super.calcPreferredSize();
     }
-    
+
     /**
      * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
      * use the layered pane if the container is a content pane.
@@ -290,10 +289,9 @@ public class FloatingActionButton extends Button {
      * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
      * use the layered pane if the container is a content pane.
      *
-     * @param cnt the Container to add the FAB to
+     * @param cnt         the Container to add the FAB to
      * @param orientation one of Component.RIGHT/LEFT/CENTER
-     * @param valign one of Component.TOP/BOTTOM/CENTER
-     *
+     * @param valign      one of Component.TOP/BOTTOM/CENTER
      * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
      */
     public Container bindFabToContainer(Component cnt, int orientation, int valign) {
@@ -301,7 +299,7 @@ public class FloatingActionButton extends Button {
         flow.setValign(valign);
 
         Form f = cnt.getComponentForm();
-        if(f != null && (f.getContentPane() == cnt || f == cnt)) {
+        if (f != null && (f.getContentPane() == cnt || f == cnt)) {
             // special case for content pane installs the button directly on the content pane
             Container layers = f.getLayeredPane(getClass(), true);
             layers.setSafeArea(true);
@@ -309,7 +307,7 @@ public class FloatingActionButton extends Button {
             layers.add(this);
             return null;
         }
-        
+
         Container conUpper = new Container(flow);
         conUpper.add(this);
         return LayeredLayout.encloseIn(cnt, conUpper);
@@ -321,14 +319,14 @@ public class FloatingActionButton extends Button {
     public void unbind() {
         Container cnt = getParent();
         remove();
-        if(cnt != null) {
+        if (cnt != null) {
             cnt.remove();
         }
     }
 
     @Override
     public void setText(String text) {
-        if(isBadge) {
+        if (isBadge) {
             super.setText(text);
         }
         this.text = text;
@@ -337,13 +335,12 @@ public class FloatingActionButton extends Button {
     @Override
     protected void fireActionEvent(int x, int y) {
         Form current = Display.getInstance().getCurrent();
-        if(current instanceof Dialog) {
-            ((Dialog)current).dispose();
+        if (current instanceof Dialog) {
+            ((Dialog) current).dispose();
         }
         super.fireActionEvent(x, y);
     }
-    
-    
+
 
     @Override
     public void released(int x, int y) {
@@ -366,7 +363,7 @@ public class FloatingActionButton extends Button {
             }
             d.setTransitionInAnimator(CommonTransitions.createEmpty());
             d.setTransitionOutAnimator(CommonTransitions.createEmpty());
-            for(Component c : con) {
+            for (Component c : con) {
                 c.setVisible(false);
             }
             Form f = getComponentForm();
@@ -375,7 +372,7 @@ public class FloatingActionButton extends Button {
             d.setBlurBackgroundRadius(-1);
             d.addShowListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    for(Component c : con) {
+                    for (Component c : con) {
                         c.setY(con.getHeight());
                         c.setVisible(true);
                     }

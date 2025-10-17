@@ -64,11 +64,52 @@ public final class AnimationObject {
     private int startTime = -1;
     private int endTime = -1;
 
-    private AnimationObject() {}
+    private AnimationObject() {
+    }
+
+    /**
+     * Creates an animation object instance that can define the animation properties for an image
+     *
+     * @param img the image to animate within the timeline
+     * @param x   position of the animation
+     * @param y   position of the animation
+     * @return new animation object
+     */
+    public static AnimationObject createAnimationImage(Image img, int x, int y) {
+        AnimationObject o = new AnimationObject();
+        o.img = img;
+        o.motionX = Motion.createLinearMotion(x, x, 1);
+        o.motionX.setStartTime(Long.MAX_VALUE);
+        o.motionY = Motion.createLinearMotion(y, y, 1);
+        o.motionY.setStartTime(Long.MAX_VALUE);
+        return o;
+    }
+
+    /**
+     * Creates an animation object instance that can define the animation properties for an image.
+     * This version of the method is useful while a resource file is in the process of being loaded
+     * and not all images are in place. Loading will finish implicitly when the image is first used.
+     *
+     * @param imageName the image to animate within the timeline
+     * @param res       the resources file from which the image should be fetched.
+     * @param x         position of the animation
+     * @param y         position of the animation
+     * @return new animation object
+     */
+    public static AnimationObject createAnimationImage(String imageName, Resources res, int x, int y) {
+        AnimationObject o = new AnimationObject();
+        o.imageName = imageName;
+        o.res = res;
+        o.motionX = Motion.createLinearMotion(x, x, 1);
+        o.motionX.setStartTime(Long.MAX_VALUE);
+        o.motionY = Motion.createLinearMotion(y, y, 1);
+        o.motionY.setStartTime(Long.MAX_VALUE);
+        return o;
+    }
 
     /**
      * Creates a copy of the given animation object
-     * 
+     *
      * @return a new instance of the Animation object with the same state
      */
     public AnimationObject copy() {
@@ -93,33 +134,15 @@ public final class AnimationObject {
     }
 
     void lock() {
-        if(img != null) {
+        if (img != null) {
             img.lock();
         }
     }
 
     void unlock() {
-        if(img != null) {
+        if (img != null) {
             img.unlock();
         }
-    }
-
-    /**
-     * Creates an animation object instance that can define the animation properties for an image
-     *
-     * @param img the image to animate within the timeline
-     * @param x position of the animation
-     * @param y position of the animation
-     * @return new animation object
-     */
-    public static AnimationObject createAnimationImage(Image img, int x, int y) {
-        AnimationObject o = new AnimationObject();
-        o.img = img;
-        o.motionX = Motion.createLinearMotion(x, x, 1);
-        o.motionX.setStartTime(Long.MAX_VALUE);
-        o.motionY = Motion.createLinearMotion(y, y, 1);
-        o.motionY.setStartTime(Long.MAX_VALUE);
-        return o;
     }
 
     /**
@@ -128,9 +151,9 @@ public final class AnimationObject {
      * Notice that this method must not be invoked more than once or after the image
      * was initilized
      *
-     * @param frameWidth the width of the frame within the image object
+     * @param frameWidth  the width of the frame within the image object
      * @param frameHeight the height of the frame within the image object
-     * @param frameDelay the delay of the frame
+     * @param frameDelay  the delay of the frame
      */
     public void defineFrames(int frameWidth, int frameHeight, int frameDelay) {
         this.frameWidth = frameWidth;
@@ -140,51 +163,29 @@ public final class AnimationObject {
     }
 
     /**
-     * Creates an animation object instance that can define the animation properties for an image.
-     * This version of the method is useful while a resource file is in the process of being loaded
-     * and not all images are in place. Loading will finish implicitly when the image is first used.
-     *
-     * @param imageName the image to animate within the timeline
-     * @param res the resources file from which the image should be fetched.
-     * @param x position of the animation
-     * @param y position of the animation
-     * @return new animation object
-     */
-    public static AnimationObject createAnimationImage(String imageName, Resources res, int x, int y) {
-        AnimationObject o = new AnimationObject();
-        o.imageName = imageName;
-        o.res = res;
-        o.motionX = Motion.createLinearMotion(x, x, 1);
-        o.motionX.setStartTime(Long.MAX_VALUE);
-        o.motionY = Motion.createLinearMotion(y, y, 1);
-        o.motionY.setStartTime(Long.MAX_VALUE);
-        return o;
-    }
-
-    /**
      * @return the img
      */
     Image getImage() {
-        if(img == null && res != null) {
+        if (img == null && res != null) {
             img = res.getImage(imageName);
-            
+
             // can happen due to a race condition we try to fail "gracefully"
-            if(img == null) {
+            if (img == null) {
                 return null;
             }
             res = null;
         }
-        if(frameDelay > -1) {
-            if(!framesInitialized) {
+        if (frameDelay > -1) {
+            if (!framesInitialized) {
                 // break up the image to smaller images
                 frames = new Image[img.getWidth() / frameWidth * img.getHeight() / frameHeight];
                 int currentX = 0;
                 int currentY = 0;
                 int flen = frames.length;
-                for(int iter = 0 ; iter < flen ; iter++) {
+                for (int iter = 0; iter < flen; iter++) {
                     frames[iter] = img.subImage(currentX, currentY, frameWidth, frameHeight, true);
                     currentX += frameWidth;
-                    if(currentX + frameWidth > img.getWidth()) {
+                    if (currentX + frameWidth > img.getWidth()) {
                         currentX = 0;
                         currentY += frameHeight;
                     }
@@ -192,20 +193,20 @@ public final class AnimationObject {
                 // if we are on a device we no longer need the img from now on and can use 
                 // only the frames. However, in the resource editor we still need the image instance
                 // for internal references
-                if(System.getProperty("microedition.platform") != null) {
+                if (System.getProperty("microedition.platform") != null) {
                     img = null;
                 }
             }
             long time = motionX.getCurrentMotionTime();
             int frameCount = Math.max(1, frames.length);
-            int frame = Math.min(Math.max(0, (int)((time / Math.max(1, frameDelay)) % frameCount)), frameCount - 1);
+            int frame = Math.min(Math.max(0, (int) ((time / Math.max(1, frameDelay)) % frameCount)), frameCount - 1);
             return frames[frame];
         }
         return img;
     }
 
     private void setTimeNotNull(Motion m, int time) {
-        if(m != null) {
+        if (m != null) {
             m.setCurrentMotionTime(time);
         }
     }
@@ -221,12 +222,12 @@ public final class AnimationObject {
 
     /**
      * Defines a motion on the x axis starting at the given time/value and ending at the given position
-     * 
+     *
      * @param motionType the type of the motion (spline/linear)
-     * @param startTime the start time for the motion within the timeline timeframe
-     * @param duration the duration of the motion
-     * @param start the starting position (the value before startTime)
-     * @param end the ending position for the property (the value after endTime)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
      */
     public void defineMotionX(int motionType, int startTime, int duration, int start, int end) {
         motionX = createMotion(motionType, startTime, duration, start, end);
@@ -237,10 +238,10 @@ public final class AnimationObject {
      * Defines a motion on the y axis starting at the given time/value and ending at the given position
      *
      * @param motionType the type of the motion (spline/linear)
-     * @param startTime the start time for the motion within the timeline timeframe
-     * @param duration the duration of the motion
-     * @param start the starting position (the value before startTime)
-     * @param end the ending position for the property (the value after endTime)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
      */
     public void defineMotionY(int motionType, int startTime, int duration, int start, int end) {
         motionY = createMotion(motionType, startTime, duration, start, end);
@@ -251,10 +252,10 @@ public final class AnimationObject {
      * Defines a rotation animation starting at the given time/value and ending at the given position
      *
      * @param motionType the type of the motion (spline/linear)
-     * @param startTime the start time for the motion within the timeline timeframe
-     * @param duration the duration of the motion
-     * @param start the starting position (the value before startTime)
-     * @param end the ending position for the property (the value after endTime)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
      */
     public void defineOrientation(int motionType, int startTime, int duration, int start, int end) {
         orientation = createMotion(motionType, startTime, duration, start, end);
@@ -266,10 +267,10 @@ public final class AnimationObject {
      * Values should rance from 0 (transparent) to 255 (opaque).
      *
      * @param motionType the type of the motion (spline/linear)
-     * @param startTime the start time for the motion within the timeline timeframe
-     * @param duration the duration of the motion
-     * @param start the starting position (the value before startTime)
-     * @param end the ending position for the property (the value after endTime)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
      */
     public void defineOpacity(int motionType, int startTime, int duration, int start, int end) {
         opacity = createMotion(motionType, startTime, duration, start, end);
@@ -280,10 +281,10 @@ public final class AnimationObject {
      * Defines the width of the object starting at the given time/value and ending at the given position
      *
      * @param motionType the type of the motion (spline/linear)
-     * @param startTime the start time for the motion within the timeline timeframe
-     * @param duration the duration of the motion
-     * @param start the starting position (the value before startTime)
-     * @param end the ending position for the property (the value after endTime)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
      */
     public void defineWidth(int motionType, int startTime, int duration, int start, int end) {
         width = createMotion(motionType, startTime, duration, start, end);
@@ -294,10 +295,10 @@ public final class AnimationObject {
      * Defines the height of the object starting at the given time/value and ending at the given position
      *
      * @param motionType the type of the motion (spline/linear)
-     * @param startTime the start time for the motion within the timeline timeframe
-     * @param duration the duration of the motion
-     * @param start the starting position (the value before startTime)
-     * @param end the ending position for the property (the value after endTime)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
      */
     public void defineHeight(int motionType, int startTime, int duration, int start, int end) {
         height = createMotion(motionType, startTime, duration, start, end);
@@ -306,7 +307,7 @@ public final class AnimationObject {
 
     private Motion createMotion(int motionType, int startTime, int duration, int start, int end) {
         Motion m;
-        switch(motionType) {
+        switch (motionType) {
             case MOTION_TYPE_LINEAR:
                 m = Motion.createLinearMotion(start, end, startTime + duration);
                 break;
@@ -335,7 +336,7 @@ public final class AnimationObject {
      * @return the orientation
      */
     int getOrientation() {
-        if(orientation == null) {
+        if (orientation == null) {
             return 0;
         }
         return orientation.getValue();
@@ -345,8 +346,8 @@ public final class AnimationObject {
      * @return the width
      */
     int getWidth() {
-        if(width == null) {
-            if(getImage() != null) {
+        if (width == null) {
+            if (getImage() != null) {
                 return getImage().getWidth();
             }
             return 20;
@@ -358,8 +359,8 @@ public final class AnimationObject {
      * @return the height
      */
     int getHeight() {
-        if(height == null) {
-            if(getImage() != null) {
+        if (height == null) {
+            if (getImage() != null) {
                 return getImage().getHeight();
             }
             return 20;
@@ -371,7 +372,7 @@ public final class AnimationObject {
      * @return the opacity
      */
     int getOpacity() {
-        if(opacity == null) {
+        if (opacity == null) {
             return 255;
         }
         return opacity.getValue();
@@ -379,33 +380,33 @@ public final class AnimationObject {
 
     void draw(Graphics g, float scaleX, float scaleY) {
         int o = getOpacity();
-        if(o == 0) {
+        if (o == 0) {
             return;
         }
         Image i = getImage();
 
         // this can happen due to a race condition, mostly in the resource editor which
         // works in a separate thread
-        if(i == null) {
+        if (i == null) {
             return;
         }
-        int scaledImageW = (int)(getWidth() * scaleX);
-        int scaledImageH = (int)(getHeight() * scaleY);
-        if(scaledImageH < 1 || scaledImageW < 1) {
+        int scaledImageW = (int) (getWidth() * scaleX);
+        int scaledImageH = (int) (getHeight() * scaleY);
+        if (scaledImageH < 1 || scaledImageW < 1) {
             return;
         }
         i = getImage().scaled(scaledImageW, scaledImageH);
-        if(o != 255) {
-            i = i.modifyAlphaWithTranslucency((byte)o);
+        if (o != 255) {
+            i = i.modifyAlphaWithTranslucency((byte) o);
         }
         int r = getOrientation();
-        if(r != 0) {
+        if (r != 0) {
             i = i.rotate(r);
         }
         int x = getX();
         int y = getY();
-        x = (int)(x * scaleX);
-        y = (int)(y * scaleY);
+        x = (int) (x * scaleX);
+        y = (int) (y * scaleY);
         g.drawImage(i, x, y);
     }
 

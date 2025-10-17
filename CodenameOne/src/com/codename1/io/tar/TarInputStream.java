@@ -1,18 +1,17 @@
 /**
- * Copyright 2012 Kamran Zafar 
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
- * you may not use this file except in compliance with the License. 
- * You may obtain a copy of the License at 
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0 
- * 
- * Unless required by applicable law or agreed to in writing, software 
- * distributed under the License is distributed on an "AS IS" BASIS, 
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
- * See the License for the specific language governing permissions and 
- * limitations under the License. 
- * 
+ * Copyright 2012 Kamran Zafar
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /**
@@ -21,14 +20,14 @@
 
 package com.codename1.io.tar;
 
+import com.codename1.io.BufferedInputStream;
+
 import java.io.IOException;
 import java.io.InputStream;
 
-import com.codename1.io.BufferedInputStream;
-
 /**
  * @author Kamran Zafar
- * 
+ *
  */
 public class TarInputStream extends BufferedInputStream {
 
@@ -39,7 +38,7 @@ public class TarInputStream extends BufferedInputStream {
     private boolean defaultSkip = false;
 
     public TarInputStream(InputStream in) {
-        super( in );
+        super(in);
         currentFileSize = 0;
         bytesRead = 0;
     }
@@ -51,7 +50,7 @@ public class TarInputStream extends BufferedInputStream {
 
     /**
      * Not supported
-     * 
+     *
      */
     @Override
     public synchronized void mark(int readlimit) {
@@ -59,23 +58,23 @@ public class TarInputStream extends BufferedInputStream {
 
     /**
      * Not supported
-     * 
+     *
      */
     @Override
     public synchronized void reset() throws IOException {
-        throw new IOException( "mark/reset not supported" );
+        throw new IOException("mark/reset not supported");
     }
 
     /**
      * Read a byte
-     * 
+     *
      * @see java.io.FilterInputStream#read()
      */
     @Override
     public int read() throws IOException {
         byte[] buf = new byte[1];
 
-        int res = this.read( buf, 0, 1 );
+        int res = this.read(buf, 0, 1);
 
         if (res != -1) {
             return buf[0];
@@ -87,8 +86,8 @@ public class TarInputStream extends BufferedInputStream {
     /**
      * Checks if the bytes being read exceed the entry size and adjusts the byte
      * array length. Updates the byte counters
-     * 
-     * 
+     *
+     *
      * @see java.io.FilterInputStream#read(byte[], int, int)
      */
     @Override
@@ -96,12 +95,12 @@ public class TarInputStream extends BufferedInputStream {
         if (currentEntry != null) {
             if (currentFileSize == currentEntry.getSize()) {
                 return -1;
-            } else if (( currentEntry.getSize() - currentFileSize ) < len) {
-                len = (int) ( currentEntry.getSize() - currentFileSize );
+            } else if ((currentEntry.getSize() - currentFileSize) < len) {
+                len = (int) (currentEntry.getSize() - currentFileSize);
             }
         }
 
-        int br = super.read( b, off, len );
+        int br = super.read(b, off, len);
 
         if (br != -1) {
             if (currentEntry != null) {
@@ -116,7 +115,7 @@ public class TarInputStream extends BufferedInputStream {
 
     /**
      * Returns the next entry in the tar file
-     * 
+     *
      * @return TarEntry
      * @throws IOException
      */
@@ -129,13 +128,13 @@ public class TarInputStream extends BufferedInputStream {
 
         // Read full header
         while (tr < TarConstants.HEADER_BLOCK) {
-            int res = read( theader, 0, TarConstants.HEADER_BLOCK - tr );
+            int res = read(theader, 0, TarConstants.HEADER_BLOCK - tr);
 
             if (res < 0) {
                 break;
             }
 
-            System.arraycopy( theader, 0, header, tr, res );
+            System.arraycopy(theader, 0, header, tr, res);
             tr += res;
         }
 
@@ -150,7 +149,7 @@ public class TarInputStream extends BufferedInputStream {
 
         if (!eof) {
             bytesRead += header.length;
-            currentEntry = new TarEntry( header );
+            currentEntry = new TarEntry(header);
         }
 
         return currentEntry;
@@ -158,7 +157,7 @@ public class TarInputStream extends BufferedInputStream {
 
     /**
      * Closes the current tar entry
-     * 
+     *
      * @throws IOException
      */
     protected void closeCurrentEntry() throws IOException {
@@ -167,10 +166,10 @@ public class TarInputStream extends BufferedInputStream {
                 // Not fully read, skip rest of the bytes
                 long bs = 0;
                 while (bs < currentEntry.getSize() - currentFileSize) {
-                    long res = skip( currentEntry.getSize() - currentFileSize - bs );
+                    long res = skip(currentEntry.getSize() - currentFileSize - bs);
 
                     if (res == 0 && currentEntry.getSize() - currentFileSize > 0) {
-                        throw new IOException( "Possible tar file corruption" );
+                        throw new IOException("Possible tar file corruption");
                     }
 
                     bs += res;
@@ -185,17 +184,17 @@ public class TarInputStream extends BufferedInputStream {
 
     /**
      * Skips the pad at the end of each tar entry file content
-     * 
+     *
      * @throws IOException
      */
     protected void skipPad() throws IOException {
         if (bytesRead > 0) {
-            int extra = (int) ( bytesRead % TarConstants.DATA_BLOCK );
+            int extra = (int) (bytesRead % TarConstants.DATA_BLOCK);
 
             if (extra > 0) {
                 long bs = 0;
                 while (bs < TarConstants.DATA_BLOCK - extra) {
-                    long res = skip( TarConstants.DATA_BLOCK - extra - bs );
+                    long res = skip(TarConstants.DATA_BLOCK - extra - bs);
                     bs += res;
                 }
             }
@@ -205,14 +204,14 @@ public class TarInputStream extends BufferedInputStream {
     /**
      * Skips 'n' bytes on the InputStream<br>
      * Overrides default implementation of skip
-     * 
+     *
      */
     @Override
     public long skip(long n) throws IOException {
         if (defaultSkip) {
             // use skip method of parent stream
             // may not work if skip not implemented by parent
-            return super.skip( n );
+            return super.skip(n);
         }
 
         if (n <= 0) {
@@ -223,7 +222,7 @@ public class TarInputStream extends BufferedInputStream {
         byte[] sBuff = new byte[SKIP_BUFFER_SIZE];
 
         while (left > 0) {
-            int res = read( sBuff, 0, (int) ( left < SKIP_BUFFER_SIZE ? left : SKIP_BUFFER_SIZE ) );
+            int res = read(sBuff, 0, (int) (left < SKIP_BUFFER_SIZE ? left : SKIP_BUFFER_SIZE));
             if (res < 0) {
                 break;
             }

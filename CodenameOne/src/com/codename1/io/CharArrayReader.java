@@ -51,9 +51,8 @@ public class CharArrayReader extends Reader {
      * Constructs a CharArrayReader on the char array {@code buf}. The size of
      * the reader is set to the length of the buffer and the object to read
      * from is set to {@code buf}.
-     * 
-     * @param buf
-     *            the char array from which to read.
+     *
+     * @param buf the char array from which to read.
      */
     public CharArrayReader(char[] buf) {
         this.buf = buf;
@@ -64,16 +63,12 @@ public class CharArrayReader extends Reader {
      * Constructs a CharArrayReader on the char array {@code buf}. The size of
      * the reader is set to {@code length} and the start position from which to
      * read the buffer is set to {@code offset}.
-     * 
-     * @param buf
-     *            the char array from which to read.
-     * @param offset
-     *            the index of the first character in {@code buf} to read.
-     * @param length
-     *            the number of characters that can be read from {@code buf}.
-     * @throws IllegalArgumentException
-     *             if {@code offset < 0} or {@code length < 0}, or if
-     *             {@code offset} is greater than the size of {@code buf} .
+     *
+     * @param buf    the char array from which to read.
+     * @param offset the index of the first character in {@code buf} to read.
+     * @param length the number of characters that can be read from {@code buf}.
+     * @throws IllegalArgumentException if {@code offset < 0} or {@code length < 0}, or if
+     *                                  {@code offset} is greater than the size of {@code buf} .
      */
     public CharArrayReader(char[] buf, int offset, int length) {
         /*
@@ -110,7 +105,7 @@ public class CharArrayReader extends Reader {
 
     /**
      * Indicates whether this reader is open.
-     * 
+     *
      * @return {@code true} if the reader is open, {@code false} otherwise.
      */
     private boolean isOpen() {
@@ -119,7 +114,7 @@ public class CharArrayReader extends Reader {
 
     /**
      * Indicates whether this reader is closed.
-     * 
+     *
      * @return {@code true} if the reader is closed, {@code false} otherwise.
      */
     private boolean isClosed() {
@@ -131,17 +126,15 @@ public class CharArrayReader extends Reader {
      * ignored for CharArrayReaders. Calling {@code reset()} will reposition the
      * reader back to the marked position provided the mark has not been
      * invalidated.
-     * 
-     * @param readLimit
-     *            ignored for CharArrayReaders.
-     * @throws IOException
-     *             if this reader is closed.
+     *
+     * @param readLimit ignored for CharArrayReaders.
+     * @throws IOException if this reader is closed.
      */
     @Override
     public void mark(int readLimit) throws IOException {
         synchronized (lock) {
             if (isClosed()) {
-                throw new IOException("Stream closed"); 
+                throw new IOException("Stream closed");
             }
             markedPos = pos;
         }
@@ -150,7 +143,7 @@ public class CharArrayReader extends Reader {
     /**
      * Indicates whether this reader supports the {@code mark()} and
      * {@code reset()} methods.
-     * 
+     *
      * @return {@code true} for CharArrayReader.
      * @see #mark(int)
      * @see #reset()
@@ -166,15 +159,14 @@ public class CharArrayReader extends Reader {
      * characters are available from this reader.
      *
      * @return the character read as an int or -1 if the end of the reader has
-     *         been reached.
-     * @throws IOException
-     *             if this reader is closed.
+     * been reached.
+     * @throws IOException if this reader is closed.
      */
     @Override
     public int read() throws IOException {
         synchronized (lock) {
             if (isClosed()) {
-                throw new IOException("Stream closed"); 
+                throw new IOException("Stream closed");
             }
             if (pos == count) {
                 return -1;
@@ -188,22 +180,17 @@ public class CharArrayReader extends Reader {
      * stores them at {@code offset} in the character array {@code buf}.
      * Returns the number of characters actually read or -1 if the end of reader
      * was encountered.
-     * 
-     * @param buffer
-     *            the character array to store the characters read.
-     * @param offset
-     *            the initial position in {@code buffer} to store the characters
-     *            read from this reader.
-     * @param len
-     *            the maximum number of characters to read.
+     *
+     * @param buffer the character array to store the characters read.
+     * @param offset the initial position in {@code buffer} to store the characters
+     *               read from this reader.
+     * @param len    the maximum number of characters to read.
      * @return number of characters read or -1 if the end of the reader has been
-     *         reached.
-     * @throws IndexOutOfBoundsException
-     *             if {@code offset < 0} or {@code len < 0}, or if
-     *             {@code offset + len} is bigger than the size of
-     *             {@code buffer}.
-     * @throws IOException
-     *             if this reader is closed.
+     * reached.
+     * @throws IndexOutOfBoundsException if {@code offset < 0} or {@code len < 0}, or if
+     *                                   {@code offset + len} is bigger than the size of
+     *                                   {@code buffer}.
+     * @throws IOException               if this reader is closed.
      */
     @Override
     public int read(char buffer[], int offset, int len) throws IOException {
@@ -235,11 +222,10 @@ public class CharArrayReader extends Reader {
      * {@code false} if this reader may or may not block when {@code read} is
      * called. The implementation in CharArrayReader always returns {@code true}
      * even when it has been closed.
-     * 
+     *
      * @return {@code true} if this reader will not block when {@code read} is
-     *         called, {@code false} if unknown or blocking will occur.
-     * @throws IOException
-     *             if this reader is closed.
+     * called, {@code false} if unknown or blocking will occur.
+     * @throws IOException if this reader is closed.
      */
     @Override
     public boolean ready() throws IOException {
@@ -256,9 +242,8 @@ public class CharArrayReader extends Reader {
      * Invocations of {@code read()} and {@code skip()} will occur from this new
      * location. If this reader has not been marked, it is reset to the
      * beginning of the string.
-     * 
-     * @throws IOException
-     *             if this reader is closed.
+     *
+     * @throws IOException if this reader is closed.
      */
     @Override
     public void reset() throws IOException {
@@ -274,12 +259,10 @@ public class CharArrayReader extends Reader {
      * Skips {@code count} number of characters in this reader. Subsequent
      * {@code read()}s will not return these characters unless {@code reset()}
      * is used. This method does nothing and returns 0 if {@code n} is negative.
-     * 
-     * @param n
-     *            the number of characters to skip.
+     *
+     * @param n the number of characters to skip.
      * @return the number of characters actually skipped.
-     * @throws IOException
-     *             if this reader is closed.
+     * @throws IOException if this reader is closed.
      */
     public long skip(long n) throws IOException {
         synchronized (lock) {

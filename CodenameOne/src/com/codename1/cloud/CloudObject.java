@@ -6,33 +6,32 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.cloud;
 
-import com.codename1.cloud.BindTarget;
 import com.codename1.io.Externalizable;
 import com.codename1.io.Util;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Hashtable;
-import java.util.Vector;
 
 /**
  * A cloud object can be persisted to the cloud or locally
@@ -79,7 +78,7 @@ public final class CloudObject implements Externalizable {
      * Indicates the state of the current object, an object in the process of refresh
      */
     public static final int STATUS_REFRESH_IN_PROGRESS = 6;
-    
+
     /**
      * A world visible/modifiable object!
      */
@@ -99,13 +98,13 @@ public final class CloudObject implements Externalizable {
      * An application scope readable object! Can only be modified by its creator
      */
     public static final int ACCESS_APPLICATION_READ_ONLY = 4;
-    
+
     /**
      * An object that can only be viewed or modified by its creator
      */
     public static final int ACCESS_PRIVATE = 5;
-    
-    
+
+
     /**
      * Changes to the bound property won't be reflected into the bound cloud object until commit binding is invoked
      */
@@ -125,64 +124,90 @@ public final class CloudObject implements Externalizable {
     private static Hashtable<String, CustomProperty> custom = new Hashtable<String, CustomProperty>();
     private Hashtable values = new Hashtable();
     private Hashtable deferedValues;
-    
+
     private String cloudId;
     private long lastModified;
     private int status;
     private boolean owner = true;
     private int accessPermissions = ACCESS_PRIVATE;
-    
+
     /**
      * Default constructor for externalization purposes only!
      */
-    public CloudObject() {}
-    
+    public CloudObject() {
+    }
+
     /**
      * Constructor
+     *
      * @param type the type of the object
      */
     public CloudObject(String type) {
         values.put(CloudStorage.TYPE_FIELD, type);
     }
-    
+
     /**
      * Create an object with different permissions settings
-     * 
-     * @param type the type of the object
+     *
+     * @param type        the type of the object
      * @param permissions one of the ACCESS_* values
      */
     public CloudObject(String type, int permissions) {
         accessPermissions = permissions;
         values.put(CloudStorage.TYPE_FIELD, type);
     }
-    
+
     CloudObject(int permissions) {
         accessPermissions = permissions;
     }
-    
-    
+
+    /**
+     * Install a custom property on the given property name
+     *
+     * @param key the key on which to install the custom property
+     * @param cp  the custom property implementation
+     */
+    public static void setCustomProperty(String key, CustomProperty cp) {
+        if (cp == null) {
+            custom.remove(key);
+        } else {
+            custom.put(key, cp);
+        }
+    }
+
     /**
      * Returns one of the status constants in this class
+     *
      * @return the status of the object against the cloud
      */
     public int getStatus() {
         return status;
     }
-    
+
     void setStatus(int s) {
         status = s;
     }
-    
-    void setValues(Hashtable values) {
-        this.values = values;
-    }
-    
+
     Hashtable getValues() {
         return values;
     }
-     
+
+    void setValues(Hashtable values) {
+        this.values = values;
+    }
+
+    /**
+     * Returns the type of the object
+     *
+     * @return the type of the object
+     */
+    public String getType() {
+        return getString(CloudStorage.TYPE_FIELD);
+    }
+
     /**
      * Set the type of the object
+     *
      * @param type the type of the field
      */
     public void setType(String type) {
@@ -190,50 +215,44 @@ public final class CloudObject implements Externalizable {
     }
 
     /**
-     * Returns the type of the object
-     * @return the type of the object
-     */
-    public String getType() {
-        return getString(CloudStorage.TYPE_FIELD);
-    }
-    
-    /**
      * Only indexed values can be queried and sorted
+     *
      * @param index the index which must be a value between 1 and 10.
      * @param value the value for the given index
      */
     public void setIndexString(int index, String value) {
-        if(index > 10 || index < 1) {
+        if (index > 10 || index < 1) {
             throw new IllegalArgumentException("Invalid index: " + index);
         }
         setString(CloudStorage.INDEX_FIELD + index, value);
     }
-    
+
     /**
      * Returns the index value for the given index number
-     * 
+     *
      * @param index the index number
      * @return the value of this entry for that index as a String
      */
     public String getIndexString(int index) {
         return getString(CloudStorage.INDEX_FIELD + index);
     }
-    
+
     /**
      * Only indexed values can be queried and sorted
+     *
      * @param index the index which must be a value between 1 and 10.
      * @param value the value for the given index
      */
     public void setIndexLong(int index, long value) {
-        if(index > 10 || index < 1) {
+        if (index > 10 || index < 1) {
             throw new IllegalArgumentException("Invalid index: " + index);
         }
         setLong(CloudStorage.INDEX_FIELD + index, value);
     }
-    
+
     /**
      * Returns the index value for the given index number
-     * 
+     *
      * @param index the index number
      * @return the value of this entry for that index as a Long value
      */
@@ -241,327 +260,324 @@ public final class CloudObject implements Externalizable {
         return getLong(CloudStorage.INDEX_FIELD + index);
     }
 
-    
     /**
      * Only indexed values can be queried and sorted
+     *
      * @param index the index which must be a value between 1 and 10.
      * @param value the value for the given index
      */
     public void setIndexDouble(int index, double value) {
-        if(index > 10 || index < 1) {
+        if (index > 10 || index < 1) {
             throw new IllegalArgumentException("Invalid index: " + index);
         }
         setDouble(CloudStorage.INDEX_FIELD + index, value);
     }
-    
+
     /**
      * Returns the index value for the given index number
-     * 
+     *
      * @param index the index number
      * @return the value of this entry for that index as a Double value
      */
     public Double getIndexDouble(int index) {
         return getDouble(CloudStorage.INDEX_FIELD + index);
     }
-    
+
     /**
      * Returns true if this object is owned by me or is world writeable
+     *
      * @return ownership status
      */
     public boolean isOwner() {
         return owner;
     }
-    
+
     /**
-     * The object id is a unique key that allows you to find an object that was persisted in the 
+     * The object id is a unique key that allows you to find an object that was persisted in the
      * store (a primary key). When it is null the object is effectively unsynchronized!
+     *
      * @return the object id or null for an object that isn't fully persisted yet
      */
     public String getCloudId() {
         return cloudId;
     }
-    
+
     void setCloudId(String cloudId) {
         this.cloudId = cloudId;
     }
-    
+
     /**
      * Indicates the last modification date for the object
+     *
      * @return the last modification date
      */
     public long getLastModified() {
         return lastModified;
     }
-    
+
     void setLastModified(long lastModified) {
         this.lastModified = lastModified;
     }
-    
+
     /**
      * Allows us to extract an object from the cloud object without knowing its type in advance
      * or whether it exists
+     *
      * @param key the key for the object
      * @return the value of the object
      */
     public Object getObject(String key) {
         Object o = values.get(key);
-        if(o == null) {
+        if (o == null) {
             CustomProperty cp = custom.get(key);
-            if(cp != null) {
+            if (cp != null) {
                 return cp.propertyValue(this, key);
             }
         }
         return o;
     }
-    
-    /**
-     * Install a custom property on the given property name
-     * 
-     * @param key the key on which to install the custom property
-     * @param cp the custom property implementation
-     */
-    public static void setCustomProperty(String key, CustomProperty cp) {
-        if(cp == null) {
-            custom.remove(key);
-        } else {
-            custom.put(key, cp);
-        }
-    }
-    
+
     /**
      * Sets a value that can be no more than 512 characters
-     * 
-     * @param key the key for the given value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setString(String key, String value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
-        if(value == null) {
+        if (value == null) {
             values.remove(key);
             return;
         }
-        if(value.length() > 512) {
+        if (value.length() > 512) {
             throw new IllegalArgumentException("String too long!");
         }
         status = STATUS_MODIFIED;
         values.put(key, value);
     }
-    
+
     /**
      * Returns the value for the given key
-     * @param key the key 
+     *
+     * @param key the key
      * @return a string value
      */
     public String getString(String key) {
-        return (String)getObject(key);
+        return (String) getObject(key);
     }
-    
+
     /**
      * Delete an entry within the object
+     *
      * @param key the key to remove from the object
      */
     public void remove(String key) {
         values.remove(key);
     }
-    
+
 
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setLong(String key, long value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, Long.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
-    
+
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setLong(String key, Long value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, value);
     }
-    
+
     /**
      * Returns the value for the given key
-     * @param key the key 
+     *
+     * @param key the key
      * @return a long value
      */
     public Long getLong(String key) {
         Object o = getObject(key);
-        if(o instanceof Integer) {
-            return Long.valueOf(((Integer)o).intValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
+        if (o instanceof Integer) {
+            return Long.valueOf(((Integer) o).intValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
-        return (Long)o;
+        return (Long) o;
     }
 
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setInteger(String key, int value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, Integer.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
-    
+
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setInteger(String key, Integer value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, value);
     }
-    
+
     /**
      * Returns the value for the given key
-     * @param key the key 
+     *
+     * @param key the key
      * @return a value
      */
     public Integer getInteger(String key) {
         Object o = getObject(key);
-        if(o instanceof Long) {
-            return Integer.valueOf((int)((Long)o).longValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
+        if (o instanceof Long) {
+            return Integer.valueOf((int) ((Long) o).longValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
-        return (Integer)o;
+        return (Integer) o;
     }
 
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setDouble(String key, double value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, Double.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
-    
+
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setDouble(String key, Double value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, value);
     }
-    
+
     /**
      * Returns the value for the given key
-     * @param key the key 
+     *
+     * @param key the key
      * @return a value
      */
     public Double getDouble(String key) {
-        return (Double)getObject(key);
+        return (Double) getObject(key);
     }
 
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setFloat(String key, float value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, Float.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
-    
+
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setFloat(String key, Float value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, value);
     }
-    
+
     /**
      * Returns the value for the given key
-     * @param key the key 
+     *
+     * @param key the key
      * @return a value
      */
     public Float getFloat(String key) {
         Object o = getObject(key);
-        if(o instanceof Double) {
-            return Float.valueOf(((Double)o).floatValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
+        if (o instanceof Double) {
+            return Float.valueOf(((Double) o).floatValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
-        return (Float)o;
+        return (Float) o;
     }
 
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setBoolean(String key, boolean value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, Boolean.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
     }
-    
+
     /**
-     * Sets a value 
-     * 
-     * @param key the key for the given value
+     * Sets a value
+     *
+     * @param key   the key for the given value
      * @param value the value
      */
     public void setBoolean(String key, Boolean value) {
-        if(!owner) {
+        if (!owner) {
             throw new RuntimeException("Read only object, you are not the owner");
         }
         status = STATUS_MODIFIED;
         values.put(key, value);
     }
-    
+
     /**
      * Returns the value for the given key
-     * @param key the key 
+     *
+     * @param key the key
      * @return a value
      */
     public Boolean getBoolean(String key) {
-        return (Boolean)getObject(key);
+        return (Boolean) getObject(key);
     }
 
     /**
@@ -570,7 +586,7 @@ public final class CloudObject implements Externalizable {
     public int getVersion() {
         return 1;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -583,7 +599,7 @@ public final class CloudObject implements Externalizable {
         Util.writeObject(values, out);
     }
 
-    
+
     public String getObjectId() {
         return "CloudObject";
     }
@@ -597,30 +613,31 @@ public final class CloudObject implements Externalizable {
         accessPermissions = in.readByte();
         lastModified = in.readLong();
         status = in.readInt();
-        values = (Hashtable)Util.readObject(in);
+        values = (Hashtable) Util.readObject(in);
     }
 
     /**
      * The access permissions for an object can only be changed for an object in which
      * the current user is the owner
+     *
      * @return the accessPermissions
      */
     public int getAccessPermissions() {
         return accessPermissions;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     public boolean equals(Object o) {
-        if(!(o instanceof CloudObject)) {
+        if (!(o instanceof CloudObject)) {
             return false;
         }
-        CloudObject cl = (CloudObject)o;
-        if(cloudId == null && cl.cloudId == null) {
+        CloudObject cl = (CloudObject) o;
+        if (cloudId == null && cl.cloudId == null) {
             return values.equals(cl.values);
         }
-        if(cloudId == null || cl.cloudId == null) {
+        if (cloudId == null || cl.cloudId == null) {
             return false;
         }
         return cloudId.equals(cl.cloudId);
@@ -630,99 +647,101 @@ public final class CloudObject implements Externalizable {
      * {@inheritDoc}
      */
     public int hashCode() {
-        if(cloudId != null) {
+        if (cloudId != null) {
             return cloudId.hashCode();
         }
         return 0;
     }
-    
+
     /**
      * Binds a UI tree to the cloud object so its values automatically update in the cloud object
-     * 
-     * @param ui the component tree to bind
-     * @param defer bind settings whether to defer the binding which requires developers to explicitly commit
-     * the binding to perform the changes
+     *
+     * @param ui         the component tree to bind
+     * @param defer      bind settings whether to defer the binding which requires developers to explicitly commit
+     *                   the binding to perform the changes
      * @param objectLead if set to true the UI property is initialized from values in the CloudObject, if false
-     * the cloud object property is initialized from the UI
+     *                   the cloud object property is initialized from the UI
      */
     public void bindTree(Container ui, int defer, boolean objectLead) {
         int componentCount = ui.getComponentCount();
-        for(int iter = 0 ; iter < componentCount ; iter++) {
+        for (int iter = 0; iter < componentCount; iter++) {
             Component c = ui.getComponentAt(iter);
-            if(c instanceof Container) {
-                bindTree((Container)c, defer, objectLead);
+            if (c instanceof Container) {
+                bindTree((Container) c, defer, objectLead);
                 continue;
             }
-            
+
             String bind = c.getCloudBoundProperty();
-            if(bind != null && bind.length() > 0) {
-                String attributeName = c.getCloudDestinationProperty();            
-                if(attributeName != null) {
+            if (bind != null && bind.length() > 0) {
+                String attributeName = c.getCloudDestinationProperty();
+                if (attributeName != null) {
                     bindProperty(c, bind, attributeName, defer, objectLead);
                 }
             }
         }
     }
-    
+
     /**
      * Clears the binding to this component tree
+     *
      * @param ui the container whose children might be bound
      */
     public void unbindTree(Container ui) {
         int componentCount = ui.getComponentCount();
-        for(int iter = 0 ; iter < componentCount ; iter++) {
+        for (int iter = 0; iter < componentCount; iter++) {
             Component c = ui.getComponentAt(iter);
-            if(c instanceof Container) {
-                unbindTree((Container)c);
+            if (c instanceof Container) {
+                unbindTree((Container) c);
                 continue;
             }
-            
+
             String bind = c.getCloudBoundProperty();
-            if(bind != null && bind.length() > 0) {
-                String attributeName = c.getCloudDestinationProperty();            
-                if(attributeName != null) {
+            if (bind != null && bind.length() > 0) {
+                String attributeName = c.getCloudDestinationProperty();
+                if (attributeName != null) {
                     unbindProperty(c, bind);
                 }
             }
         }
     }
-    
+
     /**
      * Binds a property value within the given component to this cloud object, this means that
-     * when the component changes the cloud object changes unless deferred. If the defer flag is 
+     * when the component changes the cloud object changes unless deferred. If the defer flag is
      * false all changes are stored in a temporary location and only "committed" once commitBindings()
      * is invoked.
-     * @param cmp the component to bind
-     * @param propertyName the name of the property in the bound component
+     *
+     * @param cmp           the component to bind
+     * @param propertyName  the name of the property in the bound component
      * @param attributeName the key within the cloud object
-     * @param defer bind settings whether to defer the binding which requires developers to explicitly commit
-     * the binding to perform the changes
-     * @param objectLead if set to true the UI property is initialized from values in the CloudObject, if false
-     * the cloud object property is initialized from the UI
+     * @param defer         bind settings whether to defer the binding which requires developers to explicitly commit
+     *                      the binding to perform the changes
+     * @param objectLead    if set to true the UI property is initialized from values in the CloudObject, if false
+     *                      the cloud object property is initialized from the UI
      */
     public void bindProperty(Component cmp, final String propertyName, final String attributeName, final int defer, boolean objectLead) {
-        if(objectLead) {
+        if (objectLead) {
             Object val = values.get(attributeName);
             Object cmpVal = cmp.getBoundPropertyValue(propertyName);
-            if(val == null) {
-                if(cmpVal != null) {
+            if (val == null) {
+                if (cmpVal != null) {
                     cmp.setBoundPropertyValue(propertyName, null);
                 }
             } else {
-                if(cmpVal == null || !(val.equals(cmpVal))) {
+                if (cmpVal == null || !(val.equals(cmpVal))) {
                     cmp.setBoundPropertyValue(propertyName, val);
                 }
             }
         } else {
             Object val = values.get(attributeName);
             Object cmpVal = cmp.getBoundPropertyValue(propertyName);
-            if(cmpVal == null) {
-                if(val != null) {
+            if (cmpVal == null) {
+                if (val != null) {
                     values.remove(attributeName);
                     status = STATUS_MODIFIED;
                 }
             } else {
-                if(val == null || !(val.equals(cmpVal))) {
+                if (val == null || !(val.equals(cmpVal))) {
                     values.put(attributeName, cmpVal);
                     status = STATUS_MODIFIED;
                 }
@@ -730,9 +749,9 @@ public final class CloudObject implements Externalizable {
         }
         BindTarget target = new BindTarget() {
             public void propertyChanged(Component source, String propertyName, Object oldValue, Object newValue) {
-                switch(defer) {
+                switch (defer) {
                     case BINDING_DEFERRED:
-                        if(deferedValues == null) {
+                        if (deferedValues == null) {
                             deferedValues = new Hashtable();
                         }
                         deferedValues.put(attributeName, newValue);
@@ -752,31 +771,32 @@ public final class CloudObject implements Externalizable {
         cmp.bindProperty(propertyName, target);
         cmp.putClientProperty("CN1Bind" + propertyName, target);
     }
-    
+
     /**
      * Releases the binding for the specific property name
-     * @param cmp the component
+     *
+     * @param cmp          the component
      * @param propertyName the name of the property
      */
     public void unbindProperty(Component cmp, String propertyName) {
-        BindTarget t = (BindTarget)cmp.getClientProperty("CN1Bind" + propertyName);
+        BindTarget t = (BindTarget) cmp.getClientProperty("CN1Bind" + propertyName);
         cmp.unbindProperty(propertyName, t);
     }
-    
+
     /**
      * If deferred changes exist this method applies these changes to the data
      */
     public void commitBinding() {
-        if(deferedValues != null && deferedValues.size() > 0) {
+        if (deferedValues != null && deferedValues.size() > 0) {
             Enumeration en = deferedValues.keys();
-            while(en.hasMoreElements()) {
+            while (en.hasMoreElements()) {
                 Object k = en.nextElement();
                 values.put(k, deferedValues.get(k));
             }
             deferedValues = null;
         }
     }
-    
+
     /**
      * If deferred changes exist this method discards such values
      */

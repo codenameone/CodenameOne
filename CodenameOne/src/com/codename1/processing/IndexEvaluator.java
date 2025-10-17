@@ -6,57 +6,55 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.processing;
 
 import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Vector;
 
 /**
  * Internal class, do not use.
- *
+ * <p>
  * This evaluator handles expressions that involve the index. Example:
  *
  * <code>
- *
+ * <p>
  * Get the name of the second player
- *
- *  /tournament/player[2]/name
- *
- *  Get the name of the last player
- *
- *  /tournament/player[last()]/name
- *
- *  Get the name of the second last player
- *
- *  //player[last()-1]/name
- *
- *  Get players 4 and greater
- *
- *  //player[position() > 3]/name
- *
- *  Get players 0 to 4
- *
- *  //player[position() < 5]/name
+ * <p>
+ * /tournament/player[2]/name
+ * <p>
+ * Get the name of the last player
+ * <p>
+ * /tournament/player[last()]/name
+ * <p>
+ * Get the name of the second last player
+ * <p>
+ * //player[last()-1]/name
+ * <p>
+ * Get players 4 and greater
+ * <p>
+ * //player[position() > 3]/name
+ * <p>
+ * Get players 0 to 4
+ * <p>
+ * //player[position() < 5]/name
  * </code>
  *
  * @author Eric Coolman
- *
  */
 class IndexEvaluator extends AbstractEvaluator {
 
@@ -75,7 +73,7 @@ class IndexEvaluator extends AbstractEvaluator {
     /**
      * Select all elements from the array with an index less than the given
      * value.
-     *
+     * <p>
      * Example:
      *
      * <code>
@@ -83,7 +81,7 @@ class IndexEvaluator extends AbstractEvaluator {
      * </code>
      *
      * @param elements array of StructuredContent elements
-     * @param rvalue index value
+     * @param rvalue   index value
      * @return an array of matching elements.
      */
     private List _getByPositionLess(List elements, int rvalue) {
@@ -108,7 +106,7 @@ class IndexEvaluator extends AbstractEvaluator {
     /**
      * Select all elements from the array with an index greater than the given
      * value.
-     *
+     * <p>
      * Example:
      *
      * <code>
@@ -116,7 +114,7 @@ class IndexEvaluator extends AbstractEvaluator {
      * </code>
      *
      * @param elements array of StructuredContent elements
-     * @param rvalue index value
+     * @param rvalue   index value
      * @return an array of matching elements.
      */
     private List _getByPositionGreater(List elements, int rvalue) {
@@ -143,17 +141,17 @@ class IndexEvaluator extends AbstractEvaluator {
      *
      * <code>
      * Fifth last element:
-     *
+     * <p>
      * [last() - 5]
-     *
+     * <p>
      * Last element:
-     *
+     * <p>
      * [last()]
      *
      * </code>
      *
      * @param elements array of StructuredContent elements
-     * @param rvalue index value
+     * @param rvalue   index value
      * @return an array of matching elements.
      */
     private StructuredContent _getByLast(List elements, String expr) throws IllegalArgumentException {
@@ -196,7 +194,7 @@ class IndexEvaluator extends AbstractEvaluator {
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(java.util.List, java.lang.String, java.lang.String)
      */
     protected Object evaluateLeftLessRight(List elements, String lvalue,
-            String rvalue) {
+                                           String rvalue) {
         if (FUNC_POSITION.equals(lvalue)) {
             return _getByPositionLess(elements, Integer.parseInt(rvalue));
         }
@@ -207,7 +205,7 @@ class IndexEvaluator extends AbstractEvaluator {
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftGreaterRight(java.util.List, java.lang.String, java.lang.String)
      */
     protected Object evaluateLeftGreaterRight(List elements, String lvalue,
-            String rvalue) {
+                                              String rvalue) {
         if (FUNC_POSITION.equals(lvalue)) {
             return _getByPositionGreater(elements, Integer.parseInt(rvalue));
         }

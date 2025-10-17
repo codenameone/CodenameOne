@@ -26,6 +26,7 @@ package com.codename1.ui.html;
 import com.codename1.ui.Button;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+
 import java.util.Enumeration;
 import java.util.Vector;
 
@@ -34,7 +35,7 @@ import java.util.Vector;
  * Since a link can be split on several lines, the concept of parent and child links is introduced here. A parent link is the first segment of the link
  * while the children are all the other segments. Only the parent is focusable (so multiple focuses on the same links will be avoided).
  * When the parent is focused, all the children get setFocus(true). Note that for pointer events, the children are also active.
- * 
+ *
  * @author Ofir Leitner
  */
 class HTMLLink extends Button implements ActionListener {
@@ -49,32 +50,47 @@ class HTMLLink extends Button implements ActionListener {
 
     /**
      * Constructs the HTMLLink
-     * 
-     * @param text The link's text
-     * @param link The link URL
-     * @param htmlC The HTMLComponent this link is in
+     *
+     * @param text       The link's text
+     * @param link       The link URL
+     * @param htmlC      The HTMLComponent this link is in
      * @param parentLink THis link's parent if available
      */
-    HTMLLink(String text,String link,HTMLComponent htmlC,HTMLLink parentLink,boolean linkVisited) {
+    HTMLLink(String text, String link, HTMLComponent htmlC, HTMLLink parentLink, boolean linkVisited) {
         super(text);
         setUIID("HTMLLink");
-        this.link=link;
-        this.htmlC=htmlC;
-        this.parentLink=parentLink;
-        this.linkVisited=linkVisited;
-        
+        this.link = link;
+        this.htmlC = htmlC;
+        this.parentLink = parentLink;
+        this.linkVisited = linkVisited;
+
         setTickerEnabled(false);
         addActionListener(this);
-        
-        if (parentLink!=null) {
+
+        if (parentLink != null) {
             setFocusable(false);
             parentLink.addChildLink(this);
         }
 
-        if (htmlC.firstFocusable==null) {
-            htmlC.firstFocusable=this;
+        if (htmlC.firstFocusable == null) {
+            htmlC.firstFocusable = this;
         }
 
+    }
+
+    static void processLink(HTMLComponent htmlC, String link) {
+        boolean process = true;
+        if (htmlC.getHTMLCallback() != null) {
+            process = htmlC.getHTMLCallback().linkClicked(htmlC, htmlC.convertURL(link));
+        }
+        if (process) {
+            if (!link.startsWith("#")) {
+                htmlC.setPage(htmlC.convertURL(link));
+            } else { //local anchor
+                String anchorName = link.substring(1);
+                htmlC.goToAnchor(anchorName);
+            }
+        }
     }
 
     /**
@@ -83,7 +99,7 @@ class HTMLLink extends Button implements ActionListener {
      * @param focused true to apply focused style, false to remove
      */
     public void setFocus(boolean focused) {
-        if (parentLink!=null) {
+        if (parentLink != null) {
             parentLink.setChildrenFocused(focused);
             parentLink.superSetFocus(focused);
         } else {
@@ -91,7 +107,6 @@ class HTMLLink extends Button implements ActionListener {
             superSetFocus(focused);
         }
     }
-
 
     /**
      * Since setFocus calls the setFocus of other children, we need this method to call the super setFocus (which means just focus this specific component, and not its associated component)
@@ -108,18 +123,18 @@ class HTMLLink extends Button implements ActionListener {
      * @param focused true to apply focused style, false to remove
      */
     private void setChildrenFocused(boolean focused) {
-        if (parentLink!=null) {
+        if (parentLink != null) {
             return;
         }
-        if (childLinks!=null) {
-            for (Enumeration e=childLinks.elements();e.hasMoreElements();) {
-                HTMLLink child=(HTMLLink)e.nextElement();
+        if (childLinks != null) {
+            for (Enumeration e = childLinks.elements(); e.hasMoreElements(); ) {
+                HTMLLink child = (HTMLLink) e.nextElement();
                 //child.setFocus(focused);
                 child.superSetFocus(focused);
                 child.repaint();
             }
         }
-        
+
         // Some CSS attributes, such as margin/padding are applies on the parent container of links and not on them
         // This is because setting a margin per word would not get the desired result.
         // When setting focus to the parent (which is an unfocusable container) it will get the desired properties
@@ -129,25 +144,23 @@ class HTMLLink extends Button implements ActionListener {
         }
     }
 
-
-
     /**
      * If this is called it indicates that when the link is focused, its parent should change to focused as well
      */
     void setParentChangesOnFocus() {
-        if (parentLink==null) {
-            parentChangesOnFocus=true;
+        if (parentLink == null) {
+            parentChangesOnFocus = true;
         }
     }
 
     /**
      * Adds the given link as the child of this link
-     * 
+     *
      * @param childLink The child link to add
      */
     void addChildLink(HTMLLink childLink) {
-        if (childLinks==null) {
-            childLinks=new Vector();
+        if (childLinks == null) {
+            childLinks = new Vector();
         }
         childLinks.addElement(childLink);
     }
@@ -156,25 +169,10 @@ class HTMLLink extends Button implements ActionListener {
      * Triggered when the link is pressed and then it requests the link (or goes to an anchor within the page)
      */
     public void actionPerformed(ActionEvent evt) {
-        if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) && (isMap) && (evt.getX()!=-1)) { // process mp1 is checked in assigning ismap as well, but this check here should obfuscate out this method override
-            processLink(htmlC, link+"?"+(evt.getX()-getAbsoluteX())+","+(evt.getY()-getAbsoluteY()));
+        if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) && (isMap) && (evt.getX() != -1)) { // process mp1 is checked in assigning ismap as well, but this check here should obfuscate out this method override
+            processLink(htmlC, link + "?" + (evt.getX() - getAbsoluteX()) + "," + (evt.getY() - getAbsoluteY()));
         } else {
             processLink(htmlC, link);
-        }
-    }
-
-    static void processLink(HTMLComponent htmlC,String link) {
-        boolean process=true;
-        if (htmlC.getHTMLCallback()!=null) {
-            process=htmlC.getHTMLCallback().linkClicked(htmlC, htmlC.convertURL(link));
-        }
-        if (process){
-            if (!link.startsWith("#")) {
-                htmlC.setPage(htmlC.convertURL(link));
-            } else { //local anchor
-                String anchorName=link.substring(1);
-                htmlC.goToAnchor(anchorName);
-            }
         }
     }
 }

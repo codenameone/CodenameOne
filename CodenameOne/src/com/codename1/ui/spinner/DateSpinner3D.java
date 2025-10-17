@@ -6,26 +6,24 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui.spinner;
 
-import com.codename1.l10n.DateFormatSymbols;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
-import static com.codename1.ui.CN.convertToPixels;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
@@ -33,21 +31,24 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
+
 import java.util.Calendar;
 import java.util.Date;
 
+import static com.codename1.ui.CN.convertToPixels;
+
 /**
  * A date spinner allows selecting a date value within the given date range
- * 
+ * <p>
  * This is used by the Picker when in lightweight mode.
- * 
+ *
  * @author Steve Hannah
  */
 class DateSpinner3D extends Container implements InternalPickerWidget {
     private Spinner3D month;
     private Spinner3D day;
     private Spinner3D year;
-    
+
     private boolean explicitStartYear, explicitEndYear, explicitStartMonth, explicitEndMonth, explicitStartDay, explicitEndDay, explicitCurrentYear;
     private int startYear = 1970;
     private int endYear = 2100;
@@ -58,7 +59,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private int currentYear;
     private int currentDay;
     private int currentMonth;
-    
+
     private int hourOfDay;
     private int minuteOfDay;
     private int secondsOfDay;
@@ -70,7 +71,8 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private String monthRenderingPrototype = "WWW";
     private SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     private Container wrapper = new Container(BoxLayout.x());
-    
+    private Calendar tmpCal = Calendar.getInstance();
+
     /**
      * Default constructor
      */
@@ -81,7 +83,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         currentDay = c.get(Calendar.DAY_OF_MONTH);
         currentMonth = c.get(Calendar.MONTH) + 1;
         currentYear = c.get(Calendar.YEAR);
-        
+
         // If dates should be formatted with month day year in this locale,
         // then the first character of a formatted date should start with a letter
         // otherwise it will start with a number.
@@ -95,14 +97,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         super.initComponent();
         monthFormat.getDateFormatSymbols().setResourceBundle(getUIManager().getResourceBundle());
     }
-    
-    
-    
+
     void initSpinner() {
-        if(month == null) {
+        if (month == null) {
             day = Spinner3D.create(1, 31, currentDay, 1);
             day.setRowFormatter(new SpinnerNode.RowFormatter() {
-                
+
                 @Override
                 public String format(String input) {
                     if (input != null) {
@@ -111,24 +111,24 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                     return null;
                 }
             });
-            
+
             month = Spinner3D.create(1, 12, currentMonth, 1);
             month.setRowFormatter(new SpinnerNode.RowFormatter() {
                 @Override
                 public String format(String input) {
                     if (input != null) {
                         Calendar c = Calendar.getInstance();
-                        c.set(Calendar.MONTH, new Double(Double.parseDouble(input)).intValue()-1);
+                        c.set(Calendar.MONTH, new Double(Double.parseDouble(input)).intValue() - 1);
                         c.set(Calendar.DAY_OF_MONTH, 15);
                         return monthFormat.format(c.getTime());
                     }
                     return null;
                 }
             });
-            
+
             year = Spinner3D.create(startYear, endYear, currentYear, 1);
             year.setRowFormatter(new SpinnerNode.RowFormatter() {
-                
+
                 @Override
                 public String format(String input) {
                     if (input != null) {
@@ -138,32 +138,30 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 }
             });
             addComponents();
-            
+
             //getAllStyles().setBgColor(year.getUnselectedStyle().getBgColor());
             //getAllStyles().setBgTransparency(255);
         }
     }
-        
+
     private void addComponents() {
-        if(year != null) {
+        if (year != null) {
             Label l = new Label("December", "Spinner3DRow");
-            if(monthDayYear) {
+            if (monthDayYear) {
                 wrapper.addComponent(month);
-                
-                month.setPreferredW((int)(l.getPreferredW() * 1.5f));
+
+                month.setPreferredW((int) (l.getPreferredW() * 1.5f));
                 Style monthStyle = Style.createProxyStyle(month.getRowStyle(), month.getSelectedRowStyle());
                 monthStyle.setAlignment(Component.LEFT);
                 monthStyle.setPaddingLeft(3f);
-                
 
-                
+
                 //month.refreshStyles();
-                
-                
-                
+
+
                 //addComponent(createSeparator());
                 l.setText("00");
-                day.setPreferredW((int)(l.getPreferredW() * 1.5f) + convertToPixels(3f));
+                day.setPreferredW((int) (l.getPreferredW() * 1.5f) + convertToPixels(3f));
                 wrapper.addComponent(day);
                 Style dayStyle = Style.createProxyStyle(day.getRowStyle(), day.getSelectedRowStyle());
                 dayStyle.setAlignment(Component.RIGHT);
@@ -171,9 +169,9 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 //day.refreshStyles();
                 //addComponent(createSeparator());
                 l.setText("0000");
-                year.setPreferredW((int)(l.getPreferredW()*1.5f) + convertToPixels(3f));
+                year.setPreferredW((int) (l.getPreferredW() * 1.5f) + convertToPixels(3f));
                 wrapper.addComponent(year);
-                
+
                 Style yearStyle = Style.createProxyStyle(year.getRowStyle(), year.getSelectedRowStyle());
                 yearStyle.setAlignment(Component.RIGHT);
                 yearStyle.setPaddingRight(3f);
@@ -184,12 +182,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 //        .setInsets(year, "0 0 0 65%");
 
             } else {
-                month.setPreferredW((int)(l.getPreferredW() * 1.5f));
+                month.setPreferredW((int) (l.getPreferredW() * 1.5f));
                 l.setText("00");
-                day.setPreferredW((int)(l.getPreferredW() * 1.5f) + convertToPixels(3f));
+                day.setPreferredW((int) (l.getPreferredW() * 1.5f) + convertToPixels(3f));
                 l.setText("0000");
-                year.setPreferredW((int)(l.getPreferredW()*1.5f) + convertToPixels(3f));
-                
+                year.setPreferredW((int) (l.getPreferredW() * 1.5f) + convertToPixels(3f));
+
                 wrapper.addComponent(day);
                 Style dayStyle = Style.createProxyStyle(day.getRowStyle(), day.getSelectedRowStyle());
                 dayStyle.setAlignment(Component.RIGHT);
@@ -202,37 +200,37 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 monthStyle.setPaddingLeft(3f);
                 //month.refreshStyles();
                 //addComponent(createSeparator());
-                
+
                 Style yearStyle = Style.createProxyStyle(year.getRowStyle(), year.getSelectedRowStyle());
                 yearStyle.setAlignment(Component.RIGHT);
                 yearStyle.setPaddingRight(3f);
-                
+
                 //year.refreshStyles();
-                
+
                 wrapper.addComponent(year);
                 //LayeredLayout ll = (LayeredLayout)getLayout();
                 //ll.setInsets(day, "0 67% 0 0")
                 //        .setInsets(month, "0 33% 0 33%")
                 //        .setInsets(year, "0 0 0 67%");
             }
-            
+
         }
     }
-    
+
     private void rebuildMonth() {
         month.setModel(new SpinnerNumberModel(startMonth, endMonth, Math.max(startMonth, Math.min(endMonth, currentMonth)), 1));
     }
-    
+
     private void rebuildDay() {
         day.setModel(new SpinnerNumberModel(startDay, endDay, Math.max(startDay, Math.min(endDay, currentDay)), 1));
     }
 
-    
     /**
      * Sets the start and end dates in this spinner.  Month range is only limited if the year of the start and end dates are the same.  Day range is only limited if
      * both the year and month  of the start and end dates are the same.
+     *
      * @param start The start date.
-     * @param end The end date
+     * @param end   The end date
      * @since 6.0
      */
     public void setDateRange(Date start, Date end) {
@@ -242,28 +240,28 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         explicitEndDay = true;
         explicitStartYear = true;
         explicitEndYear = true;
-        int setEndYear = (end == null) ? 2100 : getYear(end) + 1900+1;
-        if (!explicitCurrentYear && currentYear > setEndYear-1) {
-            currentYear = setEndYear-1;
+        int setEndYear = (end == null) ? 2100 : getYear(end) + 1900 + 1;
+        if (!explicitCurrentYear && currentYear > setEndYear - 1) {
+            currentYear = setEndYear - 1;
         }
         setEndYear(setEndYear);
-        
+
         int setStartYear = start == null ? 1970 : getYear(start) + 1900;
         if (!explicitCurrentYear && currentYear < setStartYear) {
             currentYear = setStartYear;
         }
         setStartYear(setStartYear);
-        
-        
+
+
         if (start != null && end != null && getYear(start) == getYear(end)) {
-            startMonth = getMonth(start)+1;
+            startMonth = getMonth(start) + 1;
             endMonth = getMonth(end) + 1;
         } else {
             startMonth = 1;
             endMonth = 12;
         }
         rebuildMonth();
-        
+
         if (start != null && end != null && getYear(start) == getYear(end) && getMonth(start) == getMonth(end)) {
             startDay = getDate(start);
             endDay = getDate(end);
@@ -272,13 +270,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
             endDay = 31;
         }
         rebuildDay();
-        
+
     }
-    
-    private Calendar tmpCal=Calendar.getInstance();
-    
+
     /**
      * Since CLDC11 doesn't have {@link Date#getDate() }, this returns the date of the given date as {@link Date#getDate() } would have.
+     *
      * @param dt The date
      * @return The day of month.
      */
@@ -286,66 +283,72 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         tmpCal.setTime(dt);
         return tmpCal.get(Calendar.DAY_OF_MONTH);
     }
-    
+
     /**
      * Since CLDC11 doesn't have {@link Date#getMonth() }, this returns the month of the given date as {@link Date#getMonth()} would have.
+     *
      * @param dt
-     * @return 
+     * @return
      */
     private int getMonth(Date dt) {
         tmpCal.setTime(dt);
         return tmpCal.get(Calendar.MONTH);
     }
-    
+
     /**
      * Since CLDC doesn't have {@link Date#getYear() }, this returns the year of the given date as {@link Date#getYear() } would have.  E.g.
      * this returns 0 for year 1900
+     *
      * @param dt
-     * @return 
+     * @return
      */
     private int getYear(Date dt) {
         tmpCal.setTime(dt);
-        return tmpCal.get(Calendar.YEAR)-1900;
+        return tmpCal.get(Calendar.YEAR) - 1900;
     }
-    
+
     /**
      * Gets the start month of this Spinner.
-     * @return 
+     *
+     * @return
      * @since 6.0
      */
     public int getStartMonth() {
         return startMonth;
     }
-    
-    
+
+
     /**
      * Gets the end month of this spinner.
-     * @return 
+     *
+     * @return
      * @since 6.0
      */
     public int getEndMonth() {
         return endMonth;
     }
-    
-    
+
+
     /**
      * Gets the start day of month.
-     * @return 
+     *
+     * @return
      * @since 6.0
      */
     public int getStartDay() {
         return startDay;
     }
-    
+
     /**
      * Gets the end day of month.
-     * @return 
+     *
+     * @return
      * @since 6.0
      */
     public int getEndDay() {
         return endDay;
     }
-    
+
     /**
      * @return the startYear
      */
@@ -360,7 +363,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         this.startYear = startYear;
         this.currentYear = Math.max(this.startYear, this.currentYear);
         explicitStartYear = true;
-        if(year != null) {
+        if (year != null) {
             year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));
         }
     }
@@ -379,7 +382,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         this.endYear = endYear;
         this.currentYear = Math.min(this.endYear, this.currentYear);
         explicitEndYear = true;
-        if(year != null) {
+        if (year != null) {
             year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));
         }
     }
@@ -388,8 +391,8 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      * @return the currentYear
      */
     public int getCurrentYear() {
-        if(year != null) {
-            return ((Integer)year.getValue()).intValue();
+        if (year != null) {
+            return ((Integer) year.getValue()).intValue();
         }
         return currentYear;
     }
@@ -407,12 +410,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
             endYear = currentYear;
         }
         if (currentYear < startYear) {
-            throw new IllegalArgumentException("Current year "+currentYear+" before start year "+startYear);
+            throw new IllegalArgumentException("Current year " + currentYear + " before start year " + startYear);
         }
         if (currentYear > endYear) {
-            throw new IllegalArgumentException("Current year "+currentYear+" after end year "+endYear);
+            throw new IllegalArgumentException("Current year " + currentYear + " after end year " + endYear);
         }
-        if(year != null) {
+        if (year != null) {
             year.setModel(new SpinnerNumberModel(startYear, endYear, currentYear, 1));
         }
     }
@@ -421,7 +424,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      * @return the currentDay
      */
     public int getCurrentDay() {
-        Integer i = (Integer)day.getValue();
+        Integer i = (Integer) day.getValue();
         return i.intValue();
     }
 
@@ -437,12 +440,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
             endDay = currentDay;
         }
         if (startDay > currentDay) {
-            throw new IllegalArgumentException("Start day "+startDay+" after current day "+currentDay);
+            throw new IllegalArgumentException("Start day " + startDay + " after current day " + currentDay);
         }
         if (endDay < currentDay) {
-            throw new IllegalArgumentException("End day "+endDay+" before current day "+currentDay);
+            throw new IllegalArgumentException("End day " + endDay + " before current day " + currentDay);
         }
-        if(day != null) {
+        if (day != null) {
             rebuildDay();
         }
     }
@@ -451,8 +454,8 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      * @return the currentMonth
      */
     public int getCurrentMonth() {
-        if(month != null) {
-            Integer i = ((Integer)month.getValue()-1)%12 + 1;
+        if (month != null) {
+            Integer i = ((Integer) month.getValue() - 1) % 12 + 1;
             return i.intValue();
         }
         return currentMonth;
@@ -470,12 +473,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
             endMonth = currentMonth;
         }
         if (startMonth > currentMonth) {
-            throw new IllegalArgumentException("Start month "+startMonth+" after current month "+currentMonth);
+            throw new IllegalArgumentException("Start month " + startMonth + " after current month " + currentMonth);
         }
         if (endMonth < currentMonth) {
-            throw new IllegalArgumentException("End month "+endMonth+" before current month "+currentMonth);
+            throw new IllegalArgumentException("End month " + endMonth + " before current month " + currentMonth);
         }
-        if(month != null) {
+        if (month != null) {
             rebuildMonth();
         }
     }
@@ -508,49 +511,49 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      */
     public void setNumericMonths(boolean numericMonths) {
         this.numericMonths = numericMonths;
-        if(month != null) {
+        if (month != null) {
             month.repaint();
         }
     }
- 
-    
+
+
     /**
      * {@inheritDoc}
      */
     public String[] getPropertyNames() {
-        return new String[] {"startYear", "endYear", "currentYear", "currentDay", "currentMonth", "monthDayYear", "numericMonths"};
+        return new String[]{"startYear", "endYear", "currentYear", "currentDay", "currentMonth", "monthDayYear", "numericMonths"};
     }
 
     /**
      * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
-       return new Class[] {Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};
+        return new Class[]{Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};
     }
 
     /**
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if(name.equals("startYear")) {
+        if (name.equals("startYear")) {
             return new Integer(startYear);
         }
-        if(name.equals("endYear")) {
+        if (name.equals("endYear")) {
             return new Integer(endYear);
         }
-        if(name.equals("currentYear")) {
+        if (name.equals("currentYear")) {
             return new Integer(currentYear);
         }
-        if(name.equals("currentDay")) {
+        if (name.equals("currentDay")) {
             return new Integer(currentDay);
         }
-        if(name.equals("currentMonth")) {
+        if (name.equals("currentMonth")) {
             return new Integer(currentMonth);
         }
-        if(name.equals("monthDayYear")) {
+        if (name.equals("monthDayYear")) {
             return new Boolean(monthDayYear);
         }
-        if(name.equals("numericMonths")) {
+        if (name.equals("numericMonths")) {
             return new Boolean(numericMonths);
         }
         return null;
@@ -560,37 +563,37 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if(name.equals("startYear")) {
+        if (name.equals("startYear")) {
             setStartYear(Integer.parseInt(value.toString()));
             return null;
         }
-        if(name.equals("endYear")) {
+        if (name.equals("endYear")) {
             setEndYear(Integer.parseInt(value.toString()));
             return null;
         }
-        if(name.equals("currentYear")) {
+        if (name.equals("currentYear")) {
             setCurrentYear(Integer.parseInt(value.toString()));
             return null;
         }
-        if(name.equals("currentDay")) {
+        if (name.equals("currentDay")) {
             setCurrentDay(Integer.parseInt(value.toString()));
             return null;
         }
-        if(name.equals("currentMonth")) {
+        if (name.equals("currentMonth")) {
             setCurrentMonth(Integer.parseInt(value.toString()));
             return null;
         }
-        if(name.equals("monthDayYear")) {
-            setMonthDayYear(((Boolean)value).booleanValue());
+        if (name.equals("monthDayYear")) {
+            setMonthDayYear(((Boolean) value).booleanValue());
             return null;
         }
-        if(name.equals("numericMonths")) {
-            setNumericMonths(((Boolean)value).booleanValue());
+        if (name.equals("numericMonths")) {
+            setNumericMonths(((Boolean) value).booleanValue());
             return null;
         }
-        
+
         return super.setPropertyValue(name, value);
-    }        
+    }
 
     @Override
     public Object getValue() {
@@ -599,10 +602,10 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         cld.set(Calendar.DAY_OF_MONTH, getCurrentDay());
         cld.set(Calendar.MONTH, getCurrentMonth() - 1);
         cld.set(Calendar.YEAR, getCurrentYear());
-        
-        cld.set(Calendar.HOUR_OF_DAY,hourOfDay);
-        cld.set(Calendar.MINUTE,minuteOfDay);
-        cld.set(Calendar.SECOND,secondsOfDay);
+
+        cld.set(Calendar.HOUR_OF_DAY, hourOfDay);
+        cld.set(Calendar.MINUTE, minuteOfDay);
+        cld.set(Calendar.SECOND, secondsOfDay);
         cld.set(Calendar.MILLISECOND, millisOfDay);
 
         return cld.getTime();
@@ -610,17 +613,17 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
 
     @Override
     public void setValue(Object value) {
-        Date dt = (Date)value;
+        Date dt = (Date) value;
         Calendar cld = Calendar.getInstance();
         cld.setTime(dt);
         setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));
-        setCurrentMonth(cld.get(Calendar.MONTH)+1);
+        setCurrentMonth(cld.get(Calendar.MONTH) + 1);
         setCurrentYear(cld.get(Calendar.YEAR));
         //keep time of day when editing the date
-        hourOfDay=cld.get(Calendar.HOUR_OF_DAY);
-        minuteOfDay=cld.get(Calendar.MINUTE);
-        secondsOfDay=cld.get(Calendar.SECOND);
-        millisOfDay=cld.get(Calendar.MILLISECOND);
+        hourOfDay = cld.get(Calendar.HOUR_OF_DAY);
+        minuteOfDay = cld.get(Calendar.MINUTE);
+        secondsOfDay = cld.get(Calendar.SECOND);
+        millisOfDay = cld.get(Calendar.MILLISECOND);
     }
 
     @Override
@@ -632,7 +635,6 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
         g.setAlpha(alpha);
         super.paint(g); //To change body of generated methods, choose Tools | Templates.
     }
-    
-    
-    
+
+
 }

@@ -23,74 +23,75 @@
  */
 package com.codename1.io;
 
+import com.codename1.compat.java.util.Objects;
+import com.codename1.util.DateUtil;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Date;
-import com.codename1.compat.java.util.Objects;
-import com.codename1.util.DateUtil;
 
 /**
  * This class represent an access token.
- * 
+ *
  * @author Chen
  */
-public class AccessToken implements Externalizable{
+public class AccessToken implements Externalizable {
 
-   
-    
+
     private String token;
-    
+
     /**
      * When the token expires.  Generally this is a numeric string obtained
      * from the "expires" token of an oauth2 request, signifying the number of seconds
      * from the time of issue that the token is valid for.
      */
     private String expires;
-    
+
     /**
      * The expiry date of the token.  Prefer this value over the {@link #expires} value
-     * since the expires value may just be the number of seconds that the access token is good 
+     * since the expires value may just be the number of seconds that the access token is good
      * for since it was generated - and we may not have that information stored.
+     *
      * @since 7.0
      */
     private Date expiryDate;
-    
+
     private String refreshToken;
-    
+
     private String identityToken;
 
     /**
      * Constructor with parameters
-     * 
-     * @param token the token string
+     *
+     * @param token   the token string
      * @param expires the access token expires date
-     */ 
+     */
     public AccessToken(String token, String expires) {
         this(token, expires, null);
     }
-    
+
     /**
      * Constructor with parameters
-     * 
-     * @param token the token string
-     * @param expires the access token expires date
+     *
+     * @param token        the token string
+     * @param expires      the access token expires date
      * @param refreshToken The refresh token.
      * @ince 7.0
-     */ 
+     */
     public AccessToken(String token, String expires, String refreshToken) {
         this(token, expires, refreshToken, null);
     }
-    
+
     /**
      * Constructor with parameters
-     * 
-     * @param token the token string
-     * @param expires the access token expires date
-     * @param refreshToken The refresh token.
+     *
+     * @param token         the token string
+     * @param expires       the access token expires date
+     * @param refreshToken  The refresh token.
      * @param identityToken The identity token
      * @ince 7.0
-     */ 
+     */
     public AccessToken(String token, String expires, String refreshToken, String identityToken) {
         this.token = token;
         this.expires = expires;
@@ -98,39 +99,92 @@ public class AccessToken implements Externalizable{
         this.refreshToken = refreshToken;
         this.identityToken = identityToken;
     }
-    
+
     /**
-     * 
-     * @param Token The token.
+     * @since 7.0
+     */
+    public AccessToken() {
+
+    }
+
+    /**
+     * @param Token      The token.
      * @param expiryDate The expiry date.
      * @since 7.0
      */
     public static AccessToken createWithExpiryDate(String token, Date expiryDate) {
         AccessToken out = new AccessToken(token, null);
-        
+
         out.expiryDate = expiryDate;
         return out;
     }
-    
+
     /**
-     * @since 7.0
+     * Parses an integer value as a string.  Automatically truncates at first
+     * decimal place.
+     *
+     * @param str A numeric string
+     * @return The Long value of the string, or null if it couldn't be parsed.
      */
-    public AccessToken() {
-        
+    private static Long parseLong(String str) {
+        if (str == null) {
+            return null;
+        }
+        int decimalPos = str.indexOf('.');
+        if (decimalPos >= 0) {
+            str = str.substring(0, decimalPos);
+        }
+
+        char[] chars = str.toCharArray();
+        int len = chars.length;
+
+        for (int i = 0; i < len; i++) {
+            char c = chars[i];
+            if (!Character.isDigit(c)) {
+                return null;
+            }
+        }
+        return new Long(Long.parseLong(str));
+    }
+
+    /**
+     * A utility function that can parse date values received as a string.
+     * Most often these dates are just numbers of seconds as received from
+     * "expires" oauth2 tokens, which indicate the number of seconds an access
+     * token is valid for.
+     *
+     * @param dateStr The date string.  Value inputs include "3600", "3600.0", "7200.12345", etc..
+     * @return A Date, or null if the input can't be parsed.
+     */
+    private static Date parseDate(String dateStr) {
+        Long longExpires = parseLong(dateStr);
+        if (longExpires != null) {
+            // There was an expiry date, but it might have been from an expires_in
+            // header, which would only hold the number of seconds since
+            long l = longExpires.longValue();
+            if (l == 0l) {
+                return null;
+            }
+            return new Date(System.currentTimeMillis() + l * 1000l);
+        }
+        return null;
+
     }
 
     /**
      * Simple getter
+     *
      * @return the token string
-     */ 
+     */
     public String getToken() {
         return token;
     }
 
     /**
      * Simple getter
+     *
      * @return the expires date
-     */ 
+     */
     public String getExpires() {
         return expires;
     }
@@ -154,7 +208,7 @@ public class AccessToken implements Externalizable{
         token = Util.readUTF(in);
         expires = Util.readUTF(in);
         if (version >= 2) {
-            expiryDate = (Date)Util.readObject(in);
+            expiryDate = (Date) Util.readObject(in);
         }
         if (version >= 3) {
             refreshToken = Util.readUTF(in);
@@ -166,23 +220,24 @@ public class AccessToken implements Externalizable{
 
     /**
      * Gets refresh token.
+     *
      * @return Refresh token.
      * @since 7.0
      */
     public String getRefreshToken() {
         return refreshToken;
     }
-    
+
     /**
      * Sets refresh token.
-     * 
+     *
      * @param refreshToken The refresh token.
      * @since 7.0
      */
     public void setRefreshToken(String refreshToken) {
         this.refreshToken = refreshToken;
     }
-    
+
     @Override
     public String getObjectId() {
         return "AccessToken";
@@ -191,8 +246,8 @@ public class AccessToken implements Externalizable{
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof AccessToken) {
-            AccessToken tok = (AccessToken)obj;
-            return Objects.equals(token, tok.token) && Objects.equals(expiryDate, tok.expiryDate) ;
+            AccessToken tok = (AccessToken) obj;
+            return Objects.equals(token, tok.token) && Objects.equals(expiryDate, tok.expiryDate);
         }
         return super.equals(obj);
     }
@@ -207,89 +262,40 @@ public class AccessToken implements Externalizable{
 
     @Override
     public String toString() {
-        return "AccessToken {"+token+", expires="+expiryDate+"}";
+        return "AccessToken {" + token + ", expires=" + expiryDate + "}";
     }
-    
-    
-    
-    /**
-     * Parses an integer value as a string.  Automatically truncates at first
-     * decimal place.  
-     * @param str A numeric string
-     * @return The Long value of the string, or null if it couldn't be parsed.
-     */
-    private static Long parseLong(String str) {
-        if (str == null) {
-            return null;
-        }
-        int decimalPos = str.indexOf('.');
-        if (decimalPos >= 0) {
-            str = str.substring(0, decimalPos);
-        }
-        
-        char[] chars = str.toCharArray();
-        int len = chars.length;
-        
-        for (int i=0; i<len; i++) {
-            char c = chars[i];
-            if (!Character.isDigit(c)) {
-                return null;
-            }
-        }
-        return new Long(Long.parseLong(str));
-    }
-    
-    /**
-     * A utility function that can parse date values received as a string.
-     * Most often these dates are just numbers of seconds as received from 
-     * "expires" oauth2 tokens, which indicate the number of seconds an access
-     * token is valid for.
-     * @param dateStr The date string.  Value inputs include "3600", "3600.0", "7200.12345", etc..
-     * @return A Date, or null if the input can't be parsed.
-     */
-    private static Date parseDate(String dateStr) {
-        Long longExpires = parseLong(dateStr);
-        if (longExpires != null) {
-            // There was an expiry date, but it might have been from an expires_in
-            // header, which would only hold the number of seconds since 
-            long l = longExpires.longValue();
-            if (l == 0l) {
-                return null;
-            }
-            return new Date(System.currentTimeMillis() + l * 1000l);
-        }
-        return null;
-        
-    }
-    
+
     /**
      * Gets the expiry date of this token.
+     *
      * @return The expiry date of this token or null.
      * @since 7.0
      */
     public Date getExpiryDate() {
         return expiryDate;
     }
-    
+
     /**
      * Sets the expiry date of this token.
+     *
      * @param date The expiry date of this token.
      * @since 7.0
      */
     public void setExpiryDate(Date date) {
         this.expiryDate = date;
     }
-    
+
     /**
      * Checks to see if this token is expired.
+     *
      * @return False if no expiry date is set or the expiryDate is before the current time.
      * @since 7.0
      */
     public boolean isExpired() {
-        return expiryDate != null && DateUtil.compare(expiryDate,  new Date()) < 0;
+        return expiryDate != null && DateUtil.compare(expiryDate, new Date()) < 0;
     }
-    
-     /**
+
+    /**
      * @return the identityToken
      * @since 7.0
      */
@@ -304,5 +310,5 @@ public class AccessToken implements Externalizable{
     public void setIdentityToken(String identityToken) {
         this.identityToken = identityToken;
     }
-    
+
 }

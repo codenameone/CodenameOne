@@ -36,14 +36,13 @@ import com.codename1.ui.util.EventDispatcher;
  * @deprecated use Picker instead
  */
 class SpinnerNumberModel implements ListModel {
+    boolean realValues;
     private EventDispatcher dataListener = new EventDispatcher();
     private EventDispatcher selectionListener = new EventDispatcher();
     private double min;
     private double max;
     private double currentValue;
     private double step;
-    boolean realValues;
-
     /**
      * The old DateSpinner relies on behavior that was broken in this commit:
      * https://github.com/codenameone/CodenameOne/commit/cfac9a6a1bb15027b48a9b822e2f21eb2835d38e#diff-d12531ab4b0dd8bf1233a09f3c5e2b2b5634bff3c3cd2f357ad0a001e5f19bbf
@@ -53,32 +52,13 @@ class SpinnerNumberModel implements ListModel {
 
     private boolean setSelectedIndexReentrantLock;
 
-    void setValue(Object value) {
-        int oldIndex = getSelectedIndex();
-        if(value instanceof Integer) {
-            currentValue = ((Integer)value).doubleValue();
-        } else {
-            currentValue = ((Double)value).doubleValue();
-        }
-        if (oldIndex != getSelectedIndex()) {
-            selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());
-        }
-    }
-
-    Object getValue() {
-        if(realValues) {
-            return new Double(currentValue);
-        }
-        return new Integer((int)currentValue);
-    }
-
     /**
      * Indicates the range of the spinner
-     * 
-     * @param min lowest value allowed
-     * @param max maximum value allowed
+     *
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
      * @param currentValue the starting value for the mode
-     * @param step the value by which we increment the entries in the model
+     * @param step         the value by which we increment the entries in the model
      */
     public SpinnerNumberModel(int min, int max, int currentValue, int step) {
         this.max = max;
@@ -98,10 +78,10 @@ class SpinnerNumberModel implements ListModel {
     /**
      * Indicates the range of the spinner
      *
-     * @param min lowest value allowed
-     * @param max maximum value allowed
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
      * @param currentValue the starting value for the mode
-     * @param step the value by which we increment the entries in the model
+     * @param step         the value by which we increment the entries in the model
      */
     public SpinnerNumberModel(double min, double max, double currentValue, double step) {
         this.max = max;
@@ -111,14 +91,33 @@ class SpinnerNumberModel implements ListModel {
         realValues = true;
     }
 
+    Object getValue() {
+        if (realValues) {
+            return new Double(currentValue);
+        }
+        return new Integer((int) currentValue);
+    }
+
+    void setValue(Object value) {
+        int oldIndex = getSelectedIndex();
+        if (value instanceof Integer) {
+            currentValue = ((Integer) value).doubleValue();
+        } else {
+            currentValue = ((Double) value).doubleValue();
+        }
+        if (oldIndex != getSelectedIndex()) {
+            selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
     public Object getItemAt(int index) {
-        if(realValues) {
+        if (realValues) {
             return new Double(min + step * index);
         }
-        return new Integer((int)(min + step * index));
+        return new Integer((int) (min + step * index));
     }
 
 
@@ -126,7 +125,7 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSize() {
-        return (int)((max - min) / step) + maxOffset;
+        return (int) ((max - min) / step) + maxOffset;
     }
 
 
@@ -134,7 +133,7 @@ class SpinnerNumberModel implements ListModel {
      * {@inheritDoc}
      */
     public int getSelectedIndex() {
-        return (int)((currentValue - min) / step);
+        return (int) ((currentValue - min) / step);
     }
 
 

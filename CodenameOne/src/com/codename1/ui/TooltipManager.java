@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.ui;
@@ -36,64 +36,64 @@ public class TooltipManager {
     private static TooltipManager instance;
 
     private int tooltipShowDelay = 500;
-    
+
     private InteractionDialog currentTooltip;
-    private UITimer pendingTooltip; 
+    private UITimer pendingTooltip;
     private Component currentComponent;
     private String dialogUIID = "TooltipDialog";
     private String textUIID = "Tooltip";
-    
+
+    /**
+     * Default tooltip manager
+     */
+    protected TooltipManager() {
+    }
+
     static TooltipManager getInstance() {
         return instance;
     }
-    
+
     /**
      * Enables the tooltip manager and default tooltip behavior
      */
     public static void enableTooltips() {
         instance = new TooltipManager();
     }
-    
+
     /**
      * Enables the tooltip manager with a custom subclass
-     * 
+     *
      * @param custom customized subclass of this class
      */
     public static void enableTooltips(TooltipManager custom) {
         instance = custom;
     }
-    
-    /**
-     * Default tooltip manager
-     */
-    protected TooltipManager() {
-    }
- 
+
     /**
      * Invoked to dispose the current tooltip when the pointer moves
      */
     protected void clearTooltip() {
-        if(currentTooltip != null) {
+        if (currentTooltip != null) {
             currentTooltip.dispose();
             currentTooltip = null;
         }
-        if(pendingTooltip != null) {
+        if (pendingTooltip != null) {
             pendingTooltip.cancel();
             pendingTooltip = null;
         }
         currentComponent = null;
     }
-    
+
     /**
      * Gets ready to show the tooltip, this method implements the delay
      * before the actual showing of the tooltip. It's invoked internally
      * by the framework
-     * 
+     *
      * @param tip the tooltip text
      * @param cmp the component
      */
     protected void prepareTooltip(final String tip, final Component cmp) {
-        if(currentComponent == cmp) {
+        if (currentComponent == cmp) {
             return;
         }
         clearTooltip();
@@ -106,21 +106,21 @@ public class TooltipManager {
             }
         });
         Form f = cmp.getComponentForm();
-        if(f != null) {
+        if (f != null) {
             pendingTooltip.schedule(tooltipShowDelay, false, f);
         }
     }
-    
+
     /**
      * Shows the actual tooltip, this is invoked when the time for the tooltip
      * elapses. It shows the tooltip UI immediately
-     * 
+     *
      * @param tip the tooltip text
      * @param cmp the component
      */
     protected void showTooltip(final String tip, final Component cmp) {
         currentTooltip = new InteractionDialog(new BorderLayout());
-        
+
         TextArea text = new TextArea(tip);
         text.setGrowByContent(true);
         text.setEditable(false);
@@ -137,7 +137,7 @@ public class TooltipManager {
     /**
      * The time in milliseconds between the pointer stopping and the showing
      * of the tooltip
-     * 
+     *
      * @return the tooltipShowDelay
      */
     public int getTooltipShowDelay() {
@@ -147,7 +147,7 @@ public class TooltipManager {
     /**
      * The time in milliseconds between the pointer stopping and the showing
      * of the tooltip
-     * 
+     *
      * @param tooltipShowDelay the tooltipShowDelay to set
      */
     public void setTooltipShowDelay(int tooltipShowDelay) {
@@ -156,7 +156,7 @@ public class TooltipManager {
 
     /**
      * UIID of the tooltip dialog
-     * 
+     *
      * @return the dialogUIID
      */
     public String getDialogUIID() {
@@ -165,6 +165,7 @@ public class TooltipManager {
 
     /**
      * UIID of the tooltip dialog
+     *
      * @param dialogUIID the dialogUIID to set
      */
     public void setDialogUIID(String dialogUIID) {
@@ -173,6 +174,7 @@ public class TooltipManager {
 
     /**
      * UIID of the tooltip text body
+     *
      * @return the textUIID
      */
     public String getTextUIID() {
@@ -181,6 +183,7 @@ public class TooltipManager {
 
     /**
      * UIID of the tooltip text body
+     *
      * @param textUIID the textUIID to set
      */
     public void setTextUIID(String textUIID) {

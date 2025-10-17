@@ -6,24 +6,25 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.l10n;
 
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
+
 import java.util.Date;
 
 /**
@@ -31,7 +32,7 @@ import java.util.Date;
  * capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
  * related API's similar to Locale/currency API's from JavaSE.<br>
  * The sample code below just lists the various capabilities of the API:</p>
- * 
+ *
  * <script src="https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/l10n-manager.png" alt="Localization formatting/parsing and information" />
  *
@@ -41,14 +42,7 @@ public class L10NManager {
     private String language;
     private String locale;
     private DateFormatSymbols symbols;
-    
-    private DateFormatSymbols getSymbols() {
-        if (symbols == null) {
-            symbols = new DateFormatSymbols();
-        }
-        return symbols;
-    }
-    
+
     /**
      * Instances of this class should be received via the Display class
      */
@@ -56,31 +50,46 @@ public class L10NManager {
         this.language = language;
         this.locale = locale;
     }
-    
+
+    /**
+     * Convenience method that invokes Display.getLocalizationManager()
+     *
+     * @return the L10NManager instance
+     */
+    public static L10NManager getInstance() {
+        return Display.getInstance().getLocalizationManager();
+    }
+
+    private DateFormatSymbols getSymbols() {
+        if (symbols == null) {
+            symbols = new DateFormatSymbols();
+        }
+        return symbols;
+    }
+
     /**
      * Returns the current locale language as an ISO 639 two letter code
-     * 
+     *
      * @return iso language string
      */
     public String getLanguage() {
         return language;
     }
-    
+
     /**
      * Forces the locale/language
-     * 
-     * @param locale the new locale
+     *
+     * @param locale   the new locale
      * @param language the language to use
      */
     public void setLocale(String locale, String language) {
         this.language = language;
         this.locale = locale;
     }
-    
-    
+
     /**
      * Format an integer number for this locale
-     * 
+     *
      * @param number the number to format
      * @return a string representation of a number
      */
@@ -90,16 +99,17 @@ public class L10NManager {
 
     /**
      * Format a double number for this locale
-     * 
+     *
      * @param number the number to format
      * @return a string representation of a number
      */
     public String format(double number) {
         return "" + number;
     }
-    
+
     /**
      * Gets the short month name in the current locale for the given date.
+     *
      * @param date The date.
      * @return Short month name.  E.g. Jan, Feb, etc..
      * @since 7.0
@@ -107,9 +117,10 @@ public class L10NManager {
     public String getShortMonthName(Date date) {
         return limitLength(getLongMonthName(date), 3);
     }
-    
+
     /**
      * Gets the long month name in the current locale for the given date.
+     *
      * @param date The date.
      * @return Long month name.  E.g. January, February, etc..
      * @since 7.0
@@ -120,18 +131,18 @@ public class L10NManager {
             return extractMonthName(fmt);
         } catch (ParseException ex) {
             int v = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) - java.util.Calendar.JANUARY;
-            
+
             return getSymbols().getMonths()[v];
         }
     }
-    
+
     private String limitLength(String s, int len) {
-        if(s.length() > len) {
+        if (s.length() > len) {
             return s.substring(0, len);
         }
         return s;
     }
-    
+
     private String extractMonthName(String dateStr) throws ParseException {
         String[] parts = Util.split(dateStr, " ");
         for (String part : parts) {
@@ -149,11 +160,10 @@ public class L10NManager {
         throw new ParseException("Cannot extract month from string", 0);
 
     }
-    
 
     /**
      * Format a currency value
-     * 
+     *
      * @param currency the monetary value
      * @return a string representation of a number
      */
@@ -163,15 +173,16 @@ public class L10NManager {
 
     /**
      * Returns the currency symbol for this locale
-     * 
+     *
      * @return currency symbol
      */
     public String getCurrencySymbol() {
         return "$";
     }
-    
+
     /**
      * Formats a date in a long form e.g. Sunday January 1st 2001
+     *
      * @param d the date
      * @return the long form string
      */
@@ -181,6 +192,7 @@ public class L10NManager {
 
     /**
      * Formats a date in a short form e.g. 1/1/2011
+     *
      * @param d the date
      * @return the short form string
      */
@@ -190,6 +202,7 @@ public class L10NManager {
 
     /**
      * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     *
      * @param d the date
      * @return the date and time
      */
@@ -199,6 +212,7 @@ public class L10NManager {
 
     /**
      * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     *
      * @param d the date
      * @return the date and time
      */
@@ -208,23 +222,25 @@ public class L10NManager {
 
     /**
      * Formats the time in a default form e.g. 10:00AM
+     *
      * @param d the date time object
      * @return the time as a String
      */
     public String formatTime(Date d) {
         String s = formatDateTimeMedium(d);
         int pos = s.lastIndexOf(" ");
-        
+
         // this can be just the AM or PM
-        if(s.length() - pos < 4) {
+        if (s.length() - pos < 4) {
             pos = s.lastIndexOf(" ", pos - 1);
         }
         s = s.substring(pos + 1);
         return s;
     }
-    
+
     /**
      * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     *
      * @param d the date
      * @return the date and time
      */
@@ -234,7 +250,7 @@ public class L10NManager {
 
     /**
      * Indicates whether the language is a right to left language
-     * 
+     *
      * @return true for bidi/rtl languages
      */
     public boolean isRTLLocale() {
@@ -243,52 +259,47 @@ public class L10NManager {
 
     /**
      * Determines the locale (location) as an ISO 3166 country code
-     * 
+     *
      * @return the locale
      */
     public String getLocale() {
         return locale;
     }
-    
-    /**
-     * Convenience method that invokes Display.getLocalizationManager()
-     * @return the L10NManager instance
-     */
-    public static L10NManager getInstance() {
-        return Display.getInstance().getLocalizationManager();
-    }
 
     /**
      * Formats a number as a String with a fixed number of decimal places
-     * @param number the number
+     *
+     * @param number        the number
      * @param decimalPlaces decimals
-     * @return formatted string 
+     * @return formatted string
      */
     public String format(double number, int decimalPlaces) {
-        if(decimalPlaces == 0) {
-            return format((double)((long)number));
+        if (decimalPlaces == 0) {
+            return format((double) ((long) number));
         }
-            
+
         double pos = 10;
-        for(int iter = 1 ; iter < decimalPlaces ; iter++) {
+        for (int iter = 1; iter < decimalPlaces; iter++) {
             pos *= 10;
         }
         long ln = Math.round(number * pos);
-        number = ((double)ln) / pos;
+        number = ((double) ln) / pos;
         return format(number);
     }
-    
+
     /**
      * Parses a double based on locale conventions
+     *
      * @param localeFormattedDecimal the locale formatted number
      * @return the parsed double
      */
     public double parseDouble(String localeFormattedDecimal) {
         return Double.parseDouble(localeFormattedDecimal);
     }
-    
+
     /**
      * Parses a long based on locale conventions
+     *
      * @param localeFormattedLong the number
      * @return a long
      */
@@ -298,25 +309,26 @@ public class L10NManager {
 
     /**
      * Parses an integer based on locale conventions
-     * 
+     *
      * @param localeFormattedInteger the number
      * @return a parsed number
      */
     public int parseInt(String localeFormattedInteger) {
         return Integer.parseInt(localeFormattedInteger);
     }
-    
+
     /**
      * Parses the currency value
+     *
      * @param amount the amount
      * @return a numeric value for the currency
      */
     public double parseCurrency(String amount) {
         StringBuilder b = new StringBuilder();
         int l = amount.length();
-        for(int iter = 0 ; iter < l ; iter++) {
+        for (int iter = 0; iter < l; iter++) {
             char c = amount.charAt(iter);
-            if(Character.isDigit(c) || c == '.' || c == ',' || c == '-') {
+            if (Character.isDigit(c) || c == '.' || c == ',' || c == '-') {
                 b.append(c);
             }
         }

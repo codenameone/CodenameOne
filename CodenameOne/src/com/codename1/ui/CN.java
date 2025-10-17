@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 
@@ -30,14 +30,13 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.messaging.Message;
-import com.codename1.plugin.Plugin;
 import com.codename1.plugin.PluginSupport;
-import com.codename1.plugin.event.PluginEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 import com.codename1.util.RunnableWithResultSync;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -45,64 +44,64 @@ import java.util.Hashtable;
 import java.util.Timer;
 
 /**
- * This is a global context static class designed for static import, this class allows us to write more 
- * terse code. However, its chief purpose is simplification by hiding some of the more esoteric methods of 
+ * This is a global context static class designed for static import, this class allows us to write more
+ * terse code. However, its chief purpose is simplification by hiding some of the more esoteric methods of
  * these underlying classes and bringing to the front the commonly used important methods.
  * This class includes code from Display, NetworkManager, Log and other important classes
  *
  * @author Shai Almog
  */
-public class CN extends  CN1Constants {
+public class CN extends CN1Constants {
     /**
      * Constant for the name of the main thin native font.
      */
-    public static final String NATIVE_MAIN_THIN="native:MainThin";
-    
+    public static final String NATIVE_MAIN_THIN = "native:MainThin";
+
     /**
      * Constant for the main light native font.
      */
-    public static final String NATIVE_MAIN_LIGHT="native:MainLight";
-    
+    public static final String NATIVE_MAIN_LIGHT = "native:MainLight";
+
     /**
      * Constant for the main regular native font.
      */
-    public static final String NATIVE_MAIN_REGULAR="native:MainRegular";
-    
+    public static final String NATIVE_MAIN_REGULAR = "native:MainRegular";
+
     /**
      * Constant for the main bold native font.
      */
-    public static final String NATIVE_MAIN_BOLD="native:MainBold";
-    
+    public static final String NATIVE_MAIN_BOLD = "native:MainBold";
+
     /**
      * Constant for the main black native font.
      */
-    public static final String NATIVE_MAIN_BLACK="native:MainBlack";
-    
+    public static final String NATIVE_MAIN_BLACK = "native:MainBlack";
+
     /**
      * Constant for the italic thin native font.
      */
-    public static final String NATIVE_ITALIC_THIN="native:ItalicThin";
-    
+    public static final String NATIVE_ITALIC_THIN = "native:ItalicThin";
+
     /**
      * Constant for the italic light native font.
      */
-    public static final String NATIVE_ITALIC_LIGHT="native:ItalicLight";
-    
+    public static final String NATIVE_ITALIC_LIGHT = "native:ItalicLight";
+
     /**
      * Constant for the italic regular native font.
      */
-    public static final String NATIVE_ITALIC_REGULAR ="native:ItalicRegular";
-    
+    public static final String NATIVE_ITALIC_REGULAR = "native:ItalicRegular";
+
     /**
      * Constant for the italic bold native font.
      */
-    public static final String NATIVE_ITALIC_BOLD="native:ItalicBold";
-    
+    public static final String NATIVE_ITALIC_BOLD = "native:ItalicBold";
+
     /**
      * Constant for the italic black native font.
      */
-    public static final String NATIVE_ITALIC_BLACK="native:ItalicBlack";
-    
+    public static final String NATIVE_ITALIC_BLACK = "native:ItalicBlack";
+
     /**
      * Constant allowing us to author portable system fonts
      */
@@ -142,12 +141,12 @@ public class CN extends  CN1Constants {
      * Constant allowing us to author portable system fonts
      */
     public static final int STYLE_ITALIC = 2;
-    
+
     /**
      * Constant allowing us to author portable system fonts
      */
     public static final int STYLE_UNDERLINED = 4;
-    
+
     /**
      * Constant allowing us to author portable system fonts
      */
@@ -161,7 +160,7 @@ public class CN extends  CN1Constants {
      * The south layout constraint (bottom of container).
      */
     public static final String SOUTH = "South";
-    
+
     /**
      * The west layout constraint (left of container).
      */
@@ -175,28 +174,28 @@ public class CN extends  CN1Constants {
      * Indicates a Component center alignment
      */
     public static final int CENTER = 4;
-    /** 
+    /**
      * Box-orientation constant used to specify the top of a box.
      */
     public static final int TOP = 0;
-    /** 
+    /**
      * Box-orientation constant used to specify the left side of a box.
      */
     public static final int LEFT = 1;
-    /** 
+    /**
      * Box-orientation constant used to specify the bottom of a box.
      */
     public static final int BOTTOM = 2;
-    /** 
+    /**
      * Box-orientation constant used to specify the right side of a box.
      */
     public static final int RIGHT = 3;
-    
+
     /**
      * Alignment to the baseline constraint
      */
     public static final int BASELINE = 5;
-    
+
     /**
      * Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
      */
@@ -220,17 +219,18 @@ public class CN extends  CN1Constants {
      * a layered effect
      */
     public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
-    
-    CN() {}
+
+    CN() {
+    }
 
     /**
      * Sets a bookmark that can restore the app to a particular state.  This takes a
      * {@link Runnable} that will be run when {@link #restoreToBookmark()} () } is called.
      *
      * <p>The primary purpose of this feature is live code refresh.</p>
+     *
      * @param bookmark A {@link Runnable} that can be run to restore the app to a particular point.
      * @since 8.0
-     *
      */
     public static void setBookmark(Runnable bookmark) {
         Display.getInstance().setBookmark(bookmark);
@@ -244,7 +244,7 @@ public class CN extends  CN1Constants {
     public static void restoreToBookmark() {
         Display.getInstance().restoreToBookmark();
     }
-    
+
     /**
      * This method allows us to manipulate the drag started detection logic.
      * If the pointer was dragged for more than this percentage of the display size it
@@ -254,6 +254,17 @@ public class CN extends  CN1Constants {
      */
     public static int getDragStartPercentage() {
         return Display.impl.getDragStartPercentage();
+    }
+
+    /**
+     * This method allows us to manipulate the drag started detection logic.
+     * If the pointer was dragged for more than this percentage of the display size it
+     * is safe to assume that a drag is in progress.
+     *
+     * @param dragStartPercentage percentage of the screen required to initiate drag
+     */
+    public static void setDragStartPercentage(int dragStartPercentage) {
+        Display.impl.setDragStartPercentage(dragStartPercentage);
     }
 
     /**
@@ -281,44 +292,35 @@ public class CN extends  CN1Constants {
 
     /**
      * Checks if async stack traces are enabled.  If enabled, the stack trace
-     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will
      * be recorded, and logged in the case that there is an uncaught exception.
      * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
-     * @return Whether async stack traces are enabled.  
-     * @see #setEnableAsyncStackTraces(boolean) 
+     *
+     * @return Whether async stack traces are enabled.
+     * @see #setEnableAsyncStackTraces(boolean)
      * @since 7.0
      */
     public static boolean isEnableAsyncStackTraces() {
         return Display.getInstance().isEnableAsyncStackTraces();
     }
-    
+
     /**
      * Enables or disables async stack traces.  If enabled, the stack trace
-     * at the point of {@link #callSerially(java.lang.Runnable) } calls will 
+     * at the point of {@link #callSerially(java.lang.Runnable) } calls will
      * be recorded, and logged in the case that there is an uncaught exception.
-     * 
+     *
      * <p>Currently this is only supported in the JavaSE/Simulator port.</p>
-     * @param enable True to enable async stack traces.  
-     * @see #isEnableAsyncStackTraces() 
+     *
+     * @param enable True to enable async stack traces.
+     * @see #isEnableAsyncStackTraces()
      * @since 7.0
      */
     public static void setEnableAsyncStackTraces(boolean enable) {
         Display.getInstance().setEnableAsyncStackTraces(enable);
     }
-    
-    /**
-     * This method allows us to manipulate the drag started detection logic.
-     * If the pointer was dragged for more than this percentage of the display size it
-     * is safe to assume that a drag is in progress.
-     *
-     * @param dragStartPercentage percentage of the screen required to initiate drag
-     */
-    public static void setDragStartPercentage(int dragStartPercentage) {
-        Display.impl.setDragStartPercentage(dragStartPercentage);
-    }
 
     /**
-     * Vibrates the device for the given length of time, notice that this might ignore the time value completely 
+     * Vibrates the device for the given length of time, notice that this might ignore the time value completely
      * on some OS's where this level of control isn't supported e.g. iOS see: https://github.com/codenameone/CodenameOne/issues/1904
      *
      * @param duration length of time to vibrate (might be ignored)
@@ -333,7 +335,7 @@ public class CN extends  CN1Constants {
      * when they receive focus; this method is for cases where an announcement is needed outside
      * the normal focus lifecycle.
      *
-     * @param cmp the component related to this announcement or {@code null} for the root view
+     * @param cmp  the component related to this announcement or {@code null} for the root view
      * @param text the message to announce
      */
     public static void announceForAccessibility(Component cmp, String text) {
@@ -367,58 +369,58 @@ public class CN extends  CN1Constants {
      * returns immediately and will not wait for the serial call to occur
      *
      * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     *          the paint and key handling events
      */
-    public static void callSerially(Runnable r){
+    public static void callSerially(Runnable r) {
         Display.INSTANCE.callSerially(r);
     }
 
     /**
-     * Causes the runnable to be invoked on the event dispatch thread when the event 
-     * dispatch thread is idle. This method returns immediately and will not wait for the serial call 
+     * Causes the runnable to be invoked on the event dispatch thread when the event
+     * dispatch thread is idle. This method returns immediately and will not wait for the serial call
      * to occur. Notice this method is identical to call serially but will perform the runnable only when
      * the EDT is idle
      *
      * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     *          the paint and key handling events
      */
-    public static void callSeriallyOnIdle(Runnable r){
+    public static void callSeriallyOnIdle(Runnable r) {
         Display.INSTANCE.callSeriallyOnIdle(r);
-    }    
-    
+    }
+
     /**
      * Allows executing a background task in a separate low priority thread. Tasks are serialized
      * so they don't overload the CPU.
-     * 
+     *
      * @param r the task to perform in the background
      */
     public static void scheduleBackgroundTask(Runnable r) {
         Display.INSTANCE.scheduleBackgroundTask(r);
     }
-    
+
 
     /**
      * Identical to callSerially with the added benefit of waiting for the Runnable method to complete.
      *
      * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     *          the paint and key handling events
      * @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-     * paint or event handling).
+     *                               paint or event handling).
      */
-    public static void callSeriallyAndWait(Runnable r){
+    public static void callSeriallyAndWait(Runnable r) {
         Display.INSTANCE.callSeriallyAndWait(r);
     }
 
     /**
      * Identical to callSerially with the added benefit of waiting for the Runnable method to complete.
      *
-     * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
-     * the paint and key handling events
+     * @param r       runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+     *                the paint and key handling events
      * @param timeout timeout duration, on timeout the method just returns
      * @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
-     * paint or event handling).
+     *                               paint or event handling).
      */
-    public static void callSeriallyAndWait(Runnable r, int timeout){
+    public static void callSeriallyAndWait(Runnable r, int timeout) {
         Display.INSTANCE.callSeriallyAndWait(r, timeout);
     }
 
@@ -431,32 +433,32 @@ public class CN extends  CN1Constants {
      *
      * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
      */
-    public static void invokeAndBlock(Runnable r){
+    public static void invokeAndBlock(Runnable r) {
         Display.INSTANCE.invokeAndBlock(r);
     }
-    
+
     /**
      * Invokes a Runnable with blocking disabled.  If any attempt is made to block
      * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
      * it will result in a {@link BlockingDisallowedException} being thrown.
+     *
      * @param r Runnable to be run immediately.
      * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
-     * anywhere in the Runnable.
-     * 
+     *                                     anywhere in the Runnable.
      * @since 7.0
      */
     public static void invokeWithoutBlocking(Runnable r) {
         Display.INSTANCE.invokeWithoutBlocking(r);
     }
-    
+
     /**
      * Invokes a RunnableWithResultSync with blocking disabled.  If any attempt is made to block
      * (i.e. call {@link #invokeAndBlock(java.lang.Runnable) } from inside this Runnable,
      * it will result in a {@link BlockingDisallowedException} being thrown.
+     *
      * @param r Runnable to be run immediately.
      * @throws BlockingDisallowedException If {@link #invokeAndBlock(java.lang.Runnable) } is attempted
-     * anywhere in the Runnable.
-     * 
+     *                                     anywhere in the Runnable.
      * @since 7.0
      */
     public static <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
@@ -470,7 +472,7 @@ public class CN extends  CN1Constants {
      * @return false if minimization failed true if it succeeded or seems to be successful
      */
     public static boolean minimizeApplication() {
-        return  Display.impl.minimizeApplication();
+        return Display.impl.minimizeApplication();
     }
 
     /**
@@ -505,7 +507,7 @@ public class CN extends  CN1Constants {
      *
      * @return the width of the display
      */
-    public static int getDisplayWidth(){
+    public static int getDisplayWidth() {
         return Display.impl.getDisplayWidth();
     }
 
@@ -514,7 +516,7 @@ public class CN extends  CN1Constants {
      *
      * @return the height of the display
      */
-    public static int getDisplayHeight(){
+    public static int getDisplayHeight() {
         return Display.impl.getDisplayHeight();
     }
 
@@ -522,8 +524,8 @@ public class CN extends  CN1Constants {
     /**
      * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
      * to be relied upon
-     * 
-     * @param dipCount the dips that we will convert to pixels
+     *
+     * @param dipCount   the dips that we will convert to pixels
      * @param horizontal indicates pixels in the horizontal plane
      * @return value in pixels
      */
@@ -533,10 +535,11 @@ public class CN extends  CN1Constants {
 
     /**
      * Converts from specified unit to pixels.
-     * @param value The value to convert, expressed in unitType.
-     * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
-     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
-     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     *
+     * @param value      The value to convert, expressed in unitType.
+     * @param unitType   The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
+     *                   {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     *                   {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
      * @param horizontal Whether screen percentage units should be based on horitonzal or vertical percentage.
      * @return The value converted to pixels.
      * @since 8.0
@@ -547,27 +550,28 @@ public class CN extends  CN1Constants {
 
     /**
      * Converts from specified unit to pixels.
-     * @param value The value to convert, expressed in unitType.
+     *
+     * @param value    The value to convert, expressed in unitType.
      * @param unitType The unit type.  One of {@link Style#UNIT_TYPE_DIPS}, {@link Style#UNIT_TYPE_PIXELS},
-     * {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
-     * {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
+     *                 {@link Style#UNIT_TYPE_REM}, {@link Style#UNIT_TYPE_SCREEN_PERCENTAGE}, {@link Style#UNIT_TYPE_VH},
+     *                 {@link Style#UNIT_TYPE_VW}, {@link Style#UNIT_TYPE_VMIN}, {@link Style#UNIT_TYPE_VMAX}
      * @return The value converted to pixels.
      * @since 8.0
      */
     public static int convertToPixels(float value, byte unitType) {
-        return Display.INSTANCE.convertToPixels((float)value, unitType);
+        return Display.INSTANCE.convertToPixels((float) value, unitType);
     }
 
 
     /**
      * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
      * to be relied upon. This version of the method assumes square pixels which is pretty much the norm.
-     * 
+     *
      * @param dipCount the dips that we will convert to pixels
      * @return value in pixels
      */
     public static int convertToPixels(float dipCount) {
-        return Math.round(Display.impl.convertToPixels((int)(dipCount * 1000), true) / 1000.0f);
+        return Math.round(Display.impl.convertToPixels((int) (dipCount * 1000), true) / 1000.0f);
     }
 
     /**
@@ -625,7 +629,8 @@ public class CN extends  CN1Constants {
      * <li>OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
      *
      * </ol>
-     * @param key the key of the property
+     *
+     * @param key          the key of the property
      * @param defaultValue a default return value
      * @return the value of the property
      */
@@ -638,18 +643,18 @@ public class CN extends  CN1Constants {
      * implementation code and only allows the user to override the logic of getProperty
      * for internal application purposes.
      *
-     * @param key key the key of the property
+     * @param key   key the key of the property
      * @param value the value of the property
      */
     public static void setProperty(String key, String value) {
         Display.INSTANCE.setProperty(key, value);
     }
-    
+
     /**
      * <p>Returns true if executing this URL should work, returns false if it will not
      * and null if this is unknown.</p>
      * <script src="https://gist.github.com/codenameone/7aefb64909e75e10c396.js"></script>
-     * 
+     *
      * @param url the url that would be executed
      * @return true if executing this URL should work, returns false if it will not
      * and null if this is unknown
@@ -667,8 +672,8 @@ public class CN extends  CN1Constants {
     public static void execute(String url) {
         Display.impl.execute(url);
     }
-    
-    
+
+
     /**
      * Returns one of the density variables appropriate for this device, notice that
      * density doesn't always correspond to resolution and an implementation might
@@ -688,74 +693,76 @@ public class CN extends  CN1Constants {
     public static boolean isPortrait() {
         return Display.impl.isPortrait();
     }
-    
+
     /**
      * Try to enter full-screen mode if the platform supports it.
-     * 
+     *
      * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
      * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
      * for a list of browsers that support full-screen.</p>
-     * 
+     *
      * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
-     * 
+     *
      * @return {@literal true} on success.  This will also return {@literal true} if the app is already running in full-screen mode.  It will return {@literal false}
      * if the app fails to enter full-screen mode.
-     * @see #exitFullScreen() 
-     * @see #isInFullScreenMode() 
-     * @see #isFullScreenSupported() 
+     * @see #exitFullScreen()
+     * @see #isInFullScreenMode()
+     * @see #isFullScreenSupported()
      * @since 6.0
      */
     public static boolean requestFullScreen() {
         return Display.impl.requestFullScreen();
     }
-    
+
     /**
      * Try to exit full-screen mode if the platform supports it.
-     * 
+     *
      * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
      * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
      * for a list of browsers that support full-screen.</p>
-     * 
+     *
      * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
-     * 
+     *
      * @return {@literal true} on success.  This will also return {@literal true} if the app is already NOT in full-screen mode.  It will return {@literal false}
      * if the app fails to exit full-screen mode.
-     * @see #requestFullScreen() 
-     * @see #isInFullScreenMode() 
-     * @see #isFullScreenSupported() 
+     * @see #requestFullScreen()
+     * @see #isInFullScreenMode()
+     * @see #isFullScreenSupported()
      * @since 6.0
      */
     public static boolean exitFullScreen() {
         return Display.impl.exitFullScreen();
     }
-    
+
     /**
      * Checks if the app is currently running in full-screen mode.
+     *
      * @return {@literal true} if the app is currently in full-screen mode.
+     * @see #requestFullScreen()
+     * @see #exitFullScreen()
+     * @see #isFullScreenSupported()
      * @since 6.0
-     * @see #requestFullScreen() 
-     * @see #exitFullScreen() 
-     * @see #isFullScreenSupported() 
      */
     public static boolean isInFullScreenMode() {
         return Display.impl.isInFullScreenMode();
     }
-    
+
     /**
      * Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
      * the {@link #requestFullScreen() }, {@link #exitFullScreen() }, and {@link #isInFullScreenMode() } methods
      * to enter and exit full-screen - and query the current state.
-     * 
+     *
      * <p>Currently only desktop and Javascript builds support full-screen mode; And Javascript
      * only supports this on certain browsers.  See the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API">MDN Fullscreen API docs</a>
      * for a list of browsers that support full-screen.</p>
-     * 
+     *
      * <p>When running in the simulator, full-screen is only supported for the desktop skin.</p>
+     *
      * @return {@literal true} if Full-screen mode is supported on this platform.
+     * @see #requestFullScreen()
+     * @see #exitFullScreen()
+     * @see #isInFullScreenMode()
      * @since 6.0
-     * @see #requestFullScreen() 
-     * @see #exitFullScreen() 
-     * @see #isInFullScreenMode() 
      */
     public static boolean isFullScreenSupported() {
         return Display.impl.isFullScreenSupported();
@@ -787,7 +794,7 @@ public class CN extends  CN1Constants {
     public static void unlockOrientation() {
         Display.impl.unlockOrientation();
     }
-    
+
     /**
      * Indicates whether the device is a tablet, notice that this is often a guess
      *
@@ -796,174 +803,178 @@ public class CN extends  CN1Constants {
     public static boolean isTablet() {
         return Display.impl.isTablet();
     }
-    
+
     /**
      * Returns true if this is a desktop application
+     *
      * @return true if this is a desktop application
      */
     public static boolean isDesktop() {
         return Display.impl.isDesktop();
     }
-    
+
     /**
      * Returns true if the device has dialing capabilities
+     *
      * @return false if it cannot dial
      */
     public static boolean canDial() {
         return Display.impl.canDial();
     }
-    
+
     /**
      * Returns true if the platform is in dark mode, null is returned for
      * unknown status
-     * 
+     *
      * @return true in case of dark mode
-     */    
+     */
     public static Boolean isDarkMode() {
         return Display.INSTANCE.isDarkMode();
     }
-    
+
     /**
      * Override the default dark mode setting
+     *
      * @param darkMode can be set to null to reset to platform default
      */
     public static void setDarkMode(Boolean darkMode) {
         Display.INSTANCE.setDarkMode(darkMode);
     }
-    
+
     /**
      * <p>Opens the device gallery to pick an image or a video.<br>
      * The method returns immediately and the response is sent asynchronously
      * to the given ActionListener Object as the source value of the event (as a String)</p>
-     * 
+     *
      * <p>E.g. within the callback action performed call you can use this code: {@code String path = (String) evt.getSource();}.<br>
      * A more detailed sample of picking a video file can be seen here:
      * </p>
-     * 
+     *
      * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
      * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
-     * 
+     *
      * @param response a callback Object to retrieve the file path
-     * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}
+     * @param type     one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
-    public static void openGallery(ActionListener response, int type){
+    public static void openGallery(ActionListener response, int type) {
         Display.impl.openGallery(response, type);
     }
 
     /**
      * Returns a 2-3 letter code representing the platform name for the platform override
-     * 
+     *
      * @return the name of the platform e.g. ios, rim, win, and, me, HTML5
      */
     public static String getPlatformName() {
         return Display.impl.getPlatformName();
-    }    
+    }
 
-    
+
     /**
      * Opens the device Dialer application with the given phone number
-     * @param phoneNumber 
+     *
+     * @param phoneNumber
      */
     public static void dial(String phoneNumber) {
         Display.impl.dial(phoneNumber);
-    }    
-    
+    }
+
     /**
-     * <p>Indicates the level of SMS support in the platform as one of: 
-     * {@link #SMS_NOT_SUPPORTED} (for desktop, tablet etc.), 
-     * {@link #SMS_SEAMLESS} (no UI interaction), {@link #SMS_INTERACTIVE} (with compose UI), 
+     * <p>Indicates the level of SMS support in the platform as one of:
+     * {@link #SMS_NOT_SUPPORTED} (for desktop, tablet etc.),
+     * {@link #SMS_SEAMLESS} (no UI interaction), {@link #SMS_INTERACTIVE} (with compose UI),
      * {@link #SMS_BOTH}.<br>
      * The sample below demonstrates the use case for this property:
      * </p>
      * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
-     * 
+     *
      * @return one of the SMS_* values
      */
     public static int getSMSSupport() {
         return Display.impl.getSMSSupport();
     }
 
-    
+
     /**
      * Sends a SMS message to the given phone number
+     *
      * @param phoneNumber to send the sms
-     * @param message the content of the sms
+     * @param message     the content of the sms
      */
-    public static void sendSMS(String phoneNumber, String message) throws IOException{
+    public static void sendSMS(String phoneNumber, String message) throws IOException {
         Display.impl.sendSMS(phoneNumber, message, false);
     }
-    
+
     /**
      * <p>Sends a SMS message to the given phone number, the code below demonstrates the logic
      * of detecting platform behavior for sending SMS.</p>
      * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
-     * 
-     * @see #getSMSSupport() 
+     *
      * @param phoneNumber to send the sms
-     * @param message the content of the sms
+     * @param message     the content of the sms
      * @param interactive indicates the SMS should show a UI or should not show a UI if applicable see getSMSSupport
+     * @see #getSMSSupport()
      */
-    public static void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException{
+    public static void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException {
         Display.impl.sendSMS(phoneNumber, message, interactive);
     }
-        
-    
-    
+
+
     /**
      * Share the required information using the platform sharing services.
      * a Sharing service can be: mail, sms, facebook, twitter,...
-     * This method is implemented if isNativeShareSupported() returned true for 
+     * This method is implemented if isNativeShareSupported() returned true for
      * a specific platform.
-     * 
+     *
      * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
      * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
-     * 
-     * @param text String to share.
-     * @param image file path to the image or null
+     *
+     * @param text     String to share.
+     * @param image    file path to the image or null
      * @param mimeType type of the image or null if no image to share
      */
-    public static void share(String text, String image, String mimeType){
-        Display.INSTANCE.share(text, image, mimeType);        
+    public static void share(String text, String image, String mimeType) {
+        Display.INSTANCE.share(text, image, mimeType);
     }
-    
+
     /**
      * Indicates if the underlying platform supports sharing capabilities
-     * 
+     *
      * <p>Since 6.0, there is native sharing support in the Javascript port using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share">navigator.share</a>
      * API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.</p>
-     * 
+     *
      * @return true if the underlying platform handles share.
      */
-    public static boolean isNativeShareSupported(){
-        return Display.impl.isNativeShareSupported();        
-    }   
-    
-   /**
+    public static boolean isNativeShareSupported() {
+        return Display.impl.isNativeShareSupported();
+    }
+
+    /**
      * Share the required information using the platform sharing services.
      * a Sharing service can be: mail, sms, facebook, twitter,...
-     * This method is implemented if isNativeShareSupported() returned true for 
+     * This method is implemented if isNativeShareSupported() returned true for
      * a specific platform.
-     * 
-     * @param text String to share.
-     * @param image file path to the image or null
-     * @param mimeType type of the image or null if no image to share
+     *
+     * @param text       String to share.
+     * @param image      file path to the image or null
+     * @param mimeType   type of the image or null if no image to share
      * @param sourceRect The source rectangle of the button that originated the share request.  This is used on
-     * some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
-     * on the iPad with iOS 8 and higher.
+     *                   some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
+     *                   on the iPad with iOS 8 and higher.
      */
-    public static void share(String text, String image, String mimeType, Rectangle sourceRect){
+    public static void share(String text, String image, String mimeType, Rectangle sourceRect) {
         Display.INSTANCE.share(text, image, mimeType, sourceRect);
     }
-    
-        /**
+
+    /**
      * Register to receive push notification, invoke this method once (ever) to receive push
      * notifications.
      */
     public static void registerPush() {
         Display.impl.registerPush(new Hashtable(), false);
     }
-    
+
     /**
      * Stop receiving push notifications to this client application
      */
@@ -973,18 +984,20 @@ public class CN extends  CN1Constants {
 
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
-     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     *
+     * @param r    runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
      */
     public static Thread createThread(Runnable r, String name) {
         return Display.INSTANCE.createThread(r, name);
     }
-    
-    
+
+
     /**
      * Start a Codename One thread that supports crash protection and similar Codename One features.
-     * @param r runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
+     *
+     * @param r    runnable to run, <b>NOTICE</b> the thread MUST be explicitly started!
      * @param name the name for the thread
      * @return a thread instance which must be explicitly started!
      * @deprecated confusing name, use {@link #createThread(java.lang.Runnable, java.lang.String)} instead
@@ -993,50 +1006,53 @@ public class CN extends  CN1Constants {
         return Display.INSTANCE.startThread(r, name);
     }
 
-    
+
     /**
-     * Checks if the device supports disabling the screen display from dimming, allowing 
+     * Checks if the device supports disabling the screen display from dimming, allowing
      * the developer to keep the screen display on.
-     */ 
+     */
     public static boolean isScreenSaverDisableSupported() {
         return Display.impl.isScreenLockSupported();
     }
-    
-    /** 
-     * If isScreenSaverDisableSupported() returns true calling this method will 
+
+    /**
+     * If isScreenSaverDisableSupported() returns true calling this method will
      * lock the screen display on
+     *
      * @param e when set to true the screen saver will work as usual and when set to false the screen
-     * will not turn off automatically
+     *          will not turn off automatically
      */
-    public static void setScreenSaverEnabled(boolean e){
+    public static void setScreenSaverEnabled(boolean e) {
         Display.INSTANCE.setScreenSaverEnabled(e);
     }
 
     /**
      * Returns true if the device has camera false otherwise.
-     */ 
+     */
     public static boolean hasCamera() {
         return Display.impl.hasCamera();
     }
 
     /**
-     * Indicates whether the native picker dialog is supported for the given type 
+     * Indicates whether the native picker dialog is supported for the given type
      * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+     *
      * @param pickerType the picker type constant
      * @return true if the native platform supports this picker type
      */
     public static boolean isNativePickerTypeSupported(int pickerType) {
         return Display.impl.isNativePickerTypeSupported(pickerType);
     }
-    
+
     /**
-     * Shows a native modal dialog allowing us to perform the picking for the given type 
+     * Shows a native modal dialog allowing us to perform the picking for the given type
      * which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
-     * @param type the picker type constant
-     * @param source the source component (optional) the native dialog will be placed in relation to this
-     * component if applicable
+     *
+     * @param type         the picker type constant
+     * @param source       the source component (optional) the native dialog will be placed in relation to this
+     *                     component if applicable
      * @param currentValue the currently selected value
-     * @param data additional meta data specific to the picker type when applicable
+     * @param data         additional meta data specific to the picker type when applicable
      * @return the value from the picker or null if the operation was canceled.
      */
     public static Object showNativePicker(int type, Component source, Object currentValue, Object data) {
@@ -1045,6 +1061,7 @@ public class CN extends  CN1Constants {
 
     /**
      * Prints to the log
+     *
      * @param s the string
      */
     public static void log(String s) {
@@ -1054,12 +1071,13 @@ public class CN extends  CN1Constants {
 
     /**
      * Prints to the log
+     *
      * @param s the exception
      */
     public static void log(Throwable s) {
         Log.e(s);
     }
-    
+
     /**
      * Sends the log to your email account
      */
@@ -1073,8 +1091,9 @@ public class CN extends  CN1Constants {
      * native email client:
      * </p>
      * <script src="https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js"></script>
-     * @param subject e-mail subject
-     * @param msg the Message to send
+     *
+     * @param subject    e-mail subject
+     * @param msg        the Message to send
      * @param recipients array of e-mail addresses
      */
     public static void sendMessage(String subject, Message msg, String... recipients) {
@@ -1083,6 +1102,7 @@ public class CN extends  CN1Constants {
 
     /**
      * Allows detecting development mode so debugging code and special cases can be used to simplify flow
+     *
      * @return true if we are running in the simulator, false otherwise
      */
     public static boolean isSimulator() {
@@ -1090,11 +1110,11 @@ public class CN extends  CN1Constants {
     }
 
     /**
-     * Adds a header to the global default headers, this header will be implicitly added 
+     * Adds a header to the global default headers, this header will be implicitly added
      * to all requests going out from this point onwards. The main use case for this is
      * for authentication information communication via the header.
-     * 
-     * @param key the key of the header
+     *
+     * @param key   the key of the header
      * @param value the value of the header
      */
     public static void addDefaultHeader(String key, String value) {
@@ -1103,8 +1123,8 @@ public class CN extends  CN1Constants {
 
     /**
      * Identical to add to queue but waits until the request is processed in the queue,
-     * this is useful for completely synchronous operations. 
-     * 
+     * this is useful for completely synchronous operations.
+     *
      * @param request the request object to add
      */
     public static void addToQueueAndWait(final ConnectionRequest request) {
@@ -1124,6 +1144,7 @@ public class CN extends  CN1Constants {
      * Kills the given request and waits until the request is killed if it is
      * being processed by one of the threads. This method must not be invoked from
      * a network thread!
+     *
      * @param request
      */
     public static void killAndWait(final ConnectionRequest request) {
@@ -1171,6 +1192,7 @@ public class CN extends  CN1Constants {
 
     /**
      * Sets the number of network threads and restarts the network threads
+     *
      * @param threadCount the new number of threads
      */
     public static void updateNetworkThreadCount(int threadCount) {
@@ -1185,7 +1207,7 @@ public class CN extends  CN1Constants {
     public static void clearStorageCache() {
         Storage.getInstance().clearCache();
     }
-    
+
     /**
      * Flush the storage cache allowing implementations that cache storage objects
      * to store
@@ -1251,24 +1273,25 @@ public class CN extends  CN1Constants {
 
     /**
      * Returns the size in bytes of the given entry
+     *
      * @param name the name of the entry
      * @return the size in bytes
      */
     public static int storageEntrySize(String name) {
         return Storage.getInstance().entrySize(name);
     }
-    
+
     /**
      * <p>Writes the given object to storage assuming it is an externalizable type
      * or one of the supported types.</p>
-     * 
+     *
      * <p>
      * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
      * </p>
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param name store name
-     * @param o object to store
+     * @param o    object to store
      * @return true for success, false for failure
      */
     public static boolean writeObjectToStorage(String name, Object o) {
@@ -1281,7 +1304,6 @@ public class CN extends  CN1Constants {
      * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
      * </p>
      * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
-     *
      *
      * @param name name of the store
      * @return object stored under that name
@@ -1351,7 +1373,7 @@ public class CN extends  CN1Constants {
     public static void mkdir(String directory) {
         FileSystemStorage.getInstance().mkdir(directory);
     }
-    
+
 
     /**
      * Deletes the specific file or empty directory.
@@ -1387,7 +1409,7 @@ public class CN extends  CN1Constants {
      * Toggles the hidden state of the file
      *
      * @param file file
-     * @param h hidden state
+     * @param h    hidden state
      */
     public static void setHiddenFile(String file, boolean h) {
         FileSystemStorage.getInstance().setHidden(file, h);
@@ -1397,7 +1419,7 @@ public class CN extends  CN1Constants {
      * Renames a file to the given name, expects the new name to be relative to the
      * current directory
      *
-     * @param file absolute file name
+     * @param file    absolute file name
      * @param newName relative new name
      */
     public static void renameFile(String file, String newName) {
@@ -1415,17 +1437,18 @@ public class CN extends  CN1Constants {
     }
 
     /**
-     * Returns the time that the file denoted by this abstract pathname was 
+     * Returns the time that the file denoted by this abstract pathname was
      * last modified.
-     * @return A long value representing the time the file was last modified, 
+     *
+     * @return A long value representing the time the file was last modified,
      * measured in milliseconds
      * @deprecated this API requires additional privacy permissions on iOS
-     *     and might cause problems with iOS submissions
+     * and might cause problems with iOS submissions
      */
     public static long getFileLastModifiedFile(String file) {
         return FileSystemStorage.getInstance().getLastModified(file);
     }
-    
+
     /**
      * Indicates whether the given file is a directory
      *
@@ -1438,7 +1461,7 @@ public class CN extends  CN1Constants {
 
     /**
      * Opens an output stream to the given file
-     * 
+     *
      * @param file the file
      * @return the output stream
      */
@@ -1459,7 +1482,7 @@ public class CN extends  CN1Constants {
     /**
      * Opens an output stream to the given file
      *
-     * @param file the file
+     * @param file   the file
      * @param offset position in the file
      * @return the output stream
      */
@@ -1469,47 +1492,49 @@ public class CN extends  CN1Constants {
 
     /**
      * <p>The application home directory is a "safe place" to store files for this application in a portable way.
-     * On some platforms such as Android  &amp; iOS this path may be visible only to the 
+     * On some platforms such as Android  &amp; iOS this path may be visible only to the
      * application itself, other apps won't have permission to access this path.<br>
      * The sample below uses the app home directory to save a file so we can share it using the {@link com.codename1.components.ShareButton}:</p>
-     * 
-     *  <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
-     * 
+     *
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     *
      * @return a writable directory that represent the application home directory
      */
-     public static String getAppHomePath(){
+    public static String getAppHomePath() {
         return FileSystemStorage.getInstance().getAppHomePath();
     }
-     
-     /**
-      * Returns true if the device has a directory dedicated for "cache" files
-      * @return true if a caches style directory exists in this device type
-      */
-     public static boolean hasCachesDir() {
-        return FileSystemStorage.getInstance().hasCachesDir();
-     }
 
-     /**
-      * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
-      * is false
-      * @return file URL or null
-      */
-     public static String getCachesDir() {
+    /**
+     * Returns true if the device has a directory dedicated for "cache" files
+     *
+     * @return true if a caches style directory exists in this device type
+     */
+    public static boolean hasCachesDir() {
+        return FileSystemStorage.getInstance().hasCachesDir();
+    }
+
+    /**
+     * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+     * is false
+     *
+     * @return file URL or null
+     */
+    public static String getCachesDir() {
         return FileSystemStorage.getInstance().getCachesDir();
-     }
-     
-     /**
+    }
+
+    /**
      * Checks to see if you can prompt the user to install the app on their homescreen.
-     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it 
+     * This is only relevant for the Javascript port with PWAs.  This is not a "static" property, as it
      * only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
-     * previously prompted the user and they have declined, then this will return false.  
-     * 
-     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified 
+     * previously prompted the user and they have declined, then this will return false.
+     *
+     * <p>Best practice is to use {@link #onCanInstallOnHomescreen(java.lang.Runnable) } to be notified
      * when you are allowed to prompt the user for installation.  Then call {@link #promptInstallOnHomescreen() }
      * inside that method - or sometime after.</p>
-     * 
+     *
      * <h3>Example</h3>
-     * <pre>{@code 
+     * <pre>{@code
      * onCanInstallOnHomescreen(()->{
      *      if (canInstallOnHomescreen()) {
      *           if (promptInstallOnHomescreen()) {
@@ -1520,130 +1545,138 @@ public class CN extends  CN1Constants {
      *      }
      * });
      * }</pre>
-     * 
+     * <p>
      * https://developers.google.com/web/fundamentals/app-install-banners/
-     * @return True if you are able to prompt the user to install the app on their homescreen.  
-     * @see #promptInstallOnHomescreen() 
-     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     *
+     * @return True if you are able to prompt the user to install the app on their homescreen.
+     * @see #promptInstallOnHomescreen()
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable)
      * @since 6.0
      */
     public static boolean canInstallOnHomescreen() {
         return Display.impl.canInstallOnHomescreen();
     }
-    
+
     /**
-     * Prompts the user to install this app on their homescreen.  This is only relevant in the 
-     * javascript port. 
+     * Prompts the user to install this app on their homescreen.  This is only relevant in the
+     * javascript port.
+     *
      * @return The result of the user prompt.  {@literal true} if the user accepts the installation,
      * {@literal false} if they reject it.
-     * @see #canInstallOnHomescreen() 
-     * @see #onCanInstallOnHomescreen(java.lang.Runnable) 
+     * @see #canInstallOnHomescreen()
+     * @see #onCanInstallOnHomescreen(java.lang.Runnable)
      * @since 6.0
      */
     public static boolean promptInstallOnHomescreen() {
         return Display.impl.promptInstallOnHomescreen();
     }
-    
+
     /**
      * A callback fired when you are allowed to prompt the user to install the app on their homescreen.
      * Only relevant in the javascript port.
+     *
      * @param r Runnable that will be run when/if you are permitted to prompt the user to install
-     * the app on their homescreen.
+     *          the app on their homescreen.
      * @since 6.0
      */
     public static void onCanInstallOnHomescreen(Runnable r) {
         Display.impl.onCanInstallOnHomescreen(r);
     }
-    
+
     /**
      * Captures a screenshot of the screen.
+     *
      * @return An image of the screen, or null if it fails.
      * @since 7.0
      */
     public static Image captureScreen() {
         return Display.impl.captureScreen();
     }
-    
+
     /**
      * Adds a listener to receive messages from the native platform.  This is a mechanism to communicate
      * between the app and the native platform.  Currently the Javascript port is the only port to use
      * this mechanism.
-     * 
+     *
      * <p>In the Javascript port, javascript can send messages to the CN1 app by calling
-     * 
+     * <p>
      * {@code
      * window.dispatchEvent(new CustomEvent('cn1inbox', {detail:'The message', code: SOMEINTEGER}));
      * }
-     * 
+     *
      * @param l The listener.
      * @since 7.0
      */
     public static void addMessageListener(ActionListener<MessageEvent> l) {
         Display.INSTANCE.addMessageListener(l);
     }
-    
+
     /**
      * Removes a listener from receiving messages from the native platform.  This is a mechanism to communicate
      * between the app and the native platform.  Currently the Javascript port is the only port to use
      * this mechanism.
+     *
      * @param l The listener.
      * @since 7.0
      */
     public static void removeMessageListener(ActionListener<MessageEvent> l) {
         Display.INSTANCE.removeMessageListener(l);
     }
-    
+
     /**
      * Posts a message to the native platform.  This is a mechanism to communicate
      * between the app and the native platform.  Currently the Javascript port is the only port to use
      * this mechanism.
-     * 
+     *
      * <p>In the Javascript port these messages can be received in Javascript by adding an event listener
-     * for 'cn1outbox' events to the 'window' object.  The message is contained in the event data "detail" key. And the 
+     * for 'cn1outbox' events to the 'window' object.  The message is contained in the event data "detail" key. And the
      * code in the 'code' key.</p>
+     *
      * @param message The message to send to the native platform.
      * @since 7.0
      */
     public static void postMessage(MessageEvent message) {
         Display.INSTANCE.postMessage(message);
     }
-    
+
     /**
      * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
+     *
      * @param timeout The timeout in milliseconds.
-     * @param r The task to run.
+     * @param r       The task to run.
      * @return The Timer object that can be used to cancel the task.
+     * @see #setInterval(int, java.lang.Runnable)
      * @since 7.0
-     * @see #setInterval(int, java.lang.Runnable) 
      */
     public static Timer setTimeout(int timeout, Runnable r) {
         return Display.INSTANCE.setTimeout(timeout, r);
     }
-    
+
     /**
      * Convenience method to schedule a task to run on the EDT after {@literal period}ms
      * repeating every {@literal period}ms.
+     *
      * @param timeout The delay and repeat in milliseconds.
-     * @param r The runnable to run on the EDT.
+     * @param r       The runnable to run on the EDT.
      * @return The timer object which can be used to cancel the task.
+     * @see #setTimeout(int, java.lang.Runnable)
      * @since 7.0
-     * @see #setTimeout(int, java.lang.Runnable) 
      */
     public static Timer setInterval(int timeout, Runnable r) {
         return Display.INSTANCE.setInterval(timeout, r);
     }
-    
+
     /**
      * Gets a reference to an application-wide shared Javascript context that can be used for running
      * Javascript commands.  When running in the Javascript port, this Javascript context will be the
-     * same context in which the application itself is running, so it gives you the ability to interact 
+     * same context in which the application itself is running, so it gives you the ability to interact
      * with the browser and DOM directly using the familiar {@link BrowserComponent} API.
-     * 
+     *
      * <p>When running on other platforms, this shared context will be an off-screen browser component.</p>
-     * 
+     *
      * <p>Sample code allowing user to execute arbitrary Javascript code inside the shared context:</p>
      * <script src="https://gist.github.com/shannah/60040d9b3cc520b28bc1fef5e31afd31.js"></script>
-     * 
+     *
      * @return A shared BrowserComponent
      * @since 7.0
      */
@@ -1653,6 +1686,7 @@ public class CN extends  CN1Constants {
 
     /**
      * Returns the plugin support object for the current platform.  Use this object for registering plugins.
+     *
      * @return The plugin support object.
      * @since 8.0
      */
