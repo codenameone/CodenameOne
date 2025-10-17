@@ -43,6 +43,21 @@ name: Test Android build scripts
       - 'tests/**'
       - '!tests/**/*.md'
 
+# The token in secrets.CN1SS_GH_TOKEN was generated on
+# Oct 16th 2025. If in Oct 2026 builds start failing, it
+# means the token needs to be regenerated:
+#	1.	Go to https://github.com/settings/tokens → “Developer settings” → “Personal access tokens”.
+#	2.	Choose Fine-grained token (recommended).
+#	3.	Grant:
+#	•	Repository access → select Codename One
+#	•	Permissions:
+#	•	Contents → Read and Write
+#	•	Pull requests → Read and Write
+#	•	Issues → Read and Write
+#	4.	Copy the generated token
+#   5. Go to https://github.com/codenameone/CodenameOne/settings/secrets/actions
+#     and edit the CN1SS_GH_TOKEN to use the new token
+
 jobs:
   build-android:
     permissions:
