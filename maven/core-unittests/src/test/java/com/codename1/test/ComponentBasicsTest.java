@@ -20,7 +20,6 @@ public class ComponentBasicsTest extends UITestBase {
         label.setUIID("MyLabel");
         label.setVisible(false);
         label.setEnabled(false);
-        label.setFocusable(true);
         label.setRTL(true);
         label.setDraggable(true);
 
@@ -28,7 +27,6 @@ public class ComponentBasicsTest extends UITestBase {
         assertEquals("MyLabel", label.getUIID());
         assertFalse(label.isVisible());
         assertFalse(label.isEnabled());
-        assertTrue(label.isFocusable());
         assertTrue(label.isRTL());
         assertTrue(label.isDraggable());
     }

@@ -9,8 +9,11 @@ import org.junit.jupiter.api.BeforeEach;
 
 import java.lang.reflect.Field;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +40,10 @@ public abstract class UITestBase {
         when(implementation.getDefaultFont()).thenReturn(new Object());
         when(implementation.isInitialized()).thenReturn(true);
         when(implementation.getCommandBehavior()).thenReturn(Display.COMMAND_BEHAVIOR_DEFAULT);
+        when(implementation.isNativeFontSchemeSupported()).thenReturn(false);
+        when(implementation.loadTrueTypeFont(anyString(), anyString())).thenAnswer(invocation -> new Object());
+        when(implementation.deriveTrueTypeFont(any(), anyFloat(), anyInt())).thenAnswer(invocation -> new Object());
+        when(implementation.loadNativeFont(anyString())).thenAnswer(invocation -> new Object());
 
         pluginSupport = new PluginSupport();
 
@@ -56,7 +63,11 @@ public abstract class UITestBase {
     private void setDisplayField(String fieldName, Object value) throws Exception {
         Field field = Display.class.getDeclaredField(fieldName);
         field.setAccessible(true);
-        field.set(display, value);
+        if ((field.getModifiers() & java.lang.reflect.Modifier.STATIC) != 0) {
+            field.set(null, value);
+        } else {
+            field.set(display, value);
+        }
     }
 
     private void resetUIManager() throws Exception {
