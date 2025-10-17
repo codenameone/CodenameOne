@@ -4,13 +4,44 @@ name: Test Android build scripts
 'on':
   pull_request:
     paths:
-      - 'scripts/**'
-      - 'BUILDING.md'
+      - '.github/workflows/scripts-android.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-android-port.sh'
+      - 'scripts/build-android-app.sh'
+      - 'scripts/run-android-instrumentation-tests.sh'
+      - 'scripts/android/lib/**/*.py'
+      - 'scripts/android/tests/**/*.py'
+      - 'scripts/android/screenshots/**'
+      - '!scripts/android/screenshots/**/*.md'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/Android/**'
+      - '!Ports/Android/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
   push:
     branches:
       - master
-    paths-ignore:
-      - '**/*.md'
+    paths:
+      - '.github/workflows/scripts-android.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-android-port.sh'
+      - 'scripts/build-android-app.sh'
+      - 'scripts/run-android-instrumentation-tests.sh'
+      - 'scripts/android/lib/**/*.py'
+      - 'scripts/android/tests/**/*.py'
+      - 'scripts/android/screenshots/**'
+      - '!scripts/android/screenshots/**/*.md'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/Android/**'
+      - '!Ports/Android/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
 
 jobs:
   build-android:
