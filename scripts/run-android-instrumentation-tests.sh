@@ -8,14 +8,18 @@ ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
-# CN1SS helpers are implemented in Python for easier maintenance
-CN1SS_TOOL=""
+# CN1SS helpers are implemented in Java for easier maintenance
+CN1SS_SOURCE_PATH=""
+CN1SS_MAIN_CLASS="Cn1ssChunkTools"
+POST_COMMENT_CLASS="PostPrComment"
+PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
+RENDER_SCREENSHOT_REPORT_CLASS="RenderScreenshotReport"
 
 count_chunks() {
   local f="${1:-}"
   local test="${2:-}"
   local channel="${3:-}"
-  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
     echo 0
     return
   fi
@@ -30,14 +34,14 @@ count_chunks() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  python3 "$CN1SS_TOOL" "${args[@]}" 2>/dev/null || echo 0
+  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" "${args[@]}" 2>/dev/null || echo 0
 }
 
 extract_cn1ss_base64() {
   local f="${1:-}"
   local test="${2:-}"
   local channel="${3:-}"
-  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
     return 1
   fi
   if [ -z "$f" ] || [ ! -r "$f" ]; then
@@ -50,14 +54,14 @@ extract_cn1ss_base64() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  python3 "$CN1SS_TOOL" "${args[@]}"
+  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" "${args[@]}"
 }
 
 decode_cn1ss_binary() {
   local f="${1:-}"
   local test="${2:-}"
   local channel="${3:-}"
-  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
     return 1
   fi
   if [ -z "$f" ] || [ ! -r "$f" ]; then
@@ -70,18 +74,18 @@ decode_cn1ss_binary() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  python3 "$CN1SS_TOOL" "${args[@]}"
+  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" "${args[@]}"
 }
 
 list_cn1ss_tests() {
   local f="${1:-}"
-  if [ -z "$CN1SS_TOOL" ] || [ ! -x "$CN1SS_TOOL" ]; then
+  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
     return 1
   fi
   if [ -z "$f" ] || [ ! -r "$f" ]; then
     return 1
   fi
-  python3 "$CN1SS_TOOL" tests "$f"
+  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" tests "$f"
 }
 
 
@@ -111,7 +115,7 @@ post_pr_comment() {
   local body_size
   body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
   ra_log "Attempting to post PR comment (payload bytes=${body_size})"
-  GITHUB_TOKEN="$comment_token" python3 "$SCRIPT_DIR/android/tests/post_pr_comment.py" \
+  GITHUB_TOKEN="$comment_token" "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$POST_COMMENT_CLASS.java" \
     --body "$body_file" \
     --preview-dir "$preview_dir"
   local rc=$?
@@ -214,9 +218,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-CN1SS_TOOL="$SCRIPT_DIR/android/tests/cn1ss_chunk_tools.py"
-if [ ! -x "$CN1SS_TOOL" ]; then
-  ra_log "Missing CN1SS helper: $CN1SS_TOOL" >&2
+CN1SS_SOURCE_PATH="$SCRIPT_DIR/android/tests"
+if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
+  ra_log "Missing CN1SS helper: $CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" >&2
   exit 3
 fi
 
@@ -237,6 +241,17 @@ ra_log "Loading workspace environment from $ENV_FILE"
 [ -f "$ENV_FILE" ] || { ra_log "Missing env file: $ENV_FILE"; exit 3; }
 # shellcheck disable=SC1090
 source "$ENV_FILE"
+
+if [ -z "${JAVA17_HOME:-}" ]; then
+  ra_log "JAVA17_HOME not set in workspace environment" >&2
+  exit 3
+fi
+
+JAVA17_BIN="$JAVA17_HOME/bin/java"
+if [ ! -x "$JAVA17_BIN" ]; then
+  ra_log "JDK 17 java binary missing at $JAVA17_BIN" >&2
+  exit 3
+fi
 
 [ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
@@ -428,7 +443,7 @@ done
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 ra_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
-python3 "$SCRIPT_DIR/android/tests/process_screenshots.py" \
+"$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$PROCESS_SCREENSHOTS_CLASS.java" \
   --reference-dir "$SCREENSHOT_REF_DIR" \
   --emit-base64 \
   --preview-dir "$SCREENSHOT_PREVIEW_DIR" \
@@ -438,7 +453,7 @@ SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
 ra_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
-python3 "$SCRIPT_DIR/android/tests/render_screenshot_report.py" \
+"$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$RENDER_SCREENSHOT_REPORT_CLASS.java" \
   --compare-json "$COMPARE_JSON" \
   --comment-out "$COMMENT_FILE" \
   --summary-out "$SUMMARY_FILE"
