@@ -2873,7 +2873,7 @@ public final class GeneralPath implements Shape {
         int up = 0;
         int down = 0;
         boolean intersects = false;
-        // PMD Fix (AvoidBranchingStatementAsLastInLoop): Stop relying on a terminal break by guarding the loop with the intersects flag.
+        // PMD Fix (AvoidBranchingStatementAsLastInLoop): Guard the loop with the intersects flag instead of breaking at the end.
         for (int i = 2; i < bc && !intersects; i += 4) {
             if (bound[i] < py1) {
                 up++;

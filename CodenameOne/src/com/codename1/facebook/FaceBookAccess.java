@@ -1054,8 +1054,8 @@ public class FaceBookAccess {
 
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/notifications.getList", false);
         con.addArgument("start_time", startTime);
-        // PMD Fix (UnnecessaryConversionTemporary, PrimitiveWrapperInstantiation): Avoid boxing boolean via constructor and temporary string.
-        con.addArgument("include_read", Boolean.toString(includeRead));
+        // PMD Fix (UnnecessaryConversionTemporary, PrimitiveWrapperInstantiation): Avoid boxing boolean via constructor and temporary string while staying compatible with Codename One APIs.
+        con.addArgument("include_read", includeRead ? "true" : "false");
         con.addArgument("format", "json");
 
         con.setResponseDestination(notifications);
