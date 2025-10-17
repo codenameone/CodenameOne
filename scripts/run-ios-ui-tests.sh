@@ -246,6 +246,17 @@ ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 
+#
+# Force xcodebuild to run only the UI tests; the unit-test bundle has a broken TEST_HOST.
+# Change these names if your targets have different names.
+#
+UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
+SKIP_TEST_TARGET="${SKIP_TEST_TARGET:-HelloCodenameOneTests}"
+XCODE_TEST_FILTERS=(
+  -only-testing:"${UI_TEST_TARGET}"
+  -skip-testing:"${SKIP_TEST_TARGET}"
+)
+
 set -o pipefail
 if ! xcodebuild \
   -workspace "$WORKSPACE_PATH" \
