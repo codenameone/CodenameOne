@@ -174,6 +174,90 @@ fi
 
 bia_log "Found generated iOS project at $PROJECT_DIR"
 
+# --- Ruby/gem environment alignment (make sure this ruby sees xcodeproj) ---
+if ! command -v ruby >/dev/null; then
+  bia_log "ruby not found on PATH"; exit 1
+fi
+export PATH="$(ruby -e 'print Gem.user_dir')/bin:$PATH"
+if ! ruby -rrubygems -e 'exit(Gem::Specification.find_all_by_name("xcodeproj").empty? ? 1 : 0)'; then
+  bia_log "Installing xcodeproj gem for current ruby"
+  gem install xcodeproj --no-document --user-install
+fi
+ruby -rrubygems -e 'abort("xcodeproj gem still missing") if Gem::Specification.find_all_by_name("xcodeproj").empty?'
+
+# --- Locate the .xcodeproj and pass it to Ruby explicitly ---
+XCODEPROJ="$PROJECT_DIR/HelloCodenameOne.xcodeproj"
+if [ ! -d "$XCODEPROJ" ]; then
+  # fallback: first .xcodeproj in the dir
+  XCODEPROJ="$(/bin/ls -1d "$PROJECT_DIR"/*.xcodeproj 2>/dev/null | head -n1 || true)"
+fi
+if [ -z "$XCODEPROJ" ] || [ ! -d "$XCODEPROJ" ]; then
+  bia_log "Failed to locate .xcodeproj under $PROJECT_DIR"; exit 1
+fi
+export XCODEPROJ
+bia_log "Using Xcode project: $XCODEPROJ"
+
+# --- Ensure a UITests target exists and a shared CI scheme includes only that testable ---
+ruby -rrubygems -rxcodeproj -e '
+require "fileutils"
+proj_path = ENV["XCODEPROJ"] or abort("XCODEPROJ env not set")
+proj = Xcodeproj::Project.open(proj_path)
+
+app_target = proj.targets.find { |t| t.product_type == "com.apple.product-type.application" } || proj.targets.first
+ui_name    = "HelloCodenameOneUITests"
+ui_target  = proj.targets.find { |t| t.name == ui_name }
+
+unless ui_target
+  ui_target = proj.new_target(:ui_test_bundle, ui_name, :ios, "18.0")
+  ui_target.product_reference.name = "#{ui_name}.xctest"
+  ui_target.add_dependency(app_target) if app_target
+end
+
+proj.save
+
+# Create/update a shared scheme that only contains the UITests testable
+ws_dir = File.join(File.dirname(proj_path), "HelloCodenameOne.xcworkspace")
+schemes_root = if File.directory?(ws_dir)
+  File.join(ws_dir, "xcshareddata", "xcschemes")
+else
+  File.join(File.dirname(proj_path), "xcshareddata", "xcschemes")
+end
+FileUtils.mkdir_p(schemes_root)
+scheme_path = File.join(schemes_root, "HelloCodenameOne-CI.xcscheme")
+
+scheme = if File.exist?(scheme_path)
+  Xcodeproj::XCScheme.new(scheme_path)
+else
+  Xcodeproj::XCScheme.new
+end
+
+# Build action: keep app only (no unit-test bundles)
+scheme.build_action.entries = []
+if app_target
+  scheme.add_build_target(app_target)
+end
+
+# Test action: only the UITests bundle
+scheme.test_action = Xcodeproj::XCScheme::TestAction.new
+scheme.test_action.xml_element.elements.delete_all("Testables")
+scheme.add_test_target(ui_target)
+
+scheme.launch_action.build_configuration = "Debug"
+scheme.test_action.build_configuration   = "Debug"
+scheme.save_as(proj, "HelloCodenameOne-CI", true)
+'
+
+# Show what we created
+WS_XCSCHEME="$PROJECT_DIR/HelloCodenameOne.xcworkspace/xcshareddata/xcschemes/HelloCodenameOne-CI.xcscheme"
+PRJ_XCSCHEME="$PROJECT_DIR/xcshareddata/xcschemes/HelloCodenameOne-CI.xcscheme"
+if [ -f "$WS_XCSCHEME" ]; then
+  bia_log "CI scheme (workspace): $WS_XCSCHEME"; grep -n "BlueprintName" "$WS_XCSCHEME" || true
+elif [ -f "$PRJ_XCSCHEME" ]; then
+  bia_log "CI scheme (project):   $PRJ_XCSCHEME"; grep -n "BlueprintName" "$PRJ_XCSCHEME" || true
+else
+  bia_log "Warning: CI scheme not found after generation"
+fi
+
 # Ensure we’re using the same Ruby/gems that CI installed
 if ! command -v ruby >/dev/null; then
   bia_log "ruby not found on PATH"; exit 1
