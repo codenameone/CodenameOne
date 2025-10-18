@@ -219,9 +219,9 @@ public class User extends FBObject {
         } else if (tz instanceof Long) {
             timezone = ((Long) tz).longValue();
         } else if (tz instanceof Short) {
-            timezone = ((Short) tz).longValue();
+            timezone = ((Short) tz).shortValue();
         } else if (tz instanceof Byte) {
-            timezone = ((Byte) tz).longValue();
+            timezone = ((Byte) tz).byteValue();
         } else if (tz instanceof Double) {
             timezone = (long) ((Double) tz).doubleValue();
         } else if (tz instanceof Float) {
