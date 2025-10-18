@@ -259,6 +259,7 @@ rm -rf "$DERIVED_DATA_DIR"
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
+  -skip-testing:HelloCodenameOneTests
 )
 
 set -o pipefail

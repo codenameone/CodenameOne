@@ -174,6 +174,15 @@ fi
 
 bia_log "Found generated iOS project at $PROJECT_DIR"
 
+PBXPROJ="$PROJECT_DIR/HelloCodenameOne.xcodeproj/project.pbxproj"
+if [ -f "$PBXPROJ" ]; then
+  bia_log "Patching TEST_HOST in $PBXPROJ (remove '-src' suffix)"
+  cp "$PBXPROJ" "$PBXPROJ.bak"
+  perl -0777 -pe 's/(TEST_HOST = .*?\.app\/)([^"\/]+)-src(";\n)/$1$2$3/s' \
+    "$PBXPROJ.bak" > "$PBXPROJ"
+  grep -n "TEST_HOST =" "$PBXPROJ" || true
+fi
+
 UITEST_TEMPLATE="$SCRIPT_DIR/ios/tests/HelloCodenameOneUITests.swift.tmpl"
 if [ -f "$UITEST_TEMPLATE" ]; then
   IOS_UITEST_DIR="$(find "$PROJECT_DIR" -maxdepth 1 -type d -name '*UITests' -print -quit 2>/dev/null || true)"
