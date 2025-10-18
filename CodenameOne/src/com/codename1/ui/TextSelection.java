@@ -91,7 +91,14 @@ public class TextSelection {
             double y1 = getScaledY(o1);
             double y2 = getScaledY(o2);
 
-            int compareY = Double.compare(y1, y2);
+            int compareY;
+            if (y1 < y2) {
+                compareY = -1;
+            } else if (y1 > y2) {
+                compareY = 1;
+            } else {
+                compareY = 0;
+            }
             if (compareY != 0) {
                 return compareY;
             }
@@ -143,7 +150,14 @@ public class TextSelection {
             double y1 = getScaledY(o1);
             double y2 = getScaledY(o2);
 
-            int compareY = Double.compare(y1, y2);
+            int compareY;
+            if (y1 < y2) {
+                compareY = -1;
+            } else if (y1 > y2) {
+                compareY = 1;
+            } else {
+                compareY = 0;
+            }
             if (compareY != 0) {
                 return compareY;
             }
