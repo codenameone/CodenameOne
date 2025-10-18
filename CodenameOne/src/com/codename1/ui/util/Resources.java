@@ -541,6 +541,10 @@ public class Resources {
      * Reads the header of the resource file
      */
     private void readHeader() throws IOException {
+        // The header begins with a short denoting the size of the header section.
+        // We don't currently use this value, but it must be consumed so that the
+        // subsequent reads stay aligned with the original format.
+        input.readShort();
         majorVersion = input.readShort();
         minorVersion = input.readShort();
 
