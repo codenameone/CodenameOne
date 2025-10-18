@@ -567,7 +567,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      */
     public void setText(String t) {
         String old = this.text;
-        if (!java.util.Objects.equals(t, old)) {
+        if (!Objects.equals(t, old)) {
             // If we've previously suppressed action events,
             // we need to unsuppress them upon the text changing again.
             setSuppressActionEvent(false);

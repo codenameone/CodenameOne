@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.tree;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.components.SpanButton;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -43,7 +44,6 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
 import java.util.Vector;
 

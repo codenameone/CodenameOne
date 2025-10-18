@@ -24,11 +24,11 @@
 
 package com.codename1.ui;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
 import java.util.HashMap;
-import java.util.Objects;
 
 /**
  * The Command class provides a useful extension to the ActionListener

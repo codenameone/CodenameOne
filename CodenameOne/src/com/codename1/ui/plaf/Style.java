@@ -3107,10 +3107,10 @@ public class Style {
         if (this.bgColor != other.bgColor) {
             return false;
         }
-        if (!java.util.Objects.equals(this.font, other.font)) {
+        if (!Objects.equals(this.font, other.font)) {
             return false;
         }
-        if (!java.util.Objects.equals(this.bgImage, other.bgImage)) {
+        if (!Objects.equals(this.bgImage, other.bgImage)) {
             return false;
         }
         if (!Objects.deepEquals(this.padding, other.padding)) {
@@ -3141,7 +3141,7 @@ public class Style {
                 other.backgroundGradient)) {
             return false;
         }
-        if (!java.util.Objects.equals(this.border, other.border)) {
+        if (!Objects.equals(this.border, other.border)) {
             return false;
         }
         if (this.align != other.align) {

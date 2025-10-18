@@ -82,7 +82,11 @@ class XMLContent implements StructuredContent {
     }
 
     private static Reader wrap(String content) {
-        return new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8");
+        try {
+            return new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e.toString());
+        }
     }
 
     /**

@@ -67,7 +67,7 @@ public class CommonProgressAnimations {
                 return getProgressAnimation(cmp);
             }
             try {
-                ProgressAnimation prg = type.newInstance();
+                ProgressAnimation prg = (ProgressAnimation) type.newInstance();
                 prg.setPreferredH(cmp.getPreferredH());
                 prg.setPreferredW(cmp.getPreferredW());
                 replaceUntilReady(cmp, prg);

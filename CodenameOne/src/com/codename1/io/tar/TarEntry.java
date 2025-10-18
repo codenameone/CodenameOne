@@ -49,7 +49,7 @@ public class TarEntry {
     }
 
     public boolean equals(TarEntry it) {
-        return this.header.name.toString().contentEquals(it.header.name);
+        return this.header.name.toString().equals( it.header.name.toString() );
     }
 
     public boolean isDescendent(TarEntry desc) {

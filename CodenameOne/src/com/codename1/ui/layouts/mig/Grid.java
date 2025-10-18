@@ -1,5 +1,6 @@
 package com.codename1.ui.layouts.mig;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
@@ -9,7 +10,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeSet;
 /*
  * License (BSD):

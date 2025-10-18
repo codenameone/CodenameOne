@@ -23,7 +23,7 @@
 
 package com.codename1.properties;
 
-import java.util.Objects;
+import com.codename1.compat.java.util.Objects;
 
 /**
  * Base class for a property, it can store a generic value of any type and broadcast change events to

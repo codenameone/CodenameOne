@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -41,7 +42,6 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 import java.util.Collection;
-import java.util.Objects;
 import java.util.Vector;
 
 /**

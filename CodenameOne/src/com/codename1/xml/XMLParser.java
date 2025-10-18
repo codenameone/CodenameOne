@@ -641,7 +641,7 @@ public class XMLParser {
                     c = (char) i;
                 }
                 if (lastChar != '/') { // If this is an empty tag, no need to search for its closing tag as there's none...
-                    String endTag = String.valueOf('<' + '/' + tagName) + '>';
+                    String endTag = new StringBuilder().append('<').append('/').append(tagName).append('>').toString();
                     int index = 0;
                     int elen = endTag.length();
                     while (index < elen) {

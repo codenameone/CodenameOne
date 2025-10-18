@@ -283,7 +283,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         ArrayList al = new ArrayList();
         for (Object o : l) {
             if (o instanceof Map) {
-                PropertyBusinessObject po = recursiveType.newInstance();
+                PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
                 po.getPropertyIndex().populateFromMap((Map<String, Object>) o, recursiveType);
                 al.add(po);
                 continue;
@@ -473,7 +473,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                                     }
                                 } else {
                                     if (recursiveType != null) {
-                                        PropertyBusinessObject po = recursiveType.newInstance();
+                                        PropertyBusinessObject po = (PropertyBusinessObject) recursiveType.newInstance();
                                         po.getPropertyIndex().populateFromMap((Map<String, Object>) val, recursiveType);
                                         p.setImpl(po);
                                     }
@@ -748,7 +748,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      */
     public PropertyBusinessObject newInstance() {
         try {
-            return parent.getClass().newInstance();
+            return (PropertyBusinessObject) parent.getClass().newInstance();
         } catch (Exception err) {
             Log.e(err);
             return null;

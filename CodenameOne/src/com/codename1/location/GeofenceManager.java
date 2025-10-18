@@ -299,7 +299,7 @@ public class GeofenceManager implements Iterable<Geofence> {
         Class<? extends GeofenceListener> c = getListenerClass();
         if (c != null) {
             try {
-                return c.newInstance();
+                return (GeofenceListener) c.newInstance();
             } catch (Throwable t) {
                 Log.e(t);
             }

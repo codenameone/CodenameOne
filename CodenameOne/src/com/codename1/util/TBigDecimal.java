@@ -2449,7 +2449,7 @@ class TBigDecimal {
                 result.append(intStr.substring(begin));
             } else {
                 delta = begin - delta;
-                result.append(intStr, begin, delta);
+                result.append(intStr.substring(begin, delta));
                 result.append('.');
                 result.append(intStr.substring(delta));
             }

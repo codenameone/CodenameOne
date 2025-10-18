@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.spinner;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
@@ -39,7 +40,6 @@ import com.codename1.ui.plaf.UIManager;
 
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Objects;
 
 /**
  * A spinner allows us to select a numeric, date or time value using the arrow keys

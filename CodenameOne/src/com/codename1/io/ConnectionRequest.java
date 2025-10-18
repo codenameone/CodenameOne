@@ -2809,7 +2809,7 @@ public class ConnectionRequest implements IOProgressListener {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             try {
                 requestBodyData.appendTo(baos);
-                return baos.toString("UTF-8");
+                return new String(baos.toByteArray(), "UTF-8");
             } catch (Exception ex) {
                 Log.e(ex);
                 throw new RuntimeException("Failed to write request body to string");

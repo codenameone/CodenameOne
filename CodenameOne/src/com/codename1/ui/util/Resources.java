@@ -202,7 +202,12 @@ public class Resources {
             key = null;
             return;
         }
-        key = password.getBytes("UTF-8");
+        try {
+            key = password.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            // won't happen
+            Log.e(ex);
+        }
     }
 
     private static String[] toStringArray(ArrayList<String> v) {

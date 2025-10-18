@@ -4517,7 +4517,7 @@ public abstract class CodenameOneImplementation {
             }
             i.close();
             bo.close();
-            String htmlText = bo.toString("UTF-8");
+            String htmlText = new String(bo.toByteArray(), "UTF-8");
             String baseUrl = url.substring(0, url.lastIndexOf('/'));
             setBrowserPage(browserPeer, htmlText, baseUrl);
         } catch (IOException ex) {

@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.compat.java.util.Objects;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InteractionDialog;
 import com.codename1.impl.CodenameOneImplementation;
@@ -51,7 +52,6 @@ import com.codename1.ui.util.Resources;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Objects;
 
 /**
  * <p>The component class is the basis of all UI widgets in Codename One, to arrange multiple components
