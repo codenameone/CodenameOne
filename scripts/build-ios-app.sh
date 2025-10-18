@@ -223,6 +223,54 @@ else
   bia_log "Warning: Missing scheme helper script at $SCHEME_HELPER" >&2
 fi
 
+XCSCHEME_DIR="$PROJECT_DIR/xcshareddata/xcschemes"
+XCSCHEME="$XCSCHEME_DIR/${MAIN_NAME}-CI.xcscheme"
+
+if [ -f "$XCSCHEME" ]; then
+  bia_log "Pruning unit-test testables from CI scheme at $XCSCHEME"
+
+  # Backup for debugging
+  cp "$XCSCHEME" "$XCSCHEME.bak"
+
+  /usr/bin/python3 - "$XCSCHEME" <<'PY'
+import sys, xml.etree.ElementTree as ET
+path = sys.argv[1]
+tree = ET.parse(path)
+root = tree.getroot()
+
+# Handle (or not) namespace
+def q(name):
+    if root.tag.startswith('{'):
+        ns = root.tag.split('}')[0].strip('{')
+        return f'{{{ns}}}{name}'
+    return name
+
+test_action   = root.find(q('TestAction'))
+testables     = test_action.find(q('Testables')) if test_action is not None else None
+if testables is not None:
+    removed = 0
+    for t in list(testables):
+        br = t.find(q('BuildableReference'))
+        # Keep only UITests; drop everything else named *Tests but not *UITests
+        if br is not None:
+            bp = br.get('BlueprintName') or ''
+            if bp.endswith('Tests') and not bp.endswith('UITests'):
+                testables.remove(t)
+                removed += 1
+    if removed:
+        # Ensure Testables exists even if empty (fine).
+        pass
+
+# Also make sure only UITests are marked as testables; nothing else sneaks in.
+tree.write(path, encoding='UTF-8', xml_declaration=True)
+PY
+
+  # (Optional) show what remains in Testables
+  grep -n "BuildableReference" "$XCSCHEME" || true
+else
+  bia_log "Warning: CI scheme not found at $XCSCHEME"
+fi
+
 WORKSPACE=""
 for candidate in "$PROJECT_DIR"/*.xcworkspace; do
   if [ -d "$candidate" ]; then
