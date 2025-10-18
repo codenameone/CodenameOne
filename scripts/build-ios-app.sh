@@ -69,6 +69,28 @@ if [ ! -d "$SOURCE_PROJECT" ]; then
   bia_log "Source project template not found at $SOURCE_PROJECT" >&2
   exit 1
 fi
+
+# --- Build iOS project ---
+DERIVED_DATA_DIR="${TMPDIR}/codenameone-ios-derived"
+rm -rf "$DERIVED_DATA_DIR"
+mkdir -p "$DERIVED_DATA_DIR"
+
+# >>> Add this block <<<
+# Pin the Xcode used by GitHub’s macOS 15 runner
+export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
+export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
+xcodebuild -version   # helpful early failure if Xcode path ever changes
+# <<< Add this block <<<
+
+bia_log "Building iOS Xcode project using Codename One port"
+"${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package \
+  -DskipTests \
+  -Dcodename1.platform=ios \
+  -Dcodename1.buildTarget=ios-source \
+  -Dopen=false \
+  -Dcodenameone.version="$CN1_VERSION" \
+  "${EXTRA_MVN_ARGS[@]}"
+
 bia_log "Using source project template at $SOURCE_PROJECT"
 
 LOCAL_MAVEN_REPO="${LOCAL_MAVEN_REPO:-$HOME/.m2/repository}"
@@ -244,7 +266,8 @@ scheme.add_test_target(ui_target)
 
 scheme.launch_action.build_configuration = "Debug"
 scheme.test_action.build_configuration   = "Debug"
-scheme.save_as(proj, "HelloCodenameOne-CI", true)
+save_root = File.directory?(ws_dir) ? ws_dir : proj_path
+scheme.save_as(save_root, "HelloCodenameOne-CI", true)
 '
 
 # Show what we created
