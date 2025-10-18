@@ -63,12 +63,12 @@ jobs:
       - name: Ensure CocoaPods tooling
         run: |
           set -euo pipefail
-          if ! command -v pod >/dev/null 2>&1; then
-            sudo gem install cocoapods --no-document
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
           fi
-          if ! ruby -rrubygems -e "exit(Gem::Specification::find_all_by_name('xcodeproj').empty? ? 1 : 0)"; then
-            sudo gem install xcodeproj --no-document
-          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          gem install cocoapods xcodeproj --no-document --user-install
           pod --version
 
       - name: Restore cn1-binaries cache

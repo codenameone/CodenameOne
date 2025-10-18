@@ -174,6 +174,25 @@ fi
 
 bia_log "Found generated iOS project at $PROJECT_DIR"
 
+# Ensure we’re using the same Ruby/gems that CI installed
+if ! command -v ruby >/dev/null; then
+  bia_log "ruby not found on PATH"; exit 1
+fi
+
+# Make sure user gem bin dir is on PATH (works for both setup styles)
+USER_GEM_BIN="$(ruby -e 'print Gem.user_dir')/bin"
+export PATH="$USER_GEM_BIN:$PATH"
+
+# Verify xcodeproj gem is available to *this* ruby
+if ! ruby -rrubygems -e 'exit(Gem::Specification.find_all_by_name("xcodeproj").empty? ? 1 : 0)'; then
+  # Last resort: install to user gem dir (no sudo) for this Ruby
+  bia_log "Installing xcodeproj gem for current ruby"
+  gem install xcodeproj --no-document --user-install
+fi
+
+# Re-check
+ruby -rrubygems -e 'abort("xcodeproj gem still missing") if Gem::Specification.find_all_by_name("xcodeproj").empty?'
+
 # --- Ensure a UI Tests target exists and is hooked into the CI scheme ---
 
 PRJ="$PROJECT_DIR/HelloCodenameOne.xcodeproj"
@@ -183,7 +202,7 @@ UIT_TARGET_NAME="${APP_TARGET_NAME}UITests"
 UIT_DIR="$PROJECT_DIR/${UIT_TARGET_NAME}"
 
 # 1) Create UITests target (if missing) using the xcodeproj Ruby gem
-/usr/bin/ruby -rxcodeproj -e '
+ruby -rrubygems -rxcodeproj -e '
 require "xcodeproj"
 prj_path   = ENV["PRJ"]
 app_name   = ENV["APP_TARGET_NAME"]
