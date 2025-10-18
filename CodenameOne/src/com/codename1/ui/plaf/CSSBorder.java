@@ -19,6 +19,7 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.util.Resources;
+import com.codename1.util.StringUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -871,7 +872,9 @@ public class CSSBorder extends Border {
         }
 
         BoxShadow shadow = new BoxShadow();
-        String[] rawParts = trimmed.split("\\s+");
+        List<String> rawPartsList = StringUtil.tokenize(trimmed, " \t\r\n");
+        String[] rawParts = new String[rawPartsList.size()];
+        rawPartsList.toArray(rawParts);
         int idx = 0;
         if (idx < rawParts.length && "inset".equalsIgnoreCase(rawParts[idx])) {
             shadow.inset = true;

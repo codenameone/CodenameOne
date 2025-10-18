@@ -214,8 +214,18 @@ public class User extends FBObject {
         gender = (String) toCopy.get("gender");
         relationship_status = (String) toCopy.get("relationship_status");
         Object tz = toCopy.get("timezone");
-        if (tz instanceof Number) {
-            timezone = ((Number) tz).longValue();
+        if (tz instanceof Integer) {
+            timezone = ((Integer) tz).longValue();
+        } else if (tz instanceof Long) {
+            timezone = ((Long) tz).longValue();
+        } else if (tz instanceof Short) {
+            timezone = ((Short) tz).longValue();
+        } else if (tz instanceof Byte) {
+            timezone = ((Byte) tz).longValue();
+        } else if (tz instanceof Double) {
+            timezone = (long) ((Double) tz).doubleValue();
+        } else if (tz instanceof Float) {
+            timezone = (long) ((Float) tz).floatValue();
         } else if (tz instanceof String) {
             try {
                 timezone = Long.parseLong((String) tz);
