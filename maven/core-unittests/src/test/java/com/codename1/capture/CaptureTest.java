@@ -2,6 +2,7 @@ package com.codename1.capture;
 
 import com.codename1.io.Util;
 import com.codename1.test.UITestBase;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.util.ImageIO;
 import org.junit.jupiter.api.AfterEach;
@@ -121,6 +122,16 @@ class CaptureTest extends UITestBase {
         public void save(java.io.InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException {
             // Not used in this test
             response.write(1);
+        }
+
+        @Override
+        protected void saveImage(Image img, OutputStream response, String format, float quality) throws IOException {
+            response.write(1);
+        }
+
+        @Override
+        public boolean isFormatSupported(String format) {
+            return true;
         }
     }
 }

@@ -3,6 +3,7 @@ package com.codename1.charts.transitions;
 import com.codename1.charts.ChartComponent;
 import com.codename1.charts.compat.Canvas;
 import com.codename1.charts.compat.Paint;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.views.AbstractChart;
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Form;
@@ -124,6 +125,15 @@ class SeriesTransitionTest extends UITestBase {
     private static class RecordingChart extends AbstractChart {
         @Override
         public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+        }
+
+        @Override
+        public int getLegendShapeWidth(int seriesIndex) {
+            return 0;
+        }
+
+        @Override
+        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, int seriesIndex, Paint paint) {
         }
     }
 

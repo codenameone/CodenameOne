@@ -5,7 +5,9 @@ import com.codename1.charts.compat.Paint;
 import com.codename1.charts.models.Point;
 import com.codename1.charts.models.SeriesSelection;
 import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.AbstractChart;
 import com.codename1.charts.views.ClickableArea;
 import com.codename1.charts.views.XYChart;
@@ -163,6 +165,15 @@ class ChartComponentTest extends UITestBase {
             lastPoint = screenPoint;
             return selectionToReturn;
         }
+
+        @Override
+        public int getLegendShapeWidth(int seriesIndex) {
+            return 0;
+        }
+
+        @Override
+        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, int seriesIndex, Paint paint) {
+        }
     }
 
     private static class StubXYChart extends XYChart {
@@ -175,7 +186,7 @@ class ChartComponentTest extends UITestBase {
         }
 
         @Override
-        public void drawSeries(Canvas canvas, Paint paint, List<Float> points, List<Double> values, float defaultX, int seriesIndex, int startIndex) {
+        public void drawSeries(Canvas canvas, Paint paint, List<Float> points, XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
         }
 
         @Override
