@@ -95,8 +95,8 @@ public abstract class ButtonList extends Container implements DataChangedListene
     protected boolean ready;
     private ButtonGroup group;
     private ListModel model;
-    private EventDispatcher actionListeners = new EventDispatcher();
-    private java.util.List<Runnable> onReady = new ArrayList<Runnable>();
+    private final EventDispatcher actionListeners = new EventDispatcher();
+    private final java.util.List<Runnable> onReady = new ArrayList<Runnable>();
     private String cellUIID;
     private java.util.List<Decorator> decorators;
 

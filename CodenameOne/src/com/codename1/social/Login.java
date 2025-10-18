@@ -57,7 +57,7 @@ public abstract class Login {
     String clientSecret;
     String scope;
     private LoginCallback loginCallback;
-    private ArrayList<LoginCallback> loginCallbacksSingleUse = new ArrayList<LoginCallback>();
+    private final ArrayList<LoginCallback> loginCallbacksSingleUse = new ArrayList<LoginCallback>();
     private boolean callbackEnabled = true;
     private String validateErr = null;
     private AccessToken token;
@@ -192,7 +192,7 @@ public abstract class Login {
                     }
                     if (evt.getSource() instanceof String) {
                         String t = (String) evt.getSource();
-                        setAccessToken(new AccessToken(t, (String) null));
+                        setAccessToken(new AccessToken(t, null));
                         if (callback != null) {
                             callback.loginSuccessful();
                         }

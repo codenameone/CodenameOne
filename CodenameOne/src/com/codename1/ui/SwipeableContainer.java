@@ -42,15 +42,17 @@ import com.codename1.ui.util.EventDispatcher;
 public class SwipeableContainer extends Container {
 
     private final EventDispatcher dispatcher = new EventDispatcher();
-    private Container bottomLeftWrapper;
-    private Container bottomRightWrapper;
-    private Container topWrapper;
+    private final Container bottomLeftWrapper;
+    private final Container bottomRightWrapper;
+    private final Container topWrapper;
     private boolean open = false;
     private boolean openedToRight = false;
     private boolean openedToLeft = false;
     private Motion openCloseMotion;
     private boolean swipeActivated = true;
-    private SwipeListener press, drag, release;
+    private final SwipeListener press;
+    private final SwipeListener drag;
+    private final SwipeListener release;
     private int initialX = -1;
     private int initialY = -1;
     private int topX = -1;

@@ -29,7 +29,7 @@ import com.codename1.ui.util.WeakHashMap;
 class CacheProviderProxy extends MapProvider {
 
     private final MapProvider provider;
-    private WeakHashMap _cache;
+    private final WeakHashMap _cache;
     private int _time;
     private int _maxSize;
 
@@ -92,7 +92,7 @@ class CacheProviderProxy extends MapProvider {
     class AgeableTile extends Tile {
 
         public int age;
-        private Tile tile;
+        private final Tile tile;
 
         public AgeableTile(Tile tile, int time) {
             super(tile.dimension(), tile.getBoundingBox(), null);

@@ -50,5 +50,5 @@ public interface BrowserNavigationCallback {
      * @param url the URL requested
      * @return true to navigate to the given URL, false to ignore it.
      */
-    public boolean shouldNavigate(String url);
+    boolean shouldNavigate(String url);
 }

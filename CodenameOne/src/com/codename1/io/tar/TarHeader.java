@@ -144,7 +144,7 @@ public class TarHeader {
         this.userId = 0;
         this.groupId = 0;
         this.userName = new StringBuffer(user);
-        this.groupName = new StringBuffer("");
+        this.groupName = new StringBuffer();
     }
 
     /**

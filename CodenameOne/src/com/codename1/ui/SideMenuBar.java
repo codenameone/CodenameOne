@@ -220,7 +220,7 @@ public class SideMenuBar extends MenuBar {
         Button ob = new Button();
         ob.setUIID("MenuButton");
         UIManager uim = parent.getUIManager();
-        Image i = (Image) uim.getThemeImageConstant("sideMenuImage");
+        Image i = uim.getThemeImageConstant("sideMenuImage");
         if (i != null) {
             ob.setIcon(i);
         } else {
@@ -232,7 +232,7 @@ public class SideMenuBar extends MenuBar {
             }
             FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU, size);
         }
-        Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
+        Image p = uim.getThemeImageConstant("sideMenuPressImage");
         if (p != null) {
             ob.setPressedIcon(p);
         }
@@ -613,9 +613,7 @@ public class SideMenuBar extends MenuBar {
         if (getBackCommand() != null
                 && getCommandCount() > 0
                 && !UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
-            if (getCommands().contains(getBackCommand())) {
-                getCommands().remove(getBackCommand());
-            }
+            getCommands().remove(getBackCommand());
             getCommands().insertElementAt(getBackCommand(), getCommandCount());
         }
     }
@@ -850,13 +848,13 @@ public class SideMenuBar extends MenuBar {
             rightSideButton = new Button();
             rightSideButton.setUIID("MenuButtonRight");
             UIManager uim = parent.getUIManager();
-            Image i = (Image) uim.getThemeImageConstant("rightSideMenuImage");
+            Image i = uim.getThemeImageConstant("rightSideMenuImage");
             if (i != null) {
                 rightSideButton.setIcon(i);
             } else {
                 FontImage.setMaterialIcon(rightSideButton, FontImage.MATERIAL_MENU);
             }
-            Image p = (Image) uim.getThemeImageConstant("rightSideMenuPressImage");
+            Image p = uim.getThemeImageConstant("rightSideMenuPressImage");
             if (p != null) {
                 rightSideButton.setPressedIcon(p);
             }
@@ -869,7 +867,6 @@ public class SideMenuBar extends MenuBar {
             Container ta = getTitleAreaContainer();
             ta.addComponent(BorderLayout.EAST, rightSideButton);
             ta.revalidate();
-            return;
         }
     }
 
@@ -892,7 +889,7 @@ public class SideMenuBar extends MenuBar {
         final boolean isRTL = isRTLValue;
         final Image image = rightPanel.getStyle().getBgImage();
         UIManager uim = rightPanel.getUIManager();
-        Image sh = (Image) uim.getThemeImageConstant("sideMenuShadowImage");
+        Image sh = uim.getThemeImageConstant("sideMenuShadowImage");
         if (sh == null) {
             sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
         }
@@ -1061,7 +1058,7 @@ public class SideMenuBar extends MenuBar {
         }
         UIManager uim = menu.getUIManager();
         boolean shadowEnabled = uim.isThemeConstant("sideMenuShadowBool", true);
-        Image sh = (Image) uim.getThemeImageConstant("sideMenuShadowImage");
+        Image sh = uim.getThemeImageConstant("sideMenuShadowImage");
         if (sh == null && shadowEnabled) {
             sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
         }
@@ -1526,14 +1523,14 @@ public class SideMenuBar extends MenuBar {
 
     class MenuTransition extends Transition {
 
-        private int speed;
-        private boolean fwd;
+        private final int speed;
+        private final boolean fwd;
         private Motion motion;
         private int position;
         private Image buffer;
-        private int dest;
+        private final int dest;
         private Image shadow;
-        private String placement;
+        private final String placement;
         private boolean isRTL;
 
         public MenuTransition(int speed, boolean fwd, int dest, String placement) {
@@ -1611,7 +1608,7 @@ public class SideMenuBar extends MenuBar {
             }
             boolean shadowEnabled = getUIManager().isThemeConstant("sideMenuShadowBool", true);
 
-            shadow = (Image) getUIManager().getThemeImageConstant("sideMenuShadowImage");
+            shadow = getUIManager().getThemeImageConstant("sideMenuShadowImage");
             if (shadow == null && shadowEnabled) {
                 shadow = Resources.getSystemResource().getImage("sidemenu-shadow.png");
             }

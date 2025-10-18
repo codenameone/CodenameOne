@@ -51,11 +51,11 @@ class CustomFont extends Font {
      * bounds.
      */
     int[] charWidth;
-    private Hashtable colorCache = new Hashtable();
-    private String charsets;
+    private final Hashtable colorCache = new Hashtable();
+    private final String charsets;
     private int color;
-    private int imageWidth;
-    private int imageHeight;
+    private final int imageWidth;
+    private final int imageHeight;
     private Object imageArrayRef;
 
 
@@ -124,8 +124,8 @@ class CustomFont extends Font {
     private boolean checkCacheCurrentColor(int newColor) {
         //TODO: perhaps instead of the need to create new Integers 
         //use an IntHashTable class I have such class to donate or any other open source class
-        Integer currentColor = new Integer(color);
-        Integer newColorKey = new Integer(newColor);
+        Integer currentColor = Integer.valueOf(color);
+        Integer newColorKey = Integer.valueOf(newColor);
         if (colorCache.get(currentColor) == null) {
             colorCache.put(currentColor, cache);
         }

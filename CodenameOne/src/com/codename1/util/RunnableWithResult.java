@@ -34,5 +34,5 @@ public interface RunnableWithResult<T> {
      *
      * @param onSuccess the result of the call
      */
-    public void run(SuccessCallback<T> onSuccess);
+    void run(SuccessCallback<T> onSuccess);
 }

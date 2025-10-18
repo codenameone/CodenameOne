@@ -185,7 +185,7 @@ public class UIFragment {
 
 
     // The root element of this template
-    private Element root;
+    private final Element root;
 
     // The root view of the template
     private Container view;
@@ -194,11 +194,11 @@ public class UIFragment {
     private ComponentFactory factory = new DefaultComponentFactory();
 
     // Index that stores any component which included an "id" attribute
-    private Map<String, Component> index = new HashMap<String, Component>();
+    private final Map<String, Component> index = new HashMap<String, Component>();
 
     // Parameters for the template.  Any tag with tag name startign with $ will
     // be replaced by a corresponding parameter
-    private Map<String, Component> parameters = new HashMap<String, Component>();
+    private final Map<String, Component> parameters = new HashMap<String, Component>();
 
     private UIFragment(Element el) {
         this.root = el;
@@ -425,14 +425,14 @@ public class UIFragment {
      * @see #setFactory(com.codename1.ui.UIFragment.ComponentFactory)
      * @see #getFactory()
      */
-    public static interface ComponentFactory {
+    public interface ComponentFactory {
         /**
          * Creates a new component given its XML description.
          *
          * @param el The XML element
          * @return A Component.
          */
-        public Component newComponent(Element el);
+        Component newComponent(Element el);
 
         /**
          * Creates a layout constraint for adding a child component to a parent component.
@@ -443,7 +443,7 @@ public class UIFragment {
          * @param childEl  The XML element for the child component.
          * @return Layout constraint for adding to the parent component.
          */
-        public Object newConstraint(Container parent, Element parentEl, Component child, Element childEl);
+        Object newConstraint(Container parent, Element parentEl, Component child, Element childEl);
     }
 
     /**
@@ -478,11 +478,7 @@ public class UIFragment {
         }
 
         private static boolean grow(String grow) {
-            if ("true".equalsIgnoreCase(grow)) {
-                return true;
-            } else {
-                return false;
-            }
+            return "true".equalsIgnoreCase(grow);
         }
 
         private static int align(String align) {
@@ -720,7 +716,6 @@ public class UIFragment {
             }
             if (m.containsKey("centerTotalBelow") || m.containsKey("ctb")) {
                 m.put("behavior", "totalBelow");
-                return;
             }
 
 
@@ -739,7 +734,6 @@ public class UIFragment {
             if (m.containsKey("xng")) {
                 m.put("x", m.get("xng"));
                 m.put("noGrow", "true");
-                return;
             }
         }
 
@@ -757,7 +751,6 @@ public class UIFragment {
             if (m.containsKey("ybl")) {
                 m.put("y", m.get("ybl"));
                 m.put("bottomLast", "true");
-                return;
             }
         }
 

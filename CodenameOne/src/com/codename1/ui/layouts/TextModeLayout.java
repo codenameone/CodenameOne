@@ -57,7 +57,7 @@ public class TextModeLayout extends Layout {
      * The underlying table layout can be used freely to create constraints on the fly
      */
     public final TableLayout table;
-    private Layout actual;
+    private final Layout actual;
 
     /**
      * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}

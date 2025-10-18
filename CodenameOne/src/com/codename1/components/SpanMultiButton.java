@@ -402,7 +402,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
         }
         if (emblem instanceof CheckBox) {
             ((CheckBox) emblem).setSelected(b);
-            return;
         }
     }
 

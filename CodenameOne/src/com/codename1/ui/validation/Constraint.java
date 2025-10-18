@@ -35,12 +35,12 @@ public interface Constraint {
      * @param value the value for the object
      * @return true if the value is valid and false otherwise
      */
-    public abstract boolean isValid(Object value);
+    boolean isValid(Object value);
 
     /**
      * Includes the error message for the constraint
      *
      * @return the text of the error message for a constraint
      */
-    public String getDefaultFailMessage();
+    String getDefaultFailMessage();
 }

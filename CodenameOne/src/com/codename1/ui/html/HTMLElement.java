@@ -833,13 +833,13 @@ public class HTMLElement extends Element {
     private static final int DIGITS = 1;
     private static final int HEX = 2;
     private static final int ABC = 4;
-    private static int LAST_TAG_INDEX = HTMLComponent.PROCESS_HTML_MP1_ONLY ? TAG_FIELDSET : TAG_BUTTON; // In any case we exclude TAG_TEXT, which is given only on text element creation
+    private static final int LAST_TAG_INDEX = HTMLComponent.PROCESS_HTML_MP1_ONLY ? TAG_FIELDSET : TAG_BUTTON; // In any case we exclude TAG_TEXT, which is given only on text element creation
     /**
      * Some types accept only a specific set of strings. For these this array defines the allowed strings.
      * If the value is null it means that the type has another rule set (for example numbers only).
      * This is checked against in the DOM building process.
      */
-    private static String[][] ALLOWED_STRINGS = {
+    private static final String[][] ALLOWED_STRINGS = {
             null, // TYPE_NUMBER = 0;
             null, // TYPE_PIXELS_OR_PERCENTAGE = 1;
             null, // TYPE_COLOR = 2;
@@ -1112,7 +1112,7 @@ public class HTMLElement extends Element {
 
         } else {
             if (isValid(ATTRIBUTE_TYPES[attrId], value)) {
-                setAttribute(new Integer(attrId), value);
+                setAttribute(Integer.valueOf(attrId), value);
             } else {
                 return HTMLCallback.ERROR_ATTIBUTE_VALUE_INVALID;
             }
@@ -1132,7 +1132,7 @@ public class HTMLElement extends Element {
             throw new IllegalArgumentException("Attribute Id must be in the range of 0-" + (ATTRIBUTE_NAMES.length - 1));
         }
         if (isValid(ATTRIBUTE_TYPES[attrId], value)) {
-            setAttribute(new Integer(attrId), value);
+            setAttribute(Integer.valueOf(attrId), value);
         } else {
             throw new IllegalArgumentException(value + " is not a valid value for attribute " + ATTRIBUTE_NAMES[attrId]);
         }
@@ -1147,7 +1147,7 @@ public class HTMLElement extends Element {
         if ((attrId < 0) || (attrId >= ATTRIBUTE_NAMES.length)) {
             throw new IllegalArgumentException("Attribute Id must be in the range of 0-" + (ATTRIBUTE_NAMES.length - 1));
         }
-        removeAttribute(new Integer(attrId));
+        removeAttribute(Integer.valueOf(attrId));
     }
 
     /**
@@ -1386,7 +1386,7 @@ public class HTMLElement extends Element {
         if (attributes == null) {
             return null;
         }
-        return (String) attributes.get(new Integer(id));
+        return (String) attributes.get(Integer.valueOf(id));
     }
 
     /**

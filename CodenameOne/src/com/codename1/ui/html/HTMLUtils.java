@@ -220,7 +220,7 @@ public class HTMLUtils {
                 if (c < 16) {
                     prefix += "0"; //For a value lesser than 16, we'd like to get %0F and not %F
                 }
-                encodedStr += prefix + Integer.toHexString((int) c).toUpperCase();
+                encodedStr += prefix + Integer.toHexString(c).toUpperCase();
 
             }
         }

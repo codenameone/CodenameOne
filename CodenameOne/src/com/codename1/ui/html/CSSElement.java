@@ -132,7 +132,7 @@ class CSSElement extends HTMLElement {
     static final int CSS_COUNTER_RESET = CSS_STYLE_ID_OFFSET + 66;
     static final int CSS_COUNTER_INCREMENT = CSS_STYLE_ID_OFFSET + 67;
     static final int CSS_DIRECTION = CSS_STYLE_ID_OFFSET + 68;
-    private static int LAST_CSS_PROPERTY_INDEX = (HTMLComponent.PROCESS_HTML_MP1_ONLY ? CSS_PAGEURL : CSS_DIRECTION) - CSS_STYLE_ID_OFFSET;
+    private static final int LAST_CSS_PROPERTY_INDEX = (HTMLComponent.PROCESS_HTML_MP1_ONLY ? CSS_PAGEURL : CSS_DIRECTION) - CSS_STYLE_ID_OFFSET;
     /**
      * The types of the attribute
      */
@@ -333,7 +333,7 @@ class CSSElement extends HTMLElement {
     /**
      * The multiplier values for the suffix strings
      */
-    private final static int CSS_LENGTH_FACTORS[] = {1, 2, 1, DPI, DPI / 72, DPI / 6, (int) (DPI / 2.54 / 10), (int) (DPI / 2.54)}; // unit factors for {"px","em","ex","in","pt","pc","mm","cm"};
+    private final static int[] CSS_LENGTH_FACTORS = {1, 2, 1, DPI, DPI / 72, DPI / 6, (int) (DPI / 2.54 / 10), (int) (DPI / 2.54)}; // unit factors for {"px","em","ex","in","pt","pc","mm","cm"};
     private final static int LENGTH_SUFFIX_PX = 0;
     private final static int LENGTH_SUFFIX_EM = 1;
     private final static int LENGTH_SUFFIX_EX = 2;
@@ -368,7 +368,7 @@ class CSSElement extends HTMLElement {
     /**
      * Values associated with BG_POS_STRINGS
      */
-    private final static int[] BG_POS_PERCENTAGE = {0 + VAL_PERCENTAGE, 50 + VAL_PERCENTAGE, 100 + VAL_PERCENTAGE};
+    private final static int[] BG_POS_PERCENTAGE = {VAL_PERCENTAGE, 50 + VAL_PERCENTAGE, 100 + VAL_PERCENTAGE};
     /**
      * The values of each of the allowed strings.
      * When adding an attribute which its value is an allowed string, the attribute value is set according to this array.
@@ -890,7 +890,7 @@ class CSSElement extends HTMLElement {
      * @return true if this attribute is assigned, false otherwise
      */
     boolean isAttributeAssigned(int attrId) {
-        return ((attrVals[attrId - CSS_STYLE_ID_OFFSET] != -1) || ((getAttributes() != null) && (getAttributes().get(new Integer(attrId)) != null)));
+        return ((attrVals[attrId - CSS_STYLE_ID_OFFSET] != -1) || ((getAttributes() != null) && (getAttributes().get(Integer.valueOf(attrId)) != null)));
     }
 
     /**
@@ -988,7 +988,7 @@ class CSSElement extends HTMLElement {
                 if (knownType) {
                     return HTMLCallback.ERROR_ATTIBUTE_VALUE_INVALID;
                 } else {
-                    setAttribute(new Integer(attrId), value);
+                    setAttribute(Integer.valueOf(attrId), value);
                 }
             }
         } else {
@@ -1181,9 +1181,7 @@ class CSSElement extends HTMLElement {
      * @param dest The destination selector
      */
     void copyAttributesTo(CSSElement dest) {
-        for (int i = 0; i < attrVals.length; i++) {
-            dest.attrVals[i] = attrVals[i];
-        }
+        System.arraycopy(attrVals, 0, dest.attrVals, 0, attrVals.length);
         Hashtable attributes = getAttributes();
         if (attributes != null) {
             for (Enumeration e = attributes.keys(); e.hasMoreElements(); ) {

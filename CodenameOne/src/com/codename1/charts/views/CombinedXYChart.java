@@ -33,13 +33,13 @@ import java.util.List;
  */
 public class CombinedXYChart extends XYChart {
 
-    private XYCombinedChartDef[] chartDefinitions;
+    private final XYCombinedChartDef[] chartDefinitions;
 
     /** The embedded XY charts. */
-    private XYChart[] mCharts;
+    private final XYChart[] mCharts;
 
     /** The supported charts for being combined. */
-    private Class<?>[] xyChartTypes = new Class<?>[]{TimeChart.class, LineChart.class,
+    private final Class<?>[] xyChartTypes = new Class<?>[]{TimeChart.class, LineChart.class,
             CubicLineChart.class, BarChart.class, BubbleChart.class, ScatterChart.class,
             RangeBarChart.class, RangeStackedBarChart.class};
 
@@ -200,9 +200,9 @@ public class CombinedXYChart extends XYChart {
      */
     public static class XYCombinedChartDef {
         /** The chart type. */
-        private String type;
+        private final String type;
         /** The series index. */
-        private int[] seriesIndex;
+        private final int[] seriesIndex;
 
         /**
          * Constructs a chart definition.

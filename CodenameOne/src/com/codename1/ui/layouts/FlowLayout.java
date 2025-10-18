@@ -74,7 +74,7 @@ public class FlowLayout extends Layout {
     private int orientation = Component.LEFT;
     private int valign = Component.TOP;
     private boolean vAlignByRow;
-    private Dimension dim = new Dimension(0, 0);
+    private final Dimension dim = new Dimension(0, 0);
 
     /**
      * Creates a new instance of FlowLayout with left alignment

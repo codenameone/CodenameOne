@@ -35,12 +35,12 @@ import static com.codename1.ui.ComponentSelector.$;
  * @author Steve Hannah
  */
 class Spinner3D extends Container implements InternalPickerWidget {
-    private SpinnerNode root;
+    private final SpinnerNode root;
 
-    private Scene scene;
-    private ScrollingContainer scroller;
+    private final Scene scene;
+    private final ScrollingContainer scroller;
 
-    private boolean gridPosDirty = true;
+    private final boolean gridPosDirty = true;
 
 
     /**
@@ -89,7 +89,7 @@ class Spinner3D extends Container implements InternalPickerWidget {
                 final int rowHeight = (int) root.calcRowHeight();
                 return new Dimension(
                         500, // Width doesn't matter - only doing Y scroll.
-                        Math.max(viewportHeight, listHeight + (int) (6 * rowHeight))
+                        Math.max(viewportHeight, listHeight + (6 * rowHeight))
                 );
             }
 
@@ -236,8 +236,6 @@ class Spinner3D extends Container implements InternalPickerWidget {
     public Style getRowStyle() {
         return root.getRowStyle();
     }
-
-    ;
 
     public Style getSelectedRowStyle() {
         return root.getSelectedRowStyle();

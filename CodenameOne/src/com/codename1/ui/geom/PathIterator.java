@@ -40,23 +40,23 @@ public interface PathIterator {
     /**
      * The even-odd winding mode: a point is internal to the shape if a ray from the point to infinity (in any direction) crosses an odd number of segments.
      */
-    public static final int WIND_EVEN_ODD = 0;
+    int WIND_EVEN_ODD = 0;
 
     /**
      * The non-zero winding mode: a point is internal to the shape if a ray from the point to infinity (in any direction) crosses a different number of segments headed clockwise than those headed counterclockwise.
      */
-    public static final int WIND_NON_ZERO = 1;
+    int WIND_NON_ZERO = 1;
 
 
     /**
      * Starts a new subpath. There is no segment from the previous vertex.
      */
-    public static final int SEG_MOVETO = 0;
+    int SEG_MOVETO = 0;
 
     /**
      * The current segment is a line.
      */
-    public static final int SEG_LINETO = 1;
+    int SEG_LINETO = 1;
 
     /**
      * The current segment is a quadratic parametric curve. It is interpolated
@@ -70,7 +70,7 @@ public interface PathIterator {
      * C(n,m) = Combinations of n things, taken m at a time
      * = n! / (m! * (n-m)!) }</pre>
      */
-    public static final int SEG_QUADTO = 2;
+    int SEG_QUADTO = 2;
 
     /**
      * The current segment is a cubic parametric curve (more commonly known as a
@@ -84,30 +84,30 @@ public interface PathIterator {
      * C(n,m) = Combinations of n things, taken m at a time
      * = n! / (m! * (n-m)!)}</pre>
      */
-    public static final int SEG_CUBICTO = 3;
+    int SEG_CUBICTO = 3;
     /**
      * The current segment closes a loop by an implicit line to the previous {@link #SEG_MOVETO} coordinate.
      */
-    public static final int SEG_CLOSE = 4;
+    int SEG_CLOSE = 4;
 
     /**
      * Returns the winding rule to determine which points are inside this path.
      *
      * @return the winding rule.  ({@link #WIND_EVEN_ODD} or {@link #WIND_NON_ZERO}).
      */
-    public int getWindingRule();
+    int getWindingRule();
 
     /**
      * Tests if the iterator is exhausted. If this returns true, currentSegment and next may throw a RuntimeException (although this is not required).
      *
      * @return {@literal true} if the iteration is complete
      */
-    public boolean isDone();
+    boolean isDone();
 
     /**
      * Advance to the next segment in the iteration. It is not specified what this does if called when {@link #isDone} returns {@literal true}.
      */
-    public void next();
+    void next();
 
     /**
      * Returns the coordinates of the next point(s), as well as the type of line segment.
@@ -121,7 +121,7 @@ public interface PathIterator {
      * @param coords the array to place the point coordinates in
      * @return the segment type. One of ({@link #SEG_MOVETO}, {@link #SEG_LINETO}, {@link #SEG_QUADTO}, {@link #SEG_CUBICTO}, {@link #SEG_CLOSE}).
      */
-    public int currentSegment(float[] coords);
+    int currentSegment(float[] coords);
 
 
     /**
@@ -136,6 +136,6 @@ public interface PathIterator {
      * @param coords the array to place the point coordinates in
      * @return the segment type. One of ({@link #SEG_MOVETO}, {@link #SEG_LINETO}, {@link #SEG_QUADTO}, {@link #SEG_CUBICTO}, {@link #SEG_CLOSE}).
      */
-    public int currentSegment(double[] coords);
+    int currentSegment(double[] coords);
 
 }

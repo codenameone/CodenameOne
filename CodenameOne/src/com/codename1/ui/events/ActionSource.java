@@ -34,7 +34,7 @@ public interface ActionSource<T extends ActionEvent> {
      *
      * @param l
      */
-    public void addActionListener(ActionListener<T> l);
+    void addActionListener(ActionListener<T> l);
 
     /**
      * Removes ActionListener so that it will no longer receive events
@@ -42,5 +42,5 @@ public interface ActionSource<T extends ActionEvent> {
      *
      * @param l
      */
-    public void removeActionListener(ActionListener<T> l);
+    void removeActionListener(ActionListener<T> l);
 }

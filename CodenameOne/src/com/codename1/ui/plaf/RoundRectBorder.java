@@ -627,7 +627,6 @@ public class RoundRectBorder extends Border {
                         tg.drawShape(gp, RoundRectBorder.this.stroke);
                     }
                     c.getStyle().setBorder(RoundRectBorder.this);
-                    return;
                 } finally {
                     g.translate(-getX(), -getY());
                 }

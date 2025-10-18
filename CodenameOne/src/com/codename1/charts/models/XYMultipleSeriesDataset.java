@@ -23,7 +23,7 @@ import java.util.List;
  */
 public class XYMultipleSeriesDataset {
     /** The included series. */
-    private List<XYSeries> mSeries = new ArrayList<XYSeries>();
+    private final List<XYSeries> mSeries = new ArrayList<XYSeries>();
 
     /**
      * Adds a new XY series to the list.

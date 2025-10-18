@@ -218,7 +218,7 @@ public class CSSBorder extends Border {
     private BorderStroke[] stroke;
     private BoxShadow boxShadow;
     private BorderRadius borderRadius;
-    private Resources res;
+    private final Resources res;
     private Rectangle2D contentRect;
 
     /**
@@ -501,7 +501,7 @@ public class CSSBorder extends Border {
         double ty = y;
         x = y = 0;
         if (arrow != null) {
-            int arrowHeightPixels = CN.convertToPixels((float) arrow.size);
+            int arrowHeightPixels = CN.convertToPixels(arrow.size);
             switch (arrow.direction) {
                 case CN.TOP:
                     y = arrowHeightPixels;
@@ -544,7 +544,7 @@ public class CSSBorder extends Border {
         }
         if (arrow != null) {
             if (arrow.direction == CN.LEFT) {
-                int arrowHeightPixels = CN.convertToPixels((float) arrow.size);
+                int arrowHeightPixels = CN.convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(y + height,
                                 Math.max(arrow.position, y + borderRadius.topLeftRadiusY()));
@@ -554,7 +554,7 @@ public class CSSBorder extends Border {
                 out.closePath();
             }
             if (arrow.direction == CN.RIGHT) {
-                int arrowHeightPixels = CN.convertToPixels((float) arrow.size);
+                int arrowHeightPixels = CN.convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(y + height,
                                 Math.max(arrow.position, y + borderRadius.topRightRadiusY()));
@@ -564,7 +564,7 @@ public class CSSBorder extends Border {
                 out.closePath();
             }
             if (arrow.direction == CN.BOTTOM) {
-                int arrowHeightPixels = CN.convertToPixels((float) arrow.size);
+                int arrowHeightPixels = CN.convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(x + width,
                                 Math.max(arrow.position, x + borderRadius.topLeftRadiusX()));
@@ -574,7 +574,7 @@ public class CSSBorder extends Border {
                 out.closePath();
             }
             if (arrow.direction == CN.TOP) {
-                int arrowHeightPixels = CN.convertToPixels((float) arrow.size);
+                int arrowHeightPixels = CN.convertToPixels(arrow.size);
                 int actualArrowPosition = (int)
                         Math.min(x + width,
                                 Math.max(arrow.position, x + borderRadius.topLeftRadiusX()));
@@ -1179,8 +1179,8 @@ public class CSSBorder extends Border {
         return new Arrow(c);
     }
 
-    private static interface Decorator {
-        public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue);
+    private interface Decorator {
+        CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue);
     }
 
     private static class ScalarUnit {
@@ -1237,10 +1237,7 @@ public class CSSBorder extends Border {
             if ((val.endsWith("em") || val.endsWith("mm") || val.endsWith("pt") || val.endsWith("in")) && isFloat(val.substring(0, len - 2))) {
                 return true;
             }
-            if (val.endsWith("%") && isFloat(val.substring(0, len - 1))) {
-                return true;
-            }
-            return false;
+            return val.endsWith("%") && isFloat(val.substring(0, len - 1));
         }
 
         private static boolean isInt(String val) {
@@ -1442,11 +1439,10 @@ public class CSSBorder extends Border {
         }
 
         public String toCSSString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("#");
-            sb.append(padLeft(Integer.toHexString(color), 6));
-            sb.append(padLeft(Integer.toHexString(alpha), 2));
-            return sb.toString();
+            String sb = "#" +
+                    padLeft(Integer.toHexString(color), 6) +
+                    padLeft(Integer.toHexString(alpha), 2);
+            return sb;
         }
 
         @Override
@@ -1655,8 +1651,14 @@ public class CSSBorder extends Border {
     }
 
     private class BorderRadius {
-        private ScalarUnit topLeftX, topRightX, bottomLeftX, bottomRightX;
-        private ScalarUnit topLeftY, topRightY, bottomLeftY, bottomRightY;
+        private final ScalarUnit topLeftX;
+        private final ScalarUnit topRightX;
+        private final ScalarUnit bottomLeftX;
+        private final ScalarUnit bottomRightX;
+        private final ScalarUnit topLeftY;
+        private final ScalarUnit topRightY;
+        private final ScalarUnit bottomLeftY;
+        private final ScalarUnit bottomRightY;
 
         BorderRadius(String value) {
             if (value.indexOf("/") > 0) {
@@ -1858,16 +1860,15 @@ public class CSSBorder extends Border {
         }
 
         private String toCSSString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append(topLeftX.toCSSString()).append(" ")
-                    .append(topRightX.toCSSString()).append(" ")
-                    .append(bottomRightX.toCSSString()).append(" ")
-                    .append(bottomLeftX.toCSSString()).append(" / ")
-                    .append(topLeftY.toCSSString()).append(" ")
-                    .append(topRightY.toCSSString()).append(" ")
-                    .append(bottomRightY.toCSSString()).append(" ")
-                    .append(bottomLeftY.toCSSString());
-            return sb.toString();
+            String sb = topLeftX.toCSSString() + " " +
+                    topRightX.toCSSString() + " " +
+                    bottomRightX.toCSSString() + " " +
+                    bottomLeftX.toCSSString() + " / " +
+                    topLeftY.toCSSString() + " " +
+                    topRightY.toCSSString() + " " +
+                    bottomRightY.toCSSString() + " " +
+                    bottomLeftY.toCSSString();
+            return sb;
         }
 
 

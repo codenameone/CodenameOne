@@ -304,7 +304,7 @@ class HTMLForm {
                                 } else if (emptyNotOk.contains(tf)) {
                                     emptyStr = htmlC.getUIManager().localize("html.format.andemptynotok", " and cannot be an empty string");
                                 }
-                                errorMsg = htmlC.getUIManager().localize("html.format.errordesc", "Malformed text. Correct value: ") + inputFormat.toString() + emptyStr;
+                                errorMsg = htmlC.getUIManager().localize("html.format.errordesc", "Malformed text. Correct value: ") + inputFormat + emptyStr;
                                 error = true;
                             }
                         }

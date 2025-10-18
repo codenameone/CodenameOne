@@ -1525,7 +1525,7 @@ public class Border {
                 Image right = images[1];
                 Image center = images[2];
                 Boolean centerAlignHBorderBool = c == null ? null : (Boolean) c.getClientProperty("@centerAlignHBorderBool");
-                boolean b = centerAlignHBorderBool == null ? false : centerAlignHBorderBool;
+                boolean b = centerAlignHBorderBool != null && centerAlignHBorderBool;
                 if (b || c.getUIManager().isThemeConstant("centerAlignHBorderBool", false)) {
                     y += Math.max(0, height / 2 - center.getHeight() / 2);
                 }
@@ -2040,25 +2040,25 @@ public class Border {
             return Boolean.FALSE;
         }
         if (n.equals("Type")) {
-            return new Integer(type);
+            return Integer.valueOf(type);
         }
         if (n.equals("ColorA")) {
-            return new Integer(colorA);
+            return Integer.valueOf(colorA);
         }
         if (n.equals("ColorB")) {
-            return new Integer(colorB);
+            return Integer.valueOf(colorB);
         }
         if (n.equals("ColorC")) {
-            return new Integer(colorC);
+            return Integer.valueOf(colorC);
         }
         if (n.equals("ColorD")) {
-            return new Integer(colorD);
+            return Integer.valueOf(colorD);
         }
         if (n.equals("ArcWidth")) {
-            return new Integer(arcWidth);
+            return Integer.valueOf(arcWidth);
         }
         if (n.equals("ArcHeight")) {
-            return new Integer(arcHeight);
+            return Integer.valueOf(arcHeight);
         }
         if (n.equals("Images")) {
             return images;

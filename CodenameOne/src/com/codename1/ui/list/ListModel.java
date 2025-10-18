@@ -57,56 +57,56 @@ public interface ListModel<T> {
      * @param index an index into this list
      * @return the item at the specified index
      */
-    public T getItemAt(int index);
+    T getItemAt(int index);
 
     /**
      * Returns the number of items in the list
      *
      * @return the number of items in the list
      */
-    public int getSize();
+    int getSize();
 
     /**
      * Returns the selected list offset
      *
      * @return the selected list index
      */
-    public int getSelectedIndex();
+    int getSelectedIndex();
 
     /**
      * Sets the selected list offset can be set to -1 to clear selection
      *
      * @param index an index into this list
      */
-    public void setSelectedIndex(int index);
+    void setSelectedIndex(int index);
 
     /**
      * Invoked to indicate interest in future change events
      *
      * @param l a data changed listener
      */
-    public void addDataChangedListener(DataChangedListener l);
+    void addDataChangedListener(DataChangedListener l);
 
     /**
      * Invoked to indicate no further interest in future change events
      *
      * @param l a data changed listener
      */
-    public void removeDataChangedListener(DataChangedListener l);
+    void removeDataChangedListener(DataChangedListener l);
 
     /**
      * Invoked to indicate interest in future selection events
      *
      * @param l a selection listener
      */
-    public void addSelectionListener(SelectionListener l);
+    void addSelectionListener(SelectionListener l);
 
     /**
      * Invoked to indicate no further interest in future selection events
      *
      * @param l a selection listener
      */
-    public void removeSelectionListener(SelectionListener l);
+    void removeSelectionListener(SelectionListener l);
 
     /**
      * Adds the specified item to the end of this list.
@@ -115,13 +115,13 @@ public interface ListModel<T> {
      *
      * @param item the item to be added
      */
-    public void addItem(T item);
+    void addItem(T item);
 
     /**
      * Removes the item at the specified position in this list.
      *
      * @param index the index of the item to removed
      */
-    public void removeItem(int index);
+    void removeItem(int index);
 
 }

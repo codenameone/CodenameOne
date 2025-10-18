@@ -63,8 +63,8 @@ public class TimeSpinner extends BaseSpinner {
     private Spinner minute;
     private Spinner amPM;
 
-    private ArrayList<Component> hourComponents = new ArrayList<Component>();
-    private ArrayList<Component> minuteComponents = new ArrayList<Component>();
+    private final ArrayList<Component> hourComponents = new ArrayList<Component>();
+    private final ArrayList<Component> minuteComponents = new ArrayList<Component>();
 
     private int startHour = 1;
     private int endHour = 13;
@@ -202,13 +202,13 @@ public class TimeSpinner extends BaseSpinner {
             return Boolean.FALSE;
         }
         if (name.equals("currentHour")) {
-            return new Integer(currentHour);
+            return Integer.valueOf(currentHour);
         }
         if (name.equals("currentMinute")) {
-            return new Integer(currentMinute);
+            return Integer.valueOf(currentMinute);
         }
         if (name.equals("minuteStep")) {
-            return new Integer(minuteStep);
+            return Integer.valueOf(minuteStep);
         }
         if (name.equals("currentMeridiem")) {
             if (currentMeridiem) {
@@ -335,7 +335,7 @@ public class TimeSpinner extends BaseSpinner {
     public void setCurrentHour(int currentHour) {
         this.currentHour = currentHour;
         if (hour != null) {
-            hour.setValue(new Integer(currentHour));
+            hour.setValue(Integer.valueOf(currentHour));
         }
     }
 
@@ -355,7 +355,7 @@ public class TimeSpinner extends BaseSpinner {
     public void setCurrentMinute(int currentMinute) {
         this.currentMinute = currentMinute;
         if (minute != null) {
-            minute.setValue(new Integer(currentMinute));
+            minute.setValue(Integer.valueOf(currentMinute));
         }
     }
 
@@ -382,9 +382,9 @@ public class TimeSpinner extends BaseSpinner {
         this.currentMeridiem = currentMeridiem;
         if (amPM != null) {
             if (currentMeridiem) {
-                amPM.setValue(new Integer(1));
+                amPM.setValue(Integer.valueOf(1));
             } else {
-                amPM.setValue(new Integer(0));
+                amPM.setValue(Integer.valueOf(0));
             }
         }
     }

@@ -124,7 +124,7 @@ public class URLImage extends EncodedImage {
     private static final Map<String, URLImage> pendingToStorage = new HashMap<String, URLImage>();
     private static final Map<String, URLImage> pendingToFile = new HashMap<String, URLImage>();
     private static final String IMAGE_SUFFIX = "ImageURLTMP";
-    private static EasyThread imageLoader = EasyThread.start("ImageLoader");
+    private static final EasyThread imageLoader = EasyThread.start("ImageLoader");
     /**
      * The exception handler is used for callbacks in case of an error
      */
@@ -644,8 +644,8 @@ public class URLImage extends EncodedImage {
     /**
      * Invoked in a case of an error
      */
-    public static interface ErrorCallback {
-        public void onError(URLImage source, Exception err);
+    public interface ErrorCallback {
+        void onError(URLImage source, Exception err);
     }
 
     /**
@@ -656,7 +656,7 @@ public class URLImage extends EncodedImage {
      * and the image will be saved as "adapted" which can be great for performance but
      * is also permanent. E.g. If you mask an image it will remain masked.
      */
-    public static interface ImageAdapter {
+    public interface ImageAdapter {
         /**
          * Allows the downloaded image to be adapted e.g if it isn't the same size of the placeholder image.
          *
@@ -664,7 +664,7 @@ public class URLImage extends EncodedImage {
          * @param placeholderImage the placeholder image
          * @return the adapted image or the same image
          */
-        public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage);
+        EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage);
 
         /**
          * Return true if the adapter should work on a separate thread to avoid blocking the EDT
@@ -672,7 +672,7 @@ public class URLImage extends EncodedImage {
          *
          * @return true to run off the EDT
          */
-        public boolean isAsyncAdapter();
+        boolean isAsyncAdapter();
     }
 
     static class ScaleToFill implements ImageAdapter {

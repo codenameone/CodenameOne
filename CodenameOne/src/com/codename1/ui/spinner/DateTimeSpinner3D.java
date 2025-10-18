@@ -46,15 +46,15 @@ import static com.codename1.ui.CN.convertToPixels;
 class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private Spinner3D date;
     private TimeSpinner3D time;
-    private Date today = new Date();
+    private final Date today = new Date();
     private Date currentDate = today;
 
     private Date startDate = new Date(0);
     private Date endDate = new Date(System.currentTimeMillis() + 10000L * 24L * 60L * 60000L);
     private boolean markToday = true;
     private boolean includeYear;
-    private int off;
-    private Container wrapper = new Container(BoxLayout.x());
+    private final int off;
+    private final Container wrapper = new Container(BoxLayout.x());
 
     /**
      * Default constructor
@@ -134,7 +134,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
             if (minutesInDay == null) {
                 minutesInDay = 0;
             }
-            cld.setTime(new Date(cld.getTime().getTime() + minutesInDay * 60l * 1000l));
+            cld.setTime(new Date(cld.getTime().getTime() + minutesInDay * 60L * 1000L));
             return cld.getTime();
         }
         return currentDate;
@@ -160,7 +160,7 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
             zero.set(Calendar.SECOND, 0);
             zero.set(Calendar.MILLISECOND, 0);
 
-            int minutesInDay = (int) ((cld.getTime().getTime() - zero.getTime().getTime()) / 60l / 1000l);
+            int minutesInDay = (int) ((cld.getTime().getTime() - zero.getTime().getTime()) / 60L / 1000L);
             time.setValue(minutesInDay);
         }
     }
@@ -344,10 +344,10 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
             return endDate;
         }
         if (name.equals("markToday")) {
-            return new Boolean(markToday);
+            return Boolean.valueOf(markToday);
         }
         if (name.equals("includeYear")) {
-            return new Boolean(includeYear);
+            return Boolean.valueOf(includeYear);
         }
         return super.getPropertyValue(name);
     }

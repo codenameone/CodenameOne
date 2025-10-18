@@ -649,7 +649,6 @@ public class UIBuilder { //implements Externalizable {
                 return;
             }
             ((Slider) cmp).addDataChangedListener((DataChangedListener) listener);
-            return;
         }
     }
 
@@ -734,7 +733,7 @@ public class UIBuilder { //implements Externalizable {
                 setBackCommand(((Form) cmp), commands[iter]);
             }
             // trigger listener creation if this is the only command in the form
-            getFormListenerInstance(((Form) cmp), null);
+            getFormListenerInstance(cmp, null);
 
             ((Form) cmp).addCommand(commands[iter]);
         }
@@ -768,7 +767,7 @@ public class UIBuilder { //implements Externalizable {
                             Object value = in.readUTF();
                             if (key.equals("$navigation")) {
                                 Command cmd = createCommandImpl((String) value, null, -1, (String) value, false, "");
-                                cmd.putClientProperty(COMMAND_ACTION, (String) value);
+                                cmd.putClientProperty(COMMAND_ACTION, value);
                                 value = cmd;
                             }
                             val.put(key, value);
@@ -851,11 +850,11 @@ public class UIBuilder { //implements Externalizable {
         }
 
         if (type == Integer.class) {
-            return new Integer(in.readInt());
+            return Integer.valueOf(in.readInt());
         }
 
         if (type == Long.class) {
-            return new Long(in.readLong());
+            return Long.valueOf(in.readLong());
         }
 
         if (type == Double.class) {
@@ -867,7 +866,7 @@ public class UIBuilder { //implements Externalizable {
         }
 
         if (type == Byte.class) {
-            return new Byte(in.readByte());
+            return Byte.valueOf(in.readByte());
         }
 
         if (type == Boolean.class) {
@@ -1416,7 +1415,7 @@ public class UIBuilder { //implements Externalizable {
                         items[iter] = in.readUTF();
                     }
                     if (!setListModel(((List) cmp))) {
-                        ((List) cmp).setModel(new DefaultListModel((Object[]) items));
+                        ((List) cmp).setModel(new DefaultListModel(items));
                     }
                     break;
 
@@ -1723,7 +1722,6 @@ public class UIBuilder { //implements Externalizable {
         }
         Object currentListeners = formListeners.get(componentName);
         if (currentListeners == null) {
-            return;
         } else {
             if (currentListeners instanceof Vector) {
                 ((Vector) currentListeners).removeElement(listener);
@@ -1870,7 +1868,7 @@ public class UIBuilder { //implements Externalizable {
         }
         if (c != null) {
             if (c instanceof List) {
-                h.put(FORM_STATE_KEY_SELECTION, new Integer(((List) c).getSelectedIndex()));
+                h.put(FORM_STATE_KEY_SELECTION, Integer.valueOf(((List) c).getSelectedIndex()));
             }
             if (c.getName() != null) {
                 h.put(FORM_STATE_KEY_FOCUS, c.getName());
@@ -1940,7 +1938,7 @@ public class UIBuilder { //implements Externalizable {
             return;
         }
         if (c instanceof Tabs) {
-            destination.put(c.getName(), new Integer(((Tabs) c).getSelectedIndex()));
+            destination.put(c.getName(), Integer.valueOf(((Tabs) c).getSelectedIndex()));
         }
         if (c instanceof Container) {
             Container cnt = (Container) c;
@@ -1951,7 +1949,7 @@ public class UIBuilder { //implements Externalizable {
             return;
         }
         if (c instanceof List) {
-            destination.put(c.getName(), new Integer(((List) c).getSelectedIndex()));
+            destination.put(c.getName(), Integer.valueOf(((List) c).getSelectedIndex()));
             return;
         }
         Object o = c.getComponentState();
@@ -2009,9 +2007,9 @@ public class UIBuilder { //implements Externalizable {
         Hashtable h = new Hashtable();
         h.put(FORM_STATE_KEY_NAME, cnt.getName());
         h.put(FORM_STATE_KEY_CONTAINER, "");
-        if (c != null && isParentOf(cnt, c)) {
+        if (isParentOf(cnt, c)) {
             if (c instanceof List) {
-                h.put(FORM_STATE_KEY_SELECTION, new Integer(((List) c).getSelectedIndex()));
+                h.put(FORM_STATE_KEY_SELECTION, Integer.valueOf(((List) c).getSelectedIndex()));
             }
             if (c.getName() != null) {
                 h.put(FORM_STATE_KEY_FOCUS, c.getName());
@@ -2872,7 +2870,7 @@ public class UIBuilder { //implements Externalizable {
                     }
                     int pos = action.indexOf(';');
                     String firstScreen = action.substring(0, pos);
-                    String nextScreen = action.substring(pos + 1, action.length());
+                    String nextScreen = action.substring(pos + 1);
                     Form f = (Form) createContainer(fetchResourceFile(), firstScreen);
                     if (Display.getInstance().getCurrent().getBackCommand() == cmd) {
                         onBackNavigation();
@@ -2915,10 +2913,10 @@ public class UIBuilder { //implements Externalizable {
 }
 
 class LazyValueC implements LazyValue<Form> {
-    private Hashtable h;
-    private Form f;
-    private Command backCommand;
-    private UIBuilder parent;
+    private final Hashtable h;
+    private final Form f;
+    private final Command backCommand;
+    private final UIBuilder parent;
 
     public LazyValueC(Form f, Hashtable h, Command backCommand, UIBuilder parent) {
         this.h = h;
@@ -2930,7 +2928,6 @@ class LazyValueC implements LazyValue<Form> {
     public Form get(Object... args) {
         String n = parent.getPreviousFormName(f);
         final Form f = parent.createForm((Form) parent.createContainer(parent.fetchResourceFile(), n));
-        ;
         if (h != null) {
             parent.setFormState(f, h);
             parent.setBackCommand(f, backCommand);

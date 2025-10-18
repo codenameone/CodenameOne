@@ -121,7 +121,7 @@ final public class CRC32 implements Checksum {
         return sum;
     }
 
-    static final void gf2_matrix_square(long[] square, long[] mat) {
+    static void gf2_matrix_square(long[] square, long[] mat) {
         for (int n = 0; n < GF2_DIM; n++)
             square[n] = gf2_matrix_times(mat, mat[n]);
     }
@@ -148,7 +148,7 @@ final public class CRC32 implements Checksum {
     }
 
     public long getValue() {
-        return (long) (v & 0xffffffffL);
+        return v & 0xffffffffL;
     }
 
     /*

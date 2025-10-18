@@ -43,7 +43,7 @@ public interface PushActionsProvider {
      *
      * @return Array of action categories supported by the app.
      */
-    public PushActionCategory[] getPushActionCategories();
+    PushActionCategory[] getPushActionCategories();
 
 
 }

@@ -227,7 +227,7 @@ public class LayeredLayout extends Layout {
      * Temp collection to keep track of which components in the container
      * have been laid out.
      */
-    private HashSet<Component> tmpLaidOut = new HashSet<Component>();
+    private final HashSet<Component> tmpLaidOut = new HashSet<Component>();
 
     /**
      * The preferred height in MM of this layout which serves as a sort of minimum
@@ -1144,10 +1144,10 @@ public class LayeredLayout extends Layout {
                 }
             }
             if (maxHRatio > 0 && maxHRatio < 1) {
-                d.setHeight((int) Math.round(d.getHeight() / (1 - maxHRatio)));
+                d.setHeight(Math.round(d.getHeight() / (1 - maxHRatio)));
             }
             if (maxWRatio > 0 && maxWRatio < 1) {
-                d.setWidth((int) Math.round(d.getWidth() / (1 - maxWRatio)));
+                d.setWidth(Math.round(d.getWidth() / (1 - maxWRatio)));
             }
         }
         return d;
@@ -2261,7 +2261,7 @@ public class LayeredLayout extends Layout {
              * One of
              * {@link Component#TOP}, {@link Component#Bottom}, {@link Component#LEFT}, {@link Component#RIGHT}
              */
-            private int side;
+            private final int side;
             /**
              * The component that is used a reference for this inset.
              * {@literal null} for the parent component.
@@ -3441,7 +3441,7 @@ public class LayeredLayout extends Layout {
                             if (Math.abs(relH) < 1f) {
                                 return this;
                             }
-                            float percentDelta = delta / (float) relH * 100f;
+                            float percentDelta = delta / relH * 100f;
                             if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
                                 percentDelta = 0f;
                             }

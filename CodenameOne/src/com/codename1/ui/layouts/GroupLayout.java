@@ -206,13 +206,13 @@ public class GroupLayout extends Layout {
 
     // Maps from Component to ComponentInfo.  This is used for tracking
     // information specific to a Component.
-    private HashMap componentInfos;
+    private final HashMap componentInfos;
 
     // Container we're doing layout for.
-    private Container host;
+    private final Container host;
 
     // Used by areParallelSiblings, cached to avoid excessive garbage.
-    private ArrayList tmpParallelSet;
+    private final ArrayList tmpParallelSet;
 
     // Indicates Springs have changed in some way since last change.
     private boolean springsChanged;
@@ -402,7 +402,7 @@ public class GroupLayout extends Layout {
         String padding = "";
         if (spring instanceof ComponentSpring) {
             ComponentSpring cSpring = (ComponentSpring) spring;
-            origin = Integer.toString(cSpring.getOrigin()) + " ";
+            origin = cSpring.getOrigin() + " ";
             String name = cSpring.getComponent().toString();
             if (name != null) {
                 origin = "name=" + name + ", ";
@@ -1556,7 +1556,7 @@ public class GroupLayout extends Layout {
             for (int counter = springs.size() - 1; counter >= 0; counter--) {
                 Spring spring = (Spring) springs.get(counter);
                 if (spring instanceof AutopaddingSpring) {
-                    ((AutopaddingSpring) spring).unset();
+                    spring.unset();
                 } else if (spring instanceof Group) {
                     ((Group) spring).unsetAutopadding();
                 }
@@ -2019,7 +2019,7 @@ public class GroupLayout extends Layout {
         private int indexOfNextNonZeroSpring(int index, boolean treatAutopaddingAsZeroSized) {
             while (index < springs.size()) {
                 Spring spring = (Spring) springs.get(index);
-                if (!((Spring) spring).willHaveZeroSize(treatAutopaddingAsZeroSized)) {
+                if (!spring.willHaveZeroSize(treatAutopaddingAsZeroSized)) {
                     return index;
                 }
                 index++;
@@ -2550,11 +2550,7 @@ public class GroupLayout extends Layout {
                 }
             }
             if (!baselineAnchorSet) {
-                if (resizeBehavior == Component.BRB_CONSTANT_DESCENT) {
-                    this.baselineAnchoredToTop = false;
-                } else {
-                    this.baselineAnchoredToTop = true;
-                }
+                this.baselineAnchoredToTop = resizeBehavior != Component.BRB_CONSTANT_DESCENT;
             }
             allSpringsHaveBaseline = (baselineSpringCount == springs.size());
             calcedBaseline = true;
@@ -3260,10 +3256,10 @@ public class GroupLayout extends Layout {
 
         String getMatchDescription() {
             if (targets != null) {
-                return "leading: " + targets.toString();
+                return "leading: " + targets;
             }
             if (sources != null) {
-                return "trailing: " + sources.toString();
+                return "trailing: " + sources;
             }
             return "--";
         }
@@ -3334,8 +3330,7 @@ public class GroupLayout extends Layout {
             } else {
                 honorsVisibility = this.honorsVisibility.booleanValue();
             }
-            boolean newVisible = (honorsVisibility) ?
-                    component.isVisible() : true;
+            boolean newVisible = !honorsVisibility || component.isVisible();
             if (visible != newVisible) {
                 visible = newVisible;
                 return true;

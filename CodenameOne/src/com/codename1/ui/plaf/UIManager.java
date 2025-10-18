@@ -70,10 +70,10 @@ public class UIManager {
      */
     static boolean localeAccessible = true;
     private LookAndFeel current;
-    private HashMap<String, Style> styles = new HashMap<String, Style>();
-    private HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
+    private final HashMap<String, Style> styles = new HashMap<String, Style>();
+    private final HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
     private HashMap<String, Object> themeProps;
-    private HashMap<String, Object> themeConstants = new HashMap<String, Object>();
+    private final HashMap<String, Object> themeConstants = new HashMap<String, Object>();
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
     /**
@@ -81,7 +81,7 @@ public class UIManager {
      * an image reference is used it two places in the theme (e.g. same background
      * to title and menu bar).
      */
-    private HashMap<String, Image> imageCache = new HashMap<String, Image>();
+    private final HashMap<String, Image> imageCache = new HashMap<String, Image>();
     /**
      * The resource bundle allows us to implicitly localize the UI on the fly, once its
      * installed all internal application strings query the resource bundle and extract
@@ -159,9 +159,9 @@ public class UIManager {
                     faceStr, styleStr, sizeStr;
             String sysFont = fontStr.substring(fontStr.indexOf("{") + 1, fontStr.indexOf("}"));
             faceStr = sysFont.substring(0, sysFont.indexOf(";"));
-            sysFont = sysFont.substring(sysFont.indexOf(";") + 1, sysFont.length());
+            sysFont = sysFont.substring(sysFont.indexOf(";") + 1);
             styleStr = sysFont.substring(0, sysFont.indexOf(";"));
-            sizeStr = sysFont.substring(sysFont.indexOf(";") + 1, sysFont.length());
+            sizeStr = sysFont.substring(sysFont.indexOf(";") + 1);
 
             if (faceStr.indexOf("FACE_SYSTEM") > -1) {
                 face = Font.FACE_SYSTEM;
@@ -200,11 +200,11 @@ public class UIManager {
                 try {
                     String bitmapFont = fontStr.substring(fontStr.indexOf("{") + 1, fontStr.indexOf("}"));
                     String nameStr;
-                    nameStr = bitmapFont.substring(0, bitmapFont.length());
+                    nameStr = bitmapFont;
 
 
                     if (nameStr.toLowerCase().startsWith("highcontrast")) {
-                        nameStr = nameStr.substring(nameStr.indexOf(";") + 1, nameStr.length());
+                        nameStr = nameStr.substring(nameStr.indexOf(";") + 1);
                         com.codename1.ui.Font f = com.codename1.ui.Font.getBitmapFont(nameStr);
                         f.addContrast((byte) 30);
                         return f;
@@ -387,7 +387,7 @@ public class UIManager {
         // Check the derive property of this icon style to make sure it points to id.
         // (The icon style must derive the main style).
         String baseStyle = (String) themeProps.get(iconUIID + ".derive");
-        if (baseStyle == null || !id.equals(baseStyle)) return null;
+        if (!id.equals(baseStyle)) return null;
         return iconUIID;
 
     }
@@ -494,7 +494,7 @@ public class UIManager {
             }
 
             if (selected) {
-                style = (Style) selectedStyles.get(id);
+                style = selectedStyles.get(id);
 
                 if (style == null) {
                     style = createStyle(id, prefix, true);
@@ -502,7 +502,7 @@ public class UIManager {
                 }
             } else {
                 if (prefix.length() == 0) {
-                    style = (Style) styles.get(id);
+                    style = styles.get(id);
 
                     if (style == null) {
                         style = createStyle(id, prefix, false);
@@ -563,9 +563,9 @@ public class UIManager {
             current = new DefaultLookAndFeel(this);
         }
         String disabledColor = Integer.toHexString(getLookAndFeel().getDisableColor());
-        Integer centerAlign = new Integer(Component.CENTER);
-        Integer rightAlign = new Integer(Component.RIGHT);
-        Integer leftAlign = new Integer(Component.LEFT);
+        Integer centerAlign = Integer.valueOf(Component.CENTER);
+        Integer rightAlign = Integer.valueOf(Component.RIGHT);
+        Integer leftAlign = Integer.valueOf(Component.LEFT);
 
         // global settings
         themeProps.put("sel#transparency", "255");
@@ -684,7 +684,7 @@ public class UIManager {
                 themeProps.put("ToastBar.bgColor", "0");
             }
             themeProps.put("ToastBar.transparency", "200");
-            themeProps.put("ToastBar.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("ToastBar.bgType", Byte.valueOf(Style.BACKGROUND_NONE));
             themeProps.put("ToastBar.border", Border.createEmpty());
             themeProps.put("ToastBar.sel#derive", "ToastBar");
             themeProps.put("ToastBar.press#derive", "ToastBar");
@@ -696,7 +696,7 @@ public class UIManager {
             themeProps.put("ToastBarMessage.font", lightFont);
             themeProps.put("ToastBarMessage.transparency", "0");
             themeProps.put("ToastBarMessage.fgColor", "FFFFFF");
-            themeProps.put("ToastBarMessage.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("ToastBarMessage.bgType", Byte.valueOf(Style.BACKGROUND_NONE));
             themeProps.put("ToastBarMessage.border", Border.createEmpty());
             themeProps.put("ToastBarMessage.sel#derive", "ToastBarMessage");
             themeProps.put("ToastBarMessage.press#derive", "ToastBarMessage");
@@ -706,7 +706,7 @@ public class UIManager {
         if (installedTheme == null || !installedTheme.containsKey("Sheet.derive")) {
             themeProps.put("Sheet.padding", "0,0,0,0");
             themeProps.put("Sheet.margin", "0,0,0,0");
-            themeProps.put("Sheet.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("Sheet.bgType", Byte.valueOf(Style.BACKGROUND_NONE));
             if (darkMode) {
                 themeProps.put("Sheet.bgColor", "333333");
             } else {
@@ -1557,7 +1557,7 @@ public class UIManager {
 
             // this is a constant not a theme entry
             if (key.startsWith("@")) {
-                themeConstants.put(key.substring(1, key.length()), themeProps.get(key));
+                themeConstants.put(key.substring(1), themeProps.get(key));
                 continue;
             }
             this.themeProps.put(key, themeProps.get(key));
@@ -1865,7 +1865,7 @@ public class UIManager {
                 if (themeProps.containsKey(id + Style.ICON_GAP_UNIT)) {
                     style.setIconGapUnit((Byte) themeProps.get(id + Style.ICON_GAP_UNIT));
                 } else {
-                    style.setIconGapUnit((Byte) Style.UNIT_TYPE_PIXELS);
+                    style.setIconGapUnit(Style.UNIT_TYPE_PIXELS);
                 }
                 style.setIconGap((Float) themeProps.get(id + Style.ICON_GAP));
             }
@@ -1949,7 +1949,7 @@ public class UIManager {
                     try {
                         String bgImageStr = (String) bgImage;
                         if (imageCache.containsKey(bgImageStr)) {
-                            im = (Image) imageCache.get(bgImageStr);
+                            im = imageCache.get(bgImageStr);
                         } else {
                             if (bgImageStr.startsWith("/")) {
                                 im = Image.createImage(bgImageStr);
@@ -2006,7 +2006,7 @@ public class UIManager {
         int rlen = retVal.length;
         for (int i = 0; i < rlen; i++) {
             retVal[i] = Float.parseFloat(str.substring(0, str.indexOf(",")));
-            str = str.substring(str.indexOf(",") + 1, str.length());
+            str = str.substring(str.indexOf(",") + 1);
         }
         return retVal;
     }
@@ -2074,21 +2074,21 @@ public class UIManager {
         if (localeAccessible) {
             this.bundle = bundle;
             if (bundle != null) {
-                String v = (String) bundle.get("@rtl");
+                String v = bundle.get("@rtl");
                 if (v != null) {
                     getLookAndFeel().setRTL(v.equalsIgnoreCase("true"));
 
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
                 }
-                String textFieldInputMode = (String) bundle.get("@im");
+                String textFieldInputMode = bundle.get("@im");
                 if (textFieldInputMode != null && textFieldInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
                     int tlen = tokenized.length;
                     for (int iter = 0; iter < tlen; iter++) {
                         String val = tokenized[iter];
-                        String actual = (String) bundle.get("@im-" + val);
+                        String actual = bundle.get("@im-" + val);
                         // val can be null for builtin input mode types...
                         if (actual != null) {
                             TextField.addInputMode(val, parseTextFieldInputMode(actual), Character.isUpperCase(val.charAt(0)));

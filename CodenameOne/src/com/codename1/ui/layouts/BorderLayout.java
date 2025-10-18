@@ -141,7 +141,7 @@ public class BorderLayout extends Layout {
      * Defines the behavior of the center component to one of the constants defined in this class
      */
     private int centerBehavior;
-    private Dimension dim = new Dimension(0, 0);
+    private final Dimension dim = new Dimension(0, 0);
 
     /**
      * Creates a new instance of BorderLayout
@@ -604,7 +604,6 @@ public class BorderLayout extends Layout {
                     h = targetHeight;
                     x = s.getPaddingLeft(rtl);
                     y = s.getPaddingTop();
-                    ;
                 }
             }
             c.setWidth(w);
@@ -732,7 +731,7 @@ public class BorderLayout extends Layout {
 
     private Component getComponentImpl(Component noLandscape, String orientation) {
         if (landscapeSwap != null && isLandscape()) {
-            String s = (String) landscapeSwap.get(orientation);
+            String s = landscapeSwap.get(orientation);
             if (s != null) {
                 return getComponentAtIgnoreLandscape(s);
             }
@@ -828,7 +827,7 @@ public class BorderLayout extends Layout {
         if (landscapeSwap == null) {
             return null;
         }
-        return (String) landscapeSwap.get(portraitPosition);
+        return landscapeSwap.get(portraitPosition);
     }
 
     /**

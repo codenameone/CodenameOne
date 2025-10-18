@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -62,7 +63,7 @@ import java.util.Map;
  * @author Shai Almog
  */
 public class PropertyIndex implements Iterable<PropertyBase> {
-    private static Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
+    private static final Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
     private final PropertyBase[] properties;
     private final String name;
     PropertyBusinessObject parent;
@@ -260,7 +261,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         for (PropertyBase p : this) {
             b.append(p.getName());
             b.append(" = ");
-            b.append(p.toString());
+            b.append(p);
             if (includeNewline) {
                 b.append('\n');
             }
@@ -282,7 +283,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         ArrayList al = new ArrayList();
         for (Object o : l) {
             if (o instanceof Map) {
-                PropertyBusinessObject po = (PropertyBusinessObject) recursiveType.newInstance();
+                PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
                 po.getPropertyIndex().populateFromMap((Map<String, Object>) o, recursiveType);
                 al.add(po);
                 continue;
@@ -370,12 +371,12 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                     if (val instanceof List) {
                         if (p instanceof CollectionProperty) {
                             if (recursiveType != null) {
-                                if (((CollectionProperty) p) != null) {
+                                if (p != null) {
                                     ((CollectionProperty) p).clear();
                                 }
                                 for (Object e : (Collection) val) {
                                     if (e instanceof Map) {
-                                        Class eType = ((CollectionProperty) p).getGenericType();
+                                        Class eType = p.getGenericType();
                                         // maybe don't use recursiveType here anymore???
                                         // elementType is usually sufficient...
                                         Class type = (eType == null) ? recursiveType : eType;
@@ -849,10 +850,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         int value = 0;
         for (int iter = 0; iter < properties.length; iter++) {
             if (properties[iter] instanceof Property) {
-                Object v = ((Property) properties[iter]).get();
+                Object v = properties[iter].get();
                 if (v != null) {
                     int b = v.hashCode();
-                    value = 31 * value + (int) (b ^ (b >>> 32));
+                    value = 31 * value + (b ^ (b >>> 32));
                 }
             }
         }
@@ -944,7 +945,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                     }
                     if (b instanceof Property) {
                         out.writeByte(1);
-                        Util.writeObject(((Property) b).get(), out);
+                        Util.writeObject(b.get(), out);
                         continue;
                     }
                 }

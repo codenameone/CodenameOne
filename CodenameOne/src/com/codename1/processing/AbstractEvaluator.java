@@ -71,7 +71,7 @@ import java.util.List;
  */
 abstract class AbstractEvaluator implements Evaluator {
 
-    private String expr;
+    private final String expr;
 
     /**
      * Construct with the full predicate expression.
@@ -277,7 +277,7 @@ abstract class AbstractEvaluator implements Evaluator {
         text = text.trim();
         int tlen = text.length();
         for (int i = 0; i < tlen; i++) {
-            if (Character.isDigit(text.charAt(i)) == false) {
+            if (!Character.isDigit(text.charAt(i))) {
                 return false;
             }
         }
@@ -317,7 +317,7 @@ abstract class AbstractEvaluator implements Evaluator {
             arrayAsString = arrayAsString.substring(1, arrayAsString.length() - 1);
         }
         List v = StringUtil.tokenizeString(arrayAsString, ',');
-        String a[] = new String[v.size()];
+        String[] a = new String[v.size()];
         for (int i = 0; i < v.size(); i++) {
             a[i] = stripQuotes(v.get(i).toString().trim());
         }
@@ -364,7 +364,7 @@ abstract class AbstractEvaluator implements Evaluator {
             }
         }
         if (array.size() == 1) {
-            return (StructuredContent) array.get(0);
+            return array.get(0);
         }
         return array;
     }
@@ -398,7 +398,7 @@ abstract class AbstractEvaluator implements Evaluator {
             }
         }
         if (array.size() == 1) {
-            return (StructuredContent) array.get(0);
+            return array.get(0);
         }
         return array;
     }
@@ -446,7 +446,7 @@ abstract class AbstractEvaluator implements Evaluator {
             }
         }
         if (array.size() == 1) {
-            return (StructuredContent) array.get(0);
+            return array.get(0);
         }
         return array;
     }
@@ -494,7 +494,7 @@ abstract class AbstractEvaluator implements Evaluator {
             }
         }
         if (array.size() == 1) {
-            return (StructuredContent) array.get(0);
+            return array.get(0);
         }
         return array;
     }
@@ -542,7 +542,7 @@ abstract class AbstractEvaluator implements Evaluator {
             }
         }
         if (array.size() == 1) {
-            return (StructuredContent) array.get(0);
+            return array.get(0);
         }
         return array;
     }

@@ -50,5 +50,5 @@ public interface LocalNotificationCallback {
      * @param notificationId The notification ID of the notification that was received.
      * @see LocalNotification
      */
-    public void localNotificationReceived(String notificationId);
+    void localNotificationReceived(String notificationId);
 }

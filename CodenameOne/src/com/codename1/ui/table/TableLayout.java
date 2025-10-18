@@ -121,7 +121,8 @@ public class TableLayout extends Layout {
     private int[] rowPositions;
     private boolean horizontalSpanningExists;
     private boolean verticalSpanningExists;
-    private int rows, columns;
+    private int rows;
+    private final int columns;
     private boolean growHorizontally;
     private boolean truncateHorizontally; //whether we should truncate or shrink the table if the prefered width of all elements exceed the available width. default = false = shrink
     private boolean truncateVertically;

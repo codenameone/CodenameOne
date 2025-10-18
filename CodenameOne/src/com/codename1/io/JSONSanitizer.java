@@ -1253,7 +1253,6 @@ final class JSONSanitizer {
          * close bracket.
          */
         AFTER_VALUE,
-        ;
     }
 
     /**

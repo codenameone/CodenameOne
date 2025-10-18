@@ -282,7 +282,7 @@ public final class Display extends CN1Constants {
     static int transitionDelay = -1;
     static CodenameOneImplementation impl;
     private static String selectedVirtualKeyboard = null;
-    private static Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
+    private static final Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
     private final LinkedList<Runnable> runningSerialCallsQueue = new LinkedList<Runnable>();
     boolean codenameOneExited;
     long time;
@@ -332,11 +332,11 @@ public final class Display extends CN1Constants {
     /**
      * Contains the call serially pending elements
      */
-    private ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
+    private final ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
     /**
      * Contains the call serially idle elements
      */
-    private ArrayList<Runnable> pendingIdleSerialCalls = new ArrayList<Runnable>();
+    private final ArrayList<Runnable> pendingIdleSerialCalls = new ArrayList<Runnable>();
     /**
      * This is the instance of the EDT used internally to indicate whether
      * we are executing on the EDT or some arbitrary thread
@@ -374,8 +374,8 @@ public final class Display extends CN1Constants {
     private int longPressInterval = 500;
     private long nextKeyRepeatEvent;
     private int keyRepeatValue;
-    private int keyRepeatInitialIntervalTime = 800;
-    private int keyRepeatNextIntervalTime = 10;
+    private final int keyRepeatInitialIntervalTime = 800;
+    private final int keyRepeatNextIntervalTime = 10;
     private boolean lastInteractionWasKeypad;
     private boolean dragOccured;
     private boolean processingSerialCalls;
@@ -409,7 +409,7 @@ public final class Display extends CN1Constants {
     private int previousKeyPressed;
     private int lastKeyPressed;
     private int lastDragOffset;
-    private Rectangle tmpRect = new Rectangle();
+    private final Rectangle tmpRect = new Rectangle();
     private Form eventForm;
 
     /**
@@ -433,55 +433,55 @@ public final class Display extends CN1Constants {
 
             //restore menu state from previous run if exists
             int commandBehaviour = COMMAND_BEHAVIOR_DEFAULT;
-            if (INSTANCE.impl != null) {
-                commandBehaviour = INSTANCE.impl.getCommandBehavior();
+            if (impl != null) {
+                commandBehaviour = impl.getCommandBehavior();
             }
-            INSTANCE.impl = (CodenameOneImplementation) ImplementationFactory.getInstance().createImplementation();
+            impl = (CodenameOneImplementation) ImplementationFactory.getInstance().createImplementation();
 
-            INSTANCE.impl.setDisplayLock(lock);
-            INSTANCE.impl.initImpl(m);
-            INSTANCE.codenameOneGraphics = new Graphics(INSTANCE.impl.getNativeGraphics());
-            INSTANCE.codenameOneGraphics.paintPeersBehind = INSTANCE.impl.paintNativePeersBehind();
-            INSTANCE.impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
+            impl.setDisplayLock(lock);
+            impl.initImpl(m);
+            INSTANCE.codenameOneGraphics = new Graphics(impl.getNativeGraphics());
+            INSTANCE.codenameOneGraphics.paintPeersBehind = impl.paintNativePeersBehind();
+            impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
             // only enable but never disable the third softbutton
-            if (INSTANCE.impl.isThirdSoftButton()) {
+            if (impl.isThirdSoftButton()) {
                 INSTANCE.thirdSoftButton = true;
             }
-            if (INSTANCE.impl.getSoftkeyCount() > 0) {
-                MenuBar.leftSK = INSTANCE.impl.getSoftkeyCode(0)[0];
-                if (INSTANCE.impl.getSoftkeyCount() > 1) {
-                    MenuBar.rightSK = INSTANCE.impl.getSoftkeyCode(1)[0];
-                    if (INSTANCE.impl.getSoftkeyCode(1).length > 1) {
-                        MenuBar.rightSK2 = INSTANCE.impl.getSoftkeyCode(1)[1];
+            if (impl.getSoftkeyCount() > 0) {
+                MenuBar.leftSK = impl.getSoftkeyCode(0)[0];
+                if (impl.getSoftkeyCount() > 1) {
+                    MenuBar.rightSK = impl.getSoftkeyCode(1)[0];
+                    if (impl.getSoftkeyCode(1).length > 1) {
+                        MenuBar.rightSK2 = impl.getSoftkeyCode(1)[1];
                     }
                 }
             }
-            MenuBar.backSK = INSTANCE.impl.getBackKeyCode();
-            MenuBar.backspaceSK = INSTANCE.impl.getBackspaceKeyCode();
-            MenuBar.clearSK = INSTANCE.impl.getClearKeyCode();
+            MenuBar.backSK = impl.getBackKeyCode();
+            MenuBar.backspaceSK = impl.getBackspaceKeyCode();
+            MenuBar.clearSK = impl.getClearKeyCode();
 
-            INSTANCE.PATHLENGTH = INSTANCE.impl.getDragPathLength();
+            INSTANCE.PATHLENGTH = impl.getDragPathLength();
             INSTANCE.dragPathX = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathY = new float[INSTANCE.PATHLENGTH];
             INSTANCE.dragPathTime = new long[INSTANCE.PATHLENGTH];
-            com.codename1.util.StringUtil.setImplementation(INSTANCE.impl);
-            com.codename1.io.Util.setImplementation(INSTANCE.impl);
+            com.codename1.util.StringUtil.setImplementation(impl);
+            com.codename1.io.Util.setImplementation(impl);
 
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
             if (INSTANCE.edt == null) {
-                INSTANCE.touchScreen = INSTANCE.impl.isTouchDevice();
+                INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
                 INSTANCE.edt = new CodenameOneThread(new RunnableWrapper(null, 3), "EDT");
-                INSTANCE.impl.setThreadPriority(INSTANCE.edt, INSTANCE.impl.getEDTThreadPriority());
+                impl.setThreadPriority(INSTANCE.edt, impl.getEDTThreadPriority());
                 INSTANCE.edt.start();
             }
-            INSTANCE.impl.postInit();
+            impl.postInit();
             INSTANCE.setCommandBehavior(commandBehaviour);
         } else {
-            INSTANCE.impl.confirmControlView();
+            impl.confirmControlView();
         }
     }
 
@@ -507,7 +507,7 @@ public final class Display extends CN1Constants {
      * @return true if the EDT is running
      */
     public static boolean isInitialized() {
-        return INSTANCE.codenameOneRunning && (INSTANCE.impl == null ? false : INSTANCE.impl.isInitialized());
+        return INSTANCE.codenameOneRunning && (impl != null && impl.isInitialized());
     }
 
     /**
@@ -837,7 +837,7 @@ public final class Display extends CN1Constants {
                             Runnable nextTask = null;
                             synchronized (lock) {
                                 if (backgroundTasks.size() > 0) {
-                                    nextTask = (Runnable) backgroundTasks.get(0);
+                                    nextTask = backgroundTasks.get(0);
                                 } else {
                                     backgroundThread = null;
                                     return;
@@ -963,14 +963,14 @@ public final class Display extends CN1Constants {
      */
     public boolean isInTransition() {
         if (animationQueue != null && animationQueue.size() > 0) {
-            Animation ani = (Animation) animationQueue.get(0);
+            Animation ani = animationQueue.get(0);
             return ani instanceof Transition;
         }
         return false;
     }
 
     private void paintTransitionAnimation() {
-        Animation ani = (Animation) animationQueue.get(0);
+        Animation ani = animationQueue.get(0);
         if (!ani.animate()) {
             animationQueue.remove(0);
             if (ani instanceof Transition) {
@@ -978,7 +978,7 @@ public final class Display extends CN1Constants {
                 restoreMenu(source);
 
                 if (animationQueue.size() > 0) {
-                    ani = (Animation) animationQueue.get(0);
+                    ani = animationQueue.get(0);
                     if (ani instanceof Transition) {
                         ((Transition) ani).initTransition();
                     }
@@ -1052,7 +1052,7 @@ public final class Display extends CN1Constants {
                 if (errorHandler != null) {
                     errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
                 } else {
-                    Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
+                    Dialog.show("Error", "An internal application error occurred: " + err, "OK", null);
                 }
             }
         }
@@ -1089,12 +1089,12 @@ public final class Display extends CN1Constants {
                     if (errorHandler != null) {
                         errorHandler.fireActionEvent(new ActionEvent(err, ActionEvent.Type.Exception));
                     } else {
-                        Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
+                        Dialog.show("Error", "An internal application error occurred: " + err, "OK", null);
                     }
                 }
             }
         }
-        INSTANCE.impl.deinitialize();
+        impl.deinitialize();
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
         INSTANCE.edt = null;
@@ -1527,15 +1527,15 @@ public final class Display extends CN1Constants {
         if (current != null) {
             // make sure the fold menu occurs as expected then set the current
             // to the correct parent!
-            if (current instanceof Dialog && ((Dialog) current).isMenu()) {
+            if (current instanceof Dialog && current.isMenu()) {
                 Transition t = current.getTransitionOutAnimator();
                 if (t != null) {
                     // go back to the parent form first
-                    if (((Dialog) current).getPreviousForm() != null) {
-                        initTransition(t.copy(false), current, ((Dialog) current).getPreviousForm());
+                    if (current.getPreviousForm() != null) {
+                        initTransition(t.copy(false), current, current.getPreviousForm());
                     }
                 }
-                current = ((Dialog) current).getPreviousForm();
+                current = current.getPreviousForm();
                 impl.setCurrentForm(current);
             }
 
@@ -2184,9 +2184,7 @@ public final class Display extends CN1Constants {
         int[] a = new int[inputEventStackTmp[offset]];
         offset++;
         int alen = a.length;
-        for (int iter = 0; iter < alen; iter++) {
-            a[iter] = inputEventStackTmp[offset + iter];
-        }
+        System.arraycopy(inputEventStackTmp, offset + 0, a, 0, alen);
         return a;
     }
 
@@ -2440,7 +2438,7 @@ public final class Display extends CN1Constants {
             if (includeMenus) {
                 Form f = impl.getCurrentForm();
                 if (f instanceof Dialog) {
-                    if (((Dialog) f).isDisposed()) {
+                    if (f.isDisposed()) {
                         return getCurrent();
                     }
                 }
@@ -2462,7 +2460,7 @@ public final class Display extends CN1Constants {
     public Form getCurrent() {
         Form current = impl.getCurrentForm();
         if (current != null && current instanceof Dialog) {
-            if (((Dialog) current).isMenu() || ((Dialog) current).isDisposed()) {
+            if (current.isMenu() || current.isDisposed()) {
                 Form p = current.getPreviousForm();
                 if (p != null) {
                     return p;
@@ -2573,15 +2571,15 @@ public final class Display extends CN1Constants {
 
         switch (unitType) {
             case Style.UNIT_TYPE_REM:
-                return (int) Math.round(value * Font.getDefaultFont().getHeight());
+                return Math.round(value * Font.getDefaultFont().getHeight());
             case Style.UNIT_TYPE_VH:
-                return (int) Math.round(value / 100f * CN.getDisplayHeight());
+                return Math.round(value / 100f * CN.getDisplayHeight());
             case Style.UNIT_TYPE_VW:
-                return (int) Math.round(value / 100f * CN.getDisplayWidth());
+                return Math.round(value / 100f * CN.getDisplayWidth());
             case Style.UNIT_TYPE_VMIN:
-                return (int) Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                return Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
             case Style.UNIT_TYPE_VMAX:
-                return (int) Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                return Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
             case Style.UNIT_TYPE_DIPS:
                 return Display.getInstance().convertToPixels(value);
             case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
@@ -2732,7 +2730,7 @@ public final class Display extends CN1Constants {
         if (selectedVirtualKeyboard == null) {
             return null;
         }
-        return (VirtualKeyboardInterface) virtualKeyboards.get(selectedVirtualKeyboard);
+        return virtualKeyboards.get(selectedVirtualKeyboard);
     }
 
     /**
@@ -3319,7 +3317,7 @@ public final class Display extends CN1Constants {
             return Component.revalidateOnStyleChange ? "true" : "false";
         }
         if (localProperties != null) {
-            String v = (String) localProperties.get(key);
+            String v = localProperties.get(key);
             if (v != null) {
                 return v;
             }
@@ -4983,7 +4981,7 @@ public final class Display extends CN1Constants {
             public void run() {
                 executeTimeoutRunnable(r);
             }
-        }, (long) timeout);
+        }, timeout);
         return t;
     }
 
@@ -5073,7 +5071,7 @@ public final class Display extends CN1Constants {
      */
     private class DebugRunnable implements Runnable {
         private final Runnable internal;
-        private EdtException exceptionWrapper;
+        private final EdtException exceptionWrapper;
         private DebugRunnable parentContext;
         private int depth;
         private int totalDepth;

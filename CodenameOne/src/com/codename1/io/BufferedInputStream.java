@@ -58,7 +58,7 @@ public class BufferedInputStream extends InputStream {
     private int totalBytesRead;
 
     private boolean printInput;
-    private String name;
+    private final String name;
     private int yield = -1;
     private long elapsedSinceLastYield;
     /**
@@ -260,7 +260,7 @@ public class BufferedInputStream extends InputStream {
                 if (nsz > marklimit) {
                     nsz = marklimit;
                 }
-                byte nbuf[] = new byte[nsz];
+                byte[] nbuf = new byte[nsz];
                 System.arraycopy(buffer, 0, nbuf, 0, pos);
                 if (buffer != buf) {
                     throw new IOException("Stream closed");
@@ -425,7 +425,7 @@ public class BufferedInputStream extends InputStream {
      *                     invoking its {@link #close()} method,
      *                     or an I/O error occurs.
      */
-    public synchronized int read(byte b[], int off, int len)
+    public synchronized int read(byte[] b, int off, int len)
             throws IOException {
         if (stopped) {
             return -1;
@@ -681,7 +681,7 @@ public class BufferedInputStream extends InputStream {
     /**
      * {@inheritDoc}
      */
-    public int read(byte b[]) throws IOException {
+    public int read(byte[] b) throws IOException {
         return read(b, 0, b.length);
     }
 

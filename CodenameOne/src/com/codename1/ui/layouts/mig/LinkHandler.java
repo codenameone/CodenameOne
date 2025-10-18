@@ -65,10 +65,10 @@ public final class LinkHandler {
             if (ret == null && l == layout) {
                 int[] rect = VALUES_TEMP.get(i).get(key);
                 if (cont && rect != null && rect[type] != LayoutUtil.NOT_SET) {
-                    ret = new Integer(rect[type]);
+                    ret = Integer.valueOf(rect[type]);
                 } else {
                     rect = VALUES.get(i).get(key);
-                    ret = (rect != null && rect[type] != LayoutUtil.NOT_SET) ? new Integer(rect[type]) : null;
+                    ret = (rect != null && rect[type] != LayoutUtil.NOT_SET) ? Integer.valueOf(rect[type]) : null;
                 }
                 cont = false;
             }
@@ -105,7 +105,7 @@ public final class LinkHandler {
                 int[] old = map.get(key);
 
                 if (old == null || old[X] != x || old[Y] != y || old[WIDTH] != width || old[HEIGHT] != height) {
-                    if (old == null || incCur == false) {
+                    if (old == null || !incCur) {
                         map.put(key, new int[]{x, y, width, height, x + width, y + height});
                         return true;
                     } else {
@@ -160,7 +160,7 @@ public final class LinkHandler {
         VALUES_TEMP.add(values);
 
         values = new HashMap<String, int[]>(4);
-        if (temporary == false)
+        if (!temporary)
             values.put(key, bounds);
         VALUES.add(values);
 

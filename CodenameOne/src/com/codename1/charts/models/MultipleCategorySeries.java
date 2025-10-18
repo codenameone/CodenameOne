@@ -23,13 +23,13 @@ import java.util.List;
  */
 public class MultipleCategorySeries {
     /** The series title. */
-    private String mTitle;
+    private final String mTitle;
     /** The series local keys. */
-    private List<String> mCategories = new ArrayList<String>();
+    private final List<String> mCategories = new ArrayList<String>();
     /** The series name. */
-    private List<String[]> mTitles = new ArrayList<String[]>();
+    private final List<String[]> mTitles = new ArrayList<String[]>();
     /** The series values. */
-    private List<double[]> mValues = new ArrayList<double[]>();
+    private final List<double[]> mValues = new ArrayList<double[]>();
 
     /**
      * Builds a new category series.

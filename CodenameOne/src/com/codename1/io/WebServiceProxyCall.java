@@ -254,10 +254,10 @@ public class WebServiceProxyCall {
 
     static class WSConnection extends ConnectionRequest {
         Object returnValue;
-        private WSDefinition def;
-        private Object[] arguments;
-        private SuccessCallback scall;
-        private FailureCallback fcall;
+        private final WSDefinition def;
+        private final Object[] arguments;
+        private final SuccessCallback scall;
+        private final FailureCallback fcall;
 
         public WSConnection(WSDefinition def, Callback call, Object... arguments) {
             this(def, call, call, arguments);
@@ -303,7 +303,7 @@ public class WebServiceProxyCall {
                     return;
 
                 case TYPE_BYTE:
-                    returnValue = new Byte(dis.readByte());
+                    returnValue = Byte.valueOf(dis.readByte());
                     break;
 
                 case TYPE_CHAR:
@@ -311,15 +311,15 @@ public class WebServiceProxyCall {
                     break;
 
                 case TYPE_SHORT:
-                    returnValue = new Short(dis.readShort());
+                    returnValue = Short.valueOf(dis.readShort());
                     break;
 
                 case TYPE_INT:
-                    returnValue = new Integer(dis.readInt());
+                    returnValue = Integer.valueOf(dis.readInt());
                     break;
 
                 case TYPE_LONG:
-                    returnValue = new Long(dis.readLong());
+                    returnValue = Long.valueOf(dis.readLong());
                     break;
 
                 case TYPE_DOUBLE:
@@ -331,12 +331,12 @@ public class WebServiceProxyCall {
                     break;
 
                 case TYPE_BOOLEAN:
-                    returnValue = new Boolean(dis.readBoolean());
+                    returnValue = Boolean.valueOf(dis.readBoolean());
                     break;
 
                 case TYPE_BYTE_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Byte(dis.readByte());
+                        returnValue = Byte.valueOf(dis.readByte());
                     }
                     break;
 
@@ -348,19 +348,19 @@ public class WebServiceProxyCall {
 
                 case TYPE_SHORT_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Short(dis.readShort());
+                        returnValue = Short.valueOf(dis.readShort());
                     }
                     break;
 
                 case TYPE_INTEGER_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Integer(dis.readInt());
+                        returnValue = Integer.valueOf(dis.readInt());
                     }
                     break;
 
                 case TYPE_LONG_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Long(dis.readLong());
+                        returnValue = Long.valueOf(dis.readLong());
                     }
                     break;
 
@@ -378,7 +378,7 @@ public class WebServiceProxyCall {
 
                 case TYPE_BOOLEAN_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Boolean(dis.readBoolean());
+                        returnValue = Boolean.valueOf(dis.readBoolean());
                     }
                     break;
 

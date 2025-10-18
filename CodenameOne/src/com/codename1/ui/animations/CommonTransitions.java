@@ -648,10 +648,10 @@ public final class CommonTransitions extends Transition {
      * @param speed       the speed of the motion
      * @return a motion instance
      */
-    protected Motion createMotion(int startOffset, int dest, int speed) {
+    private Motion createMotion(int startOffset, int dest, int speed) {
         if (motionSetManually) {
             if (lazyMotion != null) {
-                return lazyMotion.get(new Integer(startOffset), new Integer(dest), new Integer(speed));
+                return lazyMotion.get(Integer.valueOf(startOffset), Integer.valueOf(dest), Integer.valueOf(speed));
             }
             return motion;
         }
@@ -840,7 +840,6 @@ public final class CommonTransitions extends Transition {
                         paint(g, c, 0, 0);
                     }
                     g.setAlpha(alpha);
-                    return;
             }
         } catch (Throwable t) {
             // end the transition now just to be safe

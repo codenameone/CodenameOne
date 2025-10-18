@@ -40,5 +40,5 @@ public interface NodePainter {
      * @param bounds The bounding rect to paint into.
      * @param node   The node whose content we are painting.
      */
-    public void paint(Graphics g, Rectangle bounds, Node node);
+    void paint(Graphics g, Rectangle bounds, Node node);
 }

@@ -74,7 +74,7 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
     /** If the custom text grid should be displayed on the Y axis. */
     private boolean mShowCustomTextGridY = false;
     /** The simple renderers that are included in this multiple series renderer. */
-    private List<SimpleSeriesRenderer> mRenderers = new ArrayList<SimpleSeriesRenderer>();
+    private final List<SimpleSeriesRenderer> mRenderers = new ArrayList<SimpleSeriesRenderer>();
     /** The antialiasing flag. */
     private boolean mAntialiasing = true;
     /** The legend height. */
@@ -94,7 +94,7 @@ public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused tex
     /** A flag for enabling the external zoom. */
     private boolean mExternalZoomEnabled = false;
     /** The original chart scale. */
-    private float mOriginalScale = mScale;
+    private final float mOriginalScale = mScale;
     /** A flag for enabling the click on elements. */
     private boolean mClickEnabled = false;
     /** The selectable radius around a clickable point. */

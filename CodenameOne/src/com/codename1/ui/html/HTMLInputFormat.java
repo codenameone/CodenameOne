@@ -42,12 +42,12 @@ class HTMLInputFormat {
     /**
      * The allowed literals in an input format defintion
      */
-    private static char[] literals = {'a', 'A', 'n', 'N', 'x', 'X', 'm', 'M'};
+    private static final char[] literals = {'a', 'A', 'n', 'N', 'x', 'X', 'm', 'M'};
 
     /**
      * The matching allowed character set for each literal
      */
-    private static int[] literalConstraints =
+    private static final int[] literalConstraints =
             {FormatConstraint.TYPE_LOWERCASE | FormatConstraint.TYPE_SYMBOL,
                     FormatConstraint.TYPE_UPPERCASE | FormatConstraint.TYPE_SYMBOL,
                     FormatConstraint.TYPE_NUMERIC | FormatConstraint.TYPE_SYMBOL,
@@ -60,7 +60,7 @@ class HTMLInputFormat {
 
     private int minLength;
     private int maxLength;
-    private Vector formatConstraints = new Vector();
+    private final Vector formatConstraints = new Vector();
 
 
     /**
@@ -237,7 +237,7 @@ class HTMLInputFormat {
         Enumeration e = formatConstraints.elements();
         if (!str.equals("")) {
             char c = str.charAt(i);
-            for (; e.hasMoreElements(); ) {
+            while (e.hasMoreElements()) {
                 FormatConstraint constraint = (FormatConstraint) e.nextElement();
                 if (constraint.count == FormatConstraint.COUNT_EXACTLY_ONE) {
                     if (!verifyChar(c, constraint.type)) {
@@ -354,7 +354,7 @@ class HTMLInputFormat {
                     singlesCount = 0;
                     lastString = "";
                 }
-                str += followedBy + constraint.toString();
+                str += followedBy + constraint;
                 followedBy = " followed by ";
 
             }

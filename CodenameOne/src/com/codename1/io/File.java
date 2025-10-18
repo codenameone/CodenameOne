@@ -42,7 +42,7 @@ import java.util.ArrayList;
 public class File {
     public static final char separatorChar = '/';
     public static final java.lang.String separator = "/";
-    private String path;
+    private final String path;
 
     /**
      * Creates a new File object from the given URI
@@ -506,7 +506,7 @@ public class File {
     /**
      * Interface to filter filenames.
      */
-    public static interface FilenameFilter {
+    public interface FilenameFilter {
         /**
          * Checks if the given file should be included in results.
          *
@@ -514,19 +514,19 @@ public class File {
          * @param name The file name.
          * @return True if the file should be included in results.
          */
-        public abstract boolean accept(File f, String name);
+        boolean accept(File f, String name);
     }
 
     /**
      * Interface for filtering files.
      */
-    public static interface FileFilter {
+    public interface FileFilter {
         /**
          * Returns {@literal true} if the file should be included in results.
          *
          * @param f The file to check
          * @return True to include.  False to not include in results.
          */
-        public abstract boolean accept(File f);
+        boolean accept(File f);
     }
 }

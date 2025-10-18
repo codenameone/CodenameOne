@@ -24,6 +24,7 @@
 
 package com.codename1.ui;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -275,12 +276,12 @@ public class Command implements ActionListener {
             return (obj != null) && obj.getClass() == getClass() && command == null &&
                     ((Command) obj).icon == icon && ((Command) obj).commandId == commandId &&
                     ((Command) obj).materialIcon == materialIcon && ((Command) obj).materialIconSize == materialIconSize &&
-                    (clientProperties == ((Command) obj).clientProperties || clientProperties != null && clientProperties.equals(((Command) obj).clientProperties));
+                    (Objects.equals(clientProperties, ((Command) obj).clientProperties));
         } else {
             return (obj != null) && obj.getClass() == getClass() && ((Command) obj).command.equals(command) &&
                     ((Command) obj).icon == icon && ((Command) obj).commandId == commandId &&
                     ((Command) obj).materialIcon == materialIcon && ((Command) obj).materialIconSize == materialIconSize &&
-                    (clientProperties == ((Command) obj).clientProperties || clientProperties != null && clientProperties.equals(((Command) obj).clientProperties));
+                    (Objects.equals(clientProperties, ((Command) obj).clientProperties));
         }
     }
 

@@ -36,6 +36,7 @@ import com.codename1.ui.plaf.Style;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -222,9 +223,7 @@ public class Node {
         if (this.tags == null) {
             this.tags = new HashSet<String>();
         }
-        for (String tag : tags) {
-            this.tags.add(tag);
-        }
+        Collections.addAll(this.tags, tags);
     }
 
     public Rectangle2D getBoundsInScene(Rectangle2D out) {

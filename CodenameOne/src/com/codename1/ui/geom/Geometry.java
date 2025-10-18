@@ -688,7 +688,6 @@ class Geometry {
                     } else {
                         last.segment(rect, out);
                     }
-                    return;
             }
 
 

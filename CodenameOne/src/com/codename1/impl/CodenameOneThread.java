@@ -36,11 +36,11 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class CodenameOneThread extends Thread {
-    private static Class CODE = CodenameOneThread.class;
-    private int[] stack = new int[500];
+    private static final Class CODE = CodenameOneThread.class;
+    private final int[] stack = new int[500];
     private int stackPointer;
-    private Runnable r;
-    private Hashtable exceptionStack = new Hashtable();
+    private final Runnable r;
+    private final Hashtable exceptionStack = new Hashtable();
 
     /**
      * Constructor accepting the runnable

@@ -96,8 +96,7 @@ public class TextField extends TextArea {
     private static String t9Text = "T9";
     private static Hashtable inputModes;
     private static String[] defaultInputModeOrder = {"Abc", "ABC", "abc", "123"};
-    ;
-    private static Vector firstUppercaseInputMode = new Vector();
+    private static final Vector firstUppercaseInputMode = new Vector();
     private static boolean qwertyAutoDetect = true;
     private static boolean qwertyDevice;
     /**
@@ -145,8 +144,8 @@ public class TextField extends TextArea {
      */
     private boolean leftAndRightEditingTrigger = true;
     private Command selectCommand;
-    private Command DELETE_COMMAND = new CommandHandler(clearText, 1);
-    private Command T9_COMMAND = new CommandHandler(t9Text, 2);
+    private final Command DELETE_COMMAND = new CommandHandler(clearText, 1);
+    private final Command T9_COMMAND = new CommandHandler(t9Text, 2);
 
     /**
      * Default constructor
@@ -304,20 +303,20 @@ public class TextField extends TextArea {
             Hashtable upcase = new Hashtable();
             int dlen = DEFAULT_KEY_CODES.length;
             for (int iter = 0; iter < dlen; iter++) {
-                upcase.put(new Integer('0' + iter), DEFAULT_KEY_CODES[iter]);
+                upcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter]);
             }
 
             inputModes.put("ABC", upcase);
 
             Hashtable lowcase = new Hashtable();
             for (int iter = 0; iter < dlen; iter++) {
-                lowcase.put(new Integer('0' + iter), DEFAULT_KEY_CODES[iter].toLowerCase());
+                lowcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter].toLowerCase());
             }
             inputModes.put("abc", lowcase);
 
             Hashtable numbers = new Hashtable();
             for (int iter = 0; iter < 10; iter++) {
-                numbers.put(new Integer('0' + iter), "" + iter);
+                numbers.put(Integer.valueOf('0' + iter), "" + iter);
             }
             inputModes.put("123", numbers);
         }
@@ -378,7 +377,6 @@ public class TextField extends TextArea {
      */
     public static void setSymbolTable(char[] table) {
         symbolTable = table;
-        ;
     }
 
     /**
@@ -513,7 +511,7 @@ public class TextField extends TextArea {
                         text = text.substring(0, text.length() - 1);
                     } else {
                         text = text.substring(0, tmpCursorCharPosition) +
-                                text.substring(tmpCursorCharPosition + 1, text.length());
+                                text.substring(tmpCursorCharPosition + 1);
                     }
                     super.setText(text);
                     commitChange();
@@ -688,7 +686,7 @@ public class TextField extends TextArea {
 
         Hashtable mode = (Hashtable) inputModes.get(input);
         if (mode != null) {
-            String s = (String) mode.get(new Integer(keyCode));
+            String s = (String) mode.get(Integer.valueOf(keyCode));
             if (s != null) {
                 pressCount = pressCount % s.length();
                 return s.charAt(pressCount);
@@ -1060,7 +1058,7 @@ public class TextField extends TextArea {
                                 previousText.length() < getMaxSize() &&
                                 validChar("" + c)) {
                             text = previousText.substring(0, pos - 1) + c +
-                                    previousText.substring(pos - 1, previousText.length());
+                                    previousText.substring(pos - 1);
                             pendingCommit = true;
                             pressCount++;
                             super.setText(text);
@@ -1136,13 +1134,13 @@ public class TextField extends TextArea {
         int pos = getCursorPosition() + 1;
         if (overwriteMode && pos <= currentText.length()) {
             setText(currentText.substring(0, pos - 1) + c +
-                    currentText.substring(pos, currentText.length()));
+                    currentText.substring(pos));
         } else {
             if (currentText.length() + c.length() > getMaxSize()) {
                 return;
             }
             setText(currentText.substring(0, pos - 1) + c +
-                    currentText.substring(pos - 1, currentText.length()));
+                    currentText.substring(pos - 1));
         }
         if (c.length() > 1) {
             pos += c.length() - 1;
@@ -1161,17 +1159,11 @@ public class TextField extends TextArea {
      */
     public boolean validChar(String c) {
         if (getConstraint() == TextArea.NUMERIC) {
-            if (c.charAt(0) < '0' || c.charAt(0) > '9') {
-                return false;
-            }
+            return c.charAt(0) >= '0' && c.charAt(0) <= '9';
         } else if (getConstraint() == TextArea.PHONENUMBER) {
-            if ((c.charAt(0) < '0' || c.charAt(0) > '9') && c.charAt(0) != '+') {
-                return false;
-            }
+            return (c.charAt(0) >= '0' && c.charAt(0) <= '9') || c.charAt(0) == '+';
         } else if (getConstraint() == TextArea.DECIMAL) {
-            if ((c.charAt(0) < '0' || c.charAt(0) > '9') && c.charAt(0) != '+' && c.charAt(0) != '-' && c.charAt(0) != '.' && c.charAt(0) != ',') {
-                return false;
-            }
+            return (c.charAt(0) >= '0' && c.charAt(0) <= '9') || c.charAt(0) == '+' || c.charAt(0) == '-' || c.charAt(0) == '.' || c.charAt(0) == ',';
         }
 
         return true;
@@ -1183,7 +1175,7 @@ public class TextField extends TextArea {
      */
     protected void showSymbolDialog() {
         Command cancel = new Command(getUIManager().localize("cancel", "Cancel"));
-        Command r = Dialog.show("", createSymbolTable(), new Command[]{cancel});
+        Command r = Dialog.show("", createSymbolTable(), cancel);
         if (r != null && r != cancel) {
             insertChars(r.getCommandName());
         }
@@ -1456,10 +1448,8 @@ public class TextField extends TextArea {
                 originalClearCommand = null;
             }
             fireActionEvent();
-            return;
         } else {
             if (handlesInput()) {
-                return;
             }
         }
     }

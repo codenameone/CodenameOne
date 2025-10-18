@@ -117,7 +117,7 @@ public class Form extends Container {
     private TextSelection textSelection;
     private ArrayList<Component> componentsAwaitingRelease;
     private VirtualInputDevice currentInputDevice;
-    private AnimationManager animMananger = new AnimationManager(this);
+    private final AnimationManager animMananger = new AnimationManager(this);
     /**
      * Contains a list of components that would like to animate their state
      */
@@ -184,13 +184,13 @@ public class Form extends Container {
      * paint.  Use {@link Container#revalidateLater() } to add to this queue.  The
      * queue the queue is flushed in {@link #flushRevalidateQueue() }
      */
-    private Set<Container> pendingRevalidateQueue = new HashSet<Container>();
+    private final Set<Container> pendingRevalidateQueue = new HashSet<Container>();
     /**
      * A temporary container used in {@link #flushRevalidateQueue() } for the list
      * of containers that are being revalidated.  This should not be used outside
      * of {@link #flushRevalidateQueue() }
      */
-    private ArrayList<Container> revalidateQueue = new ArrayList<Container>();
+    private final ArrayList<Container> revalidateQueue = new ArrayList<Container>();
     private int overrideInvisibleAreaUnderVKB = -1;
     /**
      * A flag indicating if the safe area may be dirty, and needs to be recaculated.
@@ -200,7 +200,7 @@ public class Form extends Container {
     private boolean safeAreaDirty = true;
     private boolean pointerPressedAgainDuringDrag;
     private Component pressedCmp;
-    private Rectangle pressedCmpAbsBounds = new Rectangle();
+    private final Rectangle pressedCmpAbsBounds = new Rectangle();
     private Object currentPointerPress;
     private boolean inInternalPaint;
 
@@ -1149,7 +1149,7 @@ public class Form extends Container {
         if (keyListeners == null) {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
-        Integer code = new Integer(keyCode);
+        Integer code = Integer.valueOf(keyCode);
         ArrayList<ActionListener> vec = keyListeners.get(code);
         if (vec == null) {
             vec = new ArrayList<ActionListener>();
@@ -1166,7 +1166,7 @@ public class Form extends Container {
         if (keyListeners == null) {
             return;
         }
-        Integer code = new Integer(keyCode);
+        Integer code = Integer.valueOf(keyCode);
         ArrayList<ActionListener> vec = keyListeners.get(code);
         if (vec == null) {
             return;
@@ -2078,7 +2078,7 @@ public class Form extends Container {
         // we don't save size() in a varible since the animate method may deregister
         // the animation thus invalidating the size
         for (int iter = 0; iter < v.size(); iter++) {
-            Animation c = (Animation) v.get(iter);
+            Animation c = v.get(iter);
             if (c == null || notIn != null && notIn.contains(c)) {
                 continue;
             }
@@ -2666,7 +2666,7 @@ public class Form extends Container {
             previousForm.tint = false;
 
             if (previousForm instanceof Dialog) {
-                if (!((Dialog) previousForm).isDisposed()) {
+                if (!previousForm.isDisposed()) {
                     Display.getInstance().setCurrent(previousForm, false);
                 }
             } else {
@@ -2980,7 +2980,6 @@ public class Form extends Container {
             initFocused();
             if (focused == null) {
                 getContentPane().moveScrollTowards(game, null);
-                return;
             }
         }
 
@@ -3056,7 +3055,7 @@ public class Form extends Container {
 
     private void fireKeyEvent(HashMap<Integer, ArrayList<ActionListener>> keyListeners, int keyCode) {
         if (keyListeners != null) {
-            ArrayList<ActionListener> listeners = keyListeners.get(new Integer(keyCode));
+            ArrayList<ActionListener> listeners = keyListeners.get(Integer.valueOf(keyCode));
             if (listeners != null) {
                 ActionEvent evt = new ActionEvent(this, keyCode);
                 for (int iter = 0; iter < listeners.size(); iter++) {
@@ -3187,7 +3186,7 @@ public class Form extends Container {
         stickyDrag = null;
         dragStopFlag = false;
         dragged = null;
-        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
             pointerPressedListeners.fireActionEvent(e);
@@ -3364,7 +3363,7 @@ public class Form extends Container {
      */
     public void pointerDragged(int x, int y) {
         // disable the drag stop flag if we are dragging again
-        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
             pointerPressed(x, y);
         }
@@ -3437,7 +3436,7 @@ public class Form extends Container {
     @Override
     public void pointerDragged(int[] x, int[] y) {
         // disable the drag stop flag if we are dragging again
-        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
             pointerPressed(x, y);
         }
@@ -3531,7 +3530,7 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerHoverPressed(int[] x, int[] y) {
-        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        boolean isScrollWheeling = Display.impl.isScrollWheeling();
 
         Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         Component cmp = actual.getComponentAt(x[0], y[0]);
@@ -3553,7 +3552,7 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragged != null) {
             LeadUtil.pointerHover(dragged, x, y);
             return;
@@ -3660,7 +3659,7 @@ public class Form extends Container {
             boolean inOrigPressedCmpBounds = pressedCmpAbsBounds.contains(x, y);
             rippleMotion = null;
             setPressedCmp(null);
-            boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+            boolean isScrollWheeling = Display.impl.isScrollWheeling();
             Container actual = getActualPane(formLayeredPane, x, y);
             if (componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
                 // special case allowing drag within a button
@@ -4403,7 +4402,7 @@ public class Form extends Container {
         if (mediaComponents != null) {
             int size = mediaComponents.size();
             for (int i = 0; i < size; i++) {
-                Component mediaCmp = (Component) mediaComponents.get(i);
+                Component mediaCmp = mediaComponents.get(i);
                 mediaCmp.setVisible(visible);
             }
         }
@@ -4598,7 +4597,7 @@ public class Form extends Container {
      * @see #getTabIterator(com.codename1.ui.Component)
      */
     public class TabIterator implements ListIterator<Component> {
-        private java.util.List<Component> components;
+        private final java.util.List<Component> components;
         private int currPos;
         private Component current;
 

@@ -437,9 +437,9 @@ public class DateUtil {
         if (date == null) {
             return "N/A";
         }
-        long time_ago = date.getTime() / 1000l;
+        long time_ago = date.getTime() / 1000L;
 
-        long cur_time = new Date().getTime() / 1000l;
+        long cur_time = new Date().getTime() / 1000L;
         long time_elapsed = cur_time - time_ago;
         long seconds = time_elapsed;
         // Seconds

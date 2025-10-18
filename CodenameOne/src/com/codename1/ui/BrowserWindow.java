@@ -41,7 +41,7 @@ public class BrowserWindow {
      * Implementation for BrowserWindow provided by the platform implementation.  The default
      * implementation in the JavaSE port is a JavaFX Stage with a WebView in it.
      */
-    private Object nativeWindow;
+    private final Object nativeWindow;
 
     /**
      * Fallback form to contain a webview if the platform implementation doesn't
@@ -222,7 +222,7 @@ public class BrowserWindow {
         /**
          * The form to go "back" to when browser window is closed.
          */
-        private Form backForm;
+        private final Form backForm;
         /**
          * Flag that is set when closed() called.
          */

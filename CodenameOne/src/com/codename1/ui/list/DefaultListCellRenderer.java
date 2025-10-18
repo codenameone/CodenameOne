@@ -44,7 +44,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     private static boolean showNumbersDefault = true;
     private boolean showNumbers;
     private boolean showNumbersForce;
-    private Label focusComponent = new Label();
+    private final Label focusComponent = new Label();
     private boolean rightAlignNumbers;
     private boolean alwaysRenderSelection;
 

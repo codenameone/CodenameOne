@@ -25,6 +25,7 @@ package com.codename1.properties;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -35,7 +36,7 @@ import java.util.Set;
  */
 public class SetProperty<T, K> extends CollectionProperty<T, K> {
 
-    private Set<T> value = new HashSet<T>();
+    private final Set<T> value = new HashSet<T>();
 
     /**
      * Constructs a property with the given name and value
@@ -59,9 +60,7 @@ public class SetProperty<T, K> extends CollectionProperty<T, K> {
      */
     public SetProperty(String name, Class<T> elementType, T... values) {
         super(name, elementType);
-        for (T t : values) {
-            value.add(t);
-        }
+        Collections.addAll(value, values);
     }
 
     /**

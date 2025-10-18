@@ -55,7 +55,7 @@ public interface TreeModel {
      *               tree roots
      * @return the children of the given node within the tree
      */
-    public Vector getChildren(Object parent);
+    Vector getChildren(Object parent);
 
     /**
      * Is the node a leaf or a folder
@@ -63,5 +63,5 @@ public interface TreeModel {
      * @param node a node within the tree
      * @return true if the node is a leaf that can't be expanded
      */
-    public boolean isLeaf(Object node);
+    boolean isLeaf(Object node);
 }

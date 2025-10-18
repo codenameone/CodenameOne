@@ -249,7 +249,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                Log.p("Expected null for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
+                                Log.p("Expected null for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
                             }
 
                             continue;
@@ -270,7 +270,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                Log.p("Expected true for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
+                                Log.p("Expected true for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
                             }
 
                             continue;
@@ -298,7 +298,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                Log.p("Expected false for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
+                                Log.p("Expected false for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
                             }
 
                             continue;
@@ -433,7 +433,7 @@ public class JSONParser implements JSONParseCallback {
             }
         } catch (Exception err) {
             Log.e(err);
-            Log.p("Exception during JSON parsing at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
+            Log.p("Exception during JSON parsing at row: " + row + " column: " + column + " buffer: " + currentToken);
             /*System.out.println();
             int current = i.read();
             while(current >= 0) {
@@ -643,8 +643,6 @@ public class JSONParser implements JSONParseCallback {
         this.useBoolean = useBoolean;
     }
 
-    ;
-
     /**
      * <p>
      * Parses the given input stream into this object and returns the parse tree.<br>
@@ -851,10 +849,10 @@ public class JSONParser implements JSONParseCallback {
      */
     public void longToken(long tok) {
         if (isStackHash()) {
-            getStackHash().put(currentKey, new Long(tok));
+            getStackHash().put(currentKey, Long.valueOf(tok));
             currentKey = null;
         } else {
-            getStackVec().add(new Long(tok));
+            getStackVec().add(Long.valueOf(tok));
         }
     }
 

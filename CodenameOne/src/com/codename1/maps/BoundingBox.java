@@ -151,10 +151,7 @@ public class BoundingBox {
             return false;
         }
         double longitude = cur.getLongitude();
-        if (longitude < getSouthWest().getLongitude() || longitude > getNorthEast().getLongitude()) {
-            return false;
-        }
-        return true;
+        return !(longitude < getSouthWest().getLongitude()) && !(longitude > getNorthEast().getLongitude());
     }
 
     /**

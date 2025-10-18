@@ -62,13 +62,13 @@ public class AutoCompleteTextField extends TextField {
     public static final int POPUP_POSITION_OVER = 1;
     public static final int POPUP_POSITION_UNDER = 2;
     boolean pressInBounds;
-    private Container popup;
+    private final Container popup;
     private boolean dontCalcSize = false;
     private FilterProxyListModel<String> filter;
-    private ActionListener listener = new FormPointerListener();
-    private ActionListener pressListener = new FormPointerPressListener();
+    private final ActionListener listener = new FormPointerListener();
+    private final ActionListener pressListener = new FormPointerPressListener();
     private ListCellRenderer completionRenderer;
-    private ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
+    private final ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
     private String pickedText;
     private int minimumLength;
     private int popupPosition = POPUP_POSITION_AUTO;
@@ -132,7 +132,7 @@ public class AutoCompleteTextField extends TextField {
      * getSuggestionModel value as well as for the GUI builder
      */
     public AutoCompleteTextField() {
-        this(new DefaultListModel(new Object[]{""}));
+        this(new DefaultListModel(""));
     }
 
     /**

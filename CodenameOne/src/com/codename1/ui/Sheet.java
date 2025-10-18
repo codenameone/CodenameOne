@@ -129,19 +129,19 @@ public class Sheet extends Container {
     private static final int E = 2;
     private static final int W = 3;
     private static final int C = 4;
-    private static int DEFAULT_TRANSITION_DURATION = 300;
+    private static final int DEFAULT_TRANSITION_DURATION = 300;
     private final Sheet parentSheet;
     private final Label title = new Label();
-    private EventDispatcher closeListeners = new EventDispatcher();
-    private EventDispatcher backListeners = new EventDispatcher();
-    private Button backButton = new Button(FontImage.MATERIAL_CLOSE);
-    private Container commandsContainer = new Container(BoxLayout.x());
+    private final EventDispatcher closeListeners = new EventDispatcher();
+    private final EventDispatcher backListeners = new EventDispatcher();
+    private final Button backButton = new Button(FontImage.MATERIAL_CLOSE);
+    private final Container commandsContainer = new Container(BoxLayout.x());
     private boolean allowClose = true;
-    private Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(
+    private final Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(
             BorderLayout.center(FlowLayout.encloseCenterMiddle(title)),
             BorderLayout.centerEastWest(null, commandsContainer, backButton)
     ));
-    private Container contentPane = new Container(BoxLayout.y());
+    private final Container contentPane = new Container(BoxLayout.y());
     /**
      * The position on the screen where the sheet is displayed on phones.
      * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
@@ -165,7 +165,7 @@ public class Sheet extends Container {
      * These are set the first time the sheet is shown and used as the base for safe area calculations.
      */
     private int[] originalPadding = null;
-    private ActionListener formPointerListener = new ActionListener() {
+    private final ActionListener formPointerListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();

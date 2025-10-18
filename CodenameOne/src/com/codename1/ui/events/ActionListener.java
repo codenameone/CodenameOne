@@ -37,6 +37,6 @@ public interface ActionListener<T extends ActionEvent> {
      * @param evt event object describing the source of the action as well as
      *            its trigger
      */
-    public void actionPerformed(T evt);
+    void actionPerformed(T evt);
 
 }

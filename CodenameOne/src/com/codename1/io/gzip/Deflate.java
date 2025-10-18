@@ -390,7 +390,7 @@ final class Deflate {
         int n;                     // iterates over all tree elements
         int prevlen = -1;          // last emitted length
         int curlen;                // length of current code
-        int nextlen = tree[0 * 2 + 1]; // length of next code
+        int nextlen = tree[1]; // length of next code
         int count = 0;             // repeat count of the current code
         int max_count = 7;         // max repeat count
         int min_count = 4;         // min repeat count
@@ -482,7 +482,7 @@ final class Deflate {
         int n;                     // iterates over all tree elements
         int prevlen = -1;          // last emitted length
         int curlen;                // length of current code
-        int nextlen = tree[0 * 2 + 1]; // length of next code
+        int nextlen = tree[1]; // length of next code
         int count = 0;             // repeat count of the current code
         int max_count = 7;         // max repeat count
         int min_count = 4;         // min repeat count
@@ -532,33 +532,33 @@ final class Deflate {
 
     // Output a byte on the stream.
     // IN assertion: there is enough room in pending_buf.
-    final void put_byte(byte[] p, int start, int len) {
+    void put_byte(byte[] p, int start, int len) {
         System.arraycopy(p, start, pending_buf, pending, len);
         pending += len;
     }
 
-    final void put_byte(byte c) {
+    void put_byte(byte c) {
         pending_buf[pending++] = c;
     }
 
-    final void put_short(int w) {
+    void put_short(int w) {
         put_byte((byte) (w/*&0xff*/));
         put_byte((byte) (w >>> 8));
     }
 
-    final void putShortMSB(int b) {
+    void putShortMSB(int b) {
         put_byte((byte) (b >> 8));
         put_byte((byte) (b/*&0xff*/));
     }
 
-    final void send_code(int c, short[] tree) {
+    void send_code(int c, short[] tree) {
         int c2 = c * 2;
         send_bits((tree[c2] & 0xffff), (tree[c2 + 1] & 0xffff));
     }
 
     void send_bits(int value, int length) {
         int len = length;
-        if (bi_valid > (int) Buf_size - len) {
+        if (bi_valid > Buf_size - len) {
             int val = value;
 //      bi_buf |= (val << bi_valid);
             bi_buf |= ((val << bi_valid) & 0xffff);
@@ -800,8 +800,8 @@ final class Deflate {
             max_start = block_start + max_block_size;
             if (strstart == 0 || strstart >= max_start) {
                 // strstart == 0 is possible when wraparound on 16-bit machine
-                lookahead = (int) (strstart - max_start);
-                strstart = (int) max_start;
+                lookahead = strstart - max_start;
+                strstart = max_start;
 
                 flush_block_only(false);
                 if (strm.avail_out == 0) return NeedMore;
@@ -828,7 +828,7 @@ final class Deflate {
                           int stored_len, // length of input block
                           boolean eof     // true if this is the last block for a file
     ) {
-        send_bits((STORED_BLOCK << 1) + (eof ? 1 : 0), 3);  // send block type
+        send_bits((eof ? 1 : 0), 3);  // send block type
         copy_block(buf, stored_len, true);          // with header
     }
 
@@ -1279,7 +1279,7 @@ final class Deflate {
                     window[++scan] == window[++match] &&
                     scan < strend);
 
-            len = MAX_MATCH - (int) (strend - scan);
+            len = MAX_MATCH - (strend - scan);
             scan = strend - MAX_MATCH;
 
             if (len > best_len) {
@@ -1342,7 +1342,7 @@ final class Deflate {
             return Z_STREAM_ERROR;
         }
 
-        strm.dstate = (Deflate) this;
+        strm.dstate = this;
 
         this.wrap = wrap;
         w_bits = windowBits;

@@ -367,7 +367,7 @@ public class BarChart extends XYChart {
      * The bar chart type enum.
      */
     public enum Type {
-        DEFAULT, STACKED, HEAPED;
+        DEFAULT, STACKED, HEAPED
     }
 
     private class Point {

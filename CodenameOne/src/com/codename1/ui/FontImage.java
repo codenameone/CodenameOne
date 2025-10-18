@@ -11282,7 +11282,7 @@ public class FontImage extends Image {
      * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setFontIcon(Label l, Font font, char icon, float size) {
-        setIcon((IconHolder) l, font, icon, size);
+        setIcon(l, font, icon, size);
     }
 
     /**
@@ -11342,7 +11342,7 @@ public class FontImage extends Image {
      * @deprecated use {@link Label#setMaterialIcon(char, float)} instead
      */
     public static void setFontIcon(Label l, Font font, char[] icons, float size) {
-        FontImage.setIcon((IconHolder) l, font, icons, size);
+        FontImage.setIcon(l, font, icons, size);
     }
 
     /**
@@ -11467,7 +11467,6 @@ public class FontImage extends Image {
         Style sel = uim.getComponentSelectedStyle(uiid);
         Style pre = uim.getComponentCustomStyle(uiid, "press");
         Style dis = uim.getComponentCustomStyle(uiid, "dis");
-        ;
         if (sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency()) || (sel.getFgAlpha() != s.getFgAlpha())) {
             sel = new Style(sel);
             sel.setFont(font.derive(rightSize(sel, size), Font.STYLE_PLAIN));
@@ -11523,7 +11522,7 @@ public class FontImage extends Image {
      * @param size the size of the icon in millimeters
      */
     public static void setFontIcon(MultiButton l, Font font, char icon, float size) {
-        setIcon((IconHolder) l, font, icon, size);
+        setIcon(l, font, icon, size);
     }
 
     /**
@@ -11575,7 +11574,7 @@ public class FontImage extends Image {
      * @param size the size of the icon in millimeters
      */
     public static void setFontIcon(SpanLabel l, Font font, char icon, float size) {
-        setIcon((IconHolder) l, font, icon, size);
+        setIcon(l, font, icon, size);
     }
 
     /**
@@ -11640,7 +11639,7 @@ public class FontImage extends Image {
      * @param size the size of the icon in millimeters
      */
     public static void setFontIcon(SpanButton l, Font font, char icon, float size) {
-        setIcon((SelectableIconHolder) l, font, icon, size);
+        setIcon(l, font, icon, size);
     }
 
     /**
@@ -11878,7 +11877,7 @@ public class FontImage extends Image {
 
         if (backgroundOpacity != 0) {
             g.setColor(backgroundColor);
-            g.fillRect(x, y, width, height, (byte) backgroundOpacity);
+            g.fillRect(x, y, width, height, backgroundOpacity);
         }
         g.setColor(color);
         g.setFont(fnt);
@@ -11915,7 +11914,7 @@ public class FontImage extends Image {
 
         if (backgroundOpacity != 0) {
             g.setColor(backgroundColor);
-            g.fillRect(x, y, w, h, (byte) backgroundOpacity);
+            g.fillRect(x, y, w, h, backgroundOpacity);
         }
 
         Font oldFont = g.getFont();

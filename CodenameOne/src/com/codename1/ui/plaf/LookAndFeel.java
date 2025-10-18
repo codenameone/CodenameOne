@@ -130,8 +130,8 @@ public abstract class LookAndFeel {
     private Image fadeScrollBottom;
     private Image fadeScrollRight;
     private Image fadeScrollLeft;
-    private int fadeScrollEdgeStartAlpha = 0x999999;
-    private int fadeScrollEdgeEndAlpha = 0;
+    private final int fadeScrollEdgeStartAlpha = 0x999999;
+    private final int fadeScrollEdgeEndAlpha = 0;
     private int textFieldCursorColor;
 
     private boolean backgroundImageDetermineSize;
@@ -144,7 +144,7 @@ public abstract class LookAndFeel {
      * This renderer is assigned to all Forms Menu's by default.
      */
     private ListCellRenderer menuRenderer;
-    private Image[] menuIcons = new Image[3];
+    private final Image[] menuIcons = new Image[3];
 
     /**
      * Allows defining a tactile touch device that vibrates when the user presses a component
@@ -172,7 +172,6 @@ public abstract class LookAndFeel {
      * The MenuBar class
      */
     private Class menuBar = MenuBar.class;
-    ;
 
     private boolean defaultSnapToGrid;
     private boolean defaultAlwaysTensile;
@@ -182,7 +181,7 @@ public abstract class LookAndFeel {
     private Image tensileGlowTopImage;
     private Image tensileGlowBottomImage;
 
-    private UIManager manager;
+    private final UIManager manager;
 
     public LookAndFeel(UIManager manager) {
         this.manager = manager;
@@ -940,7 +939,6 @@ public abstract class LookAndFeel {
         horizontalScroll = new Label();
         horizontalScroll.setUIID("HorizontalScroll");
         verticalScrollThumb = new Label();
-        ;
         verticalScrollThumb.setUIID("ScrollThumb");
         horizontalScrollThumb = new Label();
         horizontalScrollThumb.setUIID("HorizontalScrollThumb");
@@ -976,11 +974,7 @@ public abstract class LookAndFeel {
 
         try {
             tickerSpeed = Long.parseLong(manager.getThemeConstant("tickerSpeedInt", "" + tickerSpeed));
-            if (tickerSpeed < 1) {
-                Label.setDefaultTickerEnabled(false);
-            } else {
-                Label.setDefaultTickerEnabled(true);
-            }
+            Label.setDefaultTickerEnabled(tickerSpeed >= 1);
         } catch (NumberFormatException err) {
             Log.e(err);
         }
@@ -1087,7 +1081,6 @@ public abstract class LookAndFeel {
                 Log.p("WARNING: Theme sets the commandBehavior constant which is deprecated.  Please update the theme to NOT include this theme constant.  Using commandBehavior may cause your app to perform in unexpected ways.  In particular, using SIDE command behavior in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime exceptions.", Log.WARNING);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
                 setMenuBarClass(SideMenuBar.class);
-                return;
             }
         } else {
             if (complete) {

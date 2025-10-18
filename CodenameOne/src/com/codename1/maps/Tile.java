@@ -38,11 +38,11 @@ public class Tile {
 
     private static Image tileLoadingImage;
     private static String tileLoadingText = "Loading...";
-    private static Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
+    private static final Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
     private static boolean paintLoading = false;
-    private Dimension dimension;
-    private BoundingBox bbox;
-    private Image tileImage;
+    private final Dimension dimension;
+    private final BoundingBox bbox;
+    private final Image tileImage;
     private ActionListener listener;
 
     /**

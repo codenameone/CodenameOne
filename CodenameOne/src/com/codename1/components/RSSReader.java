@@ -227,7 +227,7 @@ public class RSSReader extends List {
                 String val = (String) h.get(n);
                 if (val != null) {
                     if (current instanceof Button) {
-                        final String url = (String) val;
+                        final String url = val;
                         ((Button) current).addActionListener(new Listener(url));
                         continue;
                     }
@@ -455,7 +455,7 @@ public class RSSReader extends List {
     }
 
     class Listener implements ActionListener {
-        private String url;
+        private final String url;
 
         public Listener(String url) {
             this.url = url;
@@ -467,7 +467,7 @@ public class RSSReader extends List {
     }
 
     class BackCommand extends Command {
-        private Form sourceForm;
+        private final Form sourceForm;
 
         public BackCommand(Form sourceForm) {
             super("Back");

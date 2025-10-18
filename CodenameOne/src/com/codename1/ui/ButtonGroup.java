@@ -44,7 +44,7 @@ import java.util.ArrayList;
 public class ButtonGroup implements ActionSource<ActionEvent> {
 
 
-    private ArrayList<RadioButton> buttons = new ArrayList<RadioButton>();
+    private final ArrayList<RadioButton> buttons = new ArrayList<RadioButton>();
     private int selectedIndex = -1;
 
     /**
@@ -110,7 +110,7 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
     public void clearSelection() {
         if (selectedIndex != -1) {
             if (selectedIndex < buttons.size()) {
-                ((RadioButton) buttons.get(selectedIndex)).setSelected(false);
+                buttons.get(selectedIndex).setSelected(false);
             }
             selectedIndex = -1;
         }
@@ -132,9 +132,7 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      * @return true if a selection was made in the radio button group
      */
     public boolean isSelected() {
-        if (selectedIndex != -1)
-            return true;
-        return false;
+        return selectedIndex != -1;
     }
 
     /**
@@ -188,9 +186,9 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
 
         if (selectedIndex != -1) {
             //unselect last selected Radio button
-            ((RadioButton) buttons.get(selectedIndex)).setSelectedImpl(false);
+            buttons.get(selectedIndex).setSelectedImpl(false);
         }
-        ((RadioButton) buttons.get(index)).setSelectedImpl(true);
+        buttons.get(index).setSelectedImpl(true);
         selectedIndex = index;
     }
 
@@ -202,7 +200,7 @@ public class ButtonGroup implements ActionSource<ActionEvent> {
      */
     public RadioButton getRadioButton(int index) {
         if (index >= 0 && index < getButtonCount())
-            return ((RadioButton) buttons.get(index));
+            return buttons.get(index);
         return null;
     }
 

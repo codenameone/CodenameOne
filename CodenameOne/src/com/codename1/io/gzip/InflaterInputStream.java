@@ -41,8 +41,8 @@ public class InflaterInputStream extends FilterInputStream {
     private boolean closed = false;
     private boolean eof = false;
     private boolean close_in = true;
-    private byte[] byte1 = new byte[1];
-    private byte[] b = new byte[512];
+    private final byte[] byte1 = new byte[1];
+    private final byte[] b = new byte[512];
 
     public InflaterInputStream(InputStream in) throws IOException {
         this(in, false);

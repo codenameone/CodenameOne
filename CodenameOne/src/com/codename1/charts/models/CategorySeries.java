@@ -23,11 +23,11 @@ import java.util.List;
  */
 public class CategorySeries {
     /** The series title. */
-    private String mTitle;
+    private final String mTitle;
     /** The series categories. */
-    private List<String> mCategories = new ArrayList<String>();
+    private final List<String> mCategories = new ArrayList<String>();
     /** The series values. */
-    private List<Double> mValues = new ArrayList<Double>();
+    private final List<Double> mValues = new ArrayList<Double>();
 
     /**
      * Builds a new category series.

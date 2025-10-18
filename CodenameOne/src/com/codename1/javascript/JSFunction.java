@@ -100,5 +100,5 @@ import com.codename1.ui.BrowserComponent;
  * @deprecated Use {@link BrowserComponent#addJSCallback(java.lang.String, com.codename1.util.SuccessCallback) }
  */
 public interface JSFunction {
-    public void apply(JSObject self, Object[] args);
+    void apply(JSObject self, Object[] args);
 }

@@ -121,7 +121,7 @@ public class ExistInConstraint implements Constraint {
             if (items.size() == 1) {
                 return "Input value can only be \"" + items.get(0) + "\"";
             }
-            return "Input value must be one of " + items.toString();
+            return "Input value must be one of " + items;
         }
 
         return errorMessage;

@@ -48,7 +48,7 @@ class TLogical {
         if (val.equals(TBigInteger.MINUS_ONE)) {
             return TBigInteger.ZERO;
         }
-        int resDigits[] = new int[val.numberLength + 1];
+        int[] resDigits = new int[val.numberLength + 1];
         int i;
 
         if (val.sign > 0) {
@@ -126,7 +126,7 @@ class TLogical {
             return TBigInteger.ZERO;
         }
 
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
         for (; i < resLength; i++) {
             resDigits[i] = val.digits[i] & that.digits[i];
         }
@@ -150,7 +150,7 @@ class TLogical {
             return TBigInteger.ZERO;
         }
         int resLength = positive.numberLength;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
 
         // Must start from max(iPos, iNeg)
         int i = Math.max(iPos, iNeg);
@@ -190,7 +190,7 @@ class TLogical {
         }
 
         int resLength;
-        int resDigits[];
+        int[] resDigits;
         int i = Math.max(iShorter, iLonger);
         int digit;
         if (iShorter > iLonger) {
@@ -274,7 +274,7 @@ class TLogical {
      */
     static TBigInteger andNotPositive(TBigInteger val, TBigInteger that) {
         // PRE: both arguments are positive
-        int resDigits[] = new int[val.numberLength];
+        int[] resDigits = new int[val.numberLength];
 
         int limit = Math.min(val.numberLength, that.numberLength);
         int i;
@@ -303,7 +303,7 @@ class TLogical {
         }
 
         int resLength = Math.min(positive.numberLength, negative.numberLength);
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
 
         // Always start from first non zero of positive
         int i = iPos;
@@ -331,7 +331,7 @@ class TLogical {
     static TBigInteger andNotNegativePositive(TBigInteger negative, TBigInteger positive) {
         // PRE: negative < 0 && positive > 0
         int resLength;
-        int resDigits[];
+        int[] resDigits;
         int limit;
         int digit;
 
@@ -418,7 +418,7 @@ class TLogical {
         }
 
         int resLength = that.numberLength;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
         int limit;
         int i = iVal;
         if (iVal < iThat) {
@@ -505,7 +505,7 @@ class TLogical {
         // PRE: longer and shorter are positive;
         // PRE: longer has at least as many digits as shorter
         int resLength = longer.numberLength;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
 
         int i = Math.min(longer.getFirstNonzeroDigit(), shorter.getFirstNonzeroDigit());
         for (i = 0; i < shorter.numberLength; i++) {
@@ -536,7 +536,7 @@ class TLogical {
         }
 
         int resLength = Math.min(val.numberLength, that.numberLength);
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
 
         //Looking for the first non-zero digit of the result
         if (iThat == iVal) {
@@ -574,7 +574,7 @@ class TLogical {
             return negative;
         }
         int resLength = negative.numberLength;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
 
         if (iNeg < iPos) {
             // We know for sure that this will
@@ -665,7 +665,7 @@ class TLogical {
         // PRE: longer and shorter are positive;
         // PRE: longer has at least as many digits as shorter
         int resLength = longer.numberLength;
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
         int i = Math.min(longer.getFirstNonzeroDigit(), shorter.getFirstNonzeroDigit());
         for (; i < shorter.numberLength; i++) {
             resDigits[i] = longer.digits[i] ^ shorter.digits[i];
@@ -686,7 +686,7 @@ class TLogical {
         // PRE: val and that are negative
         // PRE: val has at least as many trailing zero digits as that
         int resLength = Math.max(val.numberLength, that.numberLength);
-        int resDigits[] = new int[resLength];
+        int[] resDigits = new int[resLength];
         int iVal = val.getFirstNonzeroDigit();
         int iThat = that.getFirstNonzeroDigit();
         int i = iThat;
@@ -741,7 +741,7 @@ class TLogical {
      */
     static TBigInteger xorDiffSigns(TBigInteger positive, TBigInteger negative) {
         int resLength = Math.max(negative.numberLength, positive.numberLength);
-        int resDigits[];
+        int[] resDigits;
         int iNeg = negative.getFirstNonzeroDigit();
         int iPos = positive.getFirstNonzeroDigit();
         int i;

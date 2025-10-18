@@ -67,7 +67,7 @@ public interface Externalizable {
      *
      * @return version number for the persistant code
      */
-    public int getVersion();
+    int getVersion();
 
     /**
      * Allows us to store an object state, this method must be implemented
@@ -76,7 +76,7 @@ public interface Externalizable {
      * @param out the stream into which the object must be serialized
      * @throws java.io.IOException the method may throw an exception
      */
-    public void externalize(DataOutputStream out) throws IOException;
+    void externalize(DataOutputStream out) throws IOException;
 
     /**
      * Loads the object from the input stream and allows deserialization
@@ -85,7 +85,7 @@ public interface Externalizable {
      * @param in      the input stream used to load the class
      * @throws java.io.IOException the method may throw an exception
      */
-    public void internalize(int version, DataInputStream in) throws IOException;
+    void internalize(int version, DataInputStream in) throws IOException;
 
     /**
      * The object id must be unique, it is used to identify the object when loaded
@@ -93,5 +93,5 @@ public interface Externalizable {
      *
      * @return a unique id
      */
-    public String getObjectId();
+    String getObjectId();
 }

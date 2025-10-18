@@ -38,7 +38,7 @@ public class DialRenderer extends DefaultRenderer {
     /** The spacing for the major ticks. */
     private double mMajorTickSpacing = MathHelper.NULL_VALUE;
     /** An array of the renderers types (default is NEEDLE). */
-    private List<Type> mVisualTypes = new ArrayList<Type>();
+    private final List<Type> mVisualTypes = new ArrayList<Type>();
 
     /**
      * Returns the start angle value of the dial.
@@ -190,7 +190,7 @@ public class DialRenderer extends DefaultRenderer {
     }
 
     public enum Type {
-        NEEDLE, ARROW;
+        NEEDLE, ARROW
     }
 
 }

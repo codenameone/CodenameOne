@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -45,7 +46,7 @@ import java.util.Vector;
  */
 class MapContent implements StructuredContent {
 
-    private Object root;
+    private final Object root;
     private StructuredContent parent;
 
     /**
@@ -156,7 +157,7 @@ class MapContent implements StructuredContent {
             // Maps.
             // for now prevent the critical cast exception.
             if (o instanceof Map) {
-                children.add(new MapContent((Map) o, this));
+                children.add(new MapContent(o, this));
             } else if (o instanceof String) {
                 children.add(new MapContent(o, this));
             }
@@ -211,7 +212,7 @@ class MapContent implements StructuredContent {
             } else {
                 array = new ArrayList();
             }
-            array.add(new MapContent((Map) node, this));
+            array.add(new MapContent(node, this));
             return array;
         } else {
             List array;
@@ -295,7 +296,7 @@ class MapContent implements StructuredContent {
         if (source.containsKey(name)) {
             Object o = source.get(name);
             if (o instanceof StructuredContent) {
-                target.add((StructuredContent) o);
+                target.add(o);
             } else {
                 // TODO: there will be a bug here with parent node, won't be able to walk up more than one node
                 target.add(new MapContent(o, new MapContent(source)));

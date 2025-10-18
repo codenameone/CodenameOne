@@ -49,7 +49,7 @@ public interface Shape {
      *
      * @return A PathIterator that can iterate over the path segments of the shape.
      */
-    public PathIterator getPathIterator();
+    PathIterator getPathIterator();
 
     /**
      * Gets an iterator where all points are transformed by the provided transform.
@@ -58,7 +58,7 @@ public interface Shape {
      * @param transform
      * @return A PathIterator where points are transformed by the provided transform.
      */
-    public PathIterator getPathIterator(Transform transform);
+    PathIterator getPathIterator(Transform transform);
 
     /**
      * Returns the bounding rectangle for the shape.  This should be the smallest rectangle
@@ -66,7 +66,7 @@ public interface Shape {
      *
      * @return A {@link Rectangle} that comprises the bounds of the shape.
      */
-    public Rectangle getBounds();
+    Rectangle getBounds();
 
     /**
      * Gets the bounds of the shape as a 4-element array representing the (x,y,width,height)
@@ -74,7 +74,7 @@ public interface Shape {
      *
      * @return [x, y, width, height] bounds of this shape.
      */
-    public float[] getBounds2D();
+    float[] getBounds2D();
 
     /**
      * Checks if this shape is a rectangle.  A Shape is a rectangle if it is a closed quadrilateral
@@ -83,7 +83,7 @@ public interface Shape {
      *
      * @return True if shape is a rectangle.
      */
-    public boolean isRectangle();
+    boolean isRectangle();
 
     /**
      * Checks if the shape contains the given point.
@@ -92,7 +92,7 @@ public interface Shape {
      * @param y The y-coordinate of the point to test.
      * @return True if (x, y) is inside the shape.
      */
-    public boolean contains(int x, int y);
+    boolean contains(int x, int y);
 
     /**
      * Returns the shape formed by the intersection of this shape and the provided
@@ -101,5 +101,5 @@ public interface Shape {
      * @param rect A rectangle with which to form an intersection.
      * @return The shape formed by intersecting the current shape with the provided rectangle.
      */
-    public Shape intersection(Rectangle rect);
+    Shape intersection(Rectangle rect);
 }

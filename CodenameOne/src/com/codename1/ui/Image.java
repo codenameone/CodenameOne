@@ -647,11 +647,7 @@ public class Image implements ActionSource {
      */
     public static boolean isJPEG(InputStream inputStream) throws IOException {
         String type = Util.guessMimeType(inputStream);
-        if ("image/jpeg".equals(type) || "image/jpg".equals(type)) {
-            return true;
-        } else {
-            return false;
-        }
+        return "image/jpeg".equals(type) || "image/jpg".equals(type);
     }
 
     /**
@@ -663,11 +659,7 @@ public class Image implements ActionSource {
      */
     public static boolean isPNG(InputStream inputStream) throws IOException {
         String type = Util.guessMimeType(inputStream);
-        if ("image/png".equals(type)) {
-            return true;
-        } else {
-            return false;
-        }
+        return "image/png".equals(type);
     }
 
     private HashMap<Dimension, Object> getScaleCache() {

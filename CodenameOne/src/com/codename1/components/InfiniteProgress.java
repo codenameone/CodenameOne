@@ -73,7 +73,7 @@ public class InfiniteProgress extends Component {
     private Image animation;
     private int angle = 0;
     private int tick;
-    private WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
+    private final WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
     private int tintColor = 0x90000000;
     /**
      * Indicates whether this instance of infinite progress works in the material

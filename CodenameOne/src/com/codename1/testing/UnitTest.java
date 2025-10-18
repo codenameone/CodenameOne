@@ -36,29 +36,29 @@ public interface UnitTest {
      * @return whether it passed
      * @throws Exception thrown if it failed
      */
-    public boolean runTest() throws Exception;
+    boolean runTest() throws Exception;
 
     /**
      * Prepares the unit test for execution
      */
-    public void prepare();
+    void prepare();
 
     /**
      * Cleanup after a test case executed
      */
-    public void cleanup();
+    void cleanup();
 
     /**
      * Returns the time in milliseconds after which the test should be automatically failed.
      *
      * @return time in milliseconds
      */
-    public int getTimeoutMillis();
+    int getTimeoutMillis();
 
     /**
      * Returns true to indicate that the test expects to be executed on the EDT
      *
      * @return whether the test should execute on the EDT or the testing thread
      */
-    public boolean shouldExecuteOnEDT();
+    boolean shouldExecuteOnEDT();
 }

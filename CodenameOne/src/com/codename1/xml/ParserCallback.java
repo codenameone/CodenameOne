@@ -33,53 +33,53 @@ public interface ParserCallback {
     /**
      * Error code denoting that an unsupported tag was found in the XML
      */
-    public static int ERROR_TAG_NOT_SUPPORTED = 0;
+    int ERROR_TAG_NOT_SUPPORTED = 0;
 
     /**
      * Error code denoting that an unsupported attribute was found in the XML
      */
-    public static int ERROR_ATTRIBUTE_NOT_SUPPORTED = 1;
+    int ERROR_ATTRIBUTE_NOT_SUPPORTED = 1;
 
     /**
      * Error code denoting that an  invalid attribute value was found in the XML
      */
-    public static int ERROR_ATTIBUTE_VALUE_INVALID = 2;
+    int ERROR_ATTIBUTE_VALUE_INVALID = 2;
 
     /**
      * Error code denoting that a tag was not closed properly in the XML
      */
-    public static int ERROR_NO_CLOSE_TAG = 3;
+    int ERROR_NO_CLOSE_TAG = 3;
 
     /**
      * Error code denoting that an  invalid character entity was found
      * A character entity is XML codes that start with an ampersand and end with semicolon and denote special/reserved chars
      */
-    public static int ERROR_UNRECOGNIZED_CHAR_ENTITY = 4;
+    int ERROR_UNRECOGNIZED_CHAR_ENTITY = 4;
 
     /**
      * Error code denoting that a tag was not closed  prematurely
      */
-    public static int ERROR_UNEXPECTED_TAG_CLOSING = 5;
+    int ERROR_UNEXPECTED_TAG_CLOSING = 5;
 
     /**
      * Error code denoting that the parser bumped into an unexpected character
      */
-    public static int ERROR_UNEXPECTED_CHARACTER = 6;
+    int ERROR_UNEXPECTED_CHARACTER = 6;
 
     /**
      * Error code denoting that the document had more than one root element
      */
-    public static int ERROR_MULTIPLE_ROOTS = 7;
+    int ERROR_MULTIPLE_ROOTS = 7;
 
     /**
      * Error code denoting that the document had no root element at all (empty document or seriously malformed XML)
      */
-    public static int ERROR_NO_ROOTS = 8;
+    int ERROR_NO_ROOTS = 8;
 
     /**
      * Error code denoting that the encoding the page needed according to its charset (usually specified in the content-type response header) is unsupported in the device
      */
-    public static int ERROR_ENCODING = 9;
+    int ERROR_ENCODING = 9;
 
     /**
      * Called when encountering an error while parsing the XML document.
@@ -93,7 +93,7 @@ public interface ParserCallback {
      * @param description A verbal description of the error
      * @return true to continue parsing, false to stop
      */
-    public boolean parsingError(int errorId, String tag, String attribute, String value, String description);
+    boolean parsingError(int errorId, String tag, String attribute, String value, String description);
 
 
 }

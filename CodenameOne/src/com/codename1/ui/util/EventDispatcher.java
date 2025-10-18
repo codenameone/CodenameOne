@@ -91,8 +91,6 @@ public class EventDispatcher {
         }
     }
 
-    ;
-
     /**
      * Returns the vector of the listeners
      *
@@ -504,8 +502,8 @@ public class EventDispatcher {
     }
 
     class CallbackClass implements Runnable {
-        private Object[] iPending;
-        private Object iPendingEvent;
+        private final Object[] iPending;
+        private final Object iPendingEvent;
 
         public CallbackClass(Object[] iPending, Object iPendingEvent) {
             this.iPending = iPending;
@@ -555,7 +553,6 @@ public class EventDispatcher {
             if (bindTargetArray) {
                 Object[] a = (Object[]) iPendingEvent;
                 fireBindTargetChangeSync((BindTarget[]) iPending, (Component) a[0], (String) a[1], a[2], a[3]);
-                return;
             }
         }
     }

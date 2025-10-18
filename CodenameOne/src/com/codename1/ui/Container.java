@@ -100,7 +100,7 @@ public class Container extends Component implements Iterable<Component> {
     private boolean allowEnableLayoutOnPaint = false;
     private Component leadComponent;
     private Layout layout;
-    private java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
+    private final java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
     /**
      * A queue that keeps track of changes to the children while an animation is in progress.
      *
@@ -109,7 +109,7 @@ public class Container extends Component implements Iterable<Component> {
      * @see #insertComponentAt(int, java.lang.Object, com.codename1.ui.Component)
      * @see #removeComponentImpl(com.codename1.ui.Component)
      */
-    private java.util.ArrayList<QueuedChange> changeQueue = new java.util.ArrayList<QueuedChange>();
+    private final java.util.ArrayList<QueuedChange> changeQueue = new java.util.ArrayList<QueuedChange>();
     private boolean shouldLayout = true;
     private java.util.Vector cmpTransitions;
     private int scrollIncrement = 20;
@@ -347,7 +347,7 @@ public class Container extends Component implements Iterable<Component> {
                     ArrayList<Component> toProcess = new ArrayList<Component>(elevatedComponents);
                     elevatedComponents.clear();
                     for (Component elevated : toProcess) {
-                        ((Component) elevated).registerElevatedInternal(elevated);
+                        elevated.registerElevatedInternal(elevated);
                     }
                 }
             } else {
@@ -362,7 +362,7 @@ public class Container extends Component implements Iterable<Component> {
                             if (contains(elevated)) {
                                 // This component is actually inside us, so it should project on
                                 // us now.
-                                ((Component) elevated).registerElevatedInternal(elevated);
+                                elevated.registerElevatedInternal(elevated);
                             }
                         }
                     }
@@ -577,7 +577,7 @@ public class Container extends Component implements Iterable<Component> {
             if (isContainer && cu.hasLead) {
                 disableFocusAndInitLead((Container) cu);
                 if (((Container) cu).leadComponent != null) {
-                    ((Container) cu).setFocusable(true);
+                    cu.setFocusable(true);
                 }
 
             }
@@ -698,7 +698,7 @@ public class Container extends Component implements Iterable<Component> {
             for (int iter = 0; iter < componentCount; iter++) {
                 Component cmp = components.get(iter);
                 if (cmp instanceof Container) {
-                    ((Container) cmp).setShouldCalcPreferredSize(shouldCalcPreferredSize);
+                    cmp.setShouldCalcPreferredSize(shouldCalcPreferredSize);
                 }
             }
         }
@@ -2157,7 +2157,7 @@ public class Container extends Component implements Iterable<Component> {
             }
 
             for (int i = startIndex; i < endIndex; i++) {
-                Component cmp2 = (Component) components.get(i);
+                Component cmp2 = components.get(i);
                 if (cmp2.renderedElevation != elevation) continue;
                 if (Rectangle.intersects(x, y, w, h,
                         cmp2.getAbsoluteX() + cmp2.getScrollX(),
@@ -2715,17 +2715,14 @@ public class Container extends Component implements Iterable<Component> {
                     //if after moving the scroll the current focus is out of the
                     //view port and the next focus is in the view port move
                     //the focus
-                    if (nextIntersects && !Rectangle.intersects(current.getAbsoluteX(),
+                    return nextIntersects && !Rectangle.intersects(current.getAbsoluteX(),
                             current.getAbsoluteY(),
                             current.getWidth(),
                             current.getHeight(),
                             getAbsoluteX() + x,
                             getAbsoluteY() + y,
                             w,
-                            h)) {
-                        return true;
-                    }
-                    return false;
+                            h);
                 } else {
                     //scrollComponentToVisible(next);
                     return true;
@@ -3267,7 +3264,7 @@ public class Container extends Component implements Iterable<Component> {
                 if (current.isFocusable()) {
                     return current;
                 }
-                if (current instanceof Container && !((Container) current).isBlockFocus() && ((Container) current).getLeadComponent() == null) {
+                if (current instanceof Container && !((Container) current).isBlockFocus() && current.getLeadComponent() == null) {
                     Component cmp = ((Container) current).findFirstFocusable();
                     if (cmp != null) {
                         return cmp;
@@ -4033,7 +4030,6 @@ public class Container extends Component implements Iterable<Component> {
                     }
                 }
             }
-            ;
             return out;
         } else {
             java.util.ArrayList<Component> out = new java.util.ArrayList<Component>();
@@ -4109,12 +4105,12 @@ public class Container extends Component implements Iterable<Component> {
         /**
          * The component constraint of the component that was inserted.
          */
-        private Object constraint;
+        private final Object constraint;
 
         /**
          * The index where the component should be inserted.
          */
-        private int index;
+        private final int index;
 
         /**
          * Creates a new queued insertion.
@@ -4199,13 +4195,13 @@ public class Container extends Component implements Iterable<Component> {
         Vector animatedComponents;
         Motion[] opacity;
         boolean dontRevalidate;
-        private Transition t;
-        private Container thisContainer;
+        private final Transition t;
+        private final Container thisContainer;
         private boolean started = false;
         private boolean inProgress = true;
-        private Component current;
-        private Component next;
-        private Form parent;
+        private final Component current;
+        private final Component next;
+        private final Form parent;
         private boolean destroyed;
 
         TransitionAnimation(Container thisContainer, Component current, Component next, Transition t) {
@@ -4291,12 +4287,12 @@ public class Container extends Component implements Iterable<Component> {
         Vector animatedComponents;
         Motion[] opacity;
         boolean dontRevalidate;
-        private long startTime;
+        private final long startTime;
         private int duration;
         private Transition t;
-        private Container thisContainer;
+        private final Container thisContainer;
         private boolean finished = false;
-        private Motion[][] motions;
+        private final Motion[][] motions;
         private Component scrollTo;
 
         public MorphAnimation(Container thisContainer, int duration, Motion[][] motions) {

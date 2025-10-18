@@ -68,10 +68,10 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private boolean monthDayYear = true;
     private boolean numericMonths = false;
 
-    private String monthRenderingPrototype = "WWW";
-    private SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
-    private Container wrapper = new Container(BoxLayout.x());
-    private Calendar tmpCal = Calendar.getInstance();
+    private final String monthRenderingPrototype = "WWW";
+    private final SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
+    private final Container wrapper = new Container(BoxLayout.x());
+    private final Calendar tmpCal = Calendar.getInstance();
 
     /**
      * Default constructor
@@ -536,25 +536,25 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
      */
     public Object getPropertyValue(String name) {
         if (name.equals("startYear")) {
-            return new Integer(startYear);
+            return Integer.valueOf(startYear);
         }
         if (name.equals("endYear")) {
-            return new Integer(endYear);
+            return Integer.valueOf(endYear);
         }
         if (name.equals("currentYear")) {
-            return new Integer(currentYear);
+            return Integer.valueOf(currentYear);
         }
         if (name.equals("currentDay")) {
-            return new Integer(currentDay);
+            return Integer.valueOf(currentDay);
         }
         if (name.equals("currentMonth")) {
-            return new Integer(currentMonth);
+            return Integer.valueOf(currentMonth);
         }
         if (name.equals("monthDayYear")) {
-            return new Boolean(monthDayYear);
+            return Boolean.valueOf(monthDayYear);
         }
         if (name.equals("numericMonths")) {
-            return new Boolean(numericMonths);
+            return Boolean.valueOf(numericMonths);
         }
         return null;
     }

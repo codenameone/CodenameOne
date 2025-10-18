@@ -40,10 +40,10 @@ import java.util.Date;
  */
 class SpinnerDateModel implements ListModel {
     private static final long DAY = 24 * 60 * 60 * 1000;
-    private EventDispatcher dataListener = new EventDispatcher();
-    private EventDispatcher selectionListener = new EventDispatcher();
-    private long min;
-    private long max;
+    private final EventDispatcher dataListener = new EventDispatcher();
+    private final EventDispatcher selectionListener = new EventDispatcher();
+    private final long min;
+    private final long max;
     private long currentValue;
 
     /**

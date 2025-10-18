@@ -102,7 +102,7 @@ public class MenuBar extends Container implements ActionListener {
      */
     private Command clearCommand;
     private Command menuCommand;
-    private Vector commands = new Vector();
+    private final Vector commands = new Vector();
     private Button[] soft;
     private Command[] softCommand;
     private Button left;
@@ -716,12 +716,12 @@ public class MenuBar extends Container implements ActionListener {
         //calling parent.createCommandComponent is done only for backward
         //compatability reasons, in the next version this call be replaced with
         //calling directly to createCommandComponent
-        ((Form) d).getMenuBar().commandList = createCommandComponent(commands);
-        if (menuCellRenderer != null && ((Form) d).getMenuBar().commandList instanceof List) {
-            ((List) ((Form) d).getMenuBar().commandList).setListCellRenderer(menuCellRenderer);
+        d.getMenuBar().commandList = createCommandComponent(commands);
+        if (menuCellRenderer != null && d.getMenuBar().commandList instanceof List) {
+            ((List) d.getMenuBar().commandList).setListCellRenderer(menuCellRenderer);
         }
         d.getContentPane().getStyle().setMargin(0, 0, 0, 0);
-        d.addComponent(BorderLayout.CENTER, ((Form) d).getMenuBar().commandList);
+        d.addComponent(BorderLayout.CENTER, d.getMenuBar().commandList);
         if (thirdSoftButton) {
             d.addCommand(selectMenuItem);
             d.addCommand(cancelMenuItem);
@@ -734,8 +734,8 @@ public class MenuBar extends Container implements ActionListener {
         d.setClearCommand(cancelMenuItem);
         d.setBackCommand(cancelMenuItem);
 
-        if (((Form) d).getMenuBar().commandList instanceof List) {
-            ((List) ((Form) d).getMenuBar().commandList).addActionListener(((Form) d).getMenuBar());
+        if (d.getMenuBar().commandList instanceof List) {
+            ((List) d.getMenuBar().commandList).addActionListener(d.getMenuBar());
         }
         menuDisplaying = true;
         Command result = showMenuDialog(d);
@@ -743,7 +743,7 @@ public class MenuBar extends Container implements ActionListener {
         if (result != cancelMenuItem) {
             Command c = null;
             if (result == selectMenuItem) {
-                c = getComponentSelectedCommand(((Form) d).getMenuBar().commandList);
+                c = getComponentSelectedCommand(d.getMenuBar().commandList);
                 if (c != null) {
                     ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);
                     c.actionPerformed(e);
@@ -764,8 +764,8 @@ public class MenuBar extends Container implements ActionListener {
                 parent.actionCommandImpl(c);
             }
         }
-        if (((Form) d).getMenuBar().commandList instanceof List) {
-            ((List) ((Form) d).getMenuBar().commandList).removeActionListener(((Form) d).getMenuBar());
+        if (d.getMenuBar().commandList instanceof List) {
+            ((List) d.getMenuBar().commandList).removeActionListener(d.getMenuBar());
         }
 
         Form upcoming = Display.getInstance().getCurrentUpcoming();
@@ -926,7 +926,7 @@ public class MenuBar extends Container implements ActionListener {
             default:
                 if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {
                     rightContainer.removeAll();
-                    Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
+                    Image i = UIManager.getInstance().getThemeImageConstant("menuImage");
                     if (i == null) {
                         //i = Resources.getSystemResource().getImage("of_menu.png");
                         i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, getUIManager().getComponentStyle("TouchCommand"));
@@ -1023,7 +1023,6 @@ public class MenuBar extends Container implements ActionListener {
             } else {
                 c.removeComponent(c.getComponentAt(1));
             }
-            return;
         }
     }
 
@@ -1324,13 +1323,10 @@ public class MenuBar extends Container implements ActionListener {
             return false;
         }
         int game = Display.getInstance().getGameAction(keyCode);
-        if (isLSK(keyCode) || isRSK(keyCode) || keyCode == backSK
+        return isLSK(keyCode) || isRSK(keyCode) || keyCode == backSK
                 || (keyCode == clearSK && clearCommand != null)
                 || (keyCode == backspaceSK && clearCommand != null)
-                || (thirdSoftButton && game == Display.GAME_FIRE)) {
-            return true;
-        }
-        return false;
+                || (thirdSoftButton && game == Display.GAME_FIRE);
     }
 
     /**
@@ -1580,7 +1576,7 @@ public class MenuBar extends Container implements ActionListener {
         Button b = new Button(c);
         if (b.getIcon() == null) {
             // some themes look awful without any icon
-            b.setIcon((Image) parent.getUIManager().getThemeImageConstant("defaultCommandImage"));
+            b.setIcon(parent.getUIManager().getThemeImageConstant("defaultCommandImage"));
         } else {
             if (UIManager.getInstance().isThemeConstant("commandAsIconBool", false)) {
                 b.setText("");

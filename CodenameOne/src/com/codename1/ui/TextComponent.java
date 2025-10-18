@@ -64,7 +64,7 @@ import com.codename1.ui.layouts.LayeredLayout;
  * @author Shai Almog
  */
 public class TextComponent extends InputComponent {
-    private static int animationSpeed = 100;    private final TextField field = new TextField() {
+    private static final int animationSpeed = 100;    private final TextField field = new TextField() {
         @Override
         void paintHint(Graphics g) {
             if (isFocusAnimation()) {

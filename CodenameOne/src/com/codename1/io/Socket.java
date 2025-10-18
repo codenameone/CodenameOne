@@ -205,18 +205,18 @@ public class Socket {
     /**
      * This interface can be invoked to stop listening on a server socket
      */
-    public static interface StopListening {
+    public interface StopListening {
         /**
          * Stop listening
          */
-        public void stop();
+        void stop();
     }
 
     static class SocketInputStream extends InputStream {
-        private Object impl;
+        private final Object impl;
         private byte[] buffer;
         private int bufferOffset;
-        private SocketConnection con;
+        private final SocketConnection con;
         private boolean closed;
 
         SocketInputStream(Object impl, SocketConnection con) {
@@ -362,8 +362,8 @@ public class Socket {
     }
 
     static class SocketOutputStream extends OutputStream {
-        private Object impl;
-        private SocketConnection con;
+        private final Object impl;
+        private final SocketConnection con;
 
         SocketOutputStream(Object impl, SocketConnection con) {
             this.impl = impl;

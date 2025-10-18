@@ -42,10 +42,10 @@ public class GridBagLayout extends Layout {
     protected static final int MINSIZE = 1;
 
     protected static final int PREFERREDSIZE = 2;
-    public volatile double columnWeights[];
-    public volatile double rowWeights[];
-    public volatile int columnWidths[];
-    public volatile int rowHeights[];
+    public volatile double[] columnWeights;
+    public volatile double[] rowWeights;
+    public volatile int[] columnWidths;
+    public volatile int[] rowHeights;
     // Direct modification is forbidden
     protected volatile Hashtable<Component, GridBagConstraints> comptable;
     protected volatile GridBagConstraints defaultConstraints;
@@ -102,7 +102,7 @@ public class GridBagLayout extends Layout {
             cons = defaultConstraints;
             comptable.put(comp, (GridBagConstraints) cons.clone());
         }
-        return (GridBagConstraints) cons.clone();
+        return cons.clone();
     }
 
     public void setConstraints(Component comp, GridBagConstraints constraints) {
@@ -392,12 +392,8 @@ public class GridBagLayout extends Layout {
             default:
                 side.position = ComponentSide.POS_END;
         }
-        if ((cons.fill == GridBagConstraints.BOTH)
-                || (cons.fill == GridBagConstraints.HORIZONTAL)) {
-            side.stretch = true;
-        } else {
-            side.stretch = false;
-        }
+        side.stretch = (cons.fill == GridBagConstraints.BOTH)
+                || (cons.fill == GridBagConstraints.HORIZONTAL);
         side.minLength = minSize.getWidth() + cons.ipadx;
         side.prefLength = prefSize.getWidth() + cons.ipadx;
     }
@@ -425,12 +421,8 @@ public class GridBagLayout extends Layout {
             default:
                 side.position = ComponentSide.POS_END;
         }
-        if ((cons.fill == GridBagConstraints.BOTH)
-                || (cons.fill == GridBagConstraints.VERTICAL)) {
-            side.stretch = true;
-        } else {
-            side.stretch = false;
-        }
+        side.stretch = (cons.fill == GridBagConstraints.BOTH)
+                || (cons.fill == GridBagConstraints.VERTICAL);
         side.minLength = minSize.getHeight() + cons.ipady;
         side.prefLength = prefSize.getHeight() + cons.ipady;
     }
@@ -555,7 +547,7 @@ public class GridBagLayout extends Layout {
     }
 
     private class RelativeTranslator {
-        private final int curX[]; // up-to-down
+        private final int[] curX; // up-to-down
         private int curY; //Left-to-right (or vice versa)
         private int maxW; //Common for relative
 
@@ -837,14 +829,14 @@ public class GridBagLayout extends Layout {
         }*/
 
         private class GridSide {
-            private final int coordinates[] = new int[MAXGRIDSIZE];
+            private final int[] coordinates = new int[MAXGRIDSIZE];
 
-            private final int lengths[] = new int[MAXGRIDSIZE];
+            private final int[] lengths = new int[MAXGRIDSIZE];
 
             /*Cashed data. Validation controlled by parent class*/
-            private final int minLengths[] = new int[MAXGRIDSIZE];
-            private final int prefLengths[] = new int[MAXGRIDSIZE];
-            private final double weights[] = new double[MAXGRIDSIZE];
+            private final int[] minLengths = new int[MAXGRIDSIZE];
+            private final int[] prefLengths = new int[MAXGRIDSIZE];
+            private final double[] weights = new double[MAXGRIDSIZE];
             private int minLength = 0;
             private int prefLength = 0;
             private double weight = 0.;
@@ -855,8 +847,8 @@ public class GridBagLayout extends Layout {
 
             private int weightyPartsNum = 0;
 
-            public void validate(ComponentSide compSides[], int lengthsOverride[],
-                                 double weightsOverride[]) {
+            public void validate(ComponentSide[] compSides, int[] lengthsOverride,
+                                 double[] weightsOverride) {
                 resetCache();
                 spreadComponents(compSides);
                 applyOverrides(lengthsOverride, weightsOverride);
@@ -902,10 +894,8 @@ public class GridBagLayout extends Layout {
             }
 
             public int[] getLengths() {
-                int res[] = new int[MAXGRIDSIZE];
-                for (int i = 0; i < MAXGRIDSIZE; i++) {
-                    res[i] = lengths[i];
-                }
+                int[] res = new int[MAXGRIDSIZE];
+                System.arraycopy(lengths, 0, res, 0, MAXGRIDSIZE);
                 return res;
             }
 
@@ -922,10 +912,8 @@ public class GridBagLayout extends Layout {
             }
 
             public double[] getWeights() {
-                double res[] = new double[MAXGRIDSIZE];
-                for (int i = 0; i < MAXGRIDSIZE; i++) {
-                    res[i] = weights[i];
-                }
+                double[] res = new double[MAXGRIDSIZE];
+                System.arraycopy(weights, 0, res, 0, MAXGRIDSIZE);
                 return res;
             }
 
@@ -959,7 +947,7 @@ public class GridBagLayout extends Layout {
                 }
             }
 
-            private void applyOverrides(int lengthsOverride[], double weightsOverride[]) {
+            private void applyOverrides(int[] lengthsOverride, double[] weightsOverride) {
                 if (weightsOverride != null) {
                     if (weightsOverride.length > MAXGRIDSIZE) {
                         // awt.8F=Weights' overrides array is too long
@@ -981,7 +969,7 @@ public class GridBagLayout extends Layout {
                 }
             }
 
-            private void spreadComponents(ComponentSide compSides[]) {
+            private void spreadComponents(ComponentSide[] compSides) {
                 for (ComponentSide element : compSides) {
                     if (element.gridLength == 1) {
                         int insets = element.start_inset + element.end_inset;
@@ -1027,7 +1015,7 @@ public class GridBagLayout extends Layout {
                 weightyPartsNum = 0;
             }
 
-            private void spreadComponentLength(int arr[], int startPart, int partsNum,
+            private void spreadComponentLength(int[] arr, int startPart, int partsNum,
                                                int compLength, double sumWeight) {
                 int rest = compLength;
                 int lastPart = startPart + partsNum - 1;
@@ -1052,7 +1040,7 @@ public class GridBagLayout extends Layout {
                 }
             }
 
-            private double spreadComponentWeight(double arr[], int startPart, int partsNum,
+            private double spreadComponentWeight(double[] arr, int startPart, int partsNum,
                                                  double compWeight) {
                 int lastPart = startPart + partsNum - 1;
                 double sumWeight = .0;
@@ -1102,9 +1090,7 @@ public class GridBagLayout extends Layout {
             }
 
             private int centerSide(Segment clientSide) {
-                for (int i = 0; i < MAXGRIDSIZE; i++) {
-                    lengths[i] = prefLengths[i];
-                }
+                System.arraycopy(prefLengths, 0, lengths, 0, MAXGRIDSIZE);
                 return (clientSide.start + (clientSide.length - prefLength) / 2);
             }
 
@@ -1173,11 +1159,11 @@ public class GridBagLayout extends Layout {
 
         boolean valid;
 
-        ComponentSide horCompSides[];
+        ComponentSide[] horCompSides;
 
-        ComponentSide vertCompSides[];
+        ComponentSide[] vertCompSides;
 
-        Component components[]; // Hashtable is too slow
+        Component[] components; // Hashtable is too slow
 
 
         // true for RTL
@@ -1196,15 +1182,15 @@ public class GridBagLayout extends Layout {
 
 class GridBagLayoutInfo {
 
-    int widths[];
-    int heights[];
+    int[] widths;
+    int[] heights;
 
-    GridBagLayoutInfo(int widths[], int heights[]) {
+    GridBagLayoutInfo(int[] widths, int[] heights) {
         this.widths = widths;
         this.heights = heights;
     }
 
-    void update(int widths[], int heights[]) {
+    void update(int[] widths, int[] heights) {
         this.widths = widths;
         this.heights = heights;
     }

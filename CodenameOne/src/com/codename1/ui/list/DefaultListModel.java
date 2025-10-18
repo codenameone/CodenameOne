@@ -48,10 +48,10 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
 
 
     private boolean multiSelectionMode;
-    private java.util.List items;
+    private final java.util.List items;
 
-    private EventDispatcher dataListener = new EventDispatcher();
-    private EventDispatcher selectionListener = new EventDispatcher();
+    private final EventDispatcher dataListener = new EventDispatcher();
+    private final EventDispatcher selectionListener = new EventDispatcher();
 
     private int selectedIndex = 0;
     private Set<Integer> selectedIndices;
@@ -97,9 +97,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
         }
         java.util.List vec = new ArrayList(items.length);
         int ilen = items.length;
-        for (int iter = 0; iter < ilen; iter++) {
-            vec.add(items[iter]);
-        }
+        vec.addAll(Arrays.asList(items).subList(0, ilen));
         return vec;
     }
 
@@ -274,7 +272,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
                 selectedIndices = new HashSet<Integer>();
             }
             for (int index : indices) {
-                if (!selectedIndices.contains((Integer) index)) {
+                if (!selectedIndices.contains(index)) {
                     selectedIndices.add(index);
                     selectionListener.fireSelectionEvent(-1, index);
                 }
@@ -296,8 +294,8 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
                 return;
             }
             for (int index : indices) {
-                if (selectedIndices.contains((Integer) index)) {
-                    selectedIndices.remove((Integer) index);
+                if (selectedIndices.contains(index)) {
+                    selectedIndices.remove(index);
                     selectionListener.fireSelectionEvent(index, -1);
                 }
             }

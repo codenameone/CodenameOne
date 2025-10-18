@@ -182,9 +182,7 @@ public class RGBImage extends Image {
         int startPoint = y * this.width + x;
         for (int rows = 0; rows < height; rows++) {
             int currentRow = rows * width;
-            for (int columns = 0; columns < width; columns++) {
-                rgbData[offset + currentRow + columns] = rgb[startPoint + columns];
-            }
+            if (width >= 0) System.arraycopy(rgb, startPoint + 0, rgbData, offset + currentRow + 0, width);
             startPoint += this.width;
         }
     }

@@ -80,7 +80,7 @@ public abstract class InputComponent extends Container {
     private final Label descriptionMessage = new Label("", "DescriptionLabel");
     Button action;
     private Boolean onTopMode;
-    private TextHolder errorMessageImpl = createErrorLabel();
+    private final TextHolder errorMessageImpl = createErrorLabel();
     private boolean actionAsButton;
 
     /**

@@ -36,5 +36,5 @@ public interface IOProgressListener {
      * @param source the source stream which can be either an input stream or an output stream
      * @param bytes  the number of bytes read or written
      */
-    public void ioStreamUpdate(Object source, int bytes);
+    void ioStreamUpdate(Object source, int bytes);
 }

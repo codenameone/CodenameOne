@@ -220,14 +220,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * Defines the possible values for the type attribute in the input tag, ordered according to the INPUT_* constants
      */
-    private static String[] INPUT_TYPE_STRINGS = {
+    private static final String[] INPUT_TYPE_STRINGS = {
             "checkbox", "hidden", "password", "radio", "reset",
             "submit", "text", "image", "button", "email"
     };
     /**
      * Vector holding the possible input type strings.
      */
-    private static Vector INPUT_TYPES = new Vector();
+    private static final Vector INPUT_TYPES = new Vector();
 
     /**
      * This static segment sets up the INPUT_TYPES vector with values from INPUT_TYPE_STRINGS.
@@ -278,7 +278,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     // Refrences to helper classes and delegates
     private DocumentRequestHandler handler; // The HTMLComponent's request handler
     private RedirectThread redirectThread; // A refrence to a redirection thread if exists
-    private ResourceThreadQueue threadQueue; // A reference to the ResourceThreadQueue that handles asynchronous image download
+    private final ResourceThreadQueue threadQueue; // A reference to the ResourceThreadQueue that handles asynchronous image download
     private HTMLCallback htmlCallback;
     private HTMLEventsListener eventsListener;
     // Page info and status
@@ -993,7 +993,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
             // TODO - This mechanism is far from ideal - handle better page life cycle
             int waitTime = 0;
-            while ((pageStatus != htmlCallback.STATUS_CANCELLED) && (waitTime < 2500)) {
+            while ((pageStatus != HTMLCallback.STATUS_CANCELLED) && (waitTime < 2500)) {
                 System.out.println("Waiting for previous page to cancel " + System.currentTimeMillis());
                 try {
                     Thread.sleep(50);
@@ -1686,7 +1686,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     threadQueue.addCSS(href, charset);
                 } else {
                     if (htmlCallback != null) {
-                        htmlCallback.parsingError(HTMLCallback.ERROR_NO_BASE_URL, linkTag.getTagName(), linkTag.getAttributeName(new Integer(HTMLElement.ATTR_HREF)), href, "Ignoring CSS file referred in a LINK tag (" + href + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
+                        htmlCallback.parsingError(HTMLCallback.ERROR_NO_BASE_URL, linkTag.getTagName(), linkTag.getAttributeName(Integer.valueOf(HTMLElement.ATTR_HREF)), href, "Ignoring CSS file referred in a LINK tag (" + href + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
                     }
 
                 }
@@ -1923,7 +1923,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     style = cmp.getSelectedStyle();
                     style.setMargin(Component.TOP, style.getMargin(Component.TOP) + maxSuperscript - style.getMargin(Component.BOTTOM));
                     style.setMargin(Component.BOTTOM, 0);
-                    style = ((HTMLLink) cmp).getPressedStyle();
+                    style = cmp.getPressedStyle();
                     style.setMargin(Component.TOP, style.getMargin(Component.TOP) + maxSuperscript - style.getMargin(Component.BOTTOM));
                     style.setMargin(Component.BOTTOM, 0);
                 }
@@ -2138,7 +2138,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
 
             lbl.getSelectedStyle().setFont(font.getFont());
-            ((HTMLLink) lbl).getPressedStyle().setFont(font.getFont());
+            lbl.getPressedStyle().setFont(font.getFont());
             if (mainLink == null) {
                 mainLink = (HTMLLink) lbl;
             }
@@ -2148,10 +2148,10 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
             lbl.getSelectedStyle().setMargin(0, 0, 0, 0);
             lbl.getSelectedStyle().setPadding(0, 0, 0, 0);
-            ((HTMLLink) lbl).getPressedStyle().setMargin(0, 0, 0, 0);
-            ((HTMLLink) lbl).getPressedStyle().setPadding(0, 0, 0, 0);
+            lbl.getPressedStyle().setMargin(0, 0, 0, 0);
+            lbl.getPressedStyle().setPadding(0, 0, 0, 0);
             lbl.getSelectedStyle().setTextDecoration(textDecoration);
-            ((HTMLLink) lbl).getPressedStyle().setTextDecoration(textDecoration);
+            lbl.getPressedStyle().setTextDecoration(textDecoration);
         } else {
             if (labelForID != null) {
                 lbl = new ForLabel(str, this, labelForID);
@@ -2172,7 +2172,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             lbl.getStyle().setMargin(Component.BOTTOM, margin);
             if (link != null) {
                 lbl.getSelectedStyle().setMargin(Component.BOTTOM, margin);
-                ((HTMLLink) lbl).getPressedStyle().setMargin(Component.BOTTOM, margin);
+                lbl.getPressedStyle().setMargin(Component.BOTTOM, margin);
             }
             if (margin > maxSuperscript) {
                 maxSuperscript = margin; // The height superscript margin is saved for a later adjustment at newLine
@@ -2182,7 +2182,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             lbl.getStyle().setMargin(Component.TOP, margin);
             if (link != null) {
                 lbl.getSelectedStyle().setMargin(Component.TOP, margin);
-                ((HTMLLink) lbl).getPressedStyle().setMargin(Component.TOP, margin);
+                lbl.getPressedStyle().setMargin(Component.TOP, margin);
             }
         }
 
@@ -2264,7 +2264,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             accessKeys = newAccessKeys;
         }
 
-        accessKeys.put(new Integer(accessKey), cmp);
+        accessKeys.put(Integer.valueOf(accessKey), cmp);
         Form form = getComponentForm();
         if (form != null) {
             form.addKeyListener(accessKey, this);
@@ -2390,7 +2390,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
             int borderSize = getInt(imgElement.getAttributeById(HTMLElement.ATTR_BORDER));
             if (borderSize != 0) {
-                imgLabel.putClientProperty(CLIENT_PROPERTY_IMG_BORDER, new Integer(borderSize));
+                imgLabel.putClientProperty(CLIENT_PROPERTY_IMG_BORDER, Integer.valueOf(borderSize));
             } else {
                 borderSize = 1;
             }
@@ -2422,7 +2422,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         threadQueue.add(imgLabel, imageUrl);
                     } else {
                         if (htmlCallback != null) {
-                            htmlCallback.parsingError(HTMLCallback.ERROR_NO_BASE_URL, imgElement.getTagName(), imgElement.getAttributeName(new Integer(HTMLElement.ATTR_SRC)), imageUrl, "Ignoring Image file referred in an IMG tag (" + imageUrl + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
+                            htmlCallback.parsingError(HTMLCallback.ERROR_NO_BASE_URL, imgElement.getTagName(), imgElement.getAttributeName(Integer.valueOf(HTMLElement.ATTR_SRC)), imageUrl, "Ignoring Image file referred in an IMG tag (" + imageUrl + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
                         }
                     }
                 }
@@ -2455,7 +2455,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     String coordsStr = areaTag.getAttributeById(HTMLElement.ATTR_COORDS);
                     if ((coordsStr != null) && (hrefStr != null)) {
                         String curValStr = "";
-                        int coords[] = new int[4];
+                        int[] coords = new int[4];
                         int curCoord = 0;
                         boolean error = true;
                         try {
@@ -2527,7 +2527,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         int typeID = INPUT_TYPES.indexOf(type.toLowerCase());
         if (typeID == -1) {
             if (htmlCallback != null) {
-                if (!htmlCallback.parsingError(HTMLCallback.ERROR_ATTIBUTE_VALUE_INVALID, element.getTagName(), element.getAttributeName(new Integer(HTMLElement.ATTR_TYPE)), type, "Unsupported input type '" + type + "'. Supported types: text, password, checkbox, radio, submit, reset, hidden, image")) {
+                if (!htmlCallback.parsingError(HTMLCallback.ERROR_ATTIBUTE_VALUE_INVALID, element.getTagName(), element.getAttributeName(Integer.valueOf(HTMLElement.ATTR_TYPE)), type, "Unsupported input type '" + type + "'. Supported types: text, password, checkbox, radio, submit, reset, hidden, image")) {
                     cancel();
                 }
             }
@@ -2735,11 +2735,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         if (SUPPORT_INPUT_FORMAT) {
             HTMLForm form = (HTMLForm) textfieldsToForms.get(inputField);
             if (form != null) {
-                if (inputRequired) { // Note that input-required is the reverse from emptyok...
-                    form.setEmptyOK(inputField, false);
-                } else {
-                    form.setEmptyOK(inputField, true);
-                }
+                // Note that input-required is the reverse from emptyok...
+                form.setEmptyOK(inputField, !inputRequired);
             }
         }
     }
@@ -2938,7 +2935,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     link = child.getAttributeById(HTMLElement.ATTR_HREF);
                     if ((link != null) && (docInfo == null) && (!DocumentInfo.isAbsoluteURL(link))) {
                         if (htmlCallback != null) {
-                            htmlCallback.parsingError(HTMLCallback.ERROR_NO_BASE_URL, child.getTagName(), child.getAttributeName(new Integer(HTMLElement.ATTR_HREF)), link, "Disabling relative link (" + link + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
+                            htmlCallback.parsingError(HTMLCallback.ERROR_NO_BASE_URL, child.getTagName(), child.getAttributeName(Integer.valueOf(HTMLElement.ATTR_HREF)), link, "Disabling relative link (" + link + "), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs");
                         }
                         link = null;
                     }
@@ -3753,7 +3750,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
         Label quoteLabel = addString(quote, curAlign);
 
-        quoteLabel.putClientProperty(CLIENT_PROPERTY_QUOTE, new Integer(quoteNum));
+        quoteLabel.putClientProperty(CLIENT_PROPERTY_QUOTE, Integer.valueOf(quoteNum));
         if (loadCSS) {
             quoteElement.addAssociatedComponent(quoteLabel);
         }
@@ -3900,7 +3897,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             return;
         }
         int keyCode = evt.getKeyEvent();
-        Object obj = accessKeys.get(new Integer(keyCode));
+        Object obj = accessKeys.get(Integer.valueOf(keyCode));
         if (obj != null) {
             if (obj instanceof HTMLLink) {
                 HTMLLink htmlLink = (HTMLLink) obj;
@@ -4008,14 +4005,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             counters = new Hashtable();
         }
         if (reset) {
-            counters.put(counterStr, new Integer(value));
+            counters.put(counterStr, Integer.valueOf(value));
         } else {
             int curValue = 0;
             Object obj = counters.get(counterStr);
             if (obj != null) {
                 curValue = ((Integer) obj).intValue();
             }
-            counters.put(counterStr, new Integer(value + curValue));
+            counters.put(counterStr, Integer.valueOf(value + curValue));
         }
     }
 
@@ -4067,7 +4064,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
         public void run() {
             try {
-                Thread.sleep(seconds * 1000);
+                Thread.sleep(seconds * 1000L);
             } catch (InterruptedException ie) {
                 System.out.println("Warning: Redirect/Refresh thread sleep interrupted, page may refresh sooner than expected.");
             }

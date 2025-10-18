@@ -178,4 +178,4 @@ public abstract class DynamicImage extends Image {
         drawImageImpl(g, nativeGraphics, x, y, w, h);
     }
 
-};
+}

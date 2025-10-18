@@ -43,7 +43,7 @@ import java.io.InputStream;
  */
 public class FileEncodedImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
-    private String fileName;
+    private final String fileName;
     private boolean changePending;
     private boolean imageCreated;
     private byte[] imageData;

@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -42,7 +43,7 @@ import java.util.Vector;
  * @author Eric Coolman
  */
 class XMLContent implements StructuredContent {
-    private Element root;
+    private final Element root;
 
     /**
      * Construct from a parsed XML dom
@@ -83,9 +84,8 @@ class XMLContent implements StructuredContent {
     private static Reader wrap(String content) {
         try {
             return new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8");
-        } catch (UnsupportedEncodingException err) {
-            err.printStackTrace();
-            return null;
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e.toString());
         }
     }
 

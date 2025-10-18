@@ -28,7 +28,7 @@ class TPrimality {
     /**
      * All prime numbers with bit length lesser than 10 bits.
      */
-    private static final int primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
+    private static final int[] primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
             73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181,
             191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307,
             311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433,
@@ -40,7 +40,7 @@ class TPrimality {
     /**
      * All {@code BigInteger} prime numbers with bit length lesser than 8 bits.
      */
-    private static final TBigInteger BIprimes[] = new TBigInteger[primes.length];
+    private static final TBigInteger[] BIprimes = new TBigInteger[primes.length];
     /**
      * It encodes how many iterations of Miller-Rabin test are need to get an
      * error bound not greater than {@code 2<sup>(-100)</sup>}. For example: for
@@ -85,8 +85,8 @@ class TPrimality {
         int i, j;
         int certainty;
         int gapSize = 1024; // for searching of the next probable prime number
-        int modules[] = new int[primes.length];
-        boolean isDivisible[] = new boolean[gapSize];
+        int[] modules = new int[primes.length];
+        boolean[] isDivisible = new boolean[gapSize];
         TBigInteger startPoint;
         TBigInteger probPrime;
         // If n < "last prime of table" searches next prime in the table
@@ -156,7 +156,7 @@ class TPrimality {
         // PRE: bitLength >= 2;
         // For small numbers get a random prime from the prime table
         if (bitLength <= 10) {
-            int rp[] = offsetPrimes[bitLength];
+            int[] rp = offsetPrimes[bitLength];
             return BIprimes[rp[0] + rnd.nextInt(rp[1])];
         }
         int shiftCount = (-bitLength) & 31;

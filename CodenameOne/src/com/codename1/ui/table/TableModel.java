@@ -38,14 +38,14 @@ public interface TableModel {
      *
      * @return the number of rows in the table
      */
-    public int getRowCount();
+    int getRowCount();
 
     /**
      * Returns the number of columns in the table
      *
      * @return the number of columns in the table
      */
-    public int getColumnCount();
+    int getColumnCount();
 
     /**
      * Returns the name of the column at the given offset
@@ -53,7 +53,7 @@ public interface TableModel {
      * @param i the offset for the column name
      * @return name to display at the top of the table
      */
-    public String getColumnName(int i);
+    String getColumnName(int i);
 
     /**
      * Returns true if the cell at the given location is an editable cell
@@ -62,7 +62,7 @@ public interface TableModel {
      * @param column the cell column
      * @return true if the cell at the given location is an editable cell
      */
-    public boolean isCellEditable(int row, int column);
+    boolean isCellEditable(int row, int column);
 
     /**
      * Returns the value of the cell at the given location
@@ -71,7 +71,7 @@ public interface TableModel {
      * @param column the cell column
      * @return the value of the cell at the given location
      */
-    public Object getValueAt(int row, int column);
+    Object getValueAt(int row, int column);
 
     /**
      * Sets the value of the cell at the given location
@@ -80,20 +80,20 @@ public interface TableModel {
      * @param column the cell column
      * @param o      the value of the cell at the given location
      */
-    public void setValueAt(int row, int column, Object o);
+    void setValueAt(int row, int column, Object o);
 
     /**
      * Adds a listener to the data changed event
      *
      * @param d the new listener
      */
-    public void addDataChangeListener(DataChangedListener d);
+    void addDataChangeListener(DataChangedListener d);
 
     /**
      * Removes a listener to the data changed event
      *
      * @param d the listener to remove
      */
-    public void removeDataChangeListener(DataChangedListener d);
+    void removeDataChangeListener(DataChangedListener d);
 
 }

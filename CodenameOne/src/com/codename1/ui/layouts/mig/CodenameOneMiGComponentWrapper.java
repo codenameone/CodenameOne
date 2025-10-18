@@ -76,8 +76,8 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     private static boolean vp = true;
     private final Component c;
     private int compType = TYPE_UNSET;
-    private Boolean bl = null;
-    private boolean prefCalled = false;
+    private final Boolean bl = null;
+    private final boolean prefCalled = false;
 
     public CodenameOneMiGComponentWrapper(Component c) {
         this.c = c;
@@ -338,14 +338,14 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     }
 
     public final boolean equals(Object o) {
-        if (o instanceof ComponentWrapper == false)
+        if (!(o instanceof ComponentWrapper))
             return false;
 
         return c.equals(((ComponentWrapper) o).getComponent());
     }
 
     public int getContentBias() {
-        return c instanceof TextArea || (Boolean.TRUE.equals(((Component) c).getClientProperty("migLayout.dynamicAspectRatio"))) ? LayoutUtil.HORIZONTAL : -1;
+        return c instanceof TextArea || (Boolean.TRUE.equals(c.getClientProperty("migLayout.dynamicAspectRatio"))) ? LayoutUtil.HORIZONTAL : -1;
     }
 }
 

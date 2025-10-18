@@ -559,7 +559,7 @@ public class CN extends CN1Constants {
      * @since 8.0
      */
     public static int convertToPixels(float value, byte unitType) {
-        return Display.INSTANCE.convertToPixels((float) value, unitType);
+        return Display.INSTANCE.convertToPixels(value, unitType);
     }
 
 

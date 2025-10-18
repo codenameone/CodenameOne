@@ -100,6 +100,7 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.lang.ref.WeakReference;
+
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -151,16 +152,16 @@ public abstract class CodenameOneImplementation {
      * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
      * touch event should be very efficient
      */
-    private int[] xPointerEvent = new int[1];
+    private final int[] xPointerEvent = new int[1];
     /**
      * Useful since the content of a single element touch event is often recycled
      * and always arrives on 1 thread. Even on multi-tocuh devices a single coordinate
      * touch event should be very efficient
      */
-    private int[] yPointerEvent = new int[1];
+    private final int[] yPointerEvent = new int[1];
     private int pointerPressedX;
     private int pointerPressedY;
-    private Hashtable builtinSounds = new Hashtable();
+    private final Hashtable builtinSounds = new Hashtable();
     private Object storageData;
     private Hashtable cookies;
     private ActionListener logger;
@@ -171,7 +172,7 @@ public abstract class CodenameOneImplementation {
      * For use inside paintDirty() so that we don't have to instantiate
      * a rectangle each time it is called.
      */
-    private Rectangle paintDirtyTmpRect = new Rectangle();
+    private final Rectangle paintDirtyTmpRect = new Rectangle();
     private BrowserComponent sharedJavascriptContext;
 
     static void setOnCurrentFormChange(Runnable on) {
@@ -1194,9 +1195,7 @@ public abstract class CodenameOneImplementation {
         int height = image.getHeight();
 
         for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                newRGB[x + (height - y - 1) * width] = rgb[x + y * width];
-            }
+            if (width >= 0) System.arraycopy(rgb, 0 + y * width, newRGB, 0 + (height - y - 1) * width, width);
         }
 
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
@@ -2627,9 +2626,7 @@ public abstract class CodenameOneImplementation {
                 break;
             case Component.DRAG_REGION_POSSIBLE_DRAG_XY:
                 startX = Math.min(startX, 2f);
-                ;
                 startY = Math.min(startY, 2f);
-                ;
                 break;
         }
 
@@ -3060,8 +3057,8 @@ public abstract class CodenameOneImplementation {
         int intersectionsCount = 0;
 
 
-        int yMax = (int) yPoints[0];
-        int yMin = (int) yPoints[0];
+        int yMax = yPoints[0];
+        int yMin = yPoints[0];
 
 
         for (int i = 0; i < nPoints; i++) {
@@ -3919,11 +3916,8 @@ public abstract class CodenameOneImplementation {
      */
     protected boolean playUserSound(String soundIdentifier) {
         Object sound = builtinSounds.get(soundIdentifier);
-        if (sound == null) {
-            return false;
-        }
+        return sound != null;
         //playAudio(sound);
-        return true;
     }
 
     /**
@@ -4526,7 +4520,6 @@ public abstract class CodenameOneImplementation {
             String htmlText = new String(bo.toByteArray(), "UTF-8");
             String baseUrl = url.substring(0, url.lastIndexOf('/'));
             setBrowserPage(browserPeer, htmlText, baseUrl);
-            return;
         } catch (IOException ex) {
             Log.e(ex);
         }
@@ -8043,7 +8036,6 @@ public abstract class CodenameOneImplementation {
                 case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                 case Style.BACKGROUND_GRADIENT_RADIAL:
                     drawGradientBackground(s, nativeGraphics, x, y, width, height);
-                    return;
             }
         }
     }

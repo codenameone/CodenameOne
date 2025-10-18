@@ -60,15 +60,14 @@ public abstract class TiledProvider extends MapProvider {
      * @return the image url of the tile
      */
     protected String url(int zoomLevel, int xTile, int yTile) {
-        StringBuilder sb = new StringBuilder(_url);
-        sb.append("/");
-        sb.append(zoomLevel);
-        sb.append("/");
-        sb.append(xTile);
-        sb.append("/");
-        sb.append(yTile);
-        sb.append(".png");
-        return sb.toString();
+        String sb = _url + "/" +
+                zoomLevel +
+                "/" +
+                xTile +
+                "/" +
+                yTile +
+                ".png";
+        return sb;
     }
 
     private int tileNo(double pos, double pos0, double scale) {
@@ -87,8 +86,8 @@ public abstract class TiledProvider extends MapProvider {
      */
     public Coord scale(int zoomLevel) {
         int divider = (1 << zoomLevel);
-        double longitude = (1.0 * projection().extent().longitudeDifference()) / divider / tileSize().getWidth();
-        double latitude = (1.0 * projection().extent().latitudeDifference()) / divider / tileSize().getHeight();
+        double longitude = (projection().extent().longitudeDifference()) / divider / tileSize().getWidth();
+        double latitude = (projection().extent().latitudeDifference()) / divider / tileSize().getHeight();
         return new Coord(latitude, longitude, false);
     }
 

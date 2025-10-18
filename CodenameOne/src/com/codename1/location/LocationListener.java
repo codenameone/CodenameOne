@@ -33,7 +33,7 @@ public interface LocationListener {
      *
      * @param location a Location Object
      */
-    public void locationUpdated(Location location);
+    void locationUpdated(Location location);
 
     /**
      * This method is been called by the system when the provider state has
@@ -43,6 +43,6 @@ public interface LocationListener {
      *                 LocationManager.AVAILABLE, LocationManager.OUT_OF_SERVICE or
      *                 LocationManager.TEMPORARILY_UNAVAILABLE
      */
-    public void providerStateChanged(int newState);
+    void providerStateChanged(int newState);
 
 }

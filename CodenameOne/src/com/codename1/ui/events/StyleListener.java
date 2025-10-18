@@ -38,6 +38,6 @@ public interface StyleListener {
      * @param propertyName the property name that was changed
      * @param source       The changed Style object
      */
-    public void styleChanged(String propertyName, Style source);
+    void styleChanged(String propertyName, Style source);
 
 }

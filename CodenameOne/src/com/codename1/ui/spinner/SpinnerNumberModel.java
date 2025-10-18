@@ -37,12 +37,12 @@ import com.codename1.ui.util.EventDispatcher;
  */
 class SpinnerNumberModel implements ListModel {
     boolean realValues;
-    private EventDispatcher dataListener = new EventDispatcher();
-    private EventDispatcher selectionListener = new EventDispatcher();
-    private double min;
-    private double max;
+    private final EventDispatcher dataListener = new EventDispatcher();
+    private final EventDispatcher selectionListener = new EventDispatcher();
+    private final double min;
+    private final double max;
     private double currentValue;
-    private double step;
+    private final double step;
     /**
      * The old DateSpinner relies on behavior that was broken in this commit:
      * https://github.com/codenameone/CodenameOne/commit/cfac9a6a1bb15027b48a9b822e2f21eb2835d38e#diff-d12531ab4b0dd8bf1233a09f3c5e2b2b5634bff3c3cd2f357ad0a001e5f19bbf
@@ -95,7 +95,7 @@ class SpinnerNumberModel implements ListModel {
         if (realValues) {
             return new Double(currentValue);
         }
-        return new Integer((int) currentValue);
+        return Integer.valueOf((int) currentValue);
     }
 
     void setValue(Object value) {
@@ -117,7 +117,7 @@ class SpinnerNumberModel implements ListModel {
         if (realValues) {
             return new Double(min + step * index);
         }
-        return new Integer((int) (min + step * index));
+        return Integer.valueOf((int) (min + step * index));
     }
 
 

@@ -35,7 +35,7 @@ class TConversion {
      * 2 ^ 31, bigRadices[8] = 10 ^ 9, etc.
      */
 
-    static final int bigRadices[] = {-2147483648, 1162261467, 1073741824, 1220703125, 362797056, 1977326743,
+    static final int[] bigRadices = {-2147483648, 1162261467, 1073741824, 1220703125, 362797056, 1977326743,
             1073741824, 387420489, 1000000000, 214358881, 429981696, 815730721, 1475789056, 170859375, 268435456,
             410338673, 612220032, 893871739, 1280000000, 1801088541, 113379904, 148035889, 191102976, 244140625,
             308915776, 387420489, 481890304, 594823321, 729000000, 887503681, 1073741824, 1291467969, 1544804416,
@@ -53,7 +53,7 @@ class TConversion {
     static String bigInteger2String(TBigInteger val, int radix) {
         int sign = val.sign;
         int numberLength = val.numberLength;
-        int digits[] = val.digits;
+        int[] digits = val.digits;
 
         if (sign == 0) {
             return "0";
@@ -73,11 +73,11 @@ class TConversion {
         bitsForRadixDigit = MathUtil.log(radix) / MathUtil.log(2);
         int resLengthInChars = (int) (val.abs().bitLength() / bitsForRadixDigit + ((sign < 0) ? 1 : 0)) + 1;
 
-        char result[] = new char[resLengthInChars];
+        char[] result = new char[resLengthInChars];
         int currentChar = resLengthInChars;
         int resDigit;
         if (radix != 16) {
-            int temp[] = new int[numberLength];
+            int[] temp = new int[numberLength];
             System.arraycopy(digits, 0, temp, 0, numberLength);
             int tempLen = numberLength;
             int charsPerInt = digitFitInInt[radix];
@@ -132,10 +132,10 @@ class TConversion {
     static String toDecimalScaledString(TBigInteger val, int scale) {
         int sign = val.sign;
         int numberLength = val.numberLength;
-        int digits[] = val.digits;
+        int[] digits = val.digits;
         int resLengthInChars;
         int currentChar;
-        char result[];
+        char[] result;
 
         if (sign == 0) {
             switch (scale) {
@@ -193,7 +193,7 @@ class TConversion {
                 } while (v != 0);
             }
         } else {
-            int temp[] = new int[numberLength];
+            int[] temp = new int[numberLength];
             int tempLen = numberLength;
             System.arraycopy(digits, 0, temp, 0, tempLen);
             BIG_LOOP:
@@ -278,7 +278,7 @@ class TConversion {
         if (exponent > 0) {
             result1.append('+');
         }
-        result1.append(Integer.toString(exponent));
+        result1.append(exponent);
         return result1.toString();
     }
 
@@ -286,7 +286,7 @@ class TConversion {
     static String toDecimalScaledString(long value, int scale) {
         int resLengthInChars;
         int currentChar;
-        char result[];
+        char[] result;
         boolean negNumber = value < 0;
         if (negNumber) {
             value = -value;
@@ -383,7 +383,7 @@ class TConversion {
         if (exponent > 0) {
             result1.append('+');
         }
-        result1.append(Long.toString(exponent));
+        result1.append(exponent);
         return result1.toString();
     }
 

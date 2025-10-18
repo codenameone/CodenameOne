@@ -43,14 +43,14 @@ import java.util.Vector;
  */
 public class CacheMap {
     private int cacheSize = 10;
-    private Hashtable memoryCache = new Hashtable();
-    private Hashtable weakCache = new Hashtable();
+    private final Hashtable memoryCache = new Hashtable();
+    private final Hashtable weakCache = new Hashtable();
 
     private int storageCacheSize = 0;
     private Vector storageCacheContentVec;
     private String cachePrefix = "";
     private boolean alwaysStore;
-    private int storageKey = -1;
+    private final int storageKey = -1;
 
     /**
      * Default constructor
@@ -125,7 +125,7 @@ public class CacheMap {
             memoryCache.remove(oldestKey);
         }
         long lastAccess = System.currentTimeMillis();
-        memoryCache.put(key, new Object[]{new Long(lastAccess), value});
+        memoryCache.put(key, new Object[]{Long.valueOf(lastAccess), value});
         if (alwaysStore) {
             placeInStorageCache(key, lastAccess, value);
         }
@@ -145,8 +145,8 @@ public class CacheMap {
         for (int iter = 0; iter < s; iter++) {
             Object[] obj = (Object[]) storageCacheContent.elementAt(iter);
             if (obj[1].equals(key)) {
-                Storage.getInstance().deleteStorageFile("$CACHE$" + cachePrefix + key.toString());
-                obj[0] = new Long(Long.MIN_VALUE);
+                Storage.getInstance().deleteStorageFile("$CACHE$" + cachePrefix + key);
+                obj[0] = Long.valueOf(Long.MIN_VALUE);
                 obj[1] = obj[0];
                 Storage.getInstance().writeObject("$CACHE$Idx" + cachePrefix, storageCacheContent);
                 return;
@@ -180,7 +180,7 @@ public class CacheMap {
                 Object[] obj = (Object[]) storageCacheContent.elementAt(iter);
                 if (obj[1].equals(key)) {
                     // place the object back into the memory cache and return the value
-                    Vector v = (Vector) Storage.getInstance().readObject("$CACHE$" + cachePrefix + key.toString());
+                    Vector v = (Vector) Storage.getInstance().readObject("$CACHE$" + cachePrefix + key);
                     if (v != null) {
                         Object val = v.elementAt(0);
                         put(key, val);
@@ -250,7 +250,7 @@ public class CacheMap {
     private void placeInStorageCache(int offset, Object key, long lastAccessed, Object value) {
         Vector v = new Vector();
         v.addElement(value);
-        Long l = new Long(lastAccessed);
+        Long l = Long.valueOf(lastAccessed);
         v.addElement(l);
         v.addElement(key);
         Storage.getInstance().writeObject("$CACHE$" + cachePrefix + key.toString(), v);

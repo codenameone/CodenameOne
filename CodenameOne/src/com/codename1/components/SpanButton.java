@@ -56,8 +56,8 @@ import static com.codename1.ui.ComponentSelector.$;
 public class SpanButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
 
     private int gap = Label.getDefaultGap();
-    private Button actualButton;
-    private TextArea text;
+    private final Button actualButton;
+    private final TextArea text;
     private boolean shouldLocalize = true;
 
     /**

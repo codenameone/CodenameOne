@@ -53,7 +53,7 @@ import java.util.Vector;
 public class GlassTutorial implements Painter {
     private static final String DEST = "$$GLSDESTHINT$$";
     private static final String POS = "$$GLSDESTPOS$$";
-    private Vector vec = new Vector();
+    private final Vector vec = new Vector();
     private Component internal;
 
     /**

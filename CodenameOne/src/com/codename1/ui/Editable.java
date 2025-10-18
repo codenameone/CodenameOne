@@ -37,19 +37,19 @@ public interface Editable {
      *
      * @return
      */
-    public boolean isEditable();
+    boolean isEditable();
 
     /**
      * Checks whether editing is currently in progress.
      *
      * @return
      */
-    public boolean isEditing();
+    boolean isEditing();
 
     /**
      * Starts editing the component.
      */
-    public void startEditingAsync();
+    void startEditingAsync();
 
     /**
      * Stops editing the component.
@@ -57,5 +57,5 @@ public interface Editable {
      * @param onComplete Optional callback that will be called after the editing
      *                   is finished (as stopping may take some time for the native side to do cleanup).
      */
-    public void stopEditing(Runnable onComplete);
+    void stopEditing(Runnable onComplete);
 }

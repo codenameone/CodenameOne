@@ -138,7 +138,7 @@ public class BoundSize {
      */
     public boolean isUnset() {
         // Most common case by far is this == ZERO_PIXEL...
-        return this == ZERO_PIXEL || (pref == null && min == null && max == null && gapPush == false);
+        return this == ZERO_PIXEL || (pref == null && min == null && max == null && !gapPush);
     }
 
     /**

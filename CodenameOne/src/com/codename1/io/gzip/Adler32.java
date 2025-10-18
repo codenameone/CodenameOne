@@ -46,7 +46,7 @@ final public class Adler32 implements Checksum {
 
     // The following logic has come from zlib.1.2.
     static long combine(long adler1, long adler2, long len2) {
-        long BASEL = (long) BASE;
+        long BASEL = BASE;
         long sum1;
         long sum2;
         long rem;  // unsigned int

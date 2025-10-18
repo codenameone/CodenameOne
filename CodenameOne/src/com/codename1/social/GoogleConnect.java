@@ -45,7 +45,7 @@ import java.util.Hashtable;
 public class GoogleConnect extends Login {
 
     static Class implClass;
-    private static String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
+    private static final String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
     private static GoogleConnect instance;
 
     GoogleConnect() {

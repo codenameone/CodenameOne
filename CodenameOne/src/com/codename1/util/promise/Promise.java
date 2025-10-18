@@ -486,7 +486,7 @@ public class Promise<T> {
             });
         }
         if (ex[0] != null) {
-            throw new AsyncResource.AsyncExecutionException((Throwable) ex[0]);
+            throw new AsyncResource.AsyncExecutionException(ex[0]);
         }
         return (T) out[0];
     }

@@ -35,7 +35,7 @@ import com.codename1.ui.geom.Rectangle;
  * @author shannah
  */
 public class ChartUtil {
-    private Canvas c = new Canvas();
+    private final Canvas c = new Canvas();
 
     /**
      * Draws the given chart onto the given graphics

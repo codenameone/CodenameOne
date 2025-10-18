@@ -83,7 +83,7 @@ public final class MigLayout extends Layout {
     private ArrayList<LayoutCallback> callbackList = null;
 
     private boolean dirty = true;
-    private long lastSize = 0;
+    private final long lastSize = 0;
 
     /**
      * Constructor with no constraints.
@@ -207,7 +207,7 @@ public final class MigLayout extends Layout {
         } else if (constr instanceof LC) {
             lc = (LC) constr;
         } else {
-            throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass().toString());
+            throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass());
         }
         layoutConstraints = constr;
         dirty = true;
@@ -244,7 +244,7 @@ public final class MigLayout extends Layout {
         } else if (constr instanceof AC) {
             colSpecs = (AC) constr;
         } else {
-            throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass().toString());
+            throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass());
         }
         colConstraints = constr;
         dirty = true;
@@ -281,7 +281,7 @@ public final class MigLayout extends Layout {
         } else if (constr instanceof AC) {
             rowSpecs = (AC) constr;
         } else {
-            throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass().toString());
+            throw new IllegalArgumentException("Illegal constraint type: " + constr.getClass());
         }
         rowConstraints = constr;
         dirty = true;
@@ -361,7 +361,7 @@ public final class MigLayout extends Layout {
      */
     private void setComponentConstraintsImpl(Component comp, Object constr, boolean noCheck) {
         Container parent = comp.getParent();
-        if (noCheck == false && scrConstrMap.containsKey(comp) == false) {
+        if (!noCheck && !scrConstrMap.containsKey(comp)) {
             throw new IllegalArgumentException("Component must already be added to parent!");
         }
 
@@ -379,7 +379,7 @@ public final class MigLayout extends Layout {
             ccMap.put(cw, (CC) constr);
 
         } else {
-            throw new IllegalArgumentException("Constraint must be String or ComponentConstraint: " + constr.getClass().toString());
+            throw new IllegalArgumentException("Constraint must be String or ComponentConstraint: " + constr.getClass());
         }
 
         dirty = true;
@@ -582,7 +582,7 @@ public final class MigLayout extends Layout {
         Iterator<Map.Entry<ComponentWrapper, CC>> it = ccMap.entrySet().iterator();
         while (it.hasNext()) {
             Component c = (Component) it.next().getKey().getComponent();
-            if (parentCompSet.contains(c) == false) {
+            if (!parentCompSet.contains(c)) {
                 it.remove();
                 scrConstrMap.remove(c);
             }
@@ -783,7 +783,7 @@ public final class MigLayout extends Layout {
     }
 
     public void addLayoutComponent(Object value, Component comp, Container c) {
-        addLayoutComponent(comp, (String) value);
+        addLayoutComponent(comp, value);
     }
 
     public void addLayoutComponent(Component comp, Object constraints) {

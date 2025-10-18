@@ -188,25 +188,25 @@ public final class UnitValue {
     private static final float[] SCALE = new float[]{25.4f, 2.54f, 1f, 0f, 72f};
 
     static {
-        UNIT_MAP.put("px", new Integer(PIXEL));
-        UNIT_MAP.put("lpx", new Integer(LPX));
-        UNIT_MAP.put("lpy", new Integer(LPY));
-        UNIT_MAP.put("%", new Integer(PERCENT));
-        UNIT_MAP.put("cm", new Integer(CM));
-        UNIT_MAP.put("in", new Integer(INCH));
-        UNIT_MAP.put("spx", new Integer(SPX));
-        UNIT_MAP.put("spy", new Integer(SPY));
-        UNIT_MAP.put("al", new Integer(ALIGN));
-        UNIT_MAP.put("mm", new Integer(MM));
-        UNIT_MAP.put("pt", new Integer(PT));
-        UNIT_MAP.put("min", new Integer(MIN_SIZE));
-        UNIT_MAP.put("minimum", new Integer(MIN_SIZE));
-        UNIT_MAP.put("p", new Integer(PREF_SIZE));
-        UNIT_MAP.put("pref", new Integer(PREF_SIZE));
-        UNIT_MAP.put("max", new Integer(MAX_SIZE));
-        UNIT_MAP.put("maximum", new Integer(MAX_SIZE));
-        UNIT_MAP.put("button", new Integer(BUTTON));
-        UNIT_MAP.put("label", new Integer(LABEL_ALIGN));
+        UNIT_MAP.put("px", Integer.valueOf(PIXEL));
+        UNIT_MAP.put("lpx", Integer.valueOf(LPX));
+        UNIT_MAP.put("lpy", Integer.valueOf(LPY));
+        UNIT_MAP.put("%", Integer.valueOf(PERCENT));
+        UNIT_MAP.put("cm", Integer.valueOf(CM));
+        UNIT_MAP.put("in", Integer.valueOf(INCH));
+        UNIT_MAP.put("spx", Integer.valueOf(SPX));
+        UNIT_MAP.put("spy", Integer.valueOf(SPY));
+        UNIT_MAP.put("al", Integer.valueOf(ALIGN));
+        UNIT_MAP.put("mm", Integer.valueOf(MM));
+        UNIT_MAP.put("pt", Integer.valueOf(PT));
+        UNIT_MAP.put("min", Integer.valueOf(MIN_SIZE));
+        UNIT_MAP.put("minimum", Integer.valueOf(MIN_SIZE));
+        UNIT_MAP.put("p", Integer.valueOf(PREF_SIZE));
+        UNIT_MAP.put("pref", Integer.valueOf(PREF_SIZE));
+        UNIT_MAP.put("max", Integer.valueOf(MAX_SIZE));
+        UNIT_MAP.put("maximum", Integer.valueOf(MAX_SIZE));
+        UNIT_MAP.put("button", Integer.valueOf(BUTTON));
+        UNIT_MAP.put("label", Integer.valueOf(LABEL_ALIGN));
     }
 
     private final transient float value;
@@ -323,7 +323,7 @@ public final class UnitValue {
      *                 connected to any component.
      * @return The size in pixels.
      */
-    public final int getPixels(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
+    public int getPixels(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
         return MathUtil.round(getPixelsExact(refValue, parent, comp));
     }
 
@@ -337,7 +337,7 @@ public final class UnitValue {
      *                 connected to any component.
      * @return The size in pixels.
      */
-    public final float getPixelsExact(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
+    public float getPixelsExact(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
         if (parent == null)
             return 1;
 
@@ -509,7 +509,7 @@ public final class UnitValue {
         throw new IllegalArgumentException("Unknown keyword: " + unitStr);
     }
 
-    final boolean isAbsolute() {
+    boolean isAbsolute() {
         switch (unit) {
             case PIXEL:
             case LPX:
@@ -545,7 +545,7 @@ public final class UnitValue {
         throw new IllegalArgumentException("Unknown/illegal unit: " + unit + ", unitStr: " + unitStr);
     }
 
-    final boolean isAbsoluteDeep() {
+    boolean isAbsoluteDeep() {
         if (subUnits != null) {
             for (UnitValue subUnit : subUnits) {
                 if (subUnit.isAbsoluteDeep())
@@ -555,11 +555,11 @@ public final class UnitValue {
         return isAbsolute();
     }
 
-    final boolean isLinked() {
+    boolean isLinked() {
         return linkId != null;
     }
 
-    final boolean isLinkedDeep() {
+    boolean isLinkedDeep() {
         if (subUnits != null) {
             for (UnitValue subUnit : subUnits) {
                 if (subUnit.isLinkedDeep())
@@ -569,43 +569,43 @@ public final class UnitValue {
         return isLinked();
     }
 
-    final String getLinkTargetId() {
+    String getLinkTargetId() {
         return linkId;
     }
 
-    final UnitValue getSubUnitValue(int i) {
+    UnitValue getSubUnitValue(int i) {
         return subUnits[i];
     }
 
-    final int getSubUnitCount() {
+    int getSubUnitCount() {
         return subUnits != null ? subUnits.length : 0;
     }
 
-    public final UnitValue[] getSubUnits() {
-        return subUnits != null ? subUnits : null;
+    public UnitValue[] getSubUnits() {
+        return subUnits;
     }
 
-    public final int getUnit() {
+    public int getUnit() {
         return unit;
     }
 
-    public final String getUnitString() {
+    public String getUnitString() {
         return unitStr;
     }
 
-    public final int getOperation() {
+    public int getOperation() {
         return oper;
     }
 
-    public final float getValue() {
+    public float getValue() {
         return value;
     }
 
-    public final boolean isHorizontal() {
+    public boolean isHorizontal() {
         return isHor;
     }
 
-    final public String toString() {
+    public String toString() {
         return getClass().getName() + ". Value=" + value + ", unit=" + unit + ", unitString: " + unitStr + ", oper=" + oper + ", isHor: " + isHor;
     }
 
@@ -615,11 +615,11 @@ public final class UnitValue {
      *
      * @return The constraint string or <code>null</code> if none is registered.
      */
-    public final String getConstraintString() {
+    public String getConstraintString() {
         return LayoutUtil.getCCString(this);
     }
 
-    public final int hashCode() {
+    public int hashCode() {
         return (int) (value * 12345) + (oper >>> 5) + unit >>> 17;
     }
 }

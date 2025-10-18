@@ -80,7 +80,7 @@ public interface CellRenderer<T> {
      * @param isSelected whether the entry is selected
      * @return a component to paint within the list
      */
-    public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected);
+    Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected);
 
     /**
      * Returns a component instance that is painted under the currently focused renderer
@@ -94,6 +94,6 @@ public interface CellRenderer<T> {
      * @return a component to use as focus
      * @see List#setSmoothScrolling
      */
-    public Component getFocusComponent(Component list);
+    Component getFocusComponent(Component list);
 
 }

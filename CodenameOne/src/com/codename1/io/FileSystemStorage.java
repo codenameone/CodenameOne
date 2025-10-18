@@ -67,7 +67,7 @@ public class FileSystemStorage {
      * way or the other.
      */
     public static final int ROOT_TYPE_UNKNOWN = 3;
-    private static FileSystemStorage INSTANCE = new FileSystemStorage();
+    private static final FileSystemStorage INSTANCE = new FileSystemStorage();
 
     private FileSystemStorage() {
     }

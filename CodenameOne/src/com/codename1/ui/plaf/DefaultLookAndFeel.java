@@ -142,7 +142,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      */
     public void bind(Component cmp) {
         if (tickWhenFocused && cmp instanceof Label) {
-            ((Label) cmp).addFocusListener(this);
+            cmp.addFocusListener(this);
         }
     }
 
@@ -883,7 +883,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
             //if(Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
 
-            String rowText = (String) ta.getTextAt(i);
+            String rowText = ta.getTextAt(i);
             //display ******** if it is a password field
             String displayText = "";
             if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
@@ -969,7 +969,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     (ta.getRowsGap() + fontHeight) * i;
             if (Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
 
-                String rowText = (String) ta.getTextAt(i);
+                String rowText = ta.getTextAt(i);
                 //display ******** if it is a password field
                 String displayText = "";
                 if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
@@ -1859,7 +1859,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if (ta.isSingleLineTextArea()) {
             text = txt;
         } else {
-            text = (String) ta.getTextAt(ta.getCursorY());
+            text = ta.getTextAt(ta.getCursorY());
             if (ta.getCursorPosition() + text.length() < txt.length()) {
                 char c = txt.charAt(ta.getCursorPosition() + text.length());
                 if (c == '\n') {

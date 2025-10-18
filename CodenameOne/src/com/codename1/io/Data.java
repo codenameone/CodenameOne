@@ -42,7 +42,7 @@ public interface Data {
      * @param output The output stream to append to.
      * @throws IOException
      */
-    public void appendTo(OutputStream output) throws IOException;
+    void appendTo(OutputStream output) throws IOException;
 
     /**
      * Gets the size of the data content.
@@ -50,10 +50,10 @@ public interface Data {
      * @return Size of content in bytes.
      * @throws IOException
      */
-    public long getSize() throws IOException;
+    long getSize() throws IOException;
 
-    public static class StringData implements Data {
-        private byte[] bytes;
+    class StringData implements Data {
+        private final byte[] bytes;
 
         public StringData(String str) {
             this(str, "UTF-8");
@@ -85,8 +85,8 @@ public interface Data {
      *
      * @since 7.0
      */
-    public static class FileData implements Data {
-        private File file;
+    class FileData implements Data {
+        private final File file;
 
         /**
          * Creates a new Data wrapper for a file.
@@ -120,8 +120,8 @@ public interface Data {
      *
      * @since 7.0
      */
-    public static class StorageData implements Data {
-        private String key;
+    class StorageData implements Data {
+        private final String key;
 
         /**
          * Creates a new Data wrapper for a storage key.
@@ -154,8 +154,8 @@ public interface Data {
      *
      * @since 7.0
      */
-    public static class ByteData implements Data {
-        private byte[] bytes;
+    class ByteData implements Data {
+        private final byte[] bytes;
 
 
         /**

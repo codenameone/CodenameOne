@@ -28,7 +28,7 @@ package com.codename1.l10n;
  * @author Eric Coolman
  */
 public class ParseException extends Exception {
-    private int errorOffset;
+    private final int errorOffset;
     private Throwable causedBy;
 
     /**

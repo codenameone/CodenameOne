@@ -14,12 +14,12 @@ public interface ReleasableComponent {
      * Returns true if this is an auto-released Component.
      * An Auto-released Component will be disarmed when a drag is happening within it
      */
-    public boolean isAutoRelease();
+    boolean isAutoRelease();
 
     /**
      * Sets the auto released mode of the Component
      */
-    public void setAutoRelease(boolean autoRelease);
+    void setAutoRelease(boolean autoRelease);
 
     /**
      * Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
@@ -27,7 +27,7 @@ public interface ReleasableComponent {
      *
      * @return the releaseRadius
      */
-    public int getReleaseRadius();
+    int getReleaseRadius();
 
     /**
      * Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
@@ -35,10 +35,10 @@ public interface ReleasableComponent {
      *
      * @param releaseRadius the releaseRadius to set
      */
-    public void setReleaseRadius(int releaseRadius);
+    void setReleaseRadius(int releaseRadius);
 
     /**
      * Function that would be called by the parent Form to put the Component in its released state
      */
-    public void setReleased();
+    void setReleased();
 }

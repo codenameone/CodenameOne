@@ -32,10 +32,10 @@ import java.util.ArrayList;
  */
 class RunnableWrapper implements Runnable {
     private static final Object THREADPOOL_LOCK = new Object();
-    private static ArrayList<Runnable> threadPool = new ArrayList<Runnable>();
+    private static final ArrayList<Runnable> threadPool = new ArrayList<Runnable>();
 
     private static int threadCount = 0;
-    private static int maxThreadCount = 5;
+    private static final int maxThreadCount = 5;
     private static int availableThreads = 0;
 
     private boolean done = false;

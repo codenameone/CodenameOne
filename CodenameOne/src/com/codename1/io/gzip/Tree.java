@@ -143,7 +143,7 @@ final class Tree {
     // the given tree and the field len is set for all tree elements.
     // OUT assertion: the field code is set for all tree elements of non
     //     zero code length.
-    private final static void gen_codes(
+    private static void gen_codes(
             short[] tree, // the tree to decorate
             int max_code, // largest code with non zero frequency
             short[] bl_count, // number of codes at each bit length
@@ -176,7 +176,7 @@ final class Tree {
     // Reverse the first len bits of a code, using straightforward code (a faster
     // method would use a table)
     // IN assertion: 1 <= len <= 15
-    private final static int bi_reverse(
+    private static int bi_reverse(
             int code, // the value to invert
             int len   // its bit length
     ) {

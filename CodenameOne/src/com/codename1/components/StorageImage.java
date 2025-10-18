@@ -37,8 +37,8 @@ import java.io.InputStream;
  * @author Shai Almog
  */
 public class StorageImage extends EncodedImage {
-    private String fileName;
-    private boolean keep;
+    private final String fileName;
+    private final boolean keep;
     private byte[] data;
     private Object weak;
 

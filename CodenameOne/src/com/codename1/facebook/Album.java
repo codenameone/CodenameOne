@@ -33,7 +33,7 @@ import java.util.Hashtable;
  */
 public class Album extends FBObject {
 
-    private User from = new User();
+    private final User from = new User();
     private String description;
     private String location;
     private String link;

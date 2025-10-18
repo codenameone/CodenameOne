@@ -41,7 +41,7 @@ public interface VirtualKeyboardInterface {
      *                  TextArea.UNEDITABLE, TextArea.SENSITIVE, TextArea.NON_PREDICTIVE,
      *                  INITIAL_CAPS_SENTENCE, INITIAL_CAPS_WORD. E.g. ANY | PASSWORD.
      */
-    public void setInputType(int inputType);
+    void setInputType(int inputType);
 
     /**
      * Returns the Virtual Keyboard name.
@@ -49,20 +49,20 @@ public interface VirtualKeyboardInterface {
      *
      * @return a unique id that represents this virtual keyboard.
      */
-    public String getVirtualKeyboardName();
+    String getVirtualKeyboardName();
 
     /**
      * Shows or dispose the virtual keyboard
      *
      * @param show if true shows the virtual keyboard
      */
-    public void showKeyboard(boolean show);
+    void showKeyboard(boolean show);
 
     /**
      * Indicates if the Virtual Keyboard is currently showing.
      *
      * @return true if the Virtual Keyboard is currently showing
      */
-    public boolean isVirtualKeyboardShowing();
+    boolean isVirtualKeyboardShowing();
 
 }

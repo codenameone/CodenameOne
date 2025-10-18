@@ -186,7 +186,7 @@ public abstract class Layout {
      */
     public final int updateTabIndices(Container parent, int offset) {
         if (overridesTabIndices(parent)) {
-            Component cmps[] = getChildrenInTraversalOrder(parent);
+            Component[] cmps = getChildrenInTraversalOrder(parent);
             return updateTabIndicesImpl(parent, cmps, offset);
         }
         return offset;

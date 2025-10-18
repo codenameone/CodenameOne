@@ -42,7 +42,7 @@ public interface Animation {
      *
      * @return true if a repaint is desired or false if no repaint is necessary
      */
-    public boolean animate();
+    boolean animate();
 
     /**
      * Draws the animation, within a component the standard paint method would be
@@ -50,6 +50,6 @@ public interface Animation {
      *
      * @param g graphics context
      */
-    public void paint(Graphics g);
+    void paint(Graphics g);
 
 }

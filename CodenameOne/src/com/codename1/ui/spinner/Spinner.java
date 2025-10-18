@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.spinner;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
@@ -84,10 +85,10 @@ class Spinner extends List {
     private static Image spinnerHandle;
     private static int inputSkipDelay = 2000;
     private long lastKeyInteraction = -1;
-    private TextField quickType = new TextField();
+    private final TextField quickType = new TextField();
     private boolean monthFirst;
     private int currentInputAlign = LEFT;
-    private boolean ios7Mode;
+    private final boolean ios7Mode;
 
     /**
      * Creates a new spinner instance with the given spinner model
@@ -173,7 +174,7 @@ class Spinner extends List {
      */
     public static Spinner create(int min, int max, int currentValue, int step) {
         Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step, 0), new SpinnerRenderer<Object>());
-        s.setRenderingPrototype(new Integer(max * 10));
+        s.setRenderingPrototype(Integer.valueOf(max * 10));
         return s;
     }
 
@@ -385,7 +386,7 @@ class Spinner extends List {
                 int size = m.getSize();
                 for (int iter = 0; iter < size; iter++) {
                     Object c = m.getItemAt(iter);
-                    if (c == o || c != null && c.equals(o)) {
+                    if (Objects.equals(c, o)) {
                         m.setSelectedIndex(iter);
                         return;
                     }
@@ -447,7 +448,7 @@ class Spinner extends List {
                         }
 
                         int actual = seconds + minutes * 60 + hours * 60 * 60;
-                        setValue(new Integer(actual));
+                        setValue(Integer.valueOf(actual));
 
                         // update the spinner positioning if we have two characters
                         if (quickType.getText().length() > 1) {
@@ -529,7 +530,7 @@ class Spinner extends List {
                                 val < ((SpinnerNumberModel) getModel()).getMin()) {
                             return;
                         }
-                        setValue(new Integer(val));
+                        setValue(Integer.valueOf(val));
                     }
                 }
 

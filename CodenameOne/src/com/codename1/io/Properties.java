@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -202,7 +203,8 @@ public class Properties extends HashMap<String, String> {
             throw new NullPointerException("in == null");
         }
         int mode = NONE, unicode = 0, count = 0;
-        char nextChar, buf[] = new char[40];
+        char nextChar;
+        char[] buf = new char[40];
         int offset = 0, keyLength = -1, intVal;
         boolean firstChar = true;
 
@@ -471,7 +473,7 @@ public class Properties extends HashMap<String, String> {
         for (String key : k) {
             dumpString(sb, key, true);
             sb.append('=');
-            dumpString(sb, (String) get(key), false);
+            dumpString(sb, get(key), false);
             sb.append("\n");
             writer.write(sb.toString());
             sb.setLength(0);

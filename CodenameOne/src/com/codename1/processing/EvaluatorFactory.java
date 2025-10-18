@@ -77,7 +77,7 @@ class EvaluatorFactory {
         text = text.trim();
         int tlen = text.length();
         for (int i = 0; i < tlen; i++) {
-            if (Character.isDigit(text.charAt(i)) == false) {
+            if (!Character.isDigit(text.charAt(i))) {
                 return false;
             }
         }

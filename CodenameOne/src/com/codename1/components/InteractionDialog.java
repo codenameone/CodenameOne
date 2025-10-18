@@ -247,7 +247,7 @@ public class InteractionDialog extends Container {
 
     private void cleanupLayer(Form f) {
         if (formMode) {
-            Container c = (Container) f.getFormLayeredPane(InteractionDialog.class, true);
+            Container c = f.getFormLayeredPane(InteractionDialog.class, true);
             c.removeAll();
             c.remove();
         }
@@ -257,9 +257,9 @@ public class InteractionDialog extends Container {
         //return f.getLayeredPane();
         Container c;
         if (formMode) {
-            c = (Container) f.getFormLayeredPane(InteractionDialog.class, true);
+            c = f.getFormLayeredPane(InteractionDialog.class, true);
         } else {
-            c = (Container) f.getLayeredPane(InteractionDialog.class, true);
+            c = f.getLayeredPane(InteractionDialog.class, true);
         }
         if (!(c.getLayout() instanceof LayeredLayout)) {
             c.setLayout(new LayeredLayout());
@@ -306,7 +306,7 @@ public class InteractionDialog extends Container {
             unselectedStyle.setMargin(BOTTOM, Math.max(0, bottom));
             unselectedStyle.setMargin(LEFT, Math.max(0, left));
             unselectedStyle.setMargin(RIGHT, Math.max(0, right));
-            unselectedStyle.setMarginUnit(new byte[]{Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+            unselectedStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
 
             getParent().setX(getX());
             getParent().setY(getY());
@@ -343,7 +343,7 @@ public class InteractionDialog extends Container {
         unselectedStyle.setMargin(BOTTOM, bottom);
         unselectedStyle.setMargin(LEFT, left);
         unselectedStyle.setMargin(RIGHT, right);
-        unselectedStyle.setMarginUnit(new byte[]{Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        unselectedStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
 
         // might occur when showing the dialog twice...
         remove();

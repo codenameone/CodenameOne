@@ -48,6 +48,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Enumeration;
@@ -724,7 +725,7 @@ public class ConnectionRequest implements IOProgressListener {
             boolean shouldAddContentType = contentTypeSetExplicitly ||
                     Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "true").equals("false");
 
-            if (isPost() || (getHttpMethod() != null && !"get".equals(getHttpMethod().toLowerCase()))) {
+            if (isPost() || (getHttpMethod() != null && !"get".equalsIgnoreCase(getHttpMethod()))) {
                 shouldAddContentType = true;
             }
 
@@ -860,10 +861,7 @@ public class ConnectionRequest implements IOProgressListener {
         }
         try {
             checkSSLCertificates(getSSLCertificates());
-            if (shouldStop()) {
-                return false;
-            }
-            return true;
+            return !shouldStop();
         } catch (IOException ex) {
             Log.e(ex);
             return false;
@@ -1891,7 +1889,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @param value the value for the argument
      */
     public void addArgumentNoEncodingArray(String key, String... value) {
-        addArgumentNoEncoding(key, (String[]) value);
+        addArgumentNoEncoding(key, value);
     }
 
     /**
@@ -1955,7 +1953,7 @@ public class ConnectionRequest implements IOProgressListener {
         if (value.length == 1) {
             addArgument(key, value[0]);
         } else {
-            addArgument(key, (String[]) value);
+            addArgument(key, value);
         }
     }
 
@@ -2321,7 +2319,7 @@ public class ConnectionRequest implements IOProgressListener {
                             Object key = e.next();
                             Object value = requestArguments.get(key);
                             Object otherValue = r.requestArguments.get(key);
-                            if (otherValue == null || !value.equals(otherValue)) {
+                            if (!value.equals(otherValue)) {
                                 return false;
                             }
                         }
@@ -2899,7 +2897,7 @@ public class ConnectionRequest implements IOProgressListener {
      * connect to the server.
      * </ol>
      */
-    public static enum CachingMode {
+    public enum CachingMode {
         OFF,
         MANUAL,
         SMART,

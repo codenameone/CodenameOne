@@ -37,7 +37,7 @@ import java.util.Vector;
 public class LinesLayer extends AbstractLayer {
 
     protected int _lineColor;
-    private Vector _lineSegments;
+    private final Vector _lineSegments;
 
     /**
      * Constructor with default projection Mercator.
@@ -84,8 +84,8 @@ public class LinesLayer extends AbstractLayer {
     protected void paintSegment(Graphics g, Coord[] segment, Tile tile) {
         int pointsNo = segment.length;
         for (int i = 1; i < pointsNo; i++) {
-            Coord start = (Coord) segment[i - 1];
-            Coord end = (Coord) segment[i];
+            Coord start = segment[i - 1];
+            Coord end = segment[i];
             Point s = tile.pointPosition(start);
             Point e = tile.pointPosition(end);
             g.drawLine(s.getX(), s.getY(), e.getX(), e.getY());

@@ -39,7 +39,7 @@ public interface SelectableIconHolder extends IconHolder {
      * @return icon used
      * @see Button#STATE_ROLLOVER
      */
-    public Image getRolloverIcon();
+    Image getRolloverIcon();
 
     /**
      * Indicates the icon that is displayed on the button when the button is in
@@ -48,7 +48,7 @@ public interface SelectableIconHolder extends IconHolder {
      * @param rolloverIcon icon to use
      * @see Button#STATE_ROLLOVER
      */
-    public void setRolloverIcon(Image rolloverIcon);
+    void setRolloverIcon(Image rolloverIcon);
 
     /**
      * Indicates the icon that is displayed on the button when the button is in
@@ -57,7 +57,7 @@ public interface SelectableIconHolder extends IconHolder {
      * @return icon used
      * @see Button#STATE_PRESSED
      */
-    public Image getPressedIcon();
+    Image getPressedIcon();
 
     /**
      * Indicates the icon that is displayed on the button when the button is in
@@ -66,7 +66,7 @@ public interface SelectableIconHolder extends IconHolder {
      * @param pressedIcon icon used
      * @see Button#STATE_PRESSED
      */
-    public void setPressedIcon(Image pressedIcon);
+    void setPressedIcon(Image pressedIcon);
 
     /**
      * Indicates the icon that is displayed on the button when the button is in
@@ -74,7 +74,7 @@ public interface SelectableIconHolder extends IconHolder {
      *
      * @return icon used
      */
-    public Image getDisabledIcon();
+    Image getDisabledIcon();
 
     /**
      * Indicates the icon that is displayed on the button when the button is in
@@ -82,7 +82,7 @@ public interface SelectableIconHolder extends IconHolder {
      *
      * @param disabledIcon icon used
      */
-    public void setDisabledIcon(Image disabledIcon);
+    void setDisabledIcon(Image disabledIcon);
 
     /**
      * Indicates the icon that is displayed on the button when the button is in
@@ -90,7 +90,7 @@ public interface SelectableIconHolder extends IconHolder {
      *
      * @return icon used
      */
-    public Image getRolloverPressedIcon();
+    Image getRolloverPressedIcon();
 
     /**
      * Indicates the icon that is displayed on the button when the button is in
@@ -98,13 +98,13 @@ public interface SelectableIconHolder extends IconHolder {
      *
      * @param rolloverPressedIcon icon used
      */
-    public void setRolloverPressedIcon(Image rolloverPressedIcon);
+    void setRolloverPressedIcon(Image rolloverPressedIcon);
 
     /**
      * Returns the icon for the button based on its current state
      *
      * @return the button icon based on its current state
      */
-    public Image getIconFromState();
+    Image getIconFromState();
 
 }

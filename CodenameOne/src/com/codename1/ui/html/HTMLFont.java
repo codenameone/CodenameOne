@@ -48,7 +48,7 @@ class HTMLFont {
     /**
      * The following tags are tags that mainly define the style of their content, and one of the things they can change is the font
      */
-    static private int[] SPECIAL_FONT_TAGS_ID = {
+    static private final int[] SPECIAL_FONT_TAGS_ID = {
             HTMLElement.TAG_EM, HTMLElement.TAG_STRONG,
             HTMLElement.TAG_DFN, HTMLElement.TAG_CODE,
             HTMLElement.TAG_SAMP, HTMLElement.TAG_KBD,
@@ -77,7 +77,7 @@ class HTMLFont {
     boolean bold;
     boolean italic;
     String tagFont;
-    private HTMLFont[] counterpartFonts = new HTMLFont[4];
+    private final HTMLFont[] counterpartFonts = new HTMLFont[4];
 
     /**
      * Constructs the HTMLFont

@@ -32,6 +32,7 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+
 import java.util.Map;
 
 /**
@@ -90,10 +91,7 @@ public class Push {
                                           String iosCertificateURL, String iosCertificatePassword) {
         ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "");
         NetworkManager.getInstance().addToQueueAndWait(cr);
-        if (cr.getResposeCode() == 200) {
-            return true;
-        }
-        return false;
+        return cr.getResposeCode() == 200;
     }
 
     /**
@@ -120,10 +118,7 @@ public class Push {
                                           String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
         ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort);
         NetworkManager.getInstance().addToQueueAndWait(cr);
-        if (cr.getResposeCode() == 200) {
-            return true;
-        }
-        return false;
+        return cr.getResposeCode() == 200;
     }
 
     /**

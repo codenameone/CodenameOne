@@ -192,7 +192,7 @@ public abstract class Purchase {
                 if (Storage.getInstance().exists(RECEIPTS_REFRESH_TIME_KEY)) {
                     receiptsRefreshTime = (Date) Storage.getInstance().readObject(RECEIPTS_REFRESH_TIME_KEY);
                 } else {
-                    return new Date(-1l);
+                    return new Date(-1L);
                 }
             }
             return receiptsRefreshTime;
@@ -647,7 +647,7 @@ public abstract class Purchase {
      * @return The expiry date for a set of skus
      */
     private Date getExpiryDate(Receipt[] receipts, String... skus) {
-        Date expiryDate = new Date(0l);
+        Date expiryDate = new Date(0L);
         List<String> lSkus = Arrays.asList(skus);
         long now = System.currentTimeMillis();
 

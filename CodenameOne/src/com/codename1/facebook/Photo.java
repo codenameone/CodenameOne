@@ -34,7 +34,7 @@ import java.util.Vector;
  */
 public class Photo extends FBObject {
 
-    private User from = new User();
+    private final User from = new User();
     private String iconUrl;
     private String pictureUrl;
     private String sourceUrl;

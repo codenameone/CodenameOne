@@ -247,26 +247,26 @@ public abstract class MathUtil {
      * compiler will convert from decimal to binary accurately enough
      * to produce the hexadecimal values shown.
      */
-    private static final double bp[] = {1.0, 1.5,},
-            dp_h[] = {0.0, 5.84962487220764160156e-01,}, /* 0x3FE2B803, 0x40000000 */
-            dp_l[] = {0.0, 1.35003920212974897128e-08,}, /* 0x3E4CFDEB, 0x43CFD006 */
-    /* poly coefs for (3/2)*(log(x)-2s-2/3*s**3 */
-    L1 = 5.99999999999994648725e-01, /* 0x3FE33333, 0x33333303 */
-            L2 = 4.28571428578550184252e-01, /* 0x3FDB6DB6, 0xDB6FABFF */
-            L3 = 3.33333329818377432918e-01, /* 0x3FD55555, 0x518F264D */
-            L4 = 2.72728123808534006489e-01, /* 0x3FD17460, 0xA91D4101 */
-            L5 = 2.30660745775561754067e-01, /* 0x3FCD864A, 0x93C9DB65 */
-            L6 = 2.06975017800338417784e-01, /* 0x3FCA7E28, 0x4A454EEF */
-            lg2 = 6.93147180559945286227e-01, /* 0x3FE62E42, 0xFEFA39EF */
-            lg2_h = 6.93147182464599609375e-01, /* 0x3FE62E43, 0x00000000 */
-            lg2_l = -1.90465429995776804525e-09, /* 0xBE205C61, 0x0CA86C39 */
-            ovt = 8.0085662595372944372e-0017, /* -(1024-log2(ovfl+.5ulp)) */
-            cp = 9.61796693925975554329e-01, /* 0x3FEEC709, 0xDC3A03FD =2/(3ln2) */
-            cp_h = 9.61796700954437255859e-01, /* 0x3FEEC709, 0xE0000000 =(float)cp */
-            cp_l = -7.02846165095275826516e-09, /* 0xBE3E2FE0, 0x145B01F5 =tail of cp_h*/
-            ivln2 = 1.44269504088896338700e+00, /* 0x3FF71547, 0x652B82FE =1/ln2 */
-            ivln2_h = 1.44269502162933349609e+00, /* 0x3FF71547, 0x60000000 =24b 1/ln2*/
-            ivln2_l = 1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
+    private static final double[] bp = {1.0, 1.5,};
+    private static final double[] dp_h = {0.0, 5.84962487220764160156e-01,}; /* 0x3FE2B803, 0x40000000 */
+            private static final double[] dp_l = {0.0, 1.35003920212974897128e-08,}; /* 0x3E4CFDEB, 0x43CFD006 */
+    private static final double/* poly coefs for (3/2)*(log(x)-2s-2/3*s**3 */
+    L1 = 5.99999999999994648725e-01; /* 0x3FE33333, 0x33333303 */
+            private static final double L2 = 4.28571428578550184252e-01; /* 0x3FDB6DB6, 0xDB6FABFF */
+            private static final double L3 = 3.33333329818377432918e-01; /* 0x3FD55555, 0x518F264D */
+            private static final double L4 = 2.72728123808534006489e-01; /* 0x3FD17460, 0xA91D4101 */
+            private static final double L5 = 2.30660745775561754067e-01; /* 0x3FCD864A, 0x93C9DB65 */
+            private static final double L6 = 2.06975017800338417784e-01; /* 0x3FCA7E28, 0x4A454EEF */
+            private static final double lg2 = 6.93147180559945286227e-01; /* 0x3FE62E42, 0xFEFA39EF */
+            private static final double lg2_h = 6.93147182464599609375e-01; /* 0x3FE62E43, 0x00000000 */
+            private static final double lg2_l = -1.90465429995776804525e-09; /* 0xBE205C61, 0x0CA86C39 */
+            private static final double ovt = 8.0085662595372944372e-0017; /* -(1024-log2(ovfl+.5ulp)) */
+            private static final double cp = 9.61796693925975554329e-01; /* 0x3FEEC709, 0xDC3A03FD =2/(3ln2) */
+            private static final double cp_h = 9.61796700954437255859e-01; /* 0x3FEEC709, 0xE0000000 =(float)cp */
+            private static final double cp_l = -7.02846165095275826516e-09; /* 0xBE3E2FE0, 0x145B01F5 =tail of cp_h*/
+            private static final double ivln2 = 1.44269504088896338700e+00; /* 0x3FF71547, 0x652B82FE =1/ln2 */
+            private static final double ivln2_h = 1.44269502162933349609e+00; /* 0x3FF71547, 0x60000000 =24b 1/ln2*/
+            private static final double ivln2_l = 1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
     /* atan(x)
      * Method
      *   1. Reduce x to positive by atan(x) = -atan(-x).
@@ -286,17 +286,17 @@ public abstract class MathUtil {
      * compiler will convert from decimal to binary accurately enough
      * to produce the hexadecimal values shown.
      */
-    private static final double atanhi[] = {
+    private static final double[] atanhi = {
             4.63647609000806093515e-01, /* atan(0.5)hi 0x3FDDAC67, 0x0561BB4F */
             7.85398163397448278999e-01, /* atan(1.0)hi 0x3FE921FB, 0x54442D18 */
             9.82793723247329054082e-01, /* atan(1.5)hi 0x3FEF730B, 0xD281F69B */
             1.57079632679489655800e+00, /* atan(inf)hi 0x3FF921FB, 0x54442D18 */};
-    private static final double atanlo[] = {
+    private static final double[] atanlo = {
             2.26987774529616870924e-17, /* atan(0.5)lo 0x3C7A2B7F, 0x222F65E2 */
             3.06161699786838301793e-17, /* atan(1.0)lo 0x3C81A626, 0x33145C07 */
             1.39033110312309984516e-17, /* atan(1.5)lo 0x3C700788, 0x7AF0CBBD */
             6.12323399573676603587e-17, /* atan(inf)lo 0x3C91A626, 0x33145C07 */};
-    private static final double aT[] = {
+    private static final double[] aT = {
             3.33333333333329318027e-01, /* 0x3FD55555, 0x5555550D */
             -1.99999999998764832476e-01, /* 0xBFC99999, 0x9998EBC4 */
             1.42857142725034663711e-01, /* 0x3FC24924, 0x920083FF */
@@ -387,14 +387,14 @@ public abstract class MathUtil {
         long yl;
         long xl = Double.doubleToLongBits(x);
 
-        hx = (int) ((long) xl >>> HI_SHIFT); /* high word of x */
+        hx = (int) (xl >>> HI_SHIFT); /* high word of x */
         xsb = (hx >> 31) & 1;   /* sign bit of x */
         hx &= 0x7fffffff;   /* high word of |x| */
 
         /* filter out non-finite argument */
         if (hx >= 0x40862E42) {      /* if |x|>=709.78... */
             if (hx >= 0x7ff00000) {
-                lx = (int) ((long) xl & LO_MASK);  /* low word of x */
+                lx = (int) (xl & LO_MASK);  /* low word of x */
                 if (((hx & 0xfffff) | lx) != 0) {
                     return x + x;    /* NaN */
                 } else {
@@ -461,7 +461,7 @@ public abstract class MathUtil {
                 return -two54 / zero;   /* log(+-0)=-inf */
             }
             if (hx < 0) {
-                return (x - x) / zero;  /* log(-#) = NaN */
+                return (0.0) / zero;  /* log(-#) = NaN */
             }
             k -= 54;
             x *= two54; /* subnormal number, scale up x */
@@ -482,7 +482,7 @@ public abstract class MathUtil {
                 if (k == 0) {
                     return zero;
                 } else {
-                    dk = (double) k;
+                    dk = k;
                     return dk * ln2_hi + dk * ln2_lo;
                 }
             }
@@ -490,12 +490,12 @@ public abstract class MathUtil {
             if (k == 0) {
                 return f - R;
             } else {
-                dk = (double) k;
+                dk = k;
                 return dk * ln2_hi - ((R - dk * ln2_lo) - f);
             }
         }
         s = f / (2.0 + f);
-        dk = (double) k;
+        dk = k;
         z = s * s;
         i = hx - 0x6147a;
         w = z * z;
@@ -577,7 +577,7 @@ public abstract class MathUtil {
         if (ly == 0) {
             if (iy == 0x7ff00000) { /* y is +-inf */
                 if (((ix - 0x3ff00000) | lx) == 0) {
-                    return y - y;  /* inf**+-1 is NaN */
+                    return 0.0;  /* inf**+-1 is NaN */
                 } else if (ix >= 0x3ff00000)/* (|x|>1)**+-inf = inf,0 */ {
                     return (hy >= 0) ? y : zero;
                 } else /* (|x|<1)**-,+inf = inf,0 */ {
@@ -611,7 +611,7 @@ public abstract class MathUtil {
                 }
                 if (hx < 0) {
                     if (((ix - 0x3ff00000) | yisint) == 0) {
-                        z = (z - z) / (z - z); /* (-1)**non-int is NaN */
+                        z = 1.0; /* (-1)**non-int is NaN */
                     } else if (yisint == 1) {
                         z = -z;   /* (x<0)**odd = -(|x|**odd) */
                     }
@@ -624,7 +624,7 @@ public abstract class MathUtil {
 
         /* (x<0)**(non-int) is NaN */
         if ((n | yisint) == 0) {
-            return (x - x) / (x - x);
+            return 1.0;
         }
 
         s = one; /* s (sign of result -ve**odd) = -1 else = 1 */
@@ -694,7 +694,7 @@ public abstract class MathUtil {
             /* t_h=ax+bp[k] High */
             t_h = zero;
             //__HI(t_h)=((ix>>1)|0x20000000)+0x00080000+(k<<18);
-            t_h = Double.longBitsToDouble(((long) ((int) ((ix >> 1) | 0x20000000) + 0x00080000 + (k << 18)) << HI_SHIFT) | (Double.doubleToLongBits(t_h) & LO_MASK));
+            t_h = Double.longBitsToDouble(((long) (((ix >> 1) | 0x20000000) + 0x00080000 + (k << 18)) << HI_SHIFT) | (Double.doubleToLongBits(t_h) & LO_MASK));
             t_l = ax - (t_h - bp[k]);
             s_l = v * ((u - s_h * t_h) - s_h * t_l);
             /* compute log(ax) */
@@ -717,7 +717,7 @@ public abstract class MathUtil {
             z_h = cp_h * p_h;   /* cp_h+cp_l = 2/(3*log2) */
             z_l = cp_l * p_h + p_l * cp + dp_l[k];
             /* log2(ax) = (ss+..)*2/(3*log2) = n + dp_h + z_h + z_l */
-            t = (double) n;
+            t = n;
             t1 = (((z_h + z_l) + dp_h[k]) + t);
             //__LO(t1) = 0; // keep high word
             t1 = Double.longBitsToDouble(Double.doubleToLongBits(t1) & HI_MASK);
@@ -779,7 +779,7 @@ public abstract class MathUtil {
         t1 = z - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));
         r = (z * t1) / (t1 - two) - (w + z * w);
         z = one - (r - z);
-        j = (int) ((long) Double.doubleToLongBits(z) >>> HI_SHIFT);
+        j = (int) (Double.doubleToLongBits(z) >>> HI_SHIFT);
         j += (n << 20);
         if ((j >> 20) <= 0) {
             z = scalb(z, n); /* subnormal output */
@@ -826,7 +826,7 @@ public abstract class MathUtil {
                     return pi + 2.0 * pio2_lo; /* acos(-1)= pi */
                 }
             }
-            return (x - x) / (x - x);   /* acos(|x|>1) is NaN */
+            return 1.0;   /* acos(|x|>1) is NaN */
         }
         if (ix < 0x3fe00000) { /* |x| < 0.5 */
             if (ix <= 0x3c600000) {
@@ -898,7 +898,7 @@ public abstract class MathUtil {
             if (((ix - 0x3ff00000) | (int) (Double.doubleToLongBits(x) & LO_MASK)) == 0) /* asin(1)=+-pi/2 with inexact */ {
                 return x * pio2_hi + x * pio2_lo;
             }
-            return (x - x) / (x - x);   /* asin(|x|>1) is NaN */
+            return 1.0;   /* asin(|x|>1) is NaN */
         } else if (ix < 0x3fe00000) { /* |x|<0.5 */
             if (ix < 0x3e400000) {   /* if |x| < 2**-27 */
                 if (huge + x > one) {
@@ -1146,7 +1146,7 @@ public abstract class MathUtil {
         }
         if (k > 0) /* normal result */ {
             //__HI(x) = (hx&0x800fffff)|(k<<20);
-            x = Double.longBitsToDouble(((long) ((int) (hx & 0x800fffff) | (k << 20)) << HI_SHIFT) | (Double.doubleToLongBits(x) & LO_MASK));
+            x = Double.longBitsToDouble(((long) ((hx & 0x800fffff) | (k << 20)) << HI_SHIFT) | (Double.doubleToLongBits(x) & LO_MASK));
             return x;
         }
         if (k <= -54) {
@@ -1158,7 +1158,7 @@ public abstract class MathUtil {
         }
         k += 54;        /* subnormal result */
         //__HI(x) = (hx&0x800fffff)|(k<<20);
-        x = Double.longBitsToDouble(((long) ((int) (hx & 0x800fffff) | (k << 20)) << HI_SHIFT) | (Double.doubleToLongBits(x) & LO_MASK));
+        x = Double.longBitsToDouble(((long) ((hx & 0x800fffff) | (k << 20)) << HI_SHIFT) | (Double.doubleToLongBits(x) & LO_MASK));
         return x * twom54;
     }
 

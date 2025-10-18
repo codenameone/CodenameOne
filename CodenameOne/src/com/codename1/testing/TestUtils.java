@@ -1949,7 +1949,7 @@ public class TestUtils {
         }
         Label l = (Label) getComponentByPath(path);
         assertBool(l != null, "Null label" + text);
-        assertBool(text == l.getText() || text.equals(l.getText()), ("" + l.getText()) + " != " + text);
+        assertBool(text == l.getText() || text.equals(l.getText()), (l.getText()) + " != " + text);
     }
 
     /**

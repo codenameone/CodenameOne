@@ -35,39 +35,39 @@ public interface PushCallback {
     /**
      * Error code returned when sending a push notification
      */
-    public static final int REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE = 1;
+    int REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE = 1;
 
     /**
      * Error code returned when sending a push notification
      */
-    public static final int REGISTRATION_ACCOUNT_MISSING = 2;
+    int REGISTRATION_ACCOUNT_MISSING = 2;
 
     /**
      * Error code returned when sending a push notification
      */
-    public static final int REGISTRATION_AUTHENTICATION_FAILED = 3;
+    int REGISTRATION_AUTHENTICATION_FAILED = 3;
 
     /**
      * Error code returned when sending a push notification
      */
-    public static final int REGISTRATION_TOO_MANY_REGISTRATIONS = 4;
+    int REGISTRATION_TOO_MANY_REGISTRATIONS = 4;
 
     /**
      * Error code returned when sending a push notification
      */
-    public static final int REGISTRATION_INVALID_SENDER = 5;
+    int REGISTRATION_INVALID_SENDER = 5;
 
     /**
      * Error code returned when sending a push notification
      */
-    public static final int REGISTRATION_PHONE_REGISTRATION_ERROR = 6;
+    int REGISTRATION_PHONE_REGISTRATION_ERROR = 6;
 
     /**
      * Invoked when the push notification occurs
      *
      * @param value the value of the push notification
      */
-    public void push(String value);
+    void push(String value);
 
     /**
      * Invoked when push registration is complete to pass the device ID to the application.
@@ -75,7 +75,7 @@ public interface PushCallback {
      * @param deviceId OS native push id you should not use this value and instead use <code>Push.getPushKey()</code>
      * @see Push#getPushKey()
      */
-    public void registeredForPush(String deviceId);
+    void registeredForPush(String deviceId);
 
     /**
      * Invoked to indicate an error occurred during registration for push notification
@@ -83,5 +83,5 @@ public interface PushCallback {
      * @param error     descriptive error string
      * @param errorCode an error code
      */
-    public void pushRegistrationError(String error, int errorCode);
+    void pushRegistrationError(String error, int errorCode);
 }

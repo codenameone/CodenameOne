@@ -37,5 +37,5 @@ public interface URLCallback {
      * @param caller the invoking application
      * @return true to handle the URL, false otherwise
      */
-    public boolean shouldApplicationHandleURL(String url, String caller);
+    boolean shouldApplicationHandleURL(String url, String caller);
 }

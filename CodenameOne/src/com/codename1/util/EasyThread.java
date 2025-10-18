@@ -39,9 +39,9 @@ public class EasyThread {
     private static List<ErrorListener> globalErrorListenenrs;
     private final Object LOCK = new Object();
     private List<ErrorListener> errorListenenrs;
-    private Thread t;
+    private final Thread t;
     private boolean running = true;
-    private ArrayList<Object> queue = new ArrayList<Object>();
+    private final ArrayList<Object> queue = new ArrayList<Object>();
 
     private EasyThread(String name) {
         t = Display.getInstance().startThread(new Runnable() {
@@ -294,7 +294,7 @@ public class EasyThread {
     /**
      * Callback listener for errors on easy thread
      */
-    public static interface ErrorListener<T> {
+    public interface ErrorListener<T> {
         /**
          * Invoked when an exception is thrown on an easy thread. Notice
          * this callback occurs within the thread and not on the EDT. This

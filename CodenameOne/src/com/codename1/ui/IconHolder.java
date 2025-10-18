@@ -35,28 +35,28 @@ public interface IconHolder {
      *
      * @return the labels icon
      */
-    public Image getIcon();
+    Image getIcon();
 
     /**
      * Sets the Label icon, if the icon is unmodified a repaint would not be triggered
      *
      * @param icon the image that the label presents.
      */
-    public void setIcon(Image icon);
+    void setIcon(Image icon);
 
     /**
      * Returns the gap in pixels between the icon/text to the Label boundaries
      *
      * @return the gap in pixels between the icon/text to the Label boundaries
      */
-    public int getGap();
+    int getGap();
 
     /**
      * Set the gap in pixels between the icon/text to the Label boundaries
      *
      * @param gap the gap in pixels
      */
-    public void setGap(int gap);
+    void setGap(int gap);
 
     /**
      * Returns The position of the text relative to the icon
@@ -67,7 +67,7 @@ public interface IconHolder {
      * @see #BOTTOM
      * @see #TOP
      */
-    public int getTextPosition();
+    int getTextPosition();
 
     /**
      * Sets the position of the text relative to the icon if exists
@@ -78,14 +78,14 @@ public interface IconHolder {
      * @see #BOTTOM
      * @see #TOP
      */
-    public void setTextPosition(int textPosition);
+    void setTextPosition(int textPosition);
 
     /**
      * Gets the UIID used for styling material icons on this component.
      *
      * @return
      */
-    public String getIconUIID();
+    String getIconUIID();
 
     /**
      * Sets a UIID to be used for the material icon style.
@@ -93,7 +93,7 @@ public interface IconHolder {
      * @param uiid The uiid to use for the material icon style.
      * @since 7.0
      */
-    public void setIconUIID(String uiid);
+    void setIconUIID(String uiid);
 
     /**
      * Gets the component that should be used for styling material the material icon.  If {@link #setIconUIID(java.lang.String) } has been used
@@ -103,7 +103,7 @@ public interface IconHolder {
      * @return The component to use for styling the material icon.
      * @since 7.0
      */
-    public Component getIconStyleComponent();
+    Component getIconStyleComponent();
 
     /**
      * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}

@@ -25,7 +25,7 @@ public class StringReader extends Reader {
 
     private static final char NEW_LINE = '\n';
 
-    private String str;
+    private final String str;
     private int pointer = 0;
 
     public StringReader(String str) {

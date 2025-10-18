@@ -35,7 +35,7 @@ import java.util.Set;
  * @author Shai Almog
  */
 public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> implements Iterable<Map.Entry<T1, T2>> {
-    private LinkedHashMap<T1, T2> value = new LinkedHashMap<T1, T2>();
+    private final LinkedHashMap<T1, T2> value = new LinkedHashMap<T1, T2>();
     private Class keyType;
     private Class valueType;
 

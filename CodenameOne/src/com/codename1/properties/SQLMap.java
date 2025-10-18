@@ -139,7 +139,7 @@ public class SQLMap {
                     }
                     return SqlType.SQL_TEXT;
                 }
-                Object val = ((Property) p).get();
+                Object val = p.get();
                 if (val != null) {
                     if (val instanceof Long) {
                         return SqlType.SQL_LONG;
@@ -325,7 +325,7 @@ public class SQLMap {
                 createStatement.append(",");
             }
             if (p instanceof Property) {
-                values.add(tp.asUpdateInsertValue(((Property) p).get(), (Property) p));
+                values.add(tp.asUpdateInsertValue(p.get(), (Property) p));
             } else {
                 // TODO
                 values.add(null);
@@ -373,7 +373,7 @@ public class SQLMap {
                 createStatement.append(",");
             }
             if (p instanceof Property) {
-                values.add(tp.asUpdateInsertValue(((Property) p).get(), (Property) p));
+                values.add(tp.asUpdateInsertValue(p.get(), (Property) p));
             } else {
                 // TODO
                 values.add(null);
@@ -421,7 +421,7 @@ public class SQLMap {
                     createStatement.append(",");
                 }
                 if (p instanceof Property) {
-                    values[count] = ((Property) p).get();
+                    values[count] = p.get();
                 } else {
                     // TODO
                     values[count] = null;
@@ -483,14 +483,14 @@ public class SQLMap {
         boolean found = false;
         for (PropertyBase p : cmp.getPropertyIndex()) {
             if (p instanceof Property) {
-                if (((Property) p).get() != null) {
+                if (p.get() != null) {
                     if (found) {
                         createStatement.append(" AND ");
                     } else {
                         createStatement.append(" WHERE ");
                     }
                     found = true;
-                    params.add(((Property) p).get());
+                    params.add(p.get());
                     createStatement.append(getColumnName(p));
                     if (not) {
                         createStatement.append(" <> ?");
@@ -597,7 +597,7 @@ public class SQLMap {
         this.verbose = verbose;
     }
 
-    public static enum SqlType {
+    public enum SqlType {
         SQL_EXCLUDE(null),
         SQL_TEXT("TEXT"),
         SQL_INTEGER("INTEGER") {

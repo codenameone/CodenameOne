@@ -69,10 +69,10 @@ public class Font extends CN {
 
     private static Font defaultFont = new Font(null);
 
-    private static Hashtable bitmapCache = new Hashtable();
+    private static final Hashtable bitmapCache = new Hashtable();
 
     private static boolean enableBitmapFont = true;
-    private static HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
+    private static final HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
     private static float fontReturnedHeight;
     private Object font;
     private boolean ttf;

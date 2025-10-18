@@ -105,8 +105,8 @@ public class ScaleImageButton extends Button {
         // a scrollable container the vertical height might be granted providing so much space as to make this unrealistic...
         if (iw > dw) {
             float ratio = ((float) iw) / ((float) dw);
-            iw = (int) (((float) iw) / ((float) ratio));
-            ih = (int) (((float) ih) / ((float) ratio));
+            iw = (int) (((float) iw) / ratio);
+            ih = (int) (((float) ih) / ratio);
         }
         Style s = getStyle();
         return new Dimension(iw + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(), ih +

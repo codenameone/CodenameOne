@@ -35,7 +35,7 @@ import com.codename1.ui.EncodedImage;
 public class ReplaceableImage extends EncodedImage {
     private boolean replaced;
     private byte[] data;
-    private boolean opaque;
+    private final boolean opaque;
 
     private ReplaceableImage(EncodedImage placeholder) {
         super(placeholder.getWidth(), placeholder.getHeight());
@@ -77,10 +77,7 @@ public class ReplaceableImage extends EncodedImage {
      * {@inheritDoc}
      */
     public boolean animate() {
-        if (replaced) {
-            return true;
-        }
-        return false;
+        return replaced;
     }
 
     /**

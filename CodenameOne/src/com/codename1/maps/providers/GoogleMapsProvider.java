@@ -50,7 +50,7 @@ public class GoogleMapsProvider extends TiledProvider {
      */
     public static final int HYBRID = 2;
     private static int tileSize = 256;
-    private String apiKey;
+    private final String apiKey;
     private int type;
     private String language;
     private boolean sensor;

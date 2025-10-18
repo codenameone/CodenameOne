@@ -29,7 +29,7 @@ package com.codename1.ui.spinner;
  * @author shannah
  */
 interface InternalPickerWidget {
-    public Object getValue();
+    Object getValue();
 
-    public void setValue(Object value);
+    void setValue(Object value);
 }

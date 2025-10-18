@@ -227,7 +227,7 @@ public class JSObject {
     /**
      * The Javascript context that this object belongs to.
      */
-    private JavascriptContext context;
+    private final JavascriptContext context;
 
     /**
      * Constructor for a JSObject.

@@ -249,7 +249,7 @@ public class Element implements Iterable<Element> {
         if ((index < 0) || (children == null) || (index >= children.size())) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        return (Element) children.get(index);
+        return children.get(index);
 
     }
 
@@ -266,7 +266,7 @@ public class Element implements Iterable<Element> {
         int i = 0;
         Element found = null;
         while ((found == null) && (i < children.size())) {
-            Element child = (Element) children.get(i);
+            Element child = children.get(i);
             if ((!child.textElement) && cmpTagName(name, child)) {
                 found = child;
             } else {
@@ -290,7 +290,7 @@ public class Element implements Iterable<Element> {
         if (children != null) {
             int i = 0;
             while (i < children.size()) {
-                Element child = (Element) children.get(i);
+                Element child = children.get(i);
                 Element match = child.getElementById(id);
                 if (match != null) {
                     return match;
@@ -310,7 +310,7 @@ public class Element implements Iterable<Element> {
         if (children != null) {
             int i = 0;
             while (i < children.size()) {
-                Element child = (Element) children.get(i);
+                Element child = children.get(i);
                 if (depth > 1) {
                     child.getDescendantsByTagNameInternal(v, name, depth - 1);
                 }
@@ -327,7 +327,7 @@ public class Element implements Iterable<Element> {
         if (children != null) {
             int i = 0;
             while (i < children.size()) {
-                Element child = (Element) children.get(i);
+                Element child = children.get(i);
                 if (depth > 1) {
                     child.getDescendantsByTagNameAndAttributeInternal(v, name, attribute, depth - 1);
                 }
@@ -409,7 +409,7 @@ public class Element implements Iterable<Element> {
         }
         int i = 0;
         while (i < children.size()) {
-            Element child = (Element) children.get(i);
+            Element child = children.get(i);
             if (depth > 0) {
                 child.getTextDescendantsInternal(v, text, caseSensitive, depth - 1);
             }
@@ -490,7 +490,7 @@ public class Element implements Iterable<Element> {
         if (children != null) {
             int i = 0;
             while (i < children.size()) {
-                Element child = (Element) children.get(i);
+                Element child = children.get(i);
                 if (child.contains(element)) {
                     return true;
                 }
@@ -609,7 +609,7 @@ public class Element implements Iterable<Element> {
         if ((index < 0) || (children == null) || (index >= children.size())) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        Element child = (Element) children.get(index);
+        Element child = children.get(index);
         child.setParent(null);
         children.remove(index);
     }
@@ -723,7 +723,7 @@ public class Element implements Iterable<Element> {
             str += ">\n";
             if (children != null) {
                 for (int i = 0; i < children.size(); i++) {
-                    str += ((Element) children.get(i)).toString(spacing + ' ');
+                    str += children.get(i).toString(spacing + ' ');
                 }
             }
             str += spacing + "</" + getTagName() + ">\n";

@@ -31,15 +31,15 @@ public class BasicStroke {
     public static final BasicStroke DOTTED = new BasicStroke(Stroke.CAP_ROUND, Stroke.JOIN_BEVEL, 5, new float[]{
             2, 10}, 1);
     /** The stroke cap. */
-    private int mCap;
+    private final int mCap;
     /** The stroke join. */
-    private int mJoin;
+    private final int mJoin;
     /** The stroke miter. */
-    private float mMiter;
+    private final float mMiter;
     /** The path effect intervals. */
-    private float[] mIntervals;
+    private final float[] mIntervals;
     /** The path effect phase. */
-    private float mPhase;
+    private final float mPhase;
 
     /**
      * Build a new basic stroke style.

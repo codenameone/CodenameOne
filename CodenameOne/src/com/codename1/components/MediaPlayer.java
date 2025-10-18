@@ -449,7 +449,7 @@ public class MediaPlayer extends Container {
 
         final Button play = new Button() {
 
-            private ActionListener<AsyncMedia.MediaStateChangeEvent> stateChangeListener = new ActionListener<AsyncMedia.MediaStateChangeEvent>() {
+            private final ActionListener<AsyncMedia.MediaStateChangeEvent> stateChangeListener = new ActionListener<AsyncMedia.MediaStateChangeEvent>() {
                 @Override
                 public void actionPerformed(AsyncMedia.MediaStateChangeEvent evt) {
                     updateIconAndText();
@@ -520,7 +520,7 @@ public class MediaPlayer extends Container {
                     }
                 }
 
-            }, 300l);
+            }, 300L);
 
             //video.play();
         }

@@ -35,6 +35,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 import static com.codename1.ui.ComponentSelector.$;
 
@@ -49,8 +50,8 @@ import static com.codename1.ui.ComponentSelector.$;
  * @since 7.0
  */
 public class TestRunnerComponent extends Container {
-    private ArrayList<AbstractTest> tests = new ArrayList<AbstractTest>();
-    private Container resultsPane = new Container(BoxLayout.y());
+    private final ArrayList<AbstractTest> tests = new ArrayList<AbstractTest>();
+    private final Container resultsPane = new Container(BoxLayout.y());
 
     public TestRunnerComponent() {
         super(new BorderLayout());
@@ -76,9 +77,7 @@ public class TestRunnerComponent extends Container {
      * @return Self for chaining.
      */
     public TestRunnerComponent add(AbstractTest... tests) {
-        for (AbstractTest test : tests) {
-            this.tests.add(test);
-        }
+        Collections.addAll(this.tests, tests);
         return this;
     }
 

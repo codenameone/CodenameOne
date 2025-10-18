@@ -35,5 +35,5 @@ package com.codename1.payment;
  * @since 8.0
  */
 public interface PendingPurchaseCallback extends PurchaseCallback {
-    public void itemPurchasePending(String sku);
+    void itemPurchasePending(String sku);
 }

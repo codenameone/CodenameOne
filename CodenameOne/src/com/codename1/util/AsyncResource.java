@@ -74,10 +74,7 @@ public class AsyncResource<V> extends Observable {
         }
         if (t instanceof AsyncExecutionException) {
             return ((AsyncExecutionException) t).isCancelled();
-        } else if (t.getClass() == CancellationException.class) {
-            return true;
-        }
-        return false;
+        } else return t.getClass() == CancellationException.class;
     }
 
     /**
@@ -586,7 +583,7 @@ public class AsyncResource<V> extends Observable {
      * <p>Call {@link AsyncExecutionException#getCause() } to get the original exception.</p>
      */
     public static class AsyncExecutionException extends RuntimeException {
-        private Throwable cause;
+        private final Throwable cause;
 
         public AsyncExecutionException(Throwable cause) {
             super(cause.getMessage());
@@ -634,9 +631,9 @@ public class AsyncResource<V> extends Observable {
     }
 
     private class AsyncCallback<T> implements SuccessCallback<T> {
-        private SuccessCallback<T> cb;
-        private EasyThread t;
-        private boolean edt;
+        private final SuccessCallback<T> cb;
+        private final EasyThread t;
+        private final boolean edt;
 
         AsyncCallback(SuccessCallback<T> cb, EasyThread t) {
             this.cb = cb;

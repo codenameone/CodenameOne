@@ -421,7 +421,7 @@ public class UiBinding {
                 return null;
             }
             if (source instanceof Date) {
-                return (Date) source;
+                return source;
             }
             return new Date(Util.toLongValue(source));
         }
@@ -492,7 +492,7 @@ public class UiBinding {
      * match every string
      */
     public static class MappingConverter extends ObjectConverter {
-        private Map<Object, Object> m;
+        private final Map<Object, Object> m;
 
         public MappingConverter(Map<Object, Object> m) {
             this.m = m;
@@ -809,7 +809,7 @@ public class UiBinding {
                     return (PropertyType) toPropertyType.convert(cmp.getTime());
                 case Display.PICKER_TYPE_STRINGS:
                     if (toPropertyType instanceof IntegerConverter) {
-                        return (PropertyType) new Integer(cmp.getSelectedStringIndex());
+                        return (PropertyType) Integer.valueOf(cmp.getSelectedStringIndex());
                     }
                     return (PropertyType) toPropertyType.convert(cmp.getSelectedString());
             }
@@ -834,12 +834,12 @@ public class UiBinding {
     public static class BoundTableModel extends AbstractTableModel {
         private List<? extends PropertyBusinessObject> objects;
         private CollectionProperty objectProperty;
-        private PropertyBusinessObject prototype;
-        private Set<String> exclude = new HashSet<String>();
+        private final PropertyBusinessObject prototype;
+        private final Set<String> exclude = new HashSet<String>();
         private List<String> included;
         private PropertyBase[] columnOrder;
-        private Set<String> uneditable = new HashSet<String>();
-        private EventDispatcher listeners = new EventDispatcher();
+        private final Set<String> uneditable = new HashSet<String>();
+        private final EventDispatcher listeners = new EventDispatcher();
 
         /**
          * Creates a table model with the business objects
@@ -945,7 +945,7 @@ public class UiBinding {
                 objects.remove(index);
             } else {
                 if (objectProperty instanceof ListProperty) {
-                    ((ListProperty) objectProperty).remove(index);
+                    objectProperty.remove(index);
                 } else {
                     Iterator i = objectProperty.iterator();
                     for (int iter = 0; iter < index - 1; iter++) {
@@ -1157,7 +1157,7 @@ public class UiBinding {
     }
 
     class GroupBinding extends Binding {
-        private List<Binding> allBindings;
+        private final List<Binding> allBindings;
 
         public GroupBinding(List<Binding> allBindings) {
             this.allBindings = allBindings;

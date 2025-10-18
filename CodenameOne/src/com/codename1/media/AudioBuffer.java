@@ -32,17 +32,17 @@ import java.util.ArrayList;
  * @author shannah
  */
 public class AudioBuffer {
-    private Object refLock = new Object();
+    private final Object refLock = new Object();
     private int refCounter;
     /**
      * Registered callbacks to be notified when the contents of this buffer changes.
      */
-    private ArrayList<AudioBufferCallback> callbacks = new ArrayList<AudioBufferCallback>();
+    private final ArrayList<AudioBufferCallback> callbacks = new ArrayList<AudioBufferCallback>();
     /**
      * The buffer contents.
      */
-    private float[] buffer;
-    private float[] tmpDownSampleBuffer;
+    private final float[] buffer;
+    private final float[] tmpDownSampleBuffer;
     /**
      * Internal flag used to indicate that we are currently firing callbacks.  This is used
      * internally to prevent modification of the callbacks array while we are firing callbacks.
@@ -55,7 +55,7 @@ public class AudioBuffer {
      * Used to store pending add/remove calls while inFireFrame is true.  These are all
      * executed when the callbacks have all finished firing.
      */
-    private ArrayList<Runnable> pendingOps = new ArrayList<Runnable>();
+    private final ArrayList<Runnable> pendingOps = new ArrayList<Runnable>();
     /**
      * The current size of the buffer.  Every time the buffer contents are changed, this value
      * is set.  This is not to be confused with the maximum buffer size.
@@ -314,7 +314,7 @@ public class AudioBuffer {
      * <p><strong>IMPORTANT:</strong> There are no guarantees what thread this callback will be
      * run on, and it will almost never occur on the EDT.</p>
      */
-    public static interface AudioBufferCallback {
+    public interface AudioBufferCallback {
         /**
          * Method called when the contents of the AudioBuffer are changed.
          * <p><strong>IMPORTANT:</strong> There are no guarantees what thread this callback will be
@@ -322,7 +322,7 @@ public class AudioBuffer {
          *
          * @param buffer
          */
-        public void frameReceived(AudioBuffer buffer);
+        void frameReceived(AudioBuffer buffer);
     }
 
 }

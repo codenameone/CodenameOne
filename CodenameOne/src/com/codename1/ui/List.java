@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -548,7 +549,7 @@ public class List<T> extends Component implements ActionSource {
         int size = model.getSize();
         for (int iter = 0; iter < size; iter++) {
             Object current = model.getItemAt(iter);
-            if (current == item || (current != null && current.equals(item))) {
+            if (Objects.equals(current, item)) {
                 model.setSelectedIndex(iter);
                 break;
             }
@@ -1541,7 +1542,7 @@ public class List<T> extends Component implements ActionSource {
     protected void fireActionEvent(ActionEvent a) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             if (disposeDialogOnSelection) {
-                ((Dialog) getComponentForm()).dispose();
+                getComponentForm().dispose();
             }
             super.fireActionEvent();
             dispatcher.fireActionEvent(a);
@@ -2195,9 +2196,7 @@ public class List<T> extends Component implements ActionSource {
         // provide touch feedback only when pressing an entry in the list and not for the entire list
         if (isTactileTouch()) {
             int selection = pointerSelect(x, y);
-            if (selection > -1) {
-                return true;
-            }
+            return selection > -1;
         }
         return false;
     }

@@ -34,9 +34,9 @@ public class CubicLineChart extends LineChart {
     /** The chart type. */
     public static final String TYPE = "Cubic";
 
-    private float mFirstMultiplier;
+    private final float mFirstMultiplier;
 
-    private float mSecondMultiplier;
+    private final float mSecondMultiplier;
     /** A path measure for retrieving the points on the path. */
     private PathMeasure mPathMeasure;
 
