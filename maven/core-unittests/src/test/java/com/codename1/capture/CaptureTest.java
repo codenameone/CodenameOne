@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -95,7 +96,7 @@ class CaptureTest extends UITestBase {
         assertEquals(expectedScaledPath, callBack.url);
         assertEquals(expectedScaledPath, savedPath.get());
         assertEquals(ORIGINAL_PATH, deletedPath.get());
-        assertEquals(List.of(ORIGINAL_PATH), imageIO.savedFiles);
+        assertEquals(Collections.singletonList(ORIGINAL_PATH), imageIO.savedFiles);
     }
 
     private void setPrivateInt(Object target, String fieldName, int value) throws Exception {
