@@ -190,6 +190,10 @@ class ChartComponentTest extends UITestBase {
         }
 
         @Override
+        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, int seriesIndex, Paint paint) {
+        }
+
+        @Override
         protected ClickableArea[] clickableAreasForPoints(List<Float> points, List<Double> values, float yAxisValue, int seriesIndex, int startIndex) {
             return new ClickableArea[0];
         }
