@@ -223,6 +223,70 @@ else
   bia_log "Warning: Missing scheme helper script at $SCHEME_HELPER" >&2
 fi
 
+# Remove any user schemes that could shadow the shared CI scheme
+rm -rf "$PROJECT_DIR"/xcuserdata 2>/dev/null || true
+# Also remove user schemes under the workspace, if any
+find "$PROJECT_DIR" -maxdepth 1 -name "*.xcworkspace" -type d -exec rm -rf {}/xcuserdata \; 2>/dev/null || true
+
+_prune_scheme() {
+  local scheme_path="$1"
+  [ -f "$scheme_path" ] || return 0
+  bia_log "Pruning non-UI testables and build entries in $scheme_path"
+  cp "$scheme_path" "$scheme_path.bak"
+
+  /usr/bin/python3 - "$scheme_path" <<'PY'
+import sys, xml.etree.ElementTree as ET
+p = sys.argv[1]
+t = ET.parse(p); r = t.getroot()
+def q(n):
+    if r.tag.startswith('{'):
+        ns = r.tag.split('}')[0].strip('{')
+        return f'{{{ns}}}{n}'
+    return n
+
+# --- Drop non-UI tests from TestAction/Testables
+ta = r.find(q('TestAction'))
+ts = ta.find(q('Testables')) if ta is not None else None
+if ts is not None:
+    for node in list(ts):
+        br = node.find(q('BuildableReference'))
+        name = (br.get('BlueprintName') if br is not None else '') or ''
+        if name.endswith('Tests') and not name.endswith('UITests'):
+            ts.remove(node)
+
+# --- Drop non-UI test bundles from BuildAction (so Xcode doesn't prep them)
+ba = r.find(q('BuildAction'))
+bas = ba.find(q('BuildActionEntries')) if ba is not None else None
+if bas is not None:
+    for entry in list(bas):
+        br = entry.find(q('BuildableReference'))
+        name = (br.get('BlueprintName') if br is not None else '') or ''
+        if name.endswith('Tests') and not name.endswith('UITests'):
+            bas.remove(entry)
+
+t.write(p, encoding='UTF-8', xml_declaration=True)
+PY
+}
+
+# Project-level shared scheme
+PRJ_SCHEME="$PROJECT_DIR/xcshareddata/xcschemes/${MAIN_NAME}-CI.xcscheme"
+# Workspace-level shared scheme (if Pods created a workspace)
+WS=""
+for w in "$PROJECT_DIR"/*.xcworkspace; do
+  [ -d "$w" ] && WS="$w" && break
+done
+WS_SCHEME=""
+if [ -n "$WS" ]; then
+  WS_SCHEME="$WS/xcshareddata/xcschemes/${MAIN_NAME}-CI.xcscheme"
+fi
+
+_prune_scheme "$PRJ_SCHEME"
+[ -n "$WS_SCHEME" ] && _prune_scheme "$WS_SCHEME"
+
+# Debug: show remaining testables in both scheme files
+grep -n "BlueprintName" "$PRJ_SCHEME" 2>/dev/null || true
+[ -n "$WS_SCHEME" ] && grep -n "BlueprintName" "$WS_SCHEME" 2>/dev/null || true
+
 XCSCHEME_DIR="$PROJECT_DIR/xcshareddata/xcschemes"
 XCSCHEME="$XCSCHEME_DIR/${MAIN_NAME}-CI.xcscheme"
 
@@ -304,4 +368,8 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
 fi
 
 bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=$SCHEME"
+bia_log "Final CI scheme files:"
+[ -f "$PRJ_SCHEME" ] && ls -l "$PRJ_SCHEME"
+[ -n "$WS_SCHEME" ] && [ -f "$WS_SCHEME" ] && ls -l "$WS_SCHEME"
+
 exit 0
