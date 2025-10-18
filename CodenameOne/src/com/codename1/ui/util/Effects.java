@@ -144,16 +144,7 @@ public class Effects {
         int[] destinationArray = new int[destinationWidth * destinationHeight];
 
         // faster than math.min
-        float diff;
-        if (bottomScaleRatio < topScaleRatio) {
-            float smaller = bottomScaleRatio;
-            float larger = topScaleRatio;
-            diff = smaller - larger;
-        } else {
-            float larger = bottomScaleRatio;
-            float smaller = topScaleRatio;
-            diff = larger - smaller;
-        }
+        float diff = bottomScaleRatio - topScaleRatio;
 
         if (destinationWidth > sourceWidth) {
             for (int y = 0; y < destinationHeight; y++) {

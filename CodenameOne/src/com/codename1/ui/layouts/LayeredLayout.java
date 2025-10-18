@@ -2674,11 +2674,7 @@ public class LayeredLayout extends Layout {
                             preferredValue = Display.getInstance().convertToPixels(value);
                             break;
                         case UNIT_PERCENT:
-                            preferredValue = 0;
-                            break;
                         case UNIT_AUTO:
-                            preferredValue = 0;
-                            break;
                         case UNIT_BASELINE:
                             preferredValue = 0;
                             break;
@@ -2723,8 +2719,6 @@ public class LayeredLayout extends Layout {
                             preferredValue = baseValue + Display.getInstance().convertToPixels(value);
                             break;
                         case UNIT_PERCENT:
-                            preferredValue = baseValue;
-                            break;
                         case UNIT_AUTO:
                             preferredValue = baseValue;
                             break;
@@ -2775,24 +2769,20 @@ public class LayeredLayout extends Layout {
                     return baseValue;
                 }
 
-                if (referencePosition != 0) {
-                    switch (side) {
-                        case Component.TOP:
-                            baseValue = (int) ((float) h * referencePosition);
-                            break;
-                        case Component.BOTTOM:
-                            baseValue = (int) ((float) h * referencePosition);
-                            break;
-                        case Component.LEFT:
-                            baseValue = (int) ((float) w * referencePosition);
-                            break;
-                        case Component.RIGHT:
-                            baseValue = (int) ((float) w * referencePosition);
-                            break;
-                        default:
-                            throw new RuntimeException("Illegal side for inset: " + side);
+                    if (referencePosition != 0) {
+                        switch (side) {
+                            case Component.TOP:
+                            case Component.BOTTOM:
+                                baseValue = (int) (h * referencePosition);
+                                break;
+                            case Component.LEFT:
+                            case Component.RIGHT:
+                                baseValue = (int) (w * referencePosition);
+                                break;
+                            default:
+                                throw new RuntimeException("Illegal side for inset: " + side);
+                        }
                     }
-                }
                 calculatedBaseValue = baseValue;
                 return baseValue;
             }

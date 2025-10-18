@@ -476,7 +476,7 @@ public class UiBinding {
                 return null;
             }
             if (source instanceof Boolean) {
-                return ((Boolean) source).booleanValue();
+                return source;
             }
             if (source instanceof String) {
                 String s = ((String) source).toLowerCase();

@@ -54,6 +54,7 @@ public abstract class Purchase {
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_PURCHASE_KEY = "PendingPurchases.dat";
     private static final Object synchronizationLock = new Object();
+    private static final Object receiptsLock = new Object();
     private static ReceiptStore receiptStore;
     private static List<Receipt> receipts;
     private static Date receiptsRefreshTime;
@@ -131,7 +132,7 @@ public abstract class Purchase {
      * @return List of receipts for purchases this app.
      */
     public final List<Receipt> getReceipts() {
-        synchronized (RECEIPTS_KEY) {
+        synchronized (receiptsLock) {
             if (receipts == null) {
                 if (Storage.getInstance().exists(RECEIPTS_KEY)) {
                     Receipt.registerExternalizable();
@@ -157,7 +158,7 @@ public abstract class Purchase {
      * @param data
      */
     private void setReceipts(List<Receipt> data) {
-        synchronized (RECEIPTS_KEY) {
+        synchronized (receiptsLock) {
             receipts = new ArrayList<Receipt>();
             receipts.addAll(data);
             Storage.getInstance().writeObject(RECEIPTS_KEY, receipts);
@@ -187,7 +188,7 @@ public abstract class Purchase {
      * @return
      */
     private Date getReceiptsRefreshTime() {
-        synchronized (RECEIPTS_KEY) {
+        synchronized (receiptsLock) {
             if (receiptsRefreshTime == null) {
                 if (Storage.getInstance().exists(RECEIPTS_REFRESH_TIME_KEY)) {
                     receiptsRefreshTime = (Date) Storage.getInstance().readObject(RECEIPTS_REFRESH_TIME_KEY);
@@ -205,7 +206,7 @@ public abstract class Purchase {
      * @param time
      */
     private void setReceiptsRefreshTime(Date time) {
-        synchronized (RECEIPTS_KEY) {
+        synchronized (receiptsLock) {
             receiptsRefreshTime = time;
             Storage.getInstance().writeObject(RECEIPTS_REFRESH_TIME_KEY, receiptsRefreshTime);
         }
@@ -569,15 +570,16 @@ public abstract class Purchase {
 
                 public void run() {
 
-                    while (!complete[0]) {
-                        synchronized (complete) {
-                            try {
-                                complete.wait();
-                            } catch (Exception ex) {
-
+                        while (!complete[0]) {
+                            synchronized (complete) {
+                                try {
+                                    complete.wait();
+                                } catch (InterruptedException ex) {
+                                    Thread.currentThread().interrupt();
+                                    return;
+                                }
                             }
                         }
-                    }
                 }
 
             });
@@ -777,8 +779,9 @@ public abstract class Purchase {
                         synchronized (complete) {
                             try {
                                 complete.wait();
-                            } catch (Exception ex) {
-
+                            } catch (InterruptedException ex) {
+                                Thread.currentThread().interrupt();
+                                return;
                             }
                         }
                     }

@@ -2308,15 +2308,11 @@ public class Toolbar extends Container {
             final Container actualPane = f.getActualPane();
             int val = hideShowMotion.getValue();
             setY(val);
-            if (!layered) {
-                actualPane.setY(actualPaneInitialY + val);
-                if (showing) {
+                if (!layered) {
+                    actualPane.setY(actualPaneInitialY + val);
                     actualPane.setHeight(actualPaneInitialH - val);
-                } else {
-                    actualPane.setHeight(actualPaneInitialH - val);
+                    actualPane.doLayout();
                 }
-                actualPane.doLayout();
-            }
             f.repaint();
             boolean finished = hideShowMotion.isFinished();
             if (finished) {
@@ -2602,11 +2598,11 @@ public class Toolbar extends Container {
 
         @Override
         protected void initMenuBar(Form parent) {
-            Component ta = parent.getTitleArea();
-            if (ta instanceof Container) {
-                ((Container) ta).setSafeArea(true);
+            Container ta = parent.getTitleArea();
+            if (ta != null) {
+                ta.setSafeArea(true);
+                parent.removeComponentFromForm(ta);
             }
-            parent.removeComponentFromForm(ta);
             super.initMenuBar(parent);
             if (layered) {
                 Container layeredPane = parent.getLayeredPane();

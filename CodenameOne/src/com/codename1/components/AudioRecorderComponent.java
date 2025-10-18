@@ -140,10 +140,6 @@ public class AudioRecorderComponent extends Container implements ActionSource {
                         break;
 
                     case Accepted:
-                        removeAll();
-                        revalidateLater();
-                        break;
-
                     case Canceled:
                         removeAll();
                         revalidateLater();

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.table;
 
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
@@ -451,12 +452,21 @@ public class Table extends Container {
                     return ccmp.compare((String) o1, (String) o2);
                 }
                 try {
-                    double d = Util.toDoubleValue(o1) - Util.toDoubleValue(o2);
-                    if (d > 0) {
+                    double d1 = Util.toDoubleValue(o1);
+                    double d2 = Util.toDoubleValue(o2);
+                    if (d1 < d2) {
+                        return -1;
+                    }
+                    if (d1 > d2) {
                         return 1;
                     }
-                    if (d < 0) {
+                    long bits1 = Double.doubleToLongBits(d1);
+                    long bits2 = Double.doubleToLongBits(d2);
+                    if (bits1 < bits2) {
                         return -1;
+                    }
+                    if (bits1 > bits2) {
+                        return 1;
                     }
                 } catch (IllegalArgumentException err) {
                     long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
@@ -752,7 +762,7 @@ public class Table extends Container {
                     try {
                         cmp = t.getComponentAt(row, col);
                     } catch (Exception e) {
-                        // parent of cmp can be null as well - TODO - check why
+                        Log.e(e);
                     }
                     if (cmp != null) {
                         int leftMargin = (col == 0) ? hSpace : 0;

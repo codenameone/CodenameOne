@@ -1162,7 +1162,9 @@ public class SideMenuBar extends MenuBar {
                                 while (Display.getInstance().getCurrent() != parent) {
                                     try {
                                         Thread.sleep(40);
-                                    } catch (Exception ex) {
+                                    } catch (InterruptedException ex) {
+                                        Thread.currentThread().interrupt();
+                                        return;
                                     }
                                 }
                             }
@@ -1822,7 +1824,9 @@ public class SideMenuBar extends MenuBar {
                     while (Display.getInstance().getCurrent() != parent) {
                         try {
                             LOCK.wait(40);
-                        } catch (Exception ex) {
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            return;
                         }
                     }
                 }

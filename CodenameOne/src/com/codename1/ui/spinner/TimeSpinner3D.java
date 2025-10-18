@@ -89,7 +89,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
                 @Override
                 public String format(String input) {
                     if (input != null) {
-                        return "" + new Double(Double.parseDouble(input)).intValue();
+                        return Integer.toString((int) Double.parseDouble(input));
                     }
                     return null;
                 }
@@ -105,19 +105,15 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
                 @Override
                 public String format(String input) {
                     if (input != null) {
-                        Integer value = null;
                         try {
-                            value = Integer.valueOf(new Double(Double.parseDouble(input)).intValue());
-                        } catch (Throwable t) {
-
-                        }
-                        if (value != null && value instanceof Integer) {
-                            int i = value.intValue();
+                            int i = (int) Double.parseDouble(input);
                             if (i < 10) {
                                 return "0" + i;
                             } else {
-                                return "" + i;
+                                return Integer.toString(i);
                             }
+                        } catch (Throwable t) {
+                            // ignore and return null below
                         }
                     }
                     return null;

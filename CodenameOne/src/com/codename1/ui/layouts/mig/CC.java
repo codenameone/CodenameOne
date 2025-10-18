@@ -265,7 +265,7 @@ public final class CC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
      */
     public CC growX(float w) {
-        hor.setGrow(new Float(w));
+        hor.setGrow(Float.valueOf(w));
         return this;
     }
 
@@ -283,9 +283,9 @@ public final class CC {
             default:
                 throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
             case 2:
-                growY(new Float(widthHeight[1]));
+                growY(Float.valueOf(widthHeight[1]));
             case 1:
-                growX(new Float(widthHeight[0]));
+                growX(widthHeight[0]);
         }
         return this;
     }

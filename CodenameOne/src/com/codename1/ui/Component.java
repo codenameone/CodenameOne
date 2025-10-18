@@ -2602,11 +2602,6 @@ public class Component implements Animation, StyleListener, Editable {
 
                     switch (elevation) {
                         case 1:
-                            //drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
-                            //drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);
-                            drawShadow(g, img, relativeX, relativeY, 0, 1, 3, 0, 0, 0.2f);
-                            break;
-
                         case 2:
                             //drawShadow(g, img, relativeX, relativeY, 0, 1, 1, 0, 0, 0.14f);
                             //drawShadow(g, img, relativeX, relativeY, 0, 2, 1, -1, 0, 0.12f);

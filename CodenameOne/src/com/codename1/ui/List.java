@@ -1961,13 +1961,8 @@ public class List<T> extends Component implements ActionSource {
             } else {
                 boolean vertical = getOrientation() == VERTICAL;
                 float speed = getDragSpeed(vertical);
-                if (vertical) {
-                    fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                            Integer.MAX_VALUE, speed, 0.0007f);
-                } else {
-                    fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
-                            Integer.MAX_VALUE, speed, 0.0007f);
-                }
+                fixedDraggedMotion = Motion.createFrictionMotion(-fixedDraggedAnimationPosition,
+                        Integer.MAX_VALUE, speed, 0.0007f);
                 fixedDraggedPosition = fixedDraggedAnimationPosition;
                 Form p = getComponentForm();
                 if (p != null) {

@@ -91,37 +91,34 @@ public class TextSelection {
             double y1 = getScaledY(o1);
             double y2 = getScaledY(o2);
 
+            int compareY;
             if (y1 < y2) {
-                return -1;
+                compareY = -1;
             } else if (y1 > y2) {
-                return 1;
-            } else { //(y1 == y2) {
-                if (x1 < x2) {
-                    return -1;
-                } else if (x1 > x2) {
-                    return 1;
-                } else { // x1==x2
-                    int w1 = o1.getWidth();
-                    int w2 = o2.getWidth();
-                    int h1 = o1.getHeight();
-                    int h2 = o2.getHeight();
-
-                    // larger goes first
-                    if (h1 > h2) {
-                        return -1;
-                    } else if (h1 < h2) {
-                        return 1;
-                    } else { // h1==h2
-                        if (w1 > w2) {
-                            return -1;
-                        } else if (w1 > w2) {
-                            return 1;
-                        } else {
-                            return 0;
-                        }
-                    }
-                }
+                compareY = 1;
+            } else {
+                compareY = 0;
             }
+            if (compareY != 0) {
+                return compareY;
+            }
+            if (x1 < x2) {
+                return -1;
+            } else if (x1 > x2) {
+                return 1;
+            }
+            int w1 = o1.getWidth();
+            int w2 = o2.getWidth();
+            int h1 = o1.getHeight();
+            int h2 = o2.getHeight();
+
+            if (h1 != h2) {
+                return h1 > h2 ? -1 : 1;
+            }
+            if (w1 != w2) {
+                return w1 > w2 ? -1 : 1;
+            }
+            return 0;
         }
 
     };
@@ -153,37 +150,34 @@ public class TextSelection {
             double y1 = getScaledY(o1);
             double y2 = getScaledY(o2);
 
+            int compareY;
             if (y1 < y2) {
-                return -1;
+                compareY = -1;
             } else if (y1 > y2) {
-                return 1;
-            } else { //(y1 == y2) {
-                if (x1 < x2) {
-                    return 1;
-                } else if (x1 > x2) {
-                    return -1;
-                } else { // x1==x2
-                    int w1 = o1.getWidth();
-                    int w2 = o2.getWidth();
-                    int h1 = o1.getHeight();
-                    int h2 = o2.getHeight();
-
-                    // larger goes first
-                    if (h1 > h2) {
-                        return -1;
-                    } else if (h1 < h2) {
-                        return 1;
-                    } else { // h1==h2
-                        if (w1 > w2) {
-                            return -1;
-                        } else if (w1 > w2) {
-                            return 1;
-                        } else {
-                            return 0;
-                        }
-                    }
-                }
+                compareY = 1;
+            } else {
+                compareY = 0;
             }
+            if (compareY != 0) {
+                return compareY;
+            }
+            if (x1 < x2) {
+                return 1;
+            } else if (x1 > x2) {
+                return -1;
+            }
+            int w1 = o1.getWidth();
+            int w2 = o2.getWidth();
+            int h1 = o1.getHeight();
+            int h2 = o2.getHeight();
+
+            if (h1 != h2) {
+                return h1 > h2 ? -1 : 1;
+            }
+            if (w1 != w2) {
+                return w1 > w2 ? -1 : 1;
+            }
+            return 0;
         }
 
     };

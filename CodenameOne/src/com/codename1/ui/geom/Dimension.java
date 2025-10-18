@@ -119,7 +119,14 @@ public class Dimension {
      * {@inheritDoc}
      */
     public boolean equals(Object arg0) {
-        return arg0 != null && ((Dimension) arg0).width == width && ((Dimension) arg0).height == height;
+        if (this == arg0) {
+            return true;
+        }
+        if (!(arg0 instanceof Dimension)) {
+            return false;
+        }
+        Dimension other = (Dimension) arg0;
+        return other.width == width && other.height == height;
     }
 
 

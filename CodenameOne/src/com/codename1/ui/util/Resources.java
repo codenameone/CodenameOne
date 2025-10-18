@@ -477,6 +477,7 @@ public class Resources {
                     readHeader();
                     continue;
                 case MAGIC_THEME:
+                case MAGIC_THEME_LEGACY:
                     setResource(id, MAGIC_THEME, loadTheme(id, magic == MAGIC_THEME));
                     continue;
                 case MAGIC_IMAGE:
@@ -503,9 +504,6 @@ public class Resources {
                     continue;
                 case MAGIC_INDEXED_IMAGE_LEGACY:
                     setResource(id, MAGIC_IMAGE, createPackedImage8());
-                    continue;
-                case MAGIC_THEME_LEGACY:
-                    setResource(id, MAGIC_THEME, loadTheme(id, magic == MAGIC_THEME));
                     continue;
                 case MAGIC_FONT_LEGACY:
                     setResource(id, MAGIC_FONT, loadFont(this.input, id, false));

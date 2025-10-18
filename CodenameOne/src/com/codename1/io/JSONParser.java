@@ -683,15 +683,16 @@ public class JSONParser implements JSONParseCallback {
      */
     public Hashtable<String, Object> parse(Reader i) throws IOException {
         modern = false;
-        state = new Hashtable();
-        parseStack = new Vector();
+        Hashtable<String, Object> legacyState = new Hashtable<String, Object>();
+        state = legacyState;
+        parseStack = new Vector<Object>();
         currentKey = null;
         if (!strict) {
             String cleaned = JSONSanitizer.sanitize(Util.readToString(i));
             i = new CharArrayReader(cleaned.toCharArray());
         }
         parse(i, this);
-        return (Hashtable<String, Object>) state;
+        return legacyState;
     }
 
     private boolean isStackHash() {

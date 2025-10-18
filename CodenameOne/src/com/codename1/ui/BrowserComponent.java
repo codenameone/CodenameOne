@@ -1797,7 +1797,7 @@ public class BrowserComponent extends Container {
          * @return
          */
         public int getInt() {
-            return new Double(Double.parseDouble(value)).intValue();
+            return (int) Double.parseDouble(value);
         }
 
         /**
