@@ -2332,8 +2332,6 @@ public class Component implements Animation, StyleListener, Editable {
             int spreadRadiusPixels = dp2px(spreadRadius);
             int offsetXPixels = dp2px(offsetX);
             int offsetYPixels = dp2px(offsetY);
-            int imageWidth = img.getWidth();
-            int imageHeight = img.getHeight();
             for (int i = 0; i < len; i++) {
                 int pixel = mask[i];
                 int alphaMask = (pixel & 0xff000000);
@@ -2597,8 +2595,6 @@ public class Component implements Animation, StyleListener, Editable {
                     int relativeX = 0;
                     int relativeY = 0;
 
-
-                    long startTime = System.currentTimeMillis();
 
                     switch (elevation) {
                         case 1:
@@ -6992,7 +6988,6 @@ public class Component implements Animation, StyleListener, Editable {
             if (ci.isEditingText()) {
                 return;
             }
-            Form f = getComponentForm();
             int ivk = getInvisibleAreaUnderVKB();
 
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >

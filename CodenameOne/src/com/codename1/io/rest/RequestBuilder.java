@@ -876,8 +876,9 @@ public class RequestBuilder {
 
     private Connection createRequest(boolean parseJson) {
         Connection req = new Connection(parseJson);
-        for (String key : pathParams.keySet()) {
-            url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", pathParams.get(key));
+        for (Map.Entry<String, String> entry : pathParams.entrySet()) {
+            String key = entry.getKey();
+            url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", entry.getValue());
         }
         if (contentType != null) {
             req.setContentType(contentType);
@@ -905,16 +906,17 @@ public class RequestBuilder {
         if (readTimeout != null) {
             req.setReadTimeout(readTimeout);
         }
-        for (String key : queryParams.keySet()) {
-            Object value = queryParams.get(key);
+        for (Map.Entry<String, Object> entry : queryParams.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
             if (value instanceof String[]) {
                 req.addArgument(key, (String[]) value);
             } else {
                 req.addArgument(key, (String) value);
             }
         }
-        for (String key : headers.keySet()) {
-            req.addRequestHeader(key, headers.get(key));
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            req.addRequestHeader(entry.getKey(), entry.getValue());
         }
         for (ActionListener<NetworkEvent> l : errorCallbacks) {
             req.addExceptionListener(l);

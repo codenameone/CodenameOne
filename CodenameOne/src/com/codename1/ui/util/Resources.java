@@ -541,7 +541,10 @@ public class Resources {
      * Reads the header of the resource file
      */
     private void readHeader() throws IOException {
-        int size = input.readShort();
+        // The header begins with a short denoting the size of the header section.
+        // We don't currently use this value, but it must be consumed so that the
+        // subsequent reads stay aligned with the original format.
+        input.readShort();
         majorVersion = input.readShort();
         minorVersion = input.readShort();
 
@@ -679,9 +682,8 @@ public class Resources {
      */
     public String[] getImageResourceNames() {
         ArrayList<String> vec = new ArrayList<String>();
-        Iterator<String> e = resourceTypes.keySet().iterator();
-        while (e.hasNext()) {
-            String c = e.next();
+        for (Map.Entry<String, Byte> entry : resourceTypes.entrySet()) {
+            String c = entry.getKey();
             if (isImage(c)) {
                 vec.add(c);
             }
@@ -702,11 +704,9 @@ public class Resources {
 
     private String[] getResourceTypeNames(byte b) {
         ArrayList<String> vec = new ArrayList<String>();
-        Iterator<String> e = resourceTypes.keySet().iterator();
-        while (e.hasNext()) {
-            String c = e.next();
-            if (resourceTypes.get(c).byteValue() == b) {
-                vec.add(c);
+        for (Map.Entry<String, Byte> entry : resourceTypes.entrySet()) {
+            if (entry.getValue().byteValue() == b) {
+                vec.add(entry.getKey());
             }
         }
         return toStringArray(vec);
@@ -1060,7 +1060,7 @@ public class Resources {
                     if (Image.isSVGSupported()) {
                         byte[] s = new byte[svgSize];
                         input.readFully(s);
-                        String baseURL = input.readUTF();
+                        input.readUTF();
                         boolean animated = input.readBoolean();
                         Image img = readMultiImage(input, true);
                         Image svg = createSVG(animated, s);
@@ -1322,10 +1322,6 @@ public class Resources {
         String platformPrefix = "platform-" + platformName + "-";
         String densityPrefix = "density-" + densityStr + "-";
         String devicePrefix = "device-" + deviceType + "-";
-        String platformDensityPrefix = platformPrefix + densityPrefix;
-        String devicePlatformPrefix = devicePrefix + platformPrefix;
-        String devicePlatformDensityPrefix = devicePlatformPrefix + densityPrefix;
-
         theme.put("name", id);
 
         // marks the theme as uninitialized so we can finish "wiring" cached resources

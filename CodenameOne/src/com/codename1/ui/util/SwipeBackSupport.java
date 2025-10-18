@@ -129,6 +129,7 @@ public class SwipeBackSupport {
                                 destinationForm.setTransitionInAnimator(t);
                                 destinationForm = null;
                                 dragActivated = false;
+                                transitionRunning = false;
                                 return false;
                             }
                             return true;
@@ -161,6 +162,7 @@ public class SwipeBackSupport {
     }
 
     void startBackTransition(final Form currentForm, Form destination) {
+        transitionRunning = true;
         final Transition t = destination.getTransitionOutAnimator().copy(true);
         if (t instanceof CommonTransitions) {
             Transition originalTransition = currentForm.getTransitionOutAnimator();

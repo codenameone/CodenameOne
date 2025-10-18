@@ -651,7 +651,6 @@ public abstract class Purchase {
     private Date getExpiryDate(Receipt[] receipts, String... skus) {
         Date expiryDate = new Date(0L);
         List<String> lSkus = Arrays.asList(skus);
-        long now = System.currentTimeMillis();
 
         for (Receipt r : receipts) {
             if (!lSkus.contains(r.getSku())) {

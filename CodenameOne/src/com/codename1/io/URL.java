@@ -273,8 +273,8 @@ public class URL {
             connection = impl.connect(url, doInput, doOutput);
             impl.setHttpMethod(connection, requestMethod);
             if (properties != null && !properties.isEmpty()) {
-                for (String key : properties.keySet()) {
-                    impl.setHeader(connection, key, properties.get(key));
+                for (Map.Entry<String, String> entry : properties.entrySet()) {
+                    impl.setHeader(connection, entry.getKey(), entry.getValue());
                 }
             }
         }

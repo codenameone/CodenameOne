@@ -50,6 +50,14 @@ public class PushContent {
         metaData = p("metaData", null);
         actionId = p("actionId", null);
         textResponse = p("textResponse", null);
+        String typeVal = p("type", null);
+        if (typeVal != null) {
+            try {
+                type = Integer.parseInt(typeVal);
+            } catch (NumberFormatException err) {
+                type = 0;
+            }
+        }
     }
 
     private static String[] keys() {

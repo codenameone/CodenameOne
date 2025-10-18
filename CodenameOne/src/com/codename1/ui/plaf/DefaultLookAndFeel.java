@@ -428,7 +428,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
         int gap = l.getGap();
         int stateIconSize = 0;
-        int stateIconYPosition = 0;
         String text = l.getText();
         Style style = l.getStyle();
         int cmpX = l.getX();
@@ -457,9 +456,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if (stateIcon != null) {
             stateIconSize = stateIcon.getWidth(); //square image width == height
             preserveSpaceForState = stateIconSize + gap;
-            stateIconYPosition = cmpY + topPadding
-                    + (cmpHeight - topPadding
-                    - bottomPadding) / 2 - stateIconSize / 2;
             int tX = cmpX;
             if (((Button) l).isOppositeSide()) {
                 if (rtl) {
@@ -479,7 +475,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 }
             }
 
-            //g.drawImage(stateIcon, tX, stateIconYPosition);
         }
 
         //default for bottom left alignment

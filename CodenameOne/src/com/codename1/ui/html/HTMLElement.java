@@ -1556,7 +1556,6 @@ public class HTMLElement extends Element {
         }
         HTMLElement parent = (HTMLElement) getParent();
         if (parent != null) {
-            Vector v = parent.getChildren();
             for (Element e : parent) {
                 HTMLElement elem = (HTMLElement) e;
                 if (elem == this) {

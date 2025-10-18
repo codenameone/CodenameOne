@@ -185,7 +185,6 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         double ph = Math.max(w, h) * 2;
 
 
-        double pEndX = (endX - x) * pw / w;
         //System.out.println("px="+px+", "+py+", "+pw+", "+ph+" theta="+theta);
 
         g.getTransform(t);

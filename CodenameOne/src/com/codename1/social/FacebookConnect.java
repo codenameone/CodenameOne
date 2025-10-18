@@ -46,6 +46,10 @@ public class FacebookConnect extends Login {
     private static FacebookConnect instance;
     private final String[] permissions = new String[]{"public_profile", "email", "user_friends"};
 
+    static {
+        implClass = null;
+    }
+
     FacebookConnect() {
         setOauth2URL("https://www.facebook.com/dialog/oauth");
     }

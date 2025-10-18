@@ -304,8 +304,8 @@ public final class MigLayout extends Layout {
     public void setConstraintMap(Map<Component, Object> map) {
         scrConstrMap.clear();
         ccMap.clear();
-        for (Component e : map.keySet()) {
-            setComponentConstraintsImpl(e, map.get(e), true);
+        for (Map.Entry<Component, Object> entry : map.entrySet()) {
+            setComponentConstraintsImpl(entry.getKey(), entry.getValue(), true);
         }
     }
 
@@ -360,7 +360,6 @@ public final class MigLayout extends Layout {
      *                                  component.
      */
     private void setComponentConstraintsImpl(Component comp, Object constr, boolean noCheck) {
-        Container parent = comp.getParent();
         if (!noCheck && !scrConstrMap.containsKey(comp)) {
             throw new IllegalArgumentException("Component must already be added to parent!");
         }

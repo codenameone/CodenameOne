@@ -210,9 +210,29 @@ public class User extends FBObject {
         email = (String) toCopy.get("email");
         website = (String) toCopy.get("website");
         bio = (String) toCopy.get("bio");
+        quotes = (String) toCopy.get("quotes");
         gender = (String) toCopy.get("gender");
         relationship_status = (String) toCopy.get("relationship_status");
-        //timezone = Long.parseLong((String) toCopy.get("timezone"));
+        Object tz = toCopy.get("timezone");
+        if (tz instanceof Integer) {
+            timezone = ((Integer) tz).longValue();
+        } else if (tz instanceof Long) {
+            timezone = ((Long) tz).longValue();
+        } else if (tz instanceof Short) {
+            timezone = ((Short) tz).shortValue();
+        } else if (tz instanceof Byte) {
+            timezone = ((Byte) tz).byteValue();
+        } else if (tz instanceof Double) {
+            timezone = (long) ((Double) tz).doubleValue();
+        } else if (tz instanceof Float) {
+            timezone = (long) ((Float) tz).floatValue();
+        } else if (tz instanceof String) {
+            try {
+                timezone = Long.parseLong((String) tz);
+            } catch (NumberFormatException ignore) {
+                timezone = 0;
+            }
+        }
         last_updated = (String) toCopy.get("last_updated");
         locale = (String) toCopy.get("locale");
         Hashtable l = (Hashtable) toCopy.get("location");

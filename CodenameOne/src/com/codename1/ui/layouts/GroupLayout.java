@@ -917,7 +917,6 @@ public class GroupLayout extends Layout {
         Iterator componentInfo = componentInfos.values().iterator();
         while (componentInfo.hasNext()) {
             ComponentInfo info = (ComponentInfo) componentInfo.next();
-            Component c = info.getComponent();
             info.setBounds(insetLeft, insetTop, width, ltr);
         }
     }

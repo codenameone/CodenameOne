@@ -361,6 +361,9 @@ class IndexedImage extends Image {
         }
         Dimension d = new Dimension(width, height);
         Image i = getCachedImage(d);
+        if (i != null) {
+            return i;
+        }
         // currently we only support byte data...
         i = new IndexedImage(width, height, palette, scaleArray(imageDataByte, width, height));
         cacheImage(d, i);

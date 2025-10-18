@@ -2484,7 +2484,6 @@ public class StyleParser {
          * @param decimalPlaces Number of decimal places to round to.
          */
         public void setSpliceInsets(double[] insets, int decimalPlaces) {
-            L10NManager l = L10NManager.getInstance();
             this.spliceInsets =
                     round(insets[Component.TOP], decimalPlaces) + " " +
                             round(insets[Component.RIGHT], decimalPlaces) + " " +

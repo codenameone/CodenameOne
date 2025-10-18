@@ -48,6 +48,10 @@ public class GoogleConnect extends Login {
     private static final String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
     private static GoogleConnect instance;
 
+    static {
+        implClass = null;
+    }
+
     GoogleConnect() {
         setOauth2URL("https://accounts.google.com/o/oauth2/auth");
         setScope("profile email");

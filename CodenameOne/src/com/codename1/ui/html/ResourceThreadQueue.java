@@ -221,8 +221,6 @@ class ResourceThreadQueue {
                 urls.addElement(imageUrl);
             }
         }
-        urls = null;
-
         images = new Hashtable();
 
         if (!startDequeue()) {

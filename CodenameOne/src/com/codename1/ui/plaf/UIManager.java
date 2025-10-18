@@ -575,15 +575,13 @@ public class UIManager {
         boolean darkMode = darkModeBoolean != null && darkModeBoolean.booleanValue() &&
                 CN.isDarkMode() != null && CN.isDarkMode().booleanValue();
 
-        Font thinFont = Font.getDefaultFont();
-        Font lightFont = thinFont;
+        Font lightFont = Font.getDefaultFont();
         Font italic = Font.createSystemFont(Font.FACE_SYSTEM,
                 Font.STYLE_ITALIC, Font.SIZE_MEDIUM);
         Font bold = Font.createSystemFont(Font.FACE_SYSTEM,
                 Font.STYLE_BOLD, Font.SIZE_MEDIUM);
         if (Font.isNativeFontSchemeSupported()) {
             int size = Display.getInstance().convertToPixels(2.5f);
-            thinFont = Font.createTrueTypeFont("native:MainThin", "native:MainThin").derive(size, Font.STYLE_PLAIN);
             lightFont = Font.createTrueTypeFont("native:MainLight", "native:MainLight").derive(size, Font.STYLE_PLAIN);
             italic = Font.createTrueTypeFont("native:ItalicLight", "native:ItalicLight").derive(size, Font.STYLE_ITALIC);
             bold = Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD, Font.NATIVE_MAIN_BOLD).derive(size, Font.STYLE_BOLD);
@@ -1709,7 +1707,6 @@ public class UIManager {
         } else {
             themeProps.remove(id + "derive");
         }
-        String val = null;
         Integer bgColor = styleInfo.getBgColor();
         if (bgColor != null) {
             themeProps.put(id + Style.BG_COLOR, Integer.toHexString(bgColor));
@@ -1876,28 +1873,28 @@ public class UIManager {
                 style.setSurface((Boolean) themeProps.get(id + Style.SURFACE));
             }
             if (bgColor != null) {
-                style.setBgColor(Integer.valueOf(bgColor, 16).intValue());
+                style.setBgColor(Integer.parseInt(bgColor, 16));
             }
             if (fgColor != null) {
-                style.setFgColor(Integer.valueOf(fgColor, 16).intValue());
+                style.setFgColor(Integer.parseInt(fgColor, 16));
             }
             if (transperency != null) {
-                style.setBgTransparency(Integer.valueOf(transperency).intValue());
+                style.setBgTransparency(Integer.parseInt(transperency));
             } else {
                 if (selected) {
                     transperency = (String) themeProps.get(originalId + Style.TRANSPARENCY);
                     if (transperency != null) {
-                        style.setBgTransparency(Integer.valueOf(transperency).intValue());
+                        style.setBgTransparency(Integer.parseInt(transperency));
                     }
                 }
             }
             if (opacity != null) {
-                style.setOpacity(Integer.valueOf(opacity).intValue());
+                style.setOpacity(Integer.parseInt(opacity));
             } else {
                 if (selected) {
                     opacity = (String) themeProps.get(originalId + Style.OPACITY);
                     if (opacity != null) {
-                        style.setBgTransparency(Integer.valueOf(opacity).intValue());
+                        style.setBgTransparency(Integer.parseInt(opacity));
                     }
                 }
             }

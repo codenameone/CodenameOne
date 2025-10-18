@@ -3656,7 +3656,6 @@ public class Form extends Container {
     public void pointerReleased(int x, int y) {
         try {
             Component origPressedCmp = pressedCmp;
-            boolean inOrigPressedCmpBounds = pressedCmpAbsBounds.contains(x, y);
             rippleMotion = null;
             setPressedCmp(null);
             boolean isScrollWheeling = Display.impl.isScrollWheeling();

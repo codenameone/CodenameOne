@@ -1002,7 +1002,15 @@ public final class Display extends CN1Constants {
             // flush and so require the painting thread to get CPU too.
             try {
                 synchronized (lock) {
-                    lock.wait(transitionDelay);
+                    long end = System.currentTimeMillis() + transitionDelay;
+                    while (true) {
+                        long remaining = end - System.currentTimeMillis();
+                        if (remaining <= 0) {
+                            break;
+                        }
+                        lock.wait(remaining);
+                        break;
+                    }
                 }
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
@@ -1024,14 +1032,17 @@ public final class Display extends CN1Constants {
             // for features such as call serially
             while (impl.getCurrentForm() == null) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
                 synchronized (lock) {
-                    if (shouldEDTSleep()) {
-                        if (!pendingIdleSerialCalls.isEmpty()) {
-                            Runnable r = pendingIdleSerialCalls.get(0);
-                            pendingIdleSerialCalls.remove(0);
-                            callSerially(r);
-                        } else {
+                    while (shouldEDTSleep() && pendingIdleSerialCalls.isEmpty()) {
+                        try {
                             lock.wait();
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
                         }
+                    }
+                    if (shouldEDTSleep() && !pendingIdleSerialCalls.isEmpty()) {
+                        Runnable r = pendingIdleSerialCalls.remove(0);
+                        callSerially(r);
                     }
 
                     // paint transition or intro animations and don't do anything else if such
@@ -1064,13 +1075,23 @@ public final class Display extends CN1Constants {
                 synchronized (lock) {
                     if (shouldEDTSleep()) {
                         if (!pendingIdleSerialCalls.isEmpty()) {
-                            Runnable r = pendingIdleSerialCalls.get(0);
-                            pendingIdleSerialCalls.remove(0);
+                            Runnable r = pendingIdleSerialCalls.remove(0);
                             callSerially(r);
                         } else {
                             impl.edtIdle(true);
-                            lock.wait();
+                            while (shouldEDTSleep() && pendingIdleSerialCalls.isEmpty()) {
+                                try {
+                                    lock.wait();
+                                } catch (InterruptedException ie) {
+                                    Thread.currentThread().interrupt();
+                                    break;
+                                }
+                            }
                             impl.edtIdle(false);
+                            if (!pendingIdleSerialCalls.isEmpty()) {
+                                Runnable r = pendingIdleSerialCalls.remove(0);
+                                callSerially(r);
+                            }
                         }
                     }
                 }
@@ -1114,7 +1135,21 @@ public final class Display extends CN1Constants {
                 if (!noSleep) {
                     synchronized (lock) {
                         impl.edtIdle(true);
-                        lock.wait(Math.max(1, framerateLock - (time)));
+                        long waitTime = Math.max(1, framerateLock - (time));
+                        long end = System.currentTimeMillis() + waitTime;
+                        while (true) {
+                            long remaining = end - System.currentTimeMillis();
+                            if (remaining <= 0) {
+                                break;
+                            }
+                            try {
+                                lock.wait(remaining);
+                                break;
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            }
+                        }
                         impl.edtIdle(false);
                     }
                 }

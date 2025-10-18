@@ -32,6 +32,7 @@ import java.io.Writer;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -247,7 +248,7 @@ public class MultipartRequest extends ConnectionRequest {
 
     protected long calculateContentLength() {
         long length = 0L;
-        Iterator e = args.keySet().iterator();
+        Iterator entries = args.entrySet().iterator();
 
         long dLength = "Content-Disposition: form-data; name=\"\"; filename=\"\"".length() + 2; // 2 = CRLF
         long ctLength = "Content-Type: ".length() + 2; // 2 = CRLF
@@ -258,9 +259,10 @@ public class MultipartRequest extends ConnectionRequest {
         ctLength = "Content-Type: text/plain; charset=UTF-8".length() + 4; // 4 = 2 * CRLF
         long baseTextLength = dLength + ctLength + bLength + 2;  // 2 = CRLF at end of part
 
-        while (e.hasNext()) {
-            String key = (String) e.next();
-            Object value = args.get(key);
+        while (entries.hasNext()) {
+            Map.Entry entry = (Map.Entry) entries.next();
+            String key = (String) entry.getKey();
+            Object value = entry.getValue();
             if (value instanceof String) {
                 length += baseTextLength;
                 length += key.length();
@@ -319,13 +321,14 @@ public class MultipartRequest extends ConnectionRequest {
     protected void buildRequestBody(OutputStream os) throws IOException {
         Writer writer = null;
         writer = new OutputStreamWriter(os, "UTF-8");
-        Iterator e = args.keySet().iterator();
-        while (e.hasNext()) {
+        Iterator entries = args.entrySet().iterator();
+        while (entries.hasNext()) {
             if (shouldStop()) {
                 break;
             }
-            String key = (String) e.next();
-            Object value = args.get(key);
+            Map.Entry entry = (Map.Entry) entries.next();
+            String key = (String) entry.getKey();
+            Object value = entry.getValue();
 
             writer.write("--");
             writer.write(boundary);

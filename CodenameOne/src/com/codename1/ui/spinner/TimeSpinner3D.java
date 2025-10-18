@@ -64,7 +64,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     private boolean showMeridiem = true;
     private int currentHour = 8;
     private int currentMinute = 0;
-    private boolean currentMeridiem;
+    private boolean currentMeridiem = false;
 
     /**
      * Default constructor
@@ -528,7 +528,8 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         g.setColor(hour.getSelectedOverlayStyle().getBgColor());
         g.setAlpha(255);
         g.fillRect(getX(), getY(), getWidth(), getHeight());
-        super.paint(g); //To change body of generated methods, choose Tools | Templates.
+        super.paint(g);
+        g.setAlpha(alpha);
     }
 
 

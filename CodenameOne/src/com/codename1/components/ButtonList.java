@@ -131,6 +131,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
      * buttons.
      */
     protected void fireReady() {
+        ready = true;
         for (Runnable r : onReady) {
             r.run();
         }

@@ -439,7 +439,6 @@ public final class CommonTransitions extends Transition {
                 buffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),
                         Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight() +
                                 getDialogTitleHeight(dlg)), 0);
-                Graphics g = buffer.getGraphics();
                 Style stl = dlg.getDialogComponent().getStyle();
                 byte bgt = stl.getBgTransparency();
                 stl.setBgTransparency(0xff);

@@ -94,9 +94,10 @@ public class InterFormContainer extends Container {
 
         });
 
-        for (Component c : set1.keySet()) {
+        for (Map.Entry<Component, InterFormContainer> entry : set1.entrySet()) {
+            Component c = entry.getKey();
             if (set2.containsKey(c)) {
-                out.put(set1.get(c), set2.get(c));
+                out.put(entry.getValue(), set2.get(c));
             }
         }
         return out;

@@ -323,7 +323,6 @@ public class CommonProgressAnimations {
             int w = f.charWidth('M');
             Style s = cmp == null ? getStyle() : cmp.getStyle();
 
-            int paddingTop = s.getPaddingTop();
             int paddingLeft = s.getPaddingLeftNoRTL();
             int paddingRight = s.getPaddingRightNoRTL();
             int paddingBottom = s.getPaddingBottom();

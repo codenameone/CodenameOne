@@ -19,6 +19,7 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.ui.util.Resources;
+import com.codename1.util.StringUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -208,6 +209,11 @@ public class CSSBorder extends Border {
         decorators.put("border-image", new Decorator() {
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderImage(cssPropertyValue);
+            }
+        });
+        decorators.put("box-shadow", new Decorator() {
+            public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
+                return border.boxShadow(cssPropertyValue);
             }
         });
     }
@@ -852,6 +858,72 @@ public class CSSBorder extends Border {
         }
 
         return borderImageWithName(parts[0], splices);
+    }
+
+    public CSSBorder boxShadow(String value) {
+        if (value == null) {
+            boxShadow = null;
+            return this;
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() == 0 || "none".equalsIgnoreCase(trimmed)) {
+            boxShadow = null;
+            return this;
+        }
+
+        BoxShadow shadow = new BoxShadow();
+        List<String> rawPartsList = StringUtil.tokenize(trimmed, " \t\r\n");
+        String[] rawParts = new String[rawPartsList.size()];
+        rawPartsList.toArray(rawParts);
+        int idx = 0;
+        if (idx < rawParts.length && "inset".equalsIgnoreCase(rawParts[idx])) {
+            shadow.inset = true;
+            idx++;
+        }
+        if (idx < rawParts.length) {
+            ScalarUnit h = tryParseScalarUnit(rawParts[idx]);
+            if (h != null) {
+                shadow.hOffset = h;
+                idx++;
+            }
+        }
+        if (idx < rawParts.length) {
+            ScalarUnit v = tryParseScalarUnit(rawParts[idx]);
+            if (v != null) {
+                shadow.vOffset = v;
+                idx++;
+            }
+        }
+        if (idx < rawParts.length) {
+            ScalarUnit blur = tryParseScalarUnit(rawParts[idx]);
+            if (blur != null) {
+                shadow.blurRadius = blur;
+                idx++;
+            }
+        }
+        if (idx < rawParts.length) {
+            ScalarUnit spread = tryParseScalarUnit(rawParts[idx]);
+            if (spread != null) {
+                shadow.spread = spread;
+                idx++;
+            }
+        }
+        if (idx < rawParts.length) {
+            shadow.color = new Color(rawParts[idx]);
+        }
+        boxShadow = shadow;
+        return this;
+    }
+
+    private ScalarUnit tryParseScalarUnit(String token) {
+        if (token == null || token.length() == 0) {
+            return null;
+        }
+        try {
+            return new ScalarUnit(token);
+        } catch (Exception err) {
+            return null;
+        }
     }
 
     /**
@@ -1875,8 +1947,8 @@ public class CSSBorder extends Border {
     }
 
     private class ColorStop {
-        Color color;
-        int position;
+        Color color = new Color("#000000");
+        int position = 0;
 
 
         public String toCSSString() {
@@ -1892,7 +1964,7 @@ public class CSSBorder extends Border {
 
     private class LinearGradient {
         float angle;
-        ColorStop[] colors;
+        ColorStop[] colors = new ColorStop[0];
 
         double directionRadian() {
             return angle * Math.PI / 180.0;
@@ -1922,7 +1994,7 @@ public class CSSBorder extends Border {
         byte shape;
         byte size;
         float xPos, yPos;
-        ColorStop[] colors;
+        ColorStop[] colors = new ColorStop[0];
 
         private String toCSSString() {
             throw new RuntimeException("RadialGradlient toCSSString() not implemented yet");

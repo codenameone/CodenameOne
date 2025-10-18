@@ -174,7 +174,6 @@ public class GeofenceManager implements Iterable<Geofence> {
     private synchronized void purgeExpired() {
         long now = System.currentTimeMillis();
         Map<String, Long> times = getExpiryTimes(false);
-        List<String> expired = new ArrayList<String>();
         Map<String, Geofence> fences = getFences(false);
         List<String> activeKeys = getActiveKeys(false);
         Map<String, Geofence> activeFences = getActiveFences(false);
@@ -532,7 +531,6 @@ public class GeofenceManager implements Iterable<Geofence> {
         List<String> activeKeys = getActiveKeys(false);
         for (String id : activeIds) {
             Geofence g = getFences(false).get(id);
-            Geofence cg = getActiveFences(false).get(id);
             if (!forceRefresh && g != null) {
                 if (!isWithinRadius(g.getLoc(), here, getBubbleRadius() + g.getRadius())) {
                     LocationManager.getLocationManager().removeGeoFencing(id);
