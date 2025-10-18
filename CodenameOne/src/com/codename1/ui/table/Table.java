@@ -452,9 +452,21 @@ public class Table extends Container {
                     return ccmp.compare((String) o1, (String) o2);
                 }
                 try {
-                    int doubleCompare = Double.compare(Util.toDoubleValue(o1), Util.toDoubleValue(o2));
-                    if (doubleCompare != 0) {
-                        return doubleCompare;
+                    double d1 = Util.toDoubleValue(o1);
+                    double d2 = Util.toDoubleValue(o2);
+                    if (d1 < d2) {
+                        return -1;
+                    }
+                    if (d1 > d2) {
+                        return 1;
+                    }
+                    long bits1 = Double.doubleToLongBits(d1);
+                    long bits2 = Double.doubleToLongBits(d2);
+                    if (bits1 < bits2) {
+                        return -1;
+                    }
+                    if (bits1 > bits2) {
+                        return 1;
                     }
                 } catch (IllegalArgumentException err) {
                     long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
