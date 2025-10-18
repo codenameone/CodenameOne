@@ -42,6 +42,10 @@ ri_log "Loading workspace environment from $ENV_FILE"
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
+# Use the same Xcode as the build step
+export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
+export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
+
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
   ri_log "JAVA17_HOME not set correctly" >&2
   exit 3
@@ -60,11 +64,6 @@ JAVA17_BIN="$JAVA17_HOME/bin/java"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
-
-if [ ! -d "$ARTIFACTS_DIR" ]; then
-  ri_log "Failed to create artifacts directory at $ARTIFACTS_DIR" >&2
-  exit 3
-fi
 
 if [ -z "$REQUESTED_SCHEME" ]; then
   if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
@@ -95,66 +94,15 @@ auto_select_destination() {
   if show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null)"; then
     selected="$(
       printf '%s\n' "$show_dest" | python3 - <<'PY'
-import re
-import sys
-
-
-def parse_version_tuple(version: str):
-    parts = []
-    for piece in version.split('.'):
-        piece = piece.strip()
-        if not piece:
-            continue
-        try:
-            parts.append(int(piece))
-        except ValueError:
-            parts.append(0)
-    return tuple(parts)
-
-
-def iter_showdestinations(text: str):
-    pattern = re.compile(r"\{([^}]+)\}")
-    for block in pattern.findall(text):
-        fields = {}
-        for chunk in block.split(','):
-            if ':' not in chunk:
-                continue
-            key, value = chunk.split(':', 1)
-            fields[key.strip()] = value.strip()
-        if fields.get('platform') != 'iOS Simulator':
-            continue
-        name = fields.get('name', '')
-        os_version = fields.get('OS') or fields.get('os') or ''
-        ident = fields.get('id', '')
-        priority = 0
-        if 'iPhone' in name:
-            priority = 2
-        elif 'iPad' in name:
-            priority = 1
-        yield (
-            priority,
-            parse_version_tuple(os_version.replace('latest', '')),
-            name,
-            os_version,
-            ident,
-        )
-
-
-def main() -> None:
-    candidates = sorted(iter_showdestinations(sys.stdin.read()), reverse=True)
-    if not candidates:
-        return
-    _, _, name, os_version, ident = candidates[0]
-    if ident:
-        print(f"platform=iOS Simulator,id={ident}")
-    elif os_version:
-        print(f"platform=iOS Simulator,OS={os_version},name={name}")
-    else:
-        print(f"platform=iOS Simulator,name={name}")
-
-
-if __name__ == "__main__":
-    main()
+import re, sys
+def parse_version_tuple(v): return tuple(int(p) if p.isdigit() else 0 for p in v.split('.') if p)
+for block in re.findall(r"\{([^}]+)\}", sys.stdin.read()):
+    f = dict(s.split(':',1) for s in block.split(',') if ':' in s)
+    if f.get('platform')!='iOS Simulator': continue
+    name=f.get('name',''); os=f.get('OS') or f.get('os') or ''
+    pri=2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
+    print(f"__CAND__|{pri}|{'.'.join(map(str,parse_version_tuple(os.replace('latest',''))))}|{name}|{os}|{f.get('id','')}")
+cands=[l.split('|',5) for l in sys.stdin if False]
 PY
     )"
   fi
@@ -163,63 +111,23 @@ PY
     if command -v xcrun >/dev/null 2>&1; then
       selected="$(
         xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
-import json
-import sys
-
-
-def parse_version_tuple(version: str):
-    parts = []
-    for piece in version.split('.'):
-        piece = piece.strip()
-        if not piece:
-            continue
-        try:
-            parts.append(int(piece))
-        except ValueError:
-            parts.append(0)
-    return tuple(parts)
-
-
-def iter_devices(payload):
-    devices = payload.get('devices', {})
-    for runtime, entries in devices.items():
-        if 'iOS' not in runtime:
-            continue
-        version = runtime.split('iOS-')[-1].replace('-', '.')
-        version_tuple = parse_version_tuple(version)
-        for entry in entries or []:
-            if not entry.get('isAvailable'):
-                continue
-            name = entry.get('name') or ''
-            ident = entry.get('udid') or ''
-            priority = 0
-            if 'iPhone' in name:
-                priority = 2
-            elif 'iPad' in name:
-                priority = 1
-            yield (
-                priority,
-                version_tuple,
-                name,
-                ident,
-            )
-
-
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        return
-    candidates = sorted(iter_devices(data), reverse=True)
-    if not candidates:
-        return
-    _, _, name, ident = candidates[0]
-    if ident:
-        print(f"platform=iOS Simulator,id={ident}")
-
-
-if __name__ == "__main__":
-    main()
+import json, sys
+def parse_version_tuple(v): return tuple(int(p) if p.isdigit() else 0 for p in v.split('.') if p)
+try: data=json.load(sys.stdin)
+except: sys.exit(0)
+c=[]
+for runtime, entries in (data.get('devices') or {}).items():
+    if 'iOS' not in runtime: continue
+    ver=runtime.split('iOS-')[-1].replace('-','.')
+    vt=parse_version_tuple(ver)
+    for e in entries or []:
+        if not e.get('isAvailable'): continue
+        name=e.get('name') or ''; ident=e.get('udid') or ''
+        pri=2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
+        c.append((pri, vt, name, ident))
+if c:
+    pri, vt, name, ident = sorted(c, reverse=True)[0]
+    print(f"platform=iOS Simulator,id={ident}")
 PY
       )"
     fi
@@ -230,18 +138,16 @@ PY
   fi
 }
 
-
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
 if [ -z "$SIM_DESTINATION" ]; then
-  SELECTED_DESTINATION="$(auto_select_destination)"
-  if [ -n "$SELECTED_DESTINATION" ]; then
+  SELECTED_DESTINATION="$(auto_select_destination || true)"
+  if [ -n "${SELECTED_DESTINATION:-}" ]; then
     SIM_DESTINATION="$SELECTED_DESTINATION"
     ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
   else
     ri_log "Simulator auto-selection did not return a destination"
   fi
 fi
-
 if [ -z "$SIM_DESTINATION" ]; then
   SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16"
   ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
@@ -252,10 +158,7 @@ ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 
-#
-# Force xcodebuild to run only the UI tests; the unit-test bundle has a broken TEST_HOST.
-# Change these names if your targets have different names.
-#
+# Run only the UI test bundle
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
@@ -271,8 +174,6 @@ if ! xcodebuild \
   -destination "$SIM_DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   -resultBundlePath "$RESULT_BUNDLE" \
-  TEST_HOST='$(BUILT_PRODUCTS_DIR)/$(WRAPPER_NAME)/$(EXECUTABLE_NAME)' \
-  BUNDLE_LOADER='$(TEST_HOST)' \
   "${XCODE_TEST_FILTERS[@]}" \
   test | tee "$TEST_LOG"; then
   ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
@@ -295,8 +196,7 @@ ri_log "Captured ${#PNG_FILES[@]} screenshot(s)"
 
 declare -a COMPARE_ARGS=()
 for png in "${PNG_FILES[@]}"; do
-  test_name="$(basename "$png")"
-  test_name="${test_name%.png}"
+  test_name="$(basename "$png" .png)"
   COMPARE_ARGS+=("--actual" "${test_name}=${png}")
   cp "$png" "$ARTIFACTS_DIR/$(basename "$png")" 2>/dev/null || true
   ri_log "  -> Saved artifact copy for test '$test_name'"
