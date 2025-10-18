@@ -293,6 +293,99 @@ XCSCHEME="$XCSCHEME_DIR/${MAIN_NAME}-CI.xcscheme"
 if [ -f "$XCSCHEME" ]; then
   bia_log "Pruning unit-test testables from CI scheme at $XCSCHEME"
 
+# --- Ensure the CI scheme has a TestAction with HelloCodenameOneUITests ---
+
+PRJ="$PROJECT_DIR/HelloCodenameOne.xcodeproj"
+PBX="$PRJ/project.pbxproj"
+
+# Resolve the UITests target id
+UIT_ID="$(awk '
+  $0 ~ /\/\* Begin PBXNativeTarget section \*\// {inT=1}
+  inT && $0 ~ /^[0-9A-F]{24} \/\* .* \*\/ = \{/ {last=$1}
+  inT && $0 ~ /name = '"${MAIN_NAME}"'UITests;/ {print last; exit}
+' "$PBX")"
+
+if [ -z "$UIT_ID" ]; then
+  bia_log "Error: ${MAIN_NAME}UITests target not found in $PBX"
+  exit 1
+fi
+
+# Workspace-level scheme path
+WS_SCHEME="$WORKSPACE/xcshareddata/xcschemes/${MAIN_NAME}-CI.xcscheme"
+# Project-level shared scheme path (guard both)
+PRJ_SCHEME="$PROJECT_DIR/xcshareddata/xcschemes/${MAIN_NAME}-CI.xcscheme"
+
+_add_or_fix_testaction() {
+  local scheme="$1"
+  [ -f "$scheme" ] || return 0
+  bia_log "Ensuring TestAction exists and references ${MAIN_NAME}UITests in $scheme"
+  cp "$scheme" "$scheme.bak"
+
+  /usr/bin/python3 - "$scheme" "$UIT_ID" "${MAIN_NAME}" <<'PY'
+import sys, xml.etree.ElementTree as ET
+scheme, uit_id, main = sys.argv[1:4]
+t = ET.parse(scheme); r = t.getroot()
+def q(n):
+    if r.tag.startswith('{'):
+        ns = r.tag.split('}')[0].strip('{')
+        return f'{{{ns}}}{n}'
+    return n
+
+# 1) Drop non-UI testables from BuildAction (prevents prep of unit-tests)
+ba = r.find(q('BuildAction'))
+bas = ba.find(q('BuildActionEntries')) if ba is not None else None
+if bas is not None:
+    for e in list(bas):
+        br = e.find(q('BuildableReference'))
+        name = (br.get('BlueprintName') if br is not None else '') or ''
+        if name.endswith('Tests') and not name.endswith('UITests'):
+            bas.remove(e)
+
+# 2) Ensure TestAction exists
+ta = r.find(q('TestAction'))
+if ta is None:
+    ta = ET.SubElement(r, q('TestAction'), {
+        'buildConfiguration':'Debug',
+        'selectedDebuggerIdentifier':'Xcode.DebuggerFoundation.Debugger.LLDB',
+        'selectedLauncherIdentifier':'Xcode.DebuggerFoundation.Launcher.LLDB',
+        'shouldUseLaunchSchemeArgsEnv':'YES'
+    })
+
+# 3) Ensure Testables exists
+ts = ta.find(q('Testables'))
+if ts is None:
+    ts = ET.SubElement(ta, q('Testables'))
+
+# 4) Remove non-UI testables; ensure exactly one UITests
+has_ui = False
+for n in list(ts):
+    br = n.find(q('BuildableReference'))
+    name = (br.get('BlueprintName') if br is not None else '') or ''
+    if name.endswith('Tests') and not name.endswith('UITests'):
+        ts.remove(n)
+    elif name == f"{main}UITests":
+        has_ui = True
+
+if not has_ui:
+    tref = ET.SubElement(ts, q('TestableReference'), {'skipped':'NO'})
+    ET.SubElement(tref, q('BuildableReference'), {
+        'BuildableIdentifier':'primary',
+        'BlueprintIdentifier': uit_id,
+        'BlueprintName': f"{main}UITests",
+        'ReferencedContainer': 'container:HelloCodenameOne.xcodeproj'
+    })
+
+t.write(scheme, encoding='UTF-8', xml_declaration=True)
+PY
+}
+
+_add_or_fix_testaction "$WS_SCHEME"
+_add_or_fix_testaction "$PRJ_SCHEME"
+
+# Debug: prove the scheme now has a TestAction and the UITests testable
+grep -n "<TestAction" "$WS_SCHEME" 2>/dev/null || true
+grep -n 'BlueprintName="'"${MAIN_NAME}"'UITests"' "$WS_SCHEME" 2>/dev/null || true
+
   # Backup for debugging
   cp "$XCSCHEME" "$XCSCHEME.bak"
 
