@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoogleMapsProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps.providers</a> &gt; <span class="el_source">GoogleMapsProvider.java</span></div><h1>GoogleMapsProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.maps.providers;
+
+import com.codename1.maps.BoundingBox;
+import com.codename1.maps.Coord;
+import com.codename1.maps.Mercator;
+import com.codename1.maps.ProxyHttpTile;
+import com.codename1.maps.Tile;
+import com.codename1.ui.geom.Dimension;
+
+/**
+ * This is a GoogleMaps Provider https://developers.google.com/maps/documentation/staticmaps/
+ *
+ * @author Chen
+ */
+public class GoogleMapsProvider extends TiledProvider {
+
+    /**
+     * This is a regular road map
+     */
+    public static final int REGULAR = 0;
+    /**
+     * This is a satellite map
+     */
+    public static final int SATELLITE = 1;
+    /**
+     * This is a satellite + road map
+     */
+    public static final int HYBRID = 2;
+<span class="nc" id="L52">    private static int tileSize = 256;</span>
+    private final String apiKey;
+    private int type;
+    private String language;
+    private boolean sensor;
+
+    /**
+     * Google map provider Constructor
+     *
+     * @param apiKey google maps api key
+     *               https://developers.google.com/maps/documentation/staticmaps/#api_key
+     */
+    public GoogleMapsProvider(String apiKey) {
+<span class="nc" id="L65">        super(&quot;https://maps.googleapis.com/maps/api/staticmap?&quot;, new Mercator(), new Dimension(tileSize, tileSize));</span>
+<span class="nc" id="L66">        this.apiKey = apiKey;</span>
+<span class="nc" id="L67">    }</span>
+
+    /**
+     * @return the tileSize
+     */
+    public static int getTileSize() {
+<span class="nc" id="L73">        return tileSize;</span>
+    }
+
+    /**
+     * @param aTileSize the tileSize to set
+     */
+    public static void setTileSize(int aTileSize) {
+<span class="nc" id="L80">        tileSize = aTileSize;</span>
+<span class="nc" id="L81">    }</span>
+
+    /**
+     * Sets the map type
+     */
+    public void setMapType(int type) {
+<span class="nc" id="L87">        this.type = type;</span>
+<span class="nc" id="L88">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public int maxZoomLevel() {
+<span class="nc" id="L95">        return 18;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String attribution() {
+<span class="nc" id="L102">        return &quot;Google&quot;;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Tile tileFor(BoundingBox bbox) {
+<span class="nc" id="L109">        StringBuilder sb = new StringBuilder(_url);</span>
+<span class="nc" id="L110">        Coord ne = bbox.getNorthEast();</span>
+<span class="nc" id="L111">        Coord c = projection().toWGS84(new Coord(ne.getLatitude() - bbox.latitudeDifference() / 2,</span>
+<span class="nc" id="L112">                ne.getLongitude() - bbox.longitudeDifference() / 2, true));</span>
+
+<span class="nc" id="L114">        sb.append(&quot;center=&quot;);</span>
+<span class="nc" id="L115">        sb.append(c.getLatitude());</span>
+<span class="nc" id="L116">        sb.append(&quot;,&quot;);</span>
+<span class="nc" id="L117">        sb.append(c.getLongitude());</span>
+<span class="nc" id="L118">        sb.append(&quot;&amp;format=png&quot;);</span>
+<span class="nc" id="L119">        sb.append(&quot;&amp;zoom=&quot; + _zoomLevel);</span>
+<span class="nc" id="L120">        sb.append(&quot;&amp;size=&quot;);</span>
+<span class="nc" id="L121">        sb.append(tileSize);</span>
+<span class="nc" id="L122">        sb.append(&quot;x&quot;);</span>
+<span class="nc" id="L123">        sb.append(tileSize);</span>
+<span class="nc" id="L124">        sb.append(&quot;&amp;sensor=&quot;);</span>
+<span class="nc" id="L125">        sb.append(sensor);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (language != null) {</span>
+<span class="nc" id="L127">            sb.append(&quot;&amp;language=&quot;);</span>
+<span class="nc" id="L128">            sb.append(language);</span>
+        }
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (type == SATELLITE) {</span>
+<span class="nc" id="L132">            sb.append(&quot;&amp;maptype=satellite&quot;);</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        } else if (type == HYBRID) {</span>
+<span class="nc" id="L134">            sb.append(&quot;&amp;maptype=hybrid&quot;);</span>
+        }
+
+<span class="nc" id="L137">        sb.append(&quot;&amp;key=&quot; + apiKey);</span>
+
+<span class="nc" id="L139">        return new ProxyHttpTile(tileSize(), bbox, sb.toString());</span>
+    }
+
+    /**
+     * Defines the language to use for display of labels on map tiles.
+     * Note that this parameter is only supported for some country tiles;
+     * if the specific language requested is not supported for the tile set,
+     * then the default language for that tileset will be used.
+     *
+     * @return the language
+     */
+    public String getLanguage() {
+<span class="nc" id="L151">        return language;</span>
+    }
+
+    /**
+     * Defines the language to use for display of labels on map tiles.
+     * Note that this parameter is only supported for some country tiles;
+     * if the specific language requested is not supported for the tile set,
+     * then the default language for that tileset will be used.
+     *
+     * @param language the language to set
+     */
+    public void setLanguage(String language) {
+<span class="nc" id="L163">        this.language = language;</span>
+<span class="nc" id="L164">    }</span>
+
+    /**
+     * Specifies whether the application requesting the static map is using a sensor to determine the user's location.
+     *
+     * @return the sensor
+     */
+    public boolean isSensor() {
+<span class="nc" id="L172">        return sensor;</span>
+    }
+
+    /**
+     * Specifies whether the application requesting the static map is using a sensor to determine the user's location.
+     *
+     * @param sensor the sensor to set
+     */
+    public void setSensor(boolean sensor) {
+<span class="nc" id="L181">        this.sensor = sensor;</span>
+<span class="nc" id="L182">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

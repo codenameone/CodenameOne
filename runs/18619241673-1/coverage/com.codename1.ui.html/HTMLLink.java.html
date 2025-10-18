@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTMLLink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">HTMLLink.java</span></div><h1>HTMLLink.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+import java.util.Enumeration;
+import java.util.Vector;
+
+/**
+ * HTMLLink is a simple extension of Button that nullifies all its borders and attaches itself as an ActionListener to respond to link clicks.&lt;br&gt;
+ * Since a link can be split on several lines, the concept of parent and child links is introduced here. A parent link is the first segment of the link
+ * while the children are all the other segments. Only the parent is focusable (so multiple focuses on the same links will be avoided).
+ * When the parent is focused, all the children get setFocus(true). Note that for pointer events, the children are also active.
+ *
+ * @author Ofir Leitner
+ */
+class HTMLLink extends Button implements ActionListener {
+
+    String link;
+    HTMLComponent htmlC;
+    Vector childLinks;
+    HTMLLink parentLink;
+    boolean linkVisited;
+    boolean parentChangesOnFocus;
+    boolean isMap; // denotes that this is a server image map (img tag with the ismap property, and a child of the a tag)
+
+    /**
+     * Constructs the HTMLLink
+     *
+     * @param text       The link's text
+     * @param link       The link URL
+     * @param htmlC      The HTMLComponent this link is in
+     * @param parentLink THis link's parent if available
+     */
+    HTMLLink(String text, String link, HTMLComponent htmlC, HTMLLink parentLink, boolean linkVisited) {
+<span class="nc" id="L60">        super(text);</span>
+<span class="nc" id="L61">        setUIID(&quot;HTMLLink&quot;);</span>
+<span class="nc" id="L62">        this.link = link;</span>
+<span class="nc" id="L63">        this.htmlC = htmlC;</span>
+<span class="nc" id="L64">        this.parentLink = parentLink;</span>
+<span class="nc" id="L65">        this.linkVisited = linkVisited;</span>
+
+<span class="nc" id="L67">        setTickerEnabled(false);</span>
+<span class="nc" id="L68">        addActionListener(this);</span>
+
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (parentLink != null) {</span>
+<span class="nc" id="L71">            setFocusable(false);</span>
+<span class="nc" id="L72">            parentLink.addChildLink(this);</span>
+        }
+
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (htmlC.firstFocusable == null) {</span>
+<span class="nc" id="L76">            htmlC.firstFocusable = this;</span>
+        }
+
+<span class="nc" id="L79">    }</span>
+
+    static void processLink(HTMLComponent htmlC, String link) {
+<span class="nc" id="L82">        boolean process = true;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (htmlC.getHTMLCallback() != null) {</span>
+<span class="nc" id="L84">            process = htmlC.getHTMLCallback().linkClicked(htmlC, htmlC.convertURL(link));</span>
+        }
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (process) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (!link.startsWith(&quot;#&quot;)) {</span>
+<span class="nc" id="L88">                htmlC.setPage(htmlC.convertURL(link));</span>
+            } else { //local anchor
+<span class="nc" id="L90">                String anchorName = link.substring(1);</span>
+<span class="nc" id="L91">                htmlC.goToAnchor(anchorName);</span>
+            }
+        }
+<span class="nc" id="L94">    }</span>
+
+    /**
+     * Overrides setFocus in order to focus all associated components
+     *
+     * @param focused true to apply focused style, false to remove
+     */
+    public void setFocus(boolean focused) {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (parentLink != null) {</span>
+<span class="nc" id="L103">            parentLink.setChildrenFocused(focused);</span>
+<span class="nc" id="L104">            parentLink.superSetFocus(focused);</span>
+        } else {
+<span class="nc" id="L106">            setChildrenFocused(focused);</span>
+<span class="nc" id="L107">            superSetFocus(focused);</span>
+        }
+<span class="nc" id="L109">    }</span>
+
+    /**
+     * Since setFocus calls the setFocus of other children, we need this method to call the super setFocus (which means just focus this specific component, and not its associated component)
+     *
+     * @param focused true to apply focused style, false to remove
+     */
+    private void superSetFocus(boolean focused) {
+<span class="nc" id="L117">        super.setFocus(focused);</span>
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * Applies or removes the focus style to all this link children (if any)
+     *
+     * @param focused true to apply focused style, false to remove
+     */
+    private void setChildrenFocused(boolean focused) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (parentLink != null) {</span>
+<span class="nc" id="L127">            return;</span>
+        }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (childLinks != null) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            for (Enumeration e = childLinks.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L131">                HTMLLink child = (HTMLLink) e.nextElement();</span>
+                //child.setFocus(focused);
+<span class="nc" id="L133">                child.superSetFocus(focused);</span>
+<span class="nc" id="L134">                child.repaint();</span>
+<span class="nc" id="L135">            }</span>
+        }
+
+        // Some CSS attributes, such as margin/padding are applies on the parent container of links and not on them
+        // This is because setting a margin per word would not get the desired result.
+        // When setting focus to the parent (which is an unfocusable container) it will get the desired properties
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (parentChangesOnFocus) {</span>
+<span class="nc" id="L142">            getParent().setFocus(focused);</span>
+<span class="nc" id="L143">            getParent().revalidate();</span>
+        }
+<span class="nc" id="L145">    }</span>
+
+    /**
+     * If this is called it indicates that when the link is focused, its parent should change to focused as well
+     */
+    void setParentChangesOnFocus() {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (parentLink == null) {</span>
+<span class="nc" id="L152">            parentChangesOnFocus = true;</span>
+        }
+<span class="nc" id="L154">    }</span>
+
+    /**
+     * Adds the given link as the child of this link
+     *
+     * @param childLink The child link to add
+     */
+    void addChildLink(HTMLLink childLink) {
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (childLinks == null) {</span>
+<span class="nc" id="L163">            childLinks = new Vector();</span>
+        }
+<span class="nc" id="L165">        childLinks.addElement(childLink);</span>
+<span class="nc" id="L166">    }</span>
+
+    /**
+     * Triggered when the link is pressed and then it requests the link (or goes to an anchor within the page)
+     */
+    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) &amp;&amp; (isMap) &amp;&amp; (evt.getX() != -1)) { // process mp1 is checked in assigning ismap as well, but this check here should obfuscate out this method override</span>
+<span class="nc" id="L173">            processLink(htmlC, link + &quot;?&quot; + (evt.getX() - getAbsoluteX()) + &quot;,&quot; + (evt.getY() - getAbsoluteY()));</span>
+        } else {
+<span class="nc" id="L175">            processLink(htmlC, link);</span>
+        }
+<span class="nc" id="L177">    }</span>
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

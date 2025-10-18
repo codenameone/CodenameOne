@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CloudListModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.cloud</a> &gt; <span class="el_source">CloudListModel.java</span></div><h1>CloudListModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.cloud;
+
+import com.codename1.io.CacheMap;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * Seamlessly creates a cloud based searchable list model
+ *
+ * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
+ */
+public class CloudListModel implements ListModel {
+
+    private final String type;
+    private final int visibilityScope;
+<span class="nc" id="L46">    private int batchSize = 20;</span>
+<span class="nc" id="L47">    private final int keyBatchSize = 1000;</span>
+    private int sortProperty;
+    private final boolean ascending;
+    private Object[] keys;
+<span class="nc" id="L51">    private final EventDispatcher modelListener = new EventDispatcher();</span>
+<span class="nc" id="L52">    private final EventDispatcher selectionListener = new EventDispatcher();</span>
+<span class="nc" id="L53">    private int selectedIndex = 0;</span>
+    private Hashtable loadingPlaceholder;
+    private CacheMap cache;
+    private int index;
+    private String queryValue;
+
+    /**
+     * Refreshes items in the current view every 30 seconds when repainted
+     */
+<span class="nc" id="L62">    private int refreshRateMillis = 30000;</span>
+
+    private long[] lastRefresh;
+
+    /**
+     * Creates a list model that shows all the cloud elements that have the given key matching
+     * the given value at the visibility scope listed below. This model can be further narrowed
+     * down by using the filter functionality below.&lt;br&gt;
+     * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
+     * and caches data as needed.
+     *
+     * @param type            the type of object shown on the list
+     * @param visibilityScope the scope of the list (CloudObject.ACCESS_* values)
+     * @param sortProperty    the index by which we sort the entries, 0 for unsorted
+     * @param ascending       whether the sort is ascending or descending
+     */
+<span class="nc" id="L78">    public CloudListModel(String type, int visibilityScope, int sortProperty, boolean ascending) {</span>
+<span class="nc" id="L79">        this.type = type;</span>
+<span class="nc" id="L80">        this.visibilityScope = visibilityScope;</span>
+<span class="nc" id="L81">        this.sortProperty = sortProperty;</span>
+<span class="nc" id="L82">        this.ascending = ascending;</span>
+<span class="nc" id="L83">        init();</span>
+<span class="nc" id="L84">    }</span>
+
+    /**
+     * Creates a list model that shows all the cloud elements that have the given key matching
+     * the given value at the visibility scope listed below. This model can be further narrowed
+     * down by using the filter functionality below.&lt;br&gt;
+     * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
+     * and caches data as needed.
+     *
+     * @param type            the type of object shown on the list
+     * @param visibilityScope the scope of the list (CloudObject.ACCESS_* values)
+     * @param index           the index by which we limit the entries
+     * @param queryValue      the queryValue for the given index
+     * @param ascending       whether the sort is ascending or descending
+     */
+<span class="nc" id="L99">    public CloudListModel(String type, int visibilityScope, int index, String queryValue, boolean ascending) {</span>
+<span class="nc" id="L100">        this.type = type;</span>
+<span class="nc" id="L101">        this.visibilityScope = visibilityScope;</span>
+<span class="nc" id="L102">        this.index = index;</span>
+<span class="nc" id="L103">        this.queryValue = queryValue;</span>
+<span class="nc" id="L104">        this.ascending = ascending;</span>
+<span class="nc" id="L105">        init();</span>
+<span class="nc" id="L106">    }</span>
+
+    private void init() {
+<span class="nc" id="L109">        cache = new CacheMap(type + visibilityScope + sortProperty);</span>
+<span class="nc" id="L110">        cache.setCacheSize(30);</span>
+<span class="nc" id="L111">        cache.setStorageCacheSize(100);</span>
+<span class="nc" id="L112">        cache.setAlwaysStore(true);</span>
+<span class="nc" id="L113">        loadingPlaceholder = new Hashtable();</span>
+<span class="nc" id="L114">        loadingPlaceholder.put(&quot;Line1&quot;, &quot;Loading...&quot;);</span>
+<span class="nc" id="L115">        loadingPlaceholder.put(&quot;Placeholder&quot;, Boolean.TRUE);</span>
+
+        // remove loading placeholders that might have gotten stuck in cache
+<span class="nc" id="L118">        Vector v = cache.getKeysInCache();</span>
+<span class="nc" id="L119">        int cacheSize = v.size();</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        for (int iter = 0; iter &lt; cacheSize; iter++) {</span>
+<span class="nc" id="L121">            Object k = v.elementAt(iter);</span>
+<span class="nc" id="L122">            Object e = cache.get(k);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (e instanceof Hashtable) {</span>
+<span class="nc" id="L124">                Hashtable h = (Hashtable) e;</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (h.containsKey(&quot;Placeholder&quot;)) {</span>
+<span class="nc" id="L126">                    cache.delete(k);</span>
+                }
+            }
+        }
+<span class="nc" id="L130">    }</span>
+
+    /**
+     * Refreshes the list from the server, this method blocks the EDT until
+     * completion.
+     */
+    public void refresh() {
+<span class="nc" id="L137">        Vector vec = cache.getKeysInCache();</span>
+<span class="nc" id="L138">        int s = vec.size();</span>
+<span class="nc" id="L139">        Vector cld = new Vector();</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        for (int iter = 0; iter &lt; s; iter++) {</span>
+<span class="nc" id="L141">            Object key = vec.elementAt(iter);</span>
+<span class="nc" id="L142">            Object val = cache.get(key);</span>
+<span class="nc bnc" id="L143" title="All 4 branches missed.">            if (val != null &amp;&amp; val instanceof CloudObject) {</span>
+<span class="nc" id="L144">                cld.addElement(val);</span>
+            }
+        }
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (cld.size() &gt; 0) {</span>
+<span class="nc" id="L148">            CloudObject[] obj = new CloudObject[cld.size()];</span>
+<span class="nc" id="L149">            cld.toArray(obj);</span>
+<span class="nc" id="L150">            int response = CloudStorage.getInstance().refresh(obj);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (response != CloudStorage.RETURN_CODE_SUCCESS) {</span>
+<span class="nc" id="L152">                onError(new CloudException(response));</span>
+            } else {
+                // persist the object to the cache and fire the list model change
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                for (int iter = 0; iter &lt; obj.length; iter++) {</span>
+<span class="nc" id="L156">                    cache.put(obj[iter].getCloudId(), obj[iter]);</span>
+                }
+<span class="nc" id="L158">                modelListener.fireDataChangeEvent(0, getSize());</span>
+            }
+        }
+<span class="nc" id="L161">    }</span>
+
+    /**
+     * Flushes the cache which might be essential when adding new elements
+     */
+    public void clearCache() {
+<span class="nc" id="L167">        cache.clearAllCache();</span>
+<span class="nc" id="L168">    }</span>
+
+    /**
+     * Returns the elements cached within the implementation
+     *
+     * @return the cache size
+     */
+    public int getCacheSize() {
+<span class="nc" id="L176">        return cache.getCacheSize();</span>
+    }
+
+    /**
+     * Sets the size of the local cache
+     *
+     * @param elements elements to store in cache
+     */
+    public void setCacheSize(int elements) {
+<span class="nc" id="L185">        cache.setCacheSize(elements);</span>
+<span class="nc" id="L186">    }</span>
+
+    /**
+     * Returns the elements cached within the persistent storage
+     *
+     * @return the cache size
+     */
+    public int getStorageCacheSize() {
+<span class="nc" id="L194">        return cache.getCacheSize();</span>
+    }
+
+    /**
+     * Sets the size of the cache in persistent storage
+     *
+     * @param elements elements to store in cache
+     */
+    public void setStorageCacheSize(int elements) {
+<span class="nc" id="L203">        cache.setStorageCacheSize(elements);</span>
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * When loading the element from the cloud a placehold is shown to indicate to the user that the content isn't fully
+     * here
+     *
+     * @return the element shown when content isn't available for a specific entry
+     */
+    public Hashtable getLoadingPlaceholder() {
+<span class="nc" id="L213">        return loadingPlaceholder;</span>
+    }
+
+    /**
+     * When loading the element from the cloud a placehold is shown to indicate to the user that the content isn't fully
+     * here
+     *
+     * @param loadingPlaceholder shows blank content to the user
+     */
+    public void setLoadingPlaceholder(Hashtable loadingPlaceholder) {
+<span class="nc" id="L223">        this.loadingPlaceholder = loadingPlaceholder;</span>
+<span class="nc" id="L224">        this.loadingPlaceholder.put(&quot;Placeholder&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L225">    }</span>
+
+    /**
+     * Returns the batch size fetched from the server
+     *
+     * @return the size
+     */
+    public int getBatchSize() {
+<span class="nc" id="L233">        return batchSize;</span>
+    }
+
+    /**
+     * Updates the number of elements fetched from the server in a single batch
+     *
+     * @param batchSize the batch size
+     */
+    public void setBatchSize(int batchSize) {
+<span class="nc" id="L242">        this.batchSize = batchSize;</span>
+<span class="nc" id="L243">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getItemAt(int index) {
+<span class="nc bnc" id="L249" title="All 6 branches missed.">        if (keys != null &amp;&amp; index &lt; keys.length &amp;&amp; index &gt; -1) {</span>
+<span class="nc" id="L250">            Object value = cache.get(keys[index]);</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L252">                value = getLoadingPlaceholder();</span>
+<span class="nc" id="L253">                fillUpList(index);</span>
+            } else {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                if (value instanceof CloudObject) {</span>
+<span class="nc" id="L256">                    long time = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                    if (lastRefresh[index] + refreshRateMillis &lt; time) {</span>
+<span class="nc" id="L258">                        CloudObject cld = (CloudObject) value;</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                        if (cld.getLastModified() &gt; lastRefresh[index]) {</span>
+<span class="nc" id="L260">                            lastRefresh[index] = cld.getLastModified();</span>
+                        } else {
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                            if (cld.getStatus() == CloudObject.STATUS_COMMITTED) {</span>
+<span class="nc" id="L263">                                CloudStorage.getInstance().refreshAsync(cld);</span>
+                            }
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L269">            return value;</span>
+        }
+
+<span class="nc" id="L272">        return null;</span>
+    }
+
+    private void fillUpList(final int startIndex) {
+<span class="nc" id="L276">        final int len = Math.min(batchSize, keys.length - startIndex);</span>
+<span class="nc" id="L277">        Vector&lt;String&gt; request = new Vector&lt;String&gt;();</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        for (int iter = startIndex; iter &lt; startIndex + len; iter++) {</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            if (cache.get(keys[iter]) == null) {</span>
+<span class="nc" id="L280">                cache.put(keys[iter], loadingPlaceholder);</span>
+<span class="nc" id="L281">                request.addElement((String) keys[iter]);</span>
+            }
+        }
+<span class="nc" id="L284">        CloudResponse&lt;CloudObject[]&gt; resp = new CloudResponse&lt;CloudObject[]&gt;() {</span>
+            public void onSuccess(CloudObject[] returnValue) {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                for (int iter = 0; iter &lt; returnValue.length; iter++) {</span>
+<span class="nc" id="L287">                    cache.put(returnValue[iter].getCloudId(), returnValue[iter]);</span>
+                }
+<span class="nc" id="L289">                modelListener.fireDataChangeEvent(startIndex, len);</span>
+<span class="nc" id="L290">            }</span>
+
+            public void onError(CloudException err) {
+<span class="nc" id="L293">                CloudListModel.this.onError(err);</span>
+<span class="nc" id="L294">            }</span>
+        };
+<span class="nc" id="L296">        String[] arr = new String[request.size()];</span>
+<span class="nc" id="L297">        request.toArray(arr);</span>
+<span class="nc" id="L298">        CloudStorage.getInstance().fetch(arr, resp);</span>
+<span class="nc" id="L299">    }</span>
+
+    private void newRefreshRate() {
+<span class="nc" id="L302">        lastRefresh = new long[keys.length];</span>
+<span class="nc" id="L303">        long t = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        for (int iter = 0; iter &lt; lastRefresh.length; iter++) {</span>
+<span class="nc" id="L305">            lastRefresh[iter] = t;</span>
+        }
+<span class="nc" id="L307">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSize() {
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        if (keys == null) {</span>
+<span class="nc" id="L314">            keys = (Object[]) cache.get(&quot;keyIndex&quot;);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            if (keys == null) {</span>
+<span class="nc" id="L316">                keys = new Object[0];</span>
+            } else {
+<span class="nc" id="L318">                newRefreshRate();</span>
+            }
+
+            // refresh the key list even if we have them in cache since this might have changed
+<span class="nc" id="L322">            CloudResponse&lt;String[]&gt; resp = new CloudResponse&lt;String[]&gt;() {</span>
+                private int responseOffset;
+
+                public void onSuccess(String[] returnValue) {
+<span class="nc bnc" id="L326" title="All 2 branches missed.">                    if (responseOffset == 0) {</span>
+<span class="nc" id="L327">                        keys = returnValue;</span>
+                    } else {
+<span class="nc" id="L329">                        String[] k = new String[keys.length + returnValue.length];</span>
+<span class="nc" id="L330">                        Util.mergeArrays(keys, returnValue, k);</span>
+<span class="nc" id="L331">                        keys = k;</span>
+                    }
+<span class="nc" id="L333">                    newRefreshRate();</span>
+<span class="nc" id="L334">                    cache.put(&quot;keyIndex&quot;, keys);</span>
+<span class="nc" id="L335">                    modelListener.fireDataChangeEvent(-1, DataChangedListener.ADDED);</span>
+
+                    // we might have more data, send another request
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                    if (returnValue.length == keyBatchSize) {</span>
+<span class="nc" id="L339">                        responseOffset = keys.length;</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">                        if (index &gt; 0) {</span>
+<span class="nc" id="L341">                            CloudStorage.getInstance().queryEqualsKeys(type, index, queryValue, keys.length, keyBatchSize, visibilityScope, this);</span>
+                        } else {
+<span class="nc" id="L343">                            CloudStorage.getInstance().querySortedKeys(type, sortProperty, ascending, keys.length, keyBatchSize, visibilityScope, this);</span>
+                        }
+                    }
+<span class="nc" id="L346">                }</span>
+
+                public void onError(CloudException err) {
+<span class="nc" id="L349">                    CloudListModel.this.onError(err);</span>
+<span class="nc" id="L350">                }</span>
+            };
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            if (index &gt; 0) {</span>
+<span class="nc" id="L353">                CloudStorage.getInstance().queryEqualsKeys(type, index, queryValue, 0, keyBatchSize, visibilityScope, resp);</span>
+            } else {
+<span class="nc" id="L355">                CloudStorage.getInstance().querySortedKeys(type, sortProperty, ascending, 0, keyBatchSize, visibilityScope, resp);</span>
+            }
+        }
+<span class="nc" id="L358">        return keys.length;</span>
+    }
+
+    /**
+     * Invoked when a cloud error occurs
+     *
+     * @param err the exception representing the error in cloud communications
+     */
+    protected void onError(CloudException err) {
+<span class="nc" id="L367">        Log.e(err);</span>
+<span class="nc" id="L368">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSelectedIndex() {
+<span class="nc" id="L374">        return selectedIndex;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setSelectedIndex(int index) {
+<span class="nc" id="L381">        int oldIndex = selectedIndex;</span>
+<span class="nc" id="L382">        this.selectedIndex = index;</span>
+<span class="nc" id="L383">        selectionListener.fireSelectionEvent(oldIndex, selectedIndex);</span>
+<span class="nc" id="L384">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L390">        modelListener.addListener(l);</span>
+<span class="nc" id="L391">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L397">        modelListener.removeListener(l);</span>
+<span class="nc" id="L398">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addSelectionListener(SelectionListener l) {
+<span class="nc" id="L404">        selectionListener.addListener(l);</span>
+<span class="nc" id="L405">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeSelectionListener(SelectionListener l) {
+<span class="nc" id="L411">        selectionListener.removeListener(l);</span>
+<span class="nc" id="L412">    }</span>
+
+    /**
+     * &lt;b&gt;Notice&lt;/b&gt; this method does NOT commit the data, after committing the data
+     * the cache MUST be cleared!
+     * {@inheritDoc}
+     */
+    public void addItem(Object item) {
+<span class="nc" id="L420">        CloudObject cld = (CloudObject) item;</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (cld.getType() == null) {</span>
+<span class="nc" id="L422">            cld.setType(type);</span>
+        }
+<span class="nc" id="L424">        CloudStorage.getInstance().save(cld);</span>
+<span class="nc" id="L425">    }</span>
+
+    /**
+     * &lt;b&gt;Notice&lt;/b&gt; this method does NOT commit the data, after committing the data
+     * the cache MUST be cleared!
+     * {@inheritDoc}
+     */
+    public void removeItem(int index) {
+<span class="nc" id="L433">        Object o = getItemAt(index);</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        if (o instanceof CloudObject) {</span>
+<span class="nc" id="L435">            CloudObject cld = (CloudObject) o;</span>
+<span class="nc" id="L436">            CloudStorage.getInstance().delete(cld);</span>
+        }
+<span class="nc" id="L438">    }</span>
+
+    /**
+     * Indicates the rate in milliseconds in which to poll the server for the current data
+     * of elements that are visible at the moment.
+     *
+     * @return the refreshRateMillis
+     */
+    public int getRefreshRateMillis() {
+<span class="nc" id="L447">        return refreshRateMillis;</span>
+    }
+
+    /**
+     * Indicates the rate in milliseconds in which to poll the server for the current data
+     * of elements that are visible at the moment.
+     *
+     * @param refreshRateMillis the refreshRateMillis to set
+     */
+    public void setRefreshRateMillis(int refreshRateMillis) {
+<span class="nc" id="L457">        this.refreshRateMillis = refreshRateMillis;</span>
+<span class="nc" id="L458">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

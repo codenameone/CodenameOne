@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DialChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">DialChart.java</span></div><h1>DialChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.CategorySeries;
+import com.codename1.charts.renderers.DefaultRenderer;
+import com.codename1.charts.renderers.DialRenderer;
+import com.codename1.charts.renderers.DialRenderer.Type;
+import com.codename1.charts.util.MathHelper;
+import com.codename1.ui.Component;
+
+
+/**
+ * The dial chart rendering class.
+ */
+public class DialChart extends RoundChart {
+    /** The radius of the needle. */
+    private static final int NEEDLE_RADIUS = 10;
+    /** The series renderer. */
+    private final DialRenderer mRenderer;
+
+    /**
+     * Builds a new dial chart instance.
+     *
+     * @param dataset the series dataset
+     * @param renderer the dial renderer
+     */
+    public DialChart(CategorySeries dataset, DialRenderer renderer) {
+<span class="nc" id="L45">        super(dataset, renderer);</span>
+<span class="nc" id="L46">        mRenderer = renderer;</span>
+<span class="nc" id="L47">    }</span>
+
+    /**
+     * The graphical representation of the dial chart.
+     *
+     * @param canvas the canvas to paint to
+     * @param x the top left x value of the view to draw to
+     * @param y the top left y value of the view to draw to
+     * @param width the width of the view to draw to
+     * @param height the height of the view to draw to
+     * @param paint the paint
+     */
+    @Override
+    public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+<span class="nc" id="L61">        paint.setAntiAlias(mRenderer.isAntialiasing());</span>
+<span class="nc" id="L62">        paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L63">        paint.setTextSize(mRenderer.getLabelsTextSize());</span>
+<span class="nc" id="L64">        int legendSize = getLegendSize(mRenderer, height / 5, 0);</span>
+<span class="nc" id="L65">        int left = x;</span>
+<span class="nc" id="L66">        int top = y;</span>
+<span class="nc" id="L67">        int right = x + width;</span>
+
+<span class="nc" id="L69">        int sLength = mDataset.getItemCount();</span>
+<span class="nc" id="L70">        String[] titles = new String[sLength];</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="nc" id="L72">            titles[i] = mDataset.getCategory(i);</span>
+        }
+
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (mRenderer.isFitLegend()) {</span>
+<span class="nc" id="L76">            legendSize = drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize,</span>
+                    paint, true);
+        }
+<span class="nc" id="L79">        int bottom = y + height - legendSize;</span>
+<span class="nc" id="L80">        drawBackground(mRenderer, canvas, x, y, width, height, paint, false, DefaultRenderer.NO_COLOR);</span>
+
+<span class="nc" id="L82">        int mRadius = Math.min(Math.abs(right - left), Math.abs(bottom - top));</span>
+<span class="nc" id="L83">        int radius = (int) (mRadius * 0.35 * mRenderer.getScale());</span>
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterX == NO_VALUE) {</span>
+<span class="nc" id="L85">            mCenterX = (left + right) / 2;</span>
+        }
+<span class="nc bnc" id="L87" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterY == NO_VALUE) {</span>
+<span class="nc" id="L88">            mCenterY = (bottom + top) / 2;</span>
+        }
+<span class="nc" id="L90">        float shortRadius = radius * 0.9f;</span>
+<span class="nc" id="L91">        float longRadius = radius * 1.1f;</span>
+<span class="nc" id="L92">        double min = mRenderer.getMinValue();</span>
+<span class="nc" id="L93">        double max = mRenderer.getMaxValue();</span>
+<span class="nc" id="L94">        double angleMin = mRenderer.getAngleMin();</span>
+<span class="nc" id="L95">        double angleMax = mRenderer.getAngleMax();</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        if (!mRenderer.isMinValueSet() || !mRenderer.isMaxValueSet()) {</span>
+<span class="nc" id="L97">            int count = mRenderer.getSeriesRendererCount();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="nc" id="L99">                double value = mDataset.getValue(i);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                if (!mRenderer.isMinValueSet()) {</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                    min = min == MathHelper.NULL_VALUE ? value : Math.min(min, value);</span>
+                }
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                if (!mRenderer.isMaxValueSet()) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                    max = max == MathHelper.NULL_VALUE ? value : Math.max(max, value);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (min == max) {</span>
+<span class="nc" id="L109">            min = min * 0.5;</span>
+<span class="nc" id="L110">            max = max * 1.5;</span>
+        }
+
+<span class="nc" id="L113">        paint.setColor(mRenderer.getLabelsColor());</span>
+<span class="nc" id="L114">        double minorTicks = mRenderer.getMinorTicksSpacing();</span>
+<span class="nc" id="L115">        double majorTicks = mRenderer.getMajorTicksSpacing();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (minorTicks == MathHelper.NULL_VALUE) {</span>
+<span class="nc" id="L117">            minorTicks = (max - min) / 30;</span>
+        }
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (majorTicks == MathHelper.NULL_VALUE) {</span>
+<span class="nc" id="L120">            majorTicks = (max - min) / 10;</span>
+        }
+<span class="nc" id="L122">        drawTicks(canvas, min, max, angleMin, angleMax, mCenterX, mCenterY, longRadius, radius,</span>
+                minorTicks, paint, false);
+<span class="nc" id="L124">        drawTicks(canvas, min, max, angleMin, angleMax, mCenterX, mCenterY, longRadius, shortRadius,</span>
+                majorTicks, paint, true);
+
+<span class="nc" id="L127">        int count = mRenderer.getSeriesRendererCount();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="nc" id="L129">            double angle = getAngleForValue(mDataset.getValue(i), angleMin, angleMax, min, max);</span>
+<span class="nc" id="L130">            paint.setColor(mRenderer.getSeriesRendererAt(i).getColor());</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            boolean type = mRenderer.getVisualTypeForIndex(i) == Type.ARROW;</span>
+<span class="nc" id="L132">            drawNeedle(canvas, angle, mCenterX, mCenterY, shortRadius, type, paint);</span>
+        }
+<span class="nc" id="L134">        drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize, paint, false);</span>
+<span class="nc" id="L135">        drawTitle(canvas, x, y, width, paint);</span>
+<span class="nc" id="L136">    }</span>
+
+    /**
+     * Returns the angle for a specific chart value.
+     *
+     * @param value the chart value
+     * @param minAngle the minimum chart angle value
+     * @param maxAngle the maximum chart angle value
+     * @param min the minimum chart value
+     * @param max the maximum chart value
+     * @return the angle
+     */
+    private double getAngleForValue(double value, double minAngle, double maxAngle, double min,
+                                    double max) {
+<span class="nc" id="L150">        double angleDiff = maxAngle - minAngle;</span>
+<span class="nc" id="L151">        double diff = max - min;</span>
+<span class="nc" id="L152">        return Math.toRadians(minAngle + (value - min) * angleDiff / diff);</span>
+    }
+
+    /**
+     * Draws the chart tick lines.
+     *
+     * @param canvas the canvas
+     * @param min the minimum chart value
+     * @param max the maximum chart value
+     * @param minAngle the minimum chart angle value
+     * @param maxAngle the maximum chart angle value
+     * @param centerX the center x value
+     * @param centerY the center y value
+     * @param longRadius the long radius
+     * @param shortRadius the short radius
+     * @param ticks the tick spacing
+     * @param paint the paint settings
+     * @param labels paint the labels
+     * @return the angle
+     */
+    private void drawTicks(Canvas canvas, double min, double max, double minAngle, double maxAngle,
+                           int centerX, int centerY, double longRadius, double shortRadius, double ticks, Paint paint,
+                           boolean labels) {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        for (double i = min; i &lt;= max; i += ticks) {</span>
+<span class="nc" id="L176">            double angle = getAngleForValue(i, minAngle, maxAngle, min, max);</span>
+<span class="nc" id="L177">            double sinValue = Math.sin(angle);</span>
+<span class="nc" id="L178">            double cosValue = Math.cos(angle);</span>
+<span class="nc" id="L179">            int x1 = Math.round(centerX + (float) (shortRadius * sinValue));</span>
+<span class="nc" id="L180">            int y1 = Math.round(centerY + (float) (shortRadius * cosValue));</span>
+<span class="nc" id="L181">            int x2 = Math.round(centerX + (float) (longRadius * sinValue));</span>
+<span class="nc" id="L182">            int y2 = Math.round(centerY + (float) (longRadius * cosValue));</span>
+<span class="nc" id="L183">            canvas.drawLine(x1, y1, x2, y2, paint);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            if (labels) {</span>
+<span class="nc" id="L185">                paint.setTextAlign(Component.LEFT);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                if (x1 &lt;= x2) {</span>
+<span class="nc" id="L187">                    paint.setTextAlign(Component.RIGHT);</span>
+                }
+<span class="nc" id="L189">                String text = i + &quot;&quot;;</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                if (Math.round(i) == (long) i) {</span>
+<span class="nc" id="L191">                    text = (long) i + &quot;&quot;;</span>
+                }
+<span class="nc" id="L193">                canvas.drawText(text, x1, y1, paint);</span>
+            }
+        }
+<span class="nc" id="L196">    }</span>
+
+    /**
+     * Returns the angle for a specific chart value.
+     *
+     * @param canvas the canvas
+     * @param angle the needle angle value
+     * @param centerX the center x value
+     * @param centerY the center y value
+     * @param radius the radius
+     * @param arrow if a needle or an arrow to be painted
+     * @param paint the paint settings
+     * @return the angle
+     */
+    private void drawNeedle(Canvas canvas, double angle, int centerX, int centerY, double radius,
+                            boolean arrow, Paint paint) {
+<span class="nc" id="L212">        double diff = Math.toRadians(90);</span>
+<span class="nc" id="L213">        int needleSinValue = (int) (NEEDLE_RADIUS * Math.sin(angle - diff));</span>
+<span class="nc" id="L214">        int needleCosValue = (int) (NEEDLE_RADIUS * Math.cos(angle - diff));</span>
+<span class="nc" id="L215">        int needleX = (int) (radius * Math.sin(angle));</span>
+<span class="nc" id="L216">        int needleY = (int) (radius * Math.cos(angle));</span>
+<span class="nc" id="L217">        int needleCenterX = centerX + needleX;</span>
+<span class="nc" id="L218">        int needleCenterY = centerY + needleY;</span>
+        float[] points;
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (arrow) {</span>
+<span class="nc" id="L221">            int arrowBaseX = centerX + (int) (radius * 0.85 * Math.sin(angle));</span>
+<span class="nc" id="L222">            int arrowBaseY = centerY + (int) (radius * 0.85 * Math.cos(angle));</span>
+<span class="nc" id="L223">            points = new float[]{arrowBaseX - needleSinValue, arrowBaseY - needleCosValue,</span>
+                    needleCenterX, needleCenterY, arrowBaseX + needleSinValue, arrowBaseY + needleCosValue};
+<span class="nc" id="L225">            float width = paint.getStrokeWidth();</span>
+<span class="nc" id="L226">            paint.setStrokeWidth(5);</span>
+<span class="nc" id="L227">            canvas.drawLine(centerX, centerY, needleCenterX, needleCenterY, paint);</span>
+<span class="nc" id="L228">            paint.setStrokeWidth(width);</span>
+<span class="nc" id="L229">        } else {</span>
+<span class="nc" id="L230">            points = new float[]{centerX - needleSinValue, centerY - needleCosValue, needleCenterX,</span>
+                    needleCenterY, centerX + needleSinValue, centerY + needleCosValue};
+        }
+<span class="nc" id="L233">        drawPath(canvas, points, paint, true);</span>
+<span class="nc" id="L234">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

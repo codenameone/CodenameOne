@@ -1,0 +1,1601 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Image.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Image.java</span></div><h1>Image.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.util.ImageIO;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.HashMap;
+
+/**
+ * &lt;p&gt;Abstracts the underlying platform images allowing us to treat them as a uniform
+ * object. &lt;/p&gt;
+ *
+ * @author Chen Fishbein
+ */
+public class Image implements ActionSource {
+    int transform;
+    private EventDispatcher listeners;
+    private Object rgbCache;
+    private Object image;
+<span class="nc" id="L53">    private boolean opaqueTested = false;</span>
+    private boolean opaque;
+    private Object scaleCache;
+    private boolean animated;
+<span class="nc" id="L57">    private long imageTime = -1;</span>
+    private String svgBaseURL;
+    private byte[] svgData;
+    private String imageName;
+
+    /**
+     * Subclasses may use this and point to an underlying native image which might be
+     * null for a case of an image that doesn't use native drawing
+     *
+     * @param image native image object passed to the Codename One implementation
+     */
+<span class="nc" id="L68">    protected Image(Object image) {</span>
+<span class="nc" id="L69">        this.image = image;</span>
+<span class="nc" id="L70">        animated = Display.impl.isAnimation(image);</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Creates a new instance of ImageImpl
+     */
+    Image(int[] imageArray, int w, int h) {
+<span class="nc" id="L77">        this(Display.impl.createImage(imageArray, w, h));</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * Indicates whether the underlying platform supports creating an SVG Image
+     *
+     * @return true if the method create SVG image would return a valid image object
+     * from an SVG Input stream
+     */
+    public static boolean isSVGSupported() {
+<span class="nc" id="L87">        return Display.impl.isSVGSupported();</span>
+    }
+
+    /**
+     * Creates an SVG Image from the given byte array data and the base URL, this method
+     * will throw an exception if SVG is unsupported.
+     *
+     * @param baseURL  URL which is used to resolve relative references within the SVG file
+     * @param animated indicates if the SVG features an animation
+     * @param data     the conten of the SVG file
+     * @return an image object that can be used as any other image object.
+     * @throws IOException if resource lookup fail SVG is unsupported
+     */
+    public static Image createSVG(String baseURL, boolean animated, byte[] data) throws IOException {
+<span class="nc" id="L101">        Image i = new Image(Display.impl.createSVGImage(baseURL, data));</span>
+<span class="nc" id="L102">        i.animated = animated;</span>
+<span class="nc" id="L103">        i.svgBaseURL = baseURL;</span>
+<span class="nc" id="L104">        i.svgData = data;</span>
+<span class="nc" id="L105">        return i;</span>
+    }
+
+    /**
+     * Creates an indexed image with byte data this method may return a native indexed image rather than
+     * an instance of the IndexedImage class
+     *
+     * @param width   image width
+     * @param height  image height
+     * @param palette the color palette to use with the byte data
+     * @param data    byte data containing palette offsets to map to ARGB colors
+     * @deprecated try to avoid using indexed images explicitly
+     */
+    public static Image createIndexed(int width, int height, int[] palette, byte[] data) {
+<span class="nc" id="L119">        IndexedImage i = new IndexedImage(width, height, palette, data);</span>
+<span class="nc" id="L120">        CodenameOneImplementation impl = Display.impl;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (impl.isNativeIndexed()) {</span>
+<span class="nc" id="L122">            return new Image(impl.createNativeIndexed(i));</span>
+        }
+<span class="nc" id="L124">        return i;</span>
+    }
+
+    /**
+     * Creates an image from a path.
+     *
+     * @param path If path begins with {@literal file:} then the image will be loaded from FileSystemStorage.  Otherwise
+     *             it will load from the jar resources.
+     * @return newly created image object
+     * @throws java.io.IOException
+     */
+    public static Image createImage(String path) throws IOException {
+        try {
+<span class="nc" id="L137">            return new Image(Display.impl.createImage(path));</span>
+<span class="nc" id="L138">        } catch (OutOfMemoryError err) {</span>
+            // Images have a major bug on many phones where they sometimes throw
+            // an OOM with no reason. A system.gc followed by the same call over
+            // solves the problem. This has something to do with the fact that
+            // there is no Image.dispose method in existance.
+<span class="nc" id="L143">            System.gc();</span>
+<span class="nc" id="L144">            System.gc();</span>
+<span class="nc" id="L145">            return new Image(Display.impl.createImage(path));</span>
+        }
+    }
+
+    /**
+     * creates an image from the given native image (e.g. MIDP image object)
+     *
+     * @param nativeImage
+     * @return newly created Codename One image object
+     * @deprecated this method is deprecated as a warning! Don't use this method unless you actually
+     * know what you are doing, if you are invoking this method without understanding the distinction
+     * between native image and Codename One image then you are using the wrong method.
+     */
+    public static Image createImage(Object nativeImage) {
+<span class="nc" id="L159">        return new Image(nativeImage);</span>
+    }
+
+    /**
+     * creates an image from an InputStream
+     *
+     * @param stream a given InputStream
+     * @return the newly created image
+     * @throws java.io.IOException
+     */
+    public static Image createImage(InputStream stream) throws IOException {
+        try {
+<span class="nc" id="L171">            return new Image(Display.impl.createImage(stream));</span>
+<span class="nc" id="L172">        } catch (OutOfMemoryError err) {</span>
+            // Images have a major bug on many phones where they sometimes throw
+            // an OOM with no reason. A system.gc followed by the same call over
+            // solves the problem. This has something to do with the fact that
+            // there is no Image.dispose method in existance.
+<span class="nc" id="L177">            System.gc();</span>
+<span class="nc" id="L178">            System.gc();</span>
+<span class="nc" id="L179">            return new Image(Display.impl.createImage(stream));</span>
+        }
+    }
+
+    /**
+     * creates an image from an RGB image
+     *
+     * @param rgb    the RGB image array data
+     * @param width  the image width
+     * @param height the image height
+     * @return an image from an RGB image
+     */
+    public static Image createImage(int[] rgb, int width, int height) {
+        try {
+<span class="nc" id="L193">            Image i = new Image(Display.impl.createImage(rgb, width, height));</span>
+<span class="nc" id="L194">            return i;</span>
+<span class="nc" id="L195">        } catch (OutOfMemoryError err) {</span>
+            // Images have a major bug on many phones where they sometimes throw
+            // an OOM with no reason. A system.gc followed by the same call over
+            // solves the problem. This has something to do with the fact that
+            // there is no Image.dispose method in existance.
+<span class="nc" id="L200">            System.gc();</span>
+<span class="nc" id="L201">            System.gc();</span>
+<span class="nc" id="L202">            return new Image(Display.impl.createImage(rgb, width, height));</span>
+        }
+    }
+
+    /**
+     * &lt;p&gt;Creates a white opaque mutable image that may be manipulated using {@link #getGraphics()}.&lt;br&gt;
+     * The sample below shows this method being used to create a screenshot for sharing the image:&lt;/p&gt;
+     *
+     * &lt;script src=&quot;https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js&quot;&gt;&lt;/script&gt;
+     *
+     * &lt;p&gt;
+     * The sample below demonstrates the drawing of a mask image to create a round image effect
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js&quot;&gt;&lt;/script&gt;
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/graphics-image-masking.png&quot; alt=&quot;Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable&quot; /&gt;
+     *
+     * @param width  the image width
+     * @param height the image height
+     * @return an image in a given width and height dimension
+     */
+    public static Image createImage(int width, int height) {
+<span class="nc" id="L223">        return createImage(width, height, 0xffffffff);</span>
+    }
+
+    /**
+     * Returns true if mutable images support alpha transparency
+     *
+     * @return true if mutable images support alpha in their fillColor argument
+     */
+    public static boolean isAlphaMutableImageSupported() {
+<span class="nc" id="L232">        return Display.impl.isAlphaMutableImageSupported();</span>
+    }
+
+    /**
+     * &lt;p&gt;Creates a mutable image that may be manipulated using {@link #getGraphics()}.&lt;br&gt;
+     * The sample below shows this method being used to create a screenshot for sharing the image:&lt;/p&gt;
+     *
+     * &lt;script src=&quot;https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param width     the image width
+     * @param height    the image height
+     * @param fillColor the color with which the image should be initially filled
+     * @return an image in a given width and height dimension
+     */
+    public static Image createImage(int width, int height, int fillColor) {
+        try {
+<span class="nc" id="L248">            return new Image(Display.impl.createMutableImage(width, height, fillColor));</span>
+<span class="nc" id="L249">        } catch (OutOfMemoryError err) {</span>
+            // Images have a major bug on many phones where they sometimes throw
+            // an OOM with no reason. A system.gc followed by the same call over
+            // solves the problem. This has something to do with the fact that
+            // there is no Image.dispose method in existance.
+<span class="nc" id="L254">            System.gc();</span>
+<span class="nc" id="L255">            System.gc();</span>
+<span class="nc" id="L256">            return new Image(Display.impl.createMutableImage(width, height, fillColor));</span>
+        }
+    }
+
+    /**
+     * creates an image from a given byte array data
+     *
+     * @param bytes  the array of image data in a supported image format
+     * @param offset the offset of the start of the data in the array
+     * @param len    the length of the data in the array
+     * @return the newly created image
+     */
+    public static Image createImage(byte[] bytes, int offset, int len) {
+        try {
+<span class="nc" id="L270">            Object o = Display.impl.createImage(bytes, offset, len);</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (o == null) {</span>
+<span class="nc" id="L272">                throw new IllegalArgumentException(&quot;create image failed for the given image data of length: &quot; + len);</span>
+            }
+<span class="nc" id="L274">            return new Image(o);</span>
+<span class="nc" id="L275">        } catch (OutOfMemoryError err) {</span>
+            // Images have a major bug on many phones where they sometimes throw
+            // an OOM with no reason. A system.gc followed by the same call over
+            // solves the problem. This has something to do with the fact that
+            // there is no Image.dispose method in existance.
+<span class="nc" id="L280">            System.gc();</span>
+<span class="nc" id="L281">            System.gc();</span>
+<span class="nc" id="L282">            return new Image(Display.impl.createImage(bytes, offset, len));</span>
+        }
+    }
+
+    /**
+     * &lt;p&gt;
+     * The main use case of this method is the automatic rotation and flipping
+     * of an image returned from the camera or from the gallery, preserving the
+     * original format (jpeg or png); it detects the Exif Orientation Tag, if
+     * available (all the possible Exif Orientation Tag values are
+     * supported); transparency is not preserved.&lt;/p&gt;
+     * &lt;p&gt;
+     * If there is no rotation or flipping, the image is only copied or scaled
+     * if necessary; if the capturedImage has a format different from jpeg and
+     * png, it is copied as it is.&lt;br&gt;Note that this method doesn't rely on the
+     * file extension, but on the mime type of the capturedImage, since some
+     * devices don't give appropriate extension to images returned from the
+     * gallery.&lt;/p&gt;
+     * &lt;p&gt;
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * &lt;a href=&quot;https://github.com/recurser/exif-orientation-examples&quot;&gt;EXIF
+     * Orientation-flag example images&lt;/a&gt;&lt;/p&gt;
+     * &lt;p&gt;
+     * Code example:&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/jsfan3/7fc101523955e8179fadd2c713a09e05.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param capturedImage is the FileSystemStorage path of a captured photo,
+     *                      usually inside a temporary directory
+     * @return the rotated and/or flipped image
+     */
+    public static Image exifRotation(String capturedImage) throws IOException {
+<span class="nc" id="L314">        return exifRotation(capturedImage, null, -1);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * The main use case of this method is the automatic rotation and flipping
+     * of an image returned from the camera or from the gallery, preserving the
+     * original format (jpeg or png); it detects the Exif Orientation Tag, if
+     * available (all the possible Exif Orientation Tag values are
+     * supported); transparency is not preserved.&lt;/p&gt;
+     * &lt;p&gt;
+     * If there is no rotation or flipping, the image is only copied or scaled
+     * if necessary; if the capturedImage has a format different from jpeg and
+     * png, it is copied as it is.&lt;br&gt;Note that this method doesn't rely on the
+     * file extension, but on the mime type of the capturedImage, since some
+     * devices don't give appropriate extension to images returned from the
+     * gallery.&lt;/p&gt;
+     * &lt;p&gt;
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * &lt;a href=&quot;https://github.com/recurser/exif-orientation-examples&quot;&gt;EXIF
+     * Orientation-flag example images&lt;/a&gt;&lt;/p&gt;
+     * &lt;p&gt;
+     * Code example:&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/jsfan3/7fc101523955e8179fadd2c713a09e05.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param capturedImage is the FileSystemStorage path of a captured photo,
+     *                      usually inside a temporary directory
+     * @param rotatedImage  is the FileSystemStorage path in which the rotated
+     *                      photo is stored, normally this should be inside the
+     *                      FileSystemStorage.getAppHomePath(); it can be null if you don't want to
+     *                      save the rotated image to the FileSystemStorage.
+     * @return the rotated and/or flipped image
+     */
+    public static Image exifRotation(String capturedImage, String rotatedImage) throws IOException {
+<span class="nc" id="L349">        return exifRotation(capturedImage, rotatedImage, -1);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * The main use case of this method is the automatic rotation and flipping
+     * of an image returned from the camera or from the gallery, preserving the
+     * original format (jpeg or png); it detects the Exif Orientation Tag, if
+     * available (all the possible Exif Orientation Tag values are
+     * supported); transparency is not preserved.&lt;/p&gt;
+     * &lt;p&gt;
+     * However, rotating and/or flipping an hi-res image is very inefficient,
+     * that's why you should consider to pass a maxSize value as small as
+     * possible: it makes this method working faster.&lt;/p&gt;
+     * &lt;p&gt;
+     * If there is no rotation or flipping, the image is only copied or scaled
+     * if necessary; if the capturedImage has a format different from jpeg and
+     * png, it is copied as it is.&lt;br&gt;Note that this method doesn't rely on the
+     * file extension, but on the mime type of the capturedImage, since some
+     * devices don't give appropriate extension to images returned from the
+     * gallery.&lt;/p&gt;
+     * &lt;p&gt;
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * &lt;a href=&quot;https://github.com/recurser/exif-orientation-examples&quot;&gt;EXIF
+     * Orientation-flag example images&lt;/a&gt;&lt;/p&gt;
+     * &lt;p&gt;
+     * Code example:&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/jsfan3/7fc101523955e8179fadd2c713a09e05.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param capturedImage is the FileSystemStorage path of a captured photo,
+     *                      usually inside a temporary directory
+     * @param rotatedImage  is the FileSystemStorage path in which the rotated
+     *                      photo is stored, normally this should be inside the
+     *                      FileSystemStorage.getAppHomePath(); it can be null if you don't want to
+     *                      save the rotated image to the FileSystemStorage.
+     * @param maxSize       is the maximum value of the width and height of the
+     *                      rotated images, that is scaled if necessary, keeping the ratio.
+     * @return the com.codename1.ui.Image
+     * @throws java.io.IOException
+     */
+    public static Image exifRotation(String capturedImage, String rotatedImage, int maxSize) throws IOException {
+<span class="nc" id="L391">        FileSystemStorage fss = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L392">        boolean isJpeg = isJPEG(fss.openInputStream(capturedImage));</span>
+<span class="nc" id="L393">        boolean isPNG = isPNG(fss.openInputStream(capturedImage));</span>
+        String format;
+        // IMPORTANT: we cannot relies on the file extension of the capturedImage path,
+        // because some Android devices return images from the gallery without extension!
+<span class="nc bnc" id="L397" title="All 4 branches missed.">        if (!isJpeg &amp;&amp; !isPNG) {</span>
+            // Only jpeg and png images are supported, but some devices can return also different formats from the gallery (like gif).
+            // In this case, we simply copy the file.
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            if (rotatedImage != null) {</span>
+<span class="nc" id="L401">                Util.copy(fss.openInputStream(capturedImage), fss.openOutputStream(rotatedImage));</span>
+            }
+<span class="nc" id="L403">            return EncodedImage.create(fss.openInputStream(capturedImage), (int) fss.getLength(capturedImage));</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        } else if (isJpeg) {</span>
+<span class="nc" id="L405">            format = ImageIO.FORMAT_JPEG;</span>
+        } else {
+<span class="nc" id="L407">            format = ImageIO.FORMAT_PNG;</span>
+        }
+<span class="nc" id="L409">        int orientation = getExifOrientationTag(fss.openInputStream(capturedImage));</span>
+<span class="nc" id="L410">        Image img = EncodedImage.create(fss.openInputStream(capturedImage), (int) fss.getLength(capturedImage));</span>
+<span class="nc" id="L411">        img.lock();</span>
+<span class="nc bnc" id="L412" title="All 6 branches missed.">        if (maxSize &gt; 0 &amp;&amp; (img.getWidth() &gt; maxSize || img.getHeight() &gt; maxSize)) {</span>
+            // Tested that scaling the image before rotating is a lot more efficient than rotating before scaling
+<span class="nc" id="L414">            Image scaled = img.scaledSmallerRatio(maxSize, maxSize);</span>
+<span class="nc" id="L415">            img.unlock();</span>
+<span class="nc" id="L416">            img = scaled;</span>
+<span class="nc" id="L417">            img.lock();</span>
+        }
+        Image result, temp;
+<span class="nc bnc" id="L420" title="All 9 branches missed.">        switch (orientation) {</span>
+            case 0:
+            case 1:
+                // no rotation (but the image may have been scaled)
+<span class="nc" id="L424">                result = img;</span>
+<span class="nc" id="L425">                break;</span>
+            case 2:
+                // action required: flip horizontally
+<span class="nc" id="L428">                result = img.flipHorizontally(false);</span>
+<span class="nc" id="L429">                break;</span>
+            case 3:
+                //  action required: rotate 180 degrees
+<span class="nc" id="L432">                result = img.rotate180Degrees(false);</span>
+<span class="nc" id="L433">                break;</span>
+            case 4:
+                //  action required: flip vertically
+<span class="nc" id="L436">                result = img.flipVertically(false);</span>
+<span class="nc" id="L437">                break;</span>
+            case 5:
+                //  action required: rotate 270 degrees
+<span class="nc" id="L440">                result = img.rotate270Degrees(false);</span>
+<span class="nc" id="L441">                break;</span>
+            case 6:
+                //  action required: rotate 90 degrees
+<span class="nc" id="L444">                result = img.rotate90Degrees(false);</span>
+<span class="nc" id="L445">                break;</span>
+            case 7:
+                //  action required: flip horizontally and rotate 90 degrees
+<span class="nc" id="L448">                temp = img.flipHorizontally(false);</span>
+<span class="nc" id="L449">                temp.lock();</span>
+<span class="nc" id="L450">                result = temp.rotate90Degrees(false);</span>
+<span class="nc" id="L451">                temp.unlock();</span>
+<span class="nc" id="L452">                break;</span>
+            case 8:
+                //  action required: flip horizontally and rotate 270 degrees
+<span class="nc" id="L455">                temp = img.flipHorizontally(false);</span>
+<span class="nc" id="L456">                temp.lock();</span>
+<span class="nc" id="L457">                result = temp.rotate270Degrees(false);</span>
+<span class="nc" id="L458">                temp.unlock();</span>
+<span class="nc" id="L459">                break;</span>
+            default:
+                // this never should happen
+<span class="nc" id="L462">                throw new IllegalStateException(&quot;Unsupported rotation&quot;);</span>
+        }
+<span class="nc" id="L464">        img.unlock();</span>
+<span class="nc bnc" id="L465" title="All 2 branches missed.">        if (rotatedImage != null) {</span>
+<span class="nc" id="L466">            OutputStream out = fss.openOutputStream(rotatedImage);</span>
+<span class="nc" id="L467">            ImageIO.getImageIO().save(result, out, format, 0.9f);</span>
+<span class="nc" id="L468">            Util.cleanup(out);</span>
+        }
+<span class="nc" id="L470">        return EncodedImage.createFromImage(result, isJpeg);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Gets the EXIF orientation tag of an image, if it's available.&lt;/p&gt;
+     * &lt;p&gt;
+     * The Exif Orientation Tag is a number from 0 to 8, for the explanation of
+     * each value see the
+     * &lt;a href=&quot;http://sylvana.net/jpegcrop/exif_orientation.html&quot;&gt;Exif
+     * Orientation Tag&lt;/a&gt; page&lt;/p&gt;
+     * &lt;p&gt;
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * &lt;a href=&quot;https://github.com/recurser/exif-orientation-examples&quot;&gt;EXIF
+     * Orientation-flag example images&lt;/a&gt;&lt;/p&gt;
+     *
+     * @param path FileSystemStorage path
+     * @return a value from 0 to 8; 0 is default in case of error or unavailable
+     * EXIF data.
+     * @throws java.io.IOException
+     */
+    public static int getExifOrientationTag(String path) throws IOException {
+<span class="nc" id="L493">        InputStream in = FileSystemStorage.getInstance().openInputStream(path);</span>
+<span class="nc" id="L494">        return getExifOrientationTag(in);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Gets the EXIF orientation tag of an image, if it's available.&lt;/p&gt;
+     * &lt;p&gt;
+     * The Exif Orientation Tag is a number from 0 to 8, for the explanation of
+     * each value see the
+     * &lt;a href=&quot;http://sylvana.net/jpegcrop/exif_orientation.html&quot;&gt;Exif
+     * Orientation Tag&lt;/a&gt; page&lt;/p&gt;
+     * &lt;p&gt;
+     * You can test all the possible orientation values downloading the images
+     * from the repository
+     * &lt;a href=&quot;https://github.com/recurser/exif-orientation-examples&quot;&gt;EXIF
+     * Orientation-flag example images&lt;/a&gt;&lt;/p&gt;
+     *
+     * @param is
+     * @return a value from 0 to 8; 0 is default in case of error or unavailable
+     * EXIF data.
+     */
+    public static int getExifOrientationTag(InputStream is) {
+<span class="nc bnc" id="L516" title="All 2 branches missed.">        if (is == null) {</span>
+<span class="nc" id="L517">            return 0;</span>
+        }
+
+<span class="nc" id="L520">        byte[] buf = new byte[8];</span>
+<span class="nc" id="L521">        int length = 0;</span>
+
+        // ISO/IEC 10918-1:1993(E)
+<span class="nc bnc" id="L524" title="All 4 branches missed.">        while (read(is, buf, 2) &amp;&amp; (buf[0] &amp; 0xFF) == 0xFF) {</span>
+<span class="nc" id="L525">            int marker = buf[1] &amp; 0xFF;</span>
+
+            // Check if the marker is a padding.
+<span class="nc bnc" id="L528" title="All 2 branches missed.">            if (marker == 0xFF) {</span>
+<span class="nc" id="L529">                continue;</span>
+            }
+
+            // Check if the marker is SOI or TEM.
+<span class="nc bnc" id="L533" title="All 4 branches missed.">            if (marker == 0xD8 || marker == 0x01) {</span>
+<span class="nc" id="L534">                continue;</span>
+            }
+            // Check if the marker is EOI or SOS.
+<span class="nc bnc" id="L537" title="All 4 branches missed.">            if (marker == 0xD9 || marker == 0xDA) {</span>
+<span class="nc" id="L538">                return 0;</span>
+            }
+
+            // Get the length and check if it is reasonable.
+<span class="nc bnc" id="L542" title="All 2 branches missed.">            if (!read(is, buf, 2)) {</span>
+<span class="nc" id="L543">                return 0;</span>
+            }
+<span class="nc" id="L545">            length = pack(buf, 0, 2, false);</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">            if (length &lt; 2) {</span>
+<span class="nc" id="L547">                Log.p(&quot;EXIF Invalid length&quot;, Log.ERROR);</span>
+<span class="nc" id="L548">                return 0;</span>
+            }
+<span class="nc" id="L550">            length -= 2;</span>
+
+            // Break if the marker is EXIF in APP1.
+<span class="nc bnc" id="L553" title="All 4 branches missed.">            if (marker == 0xE1 &amp;&amp; length &gt;= 6) {</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">                if (!read(is, buf, 6)) {</span>
+<span class="nc" id="L555">                    return 0;</span>
+                }
+<span class="nc" id="L557">                length -= 6;</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">                if (pack(buf, 0, 4, false) == 0x45786966</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                        &amp;&amp; pack(buf, 4, 2, false) == 0) {</span>
+<span class="nc" id="L560">                    break;</span>
+                }
+            }
+
+            // Skip other markers.
+            try {
+<span class="nc" id="L566">                is.skip(length);</span>
+<span class="nc" id="L567">            } catch (IOException ex) {</span>
+<span class="nc" id="L568">                return 0;</span>
+<span class="nc" id="L569">            }</span>
+<span class="nc" id="L570">            length = 0;</span>
+<span class="nc" id="L571">        }</span>
+
+        // JEITA CP-3451 Exif Version 2.2
+<span class="nc bnc" id="L574" title="All 2 branches missed.">        if (length &gt; 8) {</span>
+<span class="nc" id="L575">            int offset = 0;</span>
+<span class="nc" id="L576">            byte[] jpeg = new byte[length];</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">            if (!read(is, jpeg, length)) {</span>
+<span class="nc" id="L578">                return 0;</span>
+            }
+
+            // Identify the byte order.
+<span class="nc" id="L582">            int tag = pack(jpeg, offset, 4, false);</span>
+<span class="nc bnc" id="L583" title="All 4 branches missed.">            if (tag != 0x49492A00 &amp;&amp; tag != 0x4D4D002A) {</span>
+<span class="nc" id="L584">                Log.p(&quot;EXIF Invalid byte order&quot;, Log.ERROR);</span>
+<span class="nc" id="L585">                return 0;</span>
+            }
+<span class="nc bnc" id="L587" title="All 2 branches missed.">            boolean littleEndian = (tag == 0x49492A00);</span>
+
+            // Get the offset and check if it is reasonable.
+<span class="nc" id="L590">            int count = pack(jpeg, offset + 4, 4, littleEndian) + 2;</span>
+<span class="nc bnc" id="L591" title="All 4 branches missed.">            if (count &lt; 10 || count &gt; length) {</span>
+<span class="nc" id="L592">                Log.p(&quot;EXIF Invalid offset&quot;, Log.ERROR);</span>
+<span class="nc" id="L593">                return 0;</span>
+            }
+<span class="nc" id="L595">            offset += count;</span>
+<span class="nc" id="L596">            length -= count;</span>
+
+            // Get the count and go through all the elements.
+<span class="nc" id="L599">            count = pack(jpeg, offset - 2, 2, littleEndian);</span>
+<span class="nc bnc" id="L600" title="All 4 branches missed.">            while (count-- &gt; 0 &amp;&amp; length &gt;= 12) {</span>
+                // Get the tag and check if it is orientation.
+<span class="nc" id="L602">                tag = pack(jpeg, offset, 2, littleEndian);</span>
+<span class="nc bnc" id="L603" title="All 2 branches missed.">                if (tag == 0x0112) {</span>
+                    // We do not really care about type and count, do we?
+<span class="nc" id="L605">                    int orientation = pack(jpeg, offset + 8, 2, littleEndian);</span>
+<span class="nc" id="L606">                    return orientation;</span>
+                }
+<span class="nc" id="L608">                offset += 12;</span>
+<span class="nc" id="L609">                length -= 12;</span>
+            }
+        }
+
+<span class="nc" id="L613">        Log.p(&quot;EXIF Orientation not found&quot;, Log.DEBUG);</span>
+<span class="nc" id="L614">        return 0;</span>
+    }
+
+    private static int pack(byte[] bytes, int offset, int length,
+                            boolean littleEndian) {
+<span class="nc" id="L619">        int step = 1;</span>
+<span class="nc bnc" id="L620" title="All 2 branches missed.">        if (littleEndian) {</span>
+<span class="nc" id="L621">            offset += length - 1;</span>
+<span class="nc" id="L622">            step = -1;</span>
+        }
+
+<span class="nc" id="L625">        int value = 0;</span>
+<span class="nc bnc" id="L626" title="All 2 branches missed.">        while (length-- &gt; 0) {</span>
+<span class="nc" id="L627">            value = (value &lt;&lt; 8) | (bytes[offset] &amp; 0xFF);</span>
+<span class="nc" id="L628">            offset += step;</span>
+        }
+<span class="nc" id="L630">        return value;</span>
+    }
+
+    private static boolean read(InputStream is, byte[] buf, int length) {
+        try {
+<span class="nc bnc" id="L635" title="All 2 branches missed.">            return is.read(buf, 0, length) == length;</span>
+<span class="nc" id="L636">        } catch (IOException ex) {</span>
+<span class="nc" id="L637">            return false;</span>
+        }
+    }
+
+    /**
+     * Very fast method to detect if the given inputStream is a JPEG image
+     * (according to its guessed mime type)
+     *
+     * @param inputStream
+     * @return true if jpeg, false otherwise
+     */
+    public static boolean isJPEG(InputStream inputStream) throws IOException {
+<span class="nc" id="L649">        String type = Util.guessMimeType(inputStream);</span>
+<span class="nc bnc" id="L650" title="All 4 branches missed.">        return &quot;image/jpeg&quot;.equals(type) || &quot;image/jpg&quot;.equals(type);</span>
+    }
+
+    /**
+     * Very fast method to detect if the given inputStream is a PNG image
+     * (according to its guessed mime type)
+     *
+     * @param inputStream
+     * @return true if PNG, false otherwise
+     */
+    public static boolean isPNG(InputStream inputStream) throws IOException {
+<span class="nc" id="L661">        String type = Util.guessMimeType(inputStream);</span>
+<span class="nc" id="L662">        return &quot;image/png&quot;.equals(type);</span>
+    }
+
+    private HashMap&lt;Dimension, Object&gt; getScaleCache() {
+<span class="nc bnc" id="L666" title="All 2 branches missed.">        if (scaleCache == null) {</span>
+<span class="nc" id="L667">            HashMap&lt;Dimension, Object&gt; h = new HashMap&lt;Dimension, Object&gt;();</span>
+<span class="nc" id="L668">            scaleCache = Display.getInstance().createSoftWeakRef(h);</span>
+<span class="nc" id="L669">            return h;</span>
+        }
+<span class="nc" id="L671">        HashMap&lt;Dimension, Object&gt; h = (HashMap&lt;Dimension, Object&gt;) Display.getInstance().extractHardRef(scaleCache);</span>
+<span class="nc bnc" id="L672" title="All 2 branches missed.">        if (h == null) {</span>
+<span class="nc" id="L673">            h = new HashMap&lt;Dimension, Object&gt;();</span>
+<span class="nc" id="L674">            scaleCache = Display.getInstance().createSoftWeakRef(h);</span>
+        }
+<span class="nc" id="L676">        return h;</span>
+    }
+
+    /**
+     * Returns a cached scaled image
+     *
+     * @param size the size of the cached image
+     * @return cached image
+     */
+    Image getCachedImage(Dimension size) {
+<span class="nc" id="L686">        Object w = getScaleCache().get(size);</span>
+<span class="nc" id="L687">        return (Image) Display.getInstance().extractHardRef(w);</span>
+    }
+
+    /**
+     * Returns a cached scaled image
+     *
+     * @param size the size of the cached image
+     * @return cached image
+     */
+    void cacheImage(Dimension size, Image i) {
+<span class="nc" id="L697">        Object w = Display.getInstance().createSoftWeakRef(i);</span>
+<span class="nc" id="L698">        getScaleCache().put(size, w);</span>
+<span class="nc" id="L699">    }</span>
+
+    /**
+     * Async lock is the equivalent of a lock operation, however it uses the given image as
+     * the hard cache and performs the actual image loading asynchronously. On completion this
+     * method will invoke repaint on the main form if applicable.
+     *
+     * @param internal the image to show while the actual image loads.
+     */
+    public void asyncLock(Image internal) {
+<span class="nc" id="L709">    }</span>
+
+    /**
+     * This callback indicates that a component pointing at this image is initialized, this allows
+     * an image to make performance sensitive considerations e.g. an encoded image
+     * might choose to cache itself in RAM.
+     * This method may be invoked multiple times.
+     */
+    public void lock() {
+<span class="nc" id="L718">    }</span>
+
+    /**
+     * Returns true if the image is locked
+     *
+     * @return false by default
+     */
+    public boolean isLocked() {
+<span class="nc" id="L726">        return false;</span>
+    }
+
+    /**
+     * This callback indicates that a component pointing at this image is now deinitilized
+     * This method may be invoked multiple times.
+     */
+    public void unlock() {
+<span class="nc" id="L734">    }</span>
+
+    /**
+     * Returns a platform specific DOM object that can be manipulated by the user
+     * to change the SVG Image
+     *
+     * @return Platform dependent object, when JSR 226 is supported an SVGSVGElement might
+     * be returned.
+     */
+    public Object getSVGDocument() {
+<span class="nc" id="L744">        return Display.impl.getSVGDocument(image);</span>
+    }
+
+    /**
+     * Indicates if this image represents an SVG file or a bitmap file
+     *
+     * @return true if this is an SVG file
+     */
+    public boolean isSVG() {
+<span class="nc bnc" id="L753" title="All 2 branches missed.">        return svgData != null;</span>
+    }
+
+    /**
+     * &lt;p&gt;Creates a mask from the given image, a mask can be used to apply an arbitrary
+     * alpha channel to any image. A mask is derived from the blue channel (LSB) of
+     * the given image, other channels are ignored.&lt;br&gt;
+     * The generated mask can be used with the apply mask method.&lt;br&gt;
+     * The sample below demonstrates the masking of an image based on a circle drawn on a mutable image:&lt;/p&gt;
+     *
+     * &lt;script src=&quot;https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js&quot;&gt;&lt;/script&gt;
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/graphics-image-masking.png&quot; alt=&quot;Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable&quot; /&gt;
+     *
+     * @return mask object that can be used with applyMask
+     */
+    public Object createMask() {
+<span class="nc" id="L769">        int[] rgb = getRGBCached();</span>
+<span class="nc" id="L770">        int rlen = rgb.length;</span>
+<span class="nc" id="L771">        byte[] mask = new byte[rlen];</span>
+<span class="nc bnc" id="L772" title="All 2 branches missed.">        for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="nc" id="L773">            mask[iter] = (byte) (rgb[iter] &amp; 0xff);</span>
+        }
+<span class="nc" id="L775">        return new IndexedImage(getWidth(), getHeight(), null, mask);</span>
+    }
+
+    /**
+     * &lt;p&gt;Applies the given alpha mask onto this image and returns the resulting image
+     * see the createMask method for indication on how to convert an image into an alpha
+     * mask.&lt;/p&gt;
+     * The sample below demonstrates the masking of an image based on a circle drawn on a mutable image:&lt;/p&gt;
+     *
+     * &lt;script src=&quot;https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js&quot;&gt;&lt;/script&gt;
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/graphics-image-masking.png&quot; alt=&quot;Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable&quot; /&gt;
+     *
+     * @param mask mask object created by the createMask() method.
+     * @param x    starting x where to apply the mask
+     * @param y    starting y where to apply the mask
+     * @return image masked based on the given object
+     */
+    public Image applyMask(Object mask, int x, int y) {
+<span class="nc" id="L793">        int[] rgb = getRGB();</span>
+<span class="nc" id="L794">        byte[] maskData = ((IndexedImage) mask).getImageDataByte();</span>
+<span class="nc" id="L795">        int mWidth = ((IndexedImage) mask).getWidth();</span>
+<span class="nc" id="L796">        int mHeight = ((IndexedImage) mask).getHeight();</span>
+<span class="nc" id="L797">        int imgWidth = getWidth();</span>
+<span class="nc" id="L798">        int aWidth = imgWidth - x;</span>
+<span class="nc" id="L799">        int aHeight = getHeight() - y;</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">        if (aWidth &gt; mWidth) {</span>
+<span class="nc" id="L801">            aWidth = mWidth;</span>
+        }
+<span class="nc bnc" id="L803" title="All 2 branches missed.">        if (aHeight &gt; mHeight) {</span>
+<span class="nc" id="L804">            aHeight = mHeight;</span>
+        }
+
+<span class="nc bnc" id="L807" title="All 2 branches missed.">        for (int xPos = 0; xPos &lt; aWidth; xPos++) {</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">            for (int yPos = 0; yPos &lt; aHeight; yPos++) {</span>
+<span class="nc" id="L809">                int aX = x + xPos;</span>
+<span class="nc" id="L810">                int aY = y + yPos;</span>
+<span class="nc" id="L811">                int imagePos = aX + aY * imgWidth;</span>
+<span class="nc" id="L812">                int maskAlpha = maskData[aX + aY * mWidth] &amp; 0xff;</span>
+<span class="nc" id="L813">                maskAlpha = (maskAlpha &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc" id="L814">                rgb[imagePos] = (rgb[imagePos] &amp; 0xffffff) | maskAlpha;</span>
+
+            }
+        }
+<span class="nc" id="L818">        return createImage(rgb, imgWidth, getHeight());</span>
+    }
+
+    /**
+     * Applies the given alpha mask onto this image and returns the resulting image
+     * see the createMask method for indication on how to convert an image into an alpha
+     * mask.
+     *
+     * @param mask mask object created by the createMask() method.
+     * @return image masked based on the given object
+     * @throws IllegalArgumentException if the image size doesn't match the mask size
+     */
+    public Image applyMask(Object mask) {
+<span class="nc" id="L831">        int[] rgb = getRGB();</span>
+<span class="nc" id="L832">        byte[] maskData = ((IndexedImage) mask).getImageDataByte();</span>
+<span class="nc" id="L833">        int mWidth = ((IndexedImage) mask).getWidth();</span>
+<span class="nc" id="L834">        int mHeight = ((IndexedImage) mask).getHeight();</span>
+<span class="nc bnc" id="L835" title="All 4 branches missed.">        if (mWidth != getWidth() || mHeight != getHeight()) {</span>
+<span class="nc" id="L836">            throw new IllegalArgumentException(&quot;Mask and image sizes don't match&quot;);</span>
+        }
+<span class="nc" id="L838">        int mdlen = maskData.length;</span>
+<span class="nc bnc" id="L839" title="All 2 branches missed.">        for (int iter = 0; iter &lt; mdlen; iter++) {</span>
+<span class="nc" id="L840">            int maskAlpha = maskData[iter] &amp; 0xff;</span>
+<span class="nc" id="L841">            maskAlpha = (maskAlpha &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc" id="L842">            rgb[iter] = (rgb[iter] &amp; 0xffffff) | maskAlpha;</span>
+        }
+<span class="nc" id="L844">        return createImage(rgb, mWidth, mHeight);</span>
+    }
+
+    /**
+     * Applies the given alpha mask onto this image and returns the resulting image
+     * see the createMask method for indication on how to convert an image into an alpha
+     * mask. If the image is of a different size it will be scaled to mask size.
+     *
+     * @param mask mask object created by the createMask() method.
+     * @return image masked based on the given object
+     */
+    public Image applyMaskAutoScale(Object mask) {
+        try {
+<span class="nc" id="L857">            int mWidth = ((IndexedImage) mask).getWidth();</span>
+<span class="nc" id="L858">            int mHeight = ((IndexedImage) mask).getHeight();</span>
+<span class="nc bnc" id="L859" title="All 4 branches missed.">            if (mWidth != getWidth() || mHeight != getHeight()) {</span>
+<span class="nc" id="L860">                return scaled(mWidth, mHeight).applyMask(mask);</span>
+            }
+<span class="nc" id="L862">            return applyMask(mask);</span>
+<span class="nc" id="L863">        } catch (Throwable t) {</span>
+<span class="nc" id="L864">            Log.e(t);</span>
+        }
+<span class="nc" id="L866">        return this;</span>
+    }
+
+    /**
+     * Extracts a subimage from the given image allowing us to breakdown a single large image
+     * into multiple smaller images in RAM, this actually creates a standalone version
+     * of the image for use.
+     *
+     * @param x            the x offset from the image
+     * @param y            the y offset from the image
+     * @param width        the width of internal images
+     * @param height       the height of internal images
+     * @param processAlpha whether alpha should be processed as well as part of the cutting
+     * @return An array of all the possible images that can be created from the source
+     */
+    public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
+        // we use the getRGB API rather than the mutable image API to allow translucency to
+        // be maintained in the newly created image
+<span class="nc" id="L884">        int[] arr = new int[width * height];</span>
+<span class="nc" id="L885">        getRGB(arr, 0, x, y, width, height);</span>
+
+<span class="nc" id="L887">        Image i = new Image(Display.impl.createImage(arr, width, height));</span>
+<span class="nc" id="L888">        i.opaque = opaque;</span>
+<span class="nc" id="L889">        i.opaqueTested = opaqueTested;</span>
+<span class="nc" id="L890">        return i;</span>
+    }
+
+    /**
+     * Creates a mirror image for the given image which is useful for some RTL scenarios. Notice that this
+     * method isn't the most efficient way to perform this task and is designed for portability over efficiency.
+     *
+     * @return a mirrored image
+     */
+    public Image mirror() {
+<span class="nc" id="L900">        int width = getWidth();</span>
+<span class="nc" id="L901">        int height = getHeight();</span>
+<span class="nc" id="L902">        int[] tmp = getRGB();</span>
+<span class="nc" id="L903">        int[] arr = new int[width * height];</span>
+<span class="nc bnc" id="L904" title="All 2 branches missed.">        for (int x = 0; x &lt; width; x++) {</span>
+<span class="nc bnc" id="L905" title="All 2 branches missed.">            for (int y = 0; y &lt; height; y++) {</span>
+<span class="nc" id="L906">                arr[x + y * width] = tmp[width - x - 1 + y * width];</span>
+            }
+        }
+<span class="nc" id="L909">        Image i = new Image(Display.impl.createImage(arr, width, height));</span>
+<span class="nc" id="L910">        i.opaque = opaque;</span>
+<span class="nc" id="L911">        i.opaqueTested = opaqueTested;</span>
+<span class="nc" id="L912">        return i;</span>
+    }
+
+    /**
+     * Returns an instance of this image rotated by the given number of degrees. By default 90 degree
+     * angle divisions are supported, anything else is implementation dependent. This method assumes
+     * a square image. Notice that it is inefficient in the current implementation to rotate to
+     * non-square angles,
+     * &lt;p&gt;E.g. rotating an image to 45, 90 and 135 degrees is inefficient. Use rotatate to 45, 90
+     * and then rotate the 45 to another 90 degrees to achieve the same effect with less memory.
+     *
+     * @param degrees A degree in right angle must be larger than 0 and up to 359 degrees
+     * @return new image instance with the closest possible rotation
+     */
+    public Image rotate(int degrees) {
+<span class="nc" id="L927">        CodenameOneImplementation i = Display.impl;</span>
+<span class="nc bnc" id="L928" title="All 2 branches missed.">        if (i.isRotationDrawingSupported()) {</span>
+<span class="nc bnc" id="L929" title="All 2 branches missed.">            if (degrees &gt;= 90) {</span>
+<span class="nc" id="L930">                int newTransform = 0;</span>
+<span class="nc bnc" id="L931" title="All 2 branches missed.">                if (transform != 0) {</span>
+<span class="nc" id="L932">                    newTransform = (transform + degrees) % 360;</span>
+                } else {
+<span class="nc" id="L934">                    newTransform = degrees % 360;</span>
+                }
+<span class="nc" id="L936">                degrees %= 90;</span>
+<span class="nc" id="L937">                newTransform -= degrees;</span>
+<span class="nc bnc" id="L938" title="All 2 branches missed.">                if (degrees != 0) {</span>
+<span class="nc" id="L939">                    Image newImage = new Image(Display.impl.rotate(image, degrees));</span>
+<span class="nc" id="L940">                    newImage.transform = newTransform;</span>
+<span class="nc" id="L941">                    return newImage;</span>
+                } else {
+<span class="nc" id="L943">                    Image newImage = new Image(image);</span>
+<span class="nc" id="L944">                    newImage.transform = newTransform;</span>
+<span class="nc" id="L945">                    return newImage;</span>
+                }
+            }
+<span class="nc bnc" id="L948" title="All 2 branches missed.">            if (degrees != 0) {</span>
+<span class="nc" id="L949">                return new Image(Display.impl.rotate(image, degrees));</span>
+            }
+<span class="nc" id="L951">            return this;</span>
+        } else {
+<span class="nc" id="L953">            return new Image(Display.impl.rotate(image, degrees));</span>
+        }
+    }
+
+    /**
+     * Creates a new image instance with the alpha channel of opaque/translucent
+     * pixels within the image using the new alpha value. Transparent (alpha == 0)
+     * pixels remain transparent. All other pixels will have the new alpha value.
+     *
+     * @param alpha New value for the entire alpha channel
+     * @return Translucent/Opaque image based on the alpha value and the pixels of
+     * this image
+     */
+    public Image modifyAlpha(byte alpha) {
+<span class="nc" id="L967">        int w = getWidth();</span>
+<span class="nc" id="L968">        int h = getHeight();</span>
+<span class="nc" id="L969">        int size = w * h;</span>
+<span class="nc" id="L970">        int[] arr = getRGB();</span>
+<span class="nc" id="L971">        int alphaInt = (((int) alpha) &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc bnc" id="L972" title="All 2 branches missed.">        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L973">            int currentAlpha = (arr[iter] &gt;&gt; 24) &amp; 0xff;</span>
+<span class="nc bnc" id="L974" title="All 2 branches missed.">            if (currentAlpha != 0) {</span>
+<span class="nc" id="L975">                arr[iter] = (arr[iter] &amp; 0xffffff) | alphaInt;</span>
+            }
+        }
+<span class="nc" id="L978">        Image i = new Image(arr, w, h);</span>
+<span class="nc" id="L979">        i.opaqueTested = true;</span>
+<span class="nc" id="L980">        i.opaque = false;</span>
+<span class="nc" id="L981">        return i;</span>
+    }
+
+    /**
+     * Creates a new image instance with the alpha channel of opaque
+     * pixels within the image using the new alpha value. Transparent (alpha == 0)
+     * pixels remain transparent. Semi translucent pixels will be multiplied by the
+     * ratio difference and their translucency reduced appropriately.
+     *
+     * @param alpha New value for the entire alpha channel
+     * @return Translucent/Opaque image based on the alpha value and the pixels of
+     * this image
+     */
+    public Image modifyAlphaWithTranslucency(byte alpha) {
+<span class="nc" id="L995">        int w = getWidth();</span>
+<span class="nc" id="L996">        int h = getHeight();</span>
+<span class="nc" id="L997">        int size = w * h;</span>
+<span class="nc" id="L998">        int[] arr = getRGB();</span>
+<span class="nc" id="L999">        int alphaInt = (((int) alpha) &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc" id="L1000">        float alphaRatio = (alpha &amp; 0xff) / 255.0f;</span>
+<span class="nc bnc" id="L1001" title="All 2 branches missed.">        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L1002">            int currentAlpha = (arr[iter] &gt;&gt; 24) &amp; 0xff;</span>
+<span class="nc bnc" id="L1003" title="All 2 branches missed.">            if (currentAlpha != 0) {</span>
+<span class="nc bnc" id="L1004" title="All 2 branches missed.">                if (currentAlpha == 0xff) {</span>
+<span class="nc" id="L1005">                    arr[iter] = (arr[iter] &amp; 0xffffff) | alphaInt;</span>
+                } else {
+<span class="nc" id="L1007">                    int relative = (int) (currentAlpha * alphaRatio);</span>
+<span class="nc" id="L1008">                    relative = (relative &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc" id="L1009">                    arr[iter] = (arr[iter] &amp; 0xffffff) | relative;</span>
+                }
+            }
+        }
+<span class="nc" id="L1013">        Image i = new Image(arr, w, h);</span>
+<span class="nc" id="L1014">        i.opaqueTested = true;</span>
+<span class="nc" id="L1015">        i.opaque = false;</span>
+<span class="nc" id="L1016">        return i;</span>
+    }
+
+    /**
+     * Creates a new image instance with the alpha channel of opaque/translucent
+     * pixels within the image using the new alpha value. Transparent (alpha == 0)
+     * pixels remain transparent. All other pixels will have the new alpha value.
+     *
+     * @param alpha       New value for the entire alpha channel
+     * @param removeColor pixels matching this color are made transparent (alpha channel ignored)
+     * @return Translucent/Opaque image based on the alpha value and the pixels of
+     * this image
+     */
+    public Image modifyAlpha(byte alpha, int removeColor) {
+<span class="nc" id="L1030">        removeColor = removeColor &amp; 0xffffff;</span>
+<span class="nc" id="L1031">        int w = getWidth();</span>
+<span class="nc" id="L1032">        int h = getHeight();</span>
+<span class="nc" id="L1033">        int size = w * h;</span>
+<span class="nc" id="L1034">        int[] arr = new int[size];</span>
+<span class="nc" id="L1035">        getRGB(arr, 0, 0, 0, w, h);</span>
+<span class="nc" id="L1036">        int alphaInt = (((int) alpha) &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="nc bnc" id="L1037" title="All 2 branches missed.">        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">            if ((arr[iter] &amp; 0xff000000) != 0) {</span>
+<span class="nc" id="L1039">                arr[iter] = (arr[iter] &amp; 0xffffff) | alphaInt;</span>
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">                if (removeColor == (0xffffff &amp; arr[iter])) {</span>
+<span class="nc" id="L1041">                    arr[iter] = 0;</span>
+                }
+            }
+        }
+<span class="nc" id="L1045">        Image i = new Image(arr, w, h);</span>
+<span class="nc" id="L1046">        i.opaqueTested = true;</span>
+<span class="nc" id="L1047">        i.opaque = false;</span>
+<span class="nc" id="L1048">        return i;</span>
+    }
+
+    /**
+     * If this is a mutable image a graphics object allowing us to draw on it
+     * is returned.
+     *
+     * @return Graphics object allowing us to manipulate the content of a mutable image
+     */
+    public Graphics getGraphics() {
+<span class="nc" id="L1058">        Graphics g = new Graphics(Display.impl.getNativeGraphics(image));</span>
+<span class="nc" id="L1059">        rgbCache = null;    // the cache will become invalid</span>
+<span class="nc" id="L1060">        return g;</span>
+    }
+
+    /**
+     * Returns the width of the image
+     *
+     * @return the width of the image
+     */
+    public int getWidth() {
+<span class="nc bnc" id="L1069" title="All 2 branches missed.">        if (transform != 0) {</span>
+<span class="nc bnc" id="L1070" title="All 4 branches missed.">            if (transform == 90 || transform == 270) {</span>
+<span class="nc" id="L1071">                return Display.impl.getImageHeight(image);</span>
+            }
+        }
+<span class="nc" id="L1074">        return Display.impl.getImageWidth(image);</span>
+    }
+
+    /**
+     * Returns the height of the image
+     *
+     * @return the height of the image
+     */
+    public int getHeight() {
+<span class="nc bnc" id="L1083" title="All 2 branches missed.">        if (transform != 0) {</span>
+<span class="nc bnc" id="L1084" title="All 4 branches missed.">            if (transform == 90 || transform == 270) {</span>
+<span class="nc" id="L1085">                return Display.impl.getImageWidth(image);</span>
+            }
+        }
+<span class="nc" id="L1088">        return Display.impl.getImageHeight(image);</span>
+    }
+
+    /**
+     * Callback invoked internally by Codename One to draw the image/frame onto the display.
+     * Image subclasses can override this method to perform drawing of custom image types.
+     *
+     * @param g              the graphics object
+     * @param nativeGraphics the underlying native graphics which might be essential for some image types
+     * @param x              the x coordinate
+     * @param y              the y coordinate
+     */
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="nc" id="L1101">        g.drawImage(image, x, y, transform);</span>
+<span class="nc" id="L1102">    }</span>
+
+    /**
+     * Callback invoked internally by Codename One to draw the image/frame onto the display.
+     * Image subclasses can override this method to perform drawing of custom image types.
+     *
+     * @param g              the graphics object
+     * @param nativeGraphics the underlying native graphics which might be essential for some image types
+     * @param x              the x coordinate
+     * @param y              the y coordinate
+     * @param w              the width to occupy
+     * @param h              the height to occupy
+     */
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+<span class="nc" id="L1116">        g.drawImageWH(image, x, y, w, h);</span>
+<span class="nc" id="L1117">    }</span>
+
+    /**
+     * Callback invoked internally by Codename One to draw a portion of the image onto the display.
+     * Image subclasses can override this method to perform drawing of custom image types.
+     *
+     * @param g              the graphics object
+     * @param nativeGraphics the underlying native graphics which might be essential for some image types
+     * @param x              the x coordinate
+     * @param y              the y coordinate
+     * @param imageX         location within the image to draw
+     * @param imageY         location within the image to draw
+     * @param imageWidth     size of the location within the image to draw
+     * @param imageHeight    size of the location within the image to draw
+     */
+    void drawImageArea(Graphics g, Object nativeGraphics, int x, int y, int imageX, int imageY, int imageWidth, int imageHeight) {
+<span class="nc" id="L1133">        Display.impl.drawImageArea(nativeGraphics, image, x, y, imageX, imageY, imageWidth, imageHeight);</span>
+<span class="nc" id="L1134">    }</span>
+
+    /**
+     * Obtains ARGB pixel data from the specified region of this image and
+     * stores it in the provided array of integers. Each pixel value is
+     * stored in 0xAARRGGBB format, where the high-order byte contains the
+     * alpha channel and the remaining bytes contain color components for red,
+     * green and blue, respectively. The alpha channel specifies the opacity of
+     * the pixel, where a value of 0x00  represents a pixel that is fully
+     * transparent and a value of 0xFF  represents a fully opaque pixel.
+     * The rgb information contained within the image, this method ignors
+     * rotation and mirroring in some/most situations and cannot be
+     * used in such cases.
+     *
+     * @param rgbData    an array of integers in which the ARGB pixel data is
+     *                   stored
+     * @param offset     the index into the array where the first ARGB value is
+     *                   stored
+     * @param scanlength the relative offset in the array between
+     *                   corresponding pixels in consecutive rows of the region
+     * @param x          the x-coordinate of the upper left corner of the region
+     * @param y          the y-coordinate of the upper left corner of the region
+     * @param width      the width of the region
+     * @param height     the height of the region
+     */
+    void getRGB(int[] rgbData,
+                int offset,
+                int x,
+                int y,
+                int width,
+                int height) {
+<span class="nc" id="L1165">        Display.impl.getRGB(image, rgbData, offset, x, y, width, height);</span>
+<span class="nc" id="L1166">    }</span>
+
+    /**
+     * Extracts data from this image into the given RGBImage
+     *
+     * @param image  RGBImage that would receive pixel data
+     * @param destX  x location within RGBImage into which the data will
+     *               be written
+     * @param destY  y location within RGBImage into which the data will
+     *               be written
+     * @param x      location within the source image
+     * @param y      location within the source image
+     * @param width  size of the image to extract from the source image
+     * @param height size of the image to extract from the source image
+     */
+    public void toRGB(RGBImage image,
+                      int destX,
+                      int destY,
+                      int x,
+                      int y,
+                      int width,
+                      int height) {
+<span class="nc" id="L1188">        getRGB(image.getRGB(), destX + destY * image.getWidth(), x, y, width, height);</span>
+<span class="nc" id="L1189">    }</span>
+
+    /**
+     * Returns the content of this image as a newly created ARGB array.
+     *
+     * @return new array instance containing the ARGB data within this image
+     */
+    public int[] getRGB() {
+<span class="nc" id="L1197">        return getRGBImpl();</span>
+    }
+
+    /**
+     * Returns the content of this image in the supplied ARGB array.
+     *
+     * @param rgbData
+     */
+    public void getRGB(int[] rgbData) {
+<span class="nc" id="L1206">        int width = getWidth();</span>
+<span class="nc" id="L1207">        int height = getHeight();</span>
+<span class="nc" id="L1208">        getRGB(rgbData, 0, 0, 0, width, height);</span>
+
+<span class="nc" id="L1210">    }</span>
+
+    /**
+     * Returns the content of this image as a newly created ARGB array or a cached
+     * instance if possible. Note that cached instances may be garbage collected.
+     *
+     * @return array instance containing the ARGB data within this image
+     */
+    public int[] getRGBCached() {
+<span class="nc" id="L1219">        int[] r = getRGBCache();</span>
+<span class="nc bnc" id="L1220" title="All 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L1221">            r = getRGBImpl();</span>
+<span class="nc" id="L1222">            rgbCache = Display.getInstance().createSoftWeakRef(r);</span>
+        }
+<span class="nc" id="L1224">        return r;</span>
+    }
+
+    int[] getRGBCache() {
+<span class="nc bnc" id="L1228" title="All 2 branches missed.">        if (rgbCache != null) {</span>
+<span class="nc" id="L1229">            int[] rgb = (int[]) Display.getInstance().extractHardRef(rgbCache);</span>
+<span class="nc" id="L1230">            return rgb;</span>
+        }
+<span class="nc" id="L1232">        return null;</span>
+    }
+
+    int[] getRGBImpl() {
+<span class="nc" id="L1236">        int width = getWidth();</span>
+<span class="nc" id="L1237">        int height = getHeight();</span>
+<span class="nc" id="L1238">        int[] rgbData = new int[width * height];</span>
+<span class="nc" id="L1239">        getRGB(rgbData, 0, 0, 0, width, height);</span>
+<span class="nc" id="L1240">        return rgbData;</span>
+    }
+
+    /**
+     * Scales the image to the given width while updating the height based on the
+     * aspect ratio of the width
+     *
+     * @param width the given new image width
+     * @return the newly created image
+     */
+    public Image scaledWidth(int width) {
+<span class="nc" id="L1251">        float ratio = ((float) width) / ((float) getWidth());</span>
+<span class="nc" id="L1252">        return scaled(width, Math.max(1, (int) (getHeight() * ratio)));</span>
+    }
+
+    /**
+     * Scales the image to the given height while updating the width based on the
+     * aspect ratio of the height
+     *
+     * @param height the given new image height
+     * @return the newly created image
+     */
+    public Image scaledHeight(int height) {
+<span class="nc" id="L1263">        float ratio = ((float) height) / ((float) getHeight());</span>
+<span class="nc" id="L1264">        return scaled(Math.max(1, (int) (getWidth() * ratio)), height);</span>
+    }
+
+    /**
+     * Scales the image while maintaining the aspect ratio to the smaller size
+     * image
+     *
+     * @param width  the given new image width
+     * @param height the given new image height
+     * @return the newly created image
+     */
+    public Image scaledSmallerRatio(int width, int height) {
+<span class="nc" id="L1276">        float hRatio = ((float) height) / ((float) getHeight());</span>
+<span class="nc" id="L1277">        float wRatio = ((float) width) / ((float) getWidth());</span>
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">        if (hRatio &lt; wRatio) {</span>
+<span class="nc" id="L1279">            return scaled((int) (getWidth() * hRatio), height);</span>
+        } else {
+<span class="nc" id="L1281">            return scaled(width, (int) (getHeight() * wRatio));</span>
+        }
+    }
+
+    /**
+     * Scales the image while maintaining the aspect ratio to the larger size
+     * image
+     *
+     * @param width  the given new image width
+     * @param height the given new image height
+     * @return the newly created image
+     */
+    public Image scaledLargerRatio(int width, int height) {
+<span class="nc" id="L1294">        float hRatio = ((float) height) / ((float) getHeight());</span>
+<span class="nc" id="L1295">        float wRatio = ((float) width) / ((float) getWidth());</span>
+<span class="nc bnc" id="L1296" title="All 2 branches missed.">        if (hRatio &gt; wRatio) {</span>
+<span class="nc" id="L1297">            return scaled(Math.round(getWidth() * hRatio), height);</span>
+        } else {
+<span class="nc" id="L1299">            return scaled(width, Math.round(getHeight() * wRatio));</span>
+        }
+    }
+
+    /**
+     * Returns a scaled version of this image image using the given width and height,
+     * this is a fast algorithm that preserves translucent information.
+     * The method accepts -1 to preserve aspect ratio in the given axis.
+     *
+     * @param width  width for the scaling
+     * @param height height of the scaled image
+     * @return new image instance scaled to the given height and width
+     */
+    public Image scaled(int width, int height) {
+<span class="nc" id="L1313">        return scaledImpl(width, height);</span>
+    }
+
+    /**
+     * Returns a scaled version of this image image using the given width and height,
+     * this is a fast algorithm that preserves translucent information.
+     * The method accepts -1 to preserve aspect ratio in the given axis.
+     *
+     * @param width  width for the scaling
+     * @param height height of the scaled image
+     * @return new image instance scaled to the given height and width
+     */
+    Image scaledImpl(int width, int height) {
+<span class="nc bnc" id="L1326" title="All 2 branches missed.">        if (width == -1) {</span>
+<span class="nc" id="L1327">            return scaledHeight(height);</span>
+        }
+<span class="nc bnc" id="L1329" title="All 2 branches missed.">        if (height == -1) {</span>
+<span class="nc" id="L1330">            return scaledWidth(width);</span>
+        }
+<span class="nc" id="L1332">        Dimension d = new Dimension(width, height);</span>
+<span class="nc" id="L1333">        Image i = getCachedImage(d);</span>
+<span class="nc bnc" id="L1334" title="All 2 branches missed.">        if (i != null) {</span>
+<span class="nc" id="L1335">            return i;</span>
+        }
+
+<span class="nc bnc" id="L1338" title="All 2 branches missed.">        if (svgData != null) {</span>
+            try {
+<span class="nc" id="L1340">                i = createSVG(svgBaseURL, animated, svgData);</span>
+<span class="nc" id="L1341">            } catch (IOException ex) {</span>
+<span class="nc" id="L1342">                i = new Image(this.image);</span>
+<span class="nc" id="L1343">            }</span>
+        } else {
+<span class="nc" id="L1345">            i = new Image(this.image);</span>
+        }
+<span class="nc" id="L1347">        i.scaleCache = scaleCache;</span>
+<span class="nc" id="L1348">        i.scale(width, height);</span>
+<span class="nc" id="L1349">        i.transform = this.transform;</span>
+<span class="nc" id="L1350">        i.animated = animated;</span>
+<span class="nc" id="L1351">        i.svgBaseURL = svgBaseURL;</span>
+<span class="nc" id="L1352">        i.svgData = svgData;</span>
+<span class="nc" id="L1353">        cacheImage(new Dimension(width, height), i);</span>
+<span class="nc" id="L1354">        return i;</span>
+    }
+
+    /**
+     * Resizes/crops the image so that its center fills the given dimensions. This is similar to {@link com.codename1.ui.plaf.Style#BACKGROUND_IMAGE_SCALED_FILL}
+     *
+     * @param width  the width to fill
+     * @param height the height to fill
+     * @return a new image (or the same image if dimensions happen to match) filling the width/height
+     */
+    public Image fill(int width, int height) {
+<span class="nc bnc" id="L1365" title="All 4 branches missed.">        if (getWidth() == width &amp;&amp; getHeight() == height) {</span>
+<span class="nc" id="L1366">            return this;</span>
+        }
+<span class="nc" id="L1368">        Image nimage = scaledLargerRatio(width, height);</span>
+<span class="nc bnc" id="L1369" title="All 2 branches missed.">        if (nimage.getWidth() &gt; width) {</span>
+<span class="nc" id="L1370">            int diff = nimage.getWidth() - width;</span>
+<span class="nc" id="L1371">            nimage = nimage.subImage(diff / 2, 0, width, height, true);</span>
+<span class="nc" id="L1372">        } else {</span>
+<span class="nc bnc" id="L1373" title="All 2 branches missed.">            if (nimage.getHeight() &gt; height) {</span>
+<span class="nc" id="L1374">                int diff = nimage.getHeight() - height;</span>
+<span class="nc" id="L1375">                nimage = nimage.subImage(0, diff / 2, width, height, true);</span>
+            }
+        }
+<span class="nc" id="L1378">        return nimage;</span>
+    }
+
+    /**
+     * Returns the platform specific image implementation, &lt;strong&gt;warning&lt;/strong&gt; the
+     * implementation class can change between revisions of Codename One and platforms.
+     *
+     * @return platform specific native implementation for this image object
+     */
+    public Object getImage() {
+<span class="nc" id="L1388">        return image;</span>
+    }
+
+    void setImage(Object image) {
+<span class="nc" id="L1392">        this.image = image;</span>
+<span class="nc" id="L1393">    }</span>
+
+    /**
+     * Scale the image to the given width and height, this is a fast algorithm
+     * that preserves translucent information
+     *
+     * @param width  width for the scaling
+     * @param height height of the scaled image
+     * @deprecated scale should return an image rather than modify the image in place
+     * use scaled(int, int) instead
+     */
+    public void scale(int width, int height) {
+<span class="nc" id="L1405">        image = Display.impl.scale(image, width, height);</span>
+<span class="nc" id="L1406">    }//resize image</span>
+
+    boolean scaleArray(int srcWidth, int srcHeight, int height, int width, int[] currentArray, int[] destinationArray) {
+        // Horizontal Resize
+<span class="nc" id="L1410">        int yRatio = (srcHeight &lt;&lt; 16) / height;</span>
+<span class="nc" id="L1411">        int xRatio = (srcWidth &lt;&lt; 16) / width;</span>
+<span class="nc" id="L1412">        int xPos = xRatio / 2;</span>
+<span class="nc" id="L1413">        int yPos = yRatio / 2;</span>
+
+        // if there is more than 16bit color there is no point in using mutable
+        // images since they won't save any memory
+<span class="nc bnc" id="L1417" title="All 4 branches missed.">        boolean testOpaque = Display.getInstance().numColors() &lt;= 65536 &amp;&amp; (!opaqueTested);</span>
+<span class="nc" id="L1418">        boolean currentOpaque = true;</span>
+<span class="nc bnc" id="L1419" title="All 2 branches missed.">        for (int y = 0; y &lt; height; y++) {</span>
+<span class="nc" id="L1420">            int srcY = yPos &gt;&gt; 16;</span>
+<span class="nc" id="L1421">            getRGB(currentArray, 0, 0, srcY, srcWidth, 1);</span>
+<span class="nc bnc" id="L1422" title="All 2 branches missed.">            for (int x = 0; x &lt; width; x++) {</span>
+<span class="nc" id="L1423">                int srcX = xPos &gt;&gt; 16;</span>
+<span class="nc" id="L1424">                int destPixel = x + y * width;</span>
+<span class="nc bnc" id="L1425" title="All 6 branches missed.">                if ((destPixel &gt;= 0 &amp;&amp; destPixel &lt; destinationArray.length) &amp;&amp; (srcX &lt; currentArray.length)) {</span>
+<span class="nc" id="L1426">                    destinationArray[destPixel] = currentArray[srcX];</span>
+
+                    // if all the pixels have an opaque alpha channel then the image is opaque
+<span class="nc bnc" id="L1429" title="All 6 branches missed.">                    currentOpaque = testOpaque &amp;&amp; currentOpaque &amp;&amp; (currentArray[srcX] &amp; 0xff000000) == 0xff000000;</span>
+                }
+<span class="nc" id="L1431">                xPos += xRatio;</span>
+            }
+<span class="nc" id="L1433">            yPos += yRatio;</span>
+<span class="nc" id="L1434">            xPos = xRatio / 2;</span>
+        }
+<span class="nc bnc" id="L1436" title="All 2 branches missed.">        if (testOpaque) {</span>
+<span class="nc" id="L1437">            this.opaque = currentOpaque;</span>
+        }
+<span class="nc" id="L1439">        return opaque;</span>
+    }
+
+    /**
+     * Returns true if this is an animated image
+     *
+     * @return true if this image represents an animation
+     */
+    public boolean isAnimation() {
+<span class="nc" id="L1448">        return animated;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean animate() {
+<span class="nc bnc" id="L1455" title="All 2 branches missed.">        if (imageTime == -1) {</span>
+<span class="nc" id="L1456">            imageTime = System.currentTimeMillis();</span>
+        }
+<span class="nc" id="L1458">        boolean val = Display.impl.animateImage(image, imageTime);</span>
+<span class="nc" id="L1459">        imageTime = System.currentTimeMillis();</span>
+<span class="nc" id="L1460">        return val;</span>
+    }
+
+    /**
+     * Indicates whether this image is opaque or not
+     *
+     * @return true if the image is completely opqaque which allows for some heavy optimizations
+     */
+    public boolean isOpaque() {
+<span class="nc bnc" id="L1469" title="All 2 branches missed.">        if (!opaqueTested) {</span>
+<span class="nc" id="L1470">            opaque = Display.impl.isOpaque(this, image);</span>
+<span class="nc" id="L1471">            opaqueTested = true;</span>
+        }
+<span class="nc" id="L1473">        return opaque;</span>
+    }
+
+    void setOpaque(boolean opaque) {
+<span class="nc" id="L1477">        this.opaque = opaque;</span>
+<span class="nc" id="L1478">        opaqueTested = true;</span>
+<span class="nc" id="L1479">    }</span>
+
+    /**
+     * The name of the image is set for some images mostly to ease the debugging of Codename One application
+     *
+     * @return the imageName
+     */
+    public String getImageName() {
+<span class="nc" id="L1487">        return imageName;</span>
+    }
+
+    /**
+     * The name of the image is set for some images mostly to ease the debugging of Codename One application
+     *
+     * @param imageName the imageName to set
+     */
+    public void setImageName(String imageName) {
+<span class="nc" id="L1496">        this.imageName = imageName;</span>
+<span class="nc" id="L1497">    }</span>
+
+    /**
+     * DO NOT CALL THIS METHOD UNLESS YOU KNOW WHAT YOU ARE DOING, IT WILL CAUSE PLATFORM SPECIFC CRASHES OTHERWISE! Images dispose
+     * automatically for most cases except for very rare special cases.
+     * Images on devices usually holds a native memory, some platforms garbage
+     * collectors might fail to release the native and to fail with out of memory
+     * errors.
+     * Use this method to make sure the image will be released from memory, after
+     * calling this the image will become unusable.
+     *
+     * @deprecated SERIOUSLY, DON'T INVOKE THIS METHOD UNLESS YOU KNOW WHAT YOU ARE DOING IT WILL CAUSE PLATFORM SPECIFC CRASHES OTHERWISE. IF YOU INVOKED THIS METHOD YOU ARE PROBABLY MAKING A MISTAKE
+     */
+    public void dispose() {
+<span class="nc bnc" id="L1511" title="All 2 branches missed.">        if (image != null) {</span>
+<span class="nc" id="L1512">            Display.impl.releaseImage(image);</span>
+        }
+<span class="nc" id="L1514">        image = null;</span>
+<span class="nc" id="L1515">    }</span>
+
+    /**
+     * Rotates this image by 90 degrees while changing the ratio of the picture
+     *
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 90 degrees
+     */
+    public Image rotate90Degrees(boolean maintainOpacity) {
+<span class="nc" id="L1524">        return Display.impl.rotate90Degrees(this, maintainOpacity);</span>
+    }
+
+    /**
+     * Rotates the image by 180 degrees
+     *
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 180 degrees
+     */
+    public Image rotate180Degrees(boolean maintainOpacity) {
+<span class="nc" id="L1534">        return Display.impl.rotate180Degrees(this, maintainOpacity);</span>
+    }
+
+    /**
+     * Rotates the image by 270 degrees while changing the ratio of the picture
+     *
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image rotated by 270 degrees
+     */
+    public Image rotate270Degrees(boolean maintainOpacity) {
+<span class="nc" id="L1544">        return Display.impl.rotate270Degrees(this, maintainOpacity);</span>
+    }
+
+    /**
+     * Flips this image on the horizontal axis
+     *
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image flipped
+     */
+    public Image flipHorizontally(boolean maintainOpacity) {
+<span class="nc" id="L1554">        return Display.impl.flipImageHorizontally(this, maintainOpacity);</span>
+    }
+
+    /**
+     * Flips this image on the vertical axis
+     *
+     * @param maintainOpacity whether the opacity in the image should be maintained
+     * @return a new image flipped
+     */
+    public Image flipVertically(boolean maintainOpacity) {
+<span class="nc" id="L1564">        return Display.impl.flipImageVertically(this, maintainOpacity);</span>
+    }
+
+    /**
+     * New label optimizations don't invoke drawImage and instead just pass the native image directly to
+     * the underlying renderer. This is problematic for some image types specifically timeline &amp;amp; FontImage
+     * and this method allows these classes to indicate that they need that legacy behavior of calling drawImage.
+     *
+     * @return true if a drawImage call is a required
+     */
+    public boolean requiresDrawImage() {
+<span class="nc bnc" id="L1575" title="All 2 branches missed.">        return getImage() == null;</span>
+    }
+
+    @Override
+    public synchronized void addActionListener(ActionListener l) {
+<span class="nc bnc" id="L1580" title="All 2 branches missed.">        if (listeners == null) {</span>
+<span class="nc" id="L1581">            listeners = new EventDispatcher();</span>
+        }
+<span class="nc" id="L1583">        listeners.addListener(l);</span>
+<span class="nc" id="L1584">    }</span>
+
+    @Override
+    public synchronized void removeActionListener(ActionListener l) {
+<span class="nc bnc" id="L1588" title="All 2 branches missed.">        if (listeners != null) {</span>
+<span class="nc" id="L1589">            listeners.removeListener(l);</span>
+        }
+<span class="nc" id="L1591">    }</span>
+
+    public void fireChangedEvent() {
+<span class="nc bnc" id="L1594" title="All 2 branches missed.">        if (listeners == null) {</span>
+<span class="nc" id="L1595">            return;</span>
+        }
+<span class="nc" id="L1597">        listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));</span>
+
+<span class="nc" id="L1599">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

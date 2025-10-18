@@ -1,0 +1,2214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSSEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">CSSEngine.java</span></div><h1>CSSEngine.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Font;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * This class is responsible for applying CSS directives to an HTMLComponent
+ *
+ * @author Ofir Leitner
+ */
+<span class="nc" id="L48">class CSSEngine {</span>
+
+    /**
+     * Denotes that the selector should be applied to the unselected style of the component
+     */
+    final static int STYLE_UNSELECTED = 1;
+    /**
+     * Denotes that the selector should be applied to the selected style of the component
+     */
+    final static int STYLE_SELECTED = 2;
+    /**
+     * Denotes that the selector should be applied to the pressed style of the component
+     */
+    final static int STYLE_PRESSED = 4;
+    static final String CLIENT_PROPERTY_CSS_CONTENT = &quot;cssContent&quot;;
+    /**
+     * A list of the attributes that can contain a URL, in order to scan them and update relative URLs to an absolute one
+     */
+<span class="nc" id="L66">    private static final int[] URL_ATTRIBUTES = {CSSElement.CSS_BACKGROUND_IMAGE, CSSElement.CSS_LIST_STYLE_IMAGE};</span>
+    /**
+     * The indentation applied on a list when its 'list-style-position' is 'inside' vs. 'outside'
+     */
+    private final static int INDENT_LIST_STYLE_POSITION = 15;
+    // The possible values of the 'text-transform' attribute
+    private static final int TEXT_TRANSFORM_NONE = 0;
+    private static final int TEXT_TRANSFORM_UPPERCASE = 1;
+    private static final int TEXT_TRANSFORM_LOWERCASE = 2;
+    private static final int TEXT_TRANSFORM_CAPITALIZE = 3;
+    // The possible values of the 'text-decoration' attribute
+    private static final int TEXT_DECOR_UNDERLINE = 0;
+    private static final int TEXT_DECOR_LINETHROUGH = 1;
+    private static final int TEXT_DECOR_NONE = 2;
+    private static final int TEXT_DECOR_OVERLINE = 3;
+    // The possible values of the '-wap-input-required' attribute
+    private static final int INPUT_REQUIRED_TRUE = 0;
+    private static final int INPUT_REQUIRED_FALSE = 1;
+    // The possible values of the 'background-attachment' attribute
+    private static final int BG_ATTACHMENT_FIXED = 0;
+    private static final int BG_ATTACHMENT_SCROLL = 1;
+    // The possible values of the 'white-space' attribute
+    private static final int WHITE_SPACE_NORMAL = 0;
+    private static final int WHITE_SPACE_PRE = 1;
+    private static final int WHITE_SPACE_NOWRAP = 2;
+    // The possible values of the 'display' attribute
+    private static final int DISPLAY_INLINE = 0;
+    private static final int DISPLAY_BLOCK = 1;
+    private static final int DISPLAY_LIST_ITEM = 2;
+    private static final int DISPLAY_NONE = 3;
+    private static final int DISPLAY_MARQUEE = 4;
+    // The possible values of the 'font-variant' attribute
+    private static final int FONT_VARIANT_NORMAL = 0;
+    private static final int FONT_VARIANT_SMALLCAPS = 1;
+    // The possible values of the 'list-style-position' attribute
+    private static final int LIST_STYLE_POSITION_INSIDE = 0;
+    private static final int LIST_STYLE_POSITION_OUTSIDE = 1;
+    // The possible values of the 'border-style' attribute
+    private static final int BORDER_STYLE_NONE = 0;
+    private static final int BORDER_STYLE_SOLID = 1;
+    private static final int BORDER_STYLE_DOTTED = 2;
+    private static final int BORDER_STYLE_DASHED = 3;
+    private static final int BORDER_STYLE_DOUBLE = 4;
+    private static final int BORDER_STYLE_GROOVE = 5;
+    private static final int BORDER_STYLE_RIDGE = 6;
+    private static final int BORDER_STYLE_INSET = 7;
+    private static final int BORDER_STYLE_OUTSET = 8;
+<span class="nc" id="L113">    private static final int[][] BORDER_OUTLINE_PROPERTIES = {</span>
+            {CSSElement.CSS_BORDER_TOP_WIDTH, CSSElement.CSS_BORDER_TOP_STYLE, CSSElement.CSS_BORDER_TOP_COLOR},
+            {CSSElement.CSS_OUTLINE_WIDTH, CSSElement.CSS_OUTLINE_STYLE, CSSElement.CSS_OUTLINE_COLOR}
+    };
+    private static final int BORDER = 0;
+    private static final int OUTLINE = 1;
+    private static final int WIDTH = 0;
+    private static final int STYLE = 1;
+    private static final int COLOR = 2;
+    // The possible values of the 'visibility' attribute
+    private static final int VISIBILITY_HIDDEN = 0;
+    private static final int VISIBILITY_VISIBLE = 1;
+    private static final int VISIBILITY_COLLAPSE = 2; // collapse behaves the same as hidden in most browsers.
+    // The possible values of the 'border-collapse' attribute
+    private static final int BORDER_COLLAPSE_COLLAPSE = 0;
+    private static final int BORDER_COLLAPSE_SEPARATE = 1;
+    // The possible values of the 'empty-cells' attribute
+    private static final int EMPTY_CELLS_HIDE = 0;
+    private static final int EMPTY_CELLS_SHOW = 1;
+    // The possible values of the 'caption-side' attribute
+    private static final int CAPTION_SIDE_BOTTOM = 0;
+    private static final int CAPTION_SIDE_TOP = 1;
+    // The possible values of the 'direction' attribute
+    private static final int DIRECTION_RTL = 0;
+    private static final int DIRECTION_LTR = 1;
+    private static final int DEFAULT_3D_BORDER_COLOR = 0x9a9a9a; // default color for outset/inset/ridge/groove
+    //int count; //for debugging
+    private static CSSEngine instance; // The instance of this singleton class
+    private static Hashtable specialKeys; // A hashtable containing all recognized special key strings and their keycodes
+<span class="nc" id="L142">    private final Hashtable matchingFonts = new Hashtable(); // A hashtable used as a cache for quick find of matching fonts</span>
+
+    /**
+     * Returns the singleton instance of CSSEngine and creates it if necessary
+     *
+     * @return The singleton instance of CSSEngine
+     */
+    static CSSEngine getInstance() {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc" id="L151">            instance = new CSSEngine();</span>
+        }
+<span class="nc" id="L153">        return instance;</span>
+    }
+
+    /**
+     * Adds support for a special key to be used as an accesskey.
+     * The CSS property -wap-accesskey supports special keys, for example &quot;phone-send&quot; that may have different key codes per device.
+     * This method allows pairing between such keys to their respective key codes.
+     * Note that these keys are valid only for -wap-aceesskey in CSS files, and not for the XHTML accesskey attribute.
+     *
+     * @param specialKeyName The name of the special key as denoted in CSS files
+     * @param specialKeyCode The special key code
+     */
+    static void addSpecialKey(String specialKeyName, int specialKeyCode) {
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (specialKeys == null) {</span>
+<span class="nc" id="L167">            specialKeys = new Hashtable();</span>
+        }
+<span class="nc" id="L169">        specialKeys.put(specialKeyName, Integer.valueOf(specialKeyCode));</span>
+<span class="nc" id="L170">    }</span>
+
+    /**
+     * Omits quotes of all kinds if they exist in the string
+     *
+     * @param str The string to check
+     * @return A quoteless string
+     */
+    static String omitQuotesIfExist(String str) {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (str == null) {</span>
+<span class="nc" id="L180">            return null;</span>
+        }
+<span class="nc bnc" id="L182" title="All 6 branches missed.">        if (((str.charAt(0) == '\&quot;') || (str.charAt(0) == '\'')) &amp;&amp; (str.length() &gt;= 2)) {</span>
+<span class="nc" id="L183">            str = str.substring(1, str.length() - 1); // omit quotes from both sides</span>
+        }
+<span class="nc" id="L185">        return str;</span>
+    }
+
+    /**
+     * Extracts a url from a CSS URL value
+     *
+     * @param cssURL the CSS formatted URL - url(someurl)
+     * @return A regular URL - someurl
+     */
+    static String getCSSUrl(String cssURL) {
+<span class="nc bnc" id="L195" title="All 4 branches missed.">        if ((cssURL != null) &amp;&amp; (cssURL.toLowerCase().startsWith(&quot;url(&quot;))) {</span>
+<span class="nc" id="L196">            int index = cssURL.indexOf(')');</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (index != -1) {</span>
+<span class="nc" id="L198">                cssURL = cssURL.substring(4, index);</span>
+<span class="nc" id="L199">                cssURL = cssURL.trim(); // According to the CSS spec, a URL can have white space before/after the quotes</span>
+<span class="nc" id="L200">                cssURL = omitQuotesIfExist(cssURL);</span>
+<span class="nc" id="L201">                return cssURL;</span>
+            }
+        }
+<span class="nc" id="L204">        return null;</span>
+    }
+
+    /**
+     * Sorts the CSS directives by their specificity level
+     *
+     * @param css A css vector holding CSSElements, where each element holds CSS selectors as its children
+     * @return a flat vector containing CSS selectors, sorted by specificity
+     */
+    private CSSElement[] sortSelectorsBySpecificity(CSSElement[] css) {
+<span class="nc" id="L214">        Vector sortedSelectors = new Vector();</span>
+
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        for (int s = 0; s &lt; css.length; s++) {</span>
+<span class="nc" id="L217">            CSSElement cssRoot = css[s];</span>
+<span class="nc" id="L218">            String cssPageURL = cssRoot.getAttributeById(CSSElement.CSS_PAGEURL);</span>
+<span class="nc" id="L219">            DocumentInfo cssDocInfo = null;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (cssPageURL != null) {</span>
+<span class="nc" id="L221">                cssDocInfo = new DocumentInfo(cssPageURL);</span>
+            }
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            for (int iter = 0; iter &lt; cssRoot.getNumChildren(); iter++) {</span>
+<span class="nc" id="L224">                CSSElement currentSelector = cssRoot.getCSSChildAt(iter);</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                if (cssPageURL != null) { // Since with external CSS pages, the base URL is that of the CSS file and not of the HTML document, we have to convert relative image URLs to absolute URLs</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                    for (int i = 0; i &lt; URL_ATTRIBUTES.length; i++) {</span>
+<span class="nc" id="L227">                        String imageURL = getCSSUrl(currentSelector.getAttributeById(URL_ATTRIBUTES[i]));</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                        if (imageURL != null) {</span>
+<span class="nc" id="L229">                            imageURL = cssDocInfo.convertURL(imageURL);</span>
+<span class="nc" id="L230">                            currentSelector.setAttribute(currentSelector.getAttributeName(Integer.valueOf(URL_ATTRIBUTES[i])), &quot;url(&quot; + imageURL + &quot;)&quot;);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L234">                int i = 0;</span>
+<span class="nc" id="L235">                int specificity = currentSelector.getSelectorSpecificity(); //Note that it is important to get the specificity outside the loop, so it will necessarily get called (triggering the cal)</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">                while ((i &lt; sortedSelectors.size()) &amp;&amp; (specificity &gt;= ((CSSElement) sortedSelectors.elementAt(i)).getSelectorSpecificity())) {</span>
+<span class="nc" id="L237">                    i++;</span>
+                }
+<span class="nc" id="L239">                sortedSelectors.insertElementAt(currentSelector, i);</span>
+            }
+        }
+
+<span class="nc" id="L243">        css = new CSSElement[sortedSelectors.size()];</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        for (int i = 0; i &lt; sortedSelectors.size(); i++) {</span>
+<span class="nc" id="L245">            css[i] = (CSSElement) sortedSelectors.elementAt(i);</span>
+        }
+
+<span class="nc" id="L248">        return css;</span>
+    }
+
+    /**
+     * Applies all CSS directives to the given document and HTMLComponent, including external CSS files, embedded CSS segments and inline CSS (Style attribute)
+     * This is called by HTMLComponent after the document was fully parsed and all external CSS have been retrieved.
+     * This method actually initializes a sorted CSS array to be used by the recursive private applyCSS method.
+     *
+     * @param document    The HTML document to apply the CSS on
+     * @param htmlC       The HTMLComponent to apply the CSS on
+     * @param externalCSS A vector containing CSSElelemnts each being the root of external CSS file (1 per file)
+     * @param embeddedCSS A vector containing CSSElelemnts each being the root of embedded CSS segments (1 per segment)
+     */
+    void applyCSS(HTMLElement document, HTMLComponent htmlC, Vector externalCSS, Vector embeddedCSS) {
+        //long startTime=System.currentTimeMillis();
+        //count=0;
+<span class="nc" id="L264">        int externalSize = 0;</span>
+<span class="nc" id="L265">        int embeddedSize = 0;</span>
+
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (externalCSS != null) {</span>
+<span class="nc" id="L268">            externalSize = externalCSS.size();</span>
+        }
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        if (embeddedCSS != null) {</span>
+<span class="nc" id="L271">            embeddedSize = embeddedCSS.size();</span>
+        }
+
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (externalSize + embeddedSize == 0) {</span>
+<span class="nc" id="L275">            applyStyleAttributeRecursive(document, htmlC);</span>
+        } else {
+<span class="nc" id="L277">            CSSElement[] css = new CSSElement[externalSize + embeddedSize];</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">            for (int i = 0; i &lt; externalSize; i++) {</span>
+<span class="nc" id="L279">                css[i] = (CSSElement) externalCSS.elementAt(i);</span>
+            }
+<span class="nc bnc" id="L281" title="All 2 branches missed.">            for (int i = 0; i &lt; embeddedSize; i++) {</span>
+<span class="nc" id="L282">                css[i + externalSize] = (CSSElement) embeddedCSS.elementAt(i);</span>
+            }
+
+<span class="nc" id="L285">            css = sortSelectorsBySpecificity(css);</span>
+<span class="nc" id="L286">            applyCSS(document, htmlC, css, null, null);</span>
+        }
+        //System.out.println(&quot;Total: &quot;+count+&quot;, Time=&quot;+(System.currentTimeMillis()-startTime));
+<span class="nc" id="L289">    }</span>
+
+    /**
+     * Applies the style attribute in the specified element and all of its descendants (where exists)
+     * This method is used when no external and embedded CSS segments exists, to speed up the process of CSS application
+     *
+     * @param element The element to apply the style to
+     * @param htmlC   The HTMLComponent
+     */
+    private void applyStyleAttributeRecursive(HTMLElement element, HTMLComponent htmlC) {
+<span class="nc" id="L299">        applyStyleAttribute(element, htmlC);</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        for (int i = 0; i &lt; element.getNumChildren(); i++) {</span>
+<span class="nc" id="L301">            HTMLElement child = (HTMLElement) element.getChildAt(i);</span>
+<span class="nc" id="L302">            applyStyleAttributeRecursive(child, htmlC);</span>
+        }
+<span class="nc" id="L304">    }</span>
+
+    /**
+     * Applies the style attribute in the specified element, if exists
+     *
+     * @param element The element to apply the style to
+     * @param htmlC   The HTMLComponent
+     */
+    private void applyStyleAttribute(HTMLElement element, HTMLComponent htmlC) {
+<span class="nc" id="L313">        String styleStr = element.getAttributeById(HTMLElement.ATTR_STYLE);</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (styleStr != null) {</span>
+<span class="nc" id="L315">            CSSElement style = null;</span>
+<span class="nc" id="L316">            styleStr = &quot;{&quot; + styleStr + &quot;}&quot;; // So it will be parsed correctly</span>
+            try {
+<span class="nc" id="L318">                style = CSSParser.getInstance().parseCSS(new InputStreamReader(new ByteArrayInputStream(styleStr.getBytes())), htmlC);</span>
+<span class="nc" id="L319">                applyStyle(element, style, htmlC);</span>
+<span class="nc" id="L320">            } catch (IOException ex) {</span>
+<span class="nc" id="L321">                ex.printStackTrace();</span>
+<span class="nc" id="L322">            }</span>
+        }
+<span class="nc" id="L324">    }</span>
+
+    /**
+     * A recursive method that tries to match all CSS selectors with the specified element
+     *
+     * @param element         The specific element in the document to apply the CSS on
+     * @param htmlC           The HTMLComponent to apply the CSS on
+     * @param css             An array containing selectors sorted by specificity from all the external CSS files and then the embedded CSS segments
+     * @param nestedSelectors A vector containing nested selectors, or null if none
+     */
+    private Vector applyCSS(HTMLElement element, HTMLComponent htmlC, CSSElement[] css, Vector nestedSelectors, Vector siblingSelectors) { //Vector styleAttributes
+<span class="nc" id="L335">        String id = element.getAttributeById(HTMLElement.ATTR_ID);</span>
+<span class="nc" id="L336">        String className = element.getAttributeById(HTMLElement.ATTR_CLASS);</span>
+
+<span class="nc" id="L338">        Vector nextNestedSelectors = new Vector();</span>
+<span class="nc" id="L339">        Vector nextSiblingSelectors = null;</span>
+        if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) { // sibling selectors are not supported in HTML-MP1
+<span class="nc" id="L341">            nextSiblingSelectors = new Vector();</span>
+        }
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        for (int e = 0; e &lt; css.length; e++) {</span>
+<span class="nc" id="L344">            CSSElement currentSelector = css[e];</span>
+<span class="nc" id="L345">            checkSelector(currentSelector, element, htmlC, className, id, nextNestedSelectors, nextSiblingSelectors);</span>
+        }
+
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (nestedSelectors != null) {</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">            for (Enumeration e = nestedSelectors.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L350">                CSSElement currentSelector = (CSSElement) e.nextElement();</span>
+<span class="nc" id="L351">                checkSelector(currentSelector, element, htmlC, className, id, nextNestedSelectors, nextSiblingSelectors);</span>
+<span class="nc" id="L352">            }</span>
+        }
+
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) &amp;&amp; (siblingSelectors != null)) {</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            for (Enumeration e = siblingSelectors.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L357">                CSSElement currentSelector = (CSSElement) e.nextElement();</span>
+<span class="nc" id="L358">                checkSelector(currentSelector, element, htmlC, className, id, nextNestedSelectors, nextSiblingSelectors);</span>
+<span class="nc" id="L359">            }</span>
+        }
+
+
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        if (nextNestedSelectors.size() == 0) {</span>
+<span class="nc" id="L364">            nextNestedSelectors = null;</span>
+        }
+
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if ((!HTMLComponent.PROCESS_HTML_MP1_ONLY) &amp;&amp; (nextSiblingSelectors.size() == 0)) {</span>
+<span class="nc" id="L368">            nextSiblingSelectors = null;</span>
+        }
+
+<span class="nc" id="L371">        applyStyleAttribute(element, htmlC);</span>
+
+<span class="nc" id="L373">        Vector curSiblingSelectors = null;</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        for (int i = 0; i &lt; element.getNumChildren(); i++) {</span>
+<span class="nc" id="L375">            HTMLElement child = (HTMLElement) element.getChildAt(i);</span>
+<span class="nc" id="L376">            Vector v = applyCSS(child, htmlC, css, nextNestedSelectors, curSiblingSelectors);</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">            if (!child.isTextElement()) { // Sibling selectors skip text elements</span>
+<span class="nc" id="L378">                curSiblingSelectors = v;</span>
+            }
+        }
+
+<span class="nc" id="L382">        return nextSiblingSelectors;</span>
+    }
+
+    /**
+     * Checks if the given selector matches the given element either by its tag name, class name or id.
+     * If there's a match but the selector has children, it means that it is a nested selector, and thus
+     * its only child is added to the nested selectors vector to be checked against the children of this element in the next recursion of applyCSS
+     *
+     * @param currentSelector     The current CSS selector to check
+     * @param element             The element to check
+     * @param htmlC               The HTMLComponent
+     * @param className           The element's class name (Can be derived from element but since this method is called a lot it is extracted before and sent as a parameter)
+     * @param id                  The element's id (Same comment as in className)
+     * @param nextNestedSelectors A vector containing the nested selectors
+     */
+    private void checkSelector(CSSElement currentSelector, HTMLElement element, HTMLComponent htmlC, String className, String id, Vector nextNestedSelectors, Vector nextSiblingSelectors) {
+
+<span class="nc bnc" id="L399" title="All 6 branches missed.">        if (((currentSelector.getSelectorTag() == null) || ((!element.isTextElement()) &amp;&amp; (currentSelector.getSelectorTag().equalsIgnoreCase(element.getTagName())))) &amp;&amp;</span>
+<span class="nc bnc" id="L400" title="All 4 branches missed.">                ((currentSelector.getSelectorClass() == null) || (containsClass(className, currentSelector.getSelectorClass()))) &amp;&amp;</span>
+<span class="nc bnc" id="L401" title="All 4 branches missed.">                ((currentSelector.getSelectorId() == null) || (currentSelector.getSelectorId().equalsIgnoreCase(id))) &amp;&amp;</span>
+<span class="nc bnc" id="L402" title="All 4 branches missed.">                (((currentSelector.getSelectorPseudoClass() &amp; (CSSElement.PC_FIRST_CHILD)) == 0) || (element.isFirstChild())) &amp;&amp; //element.getParent().getChildIndex(element)==0)) &amp;&amp;</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">                (currentSelector.matchAttributeSelections(element))) {</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            if (currentSelector.getNumChildren() == 0) {</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                if ((element.getTagId() != HTMLElement.TAG_A) ||</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                        ((currentSelector.getSelectorPseudoClass() &amp; (CSSElement.PC_LINK + CSSElement.PC_VISITED)) == 0) || // not link/visited (but can be active/focus)</span>
+<span class="nc bnc" id="L407" title="All 4 branches missed.">                        ((element.getUi().size() &gt; 0) &amp;&amp; !(element.getUi().firstElement() instanceof HTMLLink)) ||</span>
+<span class="nc bnc" id="L408" title="All 6 branches missed.">                        ((element.getUi().size() &gt; 0) &amp;&amp; (!((HTMLLink) element.getUi().firstElement()).linkVisited) &amp;&amp; ((currentSelector.getSelectorPseudoClass() &amp; CSSElement.PC_LINK) != 0)) ||</span>
+<span class="nc bnc" id="L409" title="All 6 branches missed.">                        ((element.getUi().size() &gt; 0) &amp;&amp; ((HTMLLink) element.getUi().firstElement()).linkVisited) &amp;&amp; ((currentSelector.getSelectorPseudoClass() &amp; CSSElement.PC_VISITED) != 0)) {</span>
+<span class="nc" id="L410">                    applyStyle(element, currentSelector, htmlC);</span>
+                }
+            } else {
+<span class="nc" id="L413">                CSSElement child = currentSelector.getCSSChildAt(0);</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">                if (child.siblingSelector) {</span>
+                    if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) { // sibling selectors are not supported in HTML-MP1
+<span class="nc" id="L416">                        nextSiblingSelectors.addElement(child);</span>
+                    }
+                } else {
+<span class="nc" id="L419">                    nextNestedSelectors.addElement(child);</span>
+                    // Check if this is a Descendant selector (i.e. div b - which means match any b that is the descendant of div
+                    // If so then we pass not only the child selector (i.e. the b) but also the &quot;* b&quot; to allow matching later decendants
+<span class="nc bnc" id="L422" title="All 2 branches missed.">                    if (child.descendantSelector) {</span>
+<span class="nc" id="L423">                        CSSElement elem = new CSSElement(&quot;*&quot;);</span>
+<span class="nc" id="L424">                        elem.addChild(new CSSElement(child));</span>
+<span class="nc" id="L425">                        nextNestedSelectors.addElement(elem);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L430">    }</span>
+
+    /**
+     * Checks if the specified class is contained in the specified text
+     * This is used for elements that have several classes i.e. class=&quot;class1 class2&quot;
+     * Note: A simple indexOf could not be used since we need to find whole words and not frgaments of words
+     *
+     * @param selectorClass The text
+     * @param elementClass  The word to find in the text
+     * @return true if the word is found, false otherwise
+     */
+    private boolean containsClass(String elementClass, String selectorClass) {
+<span class="nc bnc" id="L442" title="All 4 branches missed.">        if ((elementClass == null) || (selectorClass == null)) {</span>
+<span class="nc" id="L443">            return false;</span>
+        }
+        // The spaces addition is to make sure we get a whole word and not a fragment of a word
+<span class="nc" id="L446">        elementClass = &quot; &quot; + elementClass + &quot; &quot;;</span>
+
+        // Selector can require multiple classes, i.e. class.1class2 (which needs to match to &quot;class 1 class2&quot; and &quot;class2 class1&quot; and also &quot;class1 otherclasses class2&quot;
+<span class="nc" id="L449">        int dotIndex = selectorClass.indexOf('.');</span>
+<span class="nc bnc" id="L450" title="All 2 branches missed.">        while (dotIndex != -1) {</span>
+<span class="nc" id="L451">            String curWord = selectorClass.substring(0, dotIndex);</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if (elementClass.indexOf(&quot; &quot; + curWord + &quot; &quot;) == -1) {</span>
+<span class="nc" id="L453">                return false;</span>
+            }
+<span class="nc" id="L455">            selectorClass = selectorClass.substring(dotIndex + 1);</span>
+<span class="nc" id="L456">            dotIndex = selectorClass.indexOf('.');</span>
+<span class="nc" id="L457">        }</span>
+
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        return (elementClass.indexOf(&quot; &quot; + selectorClass + &quot; &quot;) != -1);</span>
+    }
+
+    /**
+     * Applies the given style attributes to the HTML DOM entry
+     *
+     * @param element  The element to apply the style to
+     * @param selector The selector containing the style directives
+     * @param htmlC    The HTMLComponent
+     */
+    private void applyStyle(HTMLElement element, CSSElement selector, HTMLComponent htmlC) {
+<span class="nc bnc" id="L470" title="All 4 branches missed.">        if ((element.getUi() != null) &amp;&amp; (element.getUi().size() &gt; 0)) {</span>
+            if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) {
+<span class="nc" id="L472">                String reset = selector.getAttributeById(CSSElement.CSS_COUNTER_RESET);</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                if (reset != null) {</span>
+<span class="nc" id="L474">                    htmlC.incCounter(reset, true);</span>
+                }
+<span class="nc" id="L476">                String inc = selector.getAttributeById(CSSElement.CSS_COUNTER_INCREMENT);</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">                if (inc != null) {</span>
+<span class="nc" id="L478">                    htmlC.incCounter(inc, false);</span>
+                }
+
+<span class="nc bnc" id="L481" title="All 2 branches missed.">                if ((selector.getSelectorPseudoClass() &amp; (CSSElement.PC_BEFORE | CSSElement.PC_AFTER)) != 0) {</span>
+<span class="nc" id="L482">                    handleContentProperty(element, selector, htmlC);</span>
+<span class="nc" id="L483">                    return;</span>
+                }
+            }
+<span class="nc bnc" id="L486" title="All 2 branches missed.">            for (int iter = 0; iter &lt; element.getUi().size(); iter++) {</span>
+<span class="nc" id="L487">                Object o = element.getUi().elementAt(iter);</span>
+<span class="nc bnc" id="L488" title="All 4 branches missed.">                if (o != null &amp;&amp; o instanceof Component) {</span>
+<span class="nc" id="L489">                    final Component cmp = (Component) o;</span>
+<span class="nc" id="L490">                    applyStyleToUIElement(cmp, selector, element, htmlC);</span>
+                }
+            }
+        }
+<span class="nc" id="L494">    }</span>
+
+    /**
+     * Returns a mask of the STYLE_* constants of which CodenameOne styles this selector should be applied to
+     *
+     * @param cmp      The component in question
+     * @param selector The selector
+     * @return a mask of the STYLE_* constants of which CodenameOne styles this selector should be applied to
+     */
+    private int getApplicableStyles(Component cmp, CSSElement selector) {
+<span class="nc" id="L504">        int result = 0;</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">        if (cmp instanceof HTMLLink) {</span>
+<span class="nc" id="L506">            int pseudoClass = selector.getSelectorPseudoClass();</span>
+<span class="nc" id="L507">            boolean done = false;</span>
+<span class="nc bnc" id="L508" title="All 2 branches missed.">            if ((pseudoClass &amp; CSSElement.PC_FOCUS) != 0) { // Focused (i.e. CSS focus/hover)</span>
+<span class="nc" id="L509">                result |= STYLE_SELECTED;</span>
+<span class="nc" id="L510">                done = true;</span>
+            }
+<span class="nc bnc" id="L512" title="All 2 branches missed.">            if ((pseudoClass &amp; CSSElement.PC_ACTIVE) != 0) { // active in CSS means pressed in CodenameOne</span>
+<span class="nc" id="L513">                result |= STYLE_PRESSED;</span>
+<span class="nc" id="L514">                done = true;</span>
+            }
+
+<span class="nc bnc" id="L517" title="All 2 branches missed.">            if (!done) {</span>
+<span class="nc" id="L518">                result |= STYLE_SELECTED | STYLE_UNSELECTED;</span>
+            }
+<span class="nc" id="L520">        } else {</span>
+<span class="nc" id="L521">            result |= STYLE_SELECTED | STYLE_UNSELECTED;</span>
+        }
+<span class="nc" id="L523">        return result;</span>
+    }
+
+    /**
+     * Sets the specified color as the foreground color of the component and all its children
+     *
+     * @param cmp      The component to work on
+     * @param color    The color to set
+     * @param selector The selector with the color directive
+     */
+    private void setColorRecursive(Component cmp, int color, CSSElement selector) {
+<span class="nc" id="L534">        int styles = getApplicableStyles(cmp, selector);</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">        if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L536">            cmp.getUnselectedStyle().setFgColor(color);</span>
+        }
+<span class="nc bnc" id="L538" title="All 2 branches missed.">        if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L539">            cmp.getSelectedStyle().setFgColor(color);</span>
+        }
+<span class="nc bnc" id="L541" title="All 2 branches missed.">        if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L542">            cmp.getPressedStyle().setFgColor(color);</span>
+        }
+
+<span class="nc bnc" id="L545" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L546">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">                if (!(cont.getComponentAt(i) instanceof HTMLLink)) { // A link color is a special case, it is not inherited and applied only if the selector selects the link directly</span>
+<span class="nc" id="L549">                    setColorRecursive(cont.getComponentAt(i), color, selector);</span>
+                }
+            }
+        }
+<span class="nc" id="L553">    }</span>
+
+    // TODO - This is a problematic implementation since if a text has been converted to UPPERCASE and then due to a child's style attribute it has to change back to none/capitalize - there's no way to restore the original text.
+    // Also it has a problem with FIXED_WIDTH mode since when uppercasing for example, labels will grow in size which will take some of them out of the screen, The correct way is working on the elements and not the text, and reconstruct the labels
+
+    /**
+     * Sets the font of the component and all its children to the closest font that can be found according to the specified properties
+     *
+     * @param htmlC      The HTMLComponent this component belongs to (For the available bitmap fonts table)
+     * @param cmp        The component to work on
+     * @param fontFamily The font family
+     * @param fontSize   The font size in pixels
+     * @param fontStyle  The font style - either Font.STYLE_PLAIN or Font.STYLE_ITALIC
+     * @param fontWeight The font weight - either Font.STYLE_PLAIN ot Font.STYLE_BOLD
+     * @param selector   The selector with the font directive
+     */
+    private void setFontRecursive(HTMLComponent htmlC, Component cmp, String fontFamily, int fontSize, int fontStyle, int fontWeight, CSSElement selector) {
+<span class="nc bnc" id="L570" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L571">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L572" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L573">                setFontRecursive(htmlC, cont.getComponentAt(i), fontFamily, fontSize, fontStyle, fontWeight, selector);</span>
+            }
+<span class="nc bnc" id="L575" title="All 2 branches missed.">        } else if (cmp instanceof Label) {</span>
+<span class="nc" id="L576">            setMatchingFont(htmlC, cmp, fontFamily, fontSize, fontStyle, fontWeight, selector);</span>
+        }
+<span class="nc" id="L578">    }</span>
+
+    /**
+     * Usually we don't have to set visibility in a recursive manner, i.e. suffices to set a top level container as invisible and all its contents are invisible.
+     * However, in CSS it is possible that a top level element has visibility:hidden and some child of his has visibility:visible, and then what we do
+     * is use the setVisibleParents to make sure all containers containing this child are visible.
+     * But since other child components still need to be invsibile - we make sure that all are invisible with this method.
+     *
+     * @param cmp     The component to set visibility on
+     * @param visible true to set visible and enabled, false otherwise
+     */
+    private void setVisibleRecursive(Component cmp, boolean visible) {
+<span class="nc" id="L590">        cmp.setEnabled(visible);</span>
+<span class="nc" id="L591">        cmp.setVisible(visible);</span>
+<span class="nc bnc" id="L592" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L593">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L595">                setVisibleRecursive(cont.getComponentAt(i), visible);</span>
+            }
+        }
+<span class="nc" id="L598">    }</span>
+
+    /**
+     * Sets the specified text transform to the component and all its children
+     *
+     * @param cmp           The component to work on
+     * @param transformType The text transform type, one of the TEXT_TRANSFORM_* constants
+     */
+    private void setTextTransformRecursive(Component cmp, int transformType) {
+<span class="nc bnc" id="L607" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L608">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L610">                setTextTransformRecursive(cont.getComponentAt(i), transformType);</span>
+            }
+<span class="nc bnc" id="L612" title="All 2 branches missed.">        } else if (cmp instanceof Label) {</span>
+<span class="nc" id="L613">            Label label = (Label) cmp;</span>
+<span class="nc bnc" id="L614" title="All 4 branches missed.">            switch (transformType) {</span>
+                case TEXT_TRANSFORM_UPPERCASE:
+<span class="nc" id="L616">                    label.setText(label.getText().toUpperCase());</span>
+<span class="nc" id="L617">                    break;</span>
+                case TEXT_TRANSFORM_LOWERCASE:
+<span class="nc" id="L619">                    label.setText(label.getText().toLowerCase());</span>
+<span class="nc" id="L620">                    break;</span>
+                case TEXT_TRANSFORM_CAPITALIZE:
+
+<span class="nc" id="L623">                    String text = label.getText();</span>
+
+<span class="nc" id="L625">                    String newText = &quot;&quot;;</span>
+<span class="nc" id="L626">                    boolean capNextLetter = true;</span>
+<span class="nc bnc" id="L627" title="All 2 branches missed.">                    for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="nc" id="L628">                        char c = text.charAt(i);</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">                        if (CSSParser.isWhiteSpace(c)) {</span>
+<span class="nc" id="L630">                            capNextLetter = true;</span>
+<span class="nc bnc" id="L631" title="All 2 branches missed.">                        } else if (capNextLetter) {</span>
+<span class="nc bnc" id="L632" title="All 4 branches missed.">                            if ((c &gt;= 'a') &amp;&amp; (c &lt;= 'z')) {</span>
+<span class="nc" id="L633">                                c -= 32; // 'A' is ASCII 65, and 'a' is ASCII 97, difference: 32</span>
+                            }
+<span class="nc" id="L635">                            capNextLetter = false;</span>
+                        }
+<span class="nc" id="L637">                        newText += c;</span>
+                    }
+<span class="nc" id="L639">                    label.setText(newText);</span>
+                    break;
+            }
+        }
+
+<span class="nc" id="L644">    }</span>
+
+    /**
+     * Sets the alignment of the component and all its children according to the given alignment
+     *
+     * @param cmp   The component to set the alignment on
+     * @param align The alignment - one of left,center,right
+     */
+    private void setTextAlignmentRecursive(Component cmp, int align) {
+<span class="nc bnc" id="L653" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L654">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L655" title="All 2 branches missed.">            if (cont.getLayout() instanceof FlowLayout) {</span>
+<span class="nc" id="L656">                cont.setLayout(new FlowLayout(align));</span>
+            }
+<span class="nc bnc" id="L658" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L659">                setTextAlignmentRecursive(cont.getComponentAt(i), align);</span>
+            }
+        } else if ((HTMLComponent.FIXED_WIDTH) &amp;&amp; (cmp instanceof Label)) { // In FIXED_WIDTH mode labels are aligned by appling alignment on themselves and enlarging the label size to take the whole width of the screen
+            ((Label) cmp).setAlignment(align);
+        }
+<span class="nc" id="L664">    }</span>
+
+    /**
+     * Sets the given text indentation to the component and all its children
+     * Note: This doesn't really work well with HTMLComponent.FIXED_WIDTH mode since labels there are not single words but rather the whole line, so they get pushed out of the screen
+     *
+     * @param cmp    The component to set the indentation on
+     * @param indent The indentation in pixels
+     */
+    private void setTextIndentationRecursive(Component cmp, int indent) {
+<span class="nc bnc" id="L674" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L675">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L676" title="All 4 branches missed.">            if ((cont.getLayout() instanceof FlowLayout) &amp;&amp; (cont.getComponentCount() &gt; 0)) {</span>
+                // Note that we don't need to consider the &quot;applicable&quot; styles, as this is a container and will always return selected+unselected
+<span class="nc" id="L678">                cont.getComponentAt(0).getUnselectedStyle().setMargin(Component.LEFT, indent);</span>
+<span class="nc" id="L679">                cont.getComponentAt(0).getSelectedStyle().setMargin(Component.LEFT, indent);</span>
+            }
+<span class="nc bnc" id="L681" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L682">                setTextIndentationRecursive(cont.getComponentAt(i), indent);</span>
+            }
+        }
+<span class="nc" id="L685">    }</span>
+
+    /**
+     * Turns on the visibilty of all ancestors of the given component
+     *
+     * @param cmp The component to work on
+     */
+    private void setParentsVisible(Component cmp) {
+<span class="nc" id="L693">        Container cont = cmp.getParent();</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">        while (cont != null) {</span>
+<span class="nc" id="L695">            cont.setVisible(true);</span>
+<span class="nc" id="L696">            cont = cont.getParent();</span>
+        }
+<span class="nc" id="L698">    }</span>
+
+    /**
+     * Replaces an unwrapped text with a wrapped version, while copying the style of the original text.
+     *
+     * @param label   The current label that contains the unwrapped text
+     * @param words   A vector containing one word of the text (without white spaces) in each element
+     * @param element The text element
+     */
+    private void setWrapText(Label label, Vector words, HTMLElement element, HTMLComponent htmlC) {
+<span class="nc" id="L708">        Style selectedStyle = label.getSelectedStyle();</span>
+<span class="nc" id="L709">        Style unselectedStyle = label.getUnselectedStyle();</span>
+<span class="nc" id="L710">        Vector ui = new Vector();</span>
+<span class="nc" id="L711">        label.setText((String) words.elementAt(0) + ' ');</span>
+<span class="nc" id="L712">        HTMLLink link = null;</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">        if (label instanceof HTMLLink) {</span>
+<span class="nc" id="L714">            link = (HTMLLink) label;</span>
+        }
+<span class="nc" id="L716">        ui.addElement(label);</span>
+<span class="nc bnc" id="L717" title="All 2 branches missed.">        for (int i = 1; i &lt; words.size(); i++) {</span>
+<span class="nc" id="L718">            Label word = null;</span>
+<span class="nc bnc" id="L719" title="All 2 branches missed.">            if (link != null) {</span>
+<span class="nc" id="L720">                word = new HTMLLink((String) words.elementAt(i) + ' ', link.link, htmlC, link, link.linkVisited);</span>
+            } else {
+<span class="nc" id="L722">                word = new Label((String) words.elementAt(i) + ' ');</span>
+            }
+<span class="nc" id="L724">            word.setSelectedStyle(selectedStyle);</span>
+<span class="nc" id="L725">            word.setUnselectedStyle(unselectedStyle);</span>
+<span class="nc" id="L726">            label.getParent().addComponent(word);</span>
+<span class="nc" id="L727">            ui.addElement(word);</span>
+        }
+<span class="nc" id="L729">        element.setAssociatedComponents(ui);</span>
+<span class="nc" id="L730">        label.getParent().revalidate();</span>
+<span class="nc" id="L731">    }</span>
+
+    /**
+     * Sets this element and all children to have wrapped text.
+     * In cases where text is already wrapped no change will be made.
+     * This will work only in FIXED_WIDTH mode (Checked before called)
+     * Technically all this logic can be found in HTMLComponent.showText, but since we don't want to get into
+     * the context of this element (i.e. what was the indentation, alignment etc.), we use this algorithm.
+     *
+     * @param element The element to apply text wrapping on
+     * @param htmlC   The HTMLComponent
+     */
+    private void setWrapRecursive(HTMLElement element, HTMLComponent htmlC) {
+<span class="nc bnc" id="L744" title="All 2 branches missed.">        if (element.isTextElement()) {</span>
+<span class="nc" id="L745">            String text = element.getText();</span>
+<span class="nc" id="L746">            final Vector ui = element.getUi();</span>
+<span class="nc bnc" id="L747" title="All 6 branches missed.">            if ((text != null) &amp;&amp; (ui != null) &amp;&amp; (ui.size() == 1)) { //If it's already wrapped, no need to process</span>
+<span class="nc" id="L748">                final Vector words = htmlC.getWords(text, Component.LEFT, false);</span>
+<span class="nc" id="L749">                final Label label = (Label) ui.elementAt(0);</span>
+<span class="nc" id="L750">                setWrapText(label, words, element, htmlC);</span>
+            }
+        }
+
+<span class="nc bnc" id="L754" title="All 2 branches missed.">        for (int i = 0; i &lt; element.getNumChildren(); i++) {</span>
+<span class="nc" id="L755">            setWrapRecursive((HTMLElement) element.getChildAt(i), htmlC);</span>
+        }
+
+<span class="nc" id="L758">    }</span>
+
+
+    ////////
+    // CSS2 additions - the following are not in the WCSS spec, but rather in the CSS2 spec
+    ///////
+
+    /**
+     * Replaces a wrapped text with an unwrapped version.
+     * This in fact removes all the labels that contains a single word each, and replaces them with one label that contains the whole text.
+     * This way the label is not wrapped.
+     *
+     * @param label   The first label of this text element (can be derived from ui but already fetched before the call)
+     * @param ui      The vector consisting all components (labels) that contain the text's words
+     * @param newText The new text that should replace current components (unwrapped text without extra white spaces)
+     * @param element The text element
+     */
+    private void setNowrapText(Label label, Vector ui, String newText, HTMLElement element) {
+<span class="nc" id="L776">        label.setText(newText);</span>
+<span class="nc bnc" id="L777" title="All 2 branches missed.">        for (int i = 1; i &lt; ui.size(); i++) {</span>
+<span class="nc" id="L778">            Component cmp = (Component) ui.elementAt(i);</span>
+<span class="nc" id="L779">            cmp.getParent().removeComponent(cmp);</span>
+        }
+<span class="nc bnc" id="L781" title="All 2 branches missed.">        if (label instanceof HTMLLink) {</span>
+<span class="nc" id="L782">            ((HTMLLink) label).childLinks = new Vector(); // Reset all associated link fragments so we don't have unneeded references</span>
+        }
+<span class="nc" id="L784">        element.setAssociatedComponents(label);</span>
+<span class="nc" id="L785">        label.getParent().revalidate();</span>
+<span class="nc" id="L786">    }</span>
+
+    /**
+     * Sets this element and all children to have unwrapped text.
+     * In cases where text is already unwrapped no change will be made.
+     * This will work only in FIXED_WIDTH mode (Checked before called)
+     * Technically a lot of this logic can be found in HTMLComponent, but since we don't want to get into
+     * the context of this element (i.e. what was the indentation, alignment etc.), we use this algorithm.
+     *
+     * @param element The element to apply text wrapping on
+     */
+    private void setNowrapRecursive(final HTMLElement element) {
+        //if (element.getId()==HTMLElement.TAG_TEXT) {
+<span class="nc bnc" id="L799" title="All 2 branches missed.">        if (element.isTextElement()) {</span>
+            //String text=element.getAttributeById(HTMLElement.ATTR_TITLE);
+<span class="nc" id="L801">            String text = element.getText();</span>
+<span class="nc" id="L802">            final Vector ui = element.getUi();</span>
+<span class="nc bnc" id="L803" title="All 6 branches missed.">            if ((text != null) &amp;&amp; (ui != null) &amp;&amp; (ui.size() &gt; 1)) { //If it's just one word or already no-wrapped, no need to process</span>
+<span class="nc" id="L804">                String word = &quot;&quot;;</span>
+<span class="nc" id="L805">                String newText = &quot;&quot;;</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">                for (int c = 0; c &lt; text.length(); c++) {</span>
+<span class="nc" id="L807">                    char ch = text.charAt(c);</span>
+<span class="nc bnc" id="L808" title="All 10 branches missed.">                    if ((ch == ' ') || (ch == 10) || (ch == 13) || (ch == '\t') || (ch == '\n')) {</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">                        if (!word.equals(&quot;&quot;)) {</span>
+<span class="nc" id="L810">                            newText += word + &quot; &quot;;</span>
+<span class="nc" id="L811">                            word = &quot;&quot;;</span>
+                        }
+                    } else {
+<span class="nc" id="L814">                        word += ch;</span>
+                    }
+                }
+<span class="nc bnc" id="L817" title="All 2 branches missed.">                if (!word.equals(&quot;&quot;)) {</span>
+<span class="nc" id="L818">                    newText += word + &quot; &quot;;</span>
+                }
+
+<span class="nc" id="L821">                final Label label = (Label) ui.elementAt(0);</span>
+<span class="nc" id="L822">                setNowrapText(label, ui, newText, element);</span>
+            }
+        }
+
+<span class="nc bnc" id="L826" title="All 2 branches missed.">        for (int i = 0; i &lt; element.getNumChildren(); i++) {</span>
+<span class="nc" id="L827">            setNowrapRecursive((HTMLElement) element.getChildAt(i));</span>
+        }
+
+<span class="nc" id="L830">        element.recalcUi(); // If children elements' UI was changed, we need to recalc the UI of the parent</span>
+
+<span class="nc" id="L832">    }</span>
+
+    /**
+     * Sets the text direction of the component
+     *
+     * @param cmp The component to set
+     * @param rtl true for right-to-left, false for left-to-right
+     */
+    private void setDirectionRecursive(Component cmp, boolean rtl) {
+<span class="nc" id="L841">        cmp.setRTL(rtl);</span>
+<span class="nc bnc" id="L842" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L843">            Container c = (Container) cmp;</span>
+<span class="nc bnc" id="L844" title="All 2 branches missed.">            for (int i = 0; i &lt; c.getComponentCount(); i++) {</span>
+<span class="nc" id="L845">                setDirectionRecursive(c.getComponentAt(i), rtl);</span>
+            }
+        }
+<span class="nc" id="L848">    }</span>
+
+    /**
+     * Sets the given spacing to all words in this component and its children
+     *
+     * @param cmp     The component to set the spacing on
+     * @param spacing The spacing in pixels
+     */
+    private void setWordSpacingRecursive(Component cmp, int spacing) {
+<span class="nc bnc" id="L857" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L858">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L860">                setWordSpacingRecursive(cont.getComponentAt(i), spacing);</span>
+            }
+<span class="nc bnc" id="L862" title="All 2 branches missed.">        } else if ((cmp instanceof Label) &amp;&amp;</span>
+<span class="nc bnc" id="L863" title="All 2 branches missed.">                (cmp.getParent().getComponentIndex(cmp) &lt; cmp.getParent().getComponentCount() - 1)) { // don't apply to the last word</span>
+<span class="nc" id="L864">            cmp.getUnselectedStyle().setPadding(Component.RIGHT, spacing);</span>
+<span class="nc bnc" id="L865" title="All 2 branches missed.">            if (cmp instanceof HTMLLink) {</span>
+<span class="nc" id="L866">                cmp.getSelectedStyle().setPadding(Component.RIGHT, spacing);</span>
+<span class="nc" id="L867">                cmp.getPressedStyle().setPadding(Component.RIGHT, spacing);</span>
+            }
+        }
+<span class="nc" id="L870">    }</span>
+
+    /**
+     * Sets the given spacing to all words in this component and its children
+     *
+     * @param cmp        The component to set the spacing on
+     * @param halfHeight Half of the line height in pixels (will be added to top and bottom margins to make for a full height)
+     */
+    private void setLineHeightRecursive(Component cmp, int halfHeight) {
+<span class="nc bnc" id="L879" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L880">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L881" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L882">                setLineHeightRecursive(cont.getComponentAt(i), halfHeight);</span>
+            }
+<span class="nc bnc" id="L884" title="All 2 branches missed.">        } else if (cmp instanceof Label) {</span>
+<span class="nc" id="L885">            cmp.getUnselectedStyle().setMargin(Component.TOP, halfHeight);</span>
+<span class="nc" id="L886">            cmp.getUnselectedStyle().setMargin(Component.BOTTOM, halfHeight);</span>
+<span class="nc bnc" id="L887" title="All 2 branches missed.">            if (cmp instanceof HTMLLink) {</span>
+<span class="nc" id="L888">                cmp.getSelectedStyle().setPadding(Component.TOP, halfHeight);</span>
+<span class="nc" id="L889">                cmp.getSelectedStyle().setPadding(Component.BOTTOM, halfHeight);</span>
+<span class="nc" id="L890">                cmp.getPressedStyle().setPadding(Component.TOP, halfHeight);</span>
+<span class="nc" id="L891">                cmp.getPressedStyle().setPadding(Component.BOTTOM, halfHeight);</span>
+            }
+        }
+<span class="nc" id="L894">    }</span>
+
+    /**
+     * Utility method to add a specific text decoration if it does not exist
+     *
+     * @param style      The style to add the decoration to
+     * @param decoration The deocration (One of Style.TEXT_DECORATION_* constants)
+     */
+    private void applyDecorationOnStyle(Style style, int decoration) {
+<span class="nc" id="L903">        int curDecoration = style.getTextDecoration();</span>
+<span class="nc bnc" id="L904" title="All 2 branches missed.">        if ((curDecoration &amp; decoration) == 0) {</span>
+<span class="nc" id="L905">            style.setTextDecoration(curDecoration | decoration);</span>
+        }
+<span class="nc" id="L907">    }</span>
+
+    /**
+     * Sets the specified decoration to the specified components and all of its Label descendants
+     *
+     * @param cmp        The component to apply the decoration to
+     * @param decoration The deocration (One of Style.TEXT_DECORATION_* constants)
+     * @param selector   The selector with the text direction directive
+     */
+    private void setTextDecorationRecursive(Component cmp, int decoration, CSSElement selector) {
+<span class="nc bnc" id="L917" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L918">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L919" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L920">                setTextDecorationRecursive(cont.getComponentAt(i), decoration, selector);</span>
+            }
+<span class="nc bnc" id="L922" title="All 2 branches missed.">        } else if (cmp instanceof Label) {</span>
+<span class="nc" id="L923">            int styles = getApplicableStyles(cmp, selector);</span>
+<span class="nc bnc" id="L924" title="All 2 branches missed.">            if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L925">                applyDecorationOnStyle(cmp.getUnselectedStyle(), decoration);</span>
+            }
+<span class="nc bnc" id="L927" title="All 2 branches missed.">            if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L928">                applyDecorationOnStyle(cmp.getSelectedStyle(), decoration);</span>
+            }
+<span class="nc bnc" id="L930" title="All 2 branches missed.">            if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L931">                applyDecorationOnStyle(cmp.getPressedStyle(), decoration);</span>
+            }
+        }
+<span class="nc" id="L934">    }</span>
+
+
+    ////////
+    // CSS2 additions end
+    ///////
+
+    /**
+     * Removes all text decorations from the specified components and its Label descendants
+     * This will be used for {text-decoration: none}
+     *
+     * @param cmp      The component to remove decorations from
+     * @param selector The selector with the text direction directive
+     */
+    private void removeTextDecorationRecursive(Component cmp, CSSElement selector) {
+<span class="nc bnc" id="L949" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L950">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L951" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L952">                removeTextDecorationRecursive(cont.getComponentAt(i), selector);</span>
+            }
+<span class="nc bnc" id="L954" title="All 2 branches missed.">        } else if (cmp instanceof Label) {</span>
+<span class="nc" id="L955">            int styles = getApplicableStyles(cmp, selector);</span>
+<span class="nc bnc" id="L956" title="All 2 branches missed.">            if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L957">                cmp.getUnselectedStyle().setTextDecoration(Style.TEXT_DECORATION_NONE);</span>
+            }
+<span class="nc bnc" id="L959" title="All 2 branches missed.">            if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L960">                cmp.getSelectedStyle().setTextDecoration(Style.TEXT_DECORATION_NONE);</span>
+            }
+<span class="nc bnc" id="L962" title="All 2 branches missed.">            if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L963">                cmp.getPressedStyle().setTextDecoration(Style.TEXT_DECORATION_NONE);</span>
+            }
+        }
+<span class="nc" id="L966">    }</span>
+
+    /**
+     * Changes the quotes marking of a certain block
+     *
+     * @param cmp    The component to change the quotes in
+     * @param quotes an array with 4 strings representing how quotes should look like (primary start,primary end,secondary start,secondary end)
+     */
+    private void setQuotesRecursive(Component cmp, String[] quotes) {
+<span class="nc bnc" id="L975" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L976">            Container cont = (Container) cmp;</span>
+<span class="nc bnc" id="L977" title="All 2 branches missed.">            for (int i = 0; i &lt; cont.getComponentCount(); i++) {</span>
+<span class="nc" id="L978">                setQuotesRecursive(cont.getComponentAt(i), quotes);</span>
+            }
+<span class="nc bnc" id="L980" title="All 2 branches missed.">        } else if (cmp instanceof Label) {</span>
+<span class="nc" id="L981">            Object o = cmp.getClientProperty(HTMLComponent.CLIENT_PROPERTY_QUOTE);</span>
+<span class="nc bnc" id="L982" title="All 2 branches missed.">            if (o != null) {</span>
+<span class="nc" id="L983">                ((Label) cmp).setText(quotes[((Integer) o).intValue()]);</span>
+            }
+        }
+<span class="nc" id="L986">    }</span>
+
+    /**
+     * Applies the given CSS directives to the component
+     *
+     * @param ui       The component representing (part of) the element that the style should be applied to
+     * @param selector The style attributes relating to this element
+     * @param element  The element the style should be applied to
+     * @param htmlC    The HTMLComponent to which this element belongs to
+     * @param focus    true if the style should be applied only to the selected state iof the ui (a result of pseudo-class selector a:focus etc.)
+     */
+    private void applyStyleToUIElement(Component ui, CSSElement selector, HTMLElement element, HTMLComponent htmlC) {
+        //count++;
+<span class="nc" id="L999">        int styles = getApplicableStyles(ui, selector); // This is relevant only for non recursive types - otherwise we need to recheck everytime since it depends on the specific UI component class</span>
+
+        // White spaces
+        if (HTMLComponent.FIXED_WIDTH) { // This works well only in fixed width mode (Since we cannot &quot;force&quot; a newline in FlowLayout)
+            // TODO - enable in FIXED_WIDTH for pre vs. normal/nowrap
+            int space = selector.getAttrVal(CSSElement.CSS_WHITE_SPACE);
+
+            if (space != -1) {
+                switch (space) {
+                    case WHITE_SPACE_NORMAL:
+                        setWrapRecursive(element, htmlC);
+                        break;
+                    case WHITE_SPACE_NOWRAP:
+                        setNowrapRecursive(element);
+                        break;
+                    case WHITE_SPACE_PRE:
+                        // TODO - Not implemented yet
+                        break;
+                }
+            }
+        }
+
+        // Input format
+<span class="nc" id="L1022">        String v = selector.getAttributeById(CSSElement.CSS_WAP_INPUT_FORMAT);</span>
+<span class="nc bnc" id="L1023" title="All 8 branches missed.">        if ((v != null) &amp;&amp; ((element.getTagId() == HTMLElement.TAG_TEXTAREA) || (element.getTagId() == HTMLElement.TAG_INPUT)) &amp;&amp; (ui instanceof TextArea)) {</span>
+<span class="nc" id="L1024">            v = omitQuotesIfExist(v);</span>
+<span class="nc" id="L1025">            ui = htmlC.setInputFormat((TextArea) ui, v); // This may return a new instance of TextField taht has to be updated in the tree. This is alos the reason why input format is the first thing checked - see HTMLInputFormat.applyConstraints</span>
+<span class="nc" id="L1026">            element.setAssociatedComponents(ui);</span>
+        }
+
+        // Input emptyOK
+<span class="nc" id="L1030">        int inputRequired = selector.getAttrVal(CSSElement.CSS_WAP_INPUT_REQUIRED);</span>
+<span class="nc bnc" id="L1031" title="All 8 branches missed.">        if ((inputRequired != -1) &amp;&amp; ((element.getTagId() == HTMLElement.TAG_TEXTAREA) || (element.getTagId() == HTMLElement.TAG_INPUT)) &amp;&amp; (ui instanceof TextArea)) {</span>
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">            if (inputRequired == INPUT_REQUIRED_TRUE) {</span>
+<span class="nc" id="L1033">                htmlC.setInputRequired(((TextArea) ui), true);</span>
+<span class="nc bnc" id="L1034" title="All 2 branches missed.">            } else if (inputRequired == INPUT_REQUIRED_FALSE) {</span>
+<span class="nc" id="L1035">                htmlC.setInputRequired(((TextArea) ui), false);</span>
+            }
+        }
+
+        // Display
+<span class="nc" id="L1040">        int disp = selector.getAttrVal(CSSElement.CSS_DISPLAY);</span>
+<span class="nc bnc" id="L1041" title="All 3 branches missed.">        switch (disp) {</span>
+            case DISPLAY_NONE:
+<span class="nc bnc" id="L1043" title="All 2 branches missed.">                if (ui.getParent() != null) {</span>
+<span class="nc" id="L1044">                    ui.getParent().removeComponent(ui);</span>
+                } else { //special case for display in the BODY tag
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">                    if (ui instanceof Container) {</span>
+<span class="nc" id="L1047">                        ((Container) ui).removeAll();</span>
+                    }
+                }
+<span class="nc" id="L1050">                return;</span>
+            case DISPLAY_MARQUEE: // Animate component (ticker-like)
+<span class="nc" id="L1052">                htmlC.marqueeComponents.addElement(ui);</span>
+                break;
+            //TODO - support also: block, inline and list-item (All mandatory in WCSS)
+        }
+
+        // Visibility
+<span class="nc" id="L1058">        int visibility = selector.getAttrVal(CSSElement.CSS_VISIBILITY);</span>
+<span class="nc bnc" id="L1059" title="All 2 branches missed.">        if (visibility != -1) {</span>
+<span class="nc bnc" id="L1060" title="All 2 branches missed.">            boolean visible = (visibility == VISIBILITY_VISIBLE);</span>
+<span class="nc" id="L1061">            setVisibleRecursive(ui, visible);</span>
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">            if (!visible) {</span>
+<span class="nc" id="L1063">                return; // Don't waste time on processing hidden elements, though technically the size of the element is still reserved and should be according to style</span>
+            } else {
+<span class="nc" id="L1065">                setParentsVisible(ui); // Need to turn on visibility of all component's parents, in case they were declared hidden</span>
+            }
+        }
+
+        //
+        // Dimensions
+        //
+
+        // TODO - debug: Width and Height don't always work - for simple components they usually do, but for containers either they don't have any effect or some inner components (with size restrictions) disappear
+        // We use the entire display width and height as reference since htmlC still doesn't have a preferred size or actual size
+        // Width
+
+        // TODO - Width/Height is disabled currently, since it causes a lot of side effects, making some components disappear
+        /*
+        int width=selector.getAttrLengthVal(CSSElement.CSS_WIDTH,ui,Display.getInstance().getDisplayWidth());
+
+        // Height
+        int height=selector.getAttrLengthVal(CSSElement.CSS_HEIGHT,ui,Display.getInstance().getDisplayHeight());
+
+        if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) {
+            int minWidth=selector.getAttrLengthVal(CSSElement.CSS_MIN_WIDTH,ui,Display.getInstance().getDisplayWidth());
+            int maxWidth=selector.getAttrLengthVal(CSSElement.CSS_MAX_WIDTH,ui,Display.getInstance().getDisplayWidth());
+            int minHeight=selector.getAttrLengthVal(CSSElement.CSS_MIN_HEIGHT,ui,Display.getInstance().getDisplayHeight());
+            int maxHeight=selector.getAttrLengthVal(CSSElement.CSS_MAX_HEIGHT,ui,Display.getInstance().getDisplayHeight());
+
+            if (width==-1) { // process min/max only if exact was not specified
+                if ((minWidth!=-1) &amp;&amp; (minWidth&gt;ui.getPreferredW())) {
+                    width=minWidth;
+                }
+                if ((maxWidth!=-1) &amp;&amp; (maxWidth&lt;ui.getPreferredW())) {
+                    width=maxWidth;
+                }
+            }
+            if (height==-1) { // process min/max only if exact was not specified
+                if ((minHeight!=-1) &amp;&amp; (minHeight&gt;ui.getPreferredH())) {
+                    height=minHeight;
+                }
+                if ((maxHeight!=-1) &amp;&amp; (maxHeight&lt;ui.getPreferredH())) {
+                    height=maxHeight;
+                }
+            }
+        }
+
+        if ((width!=-1) || (height!=-1)) {
+            if (width==-1) {
+                width=ui.getPreferredW();
+            }
+            if (height==-1) {
+                height=ui.getPreferredH();
+            }
+            ui.setPreferredSize(new Dimension(width,height));
+        }
+        */
+
+        //
+        // Colors
+        //
+
+        // Background Color
+<span class="nc" id="L1124">        int bgColor = selector.getAttrVal(CSSElement.CSS_BACKGROUND_COLOR);</span>
+<span class="nc bnc" id="L1125" title="All 2 branches missed.">        if (bgColor != -1) {</span>
+<span class="nc bnc" id="L1126" title="All 2 branches missed.">            if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L1127">                ui.getUnselectedStyle().setBgColor(bgColor);</span>
+<span class="nc" id="L1128">                ui.getUnselectedStyle().setBgTransparency(255);</span>
+
+            }
+<span class="nc bnc" id="L1131" title="All 2 branches missed.">            if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L1132">                ui.getSelectedStyle().setBgColor(bgColor);</span>
+<span class="nc" id="L1133">                ui.getSelectedStyle().setBgTransparency(255);</span>
+            }
+<span class="nc bnc" id="L1135" title="All 2 branches missed.">            if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L1136">                ui.getPressedStyle().setBgColor(bgColor);</span>
+<span class="nc" id="L1137">                ui.getPressedStyle().setBgTransparency(255);</span>
+            }
+
+        }
+
+        // Foreground color
+<span class="nc" id="L1143">        int fgColor = selector.getAttrVal(CSSElement.CSS_COLOR);</span>
+<span class="nc bnc" id="L1144" title="All 2 branches missed.">        if (fgColor != -1) {</span>
+<span class="nc" id="L1145">            setColorRecursive(ui, fgColor, selector);</span>
+        }
+
+        // Background Image
+<span class="nc" id="L1149">        v = selector.getAttributeById(CSSElement.CSS_BACKGROUND_IMAGE);</span>
+<span class="nc bnc" id="L1150" title="All 2 branches missed.">        if (v != null) {</span>
+<span class="nc" id="L1151">            String url = getCSSUrl(v);</span>
+
+<span class="nc bnc" id="L1153" title="All 2 branches missed.">            if (url != null) {</span>
+
+                // Setting an alternative bgPainter that can support CSS background properties
+<span class="nc" id="L1156">                CSSBgPainter bgPainter = new CSSBgPainter(ui);</span>
+
+                // Background tiling
+<span class="nc" id="L1159">                byte bgType = (byte) selector.getAttrVal(CSSElement.CSS_BACKGROUND_REPEAT);</span>
+<span class="nc bnc" id="L1160" title="All 2 branches missed.">                if (bgType == -1) {</span>
+<span class="nc" id="L1161">                    bgType = Style.BACKGROUND_IMAGE_TILE_BOTH; // default value</span>
+                }
+
+                // Note that we don't set transparency to 255, since the image may have its own transparency/opaque areas - we don't want to block the entire component/container entirely
+<span class="nc bnc" id="L1165" title="All 2 branches missed.">                if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L1166">                    ui.getSelectedStyle().setBgPainter(bgPainter);</span>
+<span class="nc" id="L1167">                    ui.getSelectedStyle().setBackgroundType(bgType);</span>
+                }
+<span class="nc bnc" id="L1169" title="All 2 branches missed.">                if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L1170">                    ui.getUnselectedStyle().setBgPainter(bgPainter);</span>
+<span class="nc" id="L1171">                    ui.getUnselectedStyle().setBackgroundType(bgType);</span>
+                }
+<span class="nc bnc" id="L1173" title="All 2 branches missed.">                if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L1174">                    ui.getPressedStyle().setBgPainter(bgPainter);</span>
+<span class="nc" id="L1175">                    ui.getPressedStyle().setBackgroundType(bgType);</span>
+                }
+
+                // The background image itself
+<span class="nc bnc" id="L1179" title="All 2 branches missed.">                if (htmlC.showImages) {</span>
+<span class="nc bnc" id="L1180" title="All 2 branches missed.">                    if (htmlC.getDocumentInfo() != null) {</span>
+<span class="nc" id="L1181">                        htmlC.getThreadQueue().addBgImage(ui, htmlC.convertURL(url), styles);</span>
+                    } else {
+<span class="nc bnc" id="L1183" title="All 2 branches missed.">                        if (DocumentInfo.isAbsoluteURL(url)) {</span>
+<span class="nc" id="L1184">                            htmlC.getThreadQueue().addBgImage(ui, url, styles);</span>
+                        } else {
+<span class="nc bnc" id="L1186" title="All 2 branches missed.">                            if (htmlC.getHTMLCallback() != null) {</span>
+<span class="nc" id="L1187">                                htmlC.getHTMLCallback().parsingError(HTMLCallback.ERROR_NO_BASE_URL, selector.getTagName(), selector.getAttributeName(Integer.valueOf(CSSElement.CSS_BACKGROUND_IMAGE)), url, &quot;Ignoring background image file referred in a CSS file/segment (&quot; + url + &quot;), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs&quot;);</span>
+                            }
+                        }
+                    }
+                }
+
+<span class="nc bnc" id="L1193" title="All 2 branches missed.">                for (int i = CSSElement.CSS_BACKGROUND_POSITION_X; i &lt;= CSSElement.CSS_BACKGROUND_POSITION_Y; i++) {</span>
+<span class="nc" id="L1194">                    int pos = selector.getAttrVal(i);</span>
+<span class="nc bnc" id="L1195" title="All 2 branches missed.">                    if (pos != -1) {</span>
+<span class="nc" id="L1196">                        bgPainter.setPosition(i, pos);</span>
+                    }
+                }
+
+                // Background attachment: Either 'fixed' (i.e. the bg image is fixed in its position even when scrolling)
+                // or 'scroll' (default) which means the it moves with scrolling (Like usually in CodenameOne backgrounds)
+<span class="nc bnc" id="L1202" title="All 2 branches missed.">                if (selector.getAttrVal((CSSElement.CSS_BACKGROUND_ATTACHMENT)) == BG_ATTACHMENT_FIXED) {</span>
+<span class="nc" id="L1203">                    bgPainter.setFixed();</span>
+                }
+
+            }
+        }
+
+        // TODO - float: none/left/right
+        // TODO - clear: none/left/right/both
+
+        // Margin
+<span class="nc" id="L1213">        Component marginComp = ui;</span>
+<span class="nc bnc" id="L1214" title="All 2 branches missed.">        if (ui instanceof Label) { // If this is a Label/HTMLLink we do not apply the margin individually to each word, but rather to the whole block</span>
+<span class="nc" id="L1215">            marginComp = ui.getParent();</span>
+<span class="nc bnc" id="L1216" title="All 4 branches missed.">        } else if ((element.getTagId() == HTMLElement.TAG_LI) &amp;&amp; (ui.getParent().getLayout() instanceof BorderLayout)) {</span>
+<span class="nc" id="L1217">            marginComp = ui.getParent();</span>
+        }
+<span class="nc bnc" id="L1219" title="All 2 branches missed.">        for (int i = CSSElement.CSS_MARGIN_TOP; i &lt;= CSSElement.CSS_MARGIN_RIGHT; i++) {</span>
+<span class="nc" id="L1220">            int marginPixels = -1;</span>
+
+<span class="nc bnc" id="L1222" title="All 4 branches missed.">            if ((i == CSSElement.CSS_MARGIN_TOP) || (i == CSSElement.CSS_MARGIN_BOTTOM)) {</span>
+<span class="nc" id="L1223">                marginPixels = selector.getAttrLengthVal(i, ui, htmlC.getHeight()); // Here the used component is ui and not marginComp, since we're interested in the font size (which will be corrent in Labels not in their containers)</span>
+            } else {
+<span class="nc" id="L1225">                marginPixels = selector.getAttrLengthVal(i, ui, htmlC.getWidth());</span>
+            }
+<span class="nc bnc" id="L1227" title="All 4 branches missed.">            if (marginPixels &gt;= 0 &amp;&amp; marginComp != null) { // Only positive or 0</span>
+
+<span class="nc bnc" id="L1229" title="All 2 branches missed.">                if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L1230">                    marginComp.getSelectedStyle().setMargin(i - CSSElement.CSS_MARGIN_TOP, marginPixels);</span>
+                    // If this is a link and the selector applies only to Selected, it means this is an 'a:focus'
+                    // Since the marginComp is not focusable (as it is the container holding the link), HTMLLink takes care of focusing the
+                    // parent when the link focuses
+<span class="nc bnc" id="L1234" title="All 4 branches missed.">                    if ((ui instanceof HTMLLink) &amp;&amp; (styles == STYLE_SELECTED)) {</span>
+<span class="nc" id="L1235">                        ((HTMLLink) ui).setParentChangesOnFocus();</span>
+                    }
+                }
+<span class="nc bnc" id="L1238" title="All 2 branches missed.">                if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L1239">                    marginComp.getUnselectedStyle().setMargin(i - CSSElement.CSS_MARGIN_TOP, marginPixels);</span>
+
+                }
+                // Since we don't apply the margin/padding on the component but rather on its parent
+                // There is no point in setting the PRESSED style since we don't have a pressed event from Button, nor do we have a pressedStyle for containers
+                // That's why we can't do the same trick as in selected style, and the benefit of this rather &quot;edge&quot; case (That is anyway not implemented in all browsers) seems rather small
+                //    if ((styles &amp; STYLE_PRESSED)!=0) {
+                //        ((HTMLLink)ui).getPressedStyle().setMargin(i-CSSElement.CSS_MARGIN_TOP, marginPixels);
+                //    }
+            }
+        }
+
+<span class="nc" id="L1251">        Component padComp = ui;</span>
+<span class="nc bnc" id="L1252" title="All 2 branches missed.">        if (ui instanceof Label) {</span>
+<span class="nc" id="L1253">            padComp = ui.getParent();</span>
+<span class="nc bnc" id="L1254" title="All 4 branches missed.">        } else if ((element.getTagId() == HTMLElement.TAG_LI) &amp;&amp; (ui.getParent().getLayout() instanceof BorderLayout)) {</span>
+<span class="nc" id="L1255">            padComp = ui.getParent();</span>
+        }
+
+<span class="nc bnc" id="L1258" title="All 2 branches missed.">        for (int i = CSSElement.CSS_PADDING_TOP; i &lt;= CSSElement.CSS_PADDING_RIGHT; i++) {</span>
+<span class="nc" id="L1259">            int padPixels = -1;</span>
+
+<span class="nc bnc" id="L1261" title="All 4 branches missed.">            if ((i == CSSElement.CSS_PADDING_TOP) || (i == CSSElement.CSS_PADDING_BOTTOM)) {</span>
+<span class="nc" id="L1262">                padPixels = selector.getAttrLengthVal(i, ui, htmlC.getHeight());</span>
+            } else {
+<span class="nc" id="L1264">                padPixels = selector.getAttrLengthVal(i, ui, htmlC.getWidth());</span>
+            }
+<span class="nc bnc" id="L1266" title="All 2 branches missed.">            if (padPixels &gt;= 0) { // Only positive or 0</span>
+<span class="nc bnc" id="L1267" title="All 2 branches missed.">                if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc bnc" id="L1268" title="All 2 branches missed.">                    if (padComp != null) {</span>
+<span class="nc" id="L1269">                        padComp.getSelectedStyle().setPadding(i - CSSElement.CSS_PADDING_TOP, padPixels);</span>
+                    }
+<span class="nc bnc" id="L1271" title="All 4 branches missed.">                    if ((ui instanceof HTMLLink) &amp;&amp; (styles == STYLE_SELECTED)) { // See comment on margins</span>
+<span class="nc" id="L1272">                        ((HTMLLink) ui).setParentChangesOnFocus();</span>
+                    }
+                }
+<span class="nc bnc" id="L1275" title="All 2 branches missed.">                if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc bnc" id="L1276" title="All 2 branches missed.">                    if (padComp != null) {</span>
+<span class="nc" id="L1277">                        padComp.getUnselectedStyle().setPadding(i - CSSElement.CSS_PADDING_TOP, padPixels);</span>
+                    }
+                }
+                // See comment in margin on why PRESSED was dropped
+                //    if ((styles &amp; STYLE_PRESSED)!=0) {
+                //        ((HTMLLink)padComp).getPressedStyle().setPadding(i-CSSElement.CSS_PADDING_TOP, padPixels);
+                //    }
+            }
+        }
+
+        //
+        // Text
+        //
+
+        // Text Alignment
+<span class="nc" id="L1292">        int align = selector.getAttrVal(CSSElement.CSS_TEXT_ALIGN);</span>
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">        if (align != -1) {</span>
+<span class="nc bnc" id="L1294" title="All 4 branches missed.">            switch (element.getTagId()) {</span>
+                case HTMLElement.TAG_TD:
+                case HTMLElement.TAG_TH:
+<span class="nc" id="L1297">                    setTableCellAlignment(element, ui, align, true);</span>
+<span class="nc" id="L1298">                    break;</span>
+                case HTMLElement.TAG_TR:
+<span class="nc" id="L1300">                    setTableCellAlignmentTR(element, ui, align, true);</span>
+<span class="nc" id="L1301">                    break;</span>
+                case HTMLElement.TAG_TABLE:
+<span class="nc" id="L1303">                    setTableAlignment(ui, align, true);</span>
+<span class="nc" id="L1304">                    break;</span>
+                default:
+<span class="nc" id="L1306">                    setTextAlignmentRecursive(ui, align); // TODO - this sometimes may collide with the HTML align attribute. If the style of the same tag has alignment it overrides the align attribute, but if it is inherited, the align tag prevails</span>
+            }
+        }
+
+        // Vertical align
+<span class="nc" id="L1311">        int valign = selector.getAttrVal(CSSElement.CSS_VERTICAL_ALIGN);</span>
+<span class="nc bnc" id="L1312" title="All 2 branches missed.">        if (valign != -1) {</span>
+<span class="nc bnc" id="L1313" title="All 3 branches missed.">            switch (element.getTagId()) {</span>
+                case HTMLElement.TAG_TD:
+                case HTMLElement.TAG_TH:
+<span class="nc" id="L1316">                    setTableCellAlignment(element, ui, valign, false);</span>
+<span class="nc" id="L1317">                    break;</span>
+                case HTMLElement.TAG_TR:
+<span class="nc" id="L1319">                    setTableCellAlignmentTR(element, ui, valign, false);</span>
+<span class="nc" id="L1320">                    break;</span>
+//                case Element.TAG_TABLE: // vertical alignment denoted in the table tag doesn't affect it in most browsers
+//                     setTableAlignment(element, ui, valign, false);
+//                     break;
+                default:
+                    //TODO - implement vertical alignment for non-table elements
+            }
+        }
+
+        // Text Transform
+<span class="nc" id="L1330">        int transform = selector.getAttrVal(CSSElement.CSS_TEXT_TRANSFORM);</span>
+<span class="nc bnc" id="L1331" title="All 2 branches missed.">        if (transform != -1) {</span>
+<span class="nc" id="L1332">            setTextTransformRecursive(ui, transform);</span>
+        }
+
+        // Text indentation
+<span class="nc" id="L1336">        int indent = selector.getAttrLengthVal(CSSElement.CSS_TEXT_INDENT, ui, htmlC.getWidth());</span>
+<span class="nc bnc" id="L1337" title="All 2 branches missed.">        if (indent &gt;= 0) { // Only positive (0 also as it may cancel previous margins)</span>
+<span class="nc" id="L1338">            setTextIndentationRecursive(ui, indent);</span>
+        }
+
+        //
+        // Font
+        //
+
+        // Font family
+<span class="nc" id="L1346">        String fontFamily = selector.getAttributeById(CSSElement.CSS_FONT_FAMILY);</span>
+<span class="nc bnc" id="L1347" title="All 2 branches missed.">        if (fontFamily != null) {</span>
+<span class="nc" id="L1348">            int index = fontFamily.indexOf(',');</span>
+<span class="nc bnc" id="L1349" title="All 2 branches missed.">            if (index != -1) { // Currently we ignore font families fall back (i.e. Arial,Helvetica,Sans-serif) since even finding a match for one font is quite expensive performance-wise</span>
+<span class="nc" id="L1350">                fontFamily = fontFamily.substring(0, index);</span>
+            }
+        }
+        // Font Style
+<span class="nc" id="L1354">        int fontStyle = selector.getAttrVal(CSSElement.CSS_FONT_STYLE);</span>
+
+
+        // Font Weight
+<span class="nc" id="L1358">        int fontWeight = selector.getAttrVal(CSSElement.CSS_FONT_WEIGHT);</span>
+
+<span class="nc" id="L1360">        int fontSize = selector.getAttrLengthVal(CSSElement.CSS_FONT_SIZE, ui, ui.getStyle().getFont().getHeight());</span>
+<span class="nc bnc" id="L1361" title="All 2 branches missed.">        if (fontSize &lt; -1) {</span>
+<span class="nc" id="L1362">            int curSize = ui.getStyle().getFont().getHeight();</span>
+<span class="nc bnc" id="L1363" title="All 2 branches missed.">            if (fontSize == CSSElement.FONT_SIZE_LARGER) {</span>
+<span class="nc" id="L1364">                fontSize = curSize + 2;</span>
+<span class="nc bnc" id="L1365" title="All 2 branches missed.">            } else if (fontSize == CSSElement.FONT_SIZE_SMALLER) {</span>
+<span class="nc" id="L1366">                fontSize = curSize - 2;</span>
+            }
+        }
+
+        // Since J2ME doesn't support small-caps fonts, when a small-caps font varinat is requested
+        // the font-family is changed to &quot;smallcaps&quot; which should be loaded to HTMLComponent and the theme as a bitmap font
+        // If no smallcaps font is found at all, then the family stays the same, but if even only one is found - the best match will be used.
+<span class="nc" id="L1373">        int fontVariant = selector.getAttrVal(CSSElement.CSS_FONT_VARIANT);</span>
+<span class="nc bnc" id="L1374" title="All 4 branches missed.">        if ((fontVariant == FONT_VARIANT_SMALLCAPS) &amp;&amp; (htmlC.isSmallCapsFontAvailable())) {</span>
+<span class="nc" id="L1375">            fontFamily = CSSElement.SMALL_CAPS_STRING;</span>
+        }
+
+        // Process font only if once of the font CSS properties was mentioned and valid
+<span class="nc bnc" id="L1379" title="All 8 branches missed.">        if ((fontFamily != null) || (fontSize != -1) || (fontStyle != -1) || (fontWeight != -1)) {</span>
+<span class="nc" id="L1380">            setFontRecursive(htmlC, ui, fontFamily, fontSize, fontStyle, fontWeight, selector);</span>
+        }
+
+        // List style
+<span class="nc" id="L1384">        int listType = -1;</span>
+
+<span class="nc" id="L1386">        String listImg = null;</span>
+<span class="nc" id="L1387">        Component borderUi = ui;</span>
+
+<span class="nc bnc" id="L1389" title="All 10 branches missed.">        if ((element.getTagId() == HTMLElement.TAG_LI) || (element.getTagId() == HTMLElement.TAG_UL) || (element.getTagId() == HTMLElement.TAG_OL) || (element.getTagId() == HTMLElement.TAG_DIR) || (element.getTagId() == HTMLElement.TAG_MENU)) {</span>
+<span class="nc" id="L1390">            int listPos = selector.getAttrVal(CSSElement.CSS_LIST_STYLE_POSITION);</span>
+<span class="nc bnc" id="L1391" title="All 2 branches missed.">            if (listPos == LIST_STYLE_POSITION_INSIDE) {</span>
+                // Padding and not margin since background color should affect also the indented space
+<span class="nc" id="L1393">                ui.getStyle().setPadding(Component.LEFT, ui.getStyle().getMargin(Component.LEFT) + INDENT_LIST_STYLE_POSITION);</span>
+<span class="nc" id="L1394">                Container parent = ui.getParent();</span>
+
+<span class="nc bnc" id="L1396" title="All 2 branches missed.">                if (parent.getLayout() instanceof BorderLayout) {</span>
+<span class="nc" id="L1397">                    borderUi = parent;</span>
+                }
+            }
+
+<span class="nc" id="L1401">            listType = selector.getAttrVal(CSSElement.CSS_LIST_STYLE_TYPE);</span>
+<span class="nc" id="L1402">            listImg = getCSSUrl(selector.getAttributeById(CSSElement.CSS_LIST_STYLE_IMAGE));</span>
+        }
+
+        // Border
+<span class="nc" id="L1406">        Border[] borders = new Border[4];</span>
+<span class="nc" id="L1407">        boolean leftBorder = false; // Used to prevent drawing a border in the middle of two words in the same segment</span>
+<span class="nc" id="L1408">        boolean rightBorder = false; // Used to prevent drawing a border in the middle of two words in the same segment</span>
+<span class="nc" id="L1409">        boolean hasBorder = false;</span>
+<span class="nc bnc" id="L1410" title="All 4 branches missed.">        if ((borderUi == ui) &amp;&amp; (element.getUi().size() &gt; 1)) {</span>
+<span class="nc bnc" id="L1411" title="All 2 branches missed.">            if (element.getUi().firstElement() == borderUi) {</span>
+<span class="nc" id="L1412">                leftBorder = true;</span>
+<span class="nc bnc" id="L1413" title="All 2 branches missed.">            } else if (element.getUi().lastElement() == borderUi) {</span>
+<span class="nc" id="L1414">                rightBorder = true;</span>
+            }
+        } else {
+<span class="nc" id="L1417">            leftBorder = true;</span>
+<span class="nc" id="L1418">            rightBorder = true;</span>
+        }
+
+<span class="nc bnc" id="L1421" title="All 2 branches missed.">        for (int i = Component.TOP; i &lt;= Component.RIGHT; i++) {</span>
+<span class="nc bnc" id="L1422" title="All 12 branches missed.">            if ((i == Component.BOTTOM) || (i == Component.TOP) ||</span>
+                    ((i == Component.LEFT) &amp;&amp; (leftBorder)) ||
+                    ((i == Component.RIGHT) &amp;&amp; (rightBorder))) {
+<span class="nc" id="L1425">                borders[i] = createBorder(selector, borderUi, i, styles, BORDER);</span>
+<span class="nc bnc" id="L1426" title="All 2 branches missed.">                if (borders[i] != null) {</span>
+<span class="nc" id="L1427">                    hasBorder = true;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L1431" title="All 2 branches missed.">        if (hasBorder) {</span>
+<span class="nc" id="L1432">            Border curBorder = borderUi.getUnselectedStyle().getBorder();</span>
+<span class="nc bnc" id="L1433" title="All 4 branches missed.">            if (((styles &amp; STYLE_SELECTED) != 0) &amp;&amp; ((styles &amp; STYLE_UNSELECTED) == 0)) {</span>
+<span class="nc" id="L1434">                curBorder = borderUi.getSelectedStyle().getBorder();</span>
+            }
+<span class="nc bnc" id="L1436" title="All 2 branches missed.">            if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L1437">                curBorder = borderUi.getSelectedStyle().getBorder();</span>
+            }
+
+            // In case this element was assigned a top border for instance, and then by belonging to another tag/class/id it has also a bottom border - this merges the two (and gives priority to the new one)
+<span class="nc bnc" id="L1441" title="All 4 branches missed.">            if ((curBorder != null) &amp;&amp; (curBorder.getCompoundBorders() != null)) { // TODO - This doesn't cover the case of having another border (i.e. table/fieldset?) - Can also assign the non-CSS border to the other corners?</span>
+                //curBorder.
+<span class="nc" id="L1443">                Border[] oldBorders = curBorder.getCompoundBorders();</span>
+<span class="nc bnc" id="L1444" title="All 2 branches missed.">                for (int i = Component.TOP; i &lt;= Component.RIGHT; i++) {</span>
+<span class="nc bnc" id="L1445" title="All 2 branches missed.">                    if (borders[i] == null) {</span>
+<span class="nc" id="L1446">                        borders[i] = oldBorders[i];</span>
+                    }
+                }
+            }
+<span class="nc" id="L1450">            Border border = Border.createCompoundBorder(borders[Component.TOP], borders[Component.BOTTOM], borders[Component.LEFT], borders[Component.RIGHT]);</span>
+<span class="nc bnc" id="L1451" title="All 2 branches missed.">            if (border != null) {</span>
+<span class="nc bnc" id="L1452" title="All 2 branches missed.">                if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L1453">                    borderUi.getSelectedStyle().setBorder(border);</span>
+                }
+<span class="nc bnc" id="L1455" title="All 2 branches missed.">                if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L1456">                    borderUi.getUnselectedStyle().setBorder(border);</span>
+                }
+<span class="nc bnc" id="L1458" title="All 2 branches missed.">                if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L1459">                    borderUi.getPressedStyle().setBorder(border);</span>
+                }
+<span class="nc bnc" id="L1461" title="All 2 branches missed.">                if (borderUi.getParent() != null) {</span>
+<span class="nc" id="L1462">                    borderUi.getParent().revalidate();</span>
+<span class="nc bnc" id="L1463" title="All 2 branches missed.">                } else if (borderUi instanceof Container) {</span>
+<span class="nc" id="L1464">                    ((Container) borderUi).revalidate();</span>
+                }
+            }
+        }
+
+        //
+        // Specific elements styling
+        //
+
+        // Access keys
+<span class="nc" id="L1474">        v = selector.getAttributeById(CSSElement.CSS_WAP_ACCESSKEY);</span>
+<span class="nc bnc" id="L1475" title="All 4 branches missed.">        if ((v != null) &amp;&amp; (v.length() &gt;= 1) &amp;&amp;</span>
+<span class="nc bnc" id="L1476" title="All 2 branches missed.">                ((element.getTagId() == HTMLElement.TAG_INPUT) ||  // These are the only tags that can accpet an access key</span>
+<span class="nc bnc" id="L1477" title="All 4 branches missed.">                        (element.getTagId() == HTMLElement.TAG_TEXTAREA) || (element.getTagId() == HTMLElement.TAG_LABEL) ||</span>
+<span class="nc bnc" id="L1478" title="All 6 branches missed.">                        ((element.getTagId() == HTMLElement.TAG_A) &amp;&amp; (ui instanceof HTMLLink) &amp;&amp; ((HTMLLink) ui).parentLink == null)) // For A tags this is applied only to the first word, no need to apply it to each word of the link</span>
+        ) {
+
+            // The accesskey string may consist fallback assignments (comma seperated) and multiple assignments (space seperated) and any combination of those
+            // For example: &quot;send *, #&quot; (meaning: assign both the send and * keys, and if failed to assign one of those assign the # key instead)
+<span class="nc" id="L1483">            int index = v.indexOf(',');</span>
+<span class="nc" id="L1484">            boolean assigned = false;</span>
+<span class="nc bnc" id="L1485" title="All 2 branches missed.">            while (index != -1) { // Handle fallback access keys</span>
+<span class="nc" id="L1486">                String key = v.substring(0, index).trim();</span>
+<span class="nc" id="L1487">                v = v.substring(index + 1);</span>
+<span class="nc" id="L1488">                assigned = processAccessKeys(key, htmlC, ui);</span>
+<span class="nc bnc" id="L1489" title="All 2 branches missed.">                if (assigned) {</span>
+<span class="nc" id="L1490">                    break; // comma denotes fallback, and once we succeeded assigning the accesskey, the others are irrelevant</span>
+                }
+<span class="nc" id="L1492">                index = v.indexOf(',');</span>
+<span class="nc" id="L1493">            }</span>
+<span class="nc bnc" id="L1494" title="All 2 branches missed.">            if (!assigned) {</span>
+<span class="nc" id="L1495">                processAccessKeys(v.trim(), htmlC, ui);</span>
+            }
+
+        }
+
+
+        if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) {
+
+            // Text decoration (In HTML-MP1 the only mandatory decoration is 'none')
+<span class="nc" id="L1504">            int decoration = selector.getAttrVal(CSSElement.CSS_TEXT_DECORATION);</span>
+<span class="nc bnc" id="L1505" title="All 2 branches missed.">            if (decoration == TEXT_DECOR_NONE) {</span>
+<span class="nc" id="L1506">                removeTextDecorationRecursive(ui, selector);</span>
+<span class="nc bnc" id="L1507" title="All 2 branches missed.">            } else if (decoration == TEXT_DECOR_UNDERLINE) {</span>
+<span class="nc" id="L1508">                setTextDecorationRecursive(ui, Style.TEXT_DECORATION_UNDERLINE, selector);</span>
+<span class="nc bnc" id="L1509" title="All 2 branches missed.">            } else if (decoration == TEXT_DECOR_LINETHROUGH) {</span>
+<span class="nc" id="L1510">                setTextDecorationRecursive(ui, Style.TEXT_DECORATION_STRIKETHRU, selector);</span>
+<span class="nc bnc" id="L1511" title="All 2 branches missed.">            } else if (decoration == TEXT_DECOR_OVERLINE) {</span>
+<span class="nc" id="L1512">                setTextDecorationRecursive(ui, Style.TEXT_DECORATION_OVERLINE, selector);</span>
+            }
+
+            // Word spacing
+            if (!HTMLComponent.FIXED_WIDTH) {
+<span class="nc" id="L1517">                int wordSpace = selector.getAttrLengthVal(CSSElement.CSS_WORD_SPACING, ui, 0); // The relative dimension is 0, since percentage doesn't work with word-spacing in browsers</span>
+<span class="nc bnc" id="L1518" title="All 2 branches missed.">                if (wordSpace != -1) {</span>
+<span class="nc" id="L1519">                    setWordSpacingRecursive(ui, wordSpace);</span>
+                }
+            }
+
+            // Line height
+
+            // Technically the font height should be queried when actually resizing the line (since it may differ for a big block) - but since this would be ery time consuming and also major browsers don't take it into account - we'll do the same
+            //int lineHeight=selector.getAttrLengthVal(CSSElement.CSS_LINE_HEIGHT, ui, ui.getStyle().getFont().getHeight());
+<span class="nc" id="L1527">            int lineHeight = selector.getAttrLengthVal(CSSElement.CSS_LINE_HEIGHT, ui, ui.getStyle().getFont().getHeight());</span>
+
+<span class="nc bnc" id="L1529" title="All 2 branches missed.">            if (lineHeight != -1) {</span>
+<span class="nc" id="L1530">                lineHeight = Math.max(0, lineHeight - ui.getStyle().getFont().getHeight()); // 100% means normal line height (don't add margin). Sizes below will not work, even they do in regular browsers</span>
+<span class="nc" id="L1531">                setLineHeightRecursive(ui, lineHeight / 2);</span>
+            }
+
+            // Quotes
+<span class="nc" id="L1535">            String quotesStr = selector.getAttributeById(CSSElement.CSS_QUOTES);</span>
+<span class="nc bnc" id="L1536" title="All 2 branches missed.">            if (quotesStr != null) {</span>
+<span class="nc" id="L1537">                Vector quotes = htmlC.getWords(quotesStr, Component.LEFT, false);</span>
+<span class="nc" id="L1538">                int size = quotes.size();</span>
+<span class="nc bnc" id="L1539" title="All 4 branches missed.">                if ((size == 2) || (size == 4)) {</span>
+<span class="nc" id="L1540">                    String[] quotesArr = new String[4];</span>
+<span class="nc bnc" id="L1541" title="All 2 branches missed.">                    for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L1542">                        quotesArr[i] = omitQuotesIfExist((String) quotes.elementAt(i));</span>
+                    }
+<span class="nc bnc" id="L1544" title="All 2 branches missed.">                    if (size == 2) { // If only 2 quotes are specified they are used both as primary and secondary</span>
+<span class="nc" id="L1545">                        quotesArr[2] = quotesArr[0];</span>
+<span class="nc" id="L1546">                        quotesArr[3] = quotesArr[1];</span>
+                    }
+<span class="nc" id="L1548">                    setQuotesRecursive(ui, quotesArr);</span>
+                }
+            }
+
+            // Outline
+<span class="nc" id="L1553">            Border outline = createBorder(selector, borderUi, 0, styles, OUTLINE);</span>
+<span class="nc bnc" id="L1554" title="All 2 branches missed.">            if (outline != null) {</span>
+<span class="nc bnc" id="L1555" title="All 2 branches missed.">                if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L1556">                    addOutlineToStyle(borderUi.getSelectedStyle(), outline);</span>
+                }
+<span class="nc bnc" id="L1558" title="All 2 branches missed.">                if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L1559">                    addOutlineToStyle(borderUi.getUnselectedStyle(), outline);</span>
+                }
+<span class="nc bnc" id="L1561" title="All 2 branches missed.">                if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L1562">                    addOutlineToStyle(borderUi.getPressedStyle(), outline);</span>
+                }
+<span class="nc bnc" id="L1564" title="All 2 branches missed.">                if (borderUi.getParent() != null) {</span>
+<span class="nc" id="L1565">                    borderUi.getParent().revalidate();</span>
+<span class="nc bnc" id="L1566" title="All 2 branches missed.">                } else if (borderUi instanceof Container) {</span>
+<span class="nc" id="L1567">                    ((Container) borderUi).revalidate();</span>
+                }
+            }
+
+            // Direction
+<span class="nc" id="L1572">            int dir = selector.getAttrVal(CSSElement.CSS_DIRECTION);</span>
+<span class="nc bnc" id="L1573" title="All 2 branches missed.">            if (dir != -1) {</span>
+<span class="nc bnc" id="L1574" title="All 2 branches missed.">                setDirectionRecursive(ui, dir == DIRECTION_RTL);</span>
+            }
+
+            // Table properties
+<span class="nc bnc" id="L1578" title="All 2 branches missed.">            if (ui instanceof HTMLTable) {</span>
+<span class="nc" id="L1579">                int tableProp = selector.getAttrVal(CSSElement.CSS_BORDER_COLLAPSE);</span>
+<span class="nc bnc" id="L1580" title="All 2 branches missed.">                if (tableProp != -1) {</span>
+<span class="nc bnc" id="L1581" title="All 2 branches missed.">                    ((HTMLTable) ui).setCollapseBorder(tableProp == BORDER_COLLAPSE_COLLAPSE);</span>
+                }
+<span class="nc" id="L1583">                tableProp = selector.getAttrVal(CSSElement.CSS_EMPTY_CELLS);</span>
+<span class="nc bnc" id="L1584" title="All 2 branches missed.">                if (tableProp != -1) {</span>
+<span class="nc bnc" id="L1585" title="All 2 branches missed.">                    ((HTMLTable) ui).setDrawEmptyCellsBorder(tableProp == EMPTY_CELLS_SHOW);</span>
+                }
+
+<span class="nc" id="L1588">                tableProp = selector.getAttrVal(CSSElement.CSS_CAPTION_SIDE); // bottom = 0 , top = 1</span>
+<span class="nc bnc" id="L1589" title="All 2 branches missed.">                if (tableProp != -1) {</span>
+<span class="nc" id="L1590">                    Container tableParentCont = ui.getParent();</span>
+<span class="nc" id="L1591">                    int tablePos = tableParentCont.getComponentIndex(ui); // should result in 0 when the caption is at the bottom, and 1 when the caption is on top</span>
+<span class="nc bnc" id="L1592" title="All 2 branches missed.">                    if (tableProp != tablePos) {</span>
+<span class="nc" id="L1593">                        Component caption = tableParentCont.getComponentAt((tablePos + 1) % 2);</span>
+<span class="nc" id="L1594">                        tableParentCont.removeComponent(caption);</span>
+<span class="nc" id="L1595">                        tableParentCont.addComponent(tablePos, caption);</span>
+                    }
+                }
+
+<span class="nc" id="L1599">                String spacing = selector.getAttributeById(CSSElement.CSS_BORDER_SPACING);</span>
+<span class="nc bnc" id="L1600" title="All 2 branches missed.">                if (spacing != null) {</span>
+<span class="nc" id="L1601">                    spacing = spacing.trim();</span>
+<span class="nc" id="L1602">                    int index = spacing.indexOf(' ');</span>
+<span class="nc" id="L1603">                    int spaceH = 0;</span>
+<span class="nc" id="L1604">                    int spaceV = 0;</span>
+<span class="nc bnc" id="L1605" title="All 2 branches missed.">                    if (index == -1) { // one value only</span>
+<span class="nc" id="L1606">                        spaceH = CSSElement.convertLengthVal(CSSElement.convertUnitsOrPercentage(spacing), ui, ui.getPreferredW());</span>
+<span class="nc" id="L1607">                        spaceV = spaceH;</span>
+                    } else {
+<span class="nc" id="L1609">                        String spaceHoriz = spacing.substring(0, index);</span>
+<span class="nc" id="L1610">                        String spaceVert = spacing.substring(index + 1);</span>
+<span class="nc" id="L1611">                        spaceH = CSSElement.convertLengthVal(CSSElement.convertUnitsOrPercentage(spaceHoriz), ui, ui.getPreferredW());</span>
+<span class="nc" id="L1612">                        spaceV = CSSElement.convertLengthVal(CSSElement.convertUnitsOrPercentage(spaceVert), ui, ui.getPreferredH());</span>
+                    }
+<span class="nc" id="L1614">                    ((HTMLTable) ui).setBorderSpacing(spaceH, spaceV);</span>
+                }
+
+            }
+        }
+
+        // Note that we carefully check the structure of the LI/UL/OL element with instanceof and checking component count
+        // This is since in some cases other elements can come between a OL/UL and its LI items (Though illegal in HTML, it can occur)
+<span class="nc bnc" id="L1622" title="All 4 branches missed.">        if ((listType != -1) || (listImg != null)) {</span>
+<span class="nc bnc" id="L1623" title="All 2 branches missed.">            if (element.getTagId() == HTMLElement.TAG_LI) {</span>
+<span class="nc bnc" id="L1624" title="All 2 branches missed.">                if (ui instanceof Container) {</span>
+<span class="nc" id="L1625">                    Container liCont = (Container) ui;</span>
+<span class="nc" id="L1626">                    Container liParent = liCont.getParent();</span>
+<span class="nc" id="L1627">                    Component firstComp = liParent.getComponentAt(0);</span>
+<span class="nc bnc" id="L1628" title="All 2 branches missed.">                    if (firstComp instanceof Container) {</span>
+<span class="nc" id="L1629">                        Container bulletCont = (Container) firstComp;</span>
+<span class="nc bnc" id="L1630" title="All 2 branches missed.">                        if (bulletCont.getComponentCount() &gt; 0) {</span>
+<span class="nc" id="L1631">                            Component listItemCmp = bulletCont.getComponentAt(0);</span>
+<span class="nc bnc" id="L1632" title="All 2 branches missed.">                            if (listItemCmp instanceof HTMLListItem) {</span>
+<span class="nc" id="L1633">                                HTMLListItem listItem = (HTMLListItem) listItemCmp;</span>
+<span class="nc" id="L1634">                                listItem.setStyleType(listType);</span>
+<span class="nc" id="L1635">                                listItem.setImage(listImg);</span>
+                            }
+                        }
+                    }
+<span class="nc" id="L1639">                }</span>
+<span class="nc bnc" id="L1640" title="All 8 branches missed.">            } else if ((element.getTagId() == HTMLElement.TAG_UL) || (element.getTagId() == HTMLElement.TAG_OL) || (element.getTagId() == HTMLElement.TAG_DIR) || (element.getTagId() == HTMLElement.TAG_MENU)) {</span>
+<span class="nc" id="L1641">                Container ulCont = (Container) ui;</span>
+<span class="nc bnc" id="L1642" title="All 2 branches missed.">                for (int i = 0; i &lt; ulCont.getComponentCount(); i++) {</span>
+<span class="nc" id="L1643">                    Component cmp = ulCont.getComponentAt(i);</span>
+<span class="nc bnc" id="L1644" title="All 2 branches missed.">                    if (cmp instanceof Container) {</span>
+<span class="nc" id="L1645">                        Container liCont = (Container) cmp;</span>
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">                        if (liCont.getComponentCount() &gt;= 1) {</span>
+<span class="nc" id="L1647">                            cmp = liCont.getComponentAt(0);</span>
+<span class="nc bnc" id="L1648" title="All 2 branches missed.">                            if (cmp instanceof Container) {</span>
+<span class="nc" id="L1649">                                Container liContFirstLine = (Container) cmp;</span>
+<span class="nc bnc" id="L1650" title="All 2 branches missed.">                                if (liContFirstLine.getComponentCount() &gt;= 1) {</span>
+<span class="nc" id="L1651">                                    cmp = liContFirstLine.getComponentAt(0);</span>
+<span class="nc bnc" id="L1652" title="All 2 branches missed.">                                    if (cmp instanceof HTMLListItem) {</span>
+<span class="nc" id="L1653">                                        HTMLListItem listItem = (HTMLListItem) cmp;</span>
+<span class="nc" id="L1654">                                        listItem.setStyleType(listType);</span>
+<span class="nc" id="L1655">                                        listItem.setImage(listImg);</span>
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L1665">    }</span>
+
+    private void addOutlineToStyle(Style style, Border outline) {
+<span class="nc" id="L1668">        Border curBorder = style.getBorder();</span>
+<span class="nc bnc" id="L1669" title="All 2 branches missed.">        if (curBorder != null) {</span>
+<span class="nc" id="L1670">            curBorder.addOuterBorder(outline);</span>
+        } else {
+<span class="nc" id="L1672">            style.setBorder(outline);</span>
+        }
+<span class="nc" id="L1674">    }</span>
+
+    /**
+     * Sets the alignment of all cells in the table
+     *
+     * @param ui           The component representing the table (a HTMLTable)
+     * @param align        The alignment
+     * @param isHorizontal true for horizontal alignment, false for vertical alignment
+     */
+    private void setTableAlignment(Component ui, int align, boolean isHorizontal) {
+<span class="nc" id="L1684">        HTMLTable table = (HTMLTable) ui;</span>
+<span class="nc" id="L1685">        HTMLTableModel model = ((HTMLTableModel) table.getModel());</span>
+<span class="nc" id="L1686">        model.setAlignToAll(isHorizontal, align);</span>
+<span class="nc" id="L1687">        table.setModel(model);</span>
+<span class="nc" id="L1688">    }</span>
+
+    /**
+     * Sets the table cell 'ui' to the requested alignment
+     *
+     * @param tdTag        The element representing the table cell (TD/TH tag)
+     * @param ui           The component representing the table (a HTMLTable)
+     * @param align        The alignment
+     * @param isHorizontal true for horizontal alignment, false for vertical alignment
+     */
+    private void setTableCellAlignment(HTMLElement tdTag, Component ui, int align, boolean isHorizontal) {
+<span class="nc" id="L1699">        HTMLElement trTag = (HTMLElement) tdTag.getParent();</span>
+<span class="nc bnc" id="L1700" title="All 4 branches missed.">        while ((trTag != null) &amp;&amp; (trTag.getTagId() != HTMLElement.TAG_TR)) { // Though in strict XHTML TR can only contain TD/TH - in some HTMLs TR doesn't have to be the direct parent of the tdTag, i.e.: &lt;tr&gt;&lt;b&gt;&lt;td&gt;...&lt;/td&gt;... &lt;/b&gt;&lt;/tr&gt;</span>
+<span class="nc" id="L1701">            trTag = (HTMLElement) trTag.getParent();</span>
+        }
+<span class="nc" id="L1703">        setTableCellAlignmentTR(trTag, ui, align, isHorizontal);</span>
+<span class="nc" id="L1704">    }</span>
+
+    /**
+     * Sets the table cell 'ui' to the requested alignment
+     * Note that when called directly (on TAG_TR) this is actually called multiple times, each with a different cell of the row as 'ui'.
+     * This happens since TR elements contain all their cells as their UI and as such, applyStyle will call applyToUIElement each time with another cell
+     *
+     * @param trTag        The element representing the table row (TR tag) who is the parent of the cell we want to modify
+     * @param ui           The component representing the table (a HTMLTable)
+     * @param align        The alignment
+     * @param isHorizontal true for horizontal alignment, false for vertical alignment
+     */
+    private void setTableCellAlignmentTR(HTMLElement trTag, Component ui, int align, boolean isHorizontal) {
+<span class="nc bnc" id="L1717" title="All 4 branches missed.">        if ((trTag != null) &amp;&amp; (trTag.getTagId() == HTMLElement.TAG_TR)) {</span>
+<span class="nc" id="L1718">            HTMLElement tableTag = (HTMLElement) trTag.getParent();</span>
+<span class="nc bnc" id="L1719" title="All 4 branches missed.">            while ((tableTag != null) &amp;&amp; (tableTag.getTagId() != HTMLElement.TAG_TABLE)) { // Though in strict XHTML TABLE can only contain TR - in some HTMLs it might be different</span>
+<span class="nc" id="L1720">                tableTag = (HTMLElement) tableTag.getParent();</span>
+            }
+<span class="nc bnc" id="L1722" title="All 4 branches missed.">            if ((tableTag != null) &amp;&amp; (tableTag.getTagId() == HTMLElement.TAG_TABLE)) {</span>
+<span class="nc" id="L1723">                HTMLTable table = (HTMLTable) tableTag.getUi().elementAt(0);</span>
+<span class="nc" id="L1724">                HTMLTableModel model = ((HTMLTableModel) table.getModel());</span>
+<span class="nc" id="L1725">                CellConstraint cConstraint = model.getConstraint(ui);</span>
+
+<span class="nc bnc" id="L1727" title="All 2 branches missed.">                if (isHorizontal) {</span>
+<span class="nc" id="L1728">                    cConstraint.setHorizontalAlign(align);</span>
+                } else {
+<span class="nc" id="L1730">                    cConstraint.setVerticalAlign(align);</span>
+                }
+<span class="nc" id="L1732">                table.setModel(model); // Setting the same model again causes re-evaluation of the constraints</span>
+
+            }
+        }
+
+<span class="nc" id="L1737">    }</span>
+
+    /**
+     * Tries to assign the given key string as an access key to the specified component
+     * The key string given here may consist of a multiple key assignment, i.e. several keys seperated with space
+     *
+     * @param keyStr The string representing the key (either a character, a unicode escape sequence or a special key name
+     * @param htmlC  The HTMLComponent
+     * @param ui     The component to set the access key on
+     * @return true if successful, false otherwise
+     */
+    private boolean processAccessKeys(String keyStr, HTMLComponent htmlC, Component ui) {
+<span class="nc" id="L1749">        int index = keyStr.indexOf(' ');</span>
+<span class="nc" id="L1750">        boolean isFirstKey = true; // Keeps track of whether this is the first key we are adding (In order to override XHTML accesskey or failed multiple assignments)</span>
+<span class="nc bnc" id="L1751" title="All 2 branches missed.">        while (index != -1) { // Handle multiple/fallback access keys</span>
+<span class="nc" id="L1752">            String key = keyStr.substring(0, index).trim();</span>
+<span class="nc" id="L1753">            keyStr = keyStr.substring(index + 1);</span>
+<span class="nc bnc" id="L1754" title="All 2 branches missed.">            if (!processAccessKey(key, htmlC, ui, isFirstKey)) {</span>
+<span class="nc" id="L1755">                return false; // If failing to set one of the keys - we return a failure</span>
+            }
+<span class="nc" id="L1757">            isFirstKey = false;</span>
+<span class="nc" id="L1758">            index = keyStr.indexOf(' ');</span>
+<span class="nc" id="L1759">        }</span>
+<span class="nc" id="L1760">        return processAccessKey(keyStr, htmlC, ui, isFirstKey);</span>
+    }
+
+    /**
+     * Tries to assign the given key string as an access key to the specified component
+     * The key string given here is a single key
+     *
+     * @param keyStr   The string representing the key (either a character, a unicode escape sequence or a special key name
+     * @param htmlC    The HTMLComponent
+     * @param ui       The component to set the access key on
+     * @param override If true overrides other keys assigned previously for this component
+     * @return true if successful, false otherwise
+     */
+    private boolean processAccessKey(String keyStr, HTMLComponent htmlC, Component ui, boolean override) {
+<span class="nc bnc" id="L1774" title="All 2 branches missed.">        if (keyStr.startsWith(&quot;\\&quot;)) { // Unicode escape sequence, may be used to denote * and # which technically are illegal as values</span>
+            try {
+<span class="nc" id="L1776">                int keyCode = Integer.parseInt(keyStr.substring(1), 16);</span>
+<span class="nc" id="L1777">                htmlC.addAccessKey((char) keyCode, ui, override);</span>
+<span class="nc" id="L1778">                return true;</span>
+<span class="nc" id="L1779">            } catch (NumberFormatException nfe) {</span>
+<span class="nc" id="L1780">                return false;</span>
+
+            }
+<span class="nc bnc" id="L1783" title="All 2 branches missed.">        } else if (keyStr.length() == 1) {</span>
+<span class="nc" id="L1784">            htmlC.addAccessKey(keyStr.charAt(0), ui, override);</span>
+<span class="nc" id="L1785">            return true;</span>
+        } else { //special key shortcut
+<span class="nc bnc" id="L1787" title="All 2 branches missed.">            if (specialKeys != null) {</span>
+<span class="nc" id="L1788">                Integer key = (Integer) specialKeys.get(keyStr);</span>
+<span class="nc bnc" id="L1789" title="All 2 branches missed.">                if (key != null) {</span>
+<span class="nc" id="L1790">                    htmlC.addAccessKey(key.intValue(), ui, override);</span>
+<span class="nc" id="L1791">                    return true;</span>
+                }
+            }
+<span class="nc" id="L1794">            return false;</span>
+        }
+    }
+
+    /**
+     * Returns a border for a specific side of the component
+     *
+     * @param styleAttributes The style attributes element containing the border directives
+     * @param ui              The component we want to set the border on
+     * @param location        One of Component.TOP/BOTTOM/LEFT/RIGHT
+     * @return
+     */
+    Border createBorder(CSSElement styleAttributes, Component ui, int location, int styles, int type) {
+<span class="nc" id="L1807">        int borderStyle = styleAttributes.getAttrVal(BORDER_OUTLINE_PROPERTIES[type][STYLE] + location);</span>
+<span class="nc bnc" id="L1808" title="All 4 branches missed.">        if ((borderStyle == -1) || (borderStyle == BORDER_STYLE_NONE)) {</span>
+<span class="nc" id="L1809">            return null;</span>
+        }
+
+<span class="nc" id="L1812">        int borderColor = styleAttributes.getAttrVal(BORDER_OUTLINE_PROPERTIES[type][COLOR] + location);</span>
+<span class="nc" id="L1813">        int borderWidth = styleAttributes.getAttrLengthVal(BORDER_OUTLINE_PROPERTIES[type][WIDTH] + location, ui, 0);</span>
+<span class="nc bnc" id="L1814" title="All 2 branches missed.">        if (borderWidth == -1) {</span>
+<span class="nc" id="L1815">            borderWidth = CSSElement.BORDER_DEFAULT_WIDTH; // Default value</span>
+        }
+<span class="nc bnc" id="L1817" title="All 2 branches missed.">        if (type == OUTLINE) {</span>
+<span class="nc" id="L1818">            location = -1; //all</span>
+        }
+
+<span class="nc bnc" id="L1821" title="All 2 branches missed.">        if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L1822">            incPadding(ui.getSelectedStyle(), location, borderWidth);</span>
+        }
+<span class="nc bnc" id="L1824" title="All 2 branches missed.">        if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L1825">            incPadding(ui.getUnselectedStyle(), location, borderWidth);</span>
+        }
+<span class="nc bnc" id="L1827" title="All 2 branches missed.">        if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L1828">            incPadding(ui.getPressedStyle(), location, borderWidth);</span>
+        }
+<span class="nc" id="L1830">        Border border = null;</span>
+<span class="nc bnc" id="L1831" title="All 4 branches missed.">        if ((borderColor == -1) &amp;&amp; (borderStyle &gt;= BORDER_STYLE_GROOVE)) {</span>
+<span class="nc" id="L1832">            borderColor = DEFAULT_3D_BORDER_COLOR;</span>
+        }
+<span class="nc bnc" id="L1834" title="All 9 branches missed.">        switch (borderStyle) {</span>
+            case BORDER_STYLE_SOLID:
+<span class="nc bnc" id="L1836" title="All 2 branches missed.">                if (borderColor == -1) {</span>
+<span class="nc" id="L1837">                    border = Border.createLineBorder(borderWidth);</span>
+                } else {
+<span class="nc" id="L1839">                    border = Border.createLineBorder(borderWidth, borderColor);</span>
+                }
+<span class="nc" id="L1841">                break;</span>
+            case BORDER_STYLE_DOUBLE:
+<span class="nc bnc" id="L1843" title="All 2 branches missed.">                if (borderColor == -1) {</span>
+<span class="nc" id="L1844">                    border = Border.createDoubleBorder(borderWidth);</span>
+                } else {
+<span class="nc" id="L1846">                    border = Border.createDoubleBorder(borderWidth, borderColor);</span>
+                }
+<span class="nc" id="L1848">                break;</span>
+            case BORDER_STYLE_GROOVE:
+<span class="nc" id="L1850">                border = Border.createGrooveBorder(borderWidth, borderColor);</span>
+<span class="nc" id="L1851">                break;</span>
+            case BORDER_STYLE_RIDGE:
+<span class="nc" id="L1853">                border = Border.createRidgeBorder(borderWidth, borderColor);</span>
+<span class="nc" id="L1854">                break;</span>
+            case BORDER_STYLE_INSET:
+<span class="nc" id="L1856">                border = Border.createInsetBorder(borderWidth, borderColor);</span>
+<span class="nc" id="L1857">                break;</span>
+            case BORDER_STYLE_OUTSET:
+<span class="nc" id="L1859">                border = Border.createOutsetBorder(borderWidth, borderColor);</span>
+<span class="nc" id="L1860">                break;</span>
+            case BORDER_STYLE_DOTTED:
+<span class="nc bnc" id="L1862" title="All 2 branches missed.">                if (borderColor == -1) {</span>
+<span class="nc" id="L1863">                    border = Border.createDottedBorder(borderWidth);</span>
+                } else {
+<span class="nc" id="L1865">                    border = Border.createDottedBorder(borderWidth, borderColor);</span>
+                }
+<span class="nc" id="L1867">                break;</span>
+            case BORDER_STYLE_DASHED:
+<span class="nc bnc" id="L1869" title="All 2 branches missed.">                if (borderColor == -1) {</span>
+<span class="nc" id="L1870">                    border = Border.createDashedBorder(borderWidth);</span>
+                } else {
+<span class="nc" id="L1872">                    border = Border.createDashedBorder(borderWidth, borderColor);</span>
+                }
+
+                break;
+        }
+
+<span class="nc" id="L1878">        return border;</span>
+    }
+
+    private void incPadding(Style style, int location, int padding) {
+<span class="nc bnc" id="L1882" title="All 2 branches missed.">        if (location == -1) {</span>
+<span class="nc" id="L1883">            int[] pad = new int[4];</span>
+<span class="nc bnc" id="L1884" title="All 2 branches missed.">            for (int i = Component.TOP; i &lt;= Component.RIGHT; i++) {</span>
+<span class="nc" id="L1885">                pad[i] = style.getPadding(i) + padding;</span>
+            }
+<span class="nc" id="L1887">            style.setPadding(pad[Component.TOP], pad[Component.BOTTOM], pad[Component.LEFT], pad[Component.RIGHT]);</span>
+<span class="nc" id="L1888">        } else {</span>
+<span class="nc" id="L1889">            style.setPadding(location, style.getPadding(location) + padding);</span>
+        }
+<span class="nc" id="L1891">    }</span>
+
+    /**
+     * Sets the font of the component to the closest font that can be found according to the specified properties
+     * Note that system fonts will be matched only with system fonts and same goes for bitmap fonts
+     *
+     * @param htmlC      The HTMLComponent this component belongs to (For the available bitmap fonts table)
+     * @param cmp        The component to work on
+     * @param fontFamily The font family
+     * @param fontSize   The font size in pixels
+     * @param fontStyle  The font style - either Font.STYLE_PLAIN or Font.STYLE_ITALIC
+     * @param fontWeight The font weight - either Font.STYLE_PLAIN ot Font.STYLE_BOLD
+     */
+    private void setMatchingFont(HTMLComponent htmlC, Component cmp, String fontFamily, int fontSize, int fontStyle, int fontWeight, CSSElement selector) {
+
+<span class="nc" id="L1906">        int styles = getApplicableStyles(cmp, selector);</span>
+<span class="nc" id="L1907">        Font curFont = cmp.getUnselectedStyle().getFont();</span>
+
+<span class="nc bnc" id="L1909" title="All 4 branches missed.">        if (((styles &amp; STYLE_SELECTED) != 0) &amp;&amp; ((styles &amp; STYLE_UNSELECTED) == 0)) { // Focus</span>
+<span class="nc" id="L1910">            curFont = cmp.getSelectedStyle().getFont();</span>
+        }
+<span class="nc bnc" id="L1912" title="All 2 branches missed.">        if ((styles &amp; STYLE_PRESSED) != 0) { // Active</span>
+<span class="nc" id="L1913">            curFont = cmp.getPressedStyle().getFont();</span>
+        }
+
+<span class="nc" id="L1916">        int curSize = 0;</span>
+<span class="nc" id="L1917">        boolean isBold = false;</span>
+<span class="nc" id="L1918">        boolean isItalic = false;</span>
+<span class="nc" id="L1919">        String curFamily = null;</span>
+<span class="nc bnc" id="L1920" title="All 2 branches missed.">        if (curFont.getCharset() == null) { //system font</span>
+            // The family string in system fonts is just used to index the font in the matchingFonts cache hashtable
+<span class="nc bnc" id="L1922" title="All 3 branches missed.">            switch (curFont.getFace()) {</span>
+                case Font.FACE_SYSTEM:
+<span class="nc" id="L1924">                    curFamily = &quot;system&quot;;</span>
+<span class="nc" id="L1925">                    break;</span>
+                case Font.FACE_PROPORTIONAL:
+<span class="nc" id="L1927">                    curFamily = &quot;proportional&quot;;</span>
+<span class="nc" id="L1928">                    break;</span>
+                default:
+<span class="nc" id="L1930">                    curFamily = &quot;monospace&quot;;</span>
+            }
+<span class="nc" id="L1932">            curSize = curFont.getHeight() - 2; // Font height is roughly 2-3 pixels above the font size, and is the best indicator we have to what the system font size is</span>
+<span class="nc bnc" id="L1933" title="All 2 branches missed.">            isBold = ((curFont.getStyle() &amp; Font.STYLE_BOLD) != 0);</span>
+<span class="nc bnc" id="L1934" title="All 2 branches missed.">            isItalic = ((curFont.getStyle() &amp; Font.STYLE_ITALIC) != 0);</span>
+        } else { // bitmap font
+<span class="nc" id="L1936">            HTMLFont hFont = htmlC.getHTMLFont(curFont);</span>
+
+<span class="nc bnc" id="L1938" title="All 2 branches missed.">            if (hFont != null) {</span>
+<span class="nc" id="L1939">                curSize = hFont.getSize();</span>
+<span class="nc" id="L1940">                isBold = hFont.isBold();</span>
+<span class="nc" id="L1941">                isItalic = hFont.isItalic();</span>
+<span class="nc" id="L1942">                curFamily = hFont.getFamily();</span>
+            }
+        }
+
+<span class="nc bnc" id="L1946" title="All 16 branches missed.">        if (((fontFamily != null) &amp;&amp; (curFamily != null) &amp;&amp; (!fontFamily.equalsIgnoreCase(curFamily))) ||</span>
+                (fontSize != curSize) ||
+                ((isBold) != (fontWeight == Font.STYLE_BOLD)) ||
+                ((isItalic) != (fontWeight == Font.STYLE_ITALIC))) { // This checks if there's a need to set the font, or if the current font matches the properties of the current one
+
+            // Set the unspecified attributes of the requested font to match those of the current one
+<span class="nc bnc" id="L1952" title="All 4 branches missed.">            if ((fontFamily == null) &amp;&amp; (curFamily != null)) {</span>
+<span class="nc" id="L1953">                fontFamily = curFamily.toLowerCase();</span>
+            }
+<span class="nc bnc" id="L1955" title="All 2 branches missed.">            if (fontSize == -1) {</span>
+<span class="nc" id="L1956">                fontSize = curSize;</span>
+            }
+<span class="nc bnc" id="L1958" title="All 2 branches missed.">            if (fontStyle == -1) {</span>
+<span class="nc bnc" id="L1959" title="All 2 branches missed.">                if (isItalic) {</span>
+<span class="nc" id="L1960">                    fontStyle = Font.STYLE_ITALIC;</span>
+                } else {
+<span class="nc" id="L1962">                    fontStyle = 0;</span>
+                }
+            }
+<span class="nc bnc" id="L1965" title="All 2 branches missed.">            if (fontWeight == -1) {</span>
+<span class="nc bnc" id="L1966" title="All 2 branches missed.">                if (isBold) {</span>
+<span class="nc" id="L1967">                    fontWeight = Font.STYLE_BOLD;</span>
+                } else {
+<span class="nc" id="L1969">                    fontWeight = 0;</span>
+                }
+            }
+
+<span class="nc" id="L1973">            String fontKey = fontFamily + &quot;.&quot; + fontSize + &quot;.&quot; + fontStyle + &quot;.&quot; + fontWeight;</span>
+<span class="nc" id="L1974">            Object obj = matchingFonts.get(fontKey);</span>
+<span class="nc bnc" id="L1975" title="All 2 branches missed.">            if (obj != null) {</span>
+<span class="nc" id="L1976">                Font font = (Font) obj;</span>
+<span class="nc" id="L1977">                setFontForStyles(styles, cmp, font);</span>
+<span class="nc" id="L1978">                return;</span>
+            }
+
+<span class="nc" id="L1981">            Font font = null;</span>
+<span class="nc bnc" id="L1982" title="All 2 branches missed.">            if (curFont.getCharset() == null) { //system font</span>
+<span class="nc" id="L1983">                int systemFontSize = curFont.getSize();</span>
+<span class="nc bnc" id="L1984" title="All 2 branches missed.">                if (fontSize &gt; curSize) { //bigger font</span>
+<span class="nc bnc" id="L1985" title="All 2 branches missed.">                    if (systemFontSize == Font.SIZE_SMALL) {</span>
+<span class="nc" id="L1986">                        systemFontSize = Font.SIZE_MEDIUM;</span>
+<span class="nc bnc" id="L1987" title="All 2 branches missed.">                    } else if (systemFontSize == Font.SIZE_MEDIUM) {</span>
+<span class="nc" id="L1988">                        systemFontSize = Font.SIZE_LARGE;</span>
+                    }
+<span class="nc bnc" id="L1990" title="All 2 branches missed.">                } else if (fontSize &lt; curSize) { //smaller font</span>
+<span class="nc bnc" id="L1991" title="All 2 branches missed.">                    if (systemFontSize == Font.SIZE_LARGE) {</span>
+<span class="nc" id="L1992">                        systemFontSize = Font.SIZE_MEDIUM;</span>
+<span class="nc bnc" id="L1993" title="All 2 branches missed.">                    } else if (systemFontSize == Font.SIZE_MEDIUM) {</span>
+<span class="nc" id="L1994">                        systemFontSize = Font.SIZE_SMALL;</span>
+                    }
+                }
+<span class="nc" id="L1997">                font = Font.createSystemFont(curFont.getFace(), fontStyle + fontWeight, systemFontSize);</span>
+<span class="nc" id="L1998">            } else {</span>
+<span class="nc" id="L1999">                font = htmlC.getClosestFont(fontFamily, fontSize, fontStyle, fontWeight);</span>
+            }
+<span class="nc bnc" id="L2001" title="All 2 branches missed.">            if (font != null) {</span>
+<span class="nc" id="L2002">                matchingFonts.put(fontKey, font);</span>
+<span class="nc" id="L2003">                setFontForStyles(styles, cmp, font);</span>
+            }
+        }
+
+<span class="nc" id="L2007">    }</span>
+
+    private void setFontForStyles(int styles, Component cmp, Font font) {
+<span class="nc bnc" id="L2010" title="All 2 branches missed.">        if ((styles &amp; STYLE_UNSELECTED) != 0) {</span>
+<span class="nc" id="L2011">            cmp.getUnselectedStyle().setFont(font);</span>
+        }
+<span class="nc bnc" id="L2013" title="All 2 branches missed.">        if ((styles &amp; STYLE_SELECTED) != 0) {</span>
+<span class="nc" id="L2014">            cmp.getSelectedStyle().setFont(font);</span>
+        }
+<span class="nc bnc" id="L2016" title="All 2 branches missed.">        if ((styles &amp; STYLE_PRESSED) != 0) {</span>
+<span class="nc" id="L2017">            cmp.getPressedStyle().setFont(font);</span>
+        }
+<span class="nc" id="L2019">        cmp.setShouldCalcPreferredSize(true);</span>
+
+<span class="nc" id="L2021">    }</span>
+
+    ///////////////////
+    // Methods relevant to CSS2 only (not WCSS)
+    ///////////////////
+
+    /**
+     * Returns a quote label with the proper client property
+     *
+     * @param open true if this is an opening quote, false otherwise
+     * @return The quote label
+     */
+    private Label getQuote(boolean open) {
+<span class="nc" id="L2034">        Label quoteLabel = new Label(&quot;\&quot;&quot;);</span>
+<span class="nc bnc" id="L2035" title="All 2 branches missed.">        quoteLabel.putClientProperty(HTMLComponent.CLIENT_PROPERTY_QUOTE, Integer.valueOf(open ? 0 : 1)); // 0 is open quote, 1 is closed quote (both stand for primary quotes - see HTMLComponent.addQuote)</span>
+<span class="nc" id="L2036">        return quoteLabel;</span>
+
+    }
+
+    /**
+     * Evaluates a CSS content property expression and returns the matching label component
+     *
+     * @param htmlC    The HTMLComponent
+     * @param exp      The expression to evaluate
+     * @param element  The element this content property
+     * @param selector The CSS selector that includes the content property (mainly for error messages)
+     * @return A label representing the evaluated expression or null if not found
+     */
+    private Label evalContentExpression(HTMLComponent htmlC, String exp, HTMLElement element, CSSElement selector) {
+<span class="nc bnc" id="L2050" title="All 2 branches missed.">        if (exp.length() != 0) {</span>
+<span class="nc bnc" id="L2051" title="All 2 branches missed.">            if (exp.startsWith(&quot;counter(&quot;)) {</span>
+<span class="nc" id="L2052">                exp = exp.substring(8);</span>
+<span class="nc" id="L2053">                int index = exp.indexOf(&quot;)&quot;);</span>
+<span class="nc bnc" id="L2054" title="All 2 branches missed.">                if (index != -1) {</span>
+<span class="nc" id="L2055">                    return new Label(&quot;&quot; + htmlC.getCounterValue(exp.substring(0, index)));</span>
+                }
+<span class="nc bnc" id="L2057" title="All 2 branches missed.">            } else if (exp.startsWith(&quot;attr(&quot;)) {</span>
+<span class="nc" id="L2058">                exp = exp.substring(5);</span>
+<span class="nc" id="L2059">                int index = exp.indexOf(&quot;)&quot;);</span>
+<span class="nc bnc" id="L2060" title="All 2 branches missed.">                if (index != -1) {</span>
+<span class="nc" id="L2061">                    String attr = exp.substring(0, index);</span>
+<span class="nc" id="L2062">                    String attrValue = element.getAttribute(attr);</span>
+<span class="nc bnc" id="L2063" title="All 2 branches missed.">                    return new Label(attrValue == null ? &quot;&quot; : attrValue);</span>
+                }
+<span class="nc bnc" id="L2065" title="All 2 branches missed.">            } else if (exp.equals(&quot;open-quote&quot;)) {</span>
+<span class="nc" id="L2066">                return getQuote(true);</span>
+<span class="nc bnc" id="L2067" title="All 2 branches missed.">            } else if (exp.equals(&quot;close-quote&quot;)) {</span>
+<span class="nc" id="L2068">                return getQuote(false);</span>
+<span class="nc bnc" id="L2069" title="All 2 branches missed.">            } else if (exp.startsWith(&quot;url(&quot;)) {</span>
+<span class="nc" id="L2070">                String url = getCSSUrl(exp);</span>
+<span class="nc" id="L2071">                Label imgLabel = new Label();</span>
+<span class="nc bnc" id="L2072" title="All 2 branches missed.">                if (htmlC.showImages) {</span>
+<span class="nc bnc" id="L2073" title="All 2 branches missed.">                    if (htmlC.getDocumentInfo() != null) {</span>
+<span class="nc" id="L2074">                        htmlC.getThreadQueue().add(imgLabel, htmlC.convertURL(url));</span>
+                    } else {
+<span class="nc bnc" id="L2076" title="All 2 branches missed.">                        if (DocumentInfo.isAbsoluteURL(url)) {</span>
+<span class="nc" id="L2077">                            htmlC.getThreadQueue().add(imgLabel, url);</span>
+                        } else {
+<span class="nc bnc" id="L2079" title="All 2 branches missed.">                            if (htmlC.getHTMLCallback() != null) {</span>
+<span class="nc" id="L2080">                                htmlC.getHTMLCallback().parsingError(HTMLCallback.ERROR_NO_BASE_URL, selector.getTagName(), selector.getAttributeName(Integer.valueOf(CSSElement.CSS_CONTENT)), url, &quot;Ignoring image file referred in a CSS file/segment (&quot; + url + &quot;), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs&quot;);</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L2085">                return imgLabel;</span>
+            }
+        }
+<span class="nc" id="L2088">        return null;</span>
+    }
+
+    /**
+     * Handles a CSS content property
+     *
+     * @param element  The element this content property
+     * @param selector The CSS selector that includes the content property
+     * @param htmlC    The HTMLComponent
+     */
+    private void handleContentProperty(HTMLElement element, CSSElement selector, HTMLComponent htmlC) {
+<span class="nc bnc" id="L2099" title="All 2 branches missed.">        boolean after = ((selector.getSelectorPseudoClass() &amp; CSSElement.PC_AFTER) != 0);</span>
+<span class="nc" id="L2100">        String content = selector.getAttributeById(CSSElement.CSS_CONTENT);</span>
+<span class="nc bnc" id="L2101" title="All 2 branches missed.">        if (content != null) { // if there's no content, we don't add anything</span>
+<span class="nc bnc" id="L2102" title="All 2 branches missed.">            Component cmp = after ? (Component) element.getUi().lastElement() : (Component) element.getUi().firstElement();</span>
+<span class="nc" id="L2103">            Component styleCmp = cmp;</span>
+<span class="nc" id="L2104">            Container parent = null;</span>
+<span class="nc" id="L2105">            int pos = 0;</span>
+<span class="nc bnc" id="L2106" title="All 2 branches missed.">            if (cmp instanceof Container) {</span>
+<span class="nc" id="L2107">                parent = ((Container) cmp);</span>
+<span class="nc bnc" id="L2108" title="All 6 branches missed.">                while ((parent.getComponentCount() &gt; 0) &amp;&amp; (parent.getComponentAt(after ? parent.getComponentCount() - 1 : 0) instanceof Container)) {</span>
+<span class="nc bnc" id="L2109" title="All 2 branches missed.">                    parent = (Container) parent.getComponentAt(after ? parent.getComponentCount() - 1 : 0); // find the actual content</span>
+                }
+
+<span class="nc bnc" id="L2112" title="All 2 branches missed.">                if (parent.getComponentCount() &gt; 0) {</span>
+<span class="nc bnc" id="L2113" title="All 2 branches missed.">                    pos = after ? parent.getComponentCount() - 1 : 0;</span>
+<span class="nc" id="L2114">                    styleCmp = parent.getComponentAt(pos);</span>
+                }
+            } else {
+<span class="nc" id="L2117">                parent = cmp.getParent();</span>
+<span class="nc" id="L2118">                pos = cmp.getParent().getComponentIndex(cmp);</span>
+            }
+<span class="nc bnc" id="L2120" title="All 2 branches missed.">            if (after) {</span>
+<span class="nc" id="L2121">                pos++;</span>
+            }
+<span class="nc" id="L2123">            int initPos = pos;</span>
+
+<span class="nc" id="L2125">            String str = &quot;&quot;;</span>
+<span class="nc" id="L2126">            content = content + &quot; &quot;; // to make sure the last expression is evaluated, note that this will not print an extra space in any case, since it is out of the quotes if any</span>
+<span class="nc" id="L2127">            boolean segment = false;</span>
+<span class="nc bnc" id="L2128" title="All 2 branches missed.">            for (int i = 0; i &lt; content.length(); i++) {</span>
+<span class="nc" id="L2129">                char c = content.charAt(i);</span>
+<span class="nc" id="L2130">                Label lbl = null;</span>
+<span class="nc bnc" id="L2131" title="All 2 branches missed.">                if (c == '&quot;') {</span>
+<span class="nc bnc" id="L2132" title="All 2 branches missed.">                    segment = !segment;</span>
+<span class="nc bnc" id="L2133" title="All 4 branches missed.">                    if ((!segment) &amp;&amp; (str.length() &gt; 0)) {</span>
+<span class="nc" id="L2134">                        lbl = new Label(str);</span>
+<span class="nc" id="L2135">                        str = &quot;&quot;;</span>
+                    }
+<span class="nc bnc" id="L2137" title="All 2 branches missed.">                } else if (CSSParser.isWhiteSpace(c)) {</span>
+<span class="nc bnc" id="L2138" title="All 2 branches missed.">                    if (segment) {</span>
+<span class="nc" id="L2139">                        str += c;</span>
+<span class="nc" id="L2140">                        lbl = new Label(str);</span>
+<span class="nc bnc" id="L2141" title="All 2 branches missed.">                    } else if (str.length() &gt; 0) {</span>
+<span class="nc" id="L2142">                        lbl = evalContentExpression(htmlC, str, element, selector);</span>
+<span class="nc bnc" id="L2143" title="All 2 branches missed.">                        if (lbl == null) { // if we didn't find a match we search for the following expressions which are used to remove added content</span>
+<span class="nc" id="L2144">                            int removeQuoteType = -1;</span>
+<span class="nc" id="L2145">                            boolean removeAll = false;</span>
+<span class="nc bnc" id="L2146" title="All 4 branches missed.">                            if ((str.equals(&quot;none&quot;)) || (str.equals(&quot;normal&quot;))) { // normal/none means remove all content</span>
+<span class="nc" id="L2147">                                removeAll = true;</span>
+<span class="nc bnc" id="L2148" title="All 2 branches missed.">                            } else if (str.equals(&quot;no-open-quote&quot;)) {</span>
+<span class="nc" id="L2149">                                removeQuoteType = 0; // 0 is the quote type for open quote, 1 for closed one</span>
+<span class="nc bnc" id="L2150" title="All 2 branches missed.">                            } else if (str.equals(&quot;no-close-quote&quot;)) {</span>
+<span class="nc" id="L2151">                                removeQuoteType = 1;</span>
+                            }
+<span class="nc bnc" id="L2153" title="All 4 branches missed.">                            if ((removeAll) || (removeQuoteType != -1)) {</span>
+<span class="nc" id="L2154">                                Vector v = element.getUi();</span>
+<span class="nc bnc" id="L2155" title="All 2 branches missed.">                                if (v != null) {</span>
+<span class="nc" id="L2156">                                    Vector toRemove = new Vector();</span>
+<span class="nc bnc" id="L2157" title="All 2 branches missed.">                                    for (Enumeration e = v.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L2158">                                        Component ui = (Component) e.nextElement();</span>
+<span class="nc" id="L2159">                                        String conStr = (String) ui.getClientProperty(CLIENT_PROPERTY_CSS_CONTENT);</span>
+
+<span class="nc bnc" id="L2161" title="All 8 branches missed.">                                        if ((conStr != null) &amp;&amp; (((after) &amp;&amp; (conStr.equals(&quot;a&quot;))) ||</span>
+<span class="nc bnc" id="L2162" title="All 2 branches missed.">                                                ((!after) &amp;&amp; (conStr.equals(&quot;b&quot;))))) {</span>
+<span class="nc" id="L2163">                                            boolean remove = true;</span>
+<span class="nc bnc" id="L2164" title="All 2 branches missed.">                                            if (removeQuoteType != -1) {</span>
+<span class="nc" id="L2165">                                                Object obj = ui.getClientProperty(HTMLComponent.CLIENT_PROPERTY_QUOTE);</span>
+<span class="nc bnc" id="L2166" title="All 2 branches missed.">                                                if (obj != null) {</span>
+<span class="nc" id="L2167">                                                    int quoteType = ((Integer) obj).intValue();</span>
+<span class="nc bnc" id="L2168" title="All 2 branches missed.">                                                    remove = (quoteType == removeQuoteType);</span>
+<span class="nc" id="L2169">                                                } else {</span>
+<span class="nc" id="L2170">                                                    remove = false;</span>
+                                                }
+                                            }
+<span class="nc bnc" id="L2173" title="All 2 branches missed.">                                            if (remove) {</span>
+<span class="nc" id="L2174">                                                parent.removeComponent(ui);</span>
+<span class="nc" id="L2175">                                                toRemove.addElement(ui);</span>
+                                            }
+                                        }
+<span class="nc" id="L2178">                                    }</span>
+<span class="nc bnc" id="L2179" title="All 2 branches missed.">                                    for (Enumeration e = toRemove.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L2180">                                        v.removeElement(e.nextElement());</span>
+                                    }
+                                }
+<span class="nc" id="L2183">                                return; //stop processing after removal clauses such as none/normal</span>
+                            }
+                        }
+
+                    }
+<span class="nc" id="L2188">                    str = &quot;&quot;;</span>
+                } else {
+<span class="nc" id="L2190">                    str += c;</span>
+                }
+<span class="nc bnc" id="L2192" title="All 2 branches missed.">                if (lbl != null) {</span>
+<span class="nc bnc" id="L2193" title="All 2 branches missed.">                    if (after) {</span>
+<span class="nc" id="L2194">                        element.addAssociatedComponent(lbl);</span>
+                    } else {
+<span class="nc" id="L2196">                        element.addAssociatedComponentAt(pos - initPos, lbl);</span>
+                    }
+<span class="nc" id="L2198">                    lbl.setUnselectedStyle(new Style(styleCmp.getUnselectedStyle()));</span>
+<span class="nc bnc" id="L2199" title="All 2 branches missed.">                    lbl.putClientProperty(CLIENT_PROPERTY_CSS_CONTENT, after ? &quot;a&quot; : &quot;b&quot;);</span>
+<span class="nc bnc" id="L2200" title="All 2 branches missed.">                    if (parent.getComponentCount() == 0) {</span>
+<span class="nc" id="L2201">                        parent.addComponent(lbl);</span>
+                    } else {
+<span class="nc" id="L2203">                        parent.addComponent(pos, lbl);</span>
+                    }
+<span class="nc" id="L2205">                    pos++;</span>
+<span class="nc" id="L2206">                    applyStyleToUIElement(lbl, selector, element, htmlC);</span>
+                }
+            }
+
+        }
+<span class="nc" id="L2211">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

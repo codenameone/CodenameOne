@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComponentAnimation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">ComponentAnimation.java</span></div><h1>ComponentAnimation.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.animations;
+
+import com.codename1.ui.AnimationManager;
+import com.codename1.ui.Container;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * Parent class representing an animation object within the AnimationManager queue.
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L38">public abstract class ComponentAnimation {</span>
+    private Object notifyLock;
+    private Runnable onCompletion;
+<span class="nc" id="L41">    private int step = -1;</span>
+    private ArrayList&lt;Runnable&gt; post;
+<span class="nc" id="L43">    private boolean completed = false;</span>
+
+    /**
+     * Allows us to create an animation that compounds several separate animations so they appear as a
+     * single animation to the system and process in parallel
+     *
+     * @param anims the animations
+     * @return the compounded animation
+     */
+    public static ComponentAnimation compoundAnimation(ComponentAnimation... anims) {
+<span class="nc" id="L53">        return new CompoundAnimation(anims);</span>
+    }
+
+    /**
+     * Allows us to create an animation that places several separate animations in a sequence so they appear as a
+     * single animation to the system and process one after the other
+     *
+     * @param anims the animations
+     * @return the sequential animation
+     */
+    public static ComponentAnimation sequentialAnimation(ComponentAnimation... anims) {
+<span class="nc" id="L64">        return new CompoundAnimation(anims, true);</span>
+    }
+
+    /**
+     * Invokes the runnable just as the animation finishes thus allowing cleanup of the UI for the upcoming
+     * animations, this is useful when running a complex sequence
+     *
+     * @param r the runnable to call when the animation is done
+     */
+    public void addOnCompleteCall(Runnable r) {
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (post == null) {</span>
+<span class="nc" id="L75">            post = new ArrayList&lt;Runnable&gt;();</span>
+        }
+<span class="nc" id="L77">        post.add(r);</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * Step mode allows stepping thru an animation one frame at a time, e.g. when scrolling down an animation
+     * might change title elements then change them back as we scroll up.
+     *
+     * @return true if this animation can be stepped in which case the setStep etc. methods should work.
+     */
+    public boolean isStepModeSupported() {
+<span class="nc" id="L87">        return false;</span>
+    }
+
+    public int getStep() {
+<span class="nc" id="L91">        return step;</span>
+    }
+
+    /**
+     * Sets the current animation step to a value between 0 and maxSteps
+     *
+     * @param step the current step
+     */
+    public void setStep(int step) {
+<span class="nc" id="L100">        this.step = step;</span>
+<span class="nc" id="L101">    }</span>
+
+    /**
+     * The total number of steps in this animation.
+     *
+     * @return the number of steps
+     */
+    public int getMaxSteps() {
+<span class="nc" id="L109">        return 100;</span>
+    }
+
+    /**
+     * Indicates if the animation is in progress
+     *
+     * @return true if in progress
+     */
+    public abstract boolean isInProgress();
+
+    /**
+     * Updates the animation state
+     */
+    protected abstract void updateState();
+
+    /**
+     * Invoked by the animation manager internally
+     */
+    public final void updateAnimationState() {
+<span class="nc" id="L128">        updateState();</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (!isInProgress()) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (!completed) {</span>
+<span class="nc" id="L131">                completed = true;</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                if (notifyLock != null) {</span>
+<span class="nc" id="L133">                    synchronized (notifyLock) {</span>
+<span class="nc" id="L134">                        notifyLock.notify();</span>
+<span class="nc" id="L135">                    }</span>
+                }
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                if (onCompletion != null) {</span>
+<span class="nc" id="L138">                    onCompletion.run();</span>
+                }
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                if (post != null) {</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                    for (Runnable p : post) {</span>
+<span class="nc" id="L142">                        p.run();</span>
+<span class="nc" id="L143">                    }</span>
+                }
+            }
+        } else { //ensure completed would be set to false if animation has been restarted
+<span class="nc" id="L147">            completed = false;</span>
+        }
+<span class="nc" id="L149">    }</span>
+
+    /**
+     * Flushes the animation immediately, this will be called if the form is de-initialized
+     */
+    public void flush() {
+<span class="nc" id="L155">    }</span>
+
+    /**
+     * This method is used internally by the addAnimationAndBlock method of AnimationManager and shouldn't
+     * be used outside of that.
+     *
+     * @param l the lock object
+     */
+    public final void setNotifyLock(Object l) {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (notifyLock != null) {</span>
+<span class="nc" id="L165">            throw new RuntimeException(&quot;setNotifyLock shouldn't be invoked more than once&quot;);</span>
+        }
+<span class="nc" id="L167">        this.notifyLock = l;</span>
+<span class="nc" id="L168">    }</span>
+
+    /**
+     * This method is used internally by the addAnimation method of AnimationManager and shouldn't
+     * be used outside of that.
+     *
+     * @param r the callback
+     */
+    public final void setOnCompletion(Runnable r) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (onCompletion != null) {</span>
+<span class="nc" id="L178">            throw new RuntimeException(&quot;setOnCompletion shouldn't be invoked more than once&quot;);</span>
+        }
+<span class="nc" id="L180">        this.onCompletion = r;</span>
+<span class="nc" id="L181">    }</span>
+
+    static class CompoundAnimation extends ComponentAnimation {
+        ComponentAnimation[] anims;
+        int sequence;
+
+<span class="nc" id="L187">        public CompoundAnimation(ComponentAnimation[] anims) {</span>
+<span class="nc" id="L188">            this.anims = anims;</span>
+<span class="nc" id="L189">            sequence = -1;</span>
+<span class="nc" id="L190">        }</span>
+
+<span class="nc" id="L192">        public CompoundAnimation(ComponentAnimation[] anims, boolean s) {</span>
+<span class="nc" id="L193">            this.anims = anims;</span>
+<span class="nc" id="L194">            sequence = 0;</span>
+<span class="nc" id="L195">        }</span>
+
+        @Override
+        public boolean isInProgress() {
+<span class="nc bnc" id="L199" title="All 4 branches missed.">            if (sequence &gt; -1 &amp;&amp; sequence &lt; anims.length) {</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                if (anims[sequence].isInProgress()) {</span>
+<span class="nc" id="L201">                    return true;</span>
+                }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                while (anims.length &gt; sequence) {</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                    if (anims[sequence].isInProgress()) {</span>
+<span class="nc" id="L205">                        return true;</span>
+                    }
+<span class="nc" id="L207">                    sequence++;</span>
+                }
+<span class="nc" id="L209">                return false;</span>
+            }
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            for (ComponentAnimation a : anims) {</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                if (a.isInProgress()) {</span>
+<span class="nc" id="L213">                    return true;</span>
+                }
+            }
+<span class="nc" id="L216">            return false;</span>
+        }
+
+        @Override
+        protected void updateState() {
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            if (sequence &gt; -1) {</span>
+<span class="nc" id="L222">                anims[Math.min(sequence, anims.length - 1)].updateState();</span>
+<span class="nc" id="L223">                return;</span>
+            }
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            for (ComponentAnimation a : anims) {</span>
+<span class="nc" id="L226">                a.updateAnimationState();</span>
+            }
+<span class="nc" id="L228">        }</span>
+
+        @Override
+        public void flush() {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            for (ComponentAnimation a : anims) {</span>
+<span class="nc" id="L233">                a.flush();</span>
+            }
+<span class="nc" id="L235">        }</span>
+
+        @Override
+        public int getMaxSteps() {
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            if (sequence &gt; -1) {</span>
+<span class="nc" id="L240">                int out = 0;</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                for (ComponentAnimation a : anims) {</span>
+<span class="nc" id="L242">                    out += a.getMaxSteps();</span>
+                }
+<span class="nc" id="L244">                return out;</span>
+            } else {
+<span class="nc" id="L246">                int out = 0;</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                for (ComponentAnimation a : anims) {</span>
+<span class="nc" id="L248">                    out = Math.max(a.getMaxSteps(), out);</span>
+                }
+<span class="nc" id="L250">                return out;</span>
+            }
+
+        }
+
+        @Override
+        public void setStep(int step) {
+<span class="nc" id="L257">            super.setStep(step);</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">            if (sequence &gt; -1) {</span>
+<span class="nc" id="L259">                int animIdx = 0;</span>
+<span class="nc" id="L260">                int len = anims.length;</span>
+<span class="nc bnc" id="L261" title="All 4 branches missed.">                while (animIdx &lt; anims.length &amp;&amp; anims[animIdx].getMaxSteps() &lt;= step) {</span>
+<span class="nc" id="L262">                    ComponentAnimation anim = anims[animIdx];</span>
+<span class="nc" id="L263">                    anim.setStep(anim.getMaxSteps());</span>
+<span class="nc" id="L264">                    step -= anim.getMaxSteps();</span>
+<span class="nc" id="L265">                    animIdx++;</span>
+<span class="nc" id="L266">                }</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                while (animIdx &lt; len) {</span>
+<span class="nc" id="L268">                    anims[animIdx].setStep(0);</span>
+<span class="nc" id="L269">                    animIdx++;</span>
+                }
+
+<span class="nc" id="L272">            } else {</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                for (ComponentAnimation anim : anims) {</span>
+<span class="nc" id="L274">                    anim.setStep(Math.min(anim.getMaxSteps(), step));</span>
+                }
+            }
+<span class="nc" id="L277">        }</span>
+
+
+    }
+
+    /**
+     * A special kind of ComponentAnimation that encapsulates a mutation of the
+     * user interface.  This class used internally to allow compatible UI mutation
+     * animations to run concurrently.  Two UI mutations are compatible if the containers
+     * that they mutate reside in separate branches of the UI tree.  I.e. As long as neither
+     * container contains the other, their mutations are compatible.
+     *
+     * @see AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation)
+     * @see AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation, java.lang.Runnable)
+     * @since 7.0
+     */
+    public static class UIMutation extends CompoundAnimation {
+
+        /**
+         * Containers that are being mutated as a part of this animation.
+         */
+<span class="nc" id="L298">        private final Set&lt;Container&gt; containers = new HashSet&lt;Container&gt;();</span>
+
+        /**
+         * A flag that is set the first time updateState() is called.  Once this
+         * flag is set, the UIMutation will not accept any more mutations.
+         */
+        private boolean isStarted;
+
+        /**
+         * Creates a new UIMutation which mutates the given container with the provided
+         * animation.
+         *
+         * @param cnt  The container that is being mutated.
+         * @param anim The animation.
+         */
+        public UIMutation(Container cnt, ComponentAnimation anim) {
+<span class="nc" id="L314">            super(new ComponentAnimation[]{anim});</span>
+<span class="nc" id="L315">        }</span>
+
+        /**
+         * Tries to add another mutation to this UIMutation.
+         *
+         * @param cnt  The container that is being mutated.
+         * @param anim The animation
+         * @return True if it was successfully added.  False otherwise.  This will return false if
+         * {@link #isLocked() } returns true (i.e. the animation has already stared), or if the mutation
+         * is incompatible with any of the existing mutations in this mutation.
+         */
+        public boolean add(Container cnt, ComponentAnimation anim) {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (isStarted) {</span>
+<span class="nc" id="L328">                return false;</span>
+            }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">            for (Container existing : containers) {</span>
+<span class="nc bnc" id="L331" title="All 6 branches missed.">                if (cnt == existing || existing.contains(cnt) || cnt.contains(existing)) {</span>
+<span class="nc" id="L332">                    return false;</span>
+                }
+<span class="nc" id="L334">            }</span>
+
+<span class="nc" id="L336">            ComponentAnimation[] newAnims = new ComponentAnimation[anims.length + 1];</span>
+<span class="nc" id="L337">            System.arraycopy(anims, 0, newAnims, 0, anims.length);</span>
+<span class="nc" id="L338">            newAnims[anims.length] = anim;</span>
+<span class="nc" id="L339">            anims = newAnims;</span>
+<span class="nc" id="L340">            containers.add(cnt);</span>
+<span class="nc" id="L341">            return true;</span>
+        }
+
+        /**
+         * Checks if this mutation is locked.  Once a mutation animation has started,
+         * it becomes locked, and cannot have any further mutations added to it.
+         *
+         * @return
+         */
+        public boolean isLocked() {
+<span class="nc" id="L351">            return isStarted;</span>
+        }
+
+
+        @Override
+        protected void updateState() {
+<span class="nc" id="L357">            isStarted = true;</span>
+<span class="nc" id="L358">            super.updateState();</span>
+<span class="nc" id="L359">        }</span>
+
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

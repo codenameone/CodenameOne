@@ -1,0 +1,1349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FaceBookAccess.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.facebook</a> &gt; <span class="el_source">FaceBookAccess.java</span></div><h1>FaceBookAccess.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.facebook;
+
+import com.codename1.components.SliderBridge;
+import com.codename1.io.AccessToken;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Oauth2;
+import com.codename1.io.Storage;
+import com.codename1.io.services.ImageDownloadService;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Label;
+import com.codename1.ui.Slider;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.list.DefaultListModel;
+
+import java.io.IOException;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * This is the main access API to the facebook graph API
+ * http://developers.facebook.com/docs/reference/api/
+ * This class encapsulates the Network access and provide simple methods to acess the Facebook servers.
+ *
+ * @author Chen Fishbein
+ */
+public class FaceBookAccess {
+
+    private static final String TEMP_STORAGE = &quot;FaceBookAccesstmp&quot;;
+<span class="nc" id="L59">    private static String clientId = &quot;132970916828080&quot;;</span>
+<span class="nc" id="L60">    private static String redirectURI = &quot;https://www.codenameone.com/&quot;;</span>
+<span class="nc" id="L61">    private static String clientSecret = &quot;6aaf4c8ea791f08ea15735eb647becfe&quot;;</span>
+<span class="nc" id="L62">    private static String[] permissions = new String[]{&quot;public_profile&quot;, &quot;email&quot;, &quot;user_friends&quot;};</span>
+<span class="nc" id="L63">    private static final FaceBookAccess instance = new FaceBookAccess();</span>
+    private static String token;
+<span class="nc" id="L65">    private static String apiVersion = &quot;v2.0&quot;;</span>
+    private Slider slider;
+    private ConnectionRequest current;
+<span class="nc" id="L68">    private final Vector responseCodeListeners = new Vector();</span>
+
+
+<span class="nc" id="L71">    private FaceBookAccess() {</span>
+<span class="nc" id="L72">    }</span>
+
+    /**
+     * gets the class instance
+     *
+     * @return a FaceBookAccess object
+     */
+    public static FaceBookAccess getInstance() {
+<span class="nc" id="L80">        return instance;</span>
+    }
+
+    /**
+     * This is a utility method that transforms a DefaultListModel that contains Hashtable entries
+     * into a DefaultListModel that will contain FBObject objects that will be initialized with the Hashtable entries
+     *
+     * @param hashtablesModel the model to transform, this model should hold it's data has Hashtable entries
+     * @param fbObjectClass   this is the class of the entries to be created, this class should be a FBObject type
+     * @return a DefaultListModel with fbObjectClass objects entries
+     * @throws IllegalAccessException   if the fbObjectClass.newInstance() fails
+     * @throws InstantiationExceptionif the fbObjectClass.newInstance() fails
+     */
+    public static DefaultListModel createObjectsModel(DefaultListModel hashtablesModel, Class fbObjectClass) throws IllegalAccessException, InstantiationException {
+<span class="nc" id="L94">        DefaultListModel model = new DefaultListModel();</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        for (int i = 0; i &lt; hashtablesModel.getSize(); i++) {</span>
+<span class="nc" id="L96">            Hashtable table = (Hashtable) hashtablesModel.getItemAt(i);</span>
+<span class="nc" id="L97">            FBObject obj = (FBObject) fbObjectClass.newInstance();</span>
+<span class="nc" id="L98">            obj.copy(table);</span>
+<span class="nc" id="L99">            model.addItem(obj);</span>
+        }
+<span class="nc" id="L101">        return model;</span>
+    }
+
+    /**
+     * The client id (appid) which asks to connect (this is generated when an
+     * app is created see: https://developers.facebook.com/apps)
+     *
+     * @param clientId
+     */
+    public static void setClientId(String clientId) {
+<span class="nc" id="L111">        FaceBookAccess.clientId = clientId;</span>
+<span class="nc" id="L112">    }</span>
+
+    /**
+     * The client secret is been generated by facebook
+     * see: https://developers.facebook.com/apps
+     *
+     * @param clientSecret
+     */
+    public static void setClientSecret(String clientSecret) {
+<span class="nc" id="L121">        FaceBookAccess.clientSecret = clientSecret;</span>
+<span class="nc" id="L122">    }</span>
+
+    /**
+     * The requested permissions of the app
+     * http://developers.facebook.com/docs/reference/api/permissions/
+     *
+     * @param permissions
+     */
+    public static void setPermissions(String[] permissions) {
+<span class="nc" id="L131">        FaceBookAccess.permissions = permissions;</span>
+<span class="nc" id="L132">    }</span>
+
+    /**
+     * This is generated when an app is created see:
+     * https://developers.facebook.com/apps
+     *
+     * @param redirectURI
+     */
+    public static void setRedirectURI(String redirectURI) {
+<span class="nc" id="L141">        FaceBookAccess.redirectURI = redirectURI;</span>
+<span class="nc" id="L142">    }</span>
+
+    /**
+     * Returns the Facebook authorization token that can be used for API access
+     *
+     * @return the token
+     */
+    public static String getToken() {
+<span class="nc" id="L150">        return token;</span>
+    }
+
+    /**
+     * Sets the token to the FaceBookAccess class, this is useful if the token
+     * has not yet expired, get the expiration of the token with
+     * Oauth2.getExpires()
+     *
+     * @param tok the token of the
+     */
+    public static void setToken(String tok) {
+<span class="nc" id="L161">        token = tok;</span>
+<span class="nc" id="L162">    }</span>
+
+    /**
+     * log out the current user
+     */
+    public static void logOut() {
+<span class="nc" id="L168">        ConnectionRequest req = new ConnectionRequest();</span>
+<span class="nc" id="L169">        req.setPost(false);</span>
+<span class="nc" id="L170">        req.setUrl(&quot;https://www.facebook.com/logout.php?access_token=&quot; + token + &quot;&amp;confirm=1&amp;next=&quot; + redirectURI);</span>
+<span class="nc" id="L171">        NetworkManager.getInstance().addToQueueAndWait(req);</span>
+<span class="nc" id="L172">        token = null;</span>
+<span class="nc" id="L173">    }</span>
+
+    /**
+     * Some simple queries for public data can work just fine with anonymous login without requiring the whole
+     * OAuth process, they still need a facebook application though
+     *
+     * @param appid        the id of the application
+     * @param clientSecret the client secret for the application
+     */
+    public static void anonymousLogin(String appid, String clientSecret) {
+<span class="nc" id="L183">        ConnectionRequest req = new ConnectionRequest();</span>
+<span class="nc" id="L184">        req.setPost(false);</span>
+<span class="nc" id="L185">        req.setUrl(&quot;https://graph.facebook.com/oauth/access_token&quot;);</span>
+<span class="nc" id="L186">        req.addArgument(&quot;client_id&quot;, appid);</span>
+<span class="nc" id="L187">        req.addArgument(&quot;client_secret&quot;, clientSecret);</span>
+<span class="nc" id="L188">        req.addArgument(&quot;grant_type&quot;, &quot;client_credentials&quot;);</span>
+<span class="nc" id="L189">        NetworkManager.getInstance().addToQueueAndWait(req);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (req.getResponseData() != null) {</span>
+<span class="nc" id="L191">            token = new String(req.getResponseData());</span>
+<span class="nc" id="L192">            token = token.substring(token.indexOf('=') + 1);</span>
+        }
+<span class="nc" id="L194">    }</span>
+
+    /**
+     * Returns the api version used, if empty the non version-ed is used
+     */
+    public static String getApiVersion() {
+<span class="nc" id="L200">        return apiVersion;</span>
+    }
+
+    /**
+     * Sets the Facebook api version being used, by default the api calls the
+     * non version-ed version of the API.
+     *
+     * @param apiVersion valid values are &quot;1.0&quot;, &quot;2.0&quot;, &quot;2.1&quot;
+     */
+    public static void setApiVersion(String apiVersion) {
+<span class="nc bnc" id="L210" title="All 6 branches missed.">        if (apiVersion.equals(&quot;1.0&quot;) || apiVersion.equals(&quot;2.0&quot;) || apiVersion.equals(&quot;2.1&quot;)) {</span>
+<span class="nc" id="L211">            FaceBookAccess.apiVersion = &quot;v&quot; + apiVersion;</span>
+        } else {
+<span class="nc" id="L213">            throw new IllegalArgumentException(&quot;version must be one of the following 1.0, 2.0, 2.1&quot;);</span>
+        }
+<span class="nc" id="L215">    }</span>
+
+    public Oauth2 createOAuth() {
+<span class="nc" id="L218">        String scope = &quot;&quot;;</span>
+<span class="nc bnc" id="L219" title="All 4 branches missed.">        if (permissions != null &amp;&amp; permissions.length &gt; 0) {</span>
+<span class="nc" id="L220">            int plen = permissions.length;</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            for (int i = 0; i &lt; plen; i++) {</span>
+<span class="nc" id="L222">                String permission = permissions[i];</span>
+<span class="nc" id="L223">                scope += permission + &quot;,&quot;;</span>
+            }
+<span class="nc" id="L225">            scope = scope.substring(0, scope.length() - 1);</span>
+        }
+<span class="nc" id="L227">        Hashtable additionalParams = new Hashtable();</span>
+<span class="nc" id="L228">        String p = Display.getInstance().getPlatformName();</span>
+        //on simulator BB and J2ME use the popup display (no need for javascript)
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (Display.getInstance().getProperty(&quot;OS&quot;, &quot;SE&quot;).equals(&quot;SE&quot;) ||</span>
+<span class="nc bnc" id="L231" title="All 4 branches missed.">                p.equals(&quot;rim&quot;) || p.equals(&quot;me&quot;)) {</span>
+<span class="nc" id="L232">            additionalParams.put(&quot;display&quot;, &quot;popup&quot;);</span>
+        } else {
+<span class="nc" id="L234">            additionalParams.put(&quot;display&quot;, &quot;touch&quot;);</span>
+        }
+<span class="nc" id="L236">        return new Oauth2(&quot;https://www.facebook.com/dialog/oauth&quot;, clientId, redirectURI, scope, &quot;https://graph.facebook.com/oauth/access_token&quot;, clientSecret, additionalParams);</span>
+    }
+
+    /**
+     * This method creates a component which can authenticate. You will receive either the
+     * authentication key or an Exception object within the ActionListener callback method.
+     *
+     * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to perform the authentication
+     */
+    public Component createAuthComponent(final ActionListener al) {
+<span class="nc" id="L247">        return createOAuth().createAuthComponent(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">                if (evt.getSource() instanceof String) {</span>
+<span class="nc" id="L251">                    token = (String) evt.getSource();</span>
+                }
+<span class="nc" id="L253">                al.actionPerformed(evt);</span>
+<span class="nc" id="L254">            }</span>
+        });
+    }
+
+    /**
+     * This method shows an authentication for login form
+     *
+     * @param al a listener that will receive at its source either a token for
+     *           the service or an exception in case of a failure
+     */
+    public void showAuthentication(final ActionListener al) {
+<span class="nc" id="L265">        createOAuth().showAuthentication(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                if (evt.getSource() instanceof String) {</span>
+<span class="nc" id="L269">                    token = (String) evt.getSource();</span>
+                }
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                if (evt.getSource() instanceof AccessToken) {</span>
+<span class="nc" id="L272">                    AccessToken t = (AccessToken) evt.getSource();</span>
+<span class="nc" id="L273">                    token = t.getToken();</span>
+
+                }
+<span class="nc" id="L276">                al.actionPerformed(evt);</span>
+<span class="nc" id="L277">            }</span>
+        });
+<span class="nc" id="L279">    }</span>
+
+    /**
+     * This method returns true if the user is authenticated to the facebook service.
+     *
+     * @return true if authenticated
+     */
+    public boolean isAuthenticated() {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        return token != null;</span>
+    }
+
+    private void checkAuthentication() throws IOException {
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (!isAuthenticated()) {</span>
+<span class="nc" id="L292">            throw new IOException(&quot;service is not authenticated, call public void authenticate(String clientId, String redirectURI, String [] permissions) first&quot;);</span>
+        }
+<span class="nc" id="L294">    }</span>
+
+    /**
+     * Sets the progress indicator to get network updates on the queries
+     *
+     * @param slider
+     */
+    public void setProgress(Slider slider) {
+<span class="nc" id="L302">        this.slider = slider;</span>
+<span class="nc" id="L303">    }</span>
+
+    /**
+     * This method returns immediately and will call the callback when it returns with
+     * the FaceBook Object data.
+     *
+     * @param faceBookId the object id that we would like to query
+     * @param callback   the callback that should be updated when the data arrives
+     */
+    public void getFaceBookObject(String faceBookId, final ActionListener callback) throws IOException {
+<span class="nc" id="L313">        checkAuthentication();</span>
+<span class="nc" id="L314">        final FacebookRESTService con = new FacebookRESTService(token, faceBookId, &quot;&quot;, false);</span>
+<span class="nc" id="L315">        con.addResponseListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                if (!con.isAlive()) {</span>
+<span class="nc" id="L319">                    return;</span>
+                }
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L322">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L324">            }</span>
+        });
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L327">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L329" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L330">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L332">        current = con;</span>
+<span class="nc" id="L333">        NetworkManager.getInstance().addToQueue(con);</span>
+<span class="nc" id="L334">    }</span>
+
+    /**
+     * This method returns immediately and will call the callback when it returns with
+     * the FaceBook Object data.
+     *
+     * @param faceBookId the object id that we would like to query
+     * @param callback   the callback that should be updated when the data arrives
+     * @param needToken  if true authentication is being checked
+     */
+    public void getFaceBookObject(String faceBookId, final ActionListener callback, boolean needToken, boolean async) throws IOException {
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (needToken) {</span>
+<span class="nc" id="L346">            checkAuthentication();</span>
+        }
+<span class="nc" id="L348">        final FacebookRESTService con = new FacebookRESTService(token, faceBookId, &quot;&quot;, false);</span>
+<span class="nc" id="L349">        con.addResponseListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                if (!con.isAlive()) {</span>
+<span class="nc" id="L353">                    return;</span>
+                }
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L356">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L358">            }</span>
+        });
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L361">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L364">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L366">        current = con;</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (async) {</span>
+<span class="nc" id="L368">            NetworkManager.getInstance().addToQueue(con);</span>
+        } else {
+<span class="nc" id="L370">            NetworkManager.getInstance().addToQueueAndWait(con);</span>
+        }
+<span class="nc" id="L372">    }</span>
+
+    /**
+     * Get a list of FaceBook objects for a given id
+     *
+     * @param faceBookId      the id to preform the query upon
+     * @param itemsConnection the type of the query
+     * @param feed
+     * @param params
+     * @param callback        the callback that should be updated when the data arrives
+     */
+    public void getFaceBookObjectItems(String faceBookId, String itemsConnection,
+                                       final DefaultListModel feed, Hashtable params, final ActionListener callback) throws IOException {
+<span class="nc" id="L385">        checkAuthentication();</span>
+
+<span class="nc" id="L387">        final FacebookRESTService con = new FacebookRESTService(token, faceBookId, itemsConnection, false);</span>
+<span class="nc" id="L388">        con.setResponseDestination(feed);</span>
+<span class="nc" id="L389">        con.addResponseListener(new Listener(con, callback));</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">        if (params != null) {</span>
+<span class="nc" id="L391">            Enumeration keys = params.keys();</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">            while (keys.hasMoreElements()) {</span>
+<span class="nc" id="L393">                String key = (String) keys.nextElement();</span>
+<span class="nc" id="L394">                con.addArgument(key, (String) params.get(key));</span>
+<span class="nc" id="L395">            }</span>
+        }
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L398">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L401">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L403">        current = con;</span>
+<span class="nc" id="L404">        NetworkManager.getInstance().addToQueue(con);</span>
+<span class="nc" id="L405">    }</span>
+
+    /**
+     * Gets a user from a user id
+     *
+     * @param userId   the user id or null to get detaild on the authenticated user
+     * @param user     an object to fill with the user details
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getUser(String userId, final User user, final ActionListener callback) throws IOException {
+<span class="nc" id="L415">        String id = userId;</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L417">            id = &quot;me&quot;;</span>
+        }
+<span class="nc" id="L419">        getFaceBookObject(id, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L422">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L423">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">                if (user != null) {</span>
+<span class="nc" id="L425">                    user.copy(t);</span>
+                }
+<span class="nc bnc" id="L427" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L428">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L430">            }</span>
+        });
+<span class="nc" id="L432">    }</span>
+
+    /**
+     * Gets a User from a user id
+     * This is a sync method it will block until a response it returned
+     *
+     * @param userId the user id or null to get details on the authenticated user
+     * @return the User requested
+     */
+    public User getUser(String userId) throws IOException {
+<span class="nc" id="L442">        String id = userId;</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L444">            id = &quot;me&quot;;</span>
+        }
+<span class="nc" id="L446">        final User user = new User();</span>
+<span class="nc" id="L447">        final Vector err = new Vector();</span>
+<span class="nc" id="L448">        addResponseCodeListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L451">                NetworkEvent ne = (NetworkEvent) evt;</span>
+<span class="nc" id="L452">                err.addElement(ne);</span>
+<span class="nc" id="L453">                removeResponseCodeListener(this);</span>
+<span class="nc" id="L454">            }</span>
+        });
+<span class="nc" id="L456">        getFaceBookObject(id, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L459">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L460">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc" id="L461">                user.copy(t);</span>
+<span class="nc" id="L462">            }</span>
+        }, true, false);
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        if (err.size() &gt; 0) {</span>
+<span class="nc" id="L465">            throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + &quot;: &quot; + ((NetworkEvent) err.elementAt(0)).getMessage());</span>
+        }
+
+<span class="nc" id="L468">        return user;</span>
+    }
+
+    /**
+     * Gets a Page from a pageId/name
+     * This is a sync method it will block until a response it returned
+     *
+     * @param pageId the pageId
+     * @return the Page requested
+     */
+    public Page getPage(String pageId) throws IOException {
+<span class="nc" id="L479">        final Page page = new Page();</span>
+<span class="nc" id="L480">        final Vector err = new Vector();</span>
+<span class="nc" id="L481">        addResponseCodeListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L484">                NetworkEvent ne = (NetworkEvent) evt;</span>
+<span class="nc" id="L485">                err.addElement(ne);</span>
+<span class="nc" id="L486">                removeResponseCodeListener(this);</span>
+<span class="nc" id="L487">            }</span>
+        });
+<span class="nc" id="L489">        getFaceBookObject(pageId, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L492">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L493">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc" id="L494">                page.copy(t);</span>
+<span class="nc" id="L495">            }</span>
+        }, false, false);
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        if (err.size() &gt; 0) {</span>
+<span class="nc" id="L498">            throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + &quot;: &quot; + ((NetworkEvent) err.elementAt(0)).getMessage());</span>
+        }
+<span class="nc" id="L500">        return page;</span>
+    }
+
+    /**
+     * Gest a post from a post Id
+     *
+     * @param postId   the postId
+     * @param post     an Object to fill with the data
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getPost(String postId, final Post post, final ActionListener callback) throws IOException {
+<span class="nc" id="L511">        getFaceBookObject(postId, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L514">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L515">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc bnc" id="L516" title="All 2 branches missed.">                if (post != null) {</span>
+<span class="nc" id="L517">                    post.copy(t);</span>
+                }
+<span class="nc bnc" id="L519" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L520">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L522">            }</span>
+        });
+<span class="nc" id="L524">    }</span>
+
+    /**
+     * Gets a Post from a postId
+     * This is a sync method it will block until a response it returned
+     *
+     * @param postId   the post id
+     * @param needAuth if this object is public needAuth can be false and no
+     *                 authentication will be performed
+     * @return the Post requested
+     */
+    public Post getPost(String postId, boolean needAuth) throws IOException {
+<span class="nc" id="L536">        final Post post = new Post();</span>
+<span class="nc" id="L537">        final Vector err = new Vector();</span>
+<span class="nc" id="L538">        addResponseCodeListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L541">                NetworkEvent ne = (NetworkEvent) evt;</span>
+<span class="nc" id="L542">                err.addElement(ne);</span>
+<span class="nc" id="L543">                removeResponseCodeListener(this);</span>
+<span class="nc" id="L544">            }</span>
+        });
+<span class="nc" id="L546">        getFaceBookObject(postId, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L549">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L550">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc" id="L551">                post.copy(t);</span>
+
+<span class="nc" id="L553">            }</span>
+        }, needAuth, false);
+<span class="nc bnc" id="L555" title="All 2 branches missed.">        if (err.size() &gt; 0) {</span>
+<span class="nc" id="L556">            throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + &quot;: &quot; + ((NetworkEvent) err.elementAt(0)).getMessage());</span>
+        }
+<span class="nc" id="L558">        return post;</span>
+    }
+
+    /**
+     * Gest a photo from a photo Id
+     *
+     * @param photoId  the photoId
+     * @param photo    an Object to fill with the data
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getPhoto(String photoId, final Photo photo, final ActionListener callback) throws IOException {
+<span class="nc" id="L569">        getFaceBookObject(photoId, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L572">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L573">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc bnc" id="L574" title="All 2 branches missed.">                if (photo != null) {</span>
+<span class="nc" id="L575">                    photo.copy(t);</span>
+                }
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L578">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L580">            }</span>
+        });
+<span class="nc" id="L582">    }</span>
+
+    /**
+     * Gets a Photo from a photoId
+     * This is a sync method it will block until a response it returned
+     *
+     * @param the      photoId
+     * @param needAuth if this object is public needAuth can be false and no
+     *                 authentication will be performed
+     * @return the Photo requested
+     */
+    public Photo getPhoto(String photoId, boolean needAuth) throws IOException {
+<span class="nc" id="L594">        final Photo photo = new Photo();</span>
+<span class="nc" id="L595">        final Vector err = new Vector();</span>
+
+<span class="nc" id="L597">        addResponseCodeListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L600">                NetworkEvent ne = (NetworkEvent) evt;</span>
+<span class="nc" id="L601">                err.addElement(ne);</span>
+<span class="nc" id="L602">                removeResponseCodeListener(this);</span>
+<span class="nc" id="L603">            }</span>
+        });
+<span class="nc" id="L605">        getFaceBookObject(photoId, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L608">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L609">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc" id="L610">                photo.copy(t);</span>
+<span class="nc" id="L611">            }</span>
+        }, needAuth, false);
+<span class="nc bnc" id="L613" title="All 2 branches missed.">        if (err.size() &gt; 0) {</span>
+<span class="nc" id="L614">            throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + &quot;: &quot; + ((NetworkEvent) err.elementAt(0)).getMessage());</span>
+        }
+<span class="nc" id="L616">        return photo;</span>
+    }
+
+    /**
+     * Gest an album from an albumId
+     *
+     * @param albumId  the albumId
+     * @param album    an Object to fill with the data
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getAlbum(String albumId, final Album album, final ActionListener callback) throws IOException {
+<span class="nc" id="L627">        getFaceBookObject(albumId, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L630">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L631">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc bnc" id="L632" title="All 2 branches missed.">                if (album != null) {</span>
+<span class="nc" id="L633">                    album.copy(t);</span>
+                }
+<span class="nc bnc" id="L635" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L636">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L638">            }</span>
+        });
+<span class="nc" id="L640">    }</span>
+
+    /**
+     * Gets a Album from a albumId
+     * This is a sync method it will block until a response it returned
+     *
+     * @param the      albumId
+     * @param needAuth if this object is public needAuth can be false and no
+     *                 authentication will be performed
+     * @return the Album requested
+     */
+    public Album getAlbum(String albumId, boolean needAuth) throws IOException {
+<span class="nc" id="L652">        final Album album = new Album();</span>
+<span class="nc" id="L653">        final Vector err = new Vector();</span>
+<span class="nc" id="L654">        addResponseCodeListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L657">                NetworkEvent ne = (NetworkEvent) evt;</span>
+<span class="nc" id="L658">                err.addElement(ne);</span>
+<span class="nc" id="L659">                removeResponseCodeListener(this);</span>
+<span class="nc" id="L660">            }</span>
+        });
+<span class="nc" id="L662">        getFaceBookObject(albumId, new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L665">                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();</span>
+<span class="nc" id="L666">                Hashtable t = (Hashtable) v.elementAt(0);</span>
+<span class="nc" id="L667">                album.copy(t);</span>
+<span class="nc" id="L668">            }</span>
+        }, needAuth, false);
+<span class="nc bnc" id="L670" title="All 2 branches missed.">        if (err.size() &gt; 0) {</span>
+<span class="nc" id="L671">            throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + &quot;: &quot; + ((NetworkEvent) err.elementAt(0)).getMessage());</span>
+        }
+<span class="nc" id="L673">        return album;</span>
+    }
+
+    /**
+     * Gets the user news feed, the data is being stored in the given DefaultListModel.
+     * By default this method will return last 13 news entries.
+     *
+     * @param userId   the userid we would like to query
+     * @param feed     the response to fill
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getNewsFeed(String userId, final DefaultListModel feed, final ActionListener callback) throws IOException {
+<span class="nc" id="L685">        getNewsFeed(userId, feed, 13, callback);</span>
+<span class="nc" id="L686">    }</span>
+
+    /**
+     * Gets the user news feed, the data is being stored in the given DefaultListModel.
+     *
+     * @param userId   the userid we would like to query
+     * @param feed     the response to fill
+     * @param limit    the number of items to return
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getNewsFeed(String userId, final DefaultListModel feed, int limit, final ActionListener callback) throws IOException {
+<span class="nc" id="L697">        Hashtable params = new Hashtable();</span>
+<span class="nc" id="L698">        params.put(&quot;limit&quot;, &quot;&quot; + limit);</span>
+<span class="nc" id="L699">        getFaceBookObjectItems(userId, FacebookRESTService.HOME, feed, params, callback);</span>
+<span class="nc" id="L700">    }</span>
+
+    /**
+     * Gets the user wall feed, the data is being stored in the given DefaultListModel.
+     * By default this method will return last 13 news entries.
+     *
+     * @param userId   the userid we would like to query
+     * @param feed     the response fo fill
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getWallFeed(String userId, DefaultListModel feed, final ActionListener callback) throws IOException {
+<span class="nc" id="L711">        getWallFeed(userId, feed, 13, callback);</span>
+<span class="nc" id="L712">    }</span>
+
+    /**
+     * Gets the user wall feed, the data is being stored in the given DefaultListModel.
+     *
+     * @param userId   the userid we would like to query
+     * @param feed     the response to fill
+     * @param limit    the number of items to return
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getWallFeed(String userId, DefaultListModel feed, int limit, final ActionListener callback) throws IOException {
+<span class="nc" id="L723">        Hashtable params = new Hashtable();</span>
+<span class="nc" id="L724">        params.put(&quot;limit&quot;, &quot;&quot; + limit);</span>
+<span class="nc" id="L725">        getFaceBookObjectItems(userId, FacebookRESTService.FEED, feed, params, callback);</span>
+<span class="nc" id="L726">    }</span>
+
+    /**
+     * Gets the user wall feed, the data is being stored in the given DefaultListModel.
+     * By default this method will return last 13 news entries.
+     *
+     * @param userId   the userid we would like to query
+     * @param feed     the response fo fill
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getWallPosts(String userId, DefaultListModel feed, final ActionListener callback) throws IOException {
+<span class="nc" id="L737">        getWallPosts(userId, feed, 13, callback);</span>
+<span class="nc" id="L738">    }</span>
+
+    /**
+     * Gets the user wall posts, the data is being stored in the given DefaultListModel.
+     *
+     * @param userId   the userid we would like to query
+     * @param feed     the response to fill
+     * @param limit    the number of items to return
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getWallPosts(String userId, DefaultListModel feed, int limit, final ActionListener callback) throws IOException {
+<span class="nc" id="L749">        Hashtable params = new Hashtable();</span>
+<span class="nc" id="L750">        params.put(&quot;limit&quot;, &quot;&quot; + limit);</span>
+<span class="nc" id="L751">        getFaceBookObjectItems(userId, FacebookRESTService.POSTS, feed, params, callback);</span>
+<span class="nc" id="L752">    }</span>
+
+    /**
+     * Gets the picture of the given facebook object id
+     *
+     * @param id          the object id to query
+     * @param label       place the image on the given label as an icon
+     * @param toScale     scale the image to the given dimension
+     * @param tempStorage if true place the image in a temp storage
+     */
+    public void getPicture(String id, final Label label, Dimension toScale, boolean tempStorage) throws IOException {
+<span class="nc" id="L763">        checkAuthentication();</span>
+
+<span class="nc" id="L765">        FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);</span>
+<span class="nc bnc" id="L766" title="All 2 branches missed.">        if (toScale != null) {</span>
+<span class="nc" id="L767">            fb.addArgument(&quot;width&quot;, &quot;&quot; + toScale.getWidth());</span>
+<span class="nc" id="L768">            fb.addArgument(&quot;height&quot;, &quot;&quot; + toScale.getHeight());</span>
+        } else {
+<span class="nc" id="L770">            fb.addArgument(&quot;type&quot;, &quot;small&quot;);</span>
+        }
+<span class="nc" id="L772">        String cacheKey = id;</span>
+        //check if this image is a temporarey resource and it is not saved
+        //already has a permanent image
+<span class="nc bnc" id="L775" title="All 4 branches missed.">        if (tempStorage &amp;&amp; !Storage.getInstance().exists(id)) {</span>
+<span class="nc" id="L776">            cacheKey = TEMP_STORAGE + id;</span>
+        }
+<span class="nc" id="L778">        ImageDownloadService.createImageToStorage(fb.requestURL(), label, cacheKey, toScale);</span>
+<span class="nc" id="L779">    }</span>
+
+    /**
+     * Gets the picture of the given facebook object id
+     *
+     * @param id          the object id to query
+     * @param callback    the callback that should be updated when the data arrives
+     * @param toScale     picture dimension or null
+     * @param tempStorage if true place the image in a temp storage
+     */
+    public void getPicture(String id, final ActionListener callback, Dimension toScale, boolean tempStorage) throws IOException {
+<span class="nc" id="L790">        checkAuthentication();</span>
+
+<span class="nc" id="L792">        FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">        if (toScale != null) {</span>
+<span class="nc" id="L794">            fb.addArgument(&quot;width&quot;, &quot;&quot; + toScale.getWidth());</span>
+<span class="nc" id="L795">            fb.addArgument(&quot;height&quot;, &quot;&quot; + toScale.getHeight());</span>
+        } else {
+<span class="nc" id="L797">            fb.addArgument(&quot;type&quot;, &quot;small&quot;);</span>
+        }
+<span class="nc" id="L799">        String cacheKey = id;</span>
+        //check if this image is a temporarey resource and it is not saved
+        //already has a permanent image
+<span class="nc bnc" id="L802" title="All 4 branches missed.">        if (tempStorage &amp;&amp; !Storage.getInstance().exists(id)) {</span>
+<span class="nc" id="L803">            cacheKey = TEMP_STORAGE + id;</span>
+        }
+<span class="nc" id="L805">        ImageDownloadService.createImageToStorage(fb.requestURL(), callback, cacheKey);</span>
+<span class="nc" id="L806">    }</span>
+
+    /**
+     * Gets the picture of the given facebook object id
+     *
+     * @param id      the object id to query
+     * @param toScale picture dimension or null
+     * @return the picture
+     */
+    public EncodedImage getPictureAndWait(String id, Dimension toScale) {
+<span class="nc" id="L816">        ImageDownloadService im = new ImageDownloadService(getImageURL(id, toScale), (ActionListener) null);</span>
+<span class="nc" id="L817">        NetworkManager.getInstance().addToQueueAndWait(im);</span>
+<span class="nc" id="L818">        return im.getResult();</span>
+    }
+
+    /**
+     * Returns the URL for a given image
+     *
+     * @param id      the id of the image
+     * @param toScale the resolution we want
+     * @return a link that should fetch that image
+     */
+    public String getImageURL(String id, Dimension toScale) {
+        try {
+<span class="nc" id="L830">            checkAuthentication();</span>
+
+<span class="nc" id="L832">            FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">            if (toScale != null) {</span>
+<span class="nc" id="L834">                fb.addArgument(&quot;width&quot;, &quot;&quot; + toScale.getWidth());</span>
+<span class="nc" id="L835">                fb.addArgument(&quot;height&quot;, &quot;&quot; + toScale.getHeight());</span>
+            } else {
+<span class="nc" id="L837">                fb.addArgument(&quot;type&quot;, &quot;thumbnail&quot;);</span>
+            }
+<span class="nc" id="L839">            return fb.requestURL();</span>
+<span class="nc" id="L840">        } catch (IOException err) {</span>
+<span class="nc" id="L841">            return null;</span>
+        }
+    }
+
+    /**
+     * Gets the picture of the given facebook object id and stores it in the given List in the offset index
+     * &lt;p&gt;
+     * This assumes the GenericListCellRenderer style of
+     * list which relies on a hashtable based model approach.
+     *
+     * @param id           the object id to query
+     * @param targetList   the list that should be updated when the data arrives
+     * @param targetOffset the offset within the list to insert the image
+     * @param targetKey    the key for the hashtable in the target offset
+     * @param toScale      the scale of the image to put in the List or null
+     * @param tempStorage  if true place the image in a temp storage
+     */
+    public void getPicture(String id, final Component targetList, final int targetOffset, final String targetKey,
+                           Dimension toScale, boolean tempStorage) throws IOException {
+<span class="nc" id="L860">        checkAuthentication();</span>
+
+<span class="nc" id="L862">        FacebookRESTService fb = new FacebookRESTService(token, id, FacebookRESTService.PICTURE, false);</span>
+<span class="nc bnc" id="L863" title="All 2 branches missed.">        if (toScale != null) {</span>
+<span class="nc" id="L864">            fb.addArgument(&quot;width&quot;, &quot;&quot; + toScale.getWidth());</span>
+<span class="nc" id="L865">            fb.addArgument(&quot;height&quot;, &quot;&quot; + toScale.getHeight());</span>
+        } else {
+<span class="nc" id="L867">            fb.addArgument(&quot;type&quot;, &quot;small&quot;);</span>
+        }
+<span class="nc" id="L869">        String cacheKey = id;</span>
+        //check if this image is a temporarey resource and it is not saved
+        //already has a permanent image
+<span class="nc bnc" id="L872" title="All 4 branches missed.">        if (tempStorage &amp;&amp; !Storage.getInstance().exists(id)) {</span>
+<span class="nc" id="L873">            cacheKey = TEMP_STORAGE + id;</span>
+        }
+
+<span class="nc" id="L876">        ImageDownloadService.createImageToStorage(fb.requestURL(), targetList, targetOffset, targetKey, cacheKey, toScale, ConnectionRequest.PRIORITY_LOW);</span>
+<span class="nc" id="L877">    }</span>
+
+    /**
+     * Gets the photo thumbnail of a Photo Object
+     *
+     * @param photoId     the photo id
+     * @param callback    the callback that should be updated when the data arrives
+     * @param tempStorage if true place the image in a temp storage
+     */
+    public void getPhotoThumbnail(String photoId, final ActionListener callback, boolean tempStorage) throws IOException {
+<span class="nc" id="L887">        checkAuthentication();</span>
+
+<span class="nc" id="L889">        FacebookRESTService fb = new FacebookRESTService(token, photoId, FacebookRESTService.PICTURE, false);</span>
+<span class="nc" id="L890">        fb.addArgument(&quot;type&quot;, &quot;small&quot;);</span>
+<span class="nc" id="L891">        String cacheKey = photoId;</span>
+        //check if this image is a temporarey resource and it is not saved
+        //already has a permanent image
+<span class="nc bnc" id="L894" title="All 4 branches missed.">        if (tempStorage &amp;&amp; !Storage.getInstance().exists(photoId)) {</span>
+<span class="nc" id="L895">            cacheKey = TEMP_STORAGE + photoId;</span>
+        }
+<span class="nc" id="L897">        ImageDownloadService.createImageToStorage(fb.requestURL(), callback, cacheKey);</span>
+<span class="nc" id="L898">    }</span>
+
+    /**
+     * Gets the photo thumbnail of a Photo Object
+     *
+     * @param photoId     the photo id
+     * @param label       place the image on the given label as an icon
+     * @param toScale     scale the image to the given dimension
+     * @param tempStorage if true place the image in a temp storage
+     */
+    public void getPhotoThumbnail(String photoId, final Label label, Dimension toScale, boolean tempStorage) throws IOException {
+<span class="nc" id="L909">        checkAuthentication();</span>
+
+<span class="nc" id="L911">        FacebookRESTService fb = new FacebookRESTService(token, photoId, FacebookRESTService.PICTURE, false);</span>
+<span class="nc" id="L912">        fb.addArgument(&quot;type&quot;, &quot;thumbnail&quot;);</span>
+<span class="nc" id="L913">        String cacheKey = photoId;</span>
+        //check if this image is a temporarey resource and it is not saved
+        //already has a permanent image
+<span class="nc bnc" id="L916" title="All 4 branches missed.">        if (tempStorage &amp;&amp; !Storage.getInstance().exists(photoId)) {</span>
+<span class="nc" id="L917">            cacheKey = TEMP_STORAGE + photoId;</span>
+        }
+<span class="nc" id="L919">        ImageDownloadService.createImageToStorage(fb.requestURL(), label, cacheKey, toScale);</span>
+<span class="nc" id="L920">    }</span>
+
+    /**
+     * Gets the user friends
+     *
+     * @param userId   the id
+     * @param friends  store friends results into the given model,
+     *                 each entry is an Hashtable Object contaning the Object data
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getUserFriends(String userId, DefaultListModel friends, final ActionListener callback) throws IOException {
+<span class="nc" id="L931">        getFaceBookObjectItems(userId, FacebookRESTService.FRIENDS, friends, null, callback);</span>
+<span class="nc" id="L932">    }</span>
+
+    /**
+     * Gets the user albums
+     *
+     * @param userId   the id
+     * @param albums   store albums results into the given model,
+     *                 each entry is an Hashtable Object contaning the Object data
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getUserAlbums(String userId, DefaultListModel albums, final ActionListener callback) throws IOException {
+<span class="nc" id="L943">        getFaceBookObjectItems(userId, FacebookRESTService.ALBUMS, albums, null, callback);</span>
+<span class="nc" id="L944">    }</span>
+
+    /**
+     * Gets the albums photos
+     *
+     * @param albumId  the id
+     * @param photos   store photos results into the given model,
+     *                 each entry is an Hashtable Object contaning the Object data
+     * @param offset   the offset of the photo in the album
+     * @param limit    amount of photos to bring
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getAlbumPhotos(String albumId, DefaultListModel photos, int offset, int limit, final ActionListener callback) throws IOException {
+<span class="nc" id="L957">        Hashtable params = new Hashtable();</span>
+<span class="nc" id="L958">        params.put(&quot;limit&quot;, &quot;&quot; + limit);</span>
+<span class="nc" id="L959">        params.put(&quot;offset&quot;, &quot;&quot; + offset);</span>
+
+<span class="nc" id="L961">        getFaceBookObjectItems(albumId, FacebookRESTService.PHOTOS, photos, params, callback);</span>
+<span class="nc" id="L962">    }</span>
+
+    /**
+     * Gets the post comments
+     *
+     * @param postId   the id
+     * @param comments store comments results into the given model,
+     *                 each entry is an Hashtable Object contaning the Object data
+     * @param callback the callback that should be updated when the data arrives
+     */
+    // PMD Fix (UnusedPrivateMethod): Removed unused album photo ListModel helper.
+    public void getPostComments(String postId, DefaultListModel comments, final ActionListener callback) throws IOException {
+<span class="nc" id="L974">        getFaceBookObjectItems(postId, FacebookRESTService.COMMENTS, comments, null, callback);</span>
+<span class="nc" id="L975">    }</span>
+
+    /**
+     * Gets the user inbox Threads
+     *
+     * @param userId   the id
+     * @param threads  store threads results into the given model,
+     *                 each entry is an Hashtable Object contaning the Object data
+     * @param limit    the amount of thread to return
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getUserInboxThreads(String userId, DefaultListModel threads, int limit, final ActionListener callback) throws IOException {
+<span class="nc" id="L987">        Hashtable params = new Hashtable();</span>
+<span class="nc" id="L988">        params.put(&quot;limit&quot;, &quot;&quot; + limit);</span>
+<span class="nc" id="L989">        getFaceBookObjectItems(userId, FacebookRESTService.INBOX, threads, params, callback);</span>
+<span class="nc" id="L990">    }</span>
+
+    /**
+     * Post a message on the users wall
+     *
+     * @param userId  the userId
+     * @param message the message to post
+     */
+    public void postOnWall(String userId, String message) throws IOException {
+<span class="nc" id="L999">        postOnWall(userId, message, null);</span>
+<span class="nc" id="L1000">    }</span>
+
+    /**
+     * Post like on a given post
+     *
+     * @param postId the post Id
+     */
+    public void postLike(String postId) throws IOException {
+<span class="nc" id="L1008">        postLike(postId, null);</span>
+<span class="nc" id="L1009">    }</span>
+
+    /**
+     * Post a comment on a given post
+     *
+     * @param postId  the post id
+     * @param message the message to post
+     */
+    public void postComment(String postId, String message) throws IOException {
+<span class="nc" id="L1018">        postComment(postId, message, null);</span>
+<span class="nc" id="L1019">    }</span>
+
+    /**
+     * Post a note onto the users wall
+     *
+     * @param userId  the userId
+     * @param message the message to post
+     */
+    public void createNote(String userId, String subject, String message) throws IOException {
+<span class="nc" id="L1028">        createNote(userId, subject, message, null);</span>
+<span class="nc" id="L1029">    }</span>
+
+    /**
+     * Post a message on the users wall
+     *
+     * @param userId  the userId
+     * @param message the message to post
+     */
+    public void postOnWall(String userId, String message, ActionListener callback) throws IOException {
+<span class="nc" id="L1038">        checkAuthentication();</span>
+
+<span class="nc" id="L1040">        FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.FEED, true);</span>
+<span class="nc" id="L1041">        con.addArgument(&quot;message&quot;, message);</span>
+<span class="nc" id="L1042">        con.addResponseListener(new Listener(con, callback));</span>
+<span class="nc bnc" id="L1043" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L1044">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L1047">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L1049">        current = con;</span>
+<span class="nc" id="L1050">        NetworkManager.getInstance().addToQueueAndWait(con);</span>
+<span class="nc" id="L1051">    }</span>
+
+    /**
+     * Post a message on the users wall
+     *
+     * @param userId      the userId
+     * @param message     the message to post
+     * @param name
+     * @param link
+     * @param description
+     * @param picture
+     * @param caption
+     */
+    public void postOnWall(String userId, String message, String name, String link,
+                           String description, String picture, String caption, ActionListener callback) throws IOException {
+<span class="nc" id="L1066">        checkAuthentication();</span>
+
+<span class="nc" id="L1068">        FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.FEED, true);</span>
+<span class="nc bnc" id="L1069" title="All 2 branches missed.">        if (message != null) {</span>
+<span class="nc" id="L1070">            con.addArgument(&quot;message&quot;, message);</span>
+        }
+<span class="nc bnc" id="L1072" title="All 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L1073">            con.addArgument(&quot;name&quot;, name);</span>
+        }
+<span class="nc bnc" id="L1075" title="All 2 branches missed.">        if (link != null) {</span>
+<span class="nc" id="L1076">            con.addArgument(&quot;link&quot;, link);</span>
+        }
+<span class="nc bnc" id="L1078" title="All 2 branches missed.">        if (description != null) {</span>
+<span class="nc" id="L1079">            con.addArgument(&quot;description&quot;, description);</span>
+        }
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">        if (picture != null) {</span>
+<span class="nc" id="L1082">            con.addArgument(&quot;picture&quot;, picture);</span>
+        }
+<span class="nc bnc" id="L1084" title="All 2 branches missed.">        if (caption != null) {</span>
+<span class="nc" id="L1085">            con.addArgument(&quot;caption&quot;, caption);</span>
+        }
+<span class="nc" id="L1087">        con.addResponseListener(new Listener(con, callback));</span>
+<span class="nc bnc" id="L1088" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L1089">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L1091" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L1092">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L1094">        current = con;</span>
+<span class="nc" id="L1095">        NetworkManager.getInstance().addToQueueAndWait(con);</span>
+<span class="nc" id="L1096">    }</span>
+
+    /**
+     * Post like on a given post
+     *
+     * @param postId the post Id
+     */
+    public void postLike(String postId, ActionListener callback) throws IOException {
+<span class="nc" id="L1104">        checkAuthentication();</span>
+<span class="nc" id="L1105">        FacebookRESTService con = new FacebookRESTService(token, postId, FacebookRESTService.LIKES, true);</span>
+<span class="nc" id="L1106">        con.addResponseListener(new Listener(con, callback));</span>
+<span class="nc bnc" id="L1107" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L1108">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L1110" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L1111">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L1113">        current = con;</span>
+<span class="nc" id="L1114">        NetworkManager.getInstance().addToQueueAndWait(con);</span>
+<span class="nc" id="L1115">    }</span>
+
+    /**
+     * Post a comment on a given post
+     *
+     * @param postId  the post id
+     * @param message the message to post
+     */
+    public void postComment(String postId, String message, ActionListener callback) throws IOException {
+<span class="nc" id="L1124">        checkAuthentication();</span>
+
+<span class="nc" id="L1126">        FacebookRESTService con = new FacebookRESTService(token, postId, FacebookRESTService.COMMENTS, true);</span>
+<span class="nc" id="L1127">        con.addResponseListener(new Listener(con, callback));</span>
+<span class="nc" id="L1128">        con.addArgument(&quot;message&quot;, message);</span>
+<span class="nc bnc" id="L1129" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L1130">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L1132" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L1133">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L1135">        current = con;</span>
+<span class="nc" id="L1136">        NetworkManager.getInstance().addToQueueAndWait(con);</span>
+<span class="nc" id="L1137">    }</span>
+
+    /**
+     * Post a note onto the users wall
+     *
+     * @param userId  the userId
+     * @param message the message to post
+     */
+    public void createNote(String userId, String subject, String message, ActionListener callback) throws IOException {
+<span class="nc" id="L1146">        checkAuthentication();</span>
+
+<span class="nc" id="L1148">        FacebookRESTService con = new FacebookRESTService(token, userId, FacebookRESTService.NOTES, true);</span>
+<span class="nc" id="L1149">        con.addResponseListener(new Listener(con, callback));</span>
+<span class="nc" id="L1150">        con.addArgument(&quot;subject&quot;, subject);</span>
+<span class="nc" id="L1151">        con.addArgument(&quot;message&quot;, message);</span>
+<span class="nc bnc" id="L1152" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L1153">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L1156">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L1158">        current = con;</span>
+<span class="nc" id="L1159">        System.out.println(con.getUrl());</span>
+<span class="nc" id="L1160">        NetworkManager.getInstance().addToQueueAndWait(con);</span>
+<span class="nc" id="L1161">    }</span>
+
+    /**
+     * Gets the user notifications (this method uses the legacy rest api see http://developers.facebook.com/docs/reference/rest/)
+     *
+     * @param userId        the user id
+     * @param startTime     Indicates the earliest time to return a notification.
+     *                      This equates to the updated_time field in the notification FQL table. If not specified, this call returns all available notifications.
+     * @param includeRead   Indicates whether to include notifications that have already been read.
+     *                      By default, notifications a user has read are not included.
+     * @param notifications store notifications results into the given model,
+     *                      each entry is an Hashtable Object contaning the Object data
+     * @param callback      the callback that should be updated when the data arrives
+     */
+    public void getUserNotifications(String userId, String startTime, boolean includeRead,
+                                     DefaultListModel notifications, final ActionListener callback) throws IOException {
+<span class="nc" id="L1177">        checkAuthentication();</span>
+
+<span class="nc" id="L1179">        final FacebookRESTService con = new FacebookRESTService(token, &quot;https://api.facebook.com/method/notifications.getList&quot;, false);</span>
+<span class="nc" id="L1180">        con.addArgument(&quot;start_time&quot;, startTime);</span>
+        // PMD Fix (UnnecessaryConversionTemporary, PrimitiveWrapperInstantiation): Avoid boxing boolean via constructor and temporary string while staying compatible with Codename One APIs.
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">        con.addArgument(&quot;include_read&quot;, includeRead ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="nc" id="L1183">        con.addArgument(&quot;format&quot;, &quot;json&quot;);</span>
+
+<span class="nc" id="L1185">        con.setResponseDestination(notifications);</span>
+<span class="nc" id="L1186">        con.addResponseListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1189" title="All 2 branches missed.">                if (!con.isAlive()) {</span>
+<span class="nc" id="L1190">                    return;</span>
+                }
+<span class="nc bnc" id="L1192" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L1193">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L1195">            }</span>
+        });
+
+<span class="nc bnc" id="L1198" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L1199">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L1201" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L1202">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L1204">        current = con;</span>
+<span class="nc" id="L1205">        NetworkManager.getInstance().addToQueue(con);</span>
+<span class="nc" id="L1206">    }</span>
+
+    /**
+     * Gets users requested details ((this method uses the legacy rest api see http://developers.facebook.com/docs/reference/rest/))
+     *
+     * @param usersIds the users to query
+     * @param fields   which fields to query on the users see http://developers.facebook.com/docs/reference/rest/users.getInfo/
+     * @param callback the result will call the callback with the result
+     *                 to extrct the data preform the following:
+     *                 public void actionPerformed(ActionEvent evt) {
+     *                 Vector data = (Vector) ((NetworkEvent) evt).getMetaData();
+     *                 Vector users = (Vector) data.elementAt(0);
+     *                 }
+     */
+    public void getUsersDetails(String[] usersIds, String[] fields, final ActionListener callback) throws IOException {
+<span class="nc" id="L1221">        checkAuthentication();</span>
+
+<span class="nc" id="L1223">        final FacebookRESTService con = new FacebookRESTService(token, &quot;https://api.facebook.com/method/users.getInfo&quot;, false);</span>
+<span class="nc" id="L1224">        String ids = usersIds[0];</span>
+<span class="nc" id="L1225">        int ulen = usersIds.length;</span>
+<span class="nc bnc" id="L1226" title="All 2 branches missed.">        for (int i = 1; i &lt; ulen; i++) {</span>
+<span class="nc" id="L1227">            ids += &quot;,&quot; + usersIds[i];</span>
+
+        }
+<span class="nc" id="L1230">        con.addArgumentNoEncoding(&quot;uids&quot;, ids);</span>
+
+<span class="nc" id="L1232">        String fieldsStr = fields[0];</span>
+<span class="nc" id="L1233">        int flen = fields.length;</span>
+<span class="nc bnc" id="L1234" title="All 2 branches missed.">        for (int i = 1; i &lt; flen; i++) {</span>
+<span class="nc" id="L1235">            fieldsStr += &quot;,&quot; + fields[i];</span>
+
+        }
+<span class="nc" id="L1238">        con.addArgumentNoEncoding(&quot;fields&quot;, fieldsStr);</span>
+<span class="nc" id="L1239">        con.addArgument(&quot;format&quot;, &quot;json&quot;);</span>
+
+<span class="nc" id="L1241">        con.addResponseListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1244" title="All 2 branches missed.">                if (!con.isAlive()) {</span>
+<span class="nc" id="L1245">                    return;</span>
+                }
+<span class="nc bnc" id="L1247" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L1248">                    callback.actionPerformed(evt);</span>
+                }
+<span class="nc" id="L1250">            }</span>
+        });
+<span class="nc bnc" id="L1252" title="All 2 branches missed.">        if (slider != null) {</span>
+<span class="nc" id="L1253">            SliderBridge.bindProgress(con, slider);</span>
+        }
+<span class="nc bnc" id="L1255" title="All 2 branches missed.">        for (int i = 0; i &lt; responseCodeListeners.size(); i++) {</span>
+<span class="nc" id="L1256">            con.addResponseCodeListener((ActionListener) responseCodeListeners.elementAt(i));</span>
+        }
+<span class="nc" id="L1258">        current = con;</span>
+<span class="nc" id="L1259">        NetworkManager.getInstance().addToQueue(con);</span>
+<span class="nc" id="L1260">    }</span>
+
+    /**
+     * Gets the user events
+     *
+     * @param userId   the user id
+     * @param events   store events results into the given model,
+     *                 each entry is an Hashtable Object contaning the Object data
+     * @param callback the callback that should be updated when the data arrives
+     */
+    public void getUserEvents(String userId, DefaultListModel events, final ActionListener callback) throws IOException {
+<span class="nc" id="L1271">        getFaceBookObjectItems(userId, FacebookRESTService.EVENTS, events, null, callback);</span>
+<span class="nc" id="L1272">    }</span>
+
+    /**
+     * Serach for facebook objects
+     *
+     * @param objectType one of each: post, user, page, event, group, place, checkin
+     * @param query      the query string to search for
+     * @param results    store results onto the given model,
+     *                   each entry is an Hashtable Object contaning the Object data
+     * @param callback   the callback that should be updated when the data arrives
+     */
+    public void search(String objectType, String query, DefaultListModel results, ActionListener callback) throws IOException {
+<span class="nc" id="L1284">        Hashtable params = new Hashtable();</span>
+<span class="nc" id="L1285">        params.put(&quot;q&quot;, query);</span>
+<span class="nc" id="L1286">        params.put(&quot;type&quot;, objectType);</span>
+
+<span class="nc" id="L1288">        getFaceBookObjectItems(&quot;search&quot;, &quot;&quot;, results, params, callback);</span>
+<span class="nc" id="L1289">    }</span>
+
+    /**
+     * Kills the current request.
+     */
+    public void killCurrentRequest() {
+<span class="nc" id="L1295">        current.kill();</span>
+<span class="nc" id="L1296">    }</span>
+
+    /**
+     * Adds a response listener on the requests
+     *
+     * @param a response listener
+     */
+    public void addResponseCodeListener(ActionListener a) {
+<span class="nc" id="L1304">        responseCodeListeners.addElement(a);</span>
+<span class="nc" id="L1305">    }</span>
+
+    /**
+     * Removes a response listener
+     */
+    public void removeResponseCodeListener(ActionListener a) {
+<span class="nc" id="L1311">        responseCodeListeners.removeElement(a);</span>
+<span class="nc" id="L1312">    }</span>
+
+    /**
+     * Deletes all temp storage.
+     */
+    public void cleanTempStorage() {
+<span class="nc" id="L1318">        String[] entries = Storage.getInstance().listEntries();</span>
+<span class="nc" id="L1319">        int elen = entries.length;</span>
+<span class="nc bnc" id="L1320" title="All 2 branches missed.">        for (int i = 0; i &lt; elen; i++) {</span>
+<span class="nc" id="L1321">            String key = entries[i];</span>
+<span class="nc bnc" id="L1322" title="All 2 branches missed.">            if (key.startsWith(TEMP_STORAGE)) {</span>
+<span class="nc" id="L1323">                Storage.getInstance().deleteStorageFile(key);</span>
+            }
+        }
+<span class="nc" id="L1326">    }</span>
+
+    class Listener implements ActionListener {
+        private final FacebookRESTService con;
+        private final ActionListener callback;
+
+<span class="nc" id="L1332">        Listener(FacebookRESTService con, ActionListener callback) {</span>
+<span class="nc" id="L1333">            this.con = con;</span>
+<span class="nc" id="L1334">            this.callback = callback;</span>
+<span class="nc" id="L1335">        }</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1338" title="All 2 branches missed.">            if (!con.isAlive()) {</span>
+<span class="nc" id="L1339">                return;</span>
+            }
+<span class="nc bnc" id="L1341" title="All 2 branches missed.">            if (callback != null) {</span>
+<span class="nc" id="L1342">                callback.actionPerformed(evt);</span>
+            }
+<span class="nc" id="L1344">        }</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

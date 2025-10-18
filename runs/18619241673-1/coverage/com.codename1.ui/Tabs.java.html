@@ -1,0 +1,1767 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tabs.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Tabs.java</span></div><h1>Tabs.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+/**
+ * &lt;p&gt;A component that lets the user switch between a group of components by
+ * clicking on a tab with a given title and/or icon.&lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * Tabs/components are added to a &lt;code&gt;Tabs&lt;/code&gt; object by using the
+ * &lt;code&gt;addTab&lt;/code&gt; and &lt;code&gt;insertTab&lt;/code&gt; methods.
+ * A tab is represented by an index corresponding
+ * to the position it was added in, where the first tab has an index equal to 0
+ * and the last tab has an index equal to the tab count minus 1.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * The &lt;code&gt;Tabs&lt;/code&gt; uses a &lt;code&gt;SingleSelectionModel&lt;/code&gt;
+ * to represent the set of tab indices and the currently selected index.
+ * If the tab count is greater than 0, then there will always be a selected
+ * index, which by default will be initialized to the first tab.
+ * If the tab count is 0, then the selected index will be -1.
+ * &lt;/p&gt;
+ * &lt;p&gt;A simple {@code Tabs} sample looks a bit like this:&lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/ba27124a0a25e685b123.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-tabs.png&quot; alt=&quot;Simple usage of Tabs&quot; /&gt;
+ * &lt;p&gt;
+ * The &lt;code&gt;Tabs&lt;/code&gt; allows swiping on the X-axis (by default) but also on the Y-axis (&lt;a href=&quot;https://youtu.be/9CxqFGOYAU0&quot;&gt;demo video&lt;/a&gt;):
+ * &lt;script src=&quot;https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the
+ * form and swiping is used to move between pages:&lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/e981c3f91f98f1515987.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-tabs-swipe1.png&quot; alt=&quot;Tabs carousel page 1&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-tabs-swipe2.png&quot; alt=&quot;Tabs carousel page 2&quot; /&gt;
+ *
+ * @author Chen Fishbein
+ */
+public class Tabs extends Container {
+<span class="fc" id="L75">    private final Container contentPane = new Container(new TabsLayout());</span>
+    private boolean eagerSwipeMode;
+
+    /**
+     * Where the tabs are placed.
+     */
+    private int tabPlacement;
+    private final Container tabsContainer;
+<span class="fc" id="L83">    private final ButtonGroup radioGroup = new ButtonGroup();</span>
+    private Component selectedTab;
+<span class="fc" id="L85">    private boolean swipeActivated = true;</span>
+<span class="fc" id="L86">    private boolean swipeOnXAxis = true;</span>
+
+    private final ActionListener press;
+    private final ActionListener drag;
+    private final ActionListener release;
+    private Motion slideToDestMotion;
+<span class="fc" id="L92">    private int initialX = -1;</span>
+<span class="fc" id="L93">    private int initialY = -1;</span>
+<span class="fc" id="L94">    private int lastX = -1;</span>
+<span class="fc" id="L95">    private int lastY = -1;</span>
+<span class="fc" id="L96">    private boolean dragStarted = false;</span>
+<span class="fc" id="L97">    private int activeComponent = 0;</span>
+<span class="fc" id="L98">    private int active = 0;</span>
+
+    private EventDispatcher focusListeners;
+    private EventDispatcher selectionListener;
+    private final TabFocusListener focusListener;
+    private boolean tabsFillRows;
+    private boolean tabsGridLayout;
+<span class="fc" id="L105">    private int textPosition = -1;</span>
+    private boolean changeTabOnFocus;
+    private boolean changeTabContainerStyleOnFocus;
+<span class="fc" id="L108">    private int tabsGap = 0;</span>
+    private Style originalTabsContainerUnselected, originalTabsContainerSelected;
+<span class="fc" id="L110">    private String tabUIID = &quot;Tab&quot;;</span>
+<span class="fc" id="L111">    private boolean animateTabSelection = true;</span>
+    // A flag that is used internally to temporarily override the output of the
+    // shouldBlockSideSwipe method, so that we don't block our own side swipes.
+    private boolean doNotBlockSideSwipe;
+    private boolean blockSwipe;
+    private boolean riskySwipe;
+
+    /**
+     * Creates an empty &lt;code&gt;TabbedPane&lt;/code&gt; with a default
+     * tab placement of &lt;code&gt;Component.TOP&lt;/code&gt;.
+     */
+    public Tabs() {
+<span class="fc" id="L123">        this(-1);</span>
+<span class="fc" id="L124">    }</span>
+
+
+    /**
+     * Creates an empty &lt;code&gt;TabbedPane&lt;/code&gt; with the specified tab placement
+     * of either: &lt;code&gt;Component.TOP&lt;/code&gt;, &lt;code&gt;Component.BOTTOM&lt;/code&gt;,
+     * &lt;code&gt;Component.LEFT&lt;/code&gt;, or &lt;code&gt;Component.RIGHT&lt;/code&gt;.
+     *
+     * @param tabP the placement for the tabs relative to the content
+     */
+    public Tabs(int tabP) {
+<span class="fc" id="L135">        super(new BorderLayout());</span>
+<span class="fc" id="L136">        focusListener = new TabFocusListener();</span>
+<span class="fc" id="L137">        contentPane.setUIID(&quot;TabbedPane&quot;);</span>
+<span class="fc" id="L138">        super.addComponent(BorderLayout.CENTER, contentPane);</span>
+<span class="fc" id="L139">        tabsContainer = new Container();</span>
+<span class="fc" id="L140">        tabsContainer.setSafeArea(true);</span>
+<span class="fc" id="L141">        tabsContainer.setUIID(&quot;TabsContainer&quot;);</span>
+<span class="fc" id="L142">        tabsContainer.setScrollVisible(false);</span>
+<span class="fc" id="L143">        tabsContainer.getStyle().setMargin(0, 0, 0, 0);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (tabP == -1) {</span>
+<span class="fc" id="L145">            setTabPlacement(tabPlacement);</span>
+        } else {
+<span class="nc" id="L147">            setTabPlacement(tabP);</span>
+        }
+<span class="fc" id="L149">        press = new SwipeListener(SwipeListener.PRESS);</span>
+<span class="fc" id="L150">        drag = new SwipeListener(SwipeListener.DRAG);</span>
+<span class="fc" id="L151">        release = new SwipeListener(SwipeListener.RELEASE);</span>
+<span class="fc" id="L152">        setUIID(&quot;Tabs&quot;);</span>
+<span class="fc" id="L153">        BorderLayout bd = (BorderLayout) super.getLayout();</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (bd != null) {</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (UIManager.getInstance().isThemeConstant(&quot;tabsOnTopBool&quot;, false)) {</span>
+<span class="nc" id="L156">                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);</span>
+            } else {
+<span class="fc" id="L158">                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+            }
+        }
+
+<span class="fc" id="L162">    }</span>
+
+    @Override
+    protected boolean shouldBlockSideSwipe() {
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (doNotBlockSideSwipe) {</span>
+<span class="nc" id="L167">            return false;</span>
+        }
+<span class="nc" id="L169">        return isSwipeActivated();</span>
+    }
+
+    private void checkTabsCanBeSeen() {
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (UIManager.getInstance().isThemeConstant(&quot;tabsOnTopBool&quot;, false)) {</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            for (int iter = 0; iter &lt; getTabCount(); iter++) {</span>
+<span class="nc" id="L175">                Component c = getTabComponentAt(iter);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                if (c.isScrollableY()) {</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                    if (c.getStyle().getPaddingBottom() &lt; tabsContainer.getPreferredH()) {</span>
+<span class="nc" id="L178">                        c.getStyle().setPadding(BOTTOM, tabsContainer.getPreferredH());</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L183">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initLaf(UIManager manager) {
+<span class="fc" id="L189">        super.initLaf(manager);</span>
+<span class="fc" id="L190">        int tabPlace = manager.getThemeConstant(&quot;tabPlacementInt&quot;, -1);</span>
+<span class="fc" id="L191">        tabsFillRows = manager.isThemeConstant(&quot;tabsFillRowsBool&quot;, false);</span>
+<span class="fc" id="L192">        tabsGridLayout = manager.isThemeConstant(&quot;tabsGridBool&quot;, false);</span>
+<span class="fc" id="L193">        changeTabOnFocus = manager.isThemeConstant(&quot;changeTabOnFocusBool&quot;, false);</span>
+<span class="fc" id="L194">        BorderLayout bd = (BorderLayout) super.getLayout();</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (bd != null) {</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (manager.isThemeConstant(&quot;tabsOnTopBool&quot;, false)) {</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (bd.getCenterBehavior() != BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW) {</span>
+<span class="nc" id="L198">                    bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW);</span>
+<span class="nc" id="L199">                    checkTabsCanBeSeen();</span>
+                }
+            } else {
+<span class="nc" id="L202">                bd.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+            }
+        }
+<span class="fc" id="L205">        changeTabContainerStyleOnFocus = manager.isThemeConstant(&quot;changeTabContainerStyleOnFocusBool&quot;, false);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (tabPlace != -1) {</span>
+<span class="nc" id="L207">            tabPlacement = tabPlace;</span>
+        }
+<span class="fc" id="L209">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    void initComponentImpl() {
+<span class="nc" id="L215">        super.initComponentImpl();</span>
+<span class="nc" id="L216">        Form frm = getComponentForm();</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (frm != null) {</span>
+<span class="nc" id="L218">            frm.registerAnimatedInternal(this);</span>
+<span class="nc bnc" id="L219" title="All 4 branches missed.">            if (changeTabContainerStyleOnFocus &amp;&amp; Display.getInstance().shouldRenderSelection()) {</span>
+<span class="nc" id="L220">                Component f = getComponentForm().getFocused();</span>
+<span class="nc bnc" id="L221" title="All 4 branches missed.">                if (f != null &amp;&amp; f.getParent() == tabsContainer) {</span>
+<span class="nc" id="L222">                    initTabsContainerStyle();</span>
+<span class="nc" id="L223">                    tabsContainer.setUnselectedStyle(originalTabsContainerSelected);</span>
+<span class="nc" id="L224">                    tabsContainer.repaint();</span>
+                }
+            }
+        }
+<span class="nc" id="L228">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void refreshTheme(boolean merge) {
+<span class="nc" id="L234">        super.refreshTheme(merge);</span>
+<span class="nc" id="L235">        originalTabsContainerSelected = null;</span>
+<span class="nc" id="L236">        originalTabsContainerUnselected = null;</span>
+<span class="nc" id="L237">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void deinitialize() {
+<span class="nc" id="L243">        Form form = this.getComponentForm();</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (form != null) {</span>
+<span class="nc" id="L245">            form.removePointerPressedListener(press);</span>
+<span class="nc" id="L246">            form.removePointerReleasedListener(release);</span>
+<span class="nc" id="L247">            form.removePointerDraggedListener(drag);</span>
+        }
+<span class="nc" id="L249">        super.deinitialize();</span>
+<span class="nc" id="L250">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initComponent() {
+<span class="nc" id="L256">        super.initComponent();</span>
+<span class="nc" id="L257">        Form form = this.getComponentForm();</span>
+<span class="nc bnc" id="L258" title="All 4 branches missed.">        if (form != null &amp;&amp; swipeActivated) {</span>
+<span class="nc" id="L259">            form.addPointerPressedListener(press);</span>
+<span class="nc" id="L260">            form.addPointerReleasedListener(release);</span>
+<span class="nc" id="L261">            form.addPointerDraggedListener(drag);</span>
+        }
+<span class="nc" id="L263">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean animate() {
+<span class="nc" id="L269">        boolean b = super.animate();</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        if (slideToDestMotion != null) {</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (swipeOnXAxis) {</span>
+<span class="nc" id="L272">                int motionX = slideToDestMotion.getValue();</span>
+<span class="nc" id="L273">                final int size = contentPane.getComponentCount();</span>
+<span class="nc" id="L274">                int tabWidth = contentPane.getWidth() - tabsGap * 2;</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">                for (int i = 0; i &lt; size; i++) {</span>
+                    int xOffset;
+<span class="nc bnc" id="L277" title="All 2 branches missed.">                    if (isRTL()) {</span>
+<span class="nc" id="L278">                        xOffset = (size - i) * tabWidth;</span>
+<span class="nc" id="L279">                        xOffset -= ((size - active) * tabWidth);</span>
+                    } else {
+<span class="nc" id="L281">                        xOffset = i * tabWidth;</span>
+<span class="nc" id="L282">                        xOffset -= (active * tabWidth);</span>
+                    }
+<span class="nc" id="L284">                    xOffset += motionX;</span>
+<span class="nc" id="L285">                    Component component = contentPane.getComponentAt(i);</span>
+<span class="nc" id="L286">                    component.setX(xOffset);</span>
+                }
+<span class="nc" id="L288">            } else {</span>
+<span class="nc" id="L289">                int motionY = slideToDestMotion.getValue();</span>
+<span class="nc" id="L290">                final int size = contentPane.getComponentCount();</span>
+<span class="nc" id="L291">                int tabHeight = contentPane.getHeight() - tabsGap * 2;</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                for (int i = 0; i &lt; size; i++) {</span>
+                    int yOffset;
+<span class="nc" id="L294">                    yOffset = i * tabHeight;</span>
+<span class="nc" id="L295">                    yOffset -= (active * tabHeight);</span>
+<span class="nc" id="L296">                    yOffset += motionY;</span>
+<span class="nc" id="L297">                    Component component = contentPane.getComponentAt(i);</span>
+<span class="nc" id="L298">                    component.setY(yOffset);</span>
+                }
+            }
+<span class="nc bnc" id="L301" title="All 2 branches missed.">            if (slideToDestMotion.isFinished()) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                for (int i = 0; i &lt; contentPane.getComponentCount(); i++) {</span>
+<span class="nc" id="L303">                    Component component = contentPane.getComponentAt(i);</span>
+<span class="nc" id="L304">                    component.paintLockRelease();</span>
+                }
+<span class="nc" id="L306">                slideToDestMotion = null;</span>
+<span class="nc" id="L307">                enableLayoutOnPaint = true;</span>
+<span class="nc" id="L308">                deregisterAnimatedInternal();</span>
+<span class="nc" id="L309">                setSelectedIndex(active);</span>
+            }
+<span class="nc" id="L311">            return true;</span>
+        }
+<span class="nc" id="L313">        return b;</span>
+    }
+
+    void deregisterAnimatedInternal() {
+<span class="nc bnc" id="L317" title="All 4 branches missed.">        if (slideToDestMotion == null || (slideToDestMotion.isFinished())) {</span>
+<span class="nc" id="L318">            Form f = getComponentForm();</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            if (f != null) {</span>
+<span class="nc" id="L320">                f.deregisterAnimatedInternal(this);</span>
+            }
+        }
+<span class="nc" id="L323">    }</span>
+
+    /**
+     * Invokes set text position on the given tab, the tab should be a toggle button radio by default but
+     * can be anything
+     *
+     * @param tabComponent the component representing the tab
+     * @param textPosition the text position
+     */
+    protected void setTextPosition(Component tabComponent, int textPosition) {
+<span class="nc" id="L333">        ((Button) tabComponent).setTextPosition(textPosition);</span>
+<span class="nc" id="L334">    }</span>
+
+    /**
+     * Returns The position of the text relative to the icon
+     *
+     * @return The position of the text relative to the icon, one of: LEFT, RIGHT, BOTTOM, TOP
+     * @see #LEFT
+     * @see #RIGHT
+     * @see #BOTTOM
+     * @see #TOP
+     */
+    public int getTabTextPosition() {
+<span class="nc" id="L346">        return textPosition;</span>
+    }
+
+    /**
+     * Sets the position of the text relative to the icon if exists
+     *
+     * @param textPosition alignment value (LEFT, RIGHT, BOTTOM or TOP)
+     * @see #LEFT
+     * @see #RIGHT
+     * @see #BOTTOM
+     * @see #TOP
+     */
+    public void setTabTextPosition(int textPosition) {
+<span class="nc bnc" id="L359" title="All 8 branches missed.">        if (textPosition != LEFT &amp;&amp; textPosition != RIGHT &amp;&amp; textPosition != BOTTOM &amp;&amp; textPosition != TOP) {</span>
+<span class="nc" id="L360">            throw new IllegalArgumentException(&quot;Text position can't be set to &quot; + textPosition);</span>
+        }
+<span class="nc" id="L362">        this.textPosition = textPosition;</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        for (int iter = 0; iter &lt; getTabCount(); iter++) {</span>
+<span class="nc" id="L364">            setTextPosition(tabsContainer.getComponentAt(iter), textPosition);</span>
+        }
+<span class="nc" id="L366">    }</span>
+
+    /**
+     * Adds a &lt;code&gt;component&lt;/code&gt;
+     * represented by a &lt;code&gt;title&lt;/code&gt; and/or &lt;code&gt;icon&lt;/code&gt;,
+     * either of which can be &lt;code&gt;null&lt;/code&gt;.
+     * Cover method for &lt;code&gt;insertTab&lt;/code&gt;.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      the icon to be displayed in this tab
+     * @param component the component to be displayed when this tab is clicked
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public void addTab(String title, Image icon, Component component) {
+<span class="nc" id="L381">        insertTab(title, icon, component, tabsContainer.getComponentCount());</span>
+<span class="nc" id="L382">    }</span>
+
+    /**
+     * Adds a &lt;code&gt;component&lt;/code&gt;
+     * represented by a &lt;code&gt;title&lt;/code&gt; and/or &lt;code&gt;icon&lt;/code&gt;,
+     * either of which can be &lt;code&gt;null&lt;/code&gt;.
+     * Cover method for &lt;code&gt;insertTab&lt;/code&gt;.
+     *
+     * @param title       the title to be displayed in this tab
+     * @param icon        the icon to be displayed in this tab
+     * @param pressedIcon the icon shown when the tab is selected
+     * @param component   the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, Image icon, Image pressedIcon, Component component) {
+<span class="nc" id="L399">        int index = tabsContainer.getComponentCount();</span>
+<span class="nc" id="L400">        insertTab(title, icon, component, index);</span>
+<span class="nc" id="L401">        setTabSelectedIcon(index, pressedIcon);</span>
+<span class="nc" id="L402">        return this;</span>
+    }
+
+    /**
+     * Adds a &lt;code&gt;component&lt;/code&gt;
+     * represented by a &lt;code&gt;title&lt;/code&gt; and/or &lt;code&gt;icon&lt;/code&gt;,
+     * either of which can be &lt;code&gt;null&lt;/code&gt;.
+     * Cover method for &lt;code&gt;insertTab&lt;/code&gt;.
+     *
+     * @param title        the title to be displayed in this tab
+     * @param materialIcon one of the material design icon constants from {@link com.codename1.ui.FontImage}
+     * @param iconSize     icon size in millimeters
+     * @param component    the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
+<span class="nc" id="L420">        insertTab(title, materialIcon, FontImage.getMaterialDesignFont(), iconSize, component,</span>
+<span class="nc" id="L421">                tabsContainer.getComponentCount());</span>
+<span class="nc" id="L422">        return this;</span>
+    }
+
+    /**
+     * Adds a &lt;code&gt;component&lt;/code&gt;
+     * represented by a &lt;code&gt;title&lt;/code&gt; and/or &lt;code&gt;icon&lt;/code&gt;,
+     * either of which can be &lt;code&gt;null&lt;/code&gt;.
+     * Cover method for &lt;code&gt;insertTab&lt;/code&gt;.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      an icon from the font
+     * @param font      the font for the icon
+     * @param iconSize  icon size in millimeters
+     * @param component the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, char icon, Font font, float iconSize, Component component) {
+<span class="nc" id="L441">        int index = tabsContainer.getComponentCount();</span>
+<span class="nc" id="L442">        insertTab(title, icon, font, iconSize, component, index);</span>
+<span class="nc" id="L443">        return this;</span>
+    }
+
+    /**
+     * Adds a &lt;code&gt;component&lt;/code&gt;
+     * represented by a &lt;code&gt;title&lt;/code&gt; and no &lt;code&gt;icon&lt;/code&gt;.
+     * Cover method for &lt;code&gt;insertTab&lt;/code&gt;.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param component the component to be displayed when this tab is clicked
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public void addTab(String title, Component component) {
+<span class="fc" id="L457">        insertTab(title, null, component, tabsContainer.getComponentCount());</span>
+<span class="fc" id="L458">    }</span>
+
+    /**
+     * Adds a &lt;code&gt;component&lt;/code&gt;
+     * represented by a &lt;code&gt;button&lt;/code&gt;.
+     * Cover method for &lt;code&gt;insertTab&lt;/code&gt;.
+     * The Button styling will be associated with &quot;Tab&quot; UIID.
+     *
+     * @param tab       represents the tab on top
+     * @param component the component to be displayed when this tab is clicked
+     * @see #insertTab
+     * @see #removeTabAt
+     * @deprecated should use radio button as an argument
+     */
+    public void addTab(Button tab, Component component) {
+<span class="nc" id="L473">        insertTab(tab, component, tabsContainer.getComponentCount());</span>
+<span class="nc" id="L474">    }</span>
+
+    private Component createTabImpl(RadioButton b) {
+<span class="fc" id="L477">        radioGroup.add(b);</span>
+<span class="fc" id="L478">        b.setToggle(true);</span>
+<span class="fc" id="L479">        b.setTextPosition(BOTTOM);</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (radioGroup.getButtonCount() == 1) {</span>
+<span class="fc" id="L481">            b.setSelected(true);</span>
+        }
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">        if (textPosition != -1) {</span>
+<span class="nc" id="L484">            b.setTextPosition(textPosition);</span>
+        }
+
+<span class="pc bpc" id="L487" title="2 of 4 branches missed.">        if (b.getIcon() == null &amp;&amp; !getUIManager().isThemeConstant(&quot;TabEnableAutoImageBool&quot;, true)) {</span>
+<span class="nc" id="L488">            Image d = getUIManager().getThemeImageConstant(&quot;TabUnselectedImage&quot;);</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">            if (d != null) {</span>
+<span class="nc" id="L490">                b.setIcon(d);</span>
+<span class="nc" id="L491">                d = getUIManager().getThemeImageConstant(&quot;TabSelectedImage&quot;);</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">                if (d != null) {</span>
+<span class="nc" id="L493">                    b.setRolloverIcon(d);</span>
+<span class="nc" id="L494">                    b.setPressedIcon(d);</span>
+                }
+            }
+        }
+<span class="fc" id="L498">        return b;</span>
+    }
+
+    /**
+     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
+     *
+     * @param title the title of the tab
+     * @param icon  an icon from the font
+     * @param font  the font for the icon
+     * @return component instance
+     */
+    protected Component createTab(String title, Font font, char icon, float size) {
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        RadioButton b = new RadioButton(title != null ? title : &quot;&quot;);</span>
+<span class="nc" id="L511">        FontImage.setIcon(b, font, icon, size);</span>
+<span class="nc" id="L512">        createTabImpl(b);</span>
+<span class="nc" id="L513">        return b;</span>
+    }
+
+    /**
+     * Creates a tab component by default this is a RadioButton but subclasses can use this to return anything
+     *
+     * @param title the title of the tab
+     * @param icon  the icon of the tab
+     * @return component instance
+     */
+    protected Component createTab(String title, Image icon) {
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">        RadioButton b = new RadioButton(title != null ? title : &quot;&quot;, icon);</span>
+<span class="fc" id="L525">        createTabImpl(b);</span>
+<span class="fc" id="L526">        return b;</span>
+    }
+
+    /**
+     * Inserts a &lt;code&gt;component&lt;/code&gt;, at &lt;code&gt;index&lt;/code&gt;,
+     * represented by a &lt;code&gt;title&lt;/code&gt; and/or &lt;code&gt;icon&lt;/code&gt;,
+     * either of which may be &lt;code&gt;null&lt;/code&gt;.
+     * Uses java.util.Vector internally, see &lt;code&gt;insertElementAt&lt;/code&gt;
+     * for details of insertion conventions.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      the icon to be displayed in this tab
+     * @param component The component to be displayed when this tab is clicked.
+     * @param index     the position to insert this new tab
+     * @see #addTab
+     * @see #removeTabAt
+     */
+    public void insertTab(String title, Image icon, Component component,
+                          int index) {
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        Component b = createTab(title != null ? title : &quot;&quot;, icon);</span>
+<span class="fc" id="L546">        insertTab(b, component, index);</span>
+<span class="fc" id="L547">    }</span>
+
+    /**
+     * Inserts a &lt;code&gt;component&lt;/code&gt;, at &lt;code&gt;index&lt;/code&gt;,
+     * represented by a &lt;code&gt;title&lt;/code&gt; and/or &lt;code&gt;icon&lt;/code&gt;,
+     * either of which may be &lt;code&gt;null&lt;/code&gt;.
+     * Uses java.util.Vector internally, see &lt;code&gt;insertElementAt&lt;/code&gt;
+     * for details of insertion conventions.
+     *
+     * @param title     the title to be displayed in this tab
+     * @param icon      an icon from the font
+     * @param font      the font for the icon
+     * @param component The component to be displayed when this tab is clicked.
+     * @param index     the position to insert this new tab
+     * @see #addTab
+     * @see #removeTabAt
+     */
+    public void insertTab(String title, char icon, Font font, float iconSize, Component component,
+                          int index) {
+<span class="nc bnc" id="L566" title="All 2 branches missed.">        Component b = createTab(title != null ? title : &quot;&quot;, font, icon, iconSize);</span>
+<span class="nc" id="L567">        insertTab(b, component, index);</span>
+<span class="nc" id="L568">    }</span>
+
+    /**
+     * Inserts a &lt;code&gt;component&lt;/code&gt;, at &lt;code&gt;index&lt;/code&gt;,
+     * represented by a &lt;code&gt;button&lt;/code&gt;
+     * Uses java.util.Vector internally, see &lt;code&gt;insertElementAt&lt;/code&gt;
+     * for details of insertion conventions.
+     * The Button styling will be associated with &quot;Tab&quot; UIID.
+     *
+     * @param tab       represents the tab on top
+     * @param component The component to be displayed when this tab is clicked.
+     * @param index     the position to insert this new tab
+     * @see #addTab
+     * @see #removeTabAt
+     * @deprecated should use radio button as an argument
+     */
+    public void insertTab(Component tab, Component component,
+                          int index) {
+<span class="fc" id="L586">        checkIndex(index);</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (component == null) {</span>
+<span class="nc" id="L588">            return;</span>
+        }
+<span class="fc" id="L590">        final Component b = tab;</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">        if (tabUIID != null) {</span>
+<span class="fc" id="L592">            b.setUIID(tabUIID);</span>
+        }
+
+<span class="fc" id="L595">        b.addFocusListener(focusListener);</span>
+
+<span class="fc" id="L597">        bindTabActionListener(b, new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+
+<span class="nc bnc" id="L600" title="All 2 branches missed.">                if (selectedTab != null) {</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">                    if (tabUIID != null) {</span>
+<span class="nc" id="L602">                        selectedTab.setUIID(tabUIID);</span>
+                    }
+<span class="nc bnc" id="L604" title="All 2 branches missed.">                    if (!animateTabSelection) {</span>
+<span class="nc" id="L605">                        selectedTab.setShouldCalcPreferredSize(true);</span>
+<span class="nc" id="L606">                        selectedTab.repaint();</span>
+                    }
+<span class="nc" id="L608">                    int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);</span>
+
+                    // this might happen if a tab was removed
+<span class="nc bnc" id="L611" title="All 2 branches missed.">                    if (previousSelectedIndex != -1) {</span>
+<span class="nc" id="L612">                        Component previousContent = contentPane.getComponentAt(previousSelectedIndex);</span>
+<span class="nc bnc" id="L613" title="All 2 branches missed.">                        if (previousContent instanceof Container) {</span>
+<span class="nc" id="L614">                            ((Container) previousContent).setBlockFocus(true);</span>
+                        }
+                    }
+                }
+<span class="nc bnc" id="L618" title="All 2 branches missed.">                if (active != tabsContainer.getComponentIndex(b)) {</span>
+<span class="nc" id="L619">                    active = tabsContainer.getComponentIndex(b);</span>
+<span class="nc" id="L620">                    Component content = contentPane.getComponentAt(active);</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">                    if (content instanceof Container) {</span>
+<span class="nc" id="L622">                        ((Container) content).setBlockFocus(false);</span>
+                    }
+<span class="nc" id="L624">                    setSelectedIndex(active, animateTabSelection);</span>
+<span class="nc" id="L625">                    initTabsFocus();</span>
+<span class="nc" id="L626">                    selectedTab = b;</span>
+<span class="nc bnc" id="L627" title="All 2 branches missed.">                    if (!animateTabSelection) {</span>
+<span class="nc" id="L628">                        selectedTab.setShouldCalcPreferredSize(true);</span>
+<span class="nc" id="L629">                        tabsContainer.revalidateLater();</span>
+                    }
+<span class="nc" id="L631">                    tabsContainer.scrollComponentToVisible(selectedTab);</span>
+                }
+<span class="nc" id="L633">            }</span>
+        });
+
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">        if (component instanceof Container) {</span>
+<span class="nc" id="L637">            ((Container) component).setBlockFocus(true);</span>
+        }
+
+<span class="fc" id="L640">        tabsContainer.addComponent(index, b);</span>
+<span class="fc" id="L641">        contentPane.addComponent(index, component);</span>
+<span class="fc" id="L642">        setTabsLayout(tabPlacement);</span>
+<span class="fc bfc" id="L643" title="All 2 branches covered.">        if (tabsContainer.getComponentCount() == 1) {</span>
+<span class="fc" id="L644">            selectedTab = tabsContainer.getComponentAt(0);</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">            if (component instanceof Container) {</span>
+<span class="nc" id="L646">                ((Container) component).setBlockFocus(false);</span>
+            }
+<span class="fc" id="L648">            initTabsFocus();</span>
+        }
+<span class="fc" id="L650">        checkTabsCanBeSeen();</span>
+<span class="fc" id="L651">    }</span>
+
+    /**
+     * Binds an action listener to the tab component. this method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @param l   the listener
+     */
+    protected void bindTabActionListener(Component tab, ActionListener l) {
+<span class="fc" id="L661">        ((Button) tab).addActionListener(l);</span>
+<span class="fc" id="L662">    }</span>
+
+    /**
+     * Updates the information about the tab details
+     *
+     * @param title the title to be displayed in this tab
+     * @param icon  the icon to be displayed in this tab
+     * @param index the position to insert this new tab
+     */
+    public void setTabTitle(String title, Image icon, int index) {
+<span class="nc" id="L672">        checkIndex(index);</span>
+<span class="nc" id="L673">        setTabTitle(tabsContainer.getComponentAt(index), title, icon);</span>
+<span class="nc" id="L674">    }</span>
+
+    /**
+     * Updates the tabs title . This method should be used when overriding
+     * createTab
+     *
+     * @param tab   the tab component
+     * @param title the title
+     * @param icon  the new icon
+     */
+    protected void setTabTitle(Component tab, String title, Image icon) {
+<span class="nc" id="L685">        Button b = (Button) tab;</span>
+<span class="nc" id="L686">        b.setText(title);</span>
+<span class="nc" id="L687">        b.setIcon(icon);</span>
+<span class="nc" id="L688">    }</span>
+
+    /**
+     * Returns the title of the tab at the given index
+     *
+     * @param index index for the tab
+     * @return label of the tab at the given index
+     */
+    public String getTabTitle(int index) {
+<span class="nc" id="L697">        checkIndex(index);</span>
+<span class="nc" id="L698">        return getTabTitle(tabsContainer.getComponentAt(index));</span>
+    }
+
+    /**
+     * Returns the title of the tab component. This method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @return label of the tab
+     */
+    protected String getTabTitle(Component tab) {
+<span class="nc" id="L709">        return ((Button) tab).getText();</span>
+    }
+
+    /**
+     * Returns the icon of the tab component. This method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @return icon of the tab
+     */
+    protected Image getTabIcon(Component tab) {
+<span class="nc" id="L720">        return ((Button) tab).getIcon();</span>
+    }
+
+    /**
+     * Returns the icon of the tab at the given index
+     *
+     * @param index index for the tab
+     * @return icon of the tab at the given index
+     */
+    public Image getTabIcon(int index) {
+<span class="nc" id="L730">        checkIndex(index);</span>
+<span class="nc" id="L731">        return getTabIcon(tabsContainer.getComponentAt(index));</span>
+    }
+
+    /**
+     * Returns the selected icon of the tab component. This method should be used when overriding
+     * createTab
+     *
+     * @param tab the tab component
+     * @return icon of the tab
+     */
+    protected Image getTabSelectedIcon(Component tab) {
+<span class="nc" id="L742">        return ((Button) tab).getPressedIcon();</span>
+    }
+
+    /**
+     * Returns the icon of the tab at the given index
+     *
+     * @param index index for the tab
+     * @return icon of the tab at the given index
+     */
+    public Image getTabSelectedIcon(int index) {
+<span class="nc" id="L752">        checkIndex(index);</span>
+<span class="nc" id="L753">        return getTabSelectedIcon(tabsContainer.getComponentAt(index));</span>
+    }
+
+    /**
+     * Sets the selected icon of the tab at the given index
+     *
+     * @param index index for the tab
+     * @param icon  of the tab at the given index
+     */
+    public void setTabSelectedIcon(int index, Image icon) {
+<span class="nc" id="L763">        checkIndex(index);</span>
+<span class="nc" id="L764">        setTabSelectedIcon(tabsContainer.getComponentAt(index), icon);</span>
+<span class="nc" id="L765">    }</span>
+
+    /**
+     * Sets the selected icon of the tab. This method should be used when overriding
+     * createTab
+     *
+     * @param tab  the tab component
+     * @param icon of the tab
+     */
+    protected void setTabSelectedIcon(Component tab, Image icon) {
+<span class="nc" id="L775">        ((Button) tab).setPressedIcon(icon);</span>
+<span class="nc" id="L776">    }</span>
+
+    /**
+     * Removes the tab at &lt;code&gt;index&lt;/code&gt;.
+     * After the component associated with &lt;code&gt;index&lt;/code&gt; is removed,
+     * its visibility is reset to true to ensure it will be visible
+     * if added to other containers.
+     *
+     * @param index the index of the tab to be removed
+     * @throws IndexOutOfBoundsException if index is out of range
+     *                                   (index &lt; 0 || index &gt;= tab count)
+     * @see #addTab
+     * @see #insertTab
+     */
+    public void removeTabAt(int index) {
+<span class="nc" id="L791">        checkIndex(index);</span>
+<span class="nc" id="L792">        int act = activeComponent - 1;</span>
+<span class="nc" id="L793">        act = Math.max(act, 0);</span>
+<span class="nc" id="L794">        setSelectedIndex(act);</span>
+<span class="nc" id="L795">        Component key = tabsContainer.getComponentAt(index);</span>
+<span class="nc" id="L796">        tabsContainer.removeComponent(key);</span>
+<span class="nc" id="L797">        Component content = contentPane.getComponentAt(index);</span>
+<span class="nc" id="L798">        contentPane.removeComponent(content);</span>
+<span class="nc" id="L799">        setTabsLayout(tabPlacement);</span>
+<span class="nc" id="L800">    }</span>
+
+    /**
+     * Returns the tab at &lt;code&gt;index&lt;/code&gt;.
+     *
+     * @param index the index of the tab to be removed
+     * @return the component at the given tab location
+     * @throws IndexOutOfBoundsException if index is out of range
+     *                                   (index &lt; 0 || index &gt;= tab count)
+     * @see #addTab
+     * @see #insertTab
+     */
+    public Component getTabComponentAt(int index) {
+<span class="fc" id="L813">        checkIndex(index);</span>
+<span class="fc" id="L814">        return contentPane.getComponentAt(index);</span>
+    }
+
+    private void checkIndex(int index) {
+<span class="pc bpc" id="L818" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt; tabsContainer.getComponentCount()) {</span>
+<span class="nc" id="L819">            throw new IndexOutOfBoundsException(&quot;Index: &quot; + index);</span>
+        }
+<span class="fc" id="L821">    }</span>
+
+    /**
+     * Returns the index of the tab for the specified component.
+     * Returns -1 if there is no tab for this component.
+     *
+     * @param component the component for the tab
+     * @return the first tab which matches this component, or -1
+     * if there is no tab for this component
+     */
+    public int indexOfComponent(Component component) {
+<span class="nc" id="L832">        return contentPane.getComponentIndex(component);</span>
+    }
+
+    /**
+     * Returns the number of tabs in this &lt;code&gt;tabbedpane&lt;/code&gt;.
+     *
+     * @return an integer specifying the number of tabbed pages
+     */
+    public int getTabCount() {
+<span class="fc" id="L841">        return tabsContainer.getComponentCount();</span>
+    }
+
+    /**
+     * Returns the currently selected index for this tabbedpane.
+     * Returns -1 if there is no currently selected tab.
+     *
+     * @return the index of the selected tab
+     */
+    public int getSelectedIndex() {
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">        if (tabsContainer != null) {</span>
+<span class="fc" id="L852">            return activeComponent;</span>
+        }
+<span class="nc" id="L854">        return -1;</span>
+    }
+
+    /**
+     * Sets the selected index for this tabbedpane. The index must be a valid
+     * tab index.
+     *
+     * @param index the index to be selected
+     * @throws IndexOutOfBoundsException if index is out of range
+     *                                   (index &lt; 0 || index &gt;= tab count)
+     */
+    public void setSelectedIndex(int index) {
+<span class="fc" id="L866">        setSelectedIndex(index, false);</span>
+<span class="fc" id="L867">    }</span>
+
+    /**
+     * Returns the component associated with the tab at the given index
+     *
+     * @return the component is now showing in the tabbed pane
+     */
+    public Component getSelectedComponent() {
+<span class="fc" id="L875">        int i = getSelectedIndex();</span>
+<span class="pc bpc" id="L876" title="1 of 2 branches missed.">        if (i == -1) {</span>
+<span class="nc" id="L877">            return null;</span>
+        }
+<span class="fc" id="L879">        return getTabComponentAt(i);</span>
+    }
+
+    /**
+     * Adds a focus listener to the tabs buttons
+     *
+     * @param listener FocusListener
+     * @deprecated use addSelectionListener instead
+     */
+    public void addTabsFocusListener(FocusListener listener) {
+<span class="nc bnc" id="L889" title="All 2 branches missed.">        if (focusListeners == null) {</span>
+<span class="nc" id="L890">            focusListeners = new EventDispatcher();</span>
+        }
+<span class="nc" id="L892">        focusListeners.addListener(listener);</span>
+<span class="nc" id="L893">    }</span>
+
+    /**
+     * Removes a foucs Listener from the tabs buttons
+     *
+     * @param listener FocusListener
+     * @deprecated use addSelectionListener instead
+     */
+    public void removeTabsFocusListener(FocusListener listener) {
+<span class="nc bnc" id="L902" title="All 2 branches missed.">        if (focusListeners != null) {</span>
+<span class="nc" id="L903">            focusListeners.removeListener(listener);</span>
+        }
+<span class="nc" id="L905">    }</span>
+
+    /**
+     * Adds a selection listener to the tabs.
+     *
+     * @param listener SelectionListener
+     */
+    public void addSelectionListener(SelectionListener listener) {
+<span class="nc bnc" id="L913" title="All 2 branches missed.">        if (selectionListener == null) {</span>
+<span class="nc" id="L914">            selectionListener = new EventDispatcher();</span>
+        }
+<span class="nc" id="L916">        selectionListener.addListener(listener);</span>
+<span class="nc" id="L917">    }</span>
+
+    /**
+     * Removes a selection Listener from the tabs
+     *
+     * @param listener SelectionListener
+     */
+    public void removeSelectionListener(SelectionListener listener) {
+<span class="nc bnc" id="L925" title="All 2 branches missed.">        if (selectionListener != null) {</span>
+<span class="nc" id="L926">            selectionListener.removeListener(listener);</span>
+        }
+<span class="nc" id="L928">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L934">        String className = getClass().getName();</span>
+<span class="nc" id="L935">        className = className.substring(className.lastIndexOf('.') + 1);</span>
+<span class="nc" id="L936">        return className + &quot;[x=&quot; + getX() + &quot; y=&quot; + getY() + &quot; width=&quot; +</span>
+<span class="nc" id="L937">                getWidth() + &quot; height=&quot; + getHeight() + &quot;, tab placement = &quot; +</span>
+<span class="nc" id="L938">                tabPlacement + &quot;, tab count = &quot; + getTabCount() +</span>
+<span class="nc" id="L939">                &quot;, selected index = &quot; + getSelectedIndex() + &quot;]&quot;;</span>
+    }
+
+    /**
+     * Returns the placement of the tabs for this tabbedpane.
+     *
+     * @return the tab placement value
+     * @see #setTabPlacement
+     */
+    public int getTabPlacement() {
+<span class="nc" id="L949">        return tabPlacement;</span>
+    }
+
+    /**
+     * Sets the tab placement for this tabbedpane.
+     * Possible values are:&lt;ul&gt;
+     * &lt;li&gt;&lt;code&gt;Component.TOP&lt;/code&gt;
+     * &lt;li&gt;&lt;code&gt;Component.BOTTOM&lt;/code&gt;
+     * &lt;li&gt;&lt;code&gt;Component.LEFT&lt;/code&gt;
+     * &lt;li&gt;&lt;code&gt;Component.RIGHT&lt;/code&gt;
+     * &lt;/ul&gt;
+     * The default value, if not set, is &lt;code&gt;Component.TOP&lt;/code&gt;.
+     *
+     * @param tabPlacement the placement for the tabs relative to the content
+     */
+    public void setTabPlacement(int tabPlacement) {
+<span class="pc bpc" id="L965" title="7 of 8 branches missed.">        if (tabPlacement != TOP &amp;&amp; tabPlacement != LEFT &amp;&amp;</span>
+                tabPlacement != BOTTOM &amp;&amp; tabPlacement != RIGHT) {
+<span class="nc" id="L967">            throw new IllegalArgumentException(&quot;illegal tab placement: must be TOP, BOTTOM, LEFT, or RIGHT&quot;);</span>
+        }
+<span class="pc bpc" id="L969" title="3 of 6 branches missed.">        if (this.tabPlacement == tabPlacement &amp;&amp; tabsContainer.getParent() == null &amp;&amp; isInitialized()) {</span>
+<span class="nc" id="L970">            return;</span>
+        }
+<span class="fc" id="L972">        this.tabPlacement = tabPlacement;</span>
+<span class="fc" id="L973">        removeComponent(tabsContainer);</span>
+
+<span class="fc" id="L975">        setTabsLayout(tabPlacement);</span>
+
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">        if (tabPlacement == TOP) {</span>
+<span class="fc" id="L978">            super.addComponent(BorderLayout.NORTH, tabsContainer);</span>
+<span class="nc bnc" id="L979" title="All 2 branches missed.">        } else if (tabPlacement == BOTTOM) {</span>
+<span class="nc" id="L980">            super.addComponent(BorderLayout.SOUTH, tabsContainer);</span>
+<span class="nc bnc" id="L981" title="All 2 branches missed.">        } else if (tabPlacement == LEFT) {</span>
+<span class="nc" id="L982">            super.addComponent(BorderLayout.WEST, tabsContainer);</span>
+        } else {// RIGHT
+<span class="nc" id="L984">            super.addComponent(BorderLayout.EAST, tabsContainer);</span>
+        }
+
+<span class="fc" id="L987">        initTabsFocus();</span>
+
+<span class="fc" id="L989">        tabsContainer.setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L990">        contentPane.setShouldCalcPreferredSize(true);</span>
+
+<span class="fc" id="L992">        revalidateLater();</span>
+<span class="fc" id="L993">    }</span>
+
+    /**
+     * This method retrieves the Tabs content pane
+     *
+     * @return the content pane Container
+     */
+    public Container getContentPane() {
+<span class="nc" id="L1001">        return contentPane;</span>
+    }
+
+    /**
+     * This method retrieves the Tabs buttons Container
+     *
+     * @return the Tabs Container
+     */
+    public Container getTabsContainer() {
+<span class="nc" id="L1010">        return tabsContainer;</span>
+    }
+
+    /**
+     * Sets the currently selected index in the tabs component
+     *
+     * @param index           the index for the tab starting with tab 0.
+     * @param slideToSelected true to animate the transition to the new selection
+     *                        false to just move immediately
+     */
+    public void setSelectedIndex(int index, boolean slideToSelected) {
+<span class="pc bpc" id="L1021" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= tabsContainer.getComponentCount()) {</span>
+<span class="nc" id="L1022">            throw new IndexOutOfBoundsException(&quot;Index: &quot; + index + &quot;, Tab count: &quot; + tabsContainer.getComponentCount());</span>
+        }
+<span class="pc bpc" id="L1024" title="1 of 2 branches missed.">        if (index == activeComponent) {</span>
+<span class="nc" id="L1025">            return;</span>
+        }
+
+<span class="fc" id="L1028">        Form form = getComponentForm();</span>
+<span class="pc bpc" id="L1029" title="3 of 4 branches missed.">        if (slideToSelected &amp;&amp; form != null) {</span>
+            int end;
+            int start;
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">            if (swipeOnXAxis) {</span>
+<span class="nc" id="L1033">                end = contentPane.getComponentAt(activeComponent).getX();</span>
+<span class="nc" id="L1034">                start = contentPane.getComponentAt(index).getX();</span>
+            } else {
+<span class="nc" id="L1036">                end = contentPane.getComponentAt(activeComponent).getY();</span>
+<span class="nc" id="L1037">                start = contentPane.getComponentAt(index).getY();</span>
+            }
+<span class="nc" id="L1039">            slideToDestMotion = createTabSlideMotion(start, end);</span>
+<span class="nc" id="L1040">            slideToDestMotion.start();</span>
+<span class="nc" id="L1041">            form.registerAnimatedInternal(Tabs.this);</span>
+<span class="nc" id="L1042">            active = index;</span>
+<span class="nc" id="L1043">        } else {</span>
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">            if (selectionListener != null) {</span>
+<span class="nc" id="L1045">                selectionListener.fireSelectionEvent(activeComponent, index);</span>
+            }
+<span class="fc" id="L1047">            activeComponent = index;</span>
+<span class="fc" id="L1048">            selectTab(tabsContainer.getComponentAt(index));</span>
+<span class="fc" id="L1049">            int offset = 0;</span>
+<span class="fc bfc" id="L1050" title="All 2 branches covered.">            for (Component c : contentPane) {</span>
+<span class="fc bfc" id="L1051" title="All 2 branches covered.">                c.setLightweightMode(offset != index);</span>
+<span class="fc" id="L1052">                offset++;</span>
+<span class="fc" id="L1053">            }</span>
+<span class="fc" id="L1054">            revalidateLater();</span>
+        }
+<span class="fc" id="L1056">    }</span>
+
+    /**
+     * Invoked to select a specific tab, this method should be overriden for subclasses overriding createTab
+     *
+     * @param tab the tab
+     */
+    protected void selectTab(Component tab) {
+<span class="fc" id="L1064">        Button b = (Button) tab;</span>
+<span class="fc" id="L1065">        b.fireClicked();</span>
+<span class="fc" id="L1066">        b.requestFocus();</span>
+<span class="fc" id="L1067">    }</span>
+
+    /**
+     * Hide the tabs bar
+     */
+    public void hideTabs() {
+<span class="nc" id="L1073">        removeComponent(tabsContainer);</span>
+<span class="nc" id="L1074">        revalidateLater();</span>
+<span class="nc" id="L1075">    }</span>
+
+    /**
+     * Show the tabs bar if it was hidden
+     */
+    public void showTabs() {
+<span class="nc" id="L1081">        int tp = tabPlacement;</span>
+<span class="nc" id="L1082">        tabPlacement = -1;</span>
+<span class="nc" id="L1083">        setTabPlacement(tp);</span>
+<span class="nc" id="L1084">        revalidateLater();</span>
+<span class="nc" id="L1085">    }</span>
+
+    /**
+     * Returns true if the swipe between tabs is activated, this is relevant for
+     * touch devices only
+     *
+     * @return swipe activated flag
+     */
+    public boolean isSwipeActivated() {
+<span class="nc" id="L1094">        return swipeActivated;</span>
+    }
+
+    /**
+     * Setter method for swipe mode
+     *
+     * @param swipeActivated
+     */
+    public void setSwipeActivated(boolean swipeActivated) {
+<span class="nc bnc" id="L1103" title="All 2 branches missed.">        if (this.swipeActivated != swipeActivated) {</span>
+<span class="nc" id="L1104">            this.swipeActivated = swipeActivated;</span>
+<span class="nc bnc" id="L1105" title="All 2 branches missed.">            if (isInitialized()) {</span>
+<span class="nc" id="L1106">                Form form = this.getComponentForm();</span>
+<span class="nc bnc" id="L1107" title="All 2 branches missed.">                if (form != null) {</span>
+<span class="nc bnc" id="L1108" title="All 2 branches missed.">                    if (swipeActivated) {</span>
+<span class="nc" id="L1109">                        form.addPointerPressedListener(press);</span>
+<span class="nc" id="L1110">                        form.addPointerReleasedListener(release);</span>
+<span class="nc" id="L1111">                        form.addPointerDraggedListener(drag);</span>
+                    } else {
+<span class="nc" id="L1113">                        form.removePointerPressedListener(press);</span>
+<span class="nc" id="L1114">                        form.removePointerReleasedListener(release);</span>
+<span class="nc" id="L1115">                        form.removePointerDraggedListener(drag);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L1120">    }</span>
+
+    private void initTabsFocus() {
+<span class="fc bfc" id="L1123" title="All 2 branches covered.">        for (int i = 0; i &lt; tabsContainer.getComponentCount(); i++) {</span>
+<span class="fc" id="L1124">            initTabFocus(tabsContainer.getComponentAt(i), contentPane.getComponentAt(activeComponent));</span>
+        }
+
+<span class="fc" id="L1127">    }</span>
+
+    private void initTabFocus(Component tab, Component content) {
+<span class="pc bpc" id="L1130" title="1 of 2 branches missed.">        if (content.isFocusable()) {</span>
+<span class="nc" id="L1131">            tab.setFocusable(true);</span>
+<span class="nc" id="L1132">            return;</span>
+        }
+
+<span class="pc bpc" id="L1135" title="1 of 2 branches missed.">        if (content instanceof Container) {</span>
+<span class="nc" id="L1136">            Component focus = ((Container) content).findFirstFocusable();</span>
+<span class="nc bnc" id="L1137" title="All 2 branches missed.">            if (focus != null) {</span>
+<span class="nc" id="L1138">                tab.setFocusable(true);</span>
+            }
+        }
+
+<span class="fc" id="L1142">    }</span>
+
+    /**
+     * Indicates that a tab should change when the focus changes without the user physically pressing a button
+     *
+     * @return the changeTabOnFocus
+     */
+    public boolean isChangeTabOnFocus() {
+<span class="nc" id="L1150">        return changeTabOnFocus;</span>
+    }
+
+    /**
+     * Indicates that a tab should change when the focus changes without the user physically pressing a button
+     *
+     * @param changeTabOnFocus the changeTabOnFocus to set
+     */
+    public void setChangeTabOnFocus(boolean changeTabOnFocus) {
+<span class="nc" id="L1159">        this.changeTabOnFocus = changeTabOnFocus;</span>
+<span class="nc" id="L1160">    }</span>
+
+    /**
+     * Indicates that the tabs container should have its style changed to the selected style when one of the tabs has focus
+     * this allows incorporating it into the theme of the application
+     *
+     * @return the changeTabContainerStyleOnFocus
+     */
+    public boolean isChangeTabContainerStyleOnFocus() {
+<span class="nc" id="L1169">        return changeTabContainerStyleOnFocus;</span>
+    }
+
+    /**
+     * Indicates that the tabs container should have its style changed to the selected style when one of the tabs has focus
+     * this allows incorporating it into the theme of the application
+     *
+     * @param changeTabContainerStyleOnFocus the changeTabContainerStyleOnFocus to set
+     */
+    public void setChangeTabContainerStyleOnFocus(boolean changeTabContainerStyleOnFocus) {
+<span class="nc" id="L1179">        this.changeTabContainerStyleOnFocus = changeTabContainerStyleOnFocus;</span>
+<span class="nc" id="L1180">    }</span>
+
+    /**
+     * This method allows setting the Tabs content pane spacing (right and left),
+     * This can be used to create an effect where the selected tab is smaller
+     * and the right and left tabs are visible on the sides
+     *
+     * @param tabsGap the gap on the sides of the content in pixels, the value must
+     *                be positive.
+     */
+    public void setTabsContentGap(int tabsGap) {
+<span class="nc bnc" id="L1191" title="All 2 branches missed.">        if (tabsGap &lt; 0) {</span>
+<span class="nc" id="L1192">            throw new IllegalArgumentException(&quot;gap must be positive&quot;);</span>
+        }
+<span class="nc" id="L1194">        this.tabsGap = tabsGap;</span>
+<span class="nc" id="L1195">    }</span>
+
+    private void setTabsLayout(int tabPlacement) {
+<span class="pc bpc" id="L1198" title="3 of 4 branches missed.">        if (tabPlacement == TOP || tabPlacement == BOTTOM) {</span>
+<span class="pc bpc" id="L1199" title="1 of 2 branches missed.">            if (tabsFillRows) {</span>
+<span class="nc" id="L1200">                FlowLayout f = new FlowLayout();</span>
+<span class="nc" id="L1201">                f.setFillRows(true);</span>
+<span class="nc" id="L1202">                tabsContainer.setLayout(f);</span>
+<span class="nc" id="L1203">            } else {</span>
+<span class="pc bpc" id="L1204" title="1 of 2 branches missed.">                if (tabsGridLayout) {</span>
+<span class="nc" id="L1205">                    tabsContainer.setLayout(new GridLayout(1, Math.max(1, getTabCount())));</span>
+                } else {
+<span class="fc" id="L1207">                    tabsContainer.setLayout(new BoxLayout(BoxLayout.X_AXIS));</span>
+                }
+            }
+<span class="fc" id="L1210">            tabsContainer.setScrollableX(true);</span>
+<span class="fc" id="L1211">            tabsContainer.setScrollableY(false);</span>
+        } else {// LEFT Or RIGHT
+<span class="nc bnc" id="L1213" title="All 2 branches missed.">            if (tabsGridLayout) {</span>
+<span class="nc" id="L1214">                tabsContainer.setLayout(new GridLayout(Math.max(1, getTabCount()), 1));</span>
+            } else {
+<span class="nc" id="L1216">                tabsContainer.setLayout(new BoxLayout(BoxLayout.Y_AXIS));</span>
+            }
+<span class="nc" id="L1218">            tabsContainer.setScrollableX(false);</span>
+<span class="nc" id="L1219">            tabsContainer.setScrollableY(true);</span>
+        }
+<span class="fc" id="L1221">    }</span>
+
+    /**
+     * The UIID for a tab component which defaults to Tab
+     *
+     * @return the tabUIID
+     */
+    public String getTabUIID() {
+<span class="nc" id="L1229">        return tabUIID;</span>
+    }
+
+    /**
+     * &lt;p&gt;The UIID for a tab button which defaults to Tab.
+     * Tab buttons used to have two separate styles for selected and unselected. This was later consolidated so
+     * the tabs behave as a single toggle button (radio button) however one thing that remained is a call to
+     * &lt;code&gt;setUIID&lt;/code&gt; that is implicitly made to restore the original &quot;Tab&quot; style. &lt;/p&gt;
+     *
+     * &lt;p&gt;Effectively Tabs invokes the &lt;code&gt;setUIID&lt;/code&gt; call on the Tab switch so if you want to manipulate
+     * the tab UIID manually (have one red and one green tab) this is a problem.&lt;/&gt;.
+     * &lt;p&gt;To enable such code add all the tabs then just just invoke &lt;code&gt;setTabUIID(null)&lt;/code&gt; to disable
+     * this behavior.&lt;/p&gt;
+     *
+     * @param tabUIID the tabUIID to set
+     */
+    public void setTabUIID(String tabUIID) {
+<span class="nc" id="L1246">        this.tabUIID = tabUIID;</span>
+<span class="nc" id="L1247">    }</span>
+
+    /**
+     * Allows marking tabs as swipe &quot;eager&quot; which instantly triggers swipe on movement
+     * rather than threshold the swipe.
+     *
+     * @return the eagerSwipeMode
+     */
+    public boolean isEagerSwipeMode() {
+<span class="nc" id="L1256">        return eagerSwipeMode;</span>
+    }
+
+    /**
+     * Allows marking tabs as swipe &quot;eager&quot; which instantly triggers swipe on movement
+     * rather than threshold the swipe.
+     *
+     * @param eagerSwipeMode the eagerSwipeMode to set
+     */
+    public void setEagerSwipeMode(boolean eagerSwipeMode) {
+<span class="nc" id="L1266">        this.eagerSwipeMode = eagerSwipeMode;</span>
+<span class="nc" id="L1267">    }</span>
+
+    /**
+     * Indicates whether clicking on a tab button should result in an animation to the selected tab or an immediate switch
+     *
+     * @return the animateTabSelection
+     */
+    public boolean isAnimateTabSelection() {
+<span class="nc" id="L1275">        return animateTabSelection;</span>
+    }
+
+    /**
+     * Indicates whether clicking on a tab button should result in an animation to the selected tab or an immediate switch
+     *
+     * @param animateTabSelection the animateTabSelection to set
+     */
+    public void setAnimateTabSelection(boolean animateTabSelection) {
+<span class="nc" id="L1284">        this.animateTabSelection = animateTabSelection;</span>
+<span class="nc" id="L1285">    }</span>
+
+    void initTabsContainerStyle() {
+<span class="nc bnc" id="L1288" title="All 2 branches missed.">        if (originalTabsContainerSelected == null) {</span>
+<span class="nc" id="L1289">            originalTabsContainerSelected = tabsContainer.getSelectedStyle();</span>
+<span class="nc" id="L1290">            originalTabsContainerUnselected = tabsContainer.getUnselectedStyle();</span>
+        }
+<span class="nc" id="L1292">    }</span>
+
+    /**
+     * Allows developers to customize the motion object for the slide effect
+     * to provide a linear slide effect. You can use the {@code tabsSlideSpeedInt}
+     * theme constant to define the time in milliseconds between releasing the swiped
+     * tab and reaching the next tab. This currently defaults to 200.
+     *
+     * @param start start position
+     * @param end   end position for the motion
+     * @return the motion object
+     */
+    protected Motion createTabSlideMotion(int start, int end) {
+<span class="nc" id="L1305">        return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant(&quot;tabsSlideSpeedInt&quot;, 200));</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if the swipe is on the X-Axis, &lt;code&gt;false&lt;/code&gt; if the swipe is on the Y-Axis.
+     *
+     * @return swipe direction flag
+     */
+    public boolean isSwipeOnXAxis() {
+<span class="nc" id="L1314">        return swipeOnXAxis;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * It defaults to &lt;code&gt;true&lt;/code&gt;; you can set it to &lt;code&gt;false&lt;/code&gt; for use cases like the
+     * one discussed here:
+     * &lt;a href=&quot;https://new.reddit.com/r/cn1/comments/quq7yo/realize_a_set_of_containers_that_are_browsable/&quot;&gt;Realize
+     * a set of Containers that are browsable with a finger, like a deck of
+     * cards&lt;/a&gt;
+     * &lt;/p&gt;Example of usage (&lt;a href=&quot;https://youtu.be/9CxqFGOYAU0&quot;&gt;demo video&lt;/a&gt;):&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/jsfan3/67074c6684b0ee711c6f6d950cdefb57.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; to set the swipe on the X-Axis, &lt;code&gt;false&lt;/code&gt; to set the swipe on the Y-Axis
+     * @since 8.0
+     */
+    public void setSwipeOnXAxis(boolean b) {
+<span class="nc bnc" id="L1331" title="All 2 branches missed.">        if (swipeOnXAxis != b) {</span>
+<span class="nc" id="L1332">            swipeOnXAxis = b;</span>
+<span class="nc" id="L1333">            contentPane.setShouldCalcPreferredSize(true);</span>
+<span class="nc" id="L1334">            revalidateLater();</span>
+        }
+<span class="nc" id="L1336">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L1342">        return new String[]{&quot;titles&quot;, &quot;icons&quot;, &quot;selectedIcons&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L1349">        return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArrayClass(),</span>
+<span class="nc" id="L1350">                com.codename1.impl.CodenameOneImplementation.getImageArrayClass(),</span>
+<span class="nc" id="L1351">                com.codename1.impl.CodenameOneImplementation.getImageArrayClass()};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L1358">        return new String[]{&quot;String[]&quot;, &quot;Image[]&quot;, &quot;Image[]&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L1365" title="All 2 branches missed.">        if (name.equals(&quot;titles&quot;)) {</span>
+<span class="nc" id="L1366">            String[] t = new String[getTabCount()];</span>
+<span class="nc bnc" id="L1367" title="All 2 branches missed.">            for (int iter = 0; iter &lt; t.length; iter++) {</span>
+<span class="nc" id="L1368">                t[iter] = getTabTitle(iter);</span>
+            }
+<span class="nc" id="L1370">            return t;</span>
+        }
+<span class="nc bnc" id="L1372" title="All 2 branches missed.">        if (name.equals(&quot;icons&quot;)) {</span>
+<span class="nc" id="L1373">            Image[] t = new Image[getTabCount()];</span>
+<span class="nc bnc" id="L1374" title="All 2 branches missed.">            for (int iter = 0; iter &lt; t.length; iter++) {</span>
+<span class="nc" id="L1375">                t[iter] = getTabIcon(iter);</span>
+            }
+<span class="nc" id="L1377">            return t;</span>
+        }
+<span class="nc bnc" id="L1379" title="All 2 branches missed.">        if (name.equals(&quot;selectedIcons&quot;)) {</span>
+<span class="nc" id="L1380">            Image[] t = new Image[getTabCount()];</span>
+<span class="nc bnc" id="L1381" title="All 2 branches missed.">            for (int iter = 0; iter &lt; t.length; iter++) {</span>
+<span class="nc" id="L1382">                t[iter] = getTabSelectedIcon(iter);</span>
+            }
+<span class="nc" id="L1384">            return t;</span>
+        }
+<span class="nc" id="L1386">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L1393" title="All 2 branches missed.">        if (name.equals(&quot;titles&quot;)) {</span>
+<span class="nc" id="L1394">            String[] t = (String[]) value;</span>
+<span class="nc bnc" id="L1395" title="All 2 branches missed.">            for (int iter = 0; iter &lt; Math.min(getTabCount(), t.length); iter++) {</span>
+<span class="nc" id="L1396">                setTabTitle(t[iter], getTabIcon(iter), iter);</span>
+            }
+<span class="nc" id="L1398">            return null;</span>
+        }
+<span class="nc bnc" id="L1400" title="All 2 branches missed.">        if (name.equals(&quot;icons&quot;)) {</span>
+<span class="nc" id="L1401">            Image[] t = (Image[]) value;</span>
+<span class="nc bnc" id="L1402" title="All 2 branches missed.">            if (t == null) {</span>
+<span class="nc bnc" id="L1403" title="All 2 branches missed.">                for (int iter = 0; iter &lt; getTabCount(); iter++) {</span>
+<span class="nc" id="L1404">                    setTabTitle(getTabTitle(iter), null, iter);</span>
+                }
+            } else {
+<span class="nc bnc" id="L1407" title="All 2 branches missed.">                for (int iter = 0; iter &lt; Math.min(getTabCount(), t.length); iter++) {</span>
+<span class="nc" id="L1408">                    setTabTitle(getTabTitle(iter), t[iter], iter);</span>
+                }
+            }
+<span class="nc" id="L1411">            return null;</span>
+        }
+<span class="nc bnc" id="L1413" title="All 2 branches missed.">        if (name.equals(&quot;selectedIcons&quot;)) {</span>
+<span class="nc" id="L1414">            Image[] t = (Image[]) value;</span>
+<span class="nc bnc" id="L1415" title="All 2 branches missed.">            for (int iter = 0; iter &lt; Math.min(getTabCount(), t.length); iter++) {</span>
+<span class="nc" id="L1416">                setTabSelectedIcon(iter, t[iter]);</span>
+            }
+<span class="nc" id="L1418">            return null;</span>
+        }
+<span class="nc" id="L1420">        return super.setPropertyValue(name, value);</span>
+    }
+
+<span class="fc" id="L1423">    class TabsLayout extends Layout {</span>
+
+        public void layoutContainer(Container parent) {
+<span class="nc" id="L1426">            final int size = parent.getComponentCount();</span>
+
+<span class="nc" id="L1428">            int tabWidth = parent.getWidth() - tabsGap * 2;</span>
+<span class="nc" id="L1429">            int tabHeight = parent.getHeight() - tabsGap * 2;</span>
+
+<span class="nc bnc" id="L1431" title="All 2 branches missed.">            if (swipeOnXAxis) {</span>
+<span class="nc bnc" id="L1432" title="All 2 branches missed.">                for (int i = 0; i &lt; size; i++) {</span>
+                    int xOffset;
+<span class="nc bnc" id="L1434" title="All 2 branches missed.">                    if (parent.isRTL()) {</span>
+<span class="nc" id="L1435">                        xOffset = (size - i) * tabWidth + tabsGap;</span>
+<span class="nc" id="L1436">                        xOffset -= ((size - activeComponent) * tabWidth);</span>
+                    } else {
+<span class="nc" id="L1438">                        xOffset = i * tabWidth + tabsGap;</span>
+<span class="nc" id="L1439">                        xOffset -= (activeComponent * tabWidth);</span>
+                    }
+<span class="nc" id="L1441">                    Component component = parent.getComponentAt(i);</span>
+<span class="nc" id="L1442">                    component.setX(component.getStyle().getMarginLeftNoRTL() + xOffset);</span>
+<span class="nc" id="L1443">                    component.setY(component.getStyle().getMarginTop());</span>
+<span class="nc" id="L1444">                    component.setWidth(tabWidth - component.getStyle().getHorizontalMargins());</span>
+<span class="nc" id="L1445">                    component.setHeight(parent.getHeight() - component.getStyle().getVerticalMargins());</span>
+                }
+            } else {
+<span class="nc bnc" id="L1448" title="All 2 branches missed.">                for (int i = 0; i &lt; size; i++) {</span>
+                    int yOffset;
+<span class="nc" id="L1450">                    yOffset = i * tabHeight + tabsGap;</span>
+<span class="nc" id="L1451">                    yOffset -= (activeComponent * tabHeight);</span>
+<span class="nc" id="L1452">                    Component component = parent.getComponentAt(i);</span>
+<span class="nc" id="L1453">                    component.setX(component.getStyle().getMarginLeftNoRTL());</span>
+<span class="nc" id="L1454">                    component.setY(component.getStyle().getMarginTop() + yOffset);</span>
+<span class="nc" id="L1455">                    component.setWidth(tabWidth - component.getStyle().getHorizontalMargins());</span>
+<span class="nc" id="L1456">                    component.setHeight(parent.getHeight() - component.getStyle().getVerticalMargins());</span>
+                }
+            }
+
+<span class="nc" id="L1460">        }</span>
+
+        public Dimension getPreferredSize(Container parent) {
+            // fill
+<span class="nc" id="L1464">            Dimension dim = new Dimension(0, 0);</span>
+<span class="nc" id="L1465">            dim.setWidth(parent.getWidth() + parent.getStyle().getPaddingLeftNoRTL()</span>
+<span class="nc" id="L1466">                    + parent.getStyle().getPaddingRightNoRTL());</span>
+<span class="nc" id="L1467">            dim.setHeight(parent.getHeight() + parent.getStyle().getPaddingTop()</span>
+<span class="nc" id="L1468">                    + parent.getStyle().getPaddingBottom());</span>
+<span class="nc" id="L1469">            int compCount = contentPane.getComponentCount();</span>
+<span class="nc bnc" id="L1470" title="All 2 branches missed.">            for (int iter = 0; iter &lt; compCount; iter++) {</span>
+<span class="nc" id="L1471">                Dimension d = contentPane.getComponentAt(iter).getPreferredSizeWithMargin();</span>
+<span class="nc" id="L1472">                dim.setWidth(Math.max(d.getWidth(), dim.getWidth()));</span>
+<span class="nc" id="L1473">                dim.setHeight(Math.max(d.getHeight(), dim.getHeight()));</span>
+            }
+<span class="nc" id="L1475">            return dim;</span>
+        }
+    }
+
+<span class="fc" id="L1479">    class TabFocusListener implements FocusListener {</span>
+
+        public void focusGained(Component cmp) {
+<span class="nc bnc" id="L1482" title="All 2 branches missed.">            if (focusListeners != null) {</span>
+<span class="nc" id="L1483">                focusListeners.fireFocus(cmp);</span>
+            }
+<span class="nc bnc" id="L1485" title="All 2 branches missed.">            if (Display.getInstance().shouldRenderSelection()) {</span>
+<span class="nc bnc" id="L1486" title="All 2 branches missed.">                if (isChangeTabOnFocus()) {</span>
+<span class="nc bnc" id="L1487" title="All 2 branches missed.">                    if (!((Button) cmp).isSelected()) {</span>
+<span class="nc" id="L1488">                        cmp.fireClicked();</span>
+                    }
+                }
+<span class="nc bnc" id="L1491" title="All 2 branches missed.">                if (changeTabContainerStyleOnFocus) {</span>
+<span class="nc" id="L1492">                    initTabsContainerStyle();</span>
+<span class="nc" id="L1493">                    tabsContainer.setUnselectedStyle(originalTabsContainerSelected);</span>
+<span class="nc" id="L1494">                    tabsContainer.repaint();</span>
+                }
+            }
+<span class="nc" id="L1497">        }</span>
+
+
+        public void focusLost(Component cmp) {
+<span class="nc bnc" id="L1501" title="All 2 branches missed.">            if (focusListeners != null) {</span>
+<span class="nc" id="L1502">                focusListeners.fireFocus(cmp);</span>
+            }
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">            if (changeTabContainerStyleOnFocus) {</span>
+<span class="nc" id="L1505">                initTabsContainerStyle();</span>
+<span class="nc" id="L1506">                tabsContainer.setUnselectedStyle(originalTabsContainerUnselected);</span>
+<span class="nc" id="L1507">                tabsContainer.repaint();</span>
+            }
+<span class="nc" id="L1509">        }</span>
+
+    }
+
+    class SwipeListener implements ActionListener {
+
+        private final static int PRESS = 0;
+        private final static int DRAG = 1;
+        private final static int RELEASE = 2;
+        private final int type;
+
+
+<span class="fc" id="L1521">        public SwipeListener(int type) {</span>
+<span class="fc" id="L1522">            this.type = type;</span>
+<span class="fc" id="L1523">        }</span>
+
+
+        public void actionPerformed(ActionEvent evt) {
+
+<span class="nc bnc" id="L1528" title="All 6 branches missed.">            if (getComponentCount() == 0 || !swipeActivated || slideToDestMotion != null) {</span>
+<span class="nc" id="L1529">                return;</span>
+            }
+<span class="nc" id="L1531">            final int x = evt.getX();</span>
+<span class="nc" id="L1532">            final int y = evt.getY();</span>
+<span class="nc bnc" id="L1533" title="All 4 branches missed.">            switch (type) {</span>
+                case PRESS: {
+<span class="nc" id="L1535">                    blockSwipe = false;</span>
+<span class="nc" id="L1536">                    riskySwipe = false;</span>
+<span class="nc bnc" id="L1537" title="All 4 branches missed.">                    if (!isEventBlockedByHigherComponent(evt) &amp;&amp; contentPane.visibleBoundsContains(x, y)) {</span>
+<span class="nc" id="L1538">                        Component testCmp = contentPane.getComponentAt(x, y);</span>
+<span class="nc bnc" id="L1539" title="All 4 branches missed.">                        if (testCmp != null &amp;&amp; testCmp != contentPane) {</span>
+<span class="nc" id="L1540">                            doNotBlockSideSwipe = true;</span>
+                            try {
+<span class="nc bnc" id="L1542" title="All 4 branches missed.">                                while (testCmp != null &amp;&amp; testCmp != contentPane) {</span>
+<span class="nc bnc" id="L1543" title="All 2 branches missed.">                                    if (testCmp.shouldBlockSideSwipe()) {</span>
+<span class="nc" id="L1544">                                        lastX = -1;</span>
+<span class="nc" id="L1545">                                        lastY = -1;</span>
+<span class="nc" id="L1546">                                        initialX = -1;</span>
+<span class="nc" id="L1547">                                        initialY = -1;</span>
+<span class="nc" id="L1548">                                        blockSwipe = true;</span>
+<span class="nc" id="L1549">                                        return;</span>
+                                    }
+<span class="nc bnc" id="L1551" title="All 2 branches missed.">                                    if (testCmp.isScrollable()) {</span>
+<span class="nc bnc" id="L1552" title="All 2 branches missed.">                                        if (swipeOnXAxis) {</span>
+<span class="nc bnc" id="L1553" title="All 2 branches missed.">                                            if (testCmp.isScrollableX()) {</span>
+                                                // we need to block swipe since the user is trying to scroll a component
+<span class="nc" id="L1555">                                                lastX = -1;</span>
+<span class="nc" id="L1556">                                                initialX = -1;</span>
+<span class="nc" id="L1557">                                                blockSwipe = true;</span>
+<span class="nc" id="L1558">                                                return;</span>
+                                            }
+
+                                            // scrollable Y component, we want to make side scrolling
+                                            // slightly harder so it doesn't bother the vertical swipe
+<span class="nc" id="L1563">                                            riskySwipe = true;</span>
+<span class="nc" id="L1564">                                            break;</span>
+                                        } else {
+<span class="nc bnc" id="L1566" title="All 2 branches missed.">                                            if (testCmp.isScrollableY()) {</span>
+                                                // we need to block swipe since the user is trying to scroll a component
+<span class="nc" id="L1568">                                                lastY = -1;</span>
+<span class="nc" id="L1569">                                                initialY = -1;</span>
+<span class="nc" id="L1570">                                                blockSwipe = true;</span>
+<span class="nc" id="L1571">                                                return;</span>
+                                            }
+
+                                            // scrollable X component, we want to make side scrolling
+                                            // slightly harder so it doesn't bother the vertical swipe
+<span class="nc" id="L1576">                                            riskySwipe = true;</span>
+<span class="nc" id="L1577">                                            break;</span>
+                                        }
+                                    }
+<span class="nc" id="L1580">                                    testCmp = testCmp.getParent();</span>
+                                }
+                            } finally {
+<span class="nc" id="L1583">                                doNotBlockSideSwipe = false;</span>
+                            }
+                        }
+<span class="nc" id="L1586">                        lastX = x;</span>
+<span class="nc" id="L1587">                        lastY = y;</span>
+<span class="nc" id="L1588">                        initialX = x;</span>
+<span class="nc" id="L1589">                        initialY = y;</span>
+<span class="nc" id="L1590">                    } else {</span>
+<span class="nc" id="L1591">                        lastX = -1;</span>
+<span class="nc" id="L1592">                        lastY = -1;</span>
+<span class="nc" id="L1593">                        initialX = -1;</span>
+<span class="nc" id="L1594">                        initialY = -1;</span>
+<span class="nc" id="L1595">                        blockSwipe = true;</span>
+                    }
+<span class="nc" id="L1597">                    dragStarted = false;</span>
+<span class="nc" id="L1598">                    break;</span>
+                }
+                case DRAG: {
+<span class="nc bnc" id="L1601" title="All 2 branches missed.">                    if (blockSwipe) {</span>
+<span class="nc" id="L1602">                        return;</span>
+                    }
+<span class="nc bnc" id="L1604" title="All 2 branches missed.">                    if (!dragStarted) {</span>
+<span class="nc bnc" id="L1605" title="All 2 branches missed.">                        if (isEagerSwipeMode()) {</span>
+<span class="nc" id="L1606">                            dragStarted = true;</span>
+                        } else {
+<span class="nc bnc" id="L1608" title="All 2 branches missed.">                            if (riskySwipe) {</span>
+<span class="nc bnc" id="L1609" title="All 4 branches missed.">                                if (swipeOnXAxis &amp;&amp; Math.abs(x - initialX) &lt; Math.abs(y - initialY)) {</span>
+<span class="nc" id="L1610">                                    return;</span>
+                                }
+<span class="nc bnc" id="L1612" title="All 4 branches missed.">                                if (!swipeOnXAxis &amp;&amp; Math.abs(x - initialX) &gt; Math.abs(y - initialY)) {</span>
+<span class="nc" id="L1613">                                    return;</span>
+                                }
+                                // give heavier weight when we have two axis swipe
+<span class="nc bnc" id="L1616" title="All 2 branches missed.">                                if (swipeOnXAxis) {</span>
+<span class="nc bnc" id="L1617" title="All 2 branches missed.">                                    dragStarted = Math.abs(x - initialX) &gt; (contentPane.getWidth() / 5);</span>
+                                } else {
+<span class="nc bnc" id="L1619" title="All 2 branches missed.">                                    dragStarted = Math.abs(y - initialY) &gt; (contentPane.getHeight() / 5);</span>
+                                }
+                            } else {
+                                // start drag not imediately, giving components some sort
+                                // of weight.
+<span class="nc bnc" id="L1624" title="All 2 branches missed.">                                if (swipeOnXAxis) {</span>
+<span class="nc bnc" id="L1625" title="All 2 branches missed.">                                    dragStarted = Math.abs(x - initialX) &gt; (contentPane.getWidth() / 8);</span>
+                                } else {
+<span class="nc bnc" id="L1627" title="All 2 branches missed.">                                    dragStarted = Math.abs(y - initialY) &gt; (contentPane.getHeight() / 8);</span>
+                                }
+<span class="nc bnc" id="L1629" title="All 4 branches missed.">                                if (dragStarted &amp;&amp; swipeOnXAxis) {</span>
+<span class="nc" id="L1630">                                    int diff = x - initialX;</span>
+<span class="nc bnc" id="L1631" title="All 4 branches missed.">                                    if (shouldBlockSideSwipeLeft() &amp;&amp; diff &lt; 0 ||</span>
+<span class="nc bnc" id="L1632" title="All 4 branches missed.">                                            shouldBlockSideSwipeRight() &amp;&amp; diff &gt; 0) {</span>
+<span class="nc" id="L1633">                                        lastX = -1;</span>
+<span class="nc" id="L1634">                                        initialX = -1;</span>
+<span class="nc" id="L1635">                                        initialY = -1;</span>
+<span class="nc" id="L1636">                                        blockSwipe = true;</span>
+<span class="nc" id="L1637">                                        dragStarted = false;</span>
+<span class="nc" id="L1638">                                        return;</span>
+                                    }
+                                }
+<span class="nc" id="L1641">                                Form parent = getComponentForm();</span>
+<span class="nc" id="L1642">                                parent.clearComponentsAwaitingRelease();</span>
+                            }
+                        }
+                    }
+<span class="nc bnc" id="L1646" title="All 6 branches missed.">                    if (swipeOnXAxis &amp;&amp; initialX != -1 &amp;&amp; contentPane.contains(x, y)) {</span>
+<span class="nc" id="L1647">                        int diffX = x - lastX;</span>
+<span class="nc bnc" id="L1648" title="All 4 branches missed.">                        if (diffX != 0 &amp;&amp; dragStarted) {</span>
+<span class="nc" id="L1649">                            lastX += diffX;</span>
+<span class="nc" id="L1650">                            final int size = contentPane.getComponentCount();</span>
+<span class="nc bnc" id="L1651" title="All 2 branches missed.">                            for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L1652">                                Component component = contentPane.getComponentAt(i);</span>
+<span class="nc" id="L1653">                                component.setX(component.getX() + diffX);</span>
+<span class="nc" id="L1654">                                component.paintLock(false);</span>
+                            }
+<span class="nc" id="L1656">                            enableLayoutOnPaint = false;</span>
+<span class="nc" id="L1657">                            repaint();</span>
+                        }
+                    }
+<span class="nc bnc" id="L1660" title="All 6 branches missed.">                    if (!swipeOnXAxis &amp;&amp; initialY != -1 &amp;&amp; contentPane.contains(x, y)) {</span>
+<span class="nc" id="L1661">                        int diffY = y - lastY;</span>
+<span class="nc bnc" id="L1662" title="All 4 branches missed.">                        if (diffY != 0 &amp;&amp; dragStarted) {</span>
+<span class="nc" id="L1663">                            lastY += diffY;</span>
+<span class="nc" id="L1664">                            final int size = contentPane.getComponentCount();</span>
+<span class="nc bnc" id="L1665" title="All 2 branches missed.">                            for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L1666">                                Component component = contentPane.getComponentAt(i);</span>
+<span class="nc" id="L1667">                                component.setY(component.getY() + diffY);</span>
+<span class="nc" id="L1668">                                component.paintLock(false);</span>
+                            }
+<span class="nc" id="L1670">                            enableLayoutOnPaint = false;</span>
+<span class="nc" id="L1671">                            repaint();</span>
+                        }
+<span class="nc" id="L1673">                    }</span>
+                    break;
+                }
+                case RELEASE: {
+<span class="nc bnc" id="L1677" title="All 2 branches missed.">                    if (changeTabContainerStyleOnFocus) {</span>
+<span class="nc" id="L1678">                        initTabsContainerStyle();</span>
+<span class="nc" id="L1679">                        tabsContainer.setUnselectedStyle(originalTabsContainerUnselected);</span>
+<span class="nc" id="L1680">                        tabsContainer.repaint();</span>
+                    }
+<span class="nc bnc" id="L1682" title="All 2 branches missed.">                    if (blockSwipe) {</span>
+<span class="nc" id="L1683">                        return;</span>
+                    }
+<span class="nc bnc" id="L1685" title="All 4 branches missed.">                    if (swipeOnXAxis &amp;&amp; initialX != -1) {</span>
+<span class="nc" id="L1686">                        int diff = x - initialX;</span>
+<span class="nc bnc" id="L1687" title="All 4 branches missed.">                        if (diff != 0 &amp;&amp; dragStarted) {</span>
+<span class="nc bnc" id="L1688" title="All 2 branches missed.">                            if (Math.abs(diff) &gt; contentPane.getWidth() / 6) {</span>
+<span class="nc bnc" id="L1689" title="All 2 branches missed.">                                if (isRTL()) {</span>
+<span class="nc" id="L1690">                                    diff *= -1;</span>
+                                }
+<span class="nc bnc" id="L1692" title="All 2 branches missed.">                                if (diff &gt; 0) {</span>
+<span class="nc" id="L1693">                                    active = activeComponent - 1;</span>
+<span class="nc bnc" id="L1694" title="All 2 branches missed.">                                    if (active &lt; 0) {</span>
+<span class="nc" id="L1695">                                        active = 0;</span>
+                                    }
+                                } else {
+<span class="nc" id="L1698">                                    active = activeComponent + 1;</span>
+<span class="nc bnc" id="L1699" title="All 2 branches missed.">                                    if (active &gt;= contentPane.getComponentCount()) {</span>
+<span class="nc" id="L1700">                                        active = contentPane.getComponentCount() - 1;</span>
+                                    }
+                                }
+                            }
+<span class="nc" id="L1704">                            int start = contentPane.getComponentAt(active).getX();</span>
+<span class="nc" id="L1705">                            int end = tabsGap;</span>
+<span class="nc" id="L1706">                            slideToDestMotion = createTabSlideMotion(start, end);</span>
+<span class="nc" id="L1707">                            slideToDestMotion.start();</span>
+<span class="nc" id="L1708">                            Form form = getComponentForm();</span>
+<span class="nc bnc" id="L1709" title="All 2 branches missed.">                            if (form != null) {</span>
+<span class="nc" id="L1710">                                form.registerAnimatedInternal(Tabs.this);</span>
+                            }
+<span class="nc" id="L1712">                            evt.consume();</span>
+                        }
+                    }
+<span class="nc bnc" id="L1715" title="All 4 branches missed.">                    if (!swipeOnXAxis &amp;&amp; initialY != -1) {</span>
+<span class="nc" id="L1716">                        int diff = y - initialY;</span>
+<span class="nc bnc" id="L1717" title="All 4 branches missed.">                        if (diff != 0 &amp;&amp; dragStarted) {</span>
+<span class="nc bnc" id="L1718" title="All 2 branches missed.">                            if (Math.abs(diff) &gt; contentPane.getHeight() / 6) {</span>
+<span class="nc bnc" id="L1719" title="All 2 branches missed.">                                if (diff &gt; 0) {</span>
+<span class="nc" id="L1720">                                    active = activeComponent - 1;</span>
+<span class="nc bnc" id="L1721" title="All 2 branches missed.">                                    if (active &lt; 0) {</span>
+<span class="nc" id="L1722">                                        active = 0;</span>
+                                    }
+                                } else {
+<span class="nc" id="L1725">                                    active = activeComponent + 1;</span>
+<span class="nc bnc" id="L1726" title="All 2 branches missed.">                                    if (active &gt;= contentPane.getComponentCount()) {</span>
+<span class="nc" id="L1727">                                        active = contentPane.getComponentCount() - 1;</span>
+                                    }
+                                }
+                            }
+<span class="nc" id="L1731">                            int start = contentPane.getComponentAt(active).getX();</span>
+<span class="nc" id="L1732">                            int end = tabsGap;</span>
+<span class="nc" id="L1733">                            slideToDestMotion = createTabSlideMotion(start, end);</span>
+<span class="nc" id="L1734">                            slideToDestMotion.start();</span>
+<span class="nc" id="L1735">                            Form form = getComponentForm();</span>
+<span class="nc bnc" id="L1736" title="All 2 branches missed.">                            if (form != null) {</span>
+<span class="nc" id="L1737">                                form.registerAnimatedInternal(Tabs.this);</span>
+                            }
+<span class="nc" id="L1739">                            evt.consume();</span>
+                        }
+                    }
+<span class="nc" id="L1742">                    lastX = -1;</span>
+<span class="nc" id="L1743">                    lastY = -1;</span>
+<span class="nc" id="L1744">                    initialX = -1;</span>
+<span class="nc" id="L1745">                    initialY = -1;</span>
+<span class="nc" id="L1746">                    dragStarted = false;</span>
+                    break;
+                }
+            }
+<span class="nc" id="L1750">        }</span>
+
+        private boolean isEventBlockedByHigherComponent(ActionEvent evt) {
+<span class="nc" id="L1753">            final int x = evt.getX();</span>
+<span class="nc" id="L1754">            final int y = evt.getY();</span>
+<span class="nc" id="L1755">            final Form currentForm = Display.INSTANCE.getCurrent();</span>
+<span class="nc bnc" id="L1756" title="All 2 branches missed.">            if (currentForm == null) {</span>
+<span class="nc" id="L1757">                return false;</span>
+            }
+<span class="nc" id="L1759">            final Component targetComponent = currentForm.getComponentAt(x, y);</span>
+<span class="nc bnc" id="L1760" title="All 2 branches missed.">            if (targetComponent == null) {</span>
+<span class="nc" id="L1761">                return false;</span>
+            }
+<span class="nc bnc" id="L1763" title="All 4 branches missed.">            return !contentPane.equals(targetComponent) &amp;&amp; !contentPane.contains(targetComponent);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

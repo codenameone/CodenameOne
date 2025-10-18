@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSSBgPainter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">CSSBgPainter.java</span></div><h1>CSSBgPainter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Painter;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.Style;
+
+/**
+ * A painter that draws the background of a component based on its CSS style
+ * Unlike the regular CodenameOne bg painter, this also adds the following:
+ * - Painting both a background color and a background image
+ * - Tiling horizontally or vertically (or both)
+ * - Background image position offset horizontal and vertical
+ *
+ * @author Ofir Leitner
+ */
+class CSSBgPainter implements Painter {
+    int horizPos, vertPos;
+    boolean horizIsPercentage, vertIsPercentage;
+    boolean fixedX;
+    private final Component parent;
+    private Component scrollableParent;
+
+    /**
+     * Construct a background painter for the given component
+     *
+     * @param the parent component
+     */
+<span class="nc" id="L55">    CSSBgPainter(Component parent) {</span>
+<span class="nc" id="L56">        this.parent = parent;</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Sets the horizontal/vertical position of the background image
+     *
+     * @param property CSSElement.CSS_BACKGROUND_POSITION_X or Y for horizontal/vertical
+     * @param pos      The position as a CSS length value
+     */
+    void setPosition(int property, int pos) {
+<span class="nc" id="L66">        boolean isPercentage = false;</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if ((pos &amp; CSSElement.VAL_PERCENTAGE) != 0) {</span>
+<span class="nc" id="L68">            pos -= CSSElement.VAL_PERCENTAGE;</span>
+<span class="nc" id="L69">            isPercentage = true;</span>
+        }
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (property == CSSElement.CSS_BACKGROUND_POSITION_X) {</span>
+<span class="nc" id="L72">            setHorizPosition(pos, isPercentage);</span>
+        } else {
+<span class="nc" id="L74">            setVertPosition(pos, isPercentage);</span>
+        }
+<span class="nc" id="L76">    }</span>
+
+    /**
+     * Sets the horizontal position of the background image
+     *
+     * @param pos          The position either in pixels or percentage
+     * @param isPercentage if true then the numeric value give at 'pos' is actually percentages
+     */
+    private void setHorizPosition(int pos, boolean isPercentage) {
+<span class="nc" id="L85">        horizPos = pos;</span>
+<span class="nc" id="L86">        horizIsPercentage = isPercentage;</span>
+<span class="nc" id="L87">    }</span>
+
+    /**
+     * Sets the vertical position of the background image
+     *
+     * @param pos          The position either in pixels or percentage
+     * @param isPercentage if true then the numeric value give at 'pos' is actually percentages
+     */
+    private void setVertPosition(int pos, boolean isPercentage) {
+<span class="nc" id="L96">        vertPos = pos;</span>
+<span class="nc" id="L97">        vertIsPercentage = isPercentage;</span>
+<span class="nc" id="L98">    }</span>
+
+    /**
+     * Sets this background to be fixed, which means it isn't affected by scrolling, but stays fixed in the back of the component it is applied on.
+     */
+    void setFixed() {
+<span class="nc" id="L104">        fixedX = true;</span>
+<span class="nc" id="L105">    }</span>
+
+    /**
+     * Returns a parent container that is scrollable or null if no parent is
+     * scrollable.
+     * This was copied from Container.getScrollableParent (Which can't be used as it is private)
+     *
+     * @return a parent container that is scrollable or null if no parent is
+     * scrollable.
+     */
+    private Container getScrollableParent(Component parent) {
+        Container cont;
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (parent instanceof Container) {</span>
+<span class="nc" id="L118">            cont = (Container) parent;</span>
+        } else {
+<span class="nc" id="L120">            cont = parent.getParent();</span>
+        }
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        while (cont != null) {</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if ((cont.isScrollableX()) || (cont.isScrollableY())) {</span>
+<span class="nc" id="L124">                return cont;</span>
+            }
+<span class="nc" id="L126">            cont = cont.getParent();</span>
+        }
+<span class="nc" id="L128">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g, Rectangle rect) {
+<span class="nc" id="L135">        Style s = parent.getStyle();</span>
+<span class="nc" id="L136">        int x = rect.getX();</span>
+<span class="nc" id="L137">        int y = rect.getY();</span>
+<span class="nc" id="L138">        int width = rect.getSize().getWidth();</span>
+<span class="nc" id="L139">        int height = rect.getSize().getHeight();</span>
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        if (width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L141">            return;</span>
+        }
+<span class="nc" id="L143">        g.setColor(s.getBgColor());</span>
+<span class="nc" id="L144">        g.fillRect(x, y, width, height, s.getBgTransparency());</span>
+
+<span class="nc" id="L146">        Image bgImage = s.getBgImage();</span>
+
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (bgImage == null) {</span>
+<span class="nc" id="L149">            return;</span>
+        }
+
+
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (fixedX) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (scrollableParent == null) {</span>
+<span class="nc" id="L155">                scrollableParent = getScrollableParent(parent);</span>
+            }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (scrollableParent != null) {</span>
+<span class="nc" id="L158">                x += scrollableParent.getScrollX();</span>
+<span class="nc" id="L159">                y += scrollableParent.getScrollY();</span>
+<span class="nc" id="L160">                width = scrollableParent.getWidth();</span>
+<span class="nc" id="L161">                height = scrollableParent.getHeight();</span>
+            }
+        }
+
+
+<span class="nc" id="L166">        int iW = bgImage.getWidth();</span>
+<span class="nc" id="L167">        int iH = bgImage.getHeight();</span>
+
+<span class="nc" id="L169">        int offsetX = horizPos;</span>
+<span class="nc" id="L170">        int offsetY = vertPos;</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (horizIsPercentage) {</span>
+<span class="nc" id="L172">            offsetX = (width - iW) * offsetX / 100;</span>
+        }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (vertIsPercentage) {</span>
+<span class="nc" id="L175">            offsetY = (height - iH) * offsetY / 100;</span>
+        }
+
+
+<span class="nc bnc" id="L179" title="All 5 branches missed.">        switch (s.getBackgroundType()) {</span>
+            case 0:
+<span class="nc" id="L181">                g.drawImage(s.getBgImage(), x + offsetX, y + offsetY);</span>
+<span class="nc" id="L182">                return;</span>
+            case Style.BACKGROUND_IMAGE_TILE_BOTH:
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                for (int xPos = getTiledPosition(offsetX, iW); xPos &lt;= width; xPos += iW) {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                    for (int yPos = getTiledPosition(offsetY, iH); yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L186">                        g.drawImage(s.getBgImage(), x + xPos, y + yPos);</span>
+                    }
+                }
+<span class="nc" id="L189">                return;</span>
+            case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL:
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                for (int xPos = getTiledPosition(offsetX, iW); xPos &lt;= width; xPos += iW) {</span>
+<span class="nc" id="L192">                    g.drawImage(s.getBgImage(), x + xPos, y + offsetY);</span>
+                }
+<span class="nc" id="L194">                return;</span>
+            case Style.BACKGROUND_IMAGE_TILE_VERTICAL:
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                for (int yPos = getTiledPosition(offsetY, iH); yPos &lt;= height; yPos += iH) {</span>
+<span class="nc" id="L197">                    g.drawImage(s.getBgImage(), x + offsetX, y + yPos);</span>
+                }
+        }
+
+<span class="nc" id="L201">    }</span>
+
+    /**
+     * Calculates the starting drawing position for a certain dimension (horizontal/vertical) considering the given offset
+     *
+     * @param offset   The offset in the dimension
+     * @param imageDim The image dimension (width/height)
+     * @return The starting drawing position - 0 is the offset is 0 or a negative value if there is an offset
+     */
+    private int getTiledPosition(int offset, int imageDim) {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (offset != 0) {</span>
+<span class="nc" id="L212">            return offset % imageDim - imageDim;</span>
+        }
+<span class="nc" id="L214">        return 0;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

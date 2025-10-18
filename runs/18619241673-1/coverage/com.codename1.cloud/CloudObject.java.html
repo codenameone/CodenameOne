@@ -1,0 +1,807 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CloudObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.cloud</a> &gt; <span class="el_source">CloudObject.java</span></div><h1>CloudObject.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.cloud;
+
+import com.codename1.io.Externalizable;
+import com.codename1.io.Util;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.Enumeration;
+import java.util.Hashtable;
+
+/**
+ * A cloud object can be persisted to the cloud or locally
+ * it is a set of key/value pairs that can be either strings
+ * or numbers. There is a 512 character limit on string length!
+ * Notice: keys starting with CN1 are reserved for internal usage!
+ *
+ * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
+ */
+public final class CloudObject implements Externalizable {
+    /**
+     * Indicates the state of the current object, a new object never persisted
+     */
+    public static final int STATUS_NEW = 0;
+
+    /**
+     * Indicates the state of the current object, an object that is in sync with the database as far as
+     * the client code is aware (the client code doesn't check!)
+     */
+    public static final int STATUS_COMMITTED = 1;
+
+    /**
+     * Indicates the state of the current object, a locally modified object that wasn't committed yet
+     */
+    public static final int STATUS_MODIFIED = 2;
+
+    /**
+     * Indicates the state of the current object, an object in the process of committing
+     */
+    public static final int STATUS_COMMIT_IN_PROGRESS = 3;
+
+    /**
+     * Indicates the state of the current object, an object that is in the process of deletion
+     */
+    public static final int STATUS_DELETE_IN_PROGRESS = 4;
+
+    /**
+     * Indicates the state of the current object, a deleted object
+     */
+    public static final int STATUS_DELETED = 5;
+
+    /**
+     * Indicates the state of the current object, an object in the process of refresh
+     */
+    public static final int STATUS_REFRESH_IN_PROGRESS = 6;
+
+    /**
+     * A world visible/modifiable object!
+     */
+    public static final int ACCESS_PUBLIC = 1;
+
+    /**
+     * A world visible object! Can only be modified by its creator.
+     */
+    public static final int ACCESS_PUBLIC_READ_ONLY = 2;
+
+    /**
+     * An application visible/modifiable object!
+     */
+    public static final int ACCESS_APPLICATION = 3;
+
+    /**
+     * An application scope readable object! Can only be modified by its creator
+     */
+    public static final int ACCESS_APPLICATION_READ_ONLY = 4;
+
+    /**
+     * An object that can only be viewed or modified by its creator
+     */
+    public static final int ACCESS_PRIVATE = 5;
+
+
+    /**
+     * Changes to the bound property won't be reflected into the bound cloud object until commit binding is invoked
+     */
+    public static final int BINDING_DEFERRED = 1;
+
+    /**
+     * Changes to the bound property will be reflected instantly into the cloud object
+     */
+    public static final int BINDING_IMMEDIATE = 2;
+
+    /**
+     * Changes to the bound property will be reflected instantly into the cloud object and the object would
+     * be saved immediately (not committed!).
+     */
+    public static final int BINDING_AUTO_SAVE = 3;
+
+<span class="nc" id="L124">    private static final Hashtable&lt;String, CustomProperty&gt; custom = new Hashtable&lt;String, CustomProperty&gt;();</span>
+<span class="nc" id="L125">    private Hashtable values = new Hashtable();</span>
+    private Hashtable deferedValues;
+
+    private String cloudId;
+    private long lastModified;
+    private int status;
+<span class="nc" id="L131">    private boolean owner = true;</span>
+<span class="nc" id="L132">    private int accessPermissions = ACCESS_PRIVATE;</span>
+
+    /**
+     * Default constructor for externalization purposes only!
+     */
+<span class="nc" id="L137">    public CloudObject() {</span>
+<span class="nc" id="L138">    }</span>
+
+    /**
+     * Constructor
+     *
+     * @param type the type of the object
+     */
+<span class="nc" id="L145">    public CloudObject(String type) {</span>
+<span class="nc" id="L146">        values.put(CloudStorage.TYPE_FIELD, type);</span>
+<span class="nc" id="L147">    }</span>
+
+    /**
+     * Create an object with different permissions settings
+     *
+     * @param type        the type of the object
+     * @param permissions one of the ACCESS_* values
+     */
+<span class="nc" id="L155">    public CloudObject(String type, int permissions) {</span>
+<span class="nc" id="L156">        accessPermissions = permissions;</span>
+<span class="nc" id="L157">        values.put(CloudStorage.TYPE_FIELD, type);</span>
+<span class="nc" id="L158">    }</span>
+
+<span class="nc" id="L160">    CloudObject(int permissions) {</span>
+<span class="nc" id="L161">        accessPermissions = permissions;</span>
+<span class="nc" id="L162">    }</span>
+
+    /**
+     * Install a custom property on the given property name
+     *
+     * @param key the key on which to install the custom property
+     * @param cp  the custom property implementation
+     */
+    public static void setCustomProperty(String key, CustomProperty cp) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (cp == null) {</span>
+<span class="nc" id="L172">            custom.remove(key);</span>
+        } else {
+<span class="nc" id="L174">            custom.put(key, cp);</span>
+        }
+<span class="nc" id="L176">    }</span>
+
+    /**
+     * Returns one of the status constants in this class
+     *
+     * @return the status of the object against the cloud
+     */
+    public int getStatus() {
+<span class="nc" id="L184">        return status;</span>
+    }
+
+    void setStatus(int s) {
+<span class="nc" id="L188">        status = s;</span>
+<span class="nc" id="L189">    }</span>
+
+    Hashtable getValues() {
+<span class="nc" id="L192">        return values;</span>
+    }
+
+    void setValues(Hashtable values) {
+<span class="nc" id="L196">        this.values = values;</span>
+<span class="nc" id="L197">    }</span>
+
+    /**
+     * Returns the type of the object
+     *
+     * @return the type of the object
+     */
+    public String getType() {
+<span class="nc" id="L205">        return getString(CloudStorage.TYPE_FIELD);</span>
+    }
+
+    /**
+     * Set the type of the object
+     *
+     * @param type the type of the field
+     */
+    public void setType(String type) {
+<span class="nc" id="L214">        setString(CloudStorage.TYPE_FIELD, type);</span>
+<span class="nc" id="L215">    }</span>
+
+    /**
+     * Only indexed values can be queried and sorted
+     *
+     * @param index the index which must be a value between 1 and 10.
+     * @param value the value for the given index
+     */
+    public void setIndexString(int index, String value) {
+<span class="nc bnc" id="L224" title="All 4 branches missed.">        if (index &gt; 10 || index &lt; 1) {</span>
+<span class="nc" id="L225">            throw new IllegalArgumentException(&quot;Invalid index: &quot; + index);</span>
+        }
+<span class="nc" id="L227">        setString(CloudStorage.INDEX_FIELD + index, value);</span>
+<span class="nc" id="L228">    }</span>
+
+    /**
+     * Returns the index value for the given index number
+     *
+     * @param index the index number
+     * @return the value of this entry for that index as a String
+     */
+    public String getIndexString(int index) {
+<span class="nc" id="L237">        return getString(CloudStorage.INDEX_FIELD + index);</span>
+    }
+
+    /**
+     * Only indexed values can be queried and sorted
+     *
+     * @param index the index which must be a value between 1 and 10.
+     * @param value the value for the given index
+     */
+    public void setIndexLong(int index, long value) {
+<span class="nc bnc" id="L247" title="All 4 branches missed.">        if (index &gt; 10 || index &lt; 1) {</span>
+<span class="nc" id="L248">            throw new IllegalArgumentException(&quot;Invalid index: &quot; + index);</span>
+        }
+<span class="nc" id="L250">        setLong(CloudStorage.INDEX_FIELD + index, value);</span>
+<span class="nc" id="L251">    }</span>
+
+    /**
+     * Returns the index value for the given index number
+     *
+     * @param index the index number
+     * @return the value of this entry for that index as a Long value
+     */
+    public Long getIndexLong(int index) {
+<span class="nc" id="L260">        return getLong(CloudStorage.INDEX_FIELD + index);</span>
+    }
+
+    /**
+     * Only indexed values can be queried and sorted
+     *
+     * @param index the index which must be a value between 1 and 10.
+     * @param value the value for the given index
+     */
+    public void setIndexDouble(int index, double value) {
+<span class="nc bnc" id="L270" title="All 4 branches missed.">        if (index &gt; 10 || index &lt; 1) {</span>
+<span class="nc" id="L271">            throw new IllegalArgumentException(&quot;Invalid index: &quot; + index);</span>
+        }
+<span class="nc" id="L273">        setDouble(CloudStorage.INDEX_FIELD + index, value);</span>
+<span class="nc" id="L274">    }</span>
+
+    /**
+     * Returns the index value for the given index number
+     *
+     * @param index the index number
+     * @return the value of this entry for that index as a Double value
+     */
+    public Double getIndexDouble(int index) {
+<span class="nc" id="L283">        return getDouble(CloudStorage.INDEX_FIELD + index);</span>
+    }
+
+    /**
+     * Returns true if this object is owned by me or is world writeable
+     *
+     * @return ownership status
+     */
+    public boolean isOwner() {
+<span class="nc" id="L292">        return owner;</span>
+    }
+
+    /**
+     * The object id is a unique key that allows you to find an object that was persisted in the
+     * store (a primary key). When it is null the object is effectively unsynchronized!
+     *
+     * @return the object id or null for an object that isn't fully persisted yet
+     */
+    public String getCloudId() {
+<span class="nc" id="L302">        return cloudId;</span>
+    }
+
+    void setCloudId(String cloudId) {
+<span class="nc" id="L306">        this.cloudId = cloudId;</span>
+<span class="nc" id="L307">    }</span>
+
+    /**
+     * Indicates the last modification date for the object
+     *
+     * @return the last modification date
+     */
+    public long getLastModified() {
+<span class="nc" id="L315">        return lastModified;</span>
+    }
+
+    void setLastModified(long lastModified) {
+<span class="nc" id="L319">        this.lastModified = lastModified;</span>
+<span class="nc" id="L320">    }</span>
+
+    /**
+     * Allows us to extract an object from the cloud object without knowing its type in advance
+     * or whether it exists
+     *
+     * @param key the key for the object
+     * @return the value of the object
+     */
+    public Object getObject(String key) {
+<span class="nc" id="L330">        Object o = values.get(key);</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L332">            CustomProperty cp = custom.get(key);</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            if (cp != null) {</span>
+<span class="nc" id="L334">                return cp.propertyValue(this, key);</span>
+            }
+        }
+<span class="nc" id="L337">        return o;</span>
+    }
+
+    /**
+     * Sets a value that can be no more than 512 characters
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setString(String key, String value) {
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L348">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L351">            values.remove(key);</span>
+<span class="nc" id="L352">            return;</span>
+        }
+<span class="nc bnc" id="L354" title="All 2 branches missed.">        if (value.length() &gt; 512) {</span>
+<span class="nc" id="L355">            throw new IllegalArgumentException(&quot;String too long!&quot;);</span>
+        }
+<span class="nc" id="L357">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L358">        values.put(key, value);</span>
+<span class="nc" id="L359">    }</span>
+
+    /**
+     * Returns the value for the given key
+     *
+     * @param key the key
+     * @return a string value
+     */
+    public String getString(String key) {
+<span class="nc" id="L368">        return (String) getObject(key);</span>
+    }
+
+    /**
+     * Delete an entry within the object
+     *
+     * @param key the key to remove from the object
+     */
+    public void remove(String key) {
+<span class="nc" id="L377">        values.remove(key);</span>
+<span class="nc" id="L378">    }</span>
+
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setLong(String key, long value) {
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L389">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L391">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L392">        values.put(key, Long.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+<span class="nc" id="L393">    }</span>
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setLong(String key, Long value) {
+<span class="nc bnc" id="L402" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L403">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L405">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L406">        values.put(key, value);</span>
+<span class="nc" id="L407">    }</span>
+
+    /**
+     * Returns the value for the given key
+     *
+     * @param key the key
+     * @return a long value
+     */
+    public Long getLong(String key) {
+<span class="nc" id="L416">        Object o = getObject(key);</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (o instanceof Integer) {</span>
+<span class="nc" id="L418">            return Long.valueOf(((Integer) o).intValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+        }
+<span class="nc" id="L420">        return (Long) o;</span>
+    }
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setInteger(String key, int value) {
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L431">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L433">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L434">        values.put(key, Integer.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+<span class="nc" id="L435">    }</span>
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setInteger(String key, Integer value) {
+<span class="nc bnc" id="L444" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L445">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L447">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L448">        values.put(key, value);</span>
+<span class="nc" id="L449">    }</span>
+
+    /**
+     * Returns the value for the given key
+     *
+     * @param key the key
+     * @return a value
+     */
+    public Integer getInteger(String key) {
+<span class="nc" id="L458">        Object o = getObject(key);</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        if (o instanceof Long) {</span>
+<span class="nc" id="L460">            return Integer.valueOf((int) ((Long) o).longValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+        }
+<span class="nc" id="L462">        return (Integer) o;</span>
+    }
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setDouble(String key, double value) {
+<span class="nc bnc" id="L472" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L473">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L475">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L476">        values.put(key, Double.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+<span class="nc" id="L477">    }</span>
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setDouble(String key, Double value) {
+<span class="nc bnc" id="L486" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L487">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L489">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L490">        values.put(key, value);</span>
+<span class="nc" id="L491">    }</span>
+
+    /**
+     * Returns the value for the given key
+     *
+     * @param key the key
+     * @return a value
+     */
+    public Double getDouble(String key) {
+<span class="nc" id="L500">        return (Double) getObject(key);</span>
+    }
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setFloat(String key, float value) {
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L511">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L513">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L514">        values.put(key, Float.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+<span class="nc" id="L515">    }</span>
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setFloat(String key, Float value) {
+<span class="nc bnc" id="L524" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L525">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L527">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L528">        values.put(key, value);</span>
+<span class="nc" id="L529">    }</span>
+
+    /**
+     * Returns the value for the given key
+     *
+     * @param key the key
+     * @return a value
+     */
+    public Float getFloat(String key) {
+<span class="nc" id="L538">        Object o = getObject(key);</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">        if (o instanceof Double) {</span>
+<span class="nc" id="L540">            return Float.valueOf(((Double) o).floatValue()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+        }
+<span class="nc" id="L542">        return (Float) o;</span>
+    }
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setBoolean(String key, boolean value) {
+<span class="nc bnc" id="L552" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L553">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L555">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L556">        values.put(key, Boolean.valueOf(value)); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+<span class="nc" id="L557">    }</span>
+
+    /**
+     * Sets a value
+     *
+     * @param key   the key for the given value
+     * @param value the value
+     */
+    public void setBoolean(String key, Boolean value) {
+<span class="nc bnc" id="L566" title="All 2 branches missed.">        if (!owner) {</span>
+<span class="nc" id="L567">            throw new RuntimeException(&quot;Read only object, you are not the owner&quot;);</span>
+        }
+<span class="nc" id="L569">        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L570">        values.put(key, value);</span>
+<span class="nc" id="L571">    }</span>
+
+    /**
+     * Returns the value for the given key
+     *
+     * @param key the key
+     * @return a value
+     */
+    public Boolean getBoolean(String key) {
+<span class="nc" id="L580">        return (Boolean) getObject(key);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getVersion() {
+<span class="nc" id="L587">        return 1;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void externalize(DataOutputStream out) throws IOException {
+<span class="nc" id="L594">        Util.writeUTF(cloudId, out);</span>
+<span class="nc" id="L595">        out.writeBoolean(owner);</span>
+<span class="nc" id="L596">        out.writeByte(getAccessPermissions());</span>
+<span class="nc" id="L597">        out.writeLong(lastModified);</span>
+<span class="nc" id="L598">        out.writeInt(status);</span>
+<span class="nc" id="L599">        Util.writeObject(values, out);</span>
+<span class="nc" id="L600">    }</span>
+
+
+    public String getObjectId() {
+<span class="nc" id="L604">        return &quot;CloudObject&quot;;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void internalize(int version, DataInputStream in) throws IOException {
+<span class="nc" id="L611">        cloudId = Util.readUTF(in);</span>
+<span class="nc" id="L612">        owner = in.readBoolean();</span>
+<span class="nc" id="L613">        accessPermissions = in.readByte();</span>
+<span class="nc" id="L614">        lastModified = in.readLong();</span>
+<span class="nc" id="L615">        status = in.readInt();</span>
+<span class="nc" id="L616">        values = (Hashtable) Util.readObject(in);</span>
+<span class="nc" id="L617">    }</span>
+
+    /**
+     * The access permissions for an object can only be changed for an object in which
+     * the current user is the owner
+     *
+     * @return the accessPermissions
+     */
+    public int getAccessPermissions() {
+<span class="nc" id="L626">        return accessPermissions;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L633" title="All 2 branches missed.">        if (!(o instanceof CloudObject)) {</span>
+<span class="nc" id="L634">            return false;</span>
+        }
+<span class="nc" id="L636">        CloudObject cl = (CloudObject) o;</span>
+<span class="nc bnc" id="L637" title="All 4 branches missed.">        if (cloudId == null &amp;&amp; cl.cloudId == null) {</span>
+<span class="nc" id="L638">            return values.equals(cl.values);</span>
+        }
+<span class="nc bnc" id="L640" title="All 4 branches missed.">        if (cloudId == null || cl.cloudId == null) {</span>
+<span class="nc" id="L641">            return false;</span>
+        }
+<span class="nc" id="L643">        return cloudId.equals(cl.cloudId);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+<span class="nc bnc" id="L650" title="All 2 branches missed.">        if (cloudId != null) {</span>
+<span class="nc" id="L651">            return cloudId.hashCode();</span>
+        }
+<span class="nc" id="L653">        return 0;</span>
+    }
+
+    /**
+     * Binds a UI tree to the cloud object so its values automatically update in the cloud object
+     *
+     * @param ui         the component tree to bind
+     * @param defer      bind settings whether to defer the binding which requires developers to explicitly commit
+     *                   the binding to perform the changes
+     * @param objectLead if set to true the UI property is initialized from values in the CloudObject, if false
+     *                   the cloud object property is initialized from the UI
+     */
+    public void bindTree(Container ui, int defer, boolean objectLead) {
+<span class="nc" id="L666">        int componentCount = ui.getComponentCount();</span>
+<span class="nc bnc" id="L667" title="All 2 branches missed.">        for (int iter = 0; iter &lt; componentCount; iter++) {</span>
+<span class="nc" id="L668">            Component c = ui.getComponentAt(iter);</span>
+<span class="nc bnc" id="L669" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L670">                bindTree((Container) c, defer, objectLead);</span>
+<span class="nc" id="L671">                continue;</span>
+            }
+
+<span class="nc" id="L674">            String bind = c.getCloudBoundProperty();</span>
+<span class="nc bnc" id="L675" title="All 4 branches missed.">            if (bind != null &amp;&amp; bind.length() &gt; 0) {</span>
+<span class="nc" id="L676">                String attributeName = c.getCloudDestinationProperty();</span>
+<span class="nc bnc" id="L677" title="All 2 branches missed.">                if (attributeName != null) {</span>
+<span class="nc" id="L678">                    bindProperty(c, bind, attributeName, defer, objectLead);</span>
+                }
+            }
+        }
+<span class="nc" id="L682">    }</span>
+
+    /**
+     * Clears the binding to this component tree
+     *
+     * @param ui the container whose children might be bound
+     */
+    public void unbindTree(Container ui) {
+<span class="nc" id="L690">        int componentCount = ui.getComponentCount();</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">        for (int iter = 0; iter &lt; componentCount; iter++) {</span>
+<span class="nc" id="L692">            Component c = ui.getComponentAt(iter);</span>
+<span class="nc bnc" id="L693" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L694">                unbindTree((Container) c);</span>
+<span class="nc" id="L695">                continue;</span>
+            }
+
+<span class="nc" id="L698">            String bind = c.getCloudBoundProperty();</span>
+<span class="nc bnc" id="L699" title="All 4 branches missed.">            if (bind != null &amp;&amp; bind.length() &gt; 0) {</span>
+<span class="nc" id="L700">                String attributeName = c.getCloudDestinationProperty();</span>
+<span class="nc bnc" id="L701" title="All 2 branches missed.">                if (attributeName != null) {</span>
+<span class="nc" id="L702">                    unbindProperty(c, bind);</span>
+                }
+            }
+        }
+<span class="nc" id="L706">    }</span>
+
+    /**
+     * Binds a property value within the given component to this cloud object, this means that
+     * when the component changes the cloud object changes unless deferred. If the defer flag is
+     * false all changes are stored in a temporary location and only &quot;committed&quot; once commitBindings()
+     * is invoked.
+     *
+     * @param cmp           the component to bind
+     * @param propertyName  the name of the property in the bound component
+     * @param attributeName the key within the cloud object
+     * @param defer         bind settings whether to defer the binding which requires developers to explicitly commit
+     *                      the binding to perform the changes
+     * @param objectLead    if set to true the UI property is initialized from values in the CloudObject, if false
+     *                      the cloud object property is initialized from the UI
+     */
+    public void bindProperty(Component cmp, final String propertyName, final String attributeName, final int defer, boolean objectLead) {
+<span class="nc bnc" id="L723" title="All 2 branches missed.">        if (objectLead) {</span>
+<span class="nc" id="L724">            Object val = values.get(attributeName);</span>
+<span class="nc" id="L725">            Object cmpVal = cmp.getBoundPropertyValue(propertyName);</span>
+<span class="nc bnc" id="L726" title="All 2 branches missed.">            if (val == null) {</span>
+<span class="nc bnc" id="L727" title="All 2 branches missed.">                if (cmpVal != null) {</span>
+<span class="nc" id="L728">                    cmp.setBoundPropertyValue(propertyName, null);</span>
+                }
+            } else {
+<span class="nc bnc" id="L731" title="All 2 branches missed.">                if (!(val.equals(cmpVal))) {</span>
+<span class="nc" id="L732">                    cmp.setBoundPropertyValue(propertyName, val);</span>
+                }
+            }
+<span class="nc" id="L735">        } else {</span>
+<span class="nc" id="L736">            Object val = values.get(attributeName);</span>
+<span class="nc" id="L737">            Object cmpVal = cmp.getBoundPropertyValue(propertyName);</span>
+<span class="nc bnc" id="L738" title="All 2 branches missed.">            if (cmpVal == null) {</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">                if (val != null) {</span>
+<span class="nc" id="L740">                    values.remove(attributeName);</span>
+<span class="nc" id="L741">                    status = STATUS_MODIFIED;</span>
+                }
+            } else {
+<span class="nc bnc" id="L744" title="All 4 branches missed.">                if (val == null || !(val.equals(cmpVal))) {</span>
+<span class="nc" id="L745">                    values.put(attributeName, cmpVal);</span>
+<span class="nc" id="L746">                    status = STATUS_MODIFIED;</span>
+                }
+            }
+        }
+<span class="nc" id="L750">        BindTarget target = new BindTarget() {</span>
+            public void propertyChanged(Component source, String propertyName, Object oldValue, Object newValue) {
+<span class="nc bnc" id="L752" title="All 4 branches missed.">                switch (defer) {</span>
+                    case BINDING_DEFERRED:
+<span class="nc bnc" id="L754" title="All 2 branches missed.">                        if (deferedValues == null) {</span>
+<span class="nc" id="L755">                            deferedValues = new Hashtable();</span>
+                        }
+<span class="nc" id="L757">                        deferedValues.put(attributeName, newValue);</span>
+<span class="nc" id="L758">                        break;</span>
+                    case BINDING_IMMEDIATE:
+<span class="nc" id="L760">                        values.put(attributeName, newValue);</span>
+<span class="nc" id="L761">                        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L762">                        break;</span>
+                    case BINDING_AUTO_SAVE:
+<span class="nc" id="L764">                        values.put(attributeName, newValue);</span>
+<span class="nc" id="L765">                        status = STATUS_MODIFIED;</span>
+<span class="nc" id="L766">                        CloudStorage.getInstance().save(CloudObject.this);</span>
+                        break;
+                }
+<span class="nc" id="L769">            }</span>
+        };
+<span class="nc" id="L771">        cmp.bindProperty(propertyName, target);</span>
+<span class="nc" id="L772">        cmp.putClientProperty(&quot;CN1Bind&quot; + propertyName, target);</span>
+<span class="nc" id="L773">    }</span>
+
+    /**
+     * Releases the binding for the specific property name
+     *
+     * @param cmp          the component
+     * @param propertyName the name of the property
+     */
+    public void unbindProperty(Component cmp, String propertyName) {
+<span class="nc" id="L782">        BindTarget t = (BindTarget) cmp.getClientProperty(&quot;CN1Bind&quot; + propertyName);</span>
+<span class="nc" id="L783">        cmp.unbindProperty(propertyName, t);</span>
+<span class="nc" id="L784">    }</span>
+
+    /**
+     * If deferred changes exist this method applies these changes to the data
+     */
+    public void commitBinding() {
+<span class="nc bnc" id="L790" title="All 4 branches missed.">        if (deferedValues != null &amp;&amp; deferedValues.size() &gt; 0) {</span>
+<span class="nc" id="L791">            Enumeration en = deferedValues.keys();</span>
+<span class="nc bnc" id="L792" title="All 2 branches missed.">            while (en.hasMoreElements()) {</span>
+<span class="nc" id="L793">                Object k = en.nextElement();</span>
+<span class="nc" id="L794">                values.put(k, deferedValues.get(k));</span>
+<span class="nc" id="L795">            }</span>
+<span class="nc" id="L796">            deferedValues = null;</span>
+        }
+<span class="nc" id="L798">    }</span>
+
+    /**
+     * If deferred changes exist this method discards such values
+     */
+    public void cancelBinding() {
+<span class="nc" id="L804">        deferedValues = null;</span>
+<span class="nc" id="L805">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

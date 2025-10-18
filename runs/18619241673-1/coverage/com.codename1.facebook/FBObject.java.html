@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FBObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.facebook</a> &gt; <span class="el_source">FBObject.java</span></div><h1>FBObject.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.facebook;
+
+import java.util.Hashtable;
+
+/**
+ * This is a base class for all FaceBook Objects
+ *
+ * @author Chen Fishbein
+ */
+public class FBObject {
+
+    private String id;
+
+    private String name;
+
+    /**
+     * Empty Contructor
+     */
+<span class="nc" id="L42">    public FBObject() {</span>
+<span class="nc" id="L43">    }</span>
+
+    /**
+     * This contructor initialize it's attributes from the given Hashtable
+     *
+     * @param props an Hashtable which contains the Object data
+     */
+<span class="nc" id="L50">    public FBObject(Hashtable props) {</span>
+<span class="nc" id="L51">        init(props);</span>
+<span class="nc" id="L52">    }</span>
+
+    /**
+     * Simple getter
+     *
+     * @return the facebook object id
+     */
+    public String getId() {
+<span class="nc" id="L60">        return id;</span>
+    }
+
+    /**
+     * Simple setter
+     *
+     * @param id the Object Id, each facebook element had an id
+     */
+    public void setId(String id) {
+<span class="nc" id="L69">        this.id = id;</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Simple getter
+     *
+     * @return the FB Object name
+     */
+    public String getName() {
+<span class="nc" id="L78">        return name;</span>
+    }
+
+
+    /**
+     * copies the relevant values from the given hashtable
+     *
+     * @param props an hashtable to copy from
+     */
+    public void copy(Hashtable props) {
+<span class="nc" id="L88">        init(props);</span>
+<span class="nc" id="L89">    }</span>
+
+    private void init(Hashtable props) {
+<span class="nc" id="L92">        id = (String) props.get(&quot;id&quot;);</span>
+<span class="nc" id="L93">        name = (String) props.get(&quot;name&quot;);</span>
+<span class="nc" id="L94">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L101">            return true;</span>
+        }
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (!(obj instanceof FBObject)) {</span>
+<span class="nc" id="L104">            return false;</span>
+        }
+<span class="nc" id="L106">        FBObject other = (FBObject) obj;</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (id == null) {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            return other.id == null;</span>
+        }
+<span class="nc" id="L110">        return id.equals(other.id);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return id != null ? id.hashCode() : 0;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

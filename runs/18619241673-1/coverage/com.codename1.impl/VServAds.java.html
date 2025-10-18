@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VServAds.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl</a> &gt; <span class="el_source">VServAds.java</span></div><h1>VServAds.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl;
+
+import com.codename1.components.WebBrowser;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.services.ImageDownloadService;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.BrowserNavigationCallback;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * The v-serv ad service implements full screen ads
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L52">public class VServAds extends FullScreenAdService {</span>
+    public static final int CAT_ID_ACTION_ADVENTURE = 18;
+    public static final int CAT_ID_SPORTS = 19;
+    public static final int CAT_ID_MOVIES = 20;
+    public static final int CAT_ID_KIDS = 21;
+    public static final int CAT_ID_RACING = 22;
+    public static final int CAT_ID_ARCADE = 23;
+    public static final int CAT_ID_ADULT = 24;
+    public static final int CAT_ID_STRATEGY = 25;
+    public static final int CAT_ID_TRAVEL = 27;
+    public static final int CAT_ID_EDUCATION = 28;
+    public static final int CAT_ID_PRODUCTIVITY = 29;
+    public static final int CAT_ID_ENTERTAINMENT = 30;
+    public static final int CAT_ID_MULTIMEDIA = 31;
+    public static final int CAT_ID_SPIRITUAL = 32;
+    public static final int CAT_ID_UTILITY = 33;
+    public static final int CAT_ID_SOCIAL_NETWORKING = 34;
+    public static final int CAT_ID_HEALTH = 35;
+    public static final int CAT_ID_OTHERS = 36;
+    private static final String URL = &quot;https://a.vserv.mobi/delivery/adapi.php&quot;;
+    boolean failed;
+<span class="nc" id="L73">    private String zoneId = &quot;6216&quot;;</span>
+    private String countryCode;
+    private String networkCode;
+<span class="nc" id="L76">    private String locale = &quot;en&quot;;</span>
+<span class="nc" id="L77">    private int category = CAT_ID_PRODUCTIVITY;</span>
+
+    private String destination;
+    private String imageURL;
+    private String contentType;
+    private int backgroundColor;
+    private String renderNotify;
+    private String actionNotify;
+
+    /**
+     * {@inheritDoc}
+     */
+    protected ConnectionRequest createAdRequest() {
+<span class="nc" id="L90">        ConnectionRequest con = new ConnectionRequest() {</span>
+            protected void handleErrorResponseCode(int code, String message) {
+<span class="nc" id="L92">                failed = true;</span>
+<span class="nc" id="L93">            }</span>
+
+            protected void handleException(Exception err) {
+<span class="nc" id="L96">                failed = true;</span>
+<span class="nc" id="L97">                Log.e(err);</span>
+<span class="nc" id="L98">            }</span>
+
+            private String getString(Hashtable h, String n) {
+<span class="nc" id="L101">                Object v = h.get(n);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (v == null) {</span>
+<span class="nc" id="L103">                    return null;</span>
+                }
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                if (v instanceof Vector) {</span>
+<span class="nc" id="L106">                    return (String) ((Vector) v).elementAt(0);</span>
+                }
+<span class="nc" id="L108">                return (String) v;</span>
+            }
+
+            protected void readResponse(InputStream input) throws IOException {
+<span class="nc" id="L112">                JSONParser parser = new JSONParser();</span>
+<span class="nc" id="L113">                Hashtable h = parser.parse(new InputStreamReader(input, &quot;UTF-8&quot;));</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                if (h.size() == 0) {</span>
+<span class="nc" id="L115">                    return;</span>
+                }
+<span class="nc" id="L117">                backgroundColor = Integer.parseInt((String) ((Hashtable) ((Vector) h.get(&quot;style&quot;)).elementAt(0)).get(&quot;background-color&quot;), 16);</span>
+<span class="nc" id="L118">                Hashtable actionHash = ((Hashtable) ((Vector) h.get(&quot;action&quot;)).elementAt(0));</span>
+<span class="nc" id="L119">                actionNotify = getString(actionHash, &quot;notify&quot;);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                if (actionNotify == null) {</span>
+<span class="nc" id="L121">                    actionNotify = getString(actionHash, &quot;notify-once&quot;);</span>
+                }
+
+<span class="nc" id="L124">                destination = (String) actionHash.get(&quot;data&quot;);</span>
+
+<span class="nc" id="L126">                Hashtable renderHash = ((Hashtable) ((Vector) h.get(&quot;render&quot;)).elementAt(0));</span>
+<span class="nc" id="L127">                contentType = (String) renderHash.get(&quot;type&quot;);</span>
+<span class="nc" id="L128">                renderNotify = getString(renderHash, &quot;notify&quot;);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                if (renderNotify == null) {</span>
+<span class="nc" id="L130">                    renderNotify = getString(renderHash, &quot;notify-once&quot;);</span>
+                }
+<span class="nc" id="L132">                imageURL = (String) renderHash.get(&quot;data&quot;);</span>
+<span class="nc" id="L133">            }</span>
+        };
+<span class="nc" id="L135">        con.setUrl(URL);</span>
+<span class="nc" id="L136">        con.setPost(false);</span>
+<span class="nc" id="L137">        con.addArgument(&quot;zoneid&quot;, getZoneId());</span>
+<span class="nc" id="L138">        con.addArgument(&quot;ua&quot;, Display.getInstance().getProperty(&quot;User-Agent&quot;, &quot;&quot;));</span>
+<span class="nc" id="L139">        con.addArgument(&quot;app&quot;, &quot;1&quot;);</span>
+<span class="nc" id="L140">        con.addArgument(&quot;aid&quot;, Display.getInstance().getProperty(&quot;androidId&quot;, &quot;&quot;));</span>
+<span class="nc" id="L141">        con.addArgument(&quot;uuid&quot;, Display.getInstance().getProperty(&quot;uuid&quot;, &quot;&quot;));</span>
+<span class="nc" id="L142">        con.addArgument(&quot;im&quot;, Display.getInstance().getProperty(&quot;imei&quot;, &quot;&quot;));</span>
+<span class="nc" id="L143">        con.addArgument(&quot;sw&quot;, &quot;&quot; + Display.getInstance().getDisplayWidth());</span>
+<span class="nc" id="L144">        con.addArgument(&quot;sh&quot;, &quot;&quot; + Display.getInstance().getDisplayHeight());</span>
+<span class="nc" id="L145">        con.addArgument(&quot;mn&quot;, Display.getInstance().getProperty(&quot;AppName&quot;, &quot;&quot;));</span>
+<span class="nc" id="L146">        con.addArgument(&quot;vs3&quot;, &quot;1&quot;);</span>
+<span class="nc" id="L147">        con.addArgument(&quot;partnerid&quot;, &quot;1&quot;);</span>
+<span class="nc" id="L148">        con.addArgument(&quot;zc&quot;, &quot;&quot; + category);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (countryCode != null) {</span>
+<span class="nc" id="L150">            con.addArgument(&quot;cc&quot;, countryCode);</span>
+        }
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (networkCode != null) {</span>
+<span class="nc" id="L153">            con.addArgument(&quot;nc&quot;, networkCode);</span>
+        }
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (locale != null) {</span>
+<span class="nc" id="L156">            con.addArgument(&quot;lc&quot;, locale);</span>
+        }
+<span class="nc" id="L158">        return con;</span>
+    }
+
+    protected boolean hasPendingAd() {
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        return imageURL != null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void clearPendingAd() {
+<span class="nc" id="L169">        imageURL = null;</span>
+<span class="nc" id="L170">        renderNotify = null;</span>
+
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Component getPendingAd() {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (imageURL == null) {</span>
+<span class="nc" id="L179">            return null;</span>
+        }
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (renderNotify != null &amp;&amp; renderNotify.length() &gt; 0) {</span>
+<span class="nc" id="L182">            ConnectionRequest c = new ConnectionRequest();</span>
+<span class="nc" id="L183">            c.setFailSilently(true);</span>
+<span class="nc" id="L184">            c.setUrl(renderNotify);</span>
+<span class="nc" id="L185">            c.setPost(false);</span>
+<span class="nc" id="L186">            NetworkManager.getInstance().addToQueue(c);</span>
+        }
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (&quot;image&quot;.equalsIgnoreCase(contentType)) {</span>
+<span class="nc" id="L189">            Button adComponent = new Button() {</span>
+
+                public void setIcon(Image icon) {
+<span class="nc bnc" id="L192" title="All 4 branches missed.">                    if (icon != null &amp;&amp; isScaleMode()) {</span>
+<span class="nc" id="L193">                        icon = icon.scaledWidth(Display.getInstance().getDisplayWidth());</span>
+                    }
+<span class="nc" id="L195">                    super.setIcon(icon);</span>
+<span class="nc" id="L196">                }</span>
+
+            };
+<span class="nc" id="L199">            adComponent.setUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L200">            adComponent.getStyle().setBgColor(backgroundColor);</span>
+<span class="nc" id="L201">            adComponent.getStyle().setOpacity(0xff);</span>
+<span class="nc" id="L202">            ImageDownloadService imd = new ImageDownloadService(imageURL, adComponent);</span>
+<span class="nc" id="L203">            NetworkManager.getInstance().addToQueueAndWait(imd);</span>
+            /*adComponent.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    Display.getInstance().execute(getAdDestination());
+                }
+            });*/
+<span class="nc" id="L209">            return adComponent;</span>
+        } else {
+<span class="nc" id="L211">            WebBrowser wb = new WebBrowser();</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            if (wb.getInternal() instanceof BrowserComponent) {</span>
+<span class="nc" id="L213">                BrowserComponent bc = (BrowserComponent) wb.getInternal();</span>
+<span class="nc" id="L214">                bc.setBrowserNavigationCallback(new BrowserNavigationCallback() {</span>
+                    public boolean shouldNavigate(final String url) {
+<span class="nc" id="L216">                        unlock(new ActionListener() {</span>
+                            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L218">                                Display.getInstance().execute(url);</span>
+<span class="nc" id="L219">                            }</span>
+                        });
+<span class="nc" id="L221">                        return false;</span>
+                    }
+                });
+            }
+<span class="nc" id="L225">            wb.setURL(imageURL);</span>
+<span class="nc" id="L226">            return wb;</span>
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected String getAdDestination() {
+<span class="nc bnc" id="L234" title="All 4 branches missed.">        if (actionNotify != null &amp;&amp; actionNotify.length() &gt; 0) {</span>
+<span class="nc" id="L235">            ConnectionRequest c = new ConnectionRequest();</span>
+<span class="nc" id="L236">            c.setFailSilently(true);</span>
+<span class="nc" id="L237">            c.setUrl(actionNotify);</span>
+<span class="nc" id="L238">            c.setPost(false);</span>
+<span class="nc" id="L239">            NetworkManager.getInstance().addToQueue(c);</span>
+        }
+<span class="nc" id="L241">        return destination;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected boolean failed() {
+<span class="nc" id="L248">        return failed;</span>
+    }
+
+    /**
+     * @return the countryCode
+     */
+    public String getCountryCode() {
+<span class="nc" id="L255">        return countryCode;</span>
+    }
+
+    /**
+     * @param countryCode the countryCode to set
+     */
+    public void setCountryCode(String countryCode) {
+<span class="nc" id="L262">        this.countryCode = countryCode;</span>
+<span class="nc" id="L263">    }</span>
+
+    /**
+     * @return the networkCode
+     */
+    public String getNetworkCode() {
+<span class="nc" id="L269">        return networkCode;</span>
+    }
+
+    /**
+     * @param networkCode the networkCode to set
+     */
+    public void setNetworkCode(String networkCode) {
+<span class="nc" id="L276">        this.networkCode = networkCode;</span>
+<span class="nc" id="L277">    }</span>
+
+    /**
+     * @return the locale
+     */
+    public String getLocale() {
+<span class="nc" id="L283">        return locale;</span>
+    }
+
+    /**
+     * @param locale the locale to set
+     */
+    public void setLocale(String locale) {
+<span class="nc" id="L290">        this.locale = locale;</span>
+<span class="nc" id="L291">    }</span>
+
+    /**
+     * @return the category
+     */
+    public int getCategory() {
+<span class="nc" id="L297">        return category;</span>
+    }
+
+    /**
+     * @param category the category to set
+     */
+    public void setCategory(int category) {
+<span class="nc" id="L304">        this.category = category;</span>
+<span class="nc" id="L305">    }</span>
+
+    /**
+     * @return the zoneId
+     */
+    public String getZoneId() {
+<span class="nc" id="L311">        return zoneId;</span>
+    }
+
+    /**
+     * @param zoneId the zoneId to set
+     */
+    public void setZoneId(String zoneId) {
+<span class="nc" id="L318">        this.zoneId = zoneId;</span>
+<span class="nc" id="L319">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isAllowSkipping() {
+<span class="nc" id="L326">        return true;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

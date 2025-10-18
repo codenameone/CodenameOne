@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InnerActive.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ads</a> &gt; <span class="el_source">InnerActive.java</span></div><h1>InnerActive.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ads;
+
+import com.codename1.components.Ads;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * This is an Ad service implementation by InnerActive see:
+ * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+ *
+ * @author Chen
+ */
+public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField removed obsolete field
+
+    private static final String protocolVersion = &quot;Sm2m-1.5.3&quot;;
+<span class="nc" id="L42">    private static boolean testAds = true;</span>
+<span class="nc" id="L43">    private final String REQUEST_URL = &quot;http://m2m1.inner-active.com/simpleM2M/clientRequestHtmlAd&quot;;</span>
+    //Distribution channel ID
+<span class="nc" id="L45">    private int po = 559;</span>
+    private String os;
+    //UDID/IMEI
+    private String hid;
+<span class="nc" id="L49">    private boolean banner = true;</span>
+
+    /**
+     * Empty constructor of the inner active ads service.
+     */
+<span class="nc" id="L54">    public InnerActive() {</span>
+<span class="nc" id="L55">    }</span>
+
+    private static void addParam(ConnectionRequest req, String key, String val) {
+<span class="nc bnc" id="L58" title="All 4 branches missed.">        if (val != null &amp;&amp; val.length() &gt; 0) {</span>
+<span class="nc" id="L59">            req.addArgument(key, val);</span>
+        }
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * If true and no ads exists the network will return house holds ads
+     *
+     * @param test
+     */
+    public static void setTestAds(boolean test) {
+<span class="nc" id="L69">        testAds = test;</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Sets this ads type, by default this a banner type.
+     *
+     * @param banner sets the ads to banners or text ads
+     */
+    public void setBanner(boolean banner) {
+<span class="nc" id="L78">        this.banner = banner;</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * initialize the ads service
+     */
+    public void initService(Ads ads) {
+<span class="nc" id="L85">        this.os = Display.getInstance().getPlatformName();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (os.equals(&quot;and&quot;)) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (banner) {</span>
+<span class="nc" id="L88">                po = 559;</span>
+            } else {
+<span class="nc" id="L90">                po = 600;</span>
+            }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        } else if (os.equals(&quot;rim&quot;)) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (banner) {</span>
+<span class="nc" id="L94">                po = 635;</span>
+            } else {
+<span class="nc" id="L96">                po = 634;</span>
+            }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        } else if (os.equals(&quot;ios&quot;)) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (banner) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L101">                    po = 947;</span>
+                } else {
+<span class="nc" id="L103">                    po = 642;</span>
+                }
+            } else {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L107">                    po = 946;</span>
+                } else {
+<span class="nc" id="L109">                    po = 632;</span>
+                }
+            }
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        } else if (os.equals(&quot;me&quot;)) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (banner) {</span>
+<span class="nc" id="L114">                po = 551;</span>
+            } else {
+<span class="nc" id="L116">                po = 519;</span>
+            }
+        }
+
+<span class="nc" id="L120">        String url = REQUEST_URL;</span>
+<span class="nc" id="L121">        setPost(false);</span>
+<span class="nc" id="L122">        setUrl(url);</span>
+<span class="nc" id="L123">        addParam(this, &quot;aid&quot;, ads.getAppID());</span>
+<span class="nc" id="L124">        addParam(this, &quot;po&quot;, &quot;&quot; + po);</span>
+        //protocol version
+<span class="nc" id="L126">        String version = protocolVersion;</span>
+<span class="nc" id="L127">        addParam(this, &quot;v&quot;, version);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (os.equals(&quot;ios&quot;)) {</span>
+<span class="nc" id="L129">            hid = Display.getInstance().getProperty(&quot;UDID&quot;, null);</span>
+        } else {
+<span class="nc" id="L131">            hid = Display.getInstance().getProperty(&quot;IMEI&quot;, null);</span>
+        }
+<span class="nc" id="L133">        addParam(this, &quot;hid&quot;, hid);</span>
+<span class="nc" id="L134">        addParam(this, &quot;w&quot;, &quot;&quot; + Display.getInstance().getDisplayWidth());</span>
+<span class="nc" id="L135">        addParam(this, &quot;h&quot;, &quot;&quot; + Display.getInstance().getDisplayHeight());</span>
+
+        //add optional params
+<span class="nc" id="L138">        addParam(this, &quot;a&quot;, ads.getAge());</span>
+<span class="nc" id="L139">        addParam(this, &quot;g&quot;, ads.getGender());</span>
+<span class="nc" id="L140">        addParam(this, &quot;c&quot;, ads.getCategory());</span>
+<span class="nc" id="L141">        addParam(this, &quot;l&quot;, ads.getLocation());</span>
+
+<span class="nc" id="L143">        addParam(this, &quot;mn&quot;, Display.getInstance().getProperty(&quot;MSISDN&quot;, null));</span>
+<span class="nc" id="L144">        String[] keywords = ads.getKeywords();</span>
+<span class="nc bnc" id="L145" title="All 4 branches missed.">        if (keywords != null &amp;&amp; keywords.length &gt; 0) {</span>
+<span class="nc" id="L146">            int klen = keywords.length;</span>
+<span class="nc" id="L147">            String k = &quot;&quot;;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            for (int i = 0; i &lt; klen; i++) {</span>
+<span class="nc" id="L149">                k += &quot;,&quot; + keywords[i];</span>
+            }
+<span class="nc" id="L151">            addParam(this, &quot;k&quot;, k.substring(1));</span>
+        }
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (testAds) {</span>
+<span class="nc" id="L154">            addParam(this, &quot;test&quot;, &quot;1&quot;);</span>
+        }
+<span class="nc" id="L156">        setDuplicateSupported(true);</span>
+<span class="nc" id="L157">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void readResponse(InputStream input) throws IOException {
+<span class="nc" id="L163">        StringBuffer buf = new StringBuffer();</span>
+<span class="nc" id="L164">        byte[] buffer = new byte[256];</span>
+        int len;
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        while ((len = input.read(buffer)) &gt; 0) {</span>
+<span class="nc" id="L167">            String temp = new String(buffer, 0, len, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L168">            int endOfFile = temp.indexOf(&quot;/html&gt;&quot;);</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (endOfFile &gt; 0) {</span>
+<span class="nc" id="L170">                buf.append(temp.toCharArray(), 0, endOfFile + 6);</span>
+<span class="nc" id="L171">                break;</span>
+            } else {
+<span class="nc" id="L173">                buf.append(temp);</span>
+            }
+<span class="nc" id="L175">        }</span>
+<span class="nc" id="L176">        String s = buf.toString();</span>
+//        if(s.indexOf(&quot;ci=&quot;) &gt; -1){
+//            String ci = s.substring(s.indexOf(&quot;ci=&quot;) + 3, s.length());
+//            cid = ci.substring(0, ci.indexOf(&quot;&amp;&quot;));
+//            Storage.getInstance().writeObject(&quot;cid&quot;, cid);
+//            Storage.getInstance().flushStorageCache();            
+//            addParam(this, &quot;cid&quot;, cid);
+//        }
+<span class="nc" id="L184">        fireResponseListener(new ActionEvent(s, ActionEvent.Type.Response));</span>
+<span class="nc" id="L185">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsyncDocumentRequestHandlerImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">AsyncDocumentRequestHandlerImpl.java</span></div><h1>AsyncDocumentRequestHandlerImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+
+/**
+ * Implementation of the HTML components document request handler to allow simple
+ * HTML support in CodenameOne.
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L42">public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandler {</span>
+<span class="nc" id="L43">    protected static final Object LOCK = new Object();</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
+<span class="nc" id="L49">        String url = docInfo.getUrl();</span>
+<span class="nc bnc" id="L50" title="All 6 branches missed.">        if (url.startsWith(&quot;jar://&quot;) || url.startsWith(&quot;res://&quot;) || url.startsWith(&quot;local://&quot;)) {</span>
+<span class="nc" id="L51">            super.resourceRequestedAsync(docInfo, callback);</span>
+<span class="nc" id="L52">            return;</span>
+        }
+<span class="nc" id="L54">        visitingURL(url);</span>
+<span class="nc" id="L55">        resourceRequested(docInfo, callback);</span>
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public InputStream resourceRequested(DocumentInfo docInfo) {
+<span class="nc" id="L62">        return null;</span>
+    }
+
+    private InputStream resourceRequested(final DocumentInfo docInfo, final IOCallback callback) {
+        try {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (docInfo.getUrl().startsWith(&quot;file://&quot;)) {</span>
+<span class="nc" id="L68">                String url = docInfo.getUrl();</span>
+
+                // trim anchors
+<span class="nc" id="L71">                int hash = url.indexOf('#');</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                if (hash != -1) {</span>
+<span class="nc" id="L73">                    url = url.substring(0, hash);</span>
+                }
+<span class="nc" id="L75">                callback.streamReady(FileSystemStorage.getInstance().openInputStream(url), docInfo);</span>
+<span class="nc" id="L76">                return null;</span>
+            }
+<span class="nc" id="L78">        } catch (IOException ex) {</span>
+<span class="nc" id="L79">            Log.e(ex);</span>
+<span class="nc" id="L80">        }</span>
+<span class="nc" id="L81">        final Object[] response = new Object[1];</span>
+
+<span class="nc" id="L83">        ConnectionRequest reqest = createConnectionRequest(docInfo, callback, response);</span>
+<span class="nc" id="L84">        reqest.setPost(docInfo.isPostRequest());</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (docInfo.isPostRequest()) {</span>
+<span class="nc" id="L86">            reqest.setUrl(docInfo.getUrl());</span>
+<span class="nc" id="L87">            reqest.setWriteRequest(true);</span>
+        } else {
+<span class="nc" id="L89">            reqest.setUrl(docInfo.getFullUrl());</span>
+        }
+
+<span class="nc" id="L92">        NetworkManager.getInstance().addToQueue(reqest);</span>
+
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (callback == null) {</span>
+<span class="nc" id="L95">            synchronized (LOCK) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                while (response[0] == null) {</span>
+                    try {
+<span class="nc" id="L98">                        LOCK.wait(50);</span>
+<span class="nc" id="L99">                    } catch (InterruptedException ex) {</span>
+<span class="nc" id="L100">                        ex.printStackTrace();</span>
+<span class="nc" id="L101">                    }</span>
+                }
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                if (response[0] instanceof InputStream) {</span>
+<span class="nc" id="L104">                    return (InputStream) response[0];</span>
+                }
+
+                // we need a better way to handle this...
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                if (response[0] instanceof Throwable) {</span>
+<span class="nc" id="L109">                    ((Throwable) response[0]).printStackTrace();</span>
+                }
+<span class="nc" id="L111">            }</span>
+        }
+
+<span class="nc" id="L114">        return null;</span>
+    }
+
+    protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
+                                                        final IOCallback callback, final Object[] response) {
+<span class="nc" id="L119">        return new ConnectionRequest() {</span>
+
+            protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                if (isPost()) {</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                    if (docInfo.getParams() != null) {</span>
+<span class="nc" id="L124">                        OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding());</span>
+<span class="nc" id="L125">                        w.write(docInfo.getParams());</span>
+                    }
+                }
+<span class="nc" id="L128">            }</span>
+
+            protected void handleIOException(IOException err) {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                if (callback == null) {</span>
+<span class="nc" id="L132">                    response[0] = err;</span>
+                }
+<span class="nc" id="L134">                super.handleIOException(err);</span>
+<span class="nc" id="L135">            }</span>
+
+            protected boolean shouldAutoCloseResponse() {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                return callback != null;</span>
+            }
+
+            protected void readResponse(InputStream input) throws IOException {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (callback != null) {</span>
+<span class="nc" id="L143">                    callback.streamReady(input, docInfo);</span>
+                } else {
+<span class="nc" id="L145">                    response[0] = input;</span>
+<span class="nc" id="L146">                    synchronized (LOCK) {</span>
+<span class="nc" id="L147">                        LOCK.notify();</span>
+<span class="nc" id="L148">                    }</span>
+                }
+<span class="nc" id="L150">            }</span>
+
+        };
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

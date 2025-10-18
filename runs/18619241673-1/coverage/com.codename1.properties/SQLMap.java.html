@@ -1,0 +1,826 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SQLMap.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">SQLMap.java</span></div><h1>SQLMap.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import com.codename1.db.Cursor;
+import com.codename1.db.Database;
+import com.codename1.db.Row;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.EncodedImage;
+import com.codename1.util.Base64;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
+ * properly at this time.
+ *
+ * @author Shai Almog
+ */
+public class SQLMap {
+<span class="nc" id="L46">    private boolean verbose = true;</span>
+    private Database db;
+
+<span class="nc" id="L49">    private SQLMap() {</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Creates an SQL Map instance to the given database instance
+     *
+     * @param db the database connection instance
+     * @return an instance of the SQL mapping
+     */
+    public static SQLMap create(Database db) {
+<span class="nc" id="L59">        SQLMap s = new SQLMap();</span>
+<span class="nc" id="L60">        s.db = db;</span>
+<span class="nc" id="L61">        return s;</span>
+    }
+
+    private static String getColumnNameImpl(PropertyBase prop) {
+<span class="nc" id="L65">        String val = (String) prop.getClientProperty(&quot;cn1$sqlColumn&quot;);</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L67">            return prop.getName();</span>
+        }
+<span class="nc" id="L69">        return val;</span>
+    }
+
+    /**
+     * Sets the primary key for the component
+     *
+     * @param cmp the business object
+     * @param pk  the primary key field
+     */
+    public void setPrimaryKey(PropertyBusinessObject cmp, Property pk) {
+<span class="nc" id="L79">        cmp.getPropertyIndex().putMetaDataOfClass(&quot;cn1$pk&quot;, pk.getName());</span>
+<span class="nc" id="L80">    }</span>
+
+
+    /**
+     * Sets the primary key for the component and makes it auto-increment
+     *
+     * @param cmp the business object
+     * @param pk  the primary key field
+     */
+    public void setPrimaryKeyAutoIncrement(PropertyBusinessObject cmp, Property pk) {
+<span class="nc" id="L90">        cmp.getPropertyIndex().putMetaDataOfClass(&quot;cn1$pk&quot;, pk.getName());</span>
+<span class="nc" id="L91">        cmp.getPropertyIndex().putMetaDataOfClass(&quot;cn1$autoinc&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L92">    }</span>
+
+    /**
+     * Sets the sql type for the column
+     *
+     * @param p    the property
+     * @param type one of the enum values representing supported SQL data types
+     */
+    public void setSqlType(PropertyBase p, SqlType type) {
+<span class="nc" id="L101">        p.putClientProperty(&quot;cn1$colType&quot;, type);</span>
+<span class="nc" id="L102">    }</span>
+
+    /**
+     * Returns the SQL type for the given column
+     *
+     * @param p the property
+     * @return the sql data type
+     */
+    public SqlType getSqlType(PropertyBase p) {
+<span class="nc" id="L111">        SqlType s = (SqlType) p.getClientProperty(&quot;cn1$colType&quot;);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (p instanceof Property) {</span>
+<span class="nc" id="L114">                Class gt = p.getGenericType();</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                if (gt != null) {</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                    if (gt == Integer.class) {</span>
+<span class="nc" id="L117">                        return SqlType.SQL_INTEGER;</span>
+                    }
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                    if (gt == Boolean.class) {</span>
+<span class="nc" id="L120">                        return SqlType.SQL_BOOLEAN;</span>
+                    }
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                    if (gt == Long.class) {</span>
+<span class="nc" id="L123">                        return SqlType.SQL_LONG;</span>
+                    }
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                    if (gt == Short.class) {</span>
+<span class="nc" id="L126">                        return SqlType.SQL_SHORT;</span>
+                    }
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                    if (gt == Float.class) {</span>
+<span class="nc" id="L129">                        return SqlType.SQL_FLOAT;</span>
+                    }
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                    if (gt == Double.class) {</span>
+<span class="nc" id="L132">                        return SqlType.SQL_DOUBLE;</span>
+                    }
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                    if (gt == Date.class) {</span>
+<span class="nc" id="L135">                        return SqlType.SQL_DATE;</span>
+                    }
+<span class="nc bnc" id="L137" title="All 4 branches missed.">                    if (gt == EncodedImage.class || gt == byte[].class) {</span>
+<span class="nc" id="L138">                        return SqlType.SQL_BLOB;</span>
+                    }
+<span class="nc" id="L140">                    return SqlType.SQL_TEXT;</span>
+                }
+<span class="nc" id="L142">                Object val = p.get();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (val != null) {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                    if (val instanceof Long) {</span>
+<span class="nc" id="L145">                        return SqlType.SQL_LONG;</span>
+                    }
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                    if (val instanceof Integer) {</span>
+<span class="nc" id="L148">                        return SqlType.SQL_INTEGER;</span>
+                    }
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                    if (val instanceof Short) {</span>
+<span class="nc" id="L151">                        return SqlType.SQL_SHORT;</span>
+                    }
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                    if (val instanceof Float) {</span>
+<span class="nc" id="L154">                        return SqlType.SQL_FLOAT;</span>
+                    }
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                    if (val instanceof Double) {</span>
+<span class="nc" id="L157">                        return SqlType.SQL_DOUBLE;</span>
+                    }
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                    if (gt == Date.class) {</span>
+<span class="nc" id="L160">                        return SqlType.SQL_DATE;</span>
+                    }
+                }
+            }
+<span class="nc" id="L164">            return SqlType.SQL_TEXT;</span>
+        }
+<span class="nc" id="L166">        return s;</span>
+    }
+
+    /**
+     * By default the table name matches the property index name unless explicitly modified with this method
+     *
+     * @param cmp  the properties business object
+     * @param name the name of the table
+     */
+    public void setTableName(PropertyBusinessObject cmp, String name) {
+<span class="nc" id="L176">        cmp.getPropertyIndex().putMetaDataOfClass(&quot;cn1$tableName&quot;, name);</span>
+<span class="nc" id="L177">    }</span>
+
+    /**
+     * By default the table name matches the property index name unless explicitly modified with this method
+     *
+     * @param cmp the properties business object
+     * @return the name of the table
+     */
+    public String getTableName(PropertyBusinessObject cmp) {
+<span class="nc" id="L186">        String s = (String) cmp.getPropertyIndex().getMetaDataOfClass(&quot;cn1$tableName&quot;);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L188">            return s;</span>
+        }
+<span class="nc" id="L190">        return cmp.getPropertyIndex().getName();</span>
+    }
+
+    /**
+     * By default the column name matches the property name unless explicitly modified with this method
+     *
+     * @param prop a property instance, this will apply to all the property instances for the type
+     * @param name the name of the column
+     */
+    public void setColumnName(PropertyBase prop, String name) {
+<span class="nc" id="L200">        prop.putClientProperty(&quot;cn1$sqlColumn&quot;, name);</span>
+<span class="nc" id="L201">    }</span>
+
+    /**
+     * By default the column name matches the property name unless explicitly modified with this method
+     *
+     * @param prop a property instance, this will apply to all the property instances for the type
+     * @return the name of the property
+     */
+    public String getColumnName(PropertyBase prop) {
+<span class="nc" id="L210">        return getColumnNameImpl(prop);</span>
+    }
+
+    /**
+     * Creates a table matching the given property component if one doesn't exist yet
+     *
+     * @param cmp the business object
+     * @return true if the table was created false if it already existed
+     */
+    public boolean createTable(PropertyBusinessObject cmp) throws IOException {
+<span class="nc" id="L220">        String tableName = getTableName(cmp);</span>
+<span class="nc" id="L221">        Cursor cr = null;</span>
+<span class="nc" id="L222">        boolean has = false;</span>
+        try {
+<span class="nc" id="L224">            cr = executeQuery(&quot;SELECT * FROM sqlite_master WHERE type='table' AND name='&quot; + tableName + &quot;'&quot;);</span>
+<span class="nc" id="L225">            has = cr.next();</span>
+        } finally {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            if (cr != null) {</span>
+<span class="nc" id="L228">                cr.close();</span>
+            }
+        }
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (has) {</span>
+<span class="nc" id="L232">            return false;</span>
+        }
+<span class="nc" id="L234">        StringBuilder createStatement = new StringBuilder(&quot;CREATE TABLE &quot;);</span>
+<span class="nc" id="L235">        createStatement.append(tableName);</span>
+<span class="nc" id="L236">        createStatement.append(&quot; (&quot;);</span>
+
+<span class="nc" id="L238">        String pkName = (String) cmp.getPropertyIndex().getMetaDataOfClass(&quot;cn1$pk&quot;);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        boolean autoIncrement = cmp.getPropertyIndex().getMetaDataOfClass(&quot;cn1$autoinc&quot;) != null;</span>
+<span class="nc" id="L240">        boolean first = true;</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        for (PropertyBase p : cmp.getPropertyIndex()) {</span>
+<span class="nc" id="L242">            SqlType tp = getSqlType(p);</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (tp == SqlType.SQL_EXCLUDE) {</span>
+<span class="nc" id="L244">                continue;</span>
+            }
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (!first) {</span>
+<span class="nc" id="L247">                createStatement.append(&quot;,&quot;);</span>
+            }
+<span class="nc" id="L249">            first = false;</span>
+<span class="nc" id="L250">            String columnName = getColumnName(p);</span>
+<span class="nc" id="L251">            createStatement.append(columnName);</span>
+<span class="nc" id="L252">            createStatement.append(&quot; &quot;);</span>
+<span class="nc" id="L253">            createStatement.append(tp.dbType);</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            if (columnName.equalsIgnoreCase(pkName)) {</span>
+<span class="nc" id="L255">                createStatement.append(&quot; PRIMARY KEY&quot;);</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                if (autoIncrement) {</span>
+<span class="nc" id="L257">                    createStatement.append(&quot; AUTOINCREMENT&quot;);</span>
+                }
+            }
+<span class="nc" id="L260">        }</span>
+
+<span class="nc" id="L262">        createStatement.append(&quot;)&quot;);</span>
+
+<span class="nc" id="L264">        execute(createStatement.toString());</span>
+<span class="nc" id="L265">        return true;</span>
+    }
+
+    private void execute(String stmt) throws IOException {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L270">            Log.p(stmt);</span>
+        }
+<span class="nc" id="L272">        db.execute(stmt);</span>
+<span class="nc" id="L273">    }</span>
+
+    private void execute(String stmt, Object[] args) throws IOException {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L277">            Log.p(stmt);</span>
+        }
+<span class="nc" id="L279">        db.execute(stmt, args);</span>
+<span class="nc" id="L280">    }</span>
+
+    private Cursor executeQuery(String stmt, Object[] args) throws IOException {
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L284">            Log.p(stmt);</span>
+        }
+<span class="nc" id="L286">        return db.executeQuery(stmt, args);</span>
+    }
+
+    private Cursor executeQuery(String stmt) throws IOException {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L291">            Log.p(stmt);</span>
+        }
+<span class="nc" id="L293">        return db.executeQuery(stmt);</span>
+    }
+
+    /**
+     * Drop a table matching the given property component
+     *
+     * @param cmp the business object
+     */
+    public void dropTable(PropertyBusinessObject cmp) throws IOException {
+<span class="nc" id="L302">        String tableName = getTableName(cmp);</span>
+<span class="nc" id="L303">        execute(&quot;Drop table &quot; + tableName);</span>
+<span class="nc" id="L304">    }</span>
+
+    /**
+     * Adds a new business object into the database
+     *
+     * @param cmp the business component
+     */
+    public void insert(PropertyBusinessObject cmp) throws IOException {
+<span class="nc" id="L312">        String tableName = getTableName(cmp);</span>
+<span class="nc" id="L313">        StringBuilder createStatement = new StringBuilder(&quot;INSERT INTO &quot;);</span>
+<span class="nc" id="L314">        createStatement.append(tableName);</span>
+<span class="nc" id="L315">        createStatement.append(&quot; (&quot;);</span>
+
+<span class="nc" id="L317">        int count = 0;</span>
+<span class="nc" id="L318">        ArrayList&lt;Object&gt; values = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        for (PropertyBase p : cmp.getPropertyIndex()) {</span>
+<span class="nc" id="L320">            SqlType tp = getSqlType(p);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            if (tp == SqlType.SQL_EXCLUDE) {</span>
+<span class="nc" id="L322">                continue;</span>
+            }
+<span class="nc bnc" id="L324" title="All 2 branches missed.">            if (count &gt; 0) {</span>
+<span class="nc" id="L325">                createStatement.append(&quot;,&quot;);</span>
+            }
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (p instanceof Property) {</span>
+<span class="nc" id="L328">                values.add(tp.asUpdateInsertValue(p.get(), (Property) p));</span>
+            } else {
+                // TODO
+<span class="nc" id="L331">                values.add(null);</span>
+            }
+<span class="nc" id="L333">            count++;</span>
+<span class="nc" id="L334">            String columnName = getColumnName(p);</span>
+<span class="nc" id="L335">            createStatement.append(columnName);</span>
+<span class="nc" id="L336">        }</span>
+
+<span class="nc" id="L338">        createStatement.append(&quot;) VALUES (?&quot;);</span>
+
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        for (int iter = 1; iter &lt; values.size(); iter++) {</span>
+<span class="nc" id="L341">            createStatement.append(&quot;,?&quot;);</span>
+        }
+
+<span class="nc" id="L344">        createStatement.append(&quot;)&quot;);</span>
+
+<span class="nc" id="L346">        execute(createStatement.toString(), values.toArray());</span>
+<span class="nc" id="L347">    }</span>
+
+    /**
+     * The equivalent of an SQL update assumes that the object is already in the database
+     *
+     * @param cmp the component
+     * @throws IOException
+     */
+    public void update(PropertyBusinessObject cmp) throws IOException {
+<span class="nc" id="L356">        String pkName = (String) cmp.getPropertyIndex().getMetaDataOfClass(&quot;cn1$pk&quot;);</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">        if (pkName == null) {</span>
+<span class="nc" id="L358">            throw new IOException(&quot;Primary key required for update&quot;);</span>
+        }
+<span class="nc" id="L360">        String tableName = getTableName(cmp);</span>
+<span class="nc" id="L361">        StringBuilder createStatement = new StringBuilder(&quot;UPDATE &quot;);</span>
+<span class="nc" id="L362">        createStatement.append(tableName);</span>
+<span class="nc" id="L363">        createStatement.append(&quot; SET &quot;);</span>
+
+<span class="nc" id="L365">        int count = 0;</span>
+<span class="nc" id="L366">        ArrayList&lt;Object&gt; values = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        for (PropertyBase p : cmp.getPropertyIndex()) {</span>
+<span class="nc" id="L368">            SqlType tp = getSqlType(p);</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">            if (tp == SqlType.SQL_EXCLUDE) {</span>
+<span class="nc" id="L370">                continue;</span>
+            }
+<span class="nc bnc" id="L372" title="All 2 branches missed.">            if (count &gt; 0) {</span>
+<span class="nc" id="L373">                createStatement.append(&quot;,&quot;);</span>
+            }
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (p instanceof Property) {</span>
+<span class="nc" id="L376">                values.add(tp.asUpdateInsertValue(p.get(), (Property) p));</span>
+            } else {
+                // TODO
+<span class="nc" id="L379">                values.add(null);</span>
+            }
+<span class="nc" id="L381">            count++;</span>
+<span class="nc" id="L382">            String columnName = getColumnName(p);</span>
+<span class="nc" id="L383">            createStatement.append(columnName);</span>
+<span class="nc" id="L384">            createStatement.append(&quot; = ?&quot;);</span>
+<span class="nc" id="L385">        }</span>
+
+<span class="nc" id="L387">        createStatement.append(&quot; WHERE &quot;);</span>
+
+<span class="nc" id="L389">        createStatement.append(pkName);</span>
+<span class="nc" id="L390">        createStatement.append(&quot; = ?&quot;);</span>
+
+<span class="nc" id="L392">        Property p = (Property) cmp.getPropertyIndex().getIgnoreCase(pkName);</span>
+<span class="nc" id="L393">        values.add(p.get());</span>
+
+<span class="nc" id="L395">        execute(createStatement.toString(), values.toArray());</span>
+<span class="nc" id="L396">    }</span>
+
+    /**
+     * Deletes a table row matching the component
+     *
+     * @param cmp the component
+     */
+    public void delete(PropertyBusinessObject cmp) throws IOException {
+<span class="nc" id="L404">        String pkName = (String) cmp.getPropertyIndex().getMetaDataOfClass(&quot;cn1$pk&quot;);</span>
+<span class="nc" id="L405">        String tableName = getTableName(cmp);</span>
+<span class="nc" id="L406">        StringBuilder createStatement = new StringBuilder(&quot;DELETE FROM &quot;);</span>
+<span class="nc" id="L407">        createStatement.append(tableName);</span>
+<span class="nc" id="L408">        createStatement.append(&quot; WHERE &quot;);</span>
+
+
+<span class="nc bnc" id="L411" title="All 2 branches missed.">        if (pkName != null) {</span>
+<span class="nc" id="L412">            createStatement.append(pkName);</span>
+<span class="nc" id="L413">            createStatement.append(&quot; = ?&quot;);</span>
+<span class="nc" id="L414">            Property p = (Property) cmp.getPropertyIndex().getIgnoreCase(pkName);</span>
+<span class="nc" id="L415">            execute(createStatement.toString(), new Object[]{p.get()});</span>
+<span class="nc" id="L416">        } else {</span>
+<span class="nc" id="L417">            int count = 0;</span>
+<span class="nc" id="L418">            Object[] values = new Object[cmp.getPropertyIndex().getSize()];</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            for (PropertyBase p : cmp.getPropertyIndex()) {</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">                if (count != 0) {</span>
+<span class="nc" id="L421">                    createStatement.append(&quot;,&quot;);</span>
+                }
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                if (p instanceof Property) {</span>
+<span class="nc" id="L424">                    values[count] = p.get();</span>
+                } else {
+                    // TODO
+<span class="nc" id="L427">                    values[count] = null;</span>
+                }
+<span class="nc" id="L429">                count++;</span>
+<span class="nc" id="L430">                String columnName = getColumnName(p);</span>
+<span class="nc" id="L431">                createStatement.append(columnName);</span>
+<span class="nc" id="L432">                createStatement.append(&quot; = ?&quot;);</span>
+<span class="nc" id="L433">            }</span>
+<span class="nc" id="L434">            execute(createStatement.toString(), values);</span>
+        }
+<span class="nc" id="L436">    }</span>
+
+    /**
+     * Fetches the components from the database matching the given cmp description, the fields that aren't
+     * null within the cmp will match the where clause
+     *
+     * @param cmp         the component to match
+     * @param orderBy     the column to order by, can be null to ignore order
+     * @param ascending   true to indicate ascending order
+     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
+     * @param page        the page within the query to match the max elements value
+     * @return the result of the query
+     */
+    public java.util.List&lt;PropertyBusinessObject&gt; select(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+<span class="nc" id="L450">        return selectImpl(false, cmp, orderBy, ascending, maxElements, page);</span>
+    }
+
+    /**
+     * Fetches the components from the database matching the given cmp description, the fields that aren't
+     * null within the cmp will &lt;strong&gt;NOT&lt;/strong&gt; match the where clause
+     *
+     * @param cmp         the component to match
+     * @param orderBy     the column to order by, can be null to ignore order
+     * @param ascending   true to indicate ascending order
+     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
+     * @param page        the page within the query to match the max elements value
+     * @return the result of the query
+     */
+    public java.util.List&lt;PropertyBusinessObject&gt; selectNot(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+<span class="nc" id="L465">        return selectImpl(true, cmp, orderBy, ascending, maxElements, page);</span>
+    }
+
+    /**
+     * Fetches the components from the database matching the given cmp description, the fields that aren't
+     * null within the cmp will match the where clause
+     *
+     * @param not         indicates if the query should be a &quot;not&quot; query
+     * @param orderBy     the column to order by, can be null to ignore order
+     * @param ascending   true to indicate ascending order
+     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
+     * @param page        the page within the query to match the max elements value
+     * @return the result of the query
+     */
+    private java.util.List&lt;PropertyBusinessObject&gt; selectImpl(boolean not, PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+<span class="nc" id="L480">        ArrayList&lt;Object&gt; params = new ArrayList&lt;Object&gt;();</span>
+
+<span class="nc" id="L482">        StringBuilder createStatement = new StringBuilder();</span>
+<span class="nc" id="L483">        boolean found = false;</span>
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        for (PropertyBase p : cmp.getPropertyIndex()) {</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">            if (p instanceof Property) {</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                if (p.get() != null) {</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">                    if (found) {</span>
+<span class="nc" id="L488">                        createStatement.append(&quot; AND &quot;);</span>
+                    } else {
+<span class="nc" id="L490">                        createStatement.append(&quot; WHERE &quot;);</span>
+                    }
+<span class="nc" id="L492">                    found = true;</span>
+<span class="nc" id="L493">                    params.add(p.get());</span>
+<span class="nc" id="L494">                    createStatement.append(getColumnName(p));</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">                    if (not) {</span>
+<span class="nc" id="L496">                        createStatement.append(&quot; &lt;&gt; ?&quot;);</span>
+                    } else {
+<span class="nc" id="L498">                        createStatement.append(&quot; = ?&quot;);</span>
+                    }
+                }
+            }
+<span class="nc" id="L502">        }</span>
+<span class="nc" id="L503">        return selectImpl(cmp, createStatement.toString(), cmp.getClass(), params.toArray(), orderBy, ascending, maxElements, page);</span>
+    }
+
+    /**
+     * Fetches the components from the database matching the given cmp description, the fields that aren't
+     * null within the cmp will match the where clause
+     *
+     * @param where         the where statement
+     * @param propertyClass the class of the property business object
+     * @param params        the parameters to use in the where statement
+     * @param orderBy       the column to order by, can be null to ignore order
+     * @param ascending     true to indicate ascending order
+     * @param maxElements   the maximum number of elements returned can be 0 or lower to ignore
+     * @param page          the page within the query to match the max elements value
+     * @return the result of the query
+     */
+    private java.util.List&lt;PropertyBusinessObject&gt; selectImpl(PropertyBusinessObject cmp, String where, Class propertyClass, Object[] params, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
+<span class="nc" id="L520">        String tableName = getTableName(cmp);</span>
+<span class="nc" id="L521">        StringBuilder createStatement = new StringBuilder(&quot;SELECT * FROM &quot;);</span>
+<span class="nc" id="L522">        createStatement.append(tableName);</span>
+
+<span class="nc bnc" id="L524" title="All 4 branches missed.">        if (where != null &amp;&amp; where.length() &gt; 0) {</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">            if (!where.toUpperCase().startsWith(&quot; WHERE &quot;)) {</span>
+<span class="nc" id="L526">                createStatement.append(&quot; WHERE &quot;);</span>
+            }
+<span class="nc" id="L528">            createStatement.append(where);</span>
+        }
+
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        if (orderBy != null) {</span>
+<span class="nc" id="L532">            createStatement.append(&quot; ORDER BY &quot;);</span>
+<span class="nc" id="L533">            createStatement.append(getColumnName(orderBy));</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">            if (!ascending) {</span>
+<span class="nc" id="L535">                createStatement.append(&quot; DESC&quot;);</span>
+            }
+        }
+
+<span class="nc bnc" id="L539" title="All 2 branches missed.">        if (maxElements &gt; 0) {</span>
+<span class="nc" id="L540">            createStatement.append(&quot; LIMIT &quot;);</span>
+<span class="nc" id="L541">            createStatement.append(maxElements);</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">            if (page &gt; 0) {</span>
+<span class="nc" id="L543">                createStatement.append(&quot; OFFSET &quot;);</span>
+<span class="nc" id="L544">                createStatement.append(page * maxElements);</span>
+            }
+        }
+
+<span class="nc" id="L548">        Cursor c = null;</span>
+        try {
+<span class="nc" id="L550">            ArrayList&lt;PropertyBusinessObject&gt; response = new ArrayList&lt;PropertyBusinessObject&gt;();</span>
+<span class="nc" id="L551">            c = executeQuery(createStatement.toString(), params);</span>
+<span class="nc bnc" id="L552" title="All 2 branches missed.">            while (c.next()) {</span>
+<span class="nc" id="L553">                PropertyBusinessObject pb = (PropertyBusinessObject) propertyClass.newInstance();</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">                for (PropertyBase p : pb.getPropertyIndex()) {</span>
+<span class="nc" id="L555">                    Row currentRow = c.getRow();</span>
+<span class="nc" id="L556">                    SqlType t = getSqlType(p);</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">                    if (t == SqlType.SQL_EXCLUDE) {</span>
+<span class="nc" id="L558">                        continue;</span>
+                    }
+<span class="nc" id="L560">                    Object value = t.getValue(currentRow, c.getColumnIndex(getColumnName(p)), p);</span>
+<span class="nc bnc" id="L561" title="All 2 branches missed.">                    if (p instanceof Property) {</span>
+<span class="nc" id="L562">                        ((Property) p).set(value);</span>
+                    }
+<span class="nc" id="L564">                }</span>
+<span class="nc" id="L565">                response.add(pb);</span>
+<span class="nc" id="L566">            }</span>
+<span class="nc" id="L567">            c.close();</span>
+<span class="nc" id="L568">            return response;</span>
+<span class="nc" id="L569">        } catch (Throwable t) {</span>
+<span class="nc" id="L570">            Log.e(t);</span>
+<span class="nc bnc" id="L571" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L572">                c.close();</span>
+            }
+<span class="nc bnc" id="L574" title="All 2 branches missed.">            if (t instanceof IOException) {</span>
+<span class="nc" id="L575">                throw ((IOException) t);</span>
+            } else {
+<span class="nc" id="L577">                throw new IOException(t.toString());</span>
+            }
+        }
+    }
+
+    /**
+     * Fetches the components from the database matching the given select builder query
+     *
+     * @return the result of the query
+     */
+    public SelectBuilder selectBuild() {
+<span class="nc" id="L588">        return new SelectBuilder().seed();</span>
+    }
+
+    /**
+     * Toggle verbose mode
+     *
+     * @param verbose
+     */
+    public void setVerbose(boolean verbose) {
+<span class="nc" id="L597">        this.verbose = verbose;</span>
+<span class="nc" id="L598">    }</span>
+
+<span class="nc" id="L600">    public enum SqlType {</span>
+<span class="nc" id="L601">        SQL_EXCLUDE(null),</span>
+<span class="nc" id="L602">        SQL_TEXT(&quot;TEXT&quot;),</span>
+<span class="nc" id="L603">        SQL_INTEGER(&quot;INTEGER&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L606">                return row.getInteger(index);</span>
+            }
+        },
+<span class="nc" id="L609">        SQL_BOOLEAN(&quot;BOOLEAN&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L612">                Integer i = row.getInteger(index);</span>
+<span class="nc bnc" id="L613" title="All 2 branches missed.">                if (i == null) {</span>
+<span class="nc" id="L614">                    return null;</span>
+                }
+<span class="nc bnc" id="L616" title="All 2 branches missed.">                return i.intValue() == 1;</span>
+            }
+
+            @Override
+            protected Object asUpdateInsertValue(Object data, Property p) {
+<span class="nc bnc" id="L621" title="All 2 branches missed.">                if (data == null) {</span>
+<span class="nc" id="L622">                    return null;</span>
+                }
+<span class="nc bnc" id="L624" title="All 2 branches missed.">                return Util.toBooleanValue(data) ? 1 : 0;</span>
+            }
+        },
+<span class="nc" id="L627">        SQL_LONG(&quot;INTEGER&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L630">                return row.getLong(index);</span>
+            }
+        },
+<span class="nc" id="L633">        SQL_DATE(&quot;INTEGER&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L636">                return new Date(row.getLong(index) * 1000);</span>
+            }
+
+            @Override
+            protected Object asUpdateInsertValue(Object data, Property p) {
+<span class="nc bnc" id="L641" title="All 2 branches missed.">                if (data == null) {</span>
+<span class="nc" id="L642">                    return null;</span>
+                }
+<span class="nc" id="L644">                return ((Date) data).getTime() / 1000;</span>
+            }
+        },
+<span class="nc" id="L647">        SQL_SHORT(&quot;INTEGER&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L650">                return row.getShort(index);</span>
+            }
+        },
+<span class="nc" id="L653">        SQL_FLOAT(&quot;REAL&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L656">                return row.getFloat(index);</span>
+            }
+        },
+<span class="nc" id="L659">        SQL_BLOB(&quot;TEXT&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L662">                String s = row.getString(index);</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">                if (s == null) {</span>
+<span class="nc" id="L664">                    return null;</span>
+                }
+<span class="nc" id="L666">                byte[] d = Base64.decode(s.getBytes());</span>
+<span class="nc" id="L667">                Class t = base.getGenericType();</span>
+<span class="nc bnc" id="L668" title="All 2 branches missed.">                if (t == EncodedImage.class) {</span>
+<span class="nc" id="L669">                    return EncodedImage.create(d);</span>
+                }
+<span class="nc" id="L671">                return d;</span>
+            }
+
+            @Override
+            protected Object asUpdateInsertValue(Object data, Property p) {
+<span class="nc bnc" id="L676" title="All 2 branches missed.">                if (data == null) {</span>
+<span class="nc" id="L677">                    return null;</span>
+                }
+<span class="nc" id="L679">                Class t = p.getGenericType();</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                if (t == EncodedImage.class) {</span>
+<span class="nc" id="L681">                    return Base64.encode(((EncodedImage) data).getImageData());</span>
+                }
+<span class="nc" id="L683">                return Base64.encode((byte[]) data);</span>
+            }
+        },
+<span class="nc" id="L686">        SQL_DOUBLE(&quot;REAL&quot;) {</span>
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L689">                return row.getDouble(index);</span>
+            }
+        };
+
+        String dbType;
+
+<span class="nc" id="L695">        SqlType(String dbType) {</span>
+<span class="nc" id="L696">            this.dbType = dbType;</span>
+<span class="nc" id="L697">        }</span>
+
+        protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+<span class="nc" id="L700">            return row.getString(index);</span>
+        }
+
+        protected Object asUpdateInsertValue(Object data, Property p) {
+<span class="nc" id="L704">            return data;</span>
+        }
+    }
+
+    /**
+     * Used to build the where statement as a builder pattern
+     */
+    public class SelectBuilder {
+        private final PropertyBase property;
+        private final String operator;
+        private final String prefix;
+        private final String suffix;
+        private final SelectBuilder parent;
+        private SelectBuilder child;
+
+        private SelectBuilder() {
+<span class="nc" id="L720">            this(null, null, null, null, null);</span>
+<span class="nc" id="L721">        }</span>
+
+<span class="nc" id="L723">        private SelectBuilder(PropertyBase property, String operator, String prefix, String suffix, SelectBuilder parent) {</span>
+<span class="nc" id="L724">            this.property = property;</span>
+<span class="nc" id="L725">            this.operator = operator;</span>
+<span class="nc" id="L726">            this.prefix = prefix;</span>
+<span class="nc" id="L727">            this.suffix = suffix;</span>
+<span class="nc" id="L728">            this.parent = parent;</span>
+<span class="nc" id="L729">            parent.child = this;</span>
+<span class="nc" id="L730">        }</span>
+
+        /**
+         * An orderBy clause
+         *
+         * @param property  the property
+         * @param ascending direction of the order by
+         * @return the builder instance
+         */
+        public SelectBuilder orderBy(PropertyBase property, boolean ascending) {
+<span class="nc bnc" id="L740" title="All 2 branches missed.">            return new SelectBuilder(property, null, &quot; ORDER BY &quot;, ascending ? &quot;ASC&quot; : &quot;DESC&quot;, this);</span>
+        }
+
+        /**
+         * An equals `=` operator
+         *
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder equals(PropertyBase property) {
+<span class="nc" id="L750">            return new SelectBuilder(property, &quot; = &quot;, null, null, this);</span>
+        }
+
+        /**
+         * A not equals `&lt;&gt;` operator
+         *
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder notEquals(PropertyBase property) {
+<span class="nc" id="L760">            return new SelectBuilder(property, &quot; &lt;&gt; &quot;, null, null, this);</span>
+        }
+
+        /**
+         * A greater that `&amp;gt;` operator
+         *
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder gt(PropertyBase property) {
+<span class="nc" id="L770">            return new SelectBuilder(property, &quot; &gt; &quot;, null, null, this);</span>
+        }
+
+        /**
+         * A lesser than `&amp;lt;` operator
+         *
+         * @param property the property
+         * @return the builder instance
+         */
+        public SelectBuilder lt(PropertyBase property) {
+<span class="nc" id="L780">            return new SelectBuilder(property, &quot; &lt; &quot;, null, null, this);</span>
+        }
+
+        public java.util.List&lt;PropertyBusinessObject&gt; build(PropertyBusinessObject obj, int maxElements, int page) throws IOException, InstantiationException {
+<span class="nc" id="L784">            ArrayList&lt;Object&gt; params = new ArrayList&lt;Object&gt;();</span>
+
+<span class="nc" id="L786">            SelectBuilder root = this;</span>
+<span class="nc bnc" id="L787" title="All 2 branches missed.">            while (root.parent.property != null) {</span>
+<span class="nc" id="L788">                root = root.parent;</span>
+            }
+
+<span class="nc" id="L791">            StringBuilder createStatement = new StringBuilder();</span>
+
+<span class="nc" id="L793">            boolean found = false;</span>
+<span class="nc" id="L794">            List&lt;Object&gt; paramList = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L795" title="All 2 branches missed.">            for (SelectBuilder sb = root; sb != null; sb = sb.child) {</span>
+<span class="nc bnc" id="L796" title="All 2 branches missed.">                if (sb.prefix != null) {</span>
+<span class="nc" id="L797">                    createStatement.append(sb.prefix);</span>
+                }
+<span class="nc bnc" id="L799" title="All 2 branches missed.">                if (sb.property != null) {</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">                    if (found) {</span>
+<span class="nc" id="L801">                        createStatement.append(&quot; AND &quot;);</span>
+                    } else {
+<span class="nc" id="L803">                        createStatement.append(&quot; WHERE &quot;);</span>
+                    }
+<span class="nc" id="L805">                    found = true;</span>
+<span class="nc" id="L806">                    String columnName = getColumnNameImpl(sb.property);</span>
+<span class="nc" id="L807">                    createStatement.append(columnName);</span>
+<span class="nc" id="L808">                    createStatement.append(operator);</span>
+<span class="nc" id="L809">                    createStatement.append(&quot; ? &quot;);</span>
+<span class="nc" id="L810">                    paramList.add(obj.getPropertyIndex().get(sb.property.getName()).get());</span>
+                }
+<span class="nc bnc" id="L812" title="All 2 branches missed.">                if (sb.suffix != null) {</span>
+<span class="nc" id="L813">                    createStatement.append(sb.suffix);</span>
+                }
+            }
+
+<span class="nc" id="L817">            return selectImpl(obj, createStatement.toString(), obj.getClass(), params.toArray(),</span>
+                    null, false, maxElements, page);
+        }
+
+        SelectBuilder seed() {
+<span class="nc" id="L822">            return new SelectBuilder(null, null, null, null, null);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

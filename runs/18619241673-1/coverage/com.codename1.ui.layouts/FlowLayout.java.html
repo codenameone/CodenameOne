@@ -1,0 +1,638 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FlowLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">FlowLayout.java</span></div><h1>FlowLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.layouts;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+/**
+ * &lt;p&gt;FlowLayout is the default layout manager for Codename One Containers and Forms. It places components
+ * in a row one after another based on their preferred size. When it reaches the edge of the container it will break
+ * a line and start a new row. &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/124cab8d0c1da82756f1.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/flow-layout.png&quot; alt=&quot;Result of FlowLayout code&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * Since flow layout isn't a constraint based layout it has a bunch of very useful enclose methods that can significantly
+ * reduce the code required to create the same UI e.g.:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/3481c77f93726745ad28.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;
+ * This class works nicely for simple elements, however since Codename One doesn't reflow recursively (for performance)
+ * it can't accurately handle complex layouts. As a result when an element of varying size is placed in a flow layout
+ * this confuses the line breaking logic and fails in odd ways. That is why this layout should only be used for relatively
+ * simple use cases.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * Flow layout supports aligning the component horizontally and vertically, it defaults to the top left alignment for
+ * LTR languages. E.g. the following alignments are supported thru the usage of &lt;code&gt;setAlign&lt;/code&gt; &amp;amp;
+ * &lt;code&gt;setValign&lt;/code&gt;.
+ * &lt;/p&gt;
+ * &lt;p&gt;E.g. you can align to the center&lt;/p&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/flow-layout-center.png&quot; alt=&quot;Flow layout align center&quot; /&gt;
+ *
+ * &lt;p&gt;You can align to the right&lt;/p&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/flow-layout-right.png&quot; alt=&quot;Flow layout align right&quot; /&gt;
+ *
+ * &lt;p&gt;You can align to the center and the middle horizontally&lt;/p&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/flow-layout-center-middle.png&quot; alt=&quot;Flow layout align middle&quot; /&gt;
+ *
+ * &lt;p&gt;There are quite a few additional combinations that are possible with these API's.&lt;/p&gt;
+ *
+ * @author Nir Shabi
+ * @see BoxLayout see the box layout X which is often a better choice than flow layout.
+ */
+public class FlowLayout extends Layout {
+    private boolean fillRows;
+
+<span class="pc" id="L74">    private int orientation = Component.LEFT;</span>
+<span class="pc" id="L75">    private int valign = Component.TOP;</span>
+    private boolean vAlignByRow;
+<span class="pc" id="L77">    private final Dimension dim = new Dimension(0, 0);</span>
+
+    /**
+     * Creates a new instance of FlowLayout with left alignment
+     */
+<span class="fc" id="L82">    public FlowLayout() {</span>
+<span class="fc" id="L83">    }</span>
+
+
+    /**
+     * Creates a new instance of FlowLayout with the given orientation one of
+     * LEFT, RIGHT or CENTER
+     *
+     * @param orientation the orientation value
+     */
+<span class="nc" id="L92">    public FlowLayout(int orientation) {</span>
+<span class="nc" id="L93">        this.orientation = orientation;</span>
+<span class="nc" id="L94">    }</span>
+
+    /**
+     * Creates a new instance of FlowLayout with the given orientation one of
+     * LEFT, RIGHT or CENTER and the vertical orientation
+     *
+     * @param orientation the orientation value
+     * @param valign      the vertical orientation one of Component.TOP/BOTTOM/CENTER
+     */
+<span class="fc" id="L103">    public FlowLayout(int orientation, int valign) {</span>
+<span class="fc" id="L104">        this.orientation = orientation;</span>
+<span class="fc" id="L105">        this.valign = valign;</span>
+<span class="fc" id="L106">    }</span>
+
+    /**
+     * Creates a new instance of FlowLayout with the given orientation one of
+     * LEFT, RIGHT or CENTER and the vertical orientation
+     *
+     * @param orientation the orientation value
+     * @param valign      the vertical orientation one of Component.TOP/BOTTOM/CENTER
+     * @param vAlignByRow whether vertical alignment should be computed by row elements
+     */
+<span class="nc" id="L116">    public FlowLayout(int orientation, int valign, boolean vAlignByRow) {</span>
+<span class="nc" id="L117">        this.orientation = orientation;</span>
+<span class="nc" id="L118">        this.valign = valign;</span>
+<span class="nc" id="L119">        this.vAlignByRow = vAlignByRow;</span>
+<span class="nc" id="L120">    }</span>
+
+    /**
+     * &lt;p&gt;Shorthand for {@link com.codename1.ui.Container#encloseIn(com.codename1.ui.layouts.Layout, com.codename1.ui.Component...)}
+     * with a {@code FlowLayout instance} see:&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/3481c77f93726745ad28.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseIn(Component... cmps) {
+<span class="nc" id="L131">        return Container.encloseIn(new FlowLayout(), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenter(Component... cmps) {
+<span class="nc" id="L141">        return Container.encloseIn(new FlowLayout(Component.CENTER), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRight(Component... cmps) {
+<span class="nc" id="L151">        return Container.encloseIn(new FlowLayout(Component.RIGHT), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseMiddle(Component... cmps) {
+<span class="nc" id="L161">        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseMiddleByRow(Component... cmps) {
+<span class="nc" id="L171">        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterMiddle(Component... cmps) {
+<span class="nc" id="L181">        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterMiddleByRow(Component... cmps) {
+<span class="nc" id="L191">        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.CENTER, true), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightMiddle(Component... cmps) {
+<span class="nc" id="L201">        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightMiddleByRow(Component... cmps) {
+<span class="nc" id="L211">        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.CENTER, true), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseLeftMiddle(Component... cmps) {
+<span class="nc" id="L221">        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseLeftMiddleByRow(Component... cmps) {
+<span class="nc" id="L231">        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.CENTER, true), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseBottom(Component... cmps) {
+<span class="nc" id="L241">        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterBottom(Component... cmps) {
+<span class="nc" id="L251">        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightBottom(Component... cmps) {
+<span class="nc" id="L261">        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseBottomByRow(Component... cmps) {
+<span class="nc" id="L271">        return Container.encloseIn(new FlowLayout(Component.LEFT, Component.BOTTOM, true), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseCenterBottomByRow(Component... cmps) {
+<span class="nc" id="L281">        return Container.encloseIn(new FlowLayout(Component.CENTER, Component.BOTTOM, true), cmps);</span>
+    }
+
+    /**
+     * Shorthand for Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM, true), cmps);
+     *
+     * @param cmps the components to enclose in a new container
+     * @return the new container
+     */
+    public static Container encloseRightBottomByRow(Component... cmps) {
+<span class="nc" id="L291">        return Container.encloseIn(new FlowLayout(Component.RIGHT, Component.BOTTOM, true), cmps);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void layoutContainer(Container parent) {
+<span class="nc" id="L298">        Style s = parent.getStyle();</span>
+<span class="nc" id="L299">        boolean rtl = parent.isRTL();</span>
+<span class="nc" id="L300">        int containerPaddingLeft = s.getPaddingLeftNoRTL();</span>
+<span class="nc" id="L301">        int containerPaddingRight = s.getPaddingRightNoRTL();</span>
+<span class="nc" id="L302">        int sideGap = parent.getSideGap();</span>
+<span class="nc" id="L303">        int x = containerPaddingLeft;</span>
+<span class="nc" id="L304">        int layoutWidth = parent.getLayoutWidth();</span>
+<span class="nc" id="L305">        int width = layoutWidth - sideGap - containerPaddingRight - containerPaddingLeft;</span>
+
+<span class="nc bnc" id="L307" title="All 2 branches missed.">        if (rtl) {</span>
+<span class="nc" id="L308">            x += sideGap;</span>
+        }
+<span class="nc" id="L310">        int initX = x;</span>
+
+<span class="nc" id="L312">        int y = s.getPaddingTop();</span>
+<span class="nc" id="L313">        int rowH = 0;</span>
+<span class="nc" id="L314">        int start = 0;</span>
+<span class="nc" id="L315">        int rowBaseline = 0;</span>
+
+<span class="nc" id="L317">        int maxComponentWidth = width;</span>
+
+<span class="nc" id="L319">        int numOfcomponents = parent.getComponentCount();</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="nc" id="L321">            Component cmp = parent.getComponentAt(i);</span>
+<span class="nc" id="L322">            Style style = cmp.getStyle();</span>
+<span class="nc" id="L323">            int marginX = style.getHorizontalMargins();</span>
+<span class="nc" id="L324">            cmp.setWidth(Math.min(maxComponentWidth - marginX, cmp.getPreferredW()));</span>
+<span class="nc" id="L325">            cmp.setHeight(cmp.getPreferredH());</span>
+
+            // first component never breaks the line. Since width already removed padding and X already includes the
+            // left padding we need to re-add the left padding to the width
+<span class="nc bnc" id="L329" title="All 4 branches missed.">            if ((x == initX) || (x + cmp.getPreferredW() &lt;= width + containerPaddingLeft)) {</span>
+                // We take the actual LEFT since drawing is done in reverse
+<span class="nc" id="L331">                x += cmp.getStyle().getMarginLeftNoRTL();</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L333">                    cmp.setX(layoutWidth - x - cmp.getWidth());</span>
+                    //cmp.setX(width - x - cmp.getWidth());
+                } else {
+<span class="nc" id="L336">                    cmp.setX(x);</span>
+                }
+
+<span class="nc" id="L339">                cmp.setY(y + cmp.getStyle().getMarginTop());</span>
+
+<span class="nc" id="L341">                x += cmp.getWidth() + cmp.getStyle().getMarginRightNoRTL();</span>
+<span class="nc" id="L342">                rowH = Math.max(rowH, cmp.getHeight() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                if (valign == Component.BASELINE) {</span>
+<span class="nc" id="L344">                    int cmpPrefH = cmp.getPreferredH();</span>
+<span class="nc" id="L345">                    int cmpBaseline = cmp.getBaseline(cmp.getPreferredW(), cmpPrefH);</span>
+
+<span class="nc" id="L347">                    rowBaseline = Math.max(rowBaseline, cmpBaseline + cmp.getStyle().getMarginTop());</span>
+<span class="nc" id="L348">                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMarginBottom() + cmpPrefH - cmpBaseline);</span>
+<span class="nc" id="L349">                }</span>
+            } else {
+<span class="nc" id="L351">                moveComponents(parent, 0, y, width - (x - initX), rowH, start, i, rowBaseline);</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                if (fillRows) {</span>
+<span class="nc" id="L353">                    fillRow(parent, width, start, i);</span>
+                }
+<span class="nc" id="L355">                x = initX;</span>
+<span class="nc" id="L356">                y += rowH;</span>
+<span class="nc" id="L357">                rowBaseline = 0;</span>
+
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                if (rtl) {</span>
+                    //cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
+<span class="nc" id="L361">                    cmp.setX(layoutWidth - x - cmp.getWidth());</span>
+
+                } else {
+<span class="nc" id="L364">                    cmp.setX(x);</span>
+                }
+
+<span class="nc" id="L367">                cmp.setY(y + cmp.getStyle().getMarginTop());</span>
+<span class="nc" id="L368">                rowH = cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom();</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                if (valign == Component.BASELINE) {</span>
+<span class="nc" id="L370">                    int cmpPrefH = cmp.getPreferredH();</span>
+<span class="nc" id="L371">                    int cmpBaseline = cmp.getBaseline(cmp.getPreferredW(), cmpPrefH);</span>
+
+<span class="nc" id="L373">                    rowBaseline = Math.max(rowBaseline, cmpBaseline + cmp.getStyle().getMarginTop());</span>
+<span class="nc" id="L374">                    rowH = Math.max(rowH, rowBaseline + cmp.getStyle().getMarginBottom() + cmpPrefH - cmpBaseline);</span>
+                }
+<span class="nc" id="L376">                x += cmp.getPreferredW() + cmp.getStyle().getMarginRightNoRTL();</span>
+<span class="nc" id="L377">                start = i;</span>
+
+            }
+        }
+<span class="nc" id="L381">        moveComponents(parent, 0, y, width - (x - initX), rowH, start, numOfcomponents, rowBaseline);</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        if (fillRows) {</span>
+<span class="nc" id="L383">            fillRow(parent, width, start, numOfcomponents);</span>
+        }
+<span class="nc bnc" id="L385" title="All 2 branches missed.">        if (!vAlignByRow) {</span>
+
+<span class="nc bnc" id="L387" title="All 2 branches missed.">            if (valign == Component.BOTTOM) {</span>
+<span class="nc" id="L388">                int dy = parent.getLayoutHeight() - s.getPaddingBottom() - (y + rowH);</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">                for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="nc" id="L390">                    Component cmp = parent.getComponentAt(i);</span>
+<span class="nc" id="L391">                    cmp.setY(cmp.getY() + dy);</span>
+                }
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            } else if (valign == Component.CENTER) {</span>
+<span class="nc" id="L394">                int dy = (parent.getLayoutHeight() - s.getPaddingBottom() - (y + rowH)) / 2;</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="nc" id="L396">                    Component cmp = parent.getComponentAt(i);</span>
+<span class="nc" id="L397">                    cmp.setY(cmp.getY() + dy);</span>
+                }
+            }
+        }
+<span class="nc" id="L401">    }</span>
+
+    /**
+     * This method tries to fill up the available space in a row.
+     * This method is called if isFillRows() returns true.
+     *
+     * @param target the parent container
+     * @param width  the width of the row to fill
+     * @param start  the index of the first component in this row
+     * @param end    the index of the last component in this row
+     */
+    protected void fillRow(Container target, int width, int start, int end) {
+<span class="nc" id="L413">        int available = width;</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        for (int iter = start; iter &lt; end; iter++) {</span>
+<span class="nc" id="L415">            Component c = target.getComponentAt(iter);</span>
+<span class="nc" id="L416">            available -= (c.getWidth() + c.getStyle().getMarginRightNoRTL() +</span>
+<span class="nc" id="L417">                    c.getStyle().getMarginLeftNoRTL());</span>
+        }
+<span class="nc bnc" id="L419" title="All 4 branches missed.">        if (available &gt; 0 &amp;&amp; end - start &gt; 0) {</span>
+<span class="nc" id="L420">            int perComponent = available / (end - start);</span>
+<span class="nc" id="L421">            int lastComponent = perComponent + available % (end - start);</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">            if (perComponent &gt; 0) {</span>
+<span class="nc" id="L423">                int addOffset = 0;</span>
+<span class="nc" id="L424">                boolean rtl = target.isRTL();</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                for (int iter = start; iter &lt; end - 1; iter++) {</span>
+<span class="nc" id="L426">                    Component c = target.getComponentAt(iter);</span>
+<span class="nc" id="L427">                    c.setWidth(c.getWidth() + perComponent);</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                    if (rtl) {</span>
+<span class="nc" id="L429">                        addOffset += perComponent;</span>
+<span class="nc" id="L430">                        c.setX(c.getX() - addOffset);</span>
+                    } else {
+<span class="nc" id="L432">                        c.setX(c.getX() + addOffset);</span>
+<span class="nc" id="L433">                        addOffset += perComponent;</span>
+                    }
+                }
+<span class="nc" id="L436">                Component c = target.getComponentAt(end - 1);</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L438">                    addOffset += lastComponent;</span>
+<span class="nc" id="L439">                    c.setX(c.getX() - addOffset);</span>
+                } else {
+<span class="nc" id="L441">                    c.setX(c.getX() + addOffset);</span>
+                }
+<span class="nc" id="L443">                c.setWidth(c.getWidth() + lastComponent);</span>
+<span class="nc" id="L444">            } else {</span>
+<span class="nc" id="L445">                Component c = target.getComponentAt(end - 1);</span>
+<span class="nc" id="L446">                c.setWidth(c.getWidth() + lastComponent);</span>
+            }
+        }
+
+<span class="nc" id="L450">    }</span>
+
+    private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd, int baseline) {
+<span class="nc bnc" id="L453" title="All 3 branches missed.">        switch (orientation) {</span>
+            case Component.CENTER:
+                // this will remove half of last gap
+<span class="nc bnc" id="L456" title="All 2 branches missed.">                if (target.isRTL()) {</span>
+<span class="nc" id="L457">                    x = -(width) / 2;</span>
+                } else {
+<span class="nc" id="L459">                    x = (width) / 2;</span>
+                }
+<span class="nc" id="L461">                break;</span>
+            case Component.RIGHT:
+<span class="nc bnc" id="L463" title="All 2 branches missed.">                if (target.isRTL()) {</span>
+<span class="nc" id="L464">                    x = -width;  // this will remove the last gap</span>
+                } else {
+<span class="nc" id="L466">                    x = width;</span>
+                }
+                break;
+        }
+<span class="nc" id="L470">        Style parentStyle = target.getStyle();</span>
+<span class="nc" id="L471">        int parentPadding = parentStyle.getHorizontalPadding();</span>
+
+
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        for (int i = rowStart; i &lt; rowEnd; i++) {</span>
+<span class="nc" id="L475">            Component m = target.getComponentAt(i);</span>
+<span class="nc" id="L476">            Style style = m.getStyle();</span>
+<span class="nc" id="L477">            int marginX = style.getMarginLeftNoRTL() + style.getMarginRightNoRTL();</span>
+<span class="nc bnc" id="L478" title="All 2 branches missed.">            if (m.getWidth() + marginX &lt; target.getWidth() - parentPadding) {</span>
+<span class="nc" id="L479">                m.setX(m.getX() + x);</span>
+            }
+
+<span class="nc" id="L482">            int marginTop = style.getMarginTop();</span>
+<span class="nc bnc" id="L483" title="All 4 branches missed.">            switch (valign) {</span>
+                case Component.BOTTOM:
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                    if (vAlignByRow) {</span>
+<span class="nc" id="L486">                        m.setY(y + Math.max(marginTop, height - m.getHeight() - style.getMarginBottom()));</span>
+                    } else {
+                        //m.setY(y + Math.max(marginTop, target.getHeight() - m.getHeight()) - style.getMarginBottom());
+                    }
+                    break;
+                case Component.CENTER:
+<span class="nc bnc" id="L492" title="All 2 branches missed.">                    if (vAlignByRow) {</span>
+<span class="nc" id="L493">                        m.setY(y + Math.max(marginTop, (height - m.getOuterHeight()) / 2 + style.getMarginTop()));</span>
+                    } else {
+                        //m.setY(y + Math.max(marginTop, (target.getHeight() - m.getHeight()) / 2));
+                    }
+                    break;
+                case Component.BASELINE:
+<span class="nc" id="L499">                    m.setY(y + Math.max(marginTop, baseline - m.getBaseline(m.getWidth(), m.getHeight())));</span>
+
+<span class="nc" id="L501">                    break;</span>
+                default:
+<span class="nc" id="L503">                    m.setY(y + marginTop);</span>
+                    break;
+            }
+
+        }
+<span class="nc" id="L508">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getPreferredSize(Container parent) {
+<span class="nc" id="L514">        int parentWidth = parent.getWidth();</span>
+
+        // display width can be larger on orientation change when the UI didn't have time to adapt
+<span class="nc bnc" id="L517" title="All 4 branches missed.">        if (parentWidth == 0 || parentWidth &gt; Display.getInstance().getDisplayWidth()) {</span>
+<span class="nc" id="L518">            parent.invalidate();</span>
+        }
+<span class="nc" id="L520">        int width = 0;</span>
+<span class="nc" id="L521">        int height = 0;</span>
+<span class="nc" id="L522">        int w = 0;</span>
+<span class="nc" id="L523">        int numOfcomponents = parent.getComponentCount();</span>
+<span class="nc" id="L524">        Style parentStyle = parent.getStyle();</span>
+<span class="nc" id="L525">        int parentPadding = parentStyle.getHorizontalPadding();</span>
+
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="nc" id="L528">            Component cmp = parent.getComponentAt(i);</span>
+<span class="nc" id="L529">            height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());</span>
+<span class="nc" id="L530">            int prefW = cmp.getPreferredW() + cmp.getStyle().getHorizontalMargins();</span>
+<span class="nc" id="L531">            w += prefW;</span>
+            //we need to break a line
+<span class="nc bnc" id="L533" title="All 6 branches missed.">            if (parentWidth &gt; parentPadding &amp;&amp; w &gt; parentWidth - parentPadding &amp;&amp; i &gt; 0) {</span>
+<span class="nc" id="L534">                height += cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom();</span>
+<span class="nc" id="L535">                width = Math.max(w, width);</span>
+<span class="nc" id="L536">                w = prefW;</span>
+            }
+        }
+
+<span class="nc" id="L540">        width = Math.max(w, width);</span>
+
+<span class="nc" id="L542">        dim.setWidth(width + parent.getStyle().getPaddingLeftNoRTL() + parent.getStyle().getPaddingRightNoRTL());</span>
+<span class="nc" id="L543">        dim.setHeight(height + parent.getStyle().getPaddingTop() + parent.getStyle().getPaddingBottom());</span>
+<span class="nc" id="L544">        return dim;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L551">        return &quot;FlowLayout&quot;;</span>
+    }
+
+    /**
+     * Indicates whether the layout manager should try to fill up the available space
+     * in the row
+     *
+     * @return the fillRows
+     */
+    public boolean isFillRows() {
+<span class="fc" id="L561">        return fillRows;</span>
+    }
+
+    /**
+     * Indicates whether the layout manager should try to fill up the available space
+     * in the row
+     *
+     * @param fillRows the fillRows to set
+     */
+    public void setFillRows(boolean fillRows) {
+<span class="fc" id="L571">        this.fillRows = fillRows;</span>
+<span class="fc" id="L572">    }</span>
+
+    /**
+     * Indicates vertical alignment within the flow layout
+     *
+     * @return Component.TOP/BOTTOM/CENTER
+     */
+    public int getValign() {
+<span class="fc" id="L580">        return valign;</span>
+    }
+
+    /**
+     * Indicates vertical alignment within the flow layout
+     *
+     * @param valign one of Component.TOP/BOTTOM/CENTER
+     */
+    public void setValign(int valign) {
+<span class="fc" id="L589">        this.valign = valign;</span>
+<span class="fc" id="L590">    }</span>
+
+    /**
+     * Returns whether vertical alignment is done internally or externally
+     *
+     * @return whether vertical alignment is done internally or externally
+     */
+    public boolean isValignByRow() {
+<span class="nc" id="L598">        return vAlignByRow;</span>
+    }
+
+    /**
+     * When set to true vertical alignment will be performed by row (components within the container will be aligned vertically to each other in the same row)
+     * When set to false (which is default) vertical alignment relates to the alignment of this container in regards to external components
+     *
+     * @param internal true for internal, false otherwise
+     */
+    public void setValignByRow(boolean internal) {
+<span class="nc" id="L608">        vAlignByRow = internal;</span>
+<span class="nc" id="L609">    }</span>
+
+    /**
+     * Alignment of the flow layout, defaults to LEFT
+     *
+     * @return the orientation
+     */
+    public int getAlign() {
+<span class="fc" id="L617">        return orientation;</span>
+    }
+
+    /**
+     * Alignment of the flow layout, defaults to LEFT
+     *
+     * @param orientation the orientation to set
+     */
+    public void setAlign(int orientation) {
+<span class="fc" id="L626">        this.orientation = orientation;</span>
+<span class="fc" id="L627">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L633" title="All 8 branches missed.">        return super.equals(o) &amp;&amp; ((FlowLayout) o).orientation == orientation &amp;&amp;</span>
+                ((FlowLayout) o).valign == valign &amp;&amp;
+                ((FlowLayout) o).fillRows == fillRows;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

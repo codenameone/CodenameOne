@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodenameOneThread.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl</a> &gt; <span class="el_source">CodenameOneThread.java</span></div><h1>CodenameOneThread.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Hashtable;
+
+/**
+ * Thread class implementing the crash protection functionality
+ *
+ * @author Shai Almog
+ */
+public class CodenameOneThread extends Thread {
+<span class="nc" id="L39">    private static final Class CODE = CodenameOneThread.class;</span>
+<span class="nc" id="L40">    private final int[] stack = new int[500];</span>
+    private int stackPointer;
+    private final Runnable r;
+<span class="nc" id="L43">    private final Hashtable exceptionStack = new Hashtable();</span>
+
+    /**
+     * Constructor accepting the runnable
+     */
+    public CodenameOneThread(Runnable r, String threadName) {
+<span class="nc" id="L49">        super(threadName);</span>
+<span class="nc" id="L50">        this.r = r;</span>
+<span class="nc" id="L51">    }</span>
+
+    /**
+     * Pushes the method to the current thread stack
+     *
+     * @param method the method id
+     */
+    public static void push(int method) {
+<span class="nc" id="L59">        Thread t = Thread.currentThread();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (t.getClass() == CODE) {</span>
+<span class="nc" id="L61">            CodenameOneThread c = (CodenameOneThread) t;</span>
+<span class="nc" id="L62">            c.pushStack(method);</span>
+        }
+<span class="nc" id="L64">    }</span>
+
+    /**
+     * Pops the current method from the stack
+     */
+    public static void pop() {
+<span class="nc" id="L70">        Thread t = Thread.currentThread();</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (t.getClass() == CODE) {</span>
+<span class="nc" id="L72">            CodenameOneThread c = (CodenameOneThread) t;</span>
+<span class="nc" id="L73">            c.popStack();</span>
+        }
+<span class="nc" id="L75">    }</span>
+
+    /**
+     * Stores the stack for the given exception
+     *
+     * @param th the exception mapping to the given stack
+     */
+    public static void storeStack(Throwable th, int currentStackFrame) {
+<span class="nc" id="L83">        Thread t = Thread.currentThread();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (t.getClass() == CODE) {</span>
+<span class="nc" id="L85">            CodenameOneThread c = (CodenameOneThread) t;</span>
+<span class="nc" id="L86">            c.storeStackForException(th, currentStackFrame);</span>
+        }
+<span class="nc" id="L88">    }</span>
+
+    public static void handleException(Throwable err) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (Log.isCrashBound()) {</span>
+<span class="nc" id="L92">            Log.e(err);</span>
+<span class="nc" id="L93">            Log.sendLog();</span>
+        }
+<span class="nc" id="L95">    }</span>
+
+    public boolean hasStackFrame() {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        return stackPointer &gt; 0;</span>
+    }
+
+    /**
+     * Pushes a method id into the stack
+     *
+     * @param method the method id
+     */
+    public void pushStack(int method) {
+<span class="nc" id="L107">        stack[stackPointer] = method;</span>
+<span class="nc" id="L108">        stackPointer++;</span>
+<span class="nc" id="L109">    }</span>
+
+    /**
+     * Pops the method stack pointer
+     */
+    public void popStack() {
+<span class="nc" id="L115">        stackPointer--;</span>
+<span class="nc" id="L116">    }</span>
+
+    /**
+     * Stores the stack for the given exception
+     *
+     * @param t the exception mapping to the given stack
+     */
+    public void storeStackForException(Throwable t, int currentStackFrame) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (!exceptionStack.containsKey(t)) {</span>
+<span class="nc" id="L125">            int[] s = new int[stackPointer + 1];</span>
+<span class="nc" id="L126">            System.arraycopy(stack, 0, s, 0, stackPointer);</span>
+<span class="nc" id="L127">            s[stackPointer] = currentStackFrame;</span>
+<span class="nc" id="L128">            exceptionStack.put(t, s);</span>
+        }
+<span class="nc" id="L130">    }</span>
+
+    /**
+     * Prints the stack trace matching the given stack
+     */
+    public String getStack(Throwable t) {
+        try {
+<span class="nc" id="L137">            StringBuilder b = new StringBuilder();</span>
+            int size;
+<span class="nc" id="L139">            int[] s = (int[]) exceptionStack.get(t);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (s == null) {</span>
+<span class="nc" id="L141">                s = stack;</span>
+<span class="nc" id="L142">                size = stackPointer;</span>
+            } else {
+<span class="nc" id="L144">                size = s.length;</span>
+            }
+<span class="nc" id="L146">            String[] stk = new String[size];</span>
+
+<span class="nc" id="L148">            InputStream inp = Display.getInstance().getResourceAsStream(getClass(), &quot;/methodData.dat&quot;);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (inp == null) {</span>
+<span class="nc" id="L150">                return t.toString();</span>
+            }
+<span class="nc" id="L152">            DataInputStream di = new DataInputStream(inp);</span>
+<span class="nc" id="L153">            int totalAmount = di.readInt();</span>
+<span class="nc" id="L154">            String lastClass = &quot;&quot;;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            for (int x = 0; x &lt; totalAmount; x++) {</span>
+<span class="nc" id="L156">                String current = di.readUTF();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                if (current.indexOf('.') &gt; -1) {</span>
+<span class="nc" id="L158">                    lastClass = current;</span>
+                } else {
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                        if (s[iter] == x + 1) {</span>
+<span class="nc" id="L162">                            stk[iter] = lastClass + &quot;.&quot; + current;</span>
+                        }
+                    }
+                }
+            }
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            for (int iter = size - 1; iter &gt;= 0; iter--) {</span>
+<span class="nc" id="L168">                b.append(&quot;at &quot;);</span>
+<span class="nc" id="L169">                b.append(stk[iter]);</span>
+<span class="nc" id="L170">                b.append(&quot;\n&quot;);</span>
+            }
+<span class="nc" id="L172">            return b.toString();</span>
+<span class="nc" id="L173">        } catch (IOException ex) {</span>
+<span class="nc" id="L174">            ex.printStackTrace();</span>
+        }
+<span class="nc" id="L176">        return &quot;Failed in stack generation for &quot; + t;</span>
+    }
+
+    /**
+     * Catches exception
+     */
+    public void run() {
+        try {
+<span class="nc" id="L184">            r.run();</span>
+<span class="nc" id="L185">        } catch (Throwable err) {</span>
+<span class="nc" id="L186">            err.printStackTrace();</span>
+<span class="nc" id="L187">            handleException(err);</span>
+<span class="nc" id="L188">        }</span>
+<span class="nc" id="L189">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

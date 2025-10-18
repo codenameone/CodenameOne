@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Rectangle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.geom</a> &gt; <span class="el_source">Rectangle.java</span></div><h1>Rectangle.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.geom;
+
+import com.codename1.ui.Transform;
+
+import java.util.ArrayList;
+
+/**
+ * Represents a Rectangle position (x, y) and {@link Dimension} (width, height),
+ * this is useful for measuring coordinates within the application.
+ *
+ * @author Chen Fishbein
+ */
+public class Rectangle implements Shape {
+
+    private static final int MAX_POOL_SIZE = 20;
+    private static ArrayList&lt;Rectangle&gt; pool;
+    private final Dimension size;
+    private int x;
+    private int y;
+    private GeneralPath path;
+
+    /**
+     * Creates a new instance of Rectangle
+     */
+<span class="fc" id="L48">    public Rectangle() {</span>
+<span class="fc" id="L49">        size = new Dimension();</span>
+<span class="fc" id="L50">    }</span>
+
+    /**
+     * Creates a new instance of Rectangle at position (x, y) and with
+     * predefine dimension
+     *
+     * @param x    the x coordinate of the rectangle
+     * @param y    the y coordinate of the rectangle
+     * @param size the {@link Dimension} of the rectangle
+     */
+<span class="fc" id="L60">    public Rectangle(int x, int y, Dimension size) {</span>
+<span class="fc" id="L61">        this.x = x;</span>
+<span class="fc" id="L62">        this.y = y;</span>
+<span class="fc" id="L63">        this.size = size;</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * Creates a new instance of Rectangle at position (x, y) and with
+     * predefine width and height
+     *
+     * @param x the x coordinate of the rectangle
+     * @param y the y coordinate of the rectangle
+     * @param w the width of the rectangle
+     * @param h the height of the rectangle
+     */
+<span class="nc" id="L75">    public Rectangle(int x, int y, int w, int h) {</span>
+<span class="nc" id="L76">        this.x = x;</span>
+<span class="nc" id="L77">        this.y = y;</span>
+<span class="nc" id="L78">        this.size = new Dimension(w, h);</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * A copy Constructor
+     *
+     * @param rect the Rectangle to copy
+     */
+    public Rectangle(Rectangle rect) {
+<span class="nc" id="L87">        this(rect.getX(), rect.getY(),</span>
+<span class="nc" id="L88">                rect.getSize().getWidth(), rect.getSize().getHeight());</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Creates a rectangle from a Rectangle object pool.  This is handy if you
+     * need to create a temporary Rectangle that you wish to recycle later.
+     *
+     * &lt;p&gt;When you are done with this object you should return it to the pool using
+     * {@link #recycle(com.codename1.ui.geom.Rectangle) }.
+     *
+     * @param x The x coordinate of the rect.
+     * @param y The y coordinate of the rect.
+     * @param w The width of the rect.
+     * @param h The height of the rect.
+     * @return A rectangle with the given dimensions.
+     * @see #recycle(com.codename1.ui.geom.Rectangle)
+     */
+    public static synchronized Rectangle createFromPool(int x, int y, int w, int h) {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (pool == null) {</span>
+<span class="nc" id="L107">            pool = new ArrayList&lt;Rectangle&gt;();</span>
+        }
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (pool.isEmpty()) {</span>
+<span class="nc" id="L110">            return new Rectangle(x, y, w, h);</span>
+        } else {
+<span class="nc" id="L112">            Rectangle r = pool.remove(pool.size() - 1);</span>
+<span class="nc" id="L113">            r.setBounds(x, y, w, h);</span>
+<span class="nc" id="L114">            return r;</span>
+        }
+    }
+
+    /**
+     * Returns the given rectangle to the object pool.
+     *
+     * @param r The rectangle to recycle.
+     * @see #createFromPool(int, int, int, int)
+     */
+    public static synchronized void recycle(Rectangle r) {
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (pool.size() &gt;= MAX_POOL_SIZE || r == null) {</span>
+<span class="nc" id="L126">            return;</span>
+        }
+<span class="nc" id="L128">        pool.add(r);</span>
+<span class="nc" id="L129">    }</span>
+
+    /**
+     * Checks wheather the 2nd rectangle is contained in the first rectangle
+     *
+     * @param x1 first rect x
+     * @param y1 first rect y
+     * @param w1 first rect w
+     * @param h1 first rect h
+     * @param x2 second rect x
+     * @param y2 second rect y
+     * @param w2 second rect w
+     * @param h2 second rect h
+     * @return true if x2, y2, w2, h2 is contained in x1, y1, w1, h1
+     */
+    public static boolean contains(int x1, int y1, int w1, int h1,
+                                   int x2, int y2, int w2, int h2) {
+<span class="nc bnc" id="L146" title="All 8 branches missed.">        return x1 &lt;= x2 &amp;&amp; y1 &lt;= y2 &amp;&amp; x1 + w1 &gt;= x2 + w2 &amp;&amp;</span>
+                y1 + h1 &gt;= y2 + h2;
+    }
+
+    /**
+     * Returns a rectangle that intersects the given rectangle with this rectangle
+     *
+     * @param rrX  rectangle to intersect with this rectangle
+     * @param rrY  rectangle to intersect with this rectangle
+     * @param rrW  rectangle to intersect with this rectangle
+     * @param rrH  rectangle to intersect with this rectangle
+     * @param rtx1 rectangle to intersect with this rectangle
+     * @param rty1 rectangle to intersect with this rectangle
+     * @param rtw2 rectangle to intersect with this rectangle
+     * @param rth2 rectangle to intersect with this rectangle
+     * @param dest result of the intersection are stored here
+     */
+    public static void intersection(int rrX, int rrY, int rrW, int rrH, int rtx1, int rty1, int rtw2, int rth2, Rectangle dest) {
+<span class="nc" id="L164">        int tx1 = rtx1;</span>
+<span class="nc" id="L165">        int ty1 = rty1;</span>
+<span class="nc" id="L166">        int rx1 = rrX;</span>
+<span class="nc" id="L167">        int ry1 = rrY;</span>
+<span class="nc" id="L168">        int tx2 = tx1;</span>
+<span class="nc" id="L169">        tx2 += rtw2;</span>
+<span class="nc" id="L170">        int ty2 = ty1;</span>
+<span class="nc" id="L171">        ty2 += rth2;</span>
+<span class="nc" id="L172">        int rx2 = rx1;</span>
+<span class="nc" id="L173">        rx2 += rrW;</span>
+<span class="nc" id="L174">        int ry2 = ry1;</span>
+<span class="nc" id="L175">        ry2 += rrH;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (tx1 &lt; rx1) {</span>
+<span class="nc" id="L177">            tx1 = rx1;</span>
+        }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (ty1 &lt; ry1) {</span>
+<span class="nc" id="L180">            ty1 = ry1;</span>
+        }
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (tx2 &gt; rx2) {</span>
+<span class="nc" id="L183">            tx2 = rx2;</span>
+        }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (ty2 &gt; ry2) {</span>
+<span class="nc" id="L186">            ty2 = ry2;</span>
+        }
+<span class="nc" id="L188">        tx2 -= tx1;</span>
+<span class="nc" id="L189">        ty2 -= ty1;</span>
+
+        // tx2,ty2 will never overflow (they will never be
+        // larger than the smallest of the two source w,h)
+        // they might underflow, though...
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (tx2 &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L195">            tx2 = Integer.MIN_VALUE;</span>
+        }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (ty2 &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L198">            ty2 = Integer.MIN_VALUE;</span>
+        }
+
+<span class="nc" id="L201">        dest.x = tx1;</span>
+<span class="nc" id="L202">        dest.y = ty1;</span>
+<span class="nc" id="L203">        dest.size.setWidth(tx2);</span>
+<span class="nc" id="L204">        dest.size.setHeight(ty2);</span>
+<span class="nc" id="L205">    }</span>
+
+    /**
+     * Helper method allowing us to determine if two coordinate sets intersect. This saves
+     * us the need of creating a rectangle object for a quick calculation
+     *
+     * @param tx     x of first rectangle
+     * @param ty     y of first rectangle
+     * @param tw     width of first rectangle
+     * @param th     height of first rectangle
+     * @param x      x of second rectangle
+     * @param y      y of second rectangle
+     * @param width  width of second rectangle
+     * @param height height of second rectangle
+     * @return true if the rectangles intersect
+     */
+    public static boolean intersects(int tx, int ty, int tw, int th, int x, int y, int width, int height) {
+<span class="nc" id="L222">        int rw = width;</span>
+<span class="nc" id="L223">        int rh = height;</span>
+<span class="nc bnc" id="L224" title="All 8 branches missed.">        if (rw &lt;= 0 || rh &lt;= 0 || tw &lt;= 0 || th &lt;= 0) {</span>
+<span class="nc" id="L225">            return false;</span>
+        }
+<span class="nc" id="L227">        int rx = x;</span>
+<span class="nc" id="L228">        int ry = y;</span>
+<span class="nc" id="L229">        rw += rx;</span>
+<span class="nc" id="L230">        rh += ry;</span>
+<span class="nc" id="L231">        tw += tx;</span>
+<span class="nc" id="L232">        th += ty;</span>
+<span class="nc bnc" id="L233" title="All 16 branches missed.">        return ((rw &lt; rx || rw &gt; tx) &amp;&amp;</span>
+                (rh &lt; ry || rh &gt; ty) &amp;&amp;
+                (tw &lt; tx || tw &gt; rx) &amp;&amp;
+                (th &lt; ty || th &gt; ry));
+
+    }
+
+    /**
+     * Helper method to set coordinates
+     */
+    public void setBounds(int x, int y, int w, int h) {
+<span class="nc" id="L244">        this.x = x;</span>
+<span class="nc" id="L245">        this.y = y;</span>
+<span class="nc" id="L246">        this.size.setWidth(w);</span>
+<span class="nc" id="L247">        this.size.setHeight(h);</span>
+<span class="nc" id="L248">        path = null;</span>
+<span class="nc" id="L249">    }</span>
+
+    /**
+     * Convenience method for getSize().getWidth();
+     *
+     * @return width
+     */
+    public int getWidth() {
+<span class="nc" id="L257">        return size.getWidth();</span>
+
+    }
+
+    /**
+     * Convenience method for getSize().setWidth();
+     *
+     * @param w the width
+     */
+    public void setWidth(int w) {
+<span class="nc" id="L267">        size.setWidth(w);</span>
+<span class="nc" id="L268">        path = null;</span>
+<span class="nc" id="L269">    }</span>
+
+    /**
+     * Convenience method for getSize().getHeight();
+     *
+     * @return height
+     */
+    public int getHeight() {
+<span class="nc" id="L277">        return size.getHeight();</span>
+    }
+
+    /**
+     * Convenience method for getSize().setHeight();
+     *
+     * @param h the height
+     */
+    public void setHeight(int h) {
+<span class="nc" id="L286">        size.setHeight(h);</span>
+<span class="nc" id="L287">        path = null;</span>
+<span class="nc" id="L288">    }</span>
+
+    /**
+     * Return the dimension of the rectangle
+     *
+     * @return the size of the rectangle
+     */
+    public Dimension getSize() {
+<span class="fc" id="L296">        return size;</span>
+    }
+
+    /**
+     * Return the x coordinate of the rectangle
+     *
+     * @return the x coordinate of the rectangle
+     */
+    public int getX() {
+<span class="nc" id="L305">        return x;</span>
+    }
+
+    /**
+     * Sets the x position of the rectangle
+     *
+     * @param x the x coordinate of the rectangle
+     */
+    public void setX(int x) {
+<span class="nc" id="L314">        this.x = x;</span>
+<span class="nc" id="L315">        path = null;</span>
+<span class="nc" id="L316">    }</span>
+
+    /**
+     * Return the y coordinate of the rectangle
+     *
+     * @return the y coordinate of the rectangle
+     */
+    public int getY() {
+<span class="nc" id="L324">        return y;</span>
+    }
+
+    /**
+     * Sets the y position of the rectangle
+     *
+     * @param y the y coordinate of the rectangle
+     */
+    public void setY(int y) {
+<span class="nc" id="L333">        this.y = y;</span>
+<span class="nc" id="L334">        path = null;</span>
+<span class="nc" id="L335">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L341">        return &quot;x = &quot; + x + &quot; y = &quot; + y + &quot; size = &quot; + size;</span>
+    }
+
+    /**
+     * Checks whether or not this Rectangle entirely contains the specified
+     * Rectangle.
+     *
+     * @param rect the specified Rectangle
+     * @return true if the Rectangle is contained entirely inside this
+     * Rectangle; false otherwise
+     */
+    public boolean contains(Rectangle rect) {
+<span class="nc" id="L353">        return contains(rect.x, rect.y, rect.size.getWidth(), rect.size.getHeight());</span>
+    }
+
+    /**
+     * Checks whether this Rectangle entirely contains the Rectangle
+     * at the specified location (rX, rY) with the specified
+     * dimensions (rWidth, rHeight).
+     *
+     * @param rX      the specified x coordinate
+     * @param rY      the specified y coordinate
+     * @param rWidth  the width of the Rectangle
+     * @param rHeight the height of the Rectangle
+     * @return true if the Rectangle specified by (rX, rY, rWidth, rHeight)
+     * is entirely enclosed inside this Rectangle; false otherwise.
+     */
+    public boolean contains(int rX, int rY, int rWidth, int rHeight) {
+<span class="nc bnc" id="L369" title="All 6 branches missed.">        return x &lt;= rX &amp;&amp; y &lt;= rY &amp;&amp; x + size.getWidth() &gt;= rX + rWidth &amp;&amp;</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">                y + size.getHeight() &gt;= rY + rHeight;</span>
+    }
+
+    /**
+     * Checks whether or not this Rectangle contains the point at the specified
+     * location (rX, rY).
+     *
+     * @param rX the specified x coordinate
+     * @param rY the specified y coordinate
+     * @return true if the point (rX, rY) is inside this Rectangle;
+     * false otherwise.
+     */
+    public boolean contains(int rX, int rY) {
+<span class="nc bnc" id="L383" title="All 6 branches missed.">        return x &lt;= rX &amp;&amp; y &lt;= rY &amp;&amp; x + size.getWidth() &gt;= rX &amp;&amp;</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                y + size.getHeight() &gt;= rY;</span>
+    }
+
+    /**
+     * Returns a rectangle that intersects the given rectangle with this rectangle.  If they
+     * don't intersect, the resulting rectangle will have a negative width or height.
+     *
+     * @param rX rectangle to intersect with this rectangle
+     * @param rY rectangle to intersect with this rectangle
+     * @param rW rectangle to intersect with this rectangle
+     * @param rH rectangle to intersect with this rectangle
+     * @return the intersection
+     */
+    public Rectangle intersection(int rX, int rY, int rW, int rH) {
+
+<span class="nc" id="L399">        int tx1 = this.x;</span>
+<span class="nc" id="L400">        int ty1 = this.y;</span>
+<span class="nc" id="L401">        int rx1 = rX;</span>
+<span class="nc" id="L402">        int ry1 = rY;</span>
+<span class="nc" id="L403">        int tx2 = tx1;</span>
+<span class="nc" id="L404">        tx2 += this.size.getWidth();</span>
+<span class="nc" id="L405">        int ty2 = ty1;</span>
+<span class="nc" id="L406">        ty2 += this.size.getHeight();</span>
+<span class="nc" id="L407">        int rx2 = rx1;</span>
+<span class="nc" id="L408">        rx2 += rW;</span>
+<span class="nc" id="L409">        int ry2 = ry1;</span>
+<span class="nc" id="L410">        ry2 += rH;</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">        if (tx1 &lt; rx1) {</span>
+<span class="nc" id="L412">            tx1 = rx1;</span>
+        }
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        if (ty1 &lt; ry1) {</span>
+<span class="nc" id="L415">            ty1 = ry1;</span>
+        }
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (tx2 &gt; rx2) {</span>
+<span class="nc" id="L418">            tx2 = rx2;</span>
+        }
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (ty2 &gt; ry2) {</span>
+<span class="nc" id="L421">            ty2 = ry2;</span>
+        }
+<span class="nc" id="L423">        tx2 -= tx1;</span>
+<span class="nc" id="L424">        ty2 -= ty1;</span>
+        // tx2,ty2 will never overflow (they will never be
+        // larger than the smallest of the two source w,h)
+        // they might underflow, though...
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (tx2 &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L429">            tx2 = Integer.MIN_VALUE;</span>
+        }
+<span class="nc bnc" id="L431" title="All 2 branches missed.">        if (ty2 &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L432">            ty2 = Integer.MIN_VALUE;</span>
+        }
+
+<span class="nc" id="L435">        return new Rectangle(tx1, ty1, tx2, ty2);</span>
+    }
+
+    public void intersection(Rectangle input, Rectangle output) {
+<span class="nc" id="L439">        int tx1 = this.x;</span>
+<span class="nc" id="L440">        int ty1 = this.y;</span>
+<span class="nc" id="L441">        int rx1 = input.getX();</span>
+<span class="nc" id="L442">        int ry1 = input.getY();</span>
+<span class="nc" id="L443">        int tx2 = tx1;</span>
+<span class="nc" id="L444">        tx2 += this.size.getWidth();</span>
+<span class="nc" id="L445">        int ty2 = ty1;</span>
+<span class="nc" id="L446">        ty2 += this.size.getHeight();</span>
+<span class="nc" id="L447">        int rx2 = rx1;</span>
+<span class="nc" id="L448">        rx2 += input.getWidth();</span>
+<span class="nc" id="L449">        int ry2 = ry1;</span>
+<span class="nc" id="L450">        ry2 += input.getHeight();</span>
+<span class="nc bnc" id="L451" title="All 2 branches missed.">        if (tx1 &lt; rx1) {</span>
+<span class="nc" id="L452">            tx1 = rx1;</span>
+        }
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        if (ty1 &lt; ry1) {</span>
+<span class="nc" id="L455">            ty1 = ry1;</span>
+        }
+<span class="nc bnc" id="L457" title="All 2 branches missed.">        if (tx2 &gt; rx2) {</span>
+<span class="nc" id="L458">            tx2 = rx2;</span>
+        }
+<span class="nc bnc" id="L460" title="All 2 branches missed.">        if (ty2 &gt; ry2) {</span>
+<span class="nc" id="L461">            ty2 = ry2;</span>
+        }
+<span class="nc" id="L463">        tx2 -= tx1;</span>
+<span class="nc" id="L464">        ty2 -= ty1;</span>
+        // tx2,ty2 will never overflow (they will never be
+        // larger than the smallest of the two source w,h)
+        // they might underflow, though...
+<span class="nc bnc" id="L468" title="All 2 branches missed.">        if (tx2 &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L469">            tx2 = Integer.MIN_VALUE;</span>
+        }
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        if (ty2 &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L472">            ty2 = Integer.MIN_VALUE;</span>
+        }
+<span class="nc" id="L474">        tx2 = Math.max(0, tx2);</span>
+<span class="nc" id="L475">        ty2 = Math.max(0, ty2);</span>
+<span class="nc" id="L476">        output.setBounds(tx1, ty1, tx2, ty2);</span>
+<span class="nc" id="L477">    }</span>
+
+    /**
+     * Returns a rectangle that intersects the given rectangle with this rectangle
+     *
+     * @param r rectangle to intersect with this rectangle
+     * @return the intersection
+     */
+    public Rectangle intersection(Rectangle r) {
+<span class="nc" id="L486">        return intersection(r.x, r.y, r.size.getWidth(), r.size.getHeight());</span>
+    }
+
+
+    /**
+     * Determines whether or not this Rectangle and the specified Rectangle
+     * location (x, y) with the specified dimensions (width, height),
+     * intersect. Two rectangles intersect if their intersection is nonempty.
+     *
+     * @param x      the specified x coordinate
+     * @param y      the specified y coordinate
+     * @param width  the width of the Rectangle
+     * @param height the height of the Rectangle
+     * @return true if the specified Rectangle and this Rectangle intersect;
+     * false otherwise.
+     */
+    public boolean intersects(int x, int y, int width, int height) {
+<span class="nc" id="L503">        int tw = size.getWidth();</span>
+<span class="nc" id="L504">        int th = size.getHeight();</span>
+<span class="nc" id="L505">        return intersects(this.x, this.y, tw, th, x, y, width, height);</span>
+    }
+
+    /**
+     * Determines whether or not this Rectangle and the specified Rectangle
+     * location (x, y) with the specified dimensions (width, height),
+     * intersect. Two rectangles intersect if their intersection is nonempty.
+     *
+     * @param rect the Rectangle to check intersection with
+     * @return true if the specified Rectangle and this Rectangle intersect;
+     * false otherwise.
+     */
+    public boolean intersects(Rectangle rect) {
+<span class="nc" id="L518">        return intersects(rect.getX(), rect.getY(),</span>
+<span class="nc" id="L519">                rect.getSize().getWidth(), rect.getSize().getHeight());</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public PathIterator getPathIterator(Transform m) {
+<span class="nc bnc" id="L526" title="All 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L527">            path = new GeneralPath();</span>
+<span class="nc" id="L528">            int w = size.getWidth();</span>
+<span class="nc" id="L529">            int h = size.getHeight();</span>
+<span class="nc" id="L530">            path.moveTo(x, y);</span>
+<span class="nc" id="L531">            path.lineTo(x + w, y);</span>
+<span class="nc" id="L532">            path.lineTo(x + w, y + h);</span>
+<span class="nc" id="L533">            path.lineTo(x, y + h);</span>
+<span class="nc" id="L534">            path.closePath();</span>
+
+        }
+<span class="nc" id="L537">        return path.getPathIterator(m);</span>
+
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public PathIterator getPathIterator() {
+<span class="nc" id="L545">        return getPathIterator(null);</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public Rectangle getBounds() {
+<span class="nc" id="L552">        return this;</span>
+    }
+
+    /**
+     * Sets the bounds of this rectangle.
+     *
+     * @param bounds A rectangle whose bounds will be copied.
+     * @since 7.0
+     */
+    public void setBounds(Rectangle bounds) {
+<span class="nc" id="L562">        setBounds(bounds.x, bounds.y, bounds.size.getWidth(), bounds.size.getHeight());</span>
+<span class="nc" id="L563">    }</span>
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public float[] getBounds2D() {
+<span class="nc" id="L569">        return new float[]{getX(), getY(), getWidth(), getHeight()};</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public boolean isRectangle() {
+<span class="nc" id="L576">        return true;</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L584" title="All 2 branches missed.">        if (obj instanceof Rectangle) {</span>
+<span class="nc" id="L585">            Rectangle r = (Rectangle) obj;</span>
+<span class="nc bnc" id="L586" title="All 6 branches missed.">            return r.x == x &amp;&amp; r.y == y &amp;&amp; r.size.equals(size);</span>
+        }
+<span class="nc" id="L588">        return false;</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L596">        int hash = 7;</span>
+<span class="nc" id="L597">        hash = 83 * hash + this.x;</span>
+<span class="nc" id="L598">        hash = 83 * hash + this.y;</span>
+<span class="nc" id="L599">        hash = 83 * hash + this.size.getWidth();</span>
+<span class="nc" id="L600">        hash = 83 * hash + this.size.getHeight();</span>
+<span class="nc" id="L601">        return hash;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
