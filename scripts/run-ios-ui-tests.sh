@@ -13,6 +13,12 @@ WORKSPACE_PATH="$1"
 APP_BUNDLE_PATH="${2:-}"
 REQUESTED_SCHEME="${3:-}"
 
+# If $2 isn’t a dir and $3 is empty, treat $2 as the scheme.
+if [ -n "$APP_BUNDLE_PATH" ] && [ ! -d "$APP_BUNDLE_PATH" ] && [ -z "$REQUESTED_SCHEME" ]; then
+  REQUESTED_SCHEME="$APP_BUNDLE_PATH"
+  APP_BUNDLE_PATH=""
+fi
+
 if [ ! -d "$WORKSPACE_PATH" ]; then
   ri_log "Workspace not found at $WORKSPACE_PATH" >&2
   exit 3
