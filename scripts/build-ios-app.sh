@@ -227,35 +227,3 @@ if [ -z "$WORKSPACE" ]; then
   exit 1
 fi
 
-bia_log "Building workspace $WORKSPACE with scheme $MAIN_NAME"
-(
-  cd "$PROJECT_DIR"
-  xcodebuild \
-    -workspace "$WORKSPACE" \
-    -scheme "$MAIN_NAME" \
-    -sdk iphonesimulator \
-    -configuration Debug \
-    -destination 'generic/platform=iOS Simulator' \
-    -derivedDataPath "$DERIVED_DATA_DIR" \
-    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-    build
-)
-
-PRODUCT_APP=""
-while IFS= read -r app_path; do
-  PRODUCT_APP="$app_path"
-  break
-done < <(find "$DERIVED_DATA_DIR" -type d -name '*.app' -print 2>/dev/null)
-if [ -n "$PRODUCT_APP" ]; then
-  bia_log "Successfully built iOS simulator app at $PRODUCT_APP"
-fi
-
-if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  {
-    echo "workspace=$WORKSPACE"
-    [ -n "$PRODUCT_APP" ] && echo "app_bundle=$PRODUCT_APP"
-    echo "scheme=${MAIN_NAME}-CI"
-  } >> "$GITHUB_OUTPUT"
-fi
-
-bia_log "iOS workspace build completed successfully"
