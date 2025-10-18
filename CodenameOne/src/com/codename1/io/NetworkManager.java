@@ -829,10 +829,18 @@ public class NetworkManager {
                         }
                         pending.addElement(currentRequest);
                         LOCK.notify();
-                        try {
-                            LOCK.wait(30);
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
+                        long end = System.currentTimeMillis() + 30;
+                        while (true) {
+                            long remaining = end - System.currentTimeMillis();
+                            if (remaining <= 0) {
+                                break;
+                            }
+                            try {
+                                LOCK.wait(remaining);
+                                break;
+                            } catch (InterruptedException ex) {
+                                ex.printStackTrace();
+                            }
                         }
                     }
                 }
@@ -964,7 +972,7 @@ public class NetworkManager {
                             // prevent waiting when there is still a pending request
                             // this can occur with a race condition since the synchronize
                             // scope is limited to prevent blocking on add...
-                            if (pending.size() == 0) {
+                            while (pending.size() == 0 && running && !stopped) {
                                 LOCK.wait();
                             }
                         } catch (InterruptedException ex) {

@@ -1998,8 +1998,10 @@ public class BrowserComponent extends Container {
                     try {
                         Map m = p.parseJSON(new StringReader(value.getValue()));
                         Map<String, JSRef> out = new HashMap<String, JSRef>();
-                        for (String prop : out.keySet()) {
-                            Map propVal = (Map) m.get(prop);
+                        for (Object entryObj : m.entrySet()) {
+                            Map.Entry entry = (Map.Entry) entryObj;
+                            String prop = (String) entry.getKey();
+                            Map propVal = (Map) entry.getValue();
                             out.put(prop, new JSRef((String) propVal.get("value"), (String) propVal.get("type")));
                         }
                         callback.onSucess(out);
@@ -2073,8 +2075,10 @@ public class BrowserComponent extends Container {
             try {
                 Map m = p.parseJSON(new StringReader(value.getValue()));
                 Map<String, JSRef> out = new HashMap<String, JSRef>();
-                for (String prop : out.keySet()) {
-                    Map propVal = (Map) m.get(prop);
+                for (Object entryObj : m.entrySet()) {
+                    Map.Entry entry = (Map.Entry) entryObj;
+                    String prop = (String) entry.getKey();
+                    Map propVal = (Map) entry.getValue();
                     out.put(prop, new JSRef((String) propVal.get("value"), (String) propVal.get("type")));
                 }
                 return out;
@@ -2155,9 +2159,10 @@ public class BrowserComponent extends Container {
             StringBuilder js = new StringBuilder();
             Object[] params = new Object[properties.size()];
             int i = 0;
-            for (String key : properties.keySet()) {
-                js.append("self['").append(key).append("']=${").append(i).append("};");
-                params[i] = properties.get(key);
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                js.append("self['").append(entry.getKey()).append("']=${").append(i).append("};");
+                params[i] = entry.getValue();
+                i++;
             }
             js.append("callback.onSuccess(undefined)");
             execute(timeout, js.toString(), callback);
@@ -2183,9 +2188,10 @@ public class BrowserComponent extends Container {
             StringBuilder js = new StringBuilder();
             Object[] params = new Object[properties.size()];
             int i = 0;
-            for (String key : properties.keySet()) {
-                js.append("self['").append(key).append("']=${").append(i).append("};");
-                params[i] = properties.get(key);
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                js.append("self['").append(entry.getKey()).append("']=${").append(i).append("};");
+                params[i] = entry.getValue();
+                i++;
             }
             js.append("callback.onSuccess(undefined)");
             executeAndWait(timeout, js.toString());

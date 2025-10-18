@@ -31,7 +31,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
 
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.Map;
 
 /**
  * A transition inspired by the Android L release morph activity effect allowing
@@ -87,11 +87,8 @@ public class MorphTransition extends Transition {
     public Transition copy(boolean reverse) {
         MorphTransition m = create(duration);
         if (reverse) {
-            Iterator<String> keyIterator = fromTo.keySet().iterator();
-            while (keyIterator.hasNext()) {
-                String k = keyIterator.next();
-                String v = fromTo.get(k);
-                m.fromTo.put(v, k);
+            for (Map.Entry<String, String> entry : fromTo.entrySet()) {
+                m.fromTo.put(entry.getValue(), entry.getKey());
             }
         } else {
             m.fromTo.putAll(fromTo);
@@ -133,22 +130,23 @@ public class MorphTransition extends Transition {
         Container s = (Container) getSource();
         Container d = (Container) getDestination();
 
-        Iterator<String> keyIterator = fromTo.keySet().iterator();
         int size = fromTo.size();
         fromToComponents = new CC[size];
         Form destForm = d.getComponentForm();
         destForm.forceRevalidate();
         Form sourceForm = s.getComponentForm();
-        for (int iter = 0; iter < size; iter++) {
-            String k = keyIterator.next();
-            String v = fromTo.get(k);
+        int index = 0;
+        for (Map.Entry<String, String> entry : fromTo.entrySet()) {
+            String k = entry.getKey();
+            String v = entry.getValue();
             Component sourceCmp = findByName(s, k);
             Component destCmp = findByName(d, v);
             if (sourceCmp == null || destCmp == null) {
                 continue;
             }
             CC cc = new CC(sourceCmp, destCmp, sourceForm, destForm);
-            fromToComponents[iter] = cc;
+            fromToComponents[index] = cc;
+            index++;
             cc.placeholderDest = new Label();
             cc.placeholderDest.setVisible(false);
             Container destParent = cc.dest.getParent();

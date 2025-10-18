@@ -23,6 +23,8 @@
 
 package com.codename1.properties;
 
+import com.codename1.properties.PropertyBusinessObject;
+
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -209,8 +211,9 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
      */
     public Map<T1, Object> asExplodedMap() {
         Map<T1, Object> m = new LinkedHashMap<T1, Object>();
-        for (T1 k : value.keySet()) {
-            T2 v = value.get(k);
+        for (Map.Entry<T1, T2> entry : value.entrySet()) {
+            T1 k = entry.getKey();
+            T2 v = entry.getValue();
             if (v instanceof PropertyBusinessObject) {
                 m.put(k, ((PropertyBusinessObject) v).getPropertyIndex().toMapRepresentation());
             } else {

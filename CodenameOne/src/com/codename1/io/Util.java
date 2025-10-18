@@ -410,9 +410,10 @@ public class Util {
             Map v = (Map) o;
             out.writeUTF("java.util.Map");
             out.writeInt(v.size());
-            for (Object key : v.keySet()) {
-                writeObject(key, out);
-                writeObject(v.get(key), out);
+            for (Object entryObj : v.entrySet()) {
+                Map.Entry entry = (Map.Entry) entryObj;
+                writeObject(entry.getKey(), out);
+                writeObject(entry.getValue(), out);
             }
             return;
         }
@@ -1640,9 +1641,18 @@ public class Util {
      */
     public static void wait(Object o, int t) {
         synchronized (o) {
-            try {
-                o.wait(t);
-            } catch (InterruptedException e) {
+            long end = System.currentTimeMillis() + t;
+            while (true) {
+                long remaining = end - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    return;
+                }
+                try {
+                    o.wait(remaining);
+                    return;
+                } catch (InterruptedException e) {
+                    // retry until timeout elapses
+                }
             }
         }
     }
@@ -1655,9 +1665,14 @@ public class Util {
      */
     public static void wait(Object o) {
         synchronized (o) {
-            try {
-                o.wait();
-            } catch (InterruptedException e) {
+            boolean waiting = true;
+            while (waiting) {
+                try {
+                    o.wait();
+                    waiting = false;
+                } catch (InterruptedException e) {
+                    // ignore and continue waiting
+                }
             }
         }
     }

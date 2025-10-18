@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 
 /**
  * <p>Codename One port of the infamous GridBagLayout based on the Apache Harmony code. For new applications
@@ -42,10 +43,10 @@ public class GridBagLayout extends Layout {
     protected static final int MINSIZE = 1;
 
     protected static final int PREFERREDSIZE = 2;
-    public volatile double[] columnWeights;
-    public volatile double[] rowWeights;
-    public volatile int[] columnWidths;
-    public volatile int[] rowHeights;
+    public double[] columnWeights;
+    public double[] rowWeights;
+    public int[] columnWidths;
+    public int[] rowHeights;
     // Direct modification is forbidden
     protected volatile Hashtable<Component, GridBagConstraints> comptable;
     protected volatile GridBagConstraints defaultConstraints;
@@ -493,8 +494,9 @@ public class GridBagLayout extends Layout {
         int maxW = 0;
         int maxH = 0;
         int i = 0;
-        for (Component comp : comptable.keySet()) {
-            GridBagConstraints cons = comptable.get(comp);
+        for (Map.Entry<Component, GridBagConstraints> entry : comptable.entrySet()) {
+            Component comp = entry.getKey();
+            GridBagConstraints cons = entry.getValue();
             if ((comp.getParent() == parent) && comp.isVisible()) {
                 components[i++] = comp;
             }
@@ -509,7 +511,8 @@ public class GridBagLayout extends Layout {
 
     private int getComponentsNumber(Container parent) {
         int componentsNumber = 0;
-        for (Component comp : comptable.keySet()) {
+        for (Map.Entry<Component, GridBagConstraints> entry : comptable.entrySet()) {
+            Component comp = entry.getKey();
             if ((comp.getParent() == parent) && comp.isVisible()) {
                 componentsNumber++;
             }

@@ -278,9 +278,10 @@ public abstract class XYChart extends AbstractChart {
                         seriesRenderer.isDisplayBoundingPoints());
                 int startIndex = -1;
 
-                for (Double value : range.keySet()) {
-                    double xValue = value;
-                    Double rValue = range.get(value);
+                for (Map.Entry<Double, Double> entry : range.entrySet()) {
+                    Double value = entry.getKey();
+                    double xValue = value.doubleValue();
+                    Double rValue = entry.getValue();
                     double yValue = rValue.doubleValue();
                     if (startIndex < 0 && (!isNullValue(yValue) || isRenderNullValues())) {
                         startIndex = series.getIndexForKey(xValue);

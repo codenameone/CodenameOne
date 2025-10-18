@@ -1059,8 +1059,9 @@ public final class Grid {
 
         ArrayList<WeakCell> weakCells = new ArrayList<WeakCell>(grid.size());
 
-        for (Integer xyInt : grid.keySet()) {
-            Cell cell = grid.get(xyInt);
+        for (Map.Entry<Integer, Cell> entry : grid.entrySet()) {
+            Integer xyInt = entry.getKey();
+            Cell cell = entry.getValue();
             if (xyInt != null) {
                 int x = xyInt & 0x0000ffff;
                 int y = xyInt >> 16;
@@ -1498,9 +1499,9 @@ public final class Grid {
             return;
         }
 
-        for (String o : linkTargetIDs.keySet()) {
-            if (linkTargetIDs.get(o) == Boolean.TRUE) {
-                LinkHandler.clearBounds(container.getLayout(), o);
+        for (Map.Entry<String, Boolean> entry : linkTargetIDs.entrySet()) {
+            if (Boolean.TRUE.equals(entry.getValue())) {
+                LinkHandler.clearBounds(container.getLayout(), entry.getKey());
             }
         }
     }

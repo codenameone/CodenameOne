@@ -64,7 +64,7 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     private boolean showMeridiem = true;
     private int currentHour = 8;
     private int currentMinute = 0;
-    private boolean currentMeridiem;
+    private boolean currentMeridiem = false;
 
     /**
      * Default constructor

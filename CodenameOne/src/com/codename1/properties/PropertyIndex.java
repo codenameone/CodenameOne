@@ -425,8 +425,11 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                     if (val instanceof Map) {
                         if (p instanceof MapProperty) {
                             ((MapProperty) p).clear();
-                            for (Object k : ((Map) val).keySet()) {
-                                Object value = ((Map) val).get(k);
+                            Map mapVal = (Map) val;
+                            for (Object entryObj : mapVal.entrySet()) {
+                                Map.Entry entry = (Map.Entry) entryObj;
+                                Object k = entry.getKey();
+                                Object value = entry.getValue();
                                 Class keyType = ((MapProperty) p).getKeyType();
                                 if (keyType != null &&
                                         PropertyBusinessObject.class.isAssignableFrom(keyType)) {
@@ -438,9 +441,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                                 if (valueType != null &&
                                         PropertyBusinessObject.class.isAssignableFrom(valueType)) {
                                     Map<String, Object> contentMap = (Map<String, Object>) val;
-                                    for (String kk : contentMap.keySet()) {
+                                    for (Map.Entry<String, Object> contentEntry : contentMap.entrySet()) {
+                                        String kk = contentEntry.getKey();
                                         PropertyBusinessObject po = (PropertyBusinessObject) valueType.newInstance();
-                                        Map<String, Object> vv = (Map<String, Object>) contentMap.get(kk);
+                                        Map<String, Object> vv = (Map<String, Object>) contentEntry.getValue();
                                         po.getPropertyIndex().populateFromMap(vv, valueType);
                                         ((MapProperty) p).set(kk, po);
                                     }
@@ -624,7 +628,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public void fromXml(Element e) {
         Hashtable atts = e.getAttributes();
         if (atts != null) {
-            for (Object a : atts.keySet()) {
+            for (Enumeration keys = atts.keys(); keys.hasMoreElements();) {
+                Object a = keys.nextElement();
                 PropertyBase pb = get((String) a);
                 if (pb != null) {
                     setSimpleObject(pb, atts.get(a));

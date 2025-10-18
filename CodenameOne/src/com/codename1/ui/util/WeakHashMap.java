@@ -108,8 +108,8 @@ public class WeakHashMap<K, V> implements Map<K, V> {
      */
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
-        for (K o : m.keySet()) {
-            put(o, m.get(o));
+        for (Map.Entry<? extends K, ? extends V> entry : m.entrySet()) {
+            put(entry.getKey(), entry.getValue());
         }
     }
 

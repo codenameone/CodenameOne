@@ -678,9 +678,8 @@ public class Resources {
      */
     public String[] getImageResourceNames() {
         ArrayList<String> vec = new ArrayList<String>();
-        Iterator<String> e = resourceTypes.keySet().iterator();
-        while (e.hasNext()) {
-            String c = e.next();
+        for (Map.Entry<String, Byte> entry : resourceTypes.entrySet()) {
+            String c = entry.getKey();
             if (isImage(c)) {
                 vec.add(c);
             }
@@ -701,11 +700,9 @@ public class Resources {
 
     private String[] getResourceTypeNames(byte b) {
         ArrayList<String> vec = new ArrayList<String>();
-        Iterator<String> e = resourceTypes.keySet().iterator();
-        while (e.hasNext()) {
-            String c = e.next();
-            if (resourceTypes.get(c).byteValue() == b) {
-                vec.add(c);
+        for (Map.Entry<String, Byte> entry : resourceTypes.entrySet()) {
+            if (entry.getValue().byteValue() == b) {
+                vec.add(entry.getKey());
             }
         }
         return toStringArray(vec);

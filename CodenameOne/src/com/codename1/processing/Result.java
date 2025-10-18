@@ -1030,13 +1030,13 @@ public class Result {
         if (attributes == null) {
             return;
         }
-        Iterator e = attributes.keySet().iterator();
-        while (e.hasNext()) {
-            String key = (String) e.next();
+        for (Object entryObj : ((Map) attributes).entrySet()) {
+            Map.Entry entry = (Map.Entry) entryObj;
+            String key = (String) entry.getKey();
             if (!key.startsWith("xmlns:")) {
                 continue;
             }
-            if (namespaceURI.equals(attributes.get(key))) {
+            if (namespaceURI.equals(entry.getValue())) {
                 if (namespaceAliases == null) {
                     namespaceAliases = new Hashtable();
                 }

@@ -1609,19 +1609,20 @@ public class ConnectionRequest implements IOProgressListener {
     protected String createRequestURL() {
         if (!post && requestArguments != null) {
             StringBuilder b = new StringBuilder(url);
-            Iterator e = requestArguments.keySet().iterator();
-            if (e.hasNext()) {
+            Iterator entries = requestArguments.entrySet().iterator();
+            if (entries.hasNext()) {
                 b.append("?");
             }
-            while (e.hasNext()) {
-                String key = (String) e.next();
-                Object requestVal = requestArguments.get(key);
+            while (entries.hasNext()) {
+                Map.Entry entry = (Map.Entry) entries.next();
+                String key = (String) entry.getKey();
+                Object requestVal = entry.getValue();
                 if (requestVal instanceof String) {
                     String value = (String) requestVal;
                     b.append(key);
                     b.append("=");
                     b.append(value);
-                    if (e.hasNext()) {
+                    if (entries.hasNext()) {
                         b.append("&");
                     }
                     continue;
@@ -1637,7 +1638,7 @@ public class ConnectionRequest implements IOProgressListener {
                 b.append(key);
                 b.append("=");
                 b.append(val[vlen - 1]);
-                if (e.hasNext()) {
+                if (entries.hasNext()) {
                     b.append("&");
                 }
             }
@@ -1655,16 +1656,17 @@ public class ConnectionRequest implements IOProgressListener {
     protected void buildRequestBody(OutputStream os) throws IOException {
         if (post && requestArguments != null) {
             StringBuilder val = new StringBuilder();
-            Iterator e = requestArguments.keySet().iterator();
-            while (e.hasNext()) {
-                String key = (String) e.next();
-                Object requestVal = requestArguments.get(key);
+            Iterator entries = requestArguments.entrySet().iterator();
+            while (entries.hasNext()) {
+                Map.Entry entry = (Map.Entry) entries.next();
+                String key = (String) entry.getKey();
+                Object requestVal = entry.getValue();
                 if (requestVal instanceof String) {
                     String value = (String) requestVal;
                     val.append(key);
                     val.append("=");
                     val.append(value);
-                    if (e.hasNext()) {
+                    if (entries.hasNext()) {
                         val.append("&");
                     }
                     continue;
@@ -1680,7 +1682,7 @@ public class ConnectionRequest implements IOProgressListener {
                 val.append(key);
                 val.append("=");
                 val.append(valArray[vlen - 1]);
-                if (e.hasNext()) {
+                if (entries.hasNext()) {
                     val.append("&");
                 }
             }
@@ -2314,10 +2316,11 @@ public class ConnectionRequest implements IOProgressListener {
             if (r.url == url) {
                 if (requestArguments != null) {
                     if (r.requestArguments != null && requestArguments.size() == r.requestArguments.size()) {
-                        Iterator e = requestArguments.keySet().iterator();
-                        while (e.hasNext()) {
-                            Object key = e.next();
-                            Object value = requestArguments.get(key);
+                        Iterator entries = requestArguments.entrySet().iterator();
+                        while (entries.hasNext()) {
+                            Map.Entry entry = (Map.Entry) entries.next();
+                            Object key = entry.getKey();
+                            Object value = entry.getValue();
                             Object otherValue = r.requestArguments.get(key);
                             if (!value.equals(otherValue)) {
                                 return false;

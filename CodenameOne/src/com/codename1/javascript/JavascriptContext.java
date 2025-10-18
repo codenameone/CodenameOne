@@ -37,6 +37,7 @@ import com.codename1.util.SuccessCallback;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -225,8 +226,9 @@ public class JavascriptContext {
             Log.p("Cleaning up Javascript lookup table.");
         }
         ArrayList<Integer> remove = new ArrayList<Integer>();
-        for (Integer i : objectMap.keySet()) {
-            if (Display.getInstance().extractHardRef(objectMap.get(i)) == null) {
+        for (Map.Entry<Integer, Object> entry : objectMap.entrySet()) {
+            Integer i = entry.getKey();
+            if (Display.getInstance().extractHardRef(entry.getValue()) == null) {
                 remove.add(i);
             }
         }

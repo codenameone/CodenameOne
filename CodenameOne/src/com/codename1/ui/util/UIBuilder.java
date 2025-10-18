@@ -195,7 +195,7 @@ public class UIBuilder { //implements Externalizable {
      */
     private static final String FORM_STATE_KEY_CONTAINER = "$cnt";
     // used by the resource editor
-    static boolean ignorBaseForm;
+    static boolean ignorBaseForm = false;
     private static Hashtable componentRegistry;
     private static boolean blockAnalytics;
     Vector baseFormNavigationStack = new Vector();

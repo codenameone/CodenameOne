@@ -33,6 +33,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -387,15 +388,14 @@ public class Properties extends HashMap<String, String> {
         if (defaults != null) {
             defaults.selectProperties(selectProperties, isStringOnly);
         }
-        Iterator<String> keys = keySet().iterator();
-        while (keys.hasNext()) {
+        for (Map.Entry<String, String> entry : entrySet()) {
             @SuppressWarnings("unchecked")
-            K key = (K) keys.next();
+            K key = (K) entry.getKey();
             if (isStringOnly && !(key instanceof String)) {
                 // Only select property with string key and value
                 continue;
             }
-            Object value = get(key);
+            Object value = entry.getValue();
             selectProperties.put(key, value);
         }
     }

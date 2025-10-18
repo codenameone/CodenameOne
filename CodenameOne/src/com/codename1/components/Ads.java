@@ -217,6 +217,7 @@ public class Ads extends Container implements HTMLCallback {
      * @param ad the ad to set
      */
     public void setAd(String ad) {
+        this.ad = ad;
         HTMLComponent html = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
 
             protected ConnectionRequest createConnectionRequest(DocumentInfo docInfo, IOCallback callback, Object[] response) {

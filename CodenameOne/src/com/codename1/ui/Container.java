@@ -4299,6 +4299,8 @@ public class Container extends Component implements Iterable<Component> {
             }
             this.thisContainer = thisContainer;
             this.motions = motions;
+            animatedComponents = new Vector();
+            opacity = new Motion[0];
         }
 
         @Override
