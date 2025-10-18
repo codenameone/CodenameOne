@@ -222,7 +222,7 @@ public class InflaterInputStream extends FilterInputStream {
         inflater.setInput(empty, 0, 0, false);
         inflater.setOutput(empty, 0, 0);
 
-        int err = inflater.inflate(JZlib.Z_NO_FLUSH);
+        inflater.inflate(JZlib.Z_NO_FLUSH);
         if (!inflater.istate.inParsingHeader()) {
             return;
         }
@@ -233,7 +233,7 @@ public class InflaterInputStream extends FilterInputStream {
             if (i <= 0)
                 throw new IOException("no input");
             inflater.setInput(b1);
-            err = inflater.inflate(JZlib.Z_NO_FLUSH);
+            int err = inflater.inflate(JZlib.Z_NO_FLUSH);
             if (err != 0/*Z_OK*/)
                 throw new IOException(inflater.msg);
         }

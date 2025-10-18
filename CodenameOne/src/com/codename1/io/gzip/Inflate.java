@@ -276,8 +276,6 @@ final class Inflate {
                 case DICT4:
 
                     if (z.avail_in == 0) return r;
-                    r = f;
-
                     z.avail_in--;
                     z.total_in++;
                     this.need = ((long) (z.next_in[z.next_in_index++] & 0xff) << 24) & 0xff000000L;
@@ -718,7 +716,6 @@ final class Inflate {
         if (tmp_string == null) {
             tmp_string = new java.io.ByteArrayOutputStream();
         }
-        int b = 0;
         while (this.need > 0) {
             if (z.avail_in == 0) {
                 throw new Return(r);
@@ -726,7 +723,6 @@ final class Inflate {
             r = f;
             z.avail_in--;
             z.total_in++;
-            b = z.next_in[z.next_in_index];
             tmp_string.write(z.next_in, z.next_in_index, 1);
             z.adler.update(z.next_in, z.next_in_index, 1);
             z.next_in_index++;

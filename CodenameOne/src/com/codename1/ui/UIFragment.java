@@ -785,7 +785,6 @@ public class UIFragment {
                     return buildXMLFromJSONNotation(m.get("root"));
                 } else {
                     Object children = null;
-                    String key = null;
                     if (isBorderLayout(m)) {
                         setBorderLayoutBehaviour(m);
                         el = new Element("border");

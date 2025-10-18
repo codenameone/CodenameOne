@@ -181,13 +181,14 @@ final class Tree {
             int len   // its bit length
     ) {
         int res = 0;
-        do {
+        for (int i = 0; i < len; i++) {
             res |= code & 1;
             code >>>= 1;
-            res <<= 1;
+            if (i + 1 < len) {
+                res <<= 1;
+            }
         }
-        while (--len > 0);
-        return res >>> 1;
+        return res;
     }
 
     // Compute the optimal bit lengths for a tree and update the total bit length

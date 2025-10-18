@@ -591,7 +591,6 @@ public class TestUtils {
                 int[] rgba = mute.getRGBCached();
                 Image orig = Image.createImage(Storage.getInstance().createInputStream(screenshotName));
                 int[] origRgba = orig.getRGBCached();
-                orig = null;
                 for (int iter = 0; iter < rgba.length; iter++) {
                     if (rgba[iter] != origRgba[iter]) {
                         log("screenshots do not match at offset " + iter + " saving additional image under " + screenshotName + ".fail");

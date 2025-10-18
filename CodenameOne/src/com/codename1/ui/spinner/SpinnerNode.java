@@ -318,7 +318,6 @@ class SpinnerNode extends Node {
     @Override
     protected void layoutChildren() {
         double width = boundsInLocal.get().getWidth();
-        double height = boundsInLocal.get().getHeight();
         double rendererHeight = renderer.getPreferredH();
         double circumference = rendererHeight * numSides;
         double diameter = circumference / Math.PI;

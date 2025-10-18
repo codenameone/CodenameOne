@@ -185,10 +185,6 @@ public class FlipTransition extends Transition {
     }
 
     private void makePerspectiveTransform(Transform t) {
-        int x = getSource().getAbsoluteX();
-        int y = getSource().getAbsoluteY();
-        int w = getSource().getWidth();
-        int h = getSource().getHeight();
         float displayH = Display.getInstance().getDisplayHeight();
         float displayW = Display.getInstance().getDisplayWidth();
         //double midX = (float)x+(float)w/2.0;

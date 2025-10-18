@@ -658,8 +658,7 @@ public class TextSelection {
     private boolean shouldCoverToEndOfLine(Span span, Rectangle bounds) {
         int spy = span.getBounds().getY();
         int sph = span.getBounds().getHeight();
-        boolean shouldCoverToEndOfLine = spy + 2 * sph / 3 > bounds.getY() && spy + sph <= bounds.getY() + bounds.getHeight();
-        return shouldCoverToEndOfLine;
+        return spy + 2 * sph / 3 > bounds.getY() && spy + sph <= bounds.getY() + bounds.getHeight();
     }
 
     private void updateSnappedSelectedBounds() {

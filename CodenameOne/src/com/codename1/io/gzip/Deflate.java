@@ -1204,7 +1204,7 @@ final class Deflate {
         }
 
         if (match_available != 0) {
-            bflush = _tr_tally(0, window[strstart - 1] & 0xff);
+            _tr_tally(0, window[strstart - 1] & 0xff);
             match_available = 0;
         }
         flush_block_only(flush == Z_FINISH);

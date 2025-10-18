@@ -491,9 +491,9 @@ public class MapComponent extends Container {
         y = y - getAbsoluteY();
         Tile t = screenTile();
         Coord southWest = t.position(x - 20, t.dimension().getHeight() - y - 20);
-        Coord c = Mercator.inverseMercator(southWest.getLatitude(), southWest.getLongitude());
+        Mercator.inverseMercator(southWest.getLatitude(), southWest.getLongitude());
         Coord northEast = t.position(x + 20, t.dimension().getHeight() - y + 20);
-        c = Mercator.inverseMercator(northEast.getLatitude(), northEast.getLongitude());
+        Mercator.inverseMercator(northEast.getLatitude(), northEast.getLongitude());
 
         BoundingBox bbox = new BoundingBox(southWest, northEast);
         Enumeration e = _layers.elements();

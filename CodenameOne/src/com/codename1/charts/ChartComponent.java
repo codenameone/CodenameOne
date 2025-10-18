@@ -869,15 +869,14 @@ public class ChartComponent extends Component {
         } else {
             Shape currentViewPort = screenToChartShape(new Rectangle(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight()));
             float[] currentRect = currentViewPort.getBounds2D();
-            float[] newRect = new float[]{(float) minX, (float) (maxX - minX), (float) minY, (float) (maxY - minY)};
 
             float currentAspect = currentRect[2] / currentRect[3];
-            float newAspect = 1.0f;
-            Rectangle newViewPort = new Rectangle((int) newRect[0], (int) newRect[1], (int) newRect[2], (int) newRect[3]);
-            if (newAspect != currentAspect) {
-                newViewPort.setHeight((int) (((double) newViewPort.getWidth()) / currentAspect));
-                newRect = newViewPort.getBounds2D();
-                newAspect = newRect[2] / newRect[3];
+            Rectangle newViewPort = new Rectangle((int) minX, (int) (maxX - minX), (int) minY, (int) (maxY - minY));
+            if (newViewPort.getHeight() != 0) {
+                float newAspect = (float) newViewPort.getWidth() / (float) newViewPort.getHeight();
+                if (newAspect != currentAspect) {
+                    newViewPort.setHeight((int) (((double) newViewPort.getWidth()) / currentAspect));
+                }
             }
 
             ZoomTransition zt = new ZoomTransition(currentViewPort.getBounds(), newViewPort, duration);

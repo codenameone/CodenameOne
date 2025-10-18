@@ -379,11 +379,9 @@ public class SwipeableContainer extends Container {
 
             Component bottomR;
             int bottomRightW = 0;
-            int bottomRightX = topWrapper.getWidth();
             if (bottomRightWrapper.getComponentCount() > 0) {
                 bottomR = bottomRightWrapper.getComponentAt(0);
                 bottomRightW = bottomR.getWidth();
-                bottomRightX = bottomR.getX();
             }
 
             switch (type) {

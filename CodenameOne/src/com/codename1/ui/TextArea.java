@@ -768,7 +768,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 onClick();
                 return;
             }
-            Display d = Display.getInstance();
             if (action == 0 && isTypedKey(keyCode)) {
                 //registerAsInputDevice();
                 Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText(), keyCode);
@@ -1929,7 +1928,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * primarily by implementation APIs.
      */
     public void registerAsInputDevice() {
-        final TextArea cmp = this;
         Form f = this.getComponentForm();
 
         if (f != null && Display.impl.getEditingText() != this) {
@@ -1964,7 +1962,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      */
     public void startEditing() {
         if (!Display.getInstance().isTextEditing(this)) {
-            final TextArea cmp = this;
             //registerAsInputDevice();
             Display.getInstance().editString(this, maxSize, constraint, text);
         }

@@ -1480,7 +1480,6 @@ class TBigDecimal {
     public TBigDecimal divideToIntegralValue(TBigDecimal divisor) {
         TBigInteger integralValue; // the integer of result
         TBigInteger powerOfTen; // some power of ten
-        TBigInteger[] quotAndRem = {getUnscaledValue()};
         long newScale = (long) this.scale - divisor.scale;
         long tempScale = 0;
         int i = 1;

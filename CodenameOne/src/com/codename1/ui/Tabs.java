@@ -1127,13 +1127,16 @@ public class Tabs extends Container {
     }
 
     private void initTabFocus(Component tab, Component content) {
-        Component focus = null;
         if (content.isFocusable()) {
-            focus = content;
+            tab.setFocusable(true);
+            return;
         }
 
         if (content instanceof Container) {
-            focus = ((Container) content).findFirstFocusable();
+            Component focus = ((Container) content).findFirstFocusable();
+            if (focus != null) {
+                tab.setFocusable(true);
+            }
         }
 
     }

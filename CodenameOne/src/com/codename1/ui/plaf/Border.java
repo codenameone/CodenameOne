@@ -1488,8 +1488,6 @@ public class Border {
                 width -= (topLeft.getWidth() + topRight.getWidth());
                 g.clipRect(x, y, width, height);
                 if (center != null && width > 0 && height > 0) {
-                    int centerWidth = center.getWidth();
-                    int centerHeight = center.getHeight();
                     g.drawImage(center, x, y, width, height);
                 }
                 Image top = images[0];
@@ -1806,7 +1804,6 @@ public class Border {
                 g.drawLine(x + width - 2, y + 2, x + width - 2, y + height - 3);
                 break;
             case TYPE_COMPOUND:
-                Style style = c.getStyle();
                 boolean drawLeft = true;
                 boolean drawRight = true;
 

@@ -541,7 +541,6 @@ public class Resources {
      * Reads the header of the resource file
      */
     private void readHeader() throws IOException {
-        int size = input.readShort();
         majorVersion = input.readShort();
         minorVersion = input.readShort();
 
@@ -1029,7 +1028,7 @@ public class Resources {
                     if (Image.isSVGSupported()) {
                         byte[] s = new byte[svgSize];
                         input.readFully(s);
-                        String baseURL = input.readUTF();
+                        input.readUTF();
                         boolean animated = input.readBoolean();
                         loadSVGRatios(input);
                         byte[] fallback = new byte[input.readInt()];
@@ -1060,7 +1059,7 @@ public class Resources {
                     if (Image.isSVGSupported()) {
                         byte[] s = new byte[svgSize];
                         input.readFully(s);
-                        String baseURL = input.readUTF();
+                        input.readUTF();
                         boolean animated = input.readBoolean();
                         Image img = readMultiImage(input, true);
                         Image svg = createSVG(animated, s);
@@ -1322,10 +1321,6 @@ public class Resources {
         String platformPrefix = "platform-" + platformName + "-";
         String densityPrefix = "density-" + densityStr + "-";
         String devicePrefix = "device-" + deviceType + "-";
-        String platformDensityPrefix = platformPrefix + densityPrefix;
-        String devicePlatformPrefix = devicePrefix + platformPrefix;
-        String devicePlatformDensityPrefix = devicePlatformPrefix + densityPrefix;
-
         theme.put("name", id);
 
         // marks the theme as uninitialized so we can finish "wiring" cached resources

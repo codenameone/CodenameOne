@@ -64,31 +64,7 @@ class TBitLevel {
     }
 
     static int numberOfLeadingZeros(int i) {
-        if (i == 0) {
-            return 32;
-        }
-        int n = 0;
-        if (i >>> 16 != 0) {
-            i >>>= 16;
-            n |= 16;
-        }
-        if (i >>> 8 != 0) {
-            i >>>= 8;
-            n |= 8;
-        }
-        if (i >>> 4 != 0) {
-            i >>>= 4;
-            n |= 4;
-        }
-        if (i >>> 2 != 0) {
-            i >>>= 2;
-            n |= 2;
-        }
-        if (i >>> 1 != 0) {
-            i >>>= 1;
-            n |= 1;
-        }
-        return 32 - n - 1;
+        return Integer.numberOfLeadingZeros(i);
     }
 
     /**
@@ -313,16 +289,13 @@ class TBitLevel {
         }
         if (count == 0) {
             System.arraycopy(source, intCount, result, 0, resultLen);
-            i = resultLen;
         } else {
             int leftShiftCount = 32 - count;
-
-            allZero &= (source[i] << leftShiftCount) == 0;
-            for (i = 0; i < resultLen - 1; i++) {
-                result[i] = (source[i + intCount] >>> count) | (source[i + intCount + 1] << leftShiftCount);
+            allZero &= (source[intCount] << leftShiftCount) == 0;
+            for (int j = 0; j < resultLen - 1; j++) {
+                result[j] = (source[j + intCount] >>> count) | (source[j + intCount + 1] << leftShiftCount);
             }
-            result[i] = (source[i + intCount] >>> count);
-            i++;
+            result[resultLen - 1] = (source[resultLen - 1 + intCount] >>> count);
         }
 
         return allZero;

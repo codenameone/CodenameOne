@@ -997,8 +997,7 @@ public class Image implements ActionSource {
         int size = w * h;
         int[] arr = getRGB();
         int alphaInt = (((int) alpha) << 24) & 0xff000000;
-        float alphaRatio = (alpha & 0xff);
-        alphaRatio = (alpha & 0xff) / 255.0f;
+        float alphaRatio = (alpha & 0xff) / 255.0f;
         for (int iter = 0; iter < size; iter++) {
             int currentAlpha = (arr[iter] >> 24) & 0xff;
             if (currentAlpha != 0) {

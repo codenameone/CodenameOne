@@ -238,8 +238,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         Component selected;
         if (getRenderingPrototype() != null) {
             selected = getRenderer().getListCellRendererComponent(this, getRenderingPrototype(), 0, true);
-        }
-        if (getModel().getSize() > 0) {
+        } else if (getModel().getSize() > 0) {
             selected = getRenderer().getListCellRendererComponent(this, getModel().getItemAt(0), 0, true);
         } else {
             selected = getRenderer().getListCellRendererComponent(this, "XXXXXXXXXXX", 0, true);

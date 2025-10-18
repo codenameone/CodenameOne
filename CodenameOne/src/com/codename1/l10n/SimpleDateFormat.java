@@ -310,7 +310,7 @@ public class SimpleDateFormat extends DateFormat {
     @Override
     String format(Date source, StringBuffer toAppendTo) {
         StringBuilder sb = new StringBuilder();
-        String out = format(source, sb);
+        format(source, sb);
         toAppendTo.append(sb);
         return toAppendTo.toString();
 

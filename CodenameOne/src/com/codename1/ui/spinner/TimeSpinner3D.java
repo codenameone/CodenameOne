@@ -528,7 +528,8 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         g.setColor(hour.getSelectedOverlayStyle().getBgColor());
         g.setAlpha(255);
         g.fillRect(getX(), getY(), getWidth(), getHeight());
-        super.paint(g); //To change body of generated methods, choose Tools | Templates.
+        super.paint(g);
+        g.setAlpha(alpha);
     }
 
 

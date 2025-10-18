@@ -89,12 +89,6 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
 
     // Removed for 2.3 because the parent.isValid() in MigLayout will catch this instead.
     public int getLayoutHashCode() {
-        //long n = System.nanoTime();
-        int h = super.getLayoutHashCode();
-
-        if (isLeftToRight())
-            h += 416343;
-
         return 0;
     }
 }
