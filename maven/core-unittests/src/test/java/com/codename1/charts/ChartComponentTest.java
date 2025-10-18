@@ -199,6 +199,11 @@ class ChartComponentTest extends UITestBase {
         }
 
         @Override
+        public int getLegendShapeWidth(int seriesIndex) {
+            return 0;
+        }
+
+        @Override
         public String getChartType() {
             return "Stub";
         }
