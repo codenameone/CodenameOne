@@ -1,0 +1,55 @@
+import XCTest
+
+final class HelloCodenameOneUITests: XCTestCase {
+    private var app: XCUIApplication!
+    private var outputDirectory: URL!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+
+        app = XCUIApplication()
+        let environment = ProcessInfo.processInfo.environment
+        if let outputPath = environment["CN1SS_OUTPUT_DIR"], !outputPath.isEmpty {
+            outputDirectory = URL(fileURLWithPath: outputPath)
+        } else {
+            outputDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+        }
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+
+        app.launch()
+    }
+
+    override func tearDownWithError() throws {
+        app?.terminate()
+        app = nil
+    }
+
+    private func captureScreenshot(named name: String) throws {
+        let screenshot = XCUIScreen.main.screenshot()
+        let pngURL = outputDirectory.appendingPathComponent("\(name).png")
+        try screenshot.pngRepresentation.write(to: pngURL)
+
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    func testMainScreenScreenshot() throws {
+        XCTAssertTrue(app.staticTexts["Hello Codename One"].waitForExistence(timeout: 10))
+        sleep(1)
+        try captureScreenshot(named: "MainActivity")
+    }
+
+    func testBrowserComponentScreenshot() throws {
+        let button = app.buttons["Open Browser Screen"]
+        XCTAssertTrue(button.waitForExistence(timeout: 10))
+        button.tap()
+
+        let webView = app.webViews.firstMatch
+        XCTAssertTrue(webView.waitForExistence(timeout: 15))
+        sleep(2)
+        try captureScreenshot(named: "BrowserComponent")
+    }
+}
+
