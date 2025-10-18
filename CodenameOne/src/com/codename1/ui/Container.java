@@ -2951,17 +2951,13 @@ public class Container extends Component implements Iterable<Component> {
 
                     } else {
                         // No children found here
-                        if (top == null) {
-                            if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
-                                top = cmp;
-                            }
+                        if (top == null && cmp.respondsToPointerEvents()) {
+                            top = cmp;
                         }
                     }
                 } else {
                     if (top == null) {
-                        if (cmp.respondsToPointerEvents() || !(cmp instanceof Container)) {
-                            top = cmp;
-                        }
+                        top = cmp;
                     }
                 }
                 if (!overlaps) {

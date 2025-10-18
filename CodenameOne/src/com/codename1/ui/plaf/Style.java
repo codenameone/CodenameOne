@@ -2261,12 +2261,12 @@ public class Style {
                     return Math.round(v * Font.getDefaultFont().getHeight());
                 case UNIT_TYPE_VH:
                     return Math.round(v / 100f * CN.getDisplayHeight());
-                case UNIT_TYPE_VW:
-                    return Math.round(v / 100f * CN.getDisplayWidth());
-                case UNIT_TYPE_VMIN:
-                    return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
-                case UNIT_TYPE_VMAX:
-                    return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+            case UNIT_TYPE_VW:
+                return Math.round(v / 100f * CN.getDisplayWidth());
+            case UNIT_TYPE_VMIN:
+                return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+            case UNIT_TYPE_VMAX:
+                return Math.round(v / 100f * Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()));
                 case UNIT_TYPE_DIPS:
                     return Display.getInstance().convertToPixels(v);
                 case UNIT_TYPE_SCREEN_PERCENTAGE:

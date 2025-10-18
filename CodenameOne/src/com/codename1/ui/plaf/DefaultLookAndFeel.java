@@ -1661,6 +1661,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 break;
             default:
                 g.drawImage(icon, x, y + iconStringHGap);
+                break;
 
         }
     }

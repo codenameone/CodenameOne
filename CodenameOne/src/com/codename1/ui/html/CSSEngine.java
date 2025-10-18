@@ -1629,8 +1629,8 @@ class CSSEngine {
                         Container bulletCont = (Container) firstComp;
                         if (bulletCont.getComponentCount() > 0) {
                             Component listItemCmp = bulletCont.getComponentAt(0);
-                            if (listItemCmp instanceof Component) {
-                                HTMLListItem listItem = ((HTMLListItem) listItemCmp);
+                            if (listItemCmp instanceof HTMLListItem) {
+                                HTMLListItem listItem = (HTMLListItem) listItemCmp;
                                 listItem.setStyleType(listType);
                                 listItem.setImage(listImg);
                             }

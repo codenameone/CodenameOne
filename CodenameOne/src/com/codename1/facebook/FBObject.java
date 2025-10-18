@@ -97,14 +97,24 @@ public class FBObject {
      * {@inheritDoc}
      */
     public boolean equals(Object obj) {
-        return id.equals(((FBObject) obj).id);
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof FBObject)) {
+            return false;
+        }
+        FBObject other = (FBObject) obj;
+        if (id == null) {
+            return other.id == null;
+        }
+        return id.equals(other.id);
     }
 
     /**
      * {@inheritDoc}
      */
     public int hashCode() {
-        return id.hashCode();
+        return id != null ? id.hashCode() : 0;
     }
 
 

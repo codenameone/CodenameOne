@@ -160,6 +160,7 @@ public class PushBuilder {
         switch (type) {
             case 0:
             case 1:
+            case 5:
                 sb.append(body);
                 break;
             case 2:
@@ -171,11 +172,7 @@ public class PushBuilder {
             case 4:
                 sb.append(title).append(";").append(body);
                 break;
-            case 5:
-                sb.append(body);
-                break;
             case 6:
-
             case 100:
                 sb.append(badge);
                 break;

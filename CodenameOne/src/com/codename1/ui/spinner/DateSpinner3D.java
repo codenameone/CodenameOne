@@ -106,7 +106,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 @Override
                 public String format(String input) {
                     if (input != null) {
-                        return String.valueOf(new Double(Double.parseDouble(input)).intValue());
+                        return String.valueOf((int) Double.parseDouble(input));
                     }
                     return null;
                 }
@@ -116,9 +116,9 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
             month.setRowFormatter(new SpinnerNode.RowFormatter() {
                 @Override
                 public String format(String input) {
-                    if (input != null) {
-                        Calendar c = Calendar.getInstance();
-                        c.set(Calendar.MONTH, new Double(Double.parseDouble(input)).intValue() - 1);
+                        if (input != null) {
+                            Calendar c = Calendar.getInstance();
+                            c.set(Calendar.MONTH, (int) Double.parseDouble(input) - 1);
                         c.set(Calendar.DAY_OF_MONTH, 15);
                         return monthFormat.format(c.getTime());
                     }
@@ -132,7 +132,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
                 @Override
                 public String format(String input) {
                     if (input != null) {
-                        return String.valueOf(new Double(Double.parseDouble(input)).intValue());
+                        return String.valueOf((int) Double.parseDouble(input));
                     }
                     return null;
                 }

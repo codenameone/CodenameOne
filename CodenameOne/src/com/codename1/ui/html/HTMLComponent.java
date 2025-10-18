@@ -997,7 +997,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 System.out.println("Waiting for previous page to cancel " + System.currentTimeMillis());
                 try {
                     Thread.sleep(50);
-                } catch (Exception e) {
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
                 waitTime += 50;
 
@@ -3137,8 +3139,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     pushContainer(child);
                     break;
                 case HTMLElement.TAG_BUTTON:
-                    handleInput(child, curAlign);
-                    break;
                 case HTMLElement.TAG_INPUT:
                     handleInput(child, curAlign);
                     break;

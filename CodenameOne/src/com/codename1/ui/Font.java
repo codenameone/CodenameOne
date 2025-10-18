@@ -595,14 +595,26 @@ public class Font extends CN {
      * {@inheritDoc}
      */
     public boolean equals(Object o) {
-        if (ttf && o != null) {
-            return ((Font) o).font != null && ((Font) o).ttf && ((Font) o).font.equals(font);
+        if (this == o) {
+            return true;
         }
-        if (o != null && o.getClass() == getClass()) {
-            Font f = (Font) o;
-            return !f.ttf && f.getFace() == getFace() && f.getSize() == getSize() && f.getStyle() == getStyle();
+        if (!(o instanceof Font)) {
+            return false;
         }
-        return false;
+        Font f = (Font) o;
+        if (ttf || f.ttf) {
+            if (!ttf || !f.ttf) {
+                return false;
+            }
+            if (font == null) {
+                return f.font == null;
+            }
+            return font.equals(f.font);
+        }
+        if (f.getClass() != getClass()) {
+            return false;
+        }
+        return f.getFace() == getFace() && f.getSize() == getSize() && f.getStyle() == getStyle();
     }
 
     /**

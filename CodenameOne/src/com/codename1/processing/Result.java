@@ -433,7 +433,7 @@ public class Result {
         if (s == null) {
             return 0;
         }
-        return new Double(Double.parseDouble(s)).longValue();
+        return (long) Double.parseDouble(s);
     }
 
     /**

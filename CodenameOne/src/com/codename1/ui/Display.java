@@ -2579,7 +2579,7 @@ public final class Display extends CN1Constants {
             case Style.UNIT_TYPE_VMIN:
                 return Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
             case Style.UNIT_TYPE_VMAX:
-                return Math.round(value / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));
+                return Math.round(value / 100f * Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()));
             case Style.UNIT_TYPE_DIPS:
                 return Display.getInstance().convertToPixels(value);
             case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
