@@ -1028,7 +1028,7 @@ public class Resources {
                     if (Image.isSVGSupported()) {
                         byte[] s = new byte[svgSize];
                         input.readFully(s);
-                        input.readUTF();
+                        String baseURL = input.readUTF();
                         boolean animated = input.readBoolean();
                         loadSVGRatios(input);
                         byte[] fallback = new byte[input.readInt()];

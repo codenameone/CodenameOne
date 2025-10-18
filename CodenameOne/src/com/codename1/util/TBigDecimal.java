@@ -1503,6 +1503,7 @@ class TBigDecimal {
             powerOfTen = TMultiplication.powerOf10(-newScale);
             integralValue = getUnscaledValue().multiply(powerOfTen).divide(divisor.getUnscaledValue());
             // To strip trailing zeros approximating to the preferred scale
+            TBigInteger[] quotAndRem;
             while (!integralValue.testBit(0)) {
                 quotAndRem = integralValue.divideAndRemainder(TEN_POW[i]);
                 if ((quotAndRem[1].signum() == 0)
