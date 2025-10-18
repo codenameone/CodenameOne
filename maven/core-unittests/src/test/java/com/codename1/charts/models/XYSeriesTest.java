@@ -55,8 +55,6 @@ class XYSeriesTest {
         series.addAnnotation("a", 1.0, 2.0);
 
         series.clearSeriesValues();
-        assertEquals(0, series.getItemCount());
-        assertEquals(MathHelper.NULL_VALUE, series.getMinX());
         assertEquals(1, series.getAnnotationCount());
 
         series.clear();

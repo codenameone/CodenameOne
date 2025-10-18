@@ -41,7 +41,7 @@ class SeriesTransitionTest extends UITestBase {
         assertTrue(form.registeredAnimations.contains(transition));
 
         Motion motion = getMotion(transition);
-        motion.setCurrentMotionTime(transition.getDuration() + 1);
+        motion.finish();
 
         assertTrue(transition.animate());
         assertFalse(transition.animate());
@@ -87,7 +87,7 @@ class SeriesTransitionTest extends UITestBase {
             transition.animateChart();
             Motion motion = getMotion(transition);
             assertEquals(entry.getValue(), getMotionType(motion));
-            motion.setCurrentMotionTime(transition.getDuration() + 1);
+            motion.finish();
             transition.animate();
             transition.animate();
         }

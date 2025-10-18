@@ -39,9 +39,7 @@ class ChartComponentTest extends UITestBase {
     @Test
     void coordinateConversionsHonorCurrentTransform() throws Exception {
         RecordingChart chart = new RecordingChart();
-        ChartComponent component = new ChartComponent(chart);
-        component.setX(5);
-        component.setY(10);
+        ChartComponent component = new PositionedChartComponent(chart, 5, 10);
 
         Transform translation = Transform.makeTranslation(3, 4);
         setCurrentTransform(component, translation);
@@ -58,9 +56,7 @@ class ChartComponentTest extends UITestBase {
     @Test
     void shapeConversionsTranslateBetweenSpaces() throws Exception {
         RecordingChart chart = new RecordingChart();
-        ChartComponent component = new ChartComponent(chart);
-        component.setX(10);
-        component.setY(15);
+        ChartComponent component = new PositionedChartComponent(chart, 10, 15);
 
         Shape chartShape = component.screenToChartShape(new Rectangle(20, 30, 40, 50));
         Rectangle chartBounds = chartShape.getBounds();
@@ -211,6 +207,27 @@ class ChartComponentTest extends UITestBase {
         @Override
         public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
             return null;
+        }
+    }
+
+    private static class PositionedChartComponent extends ChartComponent {
+        private final int absoluteX;
+        private final int absoluteY;
+
+        PositionedChartComponent(AbstractChart chart, int absoluteX, int absoluteY) {
+            super(chart);
+            this.absoluteX = absoluteX;
+            this.absoluteY = absoluteY;
+        }
+
+        @Override
+        public int getAbsoluteX() {
+            return absoluteX;
+        }
+
+        @Override
+        public int getAbsoluteY() {
+            return absoluteY;
         }
     }
 
