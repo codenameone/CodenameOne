@@ -98,7 +98,7 @@ jobs:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
         run: |
           mkdir -p "${ARTIFACTS_DIR}"
-          ./scripts/run-ios-ui-tests.sh "${{ steps.build-ios-app.outputs.workspace }}" "${{ steps.build-ios-app.outputs.app_bundle }}" "${{ steps.build-ios-app.outputs.scheme }}"
+          ./scripts/run-ios-ui-tests.sh "${{ steps.build-ios-app.outputs.workspace }}" "${{ steps.build-ios-app.outputs.scheme }}"
         timeout-minutes: 25
 
       - name: Upload iOS artifacts

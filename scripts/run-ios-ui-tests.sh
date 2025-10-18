@@ -261,7 +261,7 @@ if ! xcodebuild \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
   -configuration Debug \
-  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.5' \
+  -destination "$SIM_DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   -resultBundlePath "$RESULT_BUNDLE" \
   "${XCODE_TEST_FILTERS[@]}" \

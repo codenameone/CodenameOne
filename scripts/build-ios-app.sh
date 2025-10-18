@@ -227,3 +227,24 @@ if [ -z "$WORKSPACE" ]; then
   exit 1
 fi
 
+# ... after this block in build-ios-app.sh:
+# if [ -z "$WORKSPACE" ]; then
+#   bia_log "Failed to locate xcworkspace in $PROJECT_DIR" >&2
+#   ls "$PROJECT_DIR" >&2 || true
+#   exit 1
+# fi
+
+bia_log "Found xcworkspace: $WORKSPACE"
+
+SCHEME="${MAIN_NAME}-CI"   # create-shared-scheme.py created this
+
+# Make these visible to the next GH Actions step
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "workspace=$WORKSPACE"
+    echo "scheme=$SCHEME"
+  } >> "$GITHUB_OUTPUT"
+fi
+
+bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=$SCHEME"
+exit 0
