@@ -25,7 +25,7 @@ class CSVParserTest {
     @Test
     void supportsQuotedValuesAndEscapedQuotes() throws IOException {
         String csv = "\"Name\",\"Address\",\"Notes\"\n" +
-                "\"Doe, John\",\"\"\"Main\"\" Street\"\",\"Line with \"\"quote\"\" inside\"";
+                "\"Doe, John\",\"\"\"Main\"\" Street\",\"Line with \"\"quote\"\" inside\"";
         CSVParser parser = new CSVParser();
 
         String[][] rows = parser.parse(new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)));
