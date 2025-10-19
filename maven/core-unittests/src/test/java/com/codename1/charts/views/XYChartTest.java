@@ -6,6 +6,7 @@ import com.codename1.charts.models.Point;
 import com.codename1.charts.models.SeriesSelection;
 import com.codename1.charts.models.XYMultipleSeriesDataset;
 import com.codename1.charts.models.XYSeries;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.ui.geom.Rectangle;
@@ -125,6 +126,12 @@ public class XYChartTest {
         @Override
         public String getChartType() {
             return "Test";
+        }
+
+        @Override
+        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer seriesRenderer, float x, float y, int seriesIndex,
+                                    Paint paint) {
+            // no-op for testing
         }
     }
 }
