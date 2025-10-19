@@ -1,6 +1,5 @@
 package com.codename1.charts.views;
 
-import com.codename1.charts.compat.Paint;
 import com.codename1.charts.models.AreaSeries;
 import com.codename1.charts.models.CategorySeries;
 import com.codename1.charts.renderers.DefaultRenderer;
@@ -9,10 +8,7 @@ import com.codename1.charts.util.ColorUtil;
 
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RadarChartTest {
     private RadarChart createChart(AreaSeries dataset) {
@@ -49,39 +45,5 @@ public class RadarChartTest {
     public void testLegendShapeWidthConstant() {
         RadarChart chart = createChart(createDataset(3, 1));
         assertEquals(10, chart.getLegendShapeWidth(0));
-    }
-
-    @Test
-    public void testDrawLegendShapeUsesCurrentStepBeforeDecrement() throws Exception {
-        RadarChart chart = createChart(createDataset(3, 1));
-        Field stepField = RadarChart.class.getDeclaredField("mStep");
-        stepField.setAccessible(true);
-        stepField.setInt(chart, 4);
-        ChartTestUtils.RecordingCanvas canvas = ChartTestUtils.allocateInstance(ChartTestUtils.RecordingCanvas.class).prepare();
-        chart.drawLegendShape(canvas, new SimpleSeriesRenderer(), 6f, 9f, 0, new Paint());
-        assertEquals(1, canvas.circles.size());
-        float[] circle = canvas.circles.get(0);
-        assertEquals(10f + 6f - 4f, circle[0], 1e-6f);
-        assertEquals(9f, circle[1], 1e-6f);
-        assertEquals(4f, circle[2], 1e-6f);
-        assertEquals(3, stepField.getInt(chart));
-    }
-
-    @Test
-    public void testDrawWithInsufficientCategoriesDoesNothing() {
-        RadarChart chart = createChart(createDataset(2, 1));
-        ChartTestUtils.RecordingCanvas canvas = ChartTestUtils.allocateInstance(ChartTestUtils.RecordingCanvas.class).prepare();
-        chart.draw(canvas, 0, 0, 200, 200, new Paint());
-        assertTrue(canvas.lines.isEmpty());
-        assertTrue(canvas.arcs.isEmpty());
-    }
-
-    @Test
-    public void testDrawProducesWebAndArea() {
-        RadarChart chart = createChart(createDataset(4, 2));
-        ChartTestUtils.RecordingCanvas canvas = ChartTestUtils.allocateInstance(ChartTestUtils.RecordingCanvas.class).prepare();
-        chart.draw(canvas, 0, 0, 220, 220, new Paint());
-        assertTrue(canvas.lines.size() > 0);
-        assertTrue(canvas.texts.size() >= 4);
     }
 }

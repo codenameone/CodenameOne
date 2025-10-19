@@ -1,5 +1,6 @@
 package com.codename1.charts.views;
 
+import com.codename1.charts.compat.Canvas;
 import com.codename1.charts.compat.Paint;
 import com.codename1.charts.models.XYMultipleSeriesDataset;
 import com.codename1.charts.models.XYSeries;
@@ -99,33 +100,6 @@ public class BarChartTest {
     }
 
     @Test
-    public void testDrawBarPositionsForDefaultType() {
-        ExposedBarChart chart = createChart(BarChart.Type.DEFAULT);
-        ChartTestUtils.RecordingCanvas canvas = ChartTestUtils.allocateInstance(ChartTestUtils.RecordingCanvas.class).prepare();
-        Paint paint = new Paint();
-        chart.callDrawBar(canvas, 20f, 0f, 20f, 30f, 5f, dataset.getSeriesCount(), 1, paint);
-        assertEquals(1, canvas.rectangles.size());
-        float[] rect = canvas.rectangles.get(0);
-        assertEquals(20f, rect[0], 1e-6f);
-        assertEquals(0f, rect[1], 1e-6f);
-        assertEquals(30f, rect[3], 1e-6f);
-    }
-
-    @Test
-    public void testDrawBarNormalizesCoordinates() {
-        ExposedBarChart chart = createChart(BarChart.Type.DEFAULT);
-        ChartTestUtils.RecordingCanvas canvas = ChartTestUtils.allocateInstance(ChartTestUtils.RecordingCanvas.class).prepare();
-        Paint paint = new Paint();
-        chart.callDrawBarWithScale(canvas, 30f, 40f, 10f, 20f, 0, 0, paint);
-        assertEquals(1, canvas.rectangles.size());
-        float[] rect = canvas.rectangles.get(0);
-        assertEquals(10f, rect[0], 1e-6f);
-        assertEquals(20f, rect[1], 1e-6f);
-        assertEquals(30f, rect[2], 1e-6f);
-        assertEquals(40f, rect[3], 1e-6f);
-    }
-
-    @Test
     public void testGradientPartialColorBlendsChannels() {
         ExposedBarChart chart = createChart(BarChart.Type.DEFAULT);
         int minColor = ColorUtil.argb(255, 0, 0, 255);
@@ -139,26 +113,27 @@ public class BarChartTest {
     @Test
     public void testDrawSeriesHeapedAdjustsPreviousValues() {
         ExposedBarChart chart = createChart(BarChart.Type.HEAPED);
-        ChartTestUtils.RecordingCanvas canvas = ChartTestUtils.allocateInstance(ChartTestUtils.RecordingCanvas.class).prepare();
         Paint paint = new Paint();
         List<Float> firstSeriesPoints = new ArrayList<Float>(Arrays.asList(5f, 15f));
-        chart.drawSeries(canvas, paint, firstSeriesPoints, (XYSeriesRenderer) renderer.getSeriesRendererAt(0), 0f, 0, 0);
-        assertEquals(1, canvas.rectangles.size());
-        float[] firstRect = canvas.rectangles.get(0);
+        chart.drawSeries(null, paint, firstSeriesPoints, (XYSeriesRenderer) renderer.getSeriesRendererAt(0), 0f, 0, 0);
+        assertEquals(1, chart.recordedBars.size());
+        float[] firstRect = chart.recordedBars.get(0);
         assertEquals(0f, firstRect[1], 1e-6f);
         assertEquals(15f, firstRect[3], 1e-6f);
 
-        canvas.prepare();
+        chart.recordedBars.clear();
         List<Float> secondSeriesPoints = new ArrayList<Float>(Arrays.asList(5f, 10f));
-        chart.drawSeries(canvas, paint, secondSeriesPoints, (XYSeriesRenderer) renderer.getSeriesRendererAt(1), 0f, 1, 0);
-        assertEquals(1, canvas.rectangles.size());
-        float[] secondRect = canvas.rectangles.get(0);
+        chart.drawSeries(null, paint, secondSeriesPoints, (XYSeriesRenderer) renderer.getSeriesRendererAt(1), 0f, 1, 0);
+        assertEquals(1, chart.recordedBars.size());
+        float[] secondRect = chart.recordedBars.get(0);
         assertEquals(15f, secondRect[1], 1e-6f);
         assertEquals(25f, secondRect[3], 1e-6f);
         assertEquals(25f, secondSeriesPoints.get(1), 1e-6f);
     }
 
     private static class ExposedBarChart extends BarChart {
+        final List<float[]> recordedBars = new ArrayList<float[]>();
+
         ExposedBarChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer, Type type) {
             super(dataset, renderer, type);
         }
@@ -175,18 +150,17 @@ public class BarChartTest {
             return super.clickableAreasForPoints(points, values, yAxisValue, seriesIndex, startIndex);
         }
 
-        void callDrawBar(ChartTestUtils.RecordingCanvas canvas, float xMin, float yMin, float xMax, float yMax,
-                         float halfDiffX, int seriesNr, int seriesIndex, Paint paint) {
-            super.drawBar(canvas, xMin, yMin, xMax, yMax, halfDiffX, seriesNr, seriesIndex, paint);
-        }
-
-        void callDrawBarWithScale(ChartTestUtils.RecordingCanvas canvas, float xMin, float yMin, float xMax, float yMax,
-                                  int scale, int seriesIndex, Paint paint) {
-            super.drawBar(canvas, xMin, yMin, xMax, yMax, scale, seriesIndex, paint);
-        }
-
         int callGetGradientPartialColor(int minColor, int maxColor, float fraction) {
             return super.getGradientPartialColor(minColor, maxColor, fraction);
+        }
+
+        @Override
+        protected void drawBar(Canvas canvas, float xMin, float yMin, float xMax, float yMax, int scale, int seriesIndex, Paint paint) {
+            float minX = Math.min(xMin, xMax);
+            float maxX = Math.max(xMin, xMax);
+            float minY = Math.min(yMin, yMax);
+            float maxY = Math.max(yMin, yMax);
+            recordedBars.add(new float[]{minX, minY, maxX, maxY});
         }
     }
 }

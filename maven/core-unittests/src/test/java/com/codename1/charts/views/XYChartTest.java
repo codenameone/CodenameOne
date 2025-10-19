@@ -121,5 +121,10 @@ public class XYChartTest {
                                                            int seriesIndex, int startIndex) {
             return new ClickableArea[0];
         }
+
+        @Override
+        public String getChartType() {
+            return "Test";
+        }
     }
 }
