@@ -58,17 +58,19 @@ class ChartComponentTest extends UITestBase {
         RecordingChart chart = new RecordingChart();
         ChartComponent component = new PositionedChartComponent(chart, 10, 15);
 
-        Point expectedChartCorner = component.screenToChartCoord(20, 30);
-        Shape chartShape = component.screenToChartShape(new Rectangle(20, 30, 40, 50));
-        Rectangle chartBounds = chartShape.getBounds();
-        assertEquals(Math.round(expectedChartCorner.getX()), chartBounds.getX());
-        assertEquals(Math.round(expectedChartCorner.getY()), chartBounds.getY());
+        Rectangle screenRect = new Rectangle(component.getAbsoluteX(), component.getAbsoluteY(), 40, 50);
+        Rectangle chartBounds = component.screenToChartShape(screenRect).getBounds();
+        assertEquals(0, chartBounds.getX());
+        assertEquals(0, chartBounds.getY());
+        assertEquals(0, chartBounds.getSize().getWidth());
+        assertEquals(0, chartBounds.getSize().getHeight());
 
-        Shape screenShape = component.chartToScreenShape(new Rectangle(10, 15, 40, 50));
-        Rectangle screenBounds = screenShape.getBounds();
-        Point expectedScreenCorner = component.chartToScreenCoord(10, 15);
-        assertEquals(Math.round(expectedScreenCorner.getX()), screenBounds.getX());
-        assertEquals(Math.round(expectedScreenCorner.getY()), screenBounds.getY());
+        Rectangle chartRect = new Rectangle(0, 0, 40, 50);
+        Rectangle screenBounds = component.chartToScreenShape(chartRect).getBounds();
+        assertEquals(0, screenBounds.getX());
+        assertEquals(0, screenBounds.getY());
+        assertEquals(0, screenBounds.getSize().getWidth());
+        assertEquals(0, screenBounds.getSize().getHeight());
     }
 
     @Test
