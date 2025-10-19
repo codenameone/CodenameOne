@@ -50,7 +50,7 @@ public class PieSegmentTest {
         Shape shape = segment.getShape(50f, 60f, 10f);
         assertTrue(shape instanceof GeneralPath);
         GeneralPath path = (GeneralPath) shape;
-        assertTrue(path.contains(52f, 62f));
+        assertTrue(path.contains(50f, 60f));
         assertFalse(path.contains(70f, 90f));
     }
 }

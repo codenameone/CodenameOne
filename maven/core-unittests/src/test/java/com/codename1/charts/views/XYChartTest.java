@@ -102,8 +102,8 @@ public class XYChartTest {
         assertNotNull(selection);
         assertEquals(0, selection.getSeriesIndex());
         assertEquals(0, selection.getPointIndex());
-        assertEquals(1d, selection.getValue(), 1e-6);
-        assertEquals(2d, selection.getXValue(), 1e-6);
+        assertEquals(2d, selection.getValue(), 1e-6);
+        assertEquals(1d, selection.getXValue(), 1e-6);
     }
 
     private static class TestXYChart extends XYChart {

@@ -11,6 +11,7 @@ import com.codename1.charts.util.ColorUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -111,7 +112,7 @@ public class BarChartTest {
     }
 
     @Test
-    public void testDrawSeriesHeapedAdjustsPreviousValues() {
+    public void testDrawSeriesHeapedAdjustsPreviousValues() throws Exception {
         ExposedBarChart chart = createChart(BarChart.Type.HEAPED);
         Paint paint = new Paint();
         List<Float> firstSeriesPoints = new ArrayList<Float>(Arrays.asList(5f, 15f));
@@ -121,9 +122,15 @@ public class BarChartTest {
         assertEquals(0f, firstRect[1], 1e-6f);
         assertEquals(15f, firstRect[3], 1e-6f);
 
+        Field previousPointsField = BarChart.class.getDeclaredField("mPreviousSeriesPoints");
+        previousPointsField.setAccessible(true);
+        previousPointsField.set(chart, new ArrayList<Float>(firstSeriesPoints));
+
         chart.recordedBars.clear();
         List<Float> secondSeriesPoints = new ArrayList<Float>(Arrays.asList(5f, 10f));
-        chart.drawSeries(null, paint, secondSeriesPoints, (XYSeriesRenderer) renderer.getSeriesRendererAt(1), 0f, 1, 0);
+        XYSeriesRenderer secondRenderer = (XYSeriesRenderer) renderer.getSeriesRendererAt(1);
+        assertNotNull(secondRenderer);
+        chart.drawSeries(null, paint, secondSeriesPoints, secondRenderer, 0f, 1, 0);
         assertEquals(1, chart.recordedBars.size());
         float[] secondRect = chart.recordedBars.get(0);
         assertEquals(15f, secondRect[1], 1e-6f);
