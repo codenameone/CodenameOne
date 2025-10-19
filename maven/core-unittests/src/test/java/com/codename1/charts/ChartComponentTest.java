@@ -218,6 +218,8 @@ class ChartComponentTest extends UITestBase {
             super(chart);
             this.absoluteX = absoluteX;
             this.absoluteY = absoluteY;
+            setX(absoluteX);
+            setY(absoluteY);
         }
 
         @Override
