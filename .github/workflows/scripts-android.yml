@@ -21,6 +21,7 @@ name: Test Android build scripts
       - '!Ports/Android/**/*.md'
       - 'tests/**'
       - '!tests/**/*.md'
+      - '!docs/**'
   push:
     branches:
       - master
@@ -42,6 +43,7 @@ name: Test Android build scripts
       - '!Ports/Android/**/*.md'
       - 'tests/**'
       - '!tests/**/*.md'
+      - '!docs/**'
 
 # The token in secrets.CN1SS_GH_TOKEN was generated on
 # Oct 16th 2025. If in Oct 2026 builds start failing, it
