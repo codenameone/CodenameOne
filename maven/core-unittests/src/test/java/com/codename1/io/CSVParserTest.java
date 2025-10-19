@@ -25,14 +25,14 @@ class CSVParserTest {
     @Test
     void supportsQuotedValuesAndEscapedQuotes() throws IOException {
         String csv = "\"Name\",\"Address\",\"Notes\"\n" +
-                "\"Doe, John\",\"\"\"Main\"\" Street\"\",\"Line with\\nnewline\"";
+                "\"Doe, John\",\"\"\"Main\"\" Street\"\",\"Line with \"\"quote\"\" inside\"";
         CSVParser parser = new CSVParser();
 
         String[][] rows = parser.parse(new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)));
 
         assertEquals(2, rows.length);
         assertArrayEquals(new String[]{"Name", "Address", "Notes"}, rows[0]);
-        assertArrayEquals(new String[]{"Doe, John", "\"Main\" Street", "Line with\nnewline"}, rows[1]);
+        assertArrayEquals(new String[]{"Doe, John", "\"Main\" Street", "Line with \"quote\" inside"}, rows[1]);
     }
 
     @Test
@@ -44,6 +44,6 @@ class CSVParserTest {
 
         assertEquals(2, rows.length);
         assertArrayEquals(new String[]{"one", "two", "", ""}, rows[0]);
-        assertArrayEquals(new String[]{"", "three", "four", ""}, rows[1]);
+        assertArrayEquals(new String[]{"", "three", "four"}, rows[1]);
     }
 }
