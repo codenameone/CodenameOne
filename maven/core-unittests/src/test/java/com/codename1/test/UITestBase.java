@@ -26,7 +26,7 @@ public abstract class UITestBase {
     protected PluginSupport pluginSupport;
 
     @BeforeEach
-    void setUpDisplay() throws Exception {
+    protected void setUpDisplay() throws Exception {
         display = Display.getInstance();
         resetUIManager();
 
@@ -53,7 +53,7 @@ public abstract class UITestBase {
     }
 
     @AfterEach
-    void tearDownDisplay() throws Exception {
+    protected void tearDownDisplay() throws Exception {
         resetUIManager();
         setDisplayField("impl", null);
         setDisplayField("pluginSupport", null);
