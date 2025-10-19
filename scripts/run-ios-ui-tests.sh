@@ -205,8 +205,15 @@ if [ ! "$(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print -quit)" ] && [
   ri_log "No raw PNGs yet; exporting PNG attachments from $RESULT_BUNDLE"
 
   TMP_JSON="$SCREENSHOT_TMP_DIR/xcresult.json"
-  xcrun xcresulttool get --path "$RESULT_BUNDLE" --format json > "$TMP_JSON"
-
+  # Xcode 16+: new subcommand syntax
+  if ! xcrun xcresulttool get object --path "$RESULT_BUNDLE" --format json > "$TMP_JSON" 2>/dev/null; then
+    # Fallback for older Xcodes: allow deprecated form with --legacy
+    if ! xcrun xcresulttool get --legacy --path "$RESULT_BUNDLE" --format json > "$TMP_JSON" 2>/dev/null; then
+      ri_log "xcresulttool failed to export JSON from $RESULT_BUNDLE"
+      exit 12
+    fi
+  fi
+  
   # Produce a flat "ATT_ID FILENAME" list into a temp file; avoid heredoc|pipe parse issues on macOS bash
   ATT_LIST="$SCREENSHOT_TMP_DIR/xcresult-attachments.txt"
   python3 - "$TMP_JSON" "$SCREENSHOT_RAW_DIR" > "$ATT_LIST" <<'PY'
