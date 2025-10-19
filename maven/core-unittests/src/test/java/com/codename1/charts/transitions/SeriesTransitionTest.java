@@ -44,6 +44,9 @@ class SeriesTransitionTest extends UITestBase {
         motion.finish();
 
         assertTrue(transition.animate());
+        // Legacy motions only flip the finished flag once the progress value has been
+        // fetched, so one more animate() pass is required before cleanup kicks in.
+        assertTrue(transition.animate());
         assertFalse(transition.animate());
         assertTrue(transition.cleanupCalled);
         assertTrue(form.deregisteredAnimations.contains(transition));
