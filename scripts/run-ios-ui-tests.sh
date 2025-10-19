@@ -203,59 +203,52 @@ set +o pipefail
 # --- If no PNG files in $SCREENSHOT_RAW_DIR, export from the .xcresult attachments ---
 if [ ! "$(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print -quit)" ] && [ -d "$RESULT_BUNDLE" ]; then
   ri_log "No raw PNGs yet; exporting PNG attachments from $RESULT_BUNDLE"
-  # Dump the xcresult JSON and pick attachment ids for PNGs
+
   TMP_JSON="$SCREENSHOT_TMP_DIR/xcresult.json"
   xcrun xcresulttool get --path "$RESULT_BUNDLE" --format json > "$TMP_JSON"
 
-  # Python: walk the JSON and find ActionTestAttachment nodes with public.png payloads
-  python3 - "$TMP_JSON" "$SCREENSHOT_RAW_DIR" <<'PY'
+  # Produce a flat "ATT_ID FILENAME" list into a temp file; avoid heredoc|pipe parse issues on macOS bash
+  ATT_LIST="$SCREENSHOT_TMP_DIR/xcresult-attachments.txt"
+  python3 - "$TMP_JSON" "$SCREENSHOT_RAW_DIR" > "$ATT_LIST" <<'PY'
 import json, sys, os
 root = json.load(open(sys.argv[1]))
-outdir = sys.argv[2]
 found = []
-
 def walk(x):
     if isinstance(x, dict):
-        # Xcode 14–16: attachments appear as ActionTestAttachment dictionaries
         if x.get('_type',{}).get('_name') == 'ActionTestAttachment':
             uti = x.get('uniformTypeIdentifier',{}).get('_value','')
-            name = x.get('filename',{}).get('_value','')
+            name = x.get('filename',{}).get('_value','') or ''
             pref = x.get('payloadRef',{}).get('id', None)
-            if pref and name and ('png' in uti or name.lower().endswith('.png')):
+            if pref and ('png' in uti or name.lower().endswith('.png')):
+                if not name: name = 'attachment.png'
                 found.append((pref, name))
-        for v in x.values():
-            walk(v)
+        for v in x.values(): walk(v)
     elif isinstance(x, list):
-        for v in x:
-            walk(v)
-
+        for v in x: walk(v)
 walk(root)
-
-# De-dup on id and make filenames unique-ish
-seen = set()
-out = []
-for i,(att_id, fname) in enumerate(found, 1):
-    if att_id in seen:
-        continue
+seen=set()
+out=[]
+for i,(att_id,fname) in enumerate(found,1):
+    if att_id in seen: continue
     seen.add(att_id)
-    base, ext = os.path.splitext(fname or f"attachment_{i}.png")
-    out.append((att_id, f"{base or 'attachment'}{ext or '.png'}"))
-
-# Emit a small shell script to export with xcresulttool
-for att_id, fname in out:
-    print(att_id, fname)
+    base,ext=os.path.splitext(fname)
+    if not ext: ext='.png'
+    if not base: base=f'attachment_{i}'
+    print(att_id, f"{base}{ext}")
 PY
-  | while read -r ATT_ID FNAME; do
-      # Some names may collide—append a counter if needed
-      OUT="$SCREENSHOT_RAW_DIR/$FNAME"
-      if [ -f "$OUT" ]; then
-        base="${FNAME%.*}"; ext="${FNAME##*.}"
-        n=2; while [ -f "$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}" ]; do n=$((n+1)); done
-        OUT="$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}"
-      fi
-      xcrun xcresulttool export --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" || true
-      [ -f "$OUT" ] && ri_log "Exported attachment -> $OUT"
-    done
+
+  # Export each attachment id as a PNG file
+  while IFS=$' \t' read -r ATT_ID FNAME; do
+    [ -n "$ATT_ID" ] || continue
+    OUT="$SCREENSHOT_RAW_DIR/$FNAME"
+    if [ -f "$OUT" ]; then
+      base="${FNAME%.*}"; ext="${FNAME##*.}"
+      n=2; while [ -f "$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}" ]; do n=$((n+1)); done
+      OUT="$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}"
+    fi
+    xcrun xcresulttool export --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" || true
+    [ -f "$OUT" ] && ri_log "Exported attachment -> $OUT"
+  done < "$ATT_LIST"
 fi
 
 PNG_FILES=()
