@@ -11,7 +11,6 @@ import com.codename1.charts.util.ColorUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -121,10 +120,6 @@ public class BarChartTest {
         float[] firstRect = chart.recordedBars.get(0);
         assertEquals(0f, firstRect[1], 1e-6f);
         assertEquals(15f, firstRect[3], 1e-6f);
-
-        Field previousPointsField = BarChart.class.getDeclaredField("mPreviousSeriesPoints");
-        previousPointsField.setAccessible(true);
-        previousPointsField.set(chart, new ArrayList<Float>(firstSeriesPoints));
 
         chart.recordedBars.clear();
         List<Float> secondSeriesPoints = new ArrayList<Float>(Arrays.asList(5f, 10f));

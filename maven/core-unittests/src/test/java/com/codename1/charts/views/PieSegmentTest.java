@@ -50,7 +50,17 @@ public class PieSegmentTest {
         Shape shape = segment.getShape(50f, 60f, 10f);
         assertTrue(shape instanceof GeneralPath);
         GeneralPath path = (GeneralPath) shape;
-        assertTrue(path.contains(50f, 60f));
-        assertFalse(path.contains(70f, 90f));
+
+        float interiorRadius = 5f;
+        double interiorAngleRadians = Math.toRadians(45f);
+        float interiorX = 50f + (float) (interiorRadius * Math.cos(interiorAngleRadians));
+        float interiorY = 60f + (float) (interiorRadius * Math.sin(interiorAngleRadians));
+        assertTrue(path.contains(interiorX, interiorY));
+
+        float exteriorRadius = 12f;
+        double exteriorAngleRadians = Math.toRadians(135f);
+        float exteriorX = 50f + (float) (exteriorRadius * Math.cos(exteriorAngleRadians));
+        float exteriorY = 60f + (float) (exteriorRadius * Math.sin(exteriorAngleRadians));
+        assertFalse(path.contains(exteriorX, exteriorY));
     }
 }
