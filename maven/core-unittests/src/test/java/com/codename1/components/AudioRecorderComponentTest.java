@@ -100,6 +100,7 @@ class AudioRecorderComponentTest extends ComponentTestBase {
         for (Object listener : listeners) {
             ((ActionListener) listener).actionPerformed(new ActionEvent(button));
         }
+        flushSerialCalls();
     }
 
     @SuppressWarnings("unchecked")
