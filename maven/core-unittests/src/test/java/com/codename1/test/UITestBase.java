@@ -38,6 +38,8 @@ public abstract class UITestBase {
         when(implementation.convertToPixels(anyInt(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(implementation.createFont(anyInt(), anyInt(), anyInt())).thenAnswer(invocation -> new Object());
         when(implementation.getDefaultFont()).thenReturn(new Object());
+        when(implementation.isTrueTypeSupported()).thenReturn(true);
+        when(implementation.isLookupFontSupported()).thenReturn(true);
         when(implementation.isInitialized()).thenReturn(true);
         when(implementation.getCommandBehavior()).thenReturn(Display.COMMAND_BEHAVIOR_DEFAULT);
         when(implementation.isNativeFontSchemeSupported()).thenReturn(true);

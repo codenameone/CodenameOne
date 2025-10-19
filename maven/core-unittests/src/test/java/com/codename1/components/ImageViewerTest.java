@@ -55,6 +55,7 @@ class ImageViewerTest extends ComponentTestBase {
         viewer.setImageList(model);
         assertSame(first, viewer.getImage());
         model.setSelectedIndex(1);
+        flushSerialCalls();
         assertSame(second, viewer.getImage());
     }
 
