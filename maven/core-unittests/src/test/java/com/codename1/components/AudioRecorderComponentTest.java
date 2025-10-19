@@ -25,7 +25,7 @@ class AudioRecorderComponentTest extends ComponentTestBase {
     private Media media;
 
     @BeforeEach
-    void prepareMediaMocks() {
+    void prepareMediaMocks() throws Exception {
         when(implementation.getAvailableRecordingMimeTypes()).thenReturn(new String[]{"audio/wav"});
         media = mock(Media.class);
         when(implementation.createMediaRecorder(any(MediaRecorderBuilder.class))).thenReturn(media);
@@ -33,11 +33,7 @@ class AudioRecorderComponentTest extends ComponentTestBase {
 
     private AudioRecorderComponent createRecorder(boolean redirect) {
         MediaRecorderBuilder builder = new MediaRecorderBuilder();
-        try {
-            builder.path("/tmp/record.m4a");
-        } catch (java.io.IOException e) {
-            fail("Unexpected IOException configuring MediaRecorderBuilder: " + e.getMessage());
-        }
+        builder.path("/tmp/record.m4a");
         builder.redirectToAudioBuffer(redirect);
         AudioRecorderComponent component = new AudioRecorderComponent(builder);
         flushSerialCalls();
@@ -100,9 +96,9 @@ class AudioRecorderComponentTest extends ComponentTestBase {
 
     @SuppressWarnings("unchecked")
     private void fireButtonAction(Button button) {
-        Collection<ActionListener> listeners = button.getListeners();
-        for (ActionListener listener : listeners) {
-            listener.actionPerformed(new ActionEvent(button));
+        Collection listeners = button.getListeners();
+        for (Object listener : listeners) {
+            ((ActionListener) listener).actionPerformed(new ActionEvent(button));
         }
     }
 
