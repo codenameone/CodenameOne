@@ -52,6 +52,7 @@ public abstract class UITestBase {
         setDisplayField("impl", implementation);
         setDisplayField("pluginSupport", pluginSupport);
         setDisplayField("codenameOneRunning", true);
+        setDisplayField("edt", Thread.currentThread());
     }
 
     @AfterEach
@@ -60,6 +61,7 @@ public abstract class UITestBase {
         setDisplayField("impl", null);
         setDisplayField("pluginSupport", null);
         setDisplayField("codenameOneRunning", false);
+        setDisplayField("edt", null);
     }
 
     private void setDisplayField(String fieldName, Object value) throws Exception {
