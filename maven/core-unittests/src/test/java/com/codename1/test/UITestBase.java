@@ -4,6 +4,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.ui.Display;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.io.Util;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -50,6 +51,7 @@ public abstract class UITestBase {
         setDisplayField("impl", implementation);
         setDisplayField("pluginSupport", pluginSupport);
         setDisplayField("codenameOneRunning", true);
+        Util.setImplementation(implementation);
     }
 
     @AfterEach
@@ -58,6 +60,7 @@ public abstract class UITestBase {
         setDisplayField("impl", null);
         setDisplayField("pluginSupport", null);
         setDisplayField("codenameOneRunning", false);
+        Util.setImplementation(null);
     }
 
     private void setDisplayField(String fieldName, Object value) throws Exception {
