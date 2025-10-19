@@ -39,6 +39,8 @@ public abstract class UITestBase {
         when(implementation.convertToPixels(anyInt(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(0));
         when(implementation.createFont(anyInt(), anyInt(), anyInt())).thenAnswer(invocation -> new Object());
         when(implementation.getDefaultFont()).thenReturn(new Object());
+        when(implementation.isTrueTypeSupported()).thenReturn(true);
+        when(implementation.isLookupFontSupported()).thenReturn(true);
         when(implementation.isInitialized()).thenReturn(true);
         when(implementation.getCommandBehavior()).thenReturn(Display.COMMAND_BEHAVIOR_DEFAULT);
         when(implementation.isNativeFontSchemeSupported()).thenReturn(true);
@@ -51,7 +53,7 @@ public abstract class UITestBase {
         setDisplayField("impl", implementation);
         setDisplayField("pluginSupport", pluginSupport);
         setDisplayField("codenameOneRunning", true);
-        Util.setImplementation(implementation);
+        setDisplayField("edt", Thread.currentThread());
     }
 
     @AfterEach
@@ -60,7 +62,7 @@ public abstract class UITestBase {
         setDisplayField("impl", null);
         setDisplayField("pluginSupport", null);
         setDisplayField("codenameOneRunning", false);
-        Util.setImplementation(null);
+        setDisplayField("edt", null);
     }
 
     private void setDisplayField(String fieldName, Object value) throws Exception {
