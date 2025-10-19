@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,6 +30,7 @@ class AudioRecorderComponentTest extends ComponentTestBase {
         when(implementation.getAvailableRecordingMimeTypes()).thenReturn(new String[]{"audio/wav"});
         media = mock(Media.class);
         when(implementation.createMediaRecorder(any(MediaRecorderBuilder.class))).thenReturn(media);
+        when(implementation.createMediaRecorder(anyString(), anyString())).thenReturn(media);
     }
 
     private AudioRecorderComponent createRecorder(boolean redirect) {
