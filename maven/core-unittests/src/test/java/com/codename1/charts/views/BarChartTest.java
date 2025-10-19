@@ -7,20 +7,43 @@ import com.codename1.charts.models.XYSeries;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.util.ColorUtil;
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.Display;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Answers;
+import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyInt;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class BarChartTest {
+    private static boolean displayMocked;
+
+    @BeforeAll
+    public static void initDisplayMock() throws Exception {
+        if (displayMocked) {
+            return;
+        }
+        CodenameOneImplementation mockImpl = Mockito.mock(CodenameOneImplementation.class, Answers.RETURNS_DEFAULTS);
+        Mockito.when(mockImpl.createFont(anyInt(), anyInt(), anyInt())).thenReturn(new Object());
+
+        Field implField = Display.class.getDeclaredField("impl");
+        implField.setAccessible(true);
+        implField.set(null, mockImpl);
+        displayMocked = true;
+    }
+
     private XYMultipleSeriesDataset dataset;
     private XYMultipleSeriesRenderer renderer;
 
