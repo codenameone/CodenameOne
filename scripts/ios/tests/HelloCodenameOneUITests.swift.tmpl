@@ -6,19 +6,24 @@ final class HelloCodenameOneUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-
         app = XCUIApplication()
-        let environment = ProcessInfo.processInfo.environment
-        if let outputPath = environment["CN1SS_OUTPUT_DIR"], !outputPath.isEmpty {
-            outputDirectory = URL(fileURLWithPath: outputPath)
+
+        // Locale for determinism
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
+        // Tip: force light mode or content size if you need pixel-stable shots
+        // app.launchArguments += ["-uiuserInterfaceStyle", "Light"]
+
+        // IMPORTANT: write to the app's sandbox, not a host path
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        if let tag = ProcessInfo.processInfo.environment["CN1SS_OUTPUT_DIR"], !tag.isEmpty {
+            outputDirectory = tmp.appendingPathComponent(tag, isDirectory: true)
         } else {
-            outputDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+            outputDirectory = tmp.appendingPathComponent("cn1screens", isDirectory: true)
         }
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
-        // Keep the simulator quiet and deterministic where possible
-        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launch()
+        waitForStableFrame()
     }
 
     override func tearDownWithError() throws {
@@ -27,27 +32,30 @@ final class HelloCodenameOneUITests: XCTestCase {
     }
 
     private func captureScreenshot(named name: String) throws {
-        let screenshot = XCUIScreen.main.screenshot()
-        let pngURL = outputDirectory.appendingPathComponent("\(name).png")
-        try screenshot.pngRepresentation.write(to: pngURL)
+        let shot = XCUIScreen.main.screenshot()
 
-        let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        // Save into sandbox tmp (optional – mainly for local debugging)
+        let pngURL = outputDirectory.appendingPathComponent("\(name).png")
+        do { try shot.pngRepresentation.write(to: pngURL) } catch { /* ignore */ }
+
+        // ALWAYS attach so we can export from the .xcresult
+        let att = XCTAttachment(screenshot: shot)
+        att.name = name
+        att.lifetime = .keepAlways
+        add(att)
     }
 
-    /// Wait for the app to be in foreground and give Codename One time to render its scene.
-    private func waitForStableFrame(timeout: TimeInterval = 30, settle: TimeInterval = 1.5) {
+    /// Wait for foreground + a short settle time
+    private func waitForStableFrame(timeout: TimeInterval = 30, settle: TimeInterval = 1.2) {
         _ = app.wait(for: .runningForeground, timeout: timeout)
         RunLoop.current.run(until: Date(timeIntervalSinceNow: settle))
     }
 
-    /// Tap using normalized coordinates (0..1 in each axis), robust when elements aren’t exposed to XCTest.
+    /// Tap using normalized coordinates (0...1)
     private func tapNormalized(_ dx: CGFloat, _ dy: CGFloat) {
         let origin = app.coordinate(withNormalizedOffset: .zero)
-        let target = origin.withOffset(CGVector(dx: app.frame.size.width * dx,
-                                                dy: app.frame.size.height * dy))
+        let target = origin.withOffset(.init(dx: app.frame.size.width * dx,
+                                             dy: app.frame.size.height * dy))
         target.tap()
     }
 
@@ -58,12 +66,8 @@ final class HelloCodenameOneUITests: XCTestCase {
 
     func testBrowserComponentScreenshot() throws {
         waitForStableFrame()
-
-        // The "Open Browser Screen" button is part of CN1’s canvas; tap where it lives visually.
-        // Adjust if your layout changes; these coords are centered and a bit lower on the screen.
         tapNormalized(0.5, 0.70)
-
-        // Give the BrowserComponent time to paint
+        // tiny retry to allow BrowserComponent to render
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 2.0))
         try captureScreenshot(named: "BrowserComponent")
     }
