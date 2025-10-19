@@ -133,5 +133,10 @@ public class XYChartTest {
                                     Paint paint) {
             // no-op for testing
         }
+
+        @Override
+        public int getLegendShapeWidth(int seriesIndex) {
+            return 10;
+        }
     }
 }
