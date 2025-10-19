@@ -239,15 +239,25 @@ file_ref = ui_group.files.find { |f| File.expand_path(f.path, proj_dir) == ui_fi
 file_ref ||= ui_group.new_file(ui_file)
 ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.files_references.include?(file_ref)
 
-# A few safe build settings for CI/simulator
+#
+# Required settings so Xcode creates a non-empty .xctest and a proper "-Runner.app"
+# PRODUCT_NAME feeds the bundle name; TEST_TARGET_NAME feeds the runner name.
+# We also keep signing off and auto-Info.plist for simulator CI.
+#
 %w[Debug Release].each do |cfg|
-  xc = ui_target.build_configuration_list[ cfg ]
+  xc = ui_target.build_configuration_list[cfg]
   next unless xc
-  xc.build_settings["SWIFT_VERSION"] = "5.0"
-  xc.build_settings["GENERATE_INFOPLIST_FILE"] = "YES"
-  xc.build_settings["CODE_SIGNING_ALLOWED"] = "NO"
-  xc.build_settings["CODE_SIGNING_REQUIRED"] = "NO"
-  xc.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] ||= "com.codenameone.examples.uitests"
+  bs = xc.build_settings
+  bs["SWIFT_VERSION"]                = "5.0"
+  bs["GENERATE_INFOPLIST_FILE"]      = "YES"
+  bs["CODE_SIGNING_ALLOWED"]         = "NO"
+  bs["CODE_SIGNING_REQUIRED"]        = "NO"
+  bs["PRODUCT_BUNDLE_IDENTIFIER"]  ||= "com.codenameone.examples.uitests"
+  bs["PRODUCT_NAME"]               ||= ui_name
+  bs["TEST_TARGET_NAME"]           ||= app_target&.name || "HelloCodenameOne"
+  # Optional but harmless on simulators; avoids other edge cases:
+  bs["ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES"] = "YES"
+  bs["TARGETED_DEVICE_FAMILY"] ||= "1,2"
 end
 
 proj.save
