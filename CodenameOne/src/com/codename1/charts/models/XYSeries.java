@@ -214,6 +214,7 @@ public class XYSeries {
      */
     public synchronized void clearAnnotations() {
         mStringXY.clear();
+        mAnnotations.clear();
     }
 
     /**
