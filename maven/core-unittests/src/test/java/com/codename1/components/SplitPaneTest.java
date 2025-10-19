@@ -2,6 +2,7 @@ package com.codename1.components;
 
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,7 @@ class SplitPaneTest extends UITestBase {
     void testExpandCollapseAndToggleStates() throws Exception {
         SplitPane pane = new SplitPane(SplitPane.HORIZONTAL_SPLIT, new Label("Top"), new Label("Bottom"), "0px", "0px", "100px");
         setComponentSize(pane, 400, 400);
-        Component divider = getDivider(pane);
+        Container divider = getDivider(pane);
         setComponentSize(divider, 20, 400);
 
         pane.collapse(true);
@@ -124,7 +125,7 @@ class SplitPaneTest extends UITestBase {
         assertEquals("DividerUIID", dividerUIIDField.get(pane));
         assertEquals(SplitPane.VERTICAL_SPLIT, orientationField.getInt(pane));
 
-        Component divider = getDivider(pane);
+        Container divider = getDivider(pane);
         assertEquals("DividerUIID", divider.getUIID());
         assertEquals(0, divider.getComponentCount(), "Divider should hide buttons and drag handle when disabled");
     }
@@ -135,10 +136,10 @@ class SplitPaneTest extends UITestBase {
         return m.invoke(pane);
     }
 
-    private Component getDivider(SplitPane pane) throws Exception {
+    private Container getDivider(SplitPane pane) throws Exception {
         Field dividerField = SplitPane.class.getDeclaredField("divider");
         dividerField.setAccessible(true);
-        return (Component) dividerField.get(pane);
+        return (Container) dividerField.get(pane);
     }
 
     private boolean isCollapsed(SplitPane pane) throws Exception {

@@ -2,8 +2,8 @@ package com.codename1.components;
 
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Button;
-import com.codename1.ui.Dimension;
 import com.codename1.ui.Image;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
