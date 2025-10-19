@@ -204,47 +204,78 @@ set +o pipefail
 if [ ! "$(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print -quit)" ] && [ -d "$RESULT_BUNDLE" ]; then
   ri_log "No raw PNGs yet; exporting PNG attachments from $RESULT_BUNDLE"
 
-  TMP_JSON="$SCREENSHOT_TMP_DIR/xcresult.json"
-  # Xcode 16+: new subcommand syntax
-  if ! xcrun xcresulttool get object --path "$RESULT_BUNDLE" --format json > "$TMP_JSON" 2>/dev/null; then
-    # Fallback for older Xcodes: allow deprecated form with --legacy
-    if ! xcrun xcresulttool get --legacy --path "$RESULT_BUNDLE" --format json > "$TMP_JSON" 2>/dev/null; then
-      ri_log "xcresulttool failed to export JSON from $RESULT_BUNDLE"
-      exit 12
-    fi
-  fi
-  
-  # Produce a flat "ATT_ID FILENAME" list into a temp file; avoid heredoc|pipe parse issues on macOS bash
   ATT_LIST="$SCREENSHOT_TMP_DIR/xcresult-attachments.txt"
-  python3 - "$TMP_JSON" "$SCREENSHOT_RAW_DIR" > "$ATT_LIST" <<'PY'
-import json, sys, os
-root = json.load(open(sys.argv[1]))
-found = []
-def walk(x):
-    if isinstance(x, dict):
-        if x.get('_type',{}).get('_name') == 'ActionTestAttachment':
-            uti = x.get('uniformTypeIdentifier',{}).get('_value','')
-            name = x.get('filename',{}).get('_value','') or ''
-            pref = x.get('payloadRef',{}).get('id', None)
-            if pref and ('png' in uti or name.lower().endswith('.png')):
-                if not name: name = 'attachment.png'
-                found.append((pref, name))
-        for v in x.values(): walk(v)
-    elif isinstance(x, list):
-        for v in x: walk(v)
-walk(root)
+
+  python3 - "$RESULT_BUNDLE" "$ATT_LIST" <<'PY'
+import json, subprocess, sys, os
+
+bundle = sys.argv[1]
+out_list = sys.argv[2]
+
+def xcget(obj_id=None):
+    cmd = ["xcrun","xcresulttool","get","object","--path",bundle,"--format","json"]
+    if obj_id: cmd += ["--id", obj_id]
+    # Fallback to deprecated form (older Xcode) if needed
+    try:
+        return json.loads(subprocess.check_output(cmd))
+    except subprocess.CalledProcessError:
+        cmd_legacy = ["xcrun","xcresulttool","get","--legacy","--path",bundle,"--format","json"]
+        if obj_id: cmd_legacy += ["--id", obj_id]
+        return json.loads(subprocess.check_output(cmd_legacy))
+
+def values(node, key):
+    a = node.get(key) or {}
+    return a.get("_values") or []
+
+def strv(node, key):
+    a = node.get(key) or {}
+    return a.get("_value")
+
+def walk_tests(obj, hits):
+    # Traverse tests, subtests, activities, attachments
+    for test in values(obj, "tests"):
+        for st in values(test, "subtests"):
+            walk_tests(st, hits)
+        for act in values(test, "activitySummaries"):
+            for att in values(act, "attachments"):
+                if (att.get("_type",{}).get("_name") == "ActionTestAttachment"):
+                    uti = strv(att, "uniformTypeIdentifier") or ""
+                    name = strv(att, "filename") or ""
+                    pref = (att.get("payloadRef") or {}).get("id")
+                    # accept likely image types
+                    if pref and (("png" in uti.lower()) or ("jpeg" in uti.lower()) or name.lower().endswith((".png",".jpg",".jpeg"))):
+                        if not name: name = "attachment.png"
+                        hits.append((pref, name))
+
+root = xcget()
+hits = []
+
+# Follow each action's testsRef → summaries → testableSummaries → tests...
+for action in values(root, "actions"):
+    action_result = action.get("actionResult") or {}
+    tests_ref = action_result.get("testsRef") or {}
+    tests_id = tests_ref.get("id")
+    if not tests_id:
+        continue
+    tests_obj = xcget(tests_id)  # ActionTestPlanRunSummaries
+    for summ in values(tests_obj, "summaries"):
+        for testable in values(summ, "testableSummaries"):
+            walk_tests(testable, hits)
+
+# dedupe by id, and emit "ID NAME" lines
 seen=set()
-out=[]
-for i,(att_id,fname) in enumerate(found,1):
-    if att_id in seen: continue
-    seen.add(att_id)
-    base,ext=os.path.splitext(fname)
-    if not ext: ext='.png'
-    if not base: base=f'attachment_{i}'
-    print(att_id, f"{base}{ext}")
+with open(out_list, "w") as f:
+    for pref, name in hits:
+        if pref in seen:
+            continue
+        seen.add(pref)
+        base, ext = os.path.splitext(name)
+        if not ext: ext = ".png"
+        if not base: base = "attachment"
+        f.write(f"{pref} {base}{ext}\n")
 PY
 
-  # Export each attachment id as a PNG file
+  # Export each attachment id as a file
   while IFS=$' \t' read -r ATT_ID FNAME; do
     [ -n "$ATT_ID" ] || continue
     OUT="$SCREENSHOT_RAW_DIR/$FNAME"
@@ -253,7 +284,10 @@ PY
       n=2; while [ -f "$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}" ]; do n=$((n+1)); done
       OUT="$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}"
     fi
-    xcrun xcresulttool export --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" || true
+    # New syntax; fallback to legacy if needed
+    if ! xcrun xcresulttool export --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" 2>/dev/null; then
+      xcrun xcresulttool export --legacy --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" || true
+    fi
     [ -f "$OUT" ] && ri_log "Exported attachment -> $OUT"
   done < "$ATT_LIST"
 fi
