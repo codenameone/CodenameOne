@@ -1,0 +1,363 @@
+== Events
+
+[[events-top-level-section,Events Section]]
+Most events in Codename One are routed via the high level events (e.g. action listener) but sometimes we need
+access to low level events (e.g. when drawing via Graphics) that provide more fine grained access.  Typically
+working with the higher level events is far more potable since it might map to different functionality on different devices.
+
+=== High Level Events
+
+High level events are broadcast using an `addListener`/`setListener` - publish/subscribe system. Most of them are channeled via the https://www.codenameone.com/javadoc/com/codename1/ui/util/EventDispatcher.html[EventDispatcher] class which further simplifies that and makes sending events correctly far easier.
+
+TIP: All events are fired on the Event Dispatch Thread, the `EventDispatcher` makes sure of that.
+
+==== Chain Of Events
+
+Since all events fire on the EDT some complexities occur. E.g.:
+
+We have two listeners monitoring the same event (or related events e.g. pointer event and button click event both of which will fire when the button is touched).
+
+When the event occurs we can run into a scenario like this:
+
+. First event fires
+. It shows a blocking dialog or invokes an "AndWait" API
+. Second event fires only after the dialog was dismissed!
+
+This happens because events are processed in-order per cycle. Since the old EDT cycle is stuck (because of the `Dialog`) the rest of the events within the cycle can't complete. New events are in a new EDT cycle so they can finish just fine!
+
+A workaround to this issue is to wrap the code in a `callSerially`, you shouldn't do this universally as this can create a case of shifting the problem to the next EDT cycle. However, using callSerially will allow the current cycle to flush which should help.
+
+Another workaround for the issue is avoiding blocking calls within an event chain.
+
+==== Action Events
+
+The most common high level event is the https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionListener.html[ActionListener] which allows binding a generic action event to pretty much anything. This is so ubiquitous in Codename One that it is even used for networking (as a base class) and for some of the low level event options.
+
+E.g. we can bind an event callback for a https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] by using:
+
+[source,java]
+----
+Button b = new Button("Click Me");
+b.addActionListener(new ActionListener() {
+    public void actionPerformed(ActionEvent ev) {
+        // button was clicked, you can do anything you want here...
+    }
+});
+----
+
+Or thanks to the Java 8 lambdas we can write it as:
+
+[source,java]
+----
+Button b = new Button("Click Me");
+b.addActionListener((ev) ->
+    // button was clicked, you can do anything you want here...
+});
+----
+
+Notice that the click will work whether the button was touched using a mouse, finger or keypad shortcut seamlessly with an action listener. Many components work with action events e.g. buttons, text components, slider etc.
+
+There are quite a few types of high level event types that are more specific to requirements.
+
+===== Types Of Action Events
+
+When an action event is fired it is given a type, however this type might change as the event evolves e.g. a command triggered by a pointer event won't include details of the original pointer event.
+
+You can get the event type from https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getEventType--[getEventType()], this also gives you a rather exhaustive list of the possible event types for the action event.
+
+===== Source Of Event
+
+`ActionEvent` has a source object, what that source is depends heavily on the event type. For most component based events this is the component but there are some nuances.
+
+The `getComponent()` method might not get the actual component.
+In case of a lead component such as https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html[MultiButton] the underlying https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] will be returned and not the `MultiButton` itself.
+
+To get the component that you would logically think of as the source component use the `getActualComponent()` method.
+
+===== Event Consumption
+
+An `ActionEvent` can be consumed, once consumed it will no longer proceed down the chain of event processing. This is useful for some cases where we would like to block behavior from proceeding down the path.
+
+E.g. the event dispatch thread allows us to listen to errors on the EDT using:
+
+[source,java]
+----
+Display.getInstance().addEdtErrorHandler((e) -> {
+    Exception err = (Exception)e.getSource();
+    // ...
+});
+----
+
+This will work great but you will still get the default error message from the EDT over that exception. To prevent the event from proceeding to the default error handling you can just do this:
+
+
+[source,java]
+----
+Display.getInstance().addEdtErrorHandler((e) -> {
+    e.consume();
+    Exception err = (Exception)e.getSource();
+    // ...
+});
+----
+
+Notice that you can check if an event was already consumed using the `isConsumed()` method but it's pretty unlikely that you will receive a consumed event as the system will usually stop sending it.
+
+===== NetworkEvent
+
+https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html[NetworkEvent] is a subclass of `ActionEvent` that is passed to `actionPerformed` callbacks made in relation to generic network code. E.g.
+
+[source,java]
+----
+NetworkManager.getInstance().addErrorListener(new ActionListener<NetworkEvent>() {
+    public void actionPerformed(NetworkEvent ev) {
+        // now we have access to the methods on NetworkEvent that provide more information about the network specific flags
+    }
+});
+----
+
+Or with Java 8 lambdas:
+
+[source,java]
+----
+NetworkManager.getInstance().addErrorListener((ev) -> {
+    // now we have access to the methods on NetworkEvent that provide more information about the network specific flags
+});
+----
+
+The `NetworkEvent` allows the networking code to reuse the `EventDispatcher` infrastructure and to simplify event firing thru the EDT. But you should notice that some code might not be equivalent e.g. we could do this to read the input stream:
+
+[source,java]
+----
+ConnectionRequest r = new ConnectionRequest() {
+    @Override
+    protected void readResponse(InputStream input) throws IOException {
+        // read the input stream
+    }
+};
+----
+
+or we can do something similar using this code:
+
+[source,java]
+----
+ConnectionRequest r = new ConnectionRequest();
+r.addResponseListener((e) -> {
+    byte[] data = (byte[])e.getMetaData();
+    // work with the byte data
+});
+----
+
+These seem very similar but they have one important distinction. The latter code is invoked on the EDT, so if `data` is big it might slow down processing significantly. The `ConnectionRequest` is invoked on the network thread and so can process any amount of data without slowing down the UI significantly.
+
+==== DataChangeListener
+
+The https://www.codenameone.com/javadoc/com/codename1/ui/events/DataChangedListener.html[DataChangedListener] is used in several places to indicate that the underlying model data has changed:
+
+* https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] - the text field provides an action listener but that only "fires" when the data input is complete. `DataChangeListener`
+fires with every key entered and thus allows functionality such as "auto complete" and is indeed used internally
+in the Codename One AutoCompleteTextField.
+
+* https://www.codenameone.com/javadoc/com/codename1/ui/table/TableModel.html[TableModel] & https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] - the model for the https://www.codenameone.com/javadoc/com/codename1/ui/table/Table.html[Table] class notifies the view that its content has changed via this
+event, thus allowing the UI to refresh properly.
+
+// HTML_ONLY_START
+There is a very exhaustive example of search that is implemented using the `DataChangedListener` in the https://www.codenameone.com/manual/components.html#Advanced-search-code[Toolbar section].
+// HTML_ONLY_END
+////
+//PDF_ONLY
+There is a very exhaustive example of search that is implemented using the `DataChangedListener` in the <<Advanced-search-code,Toolbar section>>.
+////
+
+==== FocusListener
+
+The focus listener allows us to track the currently "selected" or focused component. It's not as useful as it used to be in feature phones.
+
+You can bind a focus listener to the `Component` itself and receive an event when it gained focus, or you can bind the listener to the `Form` and receive events for every focus change event within the hierarchy.
+
+==== ScrollListener
+
+https://www.codenameone.com/javadoc/com/codename1/ui/events/ScrollListener.html[ScrollListener] allows tracking scroll events so UI elements can be adapted if necessary.
+
+Normally scrolling is seamless and this event isn't necessary, however if developers wish to "shrink" or "fade" an element on scrolling this interface can be used to achieve that. Notice that you should bind the scroll listener to the actual scrollable component and not to an arbitrary component.
+
+E.g. in this code from the `Flickr` demo the https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html[Toolbar] is faded based on scroll position:
+
+[source,java]
+----
+public class CustomToolbar extends Toolbar implements ScrollListener {
+    private int alpha;
+
+    public CustomToolbar() {
+    }
+
+    public void paintComponentBackground(Graphics g) {
+        int a = g.getAlpha();
+        g.setAlpha(alpha);
+        super.paintComponentBackground(g);
+        g.setAlpha(a);
+    }
+
+    public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+        alpha = scrollY;
+        alpha = Math.max(alpha, 0);
+        alpha = Math.min(alpha, 255);
+    }
+}
+----
+
+// HTML_ONLY_START
+NOTE: There is a better way of implementing this exact effect using title animations https://www.codenameone.com/manual/components.html#title-animations-section[illustrated here].
+// HTML_ONLY_END
+////
+//PDF_ONLY
+NOTE: There is a better way of implementing this exact effect using title animations <<title-animations-section,illustrated here>>.
+////
+
+==== SelectionListener
+
+The https://www.codenameone.com/javadoc/com/codename1/ui/events/SelectionListener.html[SelectionListener] event is mostly used to broadcast list model selection changes to the list view. Since list supports the `ActionListener` event callback its usually the better option since it's more coarse grained.
+
+`SelectionListener` gets fired too often for events and that might result in a performance penalty. When running on non-touch devices list selection could be changed with the keypad and only a specific fire button click would fire the action event, for those cases `SelectionListener` made a lot of sense. However, in touch devices this API isn't as useful.
+
+==== StyleListener
+
+https://www.codenameone.com/javadoc/com/codename1/ui/events/StyleListener.html[StyleListener] allows components to track changes to the style objects. E.g. if the developer does something like:
+
+[source,java]
+----
+cmp.getUnselectedStyle().setFgColor(0xffffff);
+----
+
+This will trigger a style event that will eventually lead to the component being repainted. This is quite important
+for the component class but not a very important event for general user code. It is recommended that developers don't bind a style listener.
+
+==== Event Dispatcher
+
+When creating your own components and objects you sometimes want to broadcast your own events, for that
+purpose Codename One has the https://www.codenameone.com/javadoc/com/codename1/ui/util/EventDispatcher.html[EventDispatcher] class which saves a lot of coding effort in this regard.
+E.g. if you wish to provide an https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionListener.html[ActionListener] event for components you can just add this to your class:
+
+[source,java]
+----
+private final EventDispatcher listeners = new EventDispatcher();
+
+public void addActionListener(ActionListener a) {
+    listeners.addListener(a);
+}
+public void removeActionListener(ActionListener a) {
+    listeners.removeListener(a);
+}
+----
+
+Then when you need to broadcast the event just use:
+
+[source,java]
+----
+private void fireEvent(ActionEvent ev) {
+    listeners.fireActionEvent(ev);
+}
+----
+
+
+=== Low Level Events
+
+Low level events map to "system" events directly. Touch events are considered low level since they might expose platform specific nuances to your code.
+
+E.g. one platform might send a very large number of events during drag while another might send only a few. Normally the high level event handling hides those complexities but some of them trickle down into the low level event handling.
+
+TIP: Codename One tries to hide some of the complexities from the low level events as well. However, due to the nature of the event types it's a more challenging task.
+
+Low level events can be bound in one of 3 ways:
+
+* Use one of the add listener methods in https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] e.g. `addPointerPressedListener`.
+
+* Override one of the event callbacks on `Form`
+
+* Override one of the event callbacks on a https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component].
+
+TIP: When you override event callbacks on a `Component` the `Component` in question must be focusable and have focus at that point. This can be an advantage for some use cases as it will save you the need of handling unrelated events.
+
+Each of those has advantages and disadvantages, specifically:
+
+* 'Form' based events and callbacks deliver pointer events in the 'Form' coordinate space.
+* 'Component' based events require focus
+* 'Form' based events can block existing functionality from proceeding thru the event chain e.g. you can avoid calling super in a form event and thus block other events from happening (e.g. block a listener or component event from triggering).
+
+.Event type map
+[cols="4*"]
+|===
+|   |Listener     |Override Form  |Override Component
+|Coordinate System
+|Form
+|Form
+|Component
+
+|Block current functionality
+|Yes, just avoid super
+|Partially (event consume)
+|No
+|===
+
+==== Low Level Event Types
+
+There are two basic types of low level events: Key and Pointer.
+
+IMPORTANT: Key events are only relevant to physical keys and will not trigger on virtual keyboard keys, to track those use a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] with a `DataChangeListener` as mentioned above.
+
+The pointer events (touch events) can be intercepted by overriding one or more of these methods in `Component` or `Form`. Notice that unless you want to block functionality you should probably invoke `super` when overriding:
+
+[source,java]
+----
+public void pointerDragged(int[] x, int[] y)
+public void pointerDragged(final int x, final int y)
+public void pointerPressed(int[] x, int[] y)
+public void pointerPressed(int x, int y)
+public void pointerReleased(int[] x, int[] y)
+public void pointerReleased(int x, int y)
+public void longPointerPress(int x, int y)
+public void keyPressed(int keyCode)
+public void keyReleased(int keyCode)
+public void keyRepeated(int keyCode)
+----
+
+Notice that most pointer events have a version that accepts an array as an argument, this allows for multi-touch event handling by sending all the currently touched coordinates.
+
+==== Drag Event Sanitation
+
+Drag events are quite difficult to handle properly across devices. Some devices send a ridiculous number of events for even the lightest touch while others send too little. It seems like too many drag events wouldn't be a problem, however if we drag over a button then it might disable the buttons action event (since this might be the user trying to scroll).
+
+Drag sensitivity is really about the component being dragged which is why we have the method `getDragRegionStatus` that allows us to "hint" to the drag API whether we are interested in drag events or not and if so in which directional bias.
+
+E.g. if our component is a painting app where we are trying to draw using drag gestures we would use code such as:
+
+[source,java]
+----
+public class MyComponent extends Component {
+    protected int getDragRegionStatus(int x, int y) {
+        return DRAG_REGION_LIKELY_DRAG_XY;
+    }
+}
+----
+
+This indicates that we want all drag events on both AXIS to be sent as soon as possible. Notice that this doesn't completely disable event sanitation.
+
+=== BrowserNavigationCallback
+
+The https://www.codenameone.com/javadoc/com/codename1/ui/events/BrowserNavigationCallback.html[BrowserNavigationCallback] isn't quite an "event" but there is no real "proper" classification for it.
+
+IMPORTANT: The callback method of this interface is invoked off the EDT! You must **NEVER** block this method and must not access UI or Codename One sensitive elements in this method!
+
+The browser navigation callback is invoked directly from the native web component as it navigates to a new page. Because of that it is invoked on the native OS thread and gives us a unique opportunity to handle the navigation ourselves as we see fit. That is why it MUST be invoked on the native thread, since the native browser is pending on our response to that method, spanning an invokeAndBlock/callSerially would be to slow and would bog down the browser.
+
+You can use the browser navigation callback to change the UI or even to invoke Java code from JavaScript code e.g.:
+
+[source,java]
+----
+bc.setBrowserNavigationCallback((url) -> {
+    if(url.startsWith("http://click")) {
+        Display.getInstance().callSerially(() -> bc.execute("fnc('<p>You clicked!</p>')"));
+        return false;
+    }
+    return true;
+});
+----

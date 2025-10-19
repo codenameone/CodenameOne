@@ -1,0 +1,281 @@
+== The EDT - Event Dispatch Thread
+
+[[edt-section]]
+=== What Is The EDT
+
+Codename One allows developers to create as many threads as they want; however in order to interact with the Codename One user interface components a developer must use the EDT. The EDT stands for "Event Dispatch Thread" but it handles a lot more than just "events".
+
+The EDT is the main thread of Codename One, by using just one thread Codename One can avoid complex synchronization code and focus on simple functionality that assumes only one thread.
+
+TIP: This has huge advantages for your code. You can normally assume that all code will occur on a single thread and avoid complex synchronization logic.
+
+You can visualize the EDT as a loop such as this:
+
+[source,java]
+----
+while(codenameOneRunning) {
+     performEventCallbacks();
+     performCallSeriallyCalls();
+     drawGraphicsAndAnimations();
+     sleepUntilNextEDTCycle();
+}
+----
+
+Normally, every call you receive from Codename One will occur on the EDT. E.g. every event, calls to paint(), lifecycle calls (start etc.) should all occur on the EDT.
+
+This is pretty powerful, however it means that as long as your code is processing nothing else can happen in Codename One!
+
+IMPORTANT: **If your code takes too long to execute then no painting or event processing will occur during that time, so a call to `Thread.sleep()` will actually stop everything!**
+
+The solution is pretty simple, if you need to perform something that requires intensive CPU you can spawn a thread.
+
+Codename One’s networking code automatically spawns its own network thread (see the https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager]). However, this also poses a problem...
+
+Codename One assumes all modifications to the UI
+are performed on the EDT but if we spawned a separate thread. How do we force our modifications back into the EDT?
+
+Codename One includes 3 methods in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class to help in these situations: `isEDT()`, `callSerially(Runnable`) &
+`callSeriallyAndWait(Runnable)`.
+
+`isEDT()` is useful for generic code that needs to test whether the current code is executing on the EDT.
+
+=== Call Serially (And Wait)
+
+`callSerially(Runnable)` should normally be called off the EDT (in a separate thread), the run method within the submitted runnable will be invoked on the EDT.
+
+IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods is not a `Thread`. We just use the `Runnable` interface as a convenient callback interface.
+
+[source,java]
+----
+// this code is executing in a separate thread
+final String res = methodThatTakesALongTime();
+Display.getInstance().callSerially(new Runnable() {
+     public void run() {
+          // this occurs on the EDT so I can make changes to UI components
+          resultLabel.setText(res);
+     }
+});
+----
+
+TIP: You can write this code more concisely using Java 8 lambda code as such:
+
+[source,java]
+----
+// this code is executing in a separate thread
+String res = methodThatTakesALongTime();
+Display.getInstance().callSerially(() -> resultLabel.setText(res));
+----
+
+This allows code to leave the EDT and then later on return to it to perform things within the EDT.
+
+The `callSeriallyAndWait(Runnable)` method blocks the current thread until the method completes, this is useful for cases such as user notification e.g.:
+
+[source,java]
+----
+// this code is executing in a separate thread
+methodThatTakesALongTime();
+Display.getInstance().callSeriallyAndWait(() -> {
+  // this occurs on the EDT so I can make changes to UI components
+  globalFlag = Dialog.show("Are You Sure?", "Do you want to continue?", "Continue", "Stop");
+});
+// this code is executing the separate thread
+// global flag was already set by the call above
+if(!globalFlag) {
+   return;
+}
+otherMethod();
+----
+
+TIP: If you are unsure use `callSerially`. The use cases for `callSeriallyAndWait` are very rare.
+
+==== callSerially On The EDT
+
+One of the misunderstood topics is why would we ever want to invoke `callSerially` when we are still on the EDT. This is best explained by example. Say we have a button that has quite a bit of functionality tied to its events e.g.:
+
+1. A user added an action listener to show a Dialog.
+
+2. A framework the user installed added some logging to the button.
+
+3. The button repaints a release animation as its being released.
+
+However, this might cause a problem if the first event that we handle (the dialog) might cause an issue to the
+following events. E.g. a dialog will block the EDT (using `invokeAndBlock`), events will keep happening but since
+the event we are in "already happened" the button repaint and the framework logging won't occur. This might
+also happen if we show a form which might trigger logic that relies on the current form still being present.
+
+One of the solutions to this problem is to just wrap the action listeners body with a `callSerially`. In this case the `callSerially`
+will postpone the event to the next cycle (loop) of the EDT and let the other events in the chain complete. Notice
+that you shouldn't use this normally since it includes an overhead and complicates application flow, however when
+you run into issues in event processing we suggest trying this to see if its the cause.
+
+IMPORTANT: You should never invoke callSeriallyAndWait on the EDT since this would effectively mean sleeping on the
+EDT. We made that method throw an exception if its invoked from the EDT.
+
+=== Debugging EDT Violations
+
+There are two types of EDT violations:
+
+1.	Blocking the EDT thread so the UI performance is considerably slower.
+2.	Invoking UI code on a separate thread
+
+Codename One provides a tool to help you detect some of these violations some caveats may apply though…
+
+It’s an imperfect tool. It might fire “false positives” meaning it might detect a violation for perfectly legal code and it might miss some illegal calls. However, it is a valuable tool in the process of detecting hard to track bugs that are sometimes only reproducible on the devices (due to race condition behavior).
+
+To activate this tool just select the Debug EDT menu option in the simulator and pick the level of output you wish to receive:
+
+.Debug EDT
+image::img/developer-guide/debug-edt.png[Debug EDT,scaledwidth=40%]
+
+Full output will include stack traces to the area in the code that is suspected in the violation.
+
+[[invoke-And-Block-section]]
+=== Invoke And Block
+
+Invoke and block is the exact opposite of `callSeriallyAndWait()`, it blocks the EDT and opens a separate thread for the runnable call. This functionality is inspired by the http://foxtrot.sourceforge.net/[Foxtrot] API, which is
+a remarkably powerful tool most Swing developers don't know about.
+
+This is best explained by an example. When we write typical code in Java we like that code is in sequence as such:
+
+[source,java]
+----
+doOperationA();
+doOperationB();
+doOperationC();
+----
+
+This works well normally but on the EDT it might be a problem, if one of the operations is slow it might slow the whole EDT (painting, event processing etc.).  Normally we can just move operations into a separate thread e.g.:
+[source,java]
+
+----
+doOperationA();
+new Thread() {
+    public void run() {
+         doOperationB();
+    }
+}).start();
+doOperationC();
+----
+
+Unfortunately, this means that operation C will happen in parallel to operation B which might be a problem... +
+E.g. instead of using operation names lets use a more "real world" example:
+
+[source,java]
+----
+updateUIToLoadingStatus();
+readAndParseFile();
+updateUIWithContentOfFile();
+----
+
+Notice that the first and last operations must be conducted on the EDT but the middle operation might be really slow!
+Since `updateUIWithContentOfFile` needs `readAndParseFile` to occur before it starts doing the new thread won't be enough.
+
+A simplistic approach is to do something like this:
+
+[source,java]
+----
+updateUIToLoadingStatus();
+new Thread() {
+    public void run() {
+          readAndParseFile();
+          updateUIWithContentOfFile();
+    }
+}).start();
+----
+
+But `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. So the right way to do this would be something like this:
+
+[source,java]
+----
+updateUIToLoadingStatus();
+new Thread() {
+    public void run() {
+          readAndParseFile();
+          Display.getInstance().callSerially(new Runnable() {
+               public void run() {
+                     updateUIWithContentOfFile();
+               }
+          });
+    }
+}).start();
+----
+
+This is perfectly legal and would work reasonably well, however it gets complicated as we add more and more features that need to be chained serially after all these are just 3 methods!
+
+Invoke and block solves this in a unique way you can get almost the exact same behavior by using this:
+
+[source,java]
+----
+updateUIToLoadingStatus();
+Display.getInstance().invokeAndBlock(new Runnable() {
+    public void run() {
+          readAndParseFile();
+    }
+});
+updateUIWithContentOfFile();
+----
+
+Or this with Java 8 syntax:
+
+[source,java]
+----
+updateUIToLoadingStatus();
+Display.getInstance().invokeAndBlock(() -> readAndParseFile());
+updateUIWithContentOfFile();
+----
+
+Invoke and block effectively blocks the current EDT in a legal way. It spawns a separate thread that runs the `run()` method and when that run method completes it goes back to the EDT.
+
+All events and EDT behavior still work while `invokeAndBlock` is running, this is because `invokeAndBlock()` keeps calling the main thread loop internally.
+
+IMPORTANT: Notice that `invokeAndBlock` comes at a slight performance penalty. Also notice that nesting `invokeAndBlock` calls (or over using them) isn't recommended. +
+However, they are very convenient when working with multiple threads/UI.
+
+Even if you never call `invokeAndBlock` directly you are probably using it indirectly in API's such as https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] that show a dialog while blocking the current thread e.g.:
+
+[source,java]
+----
+public void actionPerformed(ActionEvent ev) {
+  // will return true if the user clicks "OK"
+  if(!Dialog.show("Question", "How Are You", "OK", "Not OK")) {
+  // ask what went wrong...
+  }
+}
+----
+
+Notice that the dialog show method will block the calling thread until the user clicks OK or Not OK...
+
+NOTE: Other API's such as `NetworkManager.addToQueueAndWait()` also make use of this feature. Pretty much every "AndWait" method or blocking method uses this API internally!
+
+To explain how invokeAndBlock works we can return to the sample above of how the EDT works:
+
+[source,java]
+----
+while(codenameOneRunning) {
+     performEventCallbacks();
+     performCallSeriallyCalls();
+     drawGraphicsAndAnimations();
+     sleepUntilNextEDTCycle();
+}
+----
+
+`invokeAndBlock()` works in a similar way to this pseudo code:
+
+[source,java]
+----
+void invokeAndBlock(Runnable r) {
+    openThreadForR(r);
+    while(r is still running) {
+         performEventCallbacks();
+         performCallSeriallyCalls();
+         drawGraphicsAndAnimations();
+         sleepUntilNextEDTCycle();
+    }
+}
+----
+
+So the EDT is effectively "blocked" but we "redo it" within the `invokeAndBlock` method...
+
+As you can see this is a very simple approach for thread programming in UI, you don't need to block your flow and
+track the UI thread. You can just program in a way that seems sequential (top to bottom) but really uses multi-threading
+correctly without blocking the EDT.

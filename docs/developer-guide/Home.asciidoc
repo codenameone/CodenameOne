@@ -1,0 +1,16 @@
+# The Codename One Wiki
+
+In this Wiki we try to maintain the Codename One Developer guide. Check it out by clicking the links on the right hand side navigation bar. Also , you can check online Kotlin courses https://skillcombo.com/topic/kotlin/[here].
+
+This is an open edit wiki, so feel free to edit everything you see in a constructive way. You can also monitor changes to the wiki https://github.com/codenameone/CodenameOne/wiki.atom[via RSS] or by using https://ifttt.com/recipes/372144-codename-one-wiki-update-to-e-mail[ifttt].
+
+To learn more about Codename One check out the following resources:
+
+* https://www.codenameone.com/javadoc/index.html[JavaDocs]
+* https://www.codenameone.com/how-do-i.html[How Do I? - Videos Covering common usages of Codename One]
+* https://www.codenameone.com/blog.html[The Codename One Blog for latest news]
+* https://www.codenameone.com/manual/[The developer guide as it is published on the Codename One site]
+* https://www.codenameone.com/hello-world.html[Hello World Tutorial]
+* https://www.udemy.com/learn-mobile-programming-by-example-with-codename-one/[Free Udemy course covering the creation of two simple applications]
+* http://stackoverflow.com/tags/codenameone[Stack overflow Codename One tag]
+* https://www.codenameone.com/discussion-forum.html[The Codename One Discussion Forum]

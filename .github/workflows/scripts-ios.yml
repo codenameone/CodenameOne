@@ -17,6 +17,7 @@ on:
       - '!vm/**/*.md'
       - 'tests/**'
       - '!tests/**/*.md'
+      - '!docs/**'
   push:
     branches: [ master ]
     paths:
@@ -34,6 +35,7 @@ on:
       - '!vm/**/*.md'
       - 'tests/**'
       - '!tests/**/*.md'
+      - '!docs/**'
 
 jobs:
   build-ios:

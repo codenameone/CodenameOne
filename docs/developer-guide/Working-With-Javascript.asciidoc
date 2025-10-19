@@ -1,0 +1,672 @@
+== Working with JavaScript
+
+This section covers the Codename One Javascript port, which allows you to compile your app as native javascript and run it inside a browser.  This is different from the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent] and other methods of displaying HTML/Javascript inside a Codename One app.
+
+[id="limitations", reftext="Limitations of the Javascript Port"]
+=== Limitations of the Javascript Port
+
+[id="static_initializers",reftext="Static Initializers"]
+==== No Multithreaded Code inside Static Initializers
+
+NOTE: This section pertains to Codename One 3.6 and older.  Newer versions of Codename One support multithreaded code inside static initializers now.
+
+Codename One's Javascript port uses http://teavm.org/[TeaVM] to compile your application directly to Javascript so that it can run inside modern web browsers without the need for any plugins (i.e. NOT as an applet).  One of the revolutionary features that TeaVM provides is the ability to run multi-threaded code (i.e. it has full support for Object.wait(), Object.notify(), Object.notifyAll(), and the `synchronized` keyword).  The one caveat to be aware of is that **you cannot use any threading primitives inside static initializers**.  This is due to technical limitations in the browser environment and the way that TeaVM compiles class definitions into Javascript.  The workaround for this issue is to do lazy initialization in cases where you need to use multithreaded code.
+
+**Example**
+
+The following code will result in a build error when deploying a Javascript build:
+
+Class1.java
+
+[source,java]
+----
+import com.codename1.io.Log;
+class Class1 {
+    public static int getValue() {
+        Log.p("Hello world");
+        return 1;
+    }
+}
+----
+
+Class2.java
+
+[source,java]
+----
+class Class2 {
+    public static int value = Class1.getValue();
+
+}
+----
+
+This fails because `Class2` calls Class1.getValue() in its static initializer, and `getValue()` calls `Log.p()`, which, underneath the covers, writes to Storage - which involves some synchronous network access in the Javascript port (i.e. it uses `wait()` and `notify()` under the hood.
+
+If we simply remove the call to `Log.p()` from `getValue()`, as follows:
+
+[source,java]
+----
+    public static int getValue() {
+        return 1;
+    }
+----
+
+Then everything would be fine.
+
+**But How do we Know if A method includes `wait()`/`notify` somewhere along the line?**
+
+When you try to build your app as a Javascript app, it will fail (if code in your static initializers uses `wait()`/`notify()` somewhere along the line).
+
+**How to Work Around this Issue**
+
+Use lazy initialization wherever you can.  You don't need to worry about this for setting static variables to literal values.  E.g.:  `static int someVal = 20;`  will always be fine.  But `static int someVal = OtherClass.calculateSomeVal();` may or may not be fine, because you don't know whether `calculateSomeVal()` uses a `wait/notify`.  So instead of initializing `someVal` in the static initializer, create a static accessor that lazily initializes it.  Or initialize it inside your app's `init()` method.  Or initialize it inside the class constructor.
+
+[id="troubleshooting", reftext="Troubleshooting Build Errors"]
+=== Troubleshooting Build Errors
+
+If your Javascript build fails, you should download the error log and see what the problem is.  The most common errors are:
+
+1. "[ERROR] Method XXX.<clinit>()V is claimed to be synchronous, but it is has invocations of asynchronous methods"
++
+This error will occur if you have static initializers that use multithreaded code (e.g. wait/notify/sleep, etc...). See <<static_initializers>> for information about troubleshooting this error.  In some cases TeaVM may give a false-positive here (i.e. it *thinks* you are doing some multithreaded stuff, but you're really not), then you can force the build to "succeed" by adding the `javascript.stopOnErrors=false` build hint.
+2. "Method XXX was not found"
++
+TeaVM uses its own Java runtime library.  It is mostly complete, but you may occasionally run into methods that haven't been implemented.  If you run into errors saying that certain classes or methods were not found, please post them to the https://github.com/codenameone/CodenameOne/issues[Codename One issue tracker].  You can also work around these by changing your own code to not use such functions.  If this missing method doesn't fall on a critical path on your app, you can also force the app to still build despite this error by adding the `javascript.stopOnErrors=false` build hint.
+
+[id="zip_war_preview", reftext="Deployment Formats"]
+=== ZIP, WAR, or Preview.  What's the difference?
+
+The *Javascript* build target will result in up to three different bundles being generated:
+
+1. YourApp-1.0.war
+2. YourApp-1.0.zip
+3. YourApp-1.0-Preview.html
+
+**YourApp-1.0.war** is a self contained application bundle that can be installed in any JavaEE servlet container.  If you haven't customized any <<javascript-proxy-settings,proxy settings>>, then the application will be configured to use a proxy servlet that is embedded into the .war file.
+
+As an example, the PropertyCross .war file contains the following files:
+
+----
+$ jar tvf PropertyCross-1.0.war
+     0 Thu Apr 30 15:57:38 PDT 2015 META-INF/
+   132 Thu Apr 30 15:57:36 PDT 2015 META-INF/MANIFEST.MF
+     0 Thu Apr 30 15:57:36 PDT 2015 assets/
+     0 Thu Apr 30 15:57:36 PDT 2015 assets/META-INF/
+     0 Thu Apr 30 15:57:36 PDT 2015 js/
+     0 Thu Apr 30 15:57:36 PDT 2015 teavm/
+     0 Thu Apr 30 15:57:36 PDT 2015 WEB-INF/
+     0 Thu Apr 30 15:57:36 PDT 2015 WEB-INF/classes/
+     0 Thu Apr 30 15:57:36 PDT 2015 WEB-INF/classes/com/
+     0 Thu Apr 30 15:57:36 PDT 2015 WEB-INF/classes/com/codename1/
+     0 Thu Apr 30 15:57:36 PDT 2015 WEB-INF/classes/com/codename1/corsproxy/
+     0 Thu Apr 30 15:57:36 PDT 2015 WEB-INF/lib/
+ 27568 Thu Apr 30 15:57:12 PDT 2015 assets/CN1Resource.res
+306312 Thu Apr 30 15:57:12 PDT 2015 assets/iOS7Theme.res
+427737 Thu Apr 30 15:57:12 PDT 2015 assets/iPhoneTheme.res
+   350 Thu Apr 30 15:57:12 PDT 2015 assets/META-INF/MANIFEST.MF
+ 92671 Thu Apr 30 15:57:12 PDT 2015 assets/theme.res
+ 23549 Thu Apr 30 15:57:14 PDT 2015 icon.png
+  2976 Thu Apr 30 15:57:14 PDT 2015 index.html
+ 30695 Thu Apr 30 15:57:12 PDT 2015 js/fontmetrics.js
+ 84319 Thu Apr 30 15:57:12 PDT 2015 js/jquery.min.js
+ 13261 Thu Apr 30 15:57:12 PDT 2015 progress.gif
+  2816 Thu Apr 30 15:57:12 PDT 2015 style.css
+1886163 Thu Apr 30 15:57:36 PDT 2015 teavm/classes.js
+359150 Thu Apr 30 15:57:36 PDT 2015 teavm/classes.js.map
+1147502 Thu Apr 30 15:57:36 PDT 2015 teavm/classes.js.teavmdbg
+ 30325 Thu Apr 30 15:57:36 PDT 2015 teavm/runtime.js
+  1011 Thu Apr 30 15:57:18 PDT 2015 WEB-INF/classes/com/codename1/corsproxy/CORSProxy.class
+232771 Wed Nov 05 17:35:12 PST 2014 WEB-INF/lib/commons-codec-1.6.jar
+ 62050 Wed Apr 15 14:35:56 PDT 2015 WEB-INF/lib/commons-logging-1.1.3.jar
+590004 Wed Apr 15 14:35:58 PDT 2015 WEB-INF/lib/httpclient-4.3.4.jar
+282269 Wed Apr 15 14:35:56 PDT 2015 WEB-INF/lib/httpcore-4.3.2.jar
+ 14527 Wed Apr 15 14:35:56 PDT 2015 WEB-INF/lib/smiley-http-proxy-servlet-1.6.jar
+   903 Thu Apr 30 15:57:12 PDT 2015 WEB-INF/web.xml
+  9458 Thu Apr 30 15:57:14 PDT 2015 META-INF/maven/com.propertycross/PropertyCross/pom.xml
+   113 Thu Apr 30 15:57:36 PDT 2015 META-INF/maven/com.propertycross/PropertyCross/pom.properties
+----
+
+Some things to note in this file listing:
+
+1. The *index.html* file is the entry point to the application.
+2. *CORSProxy.class* is the proxy servlet for making network requests to other domains.
+3. The *assets* directory contains all of your application's *jar* resources.  All resource files in your app will end up in this directory.
+4. The `teavm` directory contains all of the generated javascript for your application.  Notice that there are some debugging files generated (*classes.js.map* and *classes.js.teavmdbg*).  These are not normally loaded by the browser when your app is run, but they can be used by Chrome when you are doing debugging.
+5. The *jar* files in the *WEB-INF/lib* directory are dependencies of the proxy servlet.  They are not required for your app to run - unless you are using the proxy.
+
+**YourApp-1.0.zip** is appropriate for deploying the application on any web server.  It contains all of the same files as the .war file, excluding the WEB-INF directory (i.e. it doesn't include any servlets, class files, or Java libraries - it contains purely client-side javascript files and HTML).
+
+As an example, this is a listing of the files in the zip distribution of the PropertyCross demo:
+
+----
+$ unzip -vl PropertyCross-1.0.zip
+Archive:  /path/to/PropertyCross-1.0.zip
+ Length   Method    Size  Ratio   Date   Time   CRC-32    Name
+--------  ------  ------- -----   ----   ----   ------    ----
+   27568  Defl:N    26583   4%  04-30-15 15:57  9dc91739  assets/CN1Resource.res
+  306312  Defl:N   125797  59%  04-30-15 15:57  0b5c1c3a  assets/iOS7Theme.res
+  427737  Defl:N   218975  49%  04-30-15 15:57  3de499c8  assets/iPhoneTheme.res
+     350  Defl:N      241  31%  04-30-15 15:57  7e7e3714  assets/META-INF/MANIFEST.MF
+   92671  Defl:N    91829   1%  04-30-15 15:57  004ad9d7  assets/theme.res
+   23549  Defl:N    23452   0%  04-30-15 15:57  acd79066  icon.png
+    2903  Defl:N     1149  60%  04-30-15 15:57  e5341de1  index.html
+   30695  Defl:N     7937  74%  04-30-15 15:57  2e008f6c  js/fontmetrics.js
+   84319  Defl:N    29541  65%  04-30-15 15:57  15b91689  js/jquery.min.js
+   13261  Defl:N    11944  10%  04-30-15 15:57  51b895c7  progress.gif
+    2816  Defl:N      653  77%  04-30-15 15:57  a12159c7  style.css
+ 1886163  Defl:N   315437  83%  04-30-15 15:57  2b34c50f  teavm/classes.js
+  359150  Defl:N    92874  74%  04-30-15 15:57  30abdf13  teavm/classes.js.map
+ 1147502  Defl:N   470472  59%  04-30-15 15:57  e5c456f7  teavm/classes.js.teavmdbg
+   30325  Defl:N     5859  81%  04-30-15 15:57  46651f06  teavm/runtime.js
+--------          -------  ---                            -------
+ 4435321          1422743  68%                            15 files
+----
+
+You'll notice that it has many of the same files as the .war distribution.  It is just missing the the proxy servlet and dependencies.
+
+**YourApp-1.0-Preview.html** is a single-page HTML file with all of the application's resources embedded into a single page.  This is generated for convenience so that you can preview your application on the build server directly.  While you could use this file in production, you are probably better to use the ZIP or WAR distribution instead as some mobile devices have file size limitations that may cause problems for the "one large single file" approach.  If you do decide to use this file for your production app (i.e. copy the file to your own web server), you will need to change the proxy settings, as it is configured to use the proxy on the Codename One build server - which won't be available when the app is hosted on a different server.
+
+[[javascript-proxy-settings]]
+=== Setting up a Proxy for Network Requests
+
+The Codename One API includes a network layer (the https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager] and https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html[ConnectionRequest] classes) that allows you to make HTTP requests to arbitrary destinations.  When an application is running inside a browser as a Javascript app, it is constrained by the same origin policy.  You can only make network requests to the same host that served the app originally.
+
+E.g. If your application is hosted at http://example.com/myapp/index.html, then your app will be able to perform network requests to retrieve other resources under the *example.com* domain, but it won't be able to retrieve resources from *example2.com*, *foo.net*, etc..
+
+NOTE: The HTTP standard does support cross-origin requests in the browser via the `Access-Control-Allow-Origin` HTTP header.  Some web services supply this header when serving resources, but not all.  The only way to be make network requests to arbitrary resources is to do it through a proxy.
+
+Luckily there is a solution.  The .war javascript distribution includes an embedded proxy servlet, and your application is configured, by default, to use this servlet.  If you intend to use the .war distribution, then it **should just work**.  You shouldn't need to do anything to configure the proxy.
+
+If, however, you are using the .zip distribution or the single-file preview, you will need to set up a Proxy servlet and configure your application to use it for its network requests.
+
+==== Step 1: Setting up a Proxy
+
+TIP: This section is only relevant if you are using the .zip or single-file distributions of your app.  You shouldn't need to set up a proxy for the .war distribution since it includes a proxy built-in.
+
+The easiest way to set up a proxy is to use the Codename One *https://github.com/shannah/cors-proxy[cors-proxy]* project.  This is the open-source project from which the proxy in the .war distribution is derived.  Simply download and install the cors-proxy .war file in your JavaEE compatible servlet container.
+
+If you don't want to install the .war file, but would rather just copy the proxy servlet into an existing web project, you can do that also.  https://github.com/shannah/cors-proxy/wiki/Embedding-Servlet-into-Existing-Project[See the cors-proxy wiki for more information about this].
+
+==== Step 2: Configuring your Application to use the Proxy
+
+There are three ways to configure your application to use your proxy.
+
+1. Using the *javascript.proxy.url* build hint.
++
+E.g.:
++
+----
+javascript.proxy.url=http://example.com/myapp/cn1-cors-proxy?_target=
+----
+2. By modifying your app's *index.html* file after the build.
++
+E.g.:
++
+----
+<script type="text/javascript">
+    window.cn1CORSProxyURL='http://example.com/myapp/cn1-cors-proxy?_target=';
+</script>
+----
+3. By setting the `javascript.proxy.url` property in your Java source.  Generally you would do this inside your `init()` method, but it just has to be executed before you make a network request that requires the proxy.
++
+----
+Display.getInstance().setProperty(
+        "javascript.proxy.url",
+        "http://example.com/myapp/cn1-cors-proxy?_target="
+);
+----
+
+The method you choose will depend on the workflow that you prefer.  Options #1 and #3 will almost always result in fewer changes than #2 because you only have to set them up once, and the builds will retain the settings each time you build your project.
+
+=== Using the CORS Proxy for Same Origin Requests
+
+By default, the CORS proxy is only used for HTTP requests to URLS at a different domain than the one that the app is running in.  There are some circumstances where you may want to *even* use the proxy for same domain requests.  You can do this by setting the `javascript.useProxyForSameDomain` display property to `true`.  E.g.
+
+[source,java]
+----
+Display.getInstance().setProperty("javascript.useProxyForSameDomain", "true");
+----
+
+*Why would you want to do this?* 
+
+The browser shields some HTTP headers (e.g. "Set-Cookie") from Javascript so that your app cannot access them. Going through the proxy works around this limitation by copying and encoding such headers in a format that the browser will allow, and then decoding them client-side to make them available to your app seamlessly.
+
+===== Using Apache as a Proxy
+
+If you are hosting your application on an Apache 2 web server with mod_proxy installed, and you only need to make CORS requests to a single domain (or a limited set of domains), you can use Apache to serve as your proxy.  One sample configuration (which you would place either in your VirtualHost definition or your .htaccess file is as follows:
+
+----
+SSLProxyEngine on
+ProxyPass /app https://www.myexternaldomain.com
+ProxyPassReverse /app https://www.myexternaldomain.com
+----
+
+This tells Apache to proxy all requests for '/app' to the domain https://www.myexternaldomain.com.  You would then need to set your CORS proxy URL in your CN1 app to "/app/".
+
+The syntax is the same if you have multiple domains, but keep attention to the order of the lines to make the proxy working correctly. For example:
+
+----
+SSLProxyEngine on
+ProxyPass /app https://www.myexternaldomain1.com
+ProxyPassReverse /app https://www.myexternaldomain1.com
+ProxyPass /storage https://www.myexternaldomain2.com
+ProxyPassReverse /storage https://www.myexternaldomain2.com
+----
+
+This tells Apache to proxy all requests for '/app' to the domain https://www.myexternaldomain1.com and all requests for '/storage' to the domain https://www.myexternaldomain2.com
+
+[id="splash_screen", reftext="Customizing the Splash Screen"]
+=== Customizing the Splash Screen
+
+Since your application may include many resource files, videos, etc.., the the build-server will generate a splash screen for your app to display while it is loading.  This basically shows a progress indicator with your app's icon.
+
+You can customize this splash screen by simply modifying the HTML source inside the *cn1-splash* `div` tag of your app's index.html file:
+
+[source,html]
+----
+<div id="cn1-splash">
+    <img class="icon" src="icon.png"/>
+
+    <img class="progress" src="progress.gif"/>
+    <p>...Loading...</p>
+</div>
+----
+
+[id="debugging", reftext="Debugging in Chrome"]
+=== Debugging
+
+If you run into problems with your app that only occur in the Javascript version, you may need to do a little bit of debugging.  There are many debugging tools for Javascript, but the preferred tool for debugging Codename One apps is Chrome's debugger.
+
+If your application crashes and you don't have a clue where to begin, follow these steps:
+
+1. Load your application in Chrome.
+2. Open the Chrome debugger.
+3. Enable the "Pause on Exceptions" feature, then click the "Refresh" button to reload your app.
+4. Step through each exception until you reach the one you are interested in.  Chrome will then show you a stack trace that includes the name of the Java source file and line numbers.
++
+.Debugging using Chrome tools
+image::img/developer-guide/chrome-debugger.png[Debugging using Chrome tools,scaledwidth=50%]
+
+
+[id="third_party_libs", reftext="Including Third-Party Javascript Libraries"]
+=== Including Third-Party Javascript Libraries
+
+Codename One allows you to interact directly with Javascript using native interfaces. Native interfaces are placed inside your project's `native/javascript` directory using a prescribed naming convention.  If you want to, additionally, include third-party Javascript libraries in your application you should also place these libraries inside the `native/javascript` directory but you must specify which files should be treated as "libraries" and which files are treated as "resources".  You can do this by adding a file with extension `.cn1mf.json` file either the root of your `native/javascript` directory or the root level of the project's `src` directory.
+
+
+
+==== Libraries vs Resources
+
+A *resource* is a file whose contents can be loaded by your application at runtime using `Display.getInstance().getResourceAsStream()`.  In a typical Java environment, resources would be stored on the application's classpath (usually inside a Jar file).  On iOS, resources are packaged inside the application bundle.  In the Javascript port, resources are stored inside the `APP_ROOT/assets` directory.  Historically, javascript files have always been treated as resources in Codename One, and many apps include HTML and Javascript files for use inside the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent].
+
+With the Javascript port, it isn't quite so clear whether a Javascript file is meant to be a resource or a library that the application itself uses.  Most of the time you probably want Javascript files to be used as libraries, but you might also have Javascript files in your app that are meant to be loaded at runtime and displayed inside a Web View - these would be considered resources.
+
+==== The Javascript Manifest File
+
+In order to differentiate libraries from resources, you should provide a *cn1mf.json* file inside your `native/javascript` directory that specifies any files or directories that should be treated as libraries. This file can be named anything you like, as long as its name ends with `cn1mf.json`.  Any files or directories that you list in this manifest file will be packaged inside your app's `includes` directory instead of the `assets` directory.  Additionally it add appropriate `<script>` tags to include your libraries as part of the `index.html` page of your app.
+
+TIP: If you include the `cn1mf.json` file in your project's `src` directory it could potentially be used to add configuration parameters to platform's other than Javascript (although currently no other platforms use this feature).  If you place it inside your `native/javascript` directory, then only the Javascript port will use the configuration contained therein.
+
+A simple manifest file might contain the following JSON:
+
+----
+{
+    "javascript" : {
+        "libs" : [
+            "mylib1.js"
+        ]
+    }
+}
+----
+
+I.e. It contains a object with key *libs* whose value is a list of files that should be treated as libraries.  In the above example, we are declaring that the file `native/javascript/mylib1.js` should be treated as a library.  This will result in the following `<script>` tag being added to the `index.html` file:
+
+----
+<script src="includes/mylib1.js"></script>
+----
+
+NOTE: This also caused the `mylib1.js` file to be packaged inside the `includes` directory instead of the `assets` directory.
+
+TIP: A project may contain more than one manifest file.  This allows you to include manifest files with your cn1libs also.  You just need to make sure that each manifest file has a different name.
+
+===== How to NOT generate the `<script>` tag
+
+In some cases you may want a Javascript file to be treated as a library (i.e. packaged in the `includes` directory) but not automatically included in the `index.html` page.  Rather than simply specifying the name of the file in the `libs` list, you can provide a structure with multiple options about the file.  E.g.
+
+----
+{
+    "javascript" : {
+        "libs" : [
+            "mylib1.js",
+            {
+                "file" : "mylib2.js",
+                "include" : false
+            }
+        ]
+    }
+}
+----
+
+In the above example, the `mylib2.js` file will be packaged inside the `includes` directory, but the build server won't insert its `<script>` tag in the `index.html` page.
+
+===== Library Directories
+
+You can also specify directories in the manifest file.  In this case, the entire directory will be packaged inside the `includes` directory of your app.
+
+WARNING: If you are including Javascript files in your app that are contained inside a directory hierarchy, you should specify the root directory of the hierarchy in your manifest file and use the sub "includes" property of the directory entry to specify which files should be included with `<script>` tags.  Specifying the file directly inside the "libs" list will result in the file being packed directly in the your app's `includes` directory.  This may or may not be what you want.
+
+E.g.
+
+----
+{
+    "javascript" : {
+        "libs" : [
+            "mylib1.js",
+            {
+                "file" : "mylib2.js",
+                "include" : false
+            },
+            {
+                "file" : "mydir1",
+                "includes" : ["subfile1.js", "subfile2.js"]
+            }
+        ]
+    }
+}
+----
+
+In this example the entire `mydir1` directory would be packed inside the app's `includes` directory, and the following `script` tags would be inserted into the `index.html` file:
+
+----
+<script src="includes/mydir1/subfile1.js"></script>
+<script src="includes/mydir1/subfile2.js"></script>
+----
+
+WARNING: Libraries included from a directory hierarchy may not work correctly with the single file preview that the build server generates.  For that version, it will embed the contents of each included Javascript file inside the `index.html` file, but the rest of the directory contents will be omitted.  If your the library depends on the directory hierarchy and supporting files and you require the single-file preview to work, then you may consider hosting the library on a separate server, and including the library directly from there, rather than embedding it inside your project's "native/javascript" directory.
+
+===== Including Remote Libraries
+
+The examples so far have only demonstrated the inclusion of libraries that are part of the app bundle.  However, you can also include libraries over the network by specifying the URL to the library directly.  This is handy for including common libraries that are hosted by a CDN.
+
+E.g. The Google Maps library requires the Google maps API to be included.  This is accomplished with the following manifest file contents:
+
+----
+{
+    "javascript" : {
+        "libs" : [
+            "//maps.googleapis.com/maps/api/js?v=3.exp"
+        ]
+    }
+}
+----
+
+NOTE: This example uses the "//" prefix for the URL instead of specifying the protocol directly.  This allow the library to work for both http and https hosting.  You could however specify the protocol as well:
++
+----
+{
+    "javascript" : {
+        "libs" : [
+            "https://maps.googleapis.com/maps/api/js?v=3.exp"
+        ]
+    }
+}
+----
+
+===== Including CSS Files
+
+CSS files can be included using the same mechanism as is used for Javascript files.  If the file name ends with ".css", then it will be treated as a CSS file (and included with a `<link>` tag instead of a `<script>` tag.  E.g.
+
+----
+{
+    "javascript" : {
+        "libs" : [
+            "mystyles.css"
+        ]
+    }
+}
+----
+
+or
+
+----
+{
+    "javascript" : {
+        "libs" : [
+            "https://example.com/mystyles.css"
+        ]
+    }
+}
+----
+
+===== Embedding Variables in URLs
+
+In some cases the URL for a library may depend on the values of some build hints in the project.  For example, in the Google Maps cn1lib, the API key must be appended to the URL for the API as a GET parameter.  E.g. `https://maps.googleapis.com/maps/api/js?v=3.exp&key=SOME_API_KEY`, but the developer of the library doesn't want to put his own API key in the manifest file for the library.  It would be better for the API key to be supplied by the developer of the actual app that uses the library and not the library itself.
+
+The solution for this is to add a *variable* into the URL as follows:
+
+[source,javascript]
+----
+{
+    "javascript" : {
+        "libs" : [
+            "//maps.googleapis.com/maps/api/js?v=3.exp&key={{javascript.googlemaps.key}}"
+        ]
+    }
+}
+----
+
+The `{{javascript.googlemaps.key}}` variable will be replaced with the value of the `javascript.googlemaps.key` build hint by the build server, so the resulting include you see in the index.html page will be something like:
+
+[source,html]
+----
+<script src="//maps.googleapis.com/maps/api/js?v=3.exp&key=XYZ"></script>
+----
+
+[id="environment_variables", reftext="Browser Environment Variables"]
+=== Browser Environment Variables
+
+Native interfaces allow you to interact with the Javascript environment in unlimited ways, but Codename One provide's a simpler method of obtaining some common environment information from the browser via the `Display.getInstance().getProperty()` method.  The following environment variables are currently available:
+
+.Property hints for the JavaScript port
+|===
+|Name	|Description
+
+| `browser.window.location.href`
+| A String, representing the entire URL of the page, including the protocol (like http://)
+
+| `browser.window.location.search`
+| A String, representing the querystring part of a URL, including the question mark (?)
+
+| `browser.window.location.host`
+| A String, representing the domain name and port number, or the IP address of a URL
+
+| `browser.window.location.hash`
+| A String, representing the anchor part of the URL, including the hash sign (#)
+
+| `browser.window.location.origin`
+| A String, representing the protocol (including ://), the domain name (or IP address) and port number (including the colon sign (:) of the URL. For URL's using the "file:" protocol, the return value differs between browsers
+
+| `browser.window.location.pathname`
+| A String, representing the pathname
+
+| `browser.window.location.protocol`
+| A String, representing the protocol of the current URL, including the colon (:)
+
+| `browser.window.location.port`
+| A String, representing the port number of a URL.
++
+Note: If the port number is not specified or if it is the scheme's default port (like 80 or 443), an empty string is returned
+
+| `browser.window.location.hostname`
+| A String, representing the domain name, or the IP address of a URL
+
+| `User-Agent`
+| The User-agent string identifying the browser, version etc..
+
+| `browser.language`
+| The language code that the browser is currently set to.  (e.g. en-US)
+
+| `browser.name`
+| the name of the browser as a string.
+
+| `Platform`
+|  a string that must be an empty string or a string representing the platform on which the browser is executing.
++
+For example: "MacIntel", "Win32", "FreeBSD i386", "WebTV OS"
+
+| `browser.codeName`
+|  the internal name of the browser
+
+| `browser.version`
+| the version number of the browser
+
+| `javascript.deployment.type`
+| Specifies the deployment type of the app.  This will be "file" for the single-file preview, "directory" for the zip distribution, and "war" for the war distribution.
+|===
+
+[id="native_theme", reftext="Changing the Native Theme"]
+=== Changing the Native Theme
+
+Since a web application could potentially be run on any platform, it isn't feasible to bundle all possible themes into the application (at least it wouldn't be efficient for most use cases).  By default we have bundled the iOS7 theme for javascript applications.  This means that the app will look like iOS7 on all devices: desktop, iOS, Android, WinPhone, etc...
+
+You can override this behavior dynamically by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to a theme that you have included in your app.  All of the native themes are available on GitHub, so you can easily copy these into your application.  The best place to add the theme is in your `native/javascript` directory - so that they won't be included for other platforms.
+
+==== Example:  Using Android Theme on Android
+
+NOTE: As of Codename One 6.0, apps will automatically use the Android theme when run on an Android device, so this example is not necessary.  However the technique of changing the native theme at runtime is still applicable.
+
+First, download https://github.com/codenameone/CodenameOne/raw/master/Ports/Android/src/androidTheme.res[androidTheme.res] from the Android port on GitHub, and copy it into your app's `native/javascript` directory.
+
+Then in your app's `init()` method, add the following:
+
+[source,java]
+----
+Display d = Display.getInstance();
+if (d.getProperty("User-Agent", "Unknown").indexOf("Android") != -1) {
+    d.setProperty("javascript.native.theme", "/androidTheme.res");
+}
+----
+
+=== Disabling the 'OnBeforeUnload' Handler
+
+By default, apps will display warning/confirm dialog when the user attempts to leave the page.
+
+image::img/developer-guide/js-beforeunload-prompt.png[onbeforeunload prompt dialog,scaledwidth=20%]
+
+
+You can explicitly enable or disable this behaviour by setting the "platformHint.javascript.beforeUnloadMessage" display property.  Setting the property to `null` will disable this behaviour, so that users will not be harassed by this dialog when they navigate away from the app.  Setting it to a string value, like "leaving so soon?", will re-enable this behaviour.
+
+NOTE: Some browsers don't allow you to specify the message that is displayed in this dialog.  In those browsers, this property can be viewed as boolean:   A null value will result in no prompt being shown, and a non-null value will result in a prompt being shown.
+
+==== Example: Toggling the BeforeUnload Prompt On/Off
+
+[source,java]
+----
+Form f = new Form("Test Before Unload", BoxLayout.y());
+CheckBox enableBeforeUnload = new CheckBox("Enable Before Unload");
+enableBeforeUnload.setSelected(true);
+enableBeforeUnload.addActionListener(e->{
+    if (enableBeforeUnload.isSelected()) {
+        CN.setProperty("platformHint.javascript.beforeUnloadMessage", "Are you sure you want to leave this page?  It might be bad");
+    } else {
+        CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
+    }
+});
+f.add(enableBeforeUnload);
+f.show();
+----
+
+[id="pwa_deployment", reftext="Deploying as a Progressive Web App"]
+=== Deploying as a Progressive Web App
+
+Out of the box, your app is ready to be deployed as a progressive web app (PWA). That means that users can access the app directly in their browser, but once the browser determines that the user is frequenting the app, it will "politely" prompt the user to install the app on their home screen. Once installed on the home screen, the app will behave just like a native app.  It will continue to work while offline, and if the user launches the app, it will open without the browser's navigation bar.  If you were to install the native and PWA versions of your app side by side, you would be hard pressed to find the difference - especially on newer devices.
+
+Below is a screenshot from Chrome for Android where the browser is prompting the user to add the app to their home screen.
+
+.Add app to homescreen banner
+image::img/developer-guide/javascript-pwa-add-app-banner.png[Add app to homescreen banner,scaledwidth=20%]
+
+If the app is available as a native app, in the Play store, you can indicate this using the `javascript.manifest.related_applications` and `javascript.manifest.prefer_related_applications` build hints.  Then, instead of prompting the user to add the web app to their home screen, they'll be prompted to install the native app from the Play store, as shown below.
+
+.Add native app banner
+image::img/developer-guide/javascript-pwa-add-native-app-banner.png[Add native app banner,scaledwidth=20%]
+
+
+NOTE:  The PWA standard requires that you host your app on over HTTPS.  For testing purposes, it will also work when accessed at a `localhost` address.  You can use the https://developers.google.com/web/ilt/pwa/lighthouse-pwa-analysis-tool[Lighthoust PWA analysis tool] to ensure compliance.
+
+For more information about Progressive Web Apps see https://developers.google.com/web/progressive-web-apps/[Google's introduction to the subject].
+
+==== Customizing the App Manifest File
+
+At the heart of a progressive web app is the https://developer.mozilla.org/en-US/docs/Web/Manifest[web app manifest].  It specifies things like the app's name, icons, description, preferred orientation, display mode (e.g. whether to display browser navigation or to open with the full screen like a native app), associated native apps, etc..  The Codename One build server will automatically generate a manifest file for your app but you can (and should) customize this file via build hints.
+
+Build hints of the form `javascript.manifest.XXX` will be injected into the app manifest.  E.g. To set the app's description, you could add the build hint:
+
+----
+javascript.manifest.description=An app for doing cool stuff
+----
+
+You can find a full list of available manifest keys https://developer.mozilla.org/en-US/docs/Web/Manifest[here].  The build server will automatically generate all of the icons so you don't need to worry about those.  The "name" and "short_name" properties will default to the app's display name, but they can be overridden via the `javascript.manifest.name` and `javascript.manifest.short_name` build hints respectively.
+
+NOTE: The `javascript.manifest.related_applications` build hint expects a JSON formatted list, just like in the raw manifest file.
+
+==== Related Applications
+
+One nice feature (discussed above) of progressive web apps, is the ability to specify related applications in the app manifest.  Browsers that support the PWA standard use some heuristics to "offer" the user to install the associated native app when it is clear that the user is using the app on a regular basis.  Use the `javascript.manifest.related_applications` build hint to specify the location of the native version of your app.  E.g.
+
+`javascript.manifest.related_applications=[{"platform":"play", "id":"my.app.id"}]`
+
+You can declare that the native app is the preferred way to use the app by setting the `javascript.manifest.prefer_related_applications` build hint to "true".
+
+NOTE:  According to the https://developer.mozilla.org/en-US/docs/Web/Manifest[app manifest documentation], this should only be used if the related native apps really do offer something that the web application can't do.
+
+==== Device/Browser Support for PWAs
+
+Chrome and Firefox both support PWAs on desktop and on Android.  iOS doesn't support the PWA standard, however, many aspects of it are supported.  E.g. On iOS you can add the app to your home screen, after which time it will appear and behave like a native app - and it will continue to work while offline.  However, many other nice features of PWA like "Install this app on your home screen" banners, push notifications, and invitations to install the native version of the app, are not supported.  It is unclear when, or even, whether Apple will ever add full support; but most experts predict that they will join the rest of the civilized world and add PWA support in the near future.
+
+On the desktop, Chrome provides an analogous feature to "add to your homescreen":  "Add to shelf".  If it looks like the user is using the app on a regular basis, and it isn't yet installed, it will show a banner at the top of the page asking the user if they want to add to their shelf.
+
+.Add to shelf banner
+image::img/developer-guide/javascript-pwa-add-to-shelf-banner.png[Add to shelf banner,scaledwidth=20%]
+
+Clicking the "Add button" prompts the user for the name they wish the app to appear as:
+
+.Add to shelf prompt
+image::img/developer-guide/javascript-pwa-add-to-shelf-prompt.png[Add to shelf prompt,scaledwidth=20%]
+
+Upon submission, Chrome will generate a real application (on Mac, it will be a ".app", on Windows, an "exe", etc..) which the user can double click to open the app directly in the Chrome.  And, importantly, the app will still work when the user is offline.
+
+The app will also appear in their "Shelf" which you can always access at `chrome://apps`, or by opening the "Chrome App Launcher" app (on OS X this is located in "~/Applications/Chrome Apps/Application Launcher").
+
+.Chrome App Launcher
+image::img/developer-guide/javascript-pwa-chrome-app-launcher.png[Chrome App Launcher,scaledwidth=20%]
+
+NOTE: The Chrome App Launcher lists apps installed both via the Chrome Web Store and via the "Add to Shelf" feature that we discuss here.  The features we describe in this article are orthogonal to the Chrome Web Store and will not be affected by its closure.
+
+=== Playing Media and Opening Links
+
+People don't like it when the browser automatically starts playing sounds, or opening links without their permission.  For this reason, modern browsers generally restrict your ability to programmatically do these things, unless they are in response to a user action, like a mouse click.
+
+If your app needs to play media (e.g. `Media.play()`), or open a link (e.g. `Display.execute("...")`) without the user actually interacting physically (e.g. key press or pointer press), then it will display a popup dialog confirming that the user actually wants to perform this action.
+
+In some cases this dialog may affect the utility of the app.  For example, suppose you want to play a video in response to a voice command.  Having to press an "OK" button after the command, may be annoying. For such cases, you can use the `platformHint.javascript.backsideHooksInterval` property to *poll* for media play requests on an authorized event.
+
+For example:
+
+[source,java]
+----
+CN.setProperty("platformHint.javascript.backsideHooksInterval", "1000");
+
+// Now your app will process media.play() and Display.execute(...) calls
+// once per second (1000ms).  If play() or execute() has been called anytime
+// in that second (since the last poll), it will seamlessly process the 
+// request.
+
+
+// To disable polling, just set it to an interval 0 or lower.
+// e.g.
+CN.setProperty("platformHint.javascript.backsideHooksInterval", "0");
+----
+
+WARNING: Do not abuse this feature.  You should enable this polling only when necessary.  E.g. If your app enables the user to listen for voice commands, only enable polling for the period of time that it is listening.  When the user wants to stop listening, you should also stop the polling by setting the interval to "0".
+
+

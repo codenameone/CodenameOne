@@ -1,0 +1,71 @@
+toc::[]
+
+[preface]
+== Preface
+
+This developer guide is automatically generated from the wiki pages at https://github.com/codenameone/CodenameOne/wiki[https://github.com/codenameone/CodenameOne/wiki].
+
+You can edit any page within the wiki pages using AsciiDoc. Your changes might make it (after review) into the  official documentation available on the web here: https://www.codenameone.com/manual/ and available as a PDF file here: https://www.codenameone.com/files/developer-guide.pdf[https://www.codenameone.com/files/developer-guide.pdf].
+
+Occasionally this book is updated to the print edition available here: https://www.amazon.com/dp/1549910035
+
+We also recommend that you check out the full https://www.codenameone.com/javadoc/[JavaDoc] reference for Codename One which is very complete.
+
+You can download the full Codename One source code from the https://github.com/codenameone/CodenameOne/[Codename One git repository] where you can also edit the JavaDocs and submit pull requests to https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html[include new features into Codename One].
+
+<<<
+
+**Authors**
+
+This document includes content from multiple authors and community wiki edits. If you edit pages within the guide feel free to add your name here alphabetized by surname:
+
+- https://github.com/codenameone/[Shai Almog]
+- https://github.com/Isborg[Ismael Baum]
+- https://twitter.com/ericcoolmandev[Eric Coolman]
+- http://github.com/chen-fishbein/[Chen Fishbein]
+- http://github.com/shannah/[Steve Hannah]
+- https://github.com/kheops37[Matt]
+
+<<<
+
+**Rights & Licensing**
+
+You may copy/redistribute/print this document without prior permission from Codename One. However, you may not charge for the document itself although charging for costs such as printing is permitted.
+
+Notice that while you can print and reproduce sections arbitrarily such changes must explicitly and clearly state that this is a modified copy and link to the original source at https://www.codenameone.com/manual/ in a clear way!
+
+<<<<
+
+**Conventions**
+
+This guide uses some notations to provide tips and further guidance.
+
+In case of further information that breaks from the current tutorial
+flow we use a sidebar as such:
+
+.Sidebar
+****
+Dig deeper into some details that don't quite fit into the current flow. We use sidebars for things that are an important detour, you can skip them while reading but you might want to come back and read them later.
+****
+
+Here are common conventions for highlighting notes:
+
+IMPORTANT: This is an important note
+
+TIP: This is a helpful tip
+
+NOTE: This is a general informational note, something interesting but not crucial
+
+WARNING: This is a warning something we should pay attention to
+
+#This# convention is used when we refer to a button or a widget to press in the UI. E.g. press the button labeled #Press Here#.
+
+Quotes are presented as:
+[quote,By Author]
+____
+This is a quote
+____
+
+*Bold* is used for light emphasis on a specific word or two within a sentence.
+
+<<<<
