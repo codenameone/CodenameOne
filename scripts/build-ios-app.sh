@@ -177,6 +177,18 @@ if [ -z "$PROJECT_DIR" ]; then
 fi
 bia_log "Found generated iOS project at $PROJECT_DIR"
 
+# --- Ensure a real UITest source file exists on disk ---
+UITEST_TEMPLATE="$SCRIPT_DIR/ios/tests/HelloCodenameOneUITests.swift.tmpl"
+UITEST_DIR="$PROJECT_DIR/HelloCodenameOneUITests"
+UITEST_SWIFT="$UITEST_DIR/HelloCodenameOneUITests.swift"
+if [ -f "$UITEST_TEMPLATE" ]; then
+  mkdir -p "$UITEST_DIR"
+  cp -f "$UITEST_TEMPLATE" "$UITEST_SWIFT"
+  bia_log "Installed UITest source: $UITEST_SWIFT"
+else
+  bia_log "UITest template missing at $UITEST_TEMPLATE"; exit 1
+fi
+
 # --- Ruby/gem environment (xcodeproj) ---
 if ! command -v ruby >/dev/null; then
   bia_log "ruby not found on PATH"; exit 1
@@ -214,6 +226,28 @@ unless ui_target
   ui_target = proj.new_target(:ui_test_bundle, ui_name, :ios, "18.0")
   ui_target.product_reference.name = "#{ui_name}.xctest"
   ui_target.add_dependency(app_target) if app_target
+end
+
+
+# Ensure a group and file reference exist, then add to the UITest target
+proj_dir   = File.dirname(proj_path)
+ui_dir     = File.join(proj_dir, ui_name)
+ui_file    = File.join(ui_dir, "#{ui_name}.swift")
+ui_group   = proj.main_group.find_subpath(ui_name, true)
+ui_group.set_source_tree("<group>")
+file_ref = ui_group.files.find { |f| File.expand_path(f.path, proj_dir) == ui_file }
+file_ref ||= ui_group.new_file(ui_file)
+ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.files_references.include?(file_ref)
+
+# A few safe build settings for CI/simulator
+%w[Debug Release].each do |cfg|
+  xc = ui_target.build_configuration_list[ cfg ]
+  next unless xc
+  xc.build_settings["SWIFT_VERSION"] = "5.0"
+  xc.build_settings["GENERATE_INFOPLIST_FILE"] = "YES"
+  xc.build_settings["CODE_SIGNING_ALLOWED"] = "NO"
+  xc.build_settings["CODE_SIGNING_REQUIRED"] = "NO"
+  xc.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] ||= "com.codenameone.examples.uitests"
 end
 
 proj.save
