@@ -274,6 +274,11 @@ scheme = Xcodeproj::XCScheme.new
 scheme.build_action.entries = []
 scheme.add_build_target(app_target) if app_target
 scheme.test_action = Xcodeproj::XCScheme::TestAction.new
+scheme.test_action.xml_element.elements.delete_all("EnvironmentVariables")
+envs = Xcodeproj::XCScheme::EnvironmentVariables.new
+envs.assign_variable(name: "CN1SS_OUTPUT_DIR", value: "__CN1SS_OUTPUT_DIR__", enabled: true)
+envs.assign_variable(name: "CN1SS_PREVIEW_DIR", value: "__CN1SS_PREVIEW_DIR__", enabled: true)
+scheme.test_action.environment_variables = envs
 scheme.test_action.xml_element.elements.delete_all("Testables")
 scheme.add_test_target(ui_target)
 scheme.launch_action.build_configuration = "Debug"

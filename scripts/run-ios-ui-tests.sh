@@ -85,6 +85,23 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
+# Patch scheme env vars to point to our runtime dirs
+SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
+if [ -f "$SCHEME_FILE" ]; then
+  if sed --version >/dev/null 2>&1; then
+    # GNU sed
+    sed -i -e "s|__CN1SS_OUTPUT_DIR__|$SCREENSHOT_RAW_DIR|g" \
+           -e "s|__CN1SS_PREVIEW_DIR__|$SCREENSHOT_PREVIEW_DIR|g" "$SCHEME_FILE"
+  else
+    # BSD sed (macOS)
+    sed -i '' -e "s|__CN1SS_OUTPUT_DIR__|$SCREENSHOT_RAW_DIR|g" \
+              -e "s|__CN1SS_PREVIEW_DIR__|$SCREENSHOT_PREVIEW_DIR|g" "$SCHEME_FILE"
+  fi
+  ri_log "Injected CN1SS_* envs into scheme: $SCHEME_FILE"
+else
+  ri_log "Scheme file not found for env injection: $SCHEME_FILE"
+fi
+
 auto_select_destination() {
   if ! command -v python3 >/dev/null 2>&1; then
     return
