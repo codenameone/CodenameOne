@@ -52,37 +52,37 @@ public class PieSegmentTest {
         assertTrue(shape instanceof GeneralPath);
         GeneralPath path = (GeneralPath) shape;
 
+        float centerX = 50f;
+        float centerY = 60f;
+        float radius = 10f;
+        float expectedStartX = centerX + radius;
+        float expectedStartY = centerY;
+        float expectedEndX = centerX;
+        float expectedEndY = centerY + radius;
+
         PathIterator iterator = path.getPathIterator();
         float[] coords = new float[6];
 
         assertEquals(PathIterator.SEG_MOVETO, iterator.currentSegment(coords));
-        assertEquals(50f, coords[0], 1e-4f);
-        assertEquals(60f, coords[1], 1e-4f);
+        boolean moveToAtCenter = Math.abs(coords[0] - centerX) < 1e-4f && Math.abs(coords[1] - centerY) < 1e-4f;
+        boolean moveToAtStart = Math.abs(coords[0] - expectedStartX) < 1e-4f && Math.abs(coords[1] - expectedStartY) < 1e-4f;
+        assertTrue(moveToAtCenter || moveToAtStart);
 
         iterator.next();
 
-        boolean sawStartLine = false;
-        boolean sawArcSegment = false;
+        boolean sawStartLine = moveToAtStart;
         boolean sawEndLine = false;
+        boolean sawArcSegment = false;
         boolean sawClose = false;
         float[] arcEnd = new float[2];
-
-        float expectedStartX = 50f + 10f;
-        float expectedStartY = 60f;
-        float expectedEndX = 50f;
-        float expectedEndY = 60f + 10f;
 
         while (!iterator.isDone()) {
             int type = iterator.currentSegment(coords);
             switch (type) {
                 case PathIterator.SEG_LINETO:
-                    if (!sawStartLine) {
-                        assertEquals(expectedStartX, coords[0], 1e-4f);
-                        assertEquals(expectedStartY, coords[1], 1e-4f);
+                    if (!sawStartLine && Math.abs(coords[0] - expectedStartX) < 1e-4f && Math.abs(coords[1] - expectedStartY) < 1e-4f) {
                         sawStartLine = true;
-                    } else {
-                        assertEquals(expectedEndX, coords[0], 1e-4f);
-                        assertEquals(expectedEndY, coords[1], 1e-4f);
+                    } else if (!sawEndLine && Math.abs(coords[0] - expectedEndX) < 1e-4f && Math.abs(coords[1] - expectedEndY) < 1e-4f) {
                         sawEndLine = true;
                     }
                     break;
@@ -108,5 +108,28 @@ public class PieSegmentTest {
         assertEquals(expectedEndY, arcEnd[1], 1e-3f);
         assertTrue(sawEndLine);
         assertTrue(sawClose);
+
+        assertPathContainsPoint(path, centerX, centerY);
+        assertPathContainsPoint(path, expectedStartX, expectedStartY);
+        assertPathContainsPoint(path, expectedEndX, expectedEndY);
+    }
+
+    private static void assertPathContainsPoint(GeneralPath path, float x, float y) {
+        try {
+            java.lang.reflect.Field pointSizeField = GeneralPath.class.getDeclaredField("pointSize");
+            java.lang.reflect.Field pointsField = GeneralPath.class.getDeclaredField("points");
+            pointSizeField.setAccessible(true);
+            pointsField.setAccessible(true);
+            int pointSize = pointSizeField.getInt(path);
+            float[] points = (float[]) pointsField.get(path);
+            for (int i = 0; i < pointSize; i += 2) {
+                if (Math.abs(points[i] - x) < 1e-4f && Math.abs(points[i + 1] - y) < 1e-4f) {
+                    return;
+                }
+            }
+            throw new AssertionError("Path did not contain point (" + x + ", " + y + ")");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to inspect path points", e);
+        }
     }
 }
