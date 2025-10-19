@@ -11,6 +11,7 @@ import com.codename1.charts.util.ColorUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -122,6 +123,7 @@ public class BarChartTest {
         assertEquals(15f, firstRect[3], 1e-6f);
 
         chart.recordedBars.clear();
+        chart.seedPreviousPoints(new ArrayList<Float>(firstSeriesPoints));
         List<Float> secondSeriesPoints = new ArrayList<Float>(Arrays.asList(5f, 10f));
         XYSeriesRenderer secondRenderer = (XYSeriesRenderer) renderer.getSeriesRendererAt(1);
         assertNotNull(secondRenderer);
@@ -163,6 +165,16 @@ public class BarChartTest {
             float minY = Math.min(yMin, yMax);
             float maxY = Math.max(yMin, yMax);
             recordedBars.add(new float[]{minX, minY, maxX, maxY});
+        }
+
+        void seedPreviousPoints(List<Float> previousPoints) {
+            try {
+                Field field = BarChart.class.getDeclaredField("mPreviousSeriesPoints");
+                field.setAccessible(true);
+                field.set(this, previousPoints);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Unable to seed previous series points", e);
+            }
         }
     }
 }

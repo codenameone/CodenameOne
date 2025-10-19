@@ -1,6 +1,7 @@
 package com.codename1.charts.views;
 
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 
 import org.junit.jupiter.api.Test;
@@ -45,22 +46,67 @@ public class PieSegmentTest {
     }
 
     @Test
-    public void testGetShapeCoversCircularArc() {
+    public void testGetShapeBuildsWedgePath() {
         PieSegment segment = new PieSegment(4, 12f, 0f, 90f);
         Shape shape = segment.getShape(50f, 60f, 10f);
         assertTrue(shape instanceof GeneralPath);
         GeneralPath path = (GeneralPath) shape;
 
-        float interiorRadius = 5f;
-        double interiorAngleRadians = Math.toRadians(45f);
-        float interiorX = 50f + (float) (interiorRadius * Math.cos(interiorAngleRadians));
-        float interiorY = 60f + (float) (interiorRadius * Math.sin(interiorAngleRadians));
-        assertTrue(path.contains(interiorX, interiorY));
+        PathIterator iterator = path.getPathIterator();
+        float[] coords = new float[6];
 
-        float exteriorRadius = 12f;
-        double exteriorAngleRadians = Math.toRadians(135f);
-        float exteriorX = 50f + (float) (exteriorRadius * Math.cos(exteriorAngleRadians));
-        float exteriorY = 60f + (float) (exteriorRadius * Math.sin(exteriorAngleRadians));
-        assertFalse(path.contains(exteriorX, exteriorY));
+        assertEquals(PathIterator.SEG_MOVETO, iterator.currentSegment(coords));
+        assertEquals(50f, coords[0], 1e-4f);
+        assertEquals(60f, coords[1], 1e-4f);
+
+        iterator.next();
+
+        boolean sawStartLine = false;
+        boolean sawArcSegment = false;
+        boolean sawEndLine = false;
+        boolean sawClose = false;
+        float[] arcEnd = new float[2];
+
+        float expectedStartX = 50f + 10f;
+        float expectedStartY = 60f;
+        float expectedEndX = 50f;
+        float expectedEndY = 60f + 10f;
+
+        while (!iterator.isDone()) {
+            int type = iterator.currentSegment(coords);
+            switch (type) {
+                case PathIterator.SEG_LINETO:
+                    if (!sawStartLine) {
+                        assertEquals(expectedStartX, coords[0], 1e-4f);
+                        assertEquals(expectedStartY, coords[1], 1e-4f);
+                        sawStartLine = true;
+                    } else {
+                        assertEquals(expectedEndX, coords[0], 1e-4f);
+                        assertEquals(expectedEndY, coords[1], 1e-4f);
+                        sawEndLine = true;
+                    }
+                    break;
+                case PathIterator.SEG_QUADTO:
+                case PathIterator.SEG_CUBICTO:
+                    sawArcSegment = true;
+                    int endIndex = type == PathIterator.SEG_QUADTO ? 2 : 4;
+                    arcEnd[0] = coords[endIndex];
+                    arcEnd[1] = coords[endIndex + 1];
+                    break;
+                case PathIterator.SEG_CLOSE:
+                    sawClose = true;
+                    break;
+                default:
+                    break;
+            }
+            iterator.next();
+        }
+
+        assertTrue(sawStartLine);
+        assertTrue(sawArcSegment);
+        assertEquals(expectedEndX, arcEnd[0], 1e-3f);
+        assertEquals(expectedEndY, arcEnd[1], 1e-3f);
+        assertTrue(sawEndLine);
+        assertTrue(sawClose);
     }
 }
