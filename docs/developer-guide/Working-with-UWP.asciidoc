@@ -1,0 +1,360 @@
+== Working with UWP
+
+UWP Apps may distributed in 2 different ways:
+
+. *In the Windows App Store*.  (This should be used for deployment of any production app).
+. *Outside of the Windows App Store* via sideloading directly onto a device.  This should only be used for development.
+
+=== Deploying Outside of the Windows App Store (Sideloading)
+
+UWP apps may be deployed directly to Windows 10 desktop and mobile devices without any need to involve the Windows Store.  This process is only realistic, though, for testing and debugging your app during development because it requires you to enable "Development" mode on the device.  In addition, installation is a little bit more complicated than simply downloading an app over the internet.  The process for deploying to Windows 10 *desktop* devices is different than the process for *mobile* devices.  These are described in the following sections.
+
+==== Side-loading to Windows 10 Mobile Devices
+
+===== Enabling Developer Mode on Device
+
+Before you can side-load apps onto your phone, you'll need to set up your phone for development.
+
+. In "Settings", select "Update & Security" > "For developers"
++
+image::img/developer-guide/uwp-mobile-settings-update-security.png[Updates & Security in UWP Mobile settings,scaledwidth=20%]
+image::img/developer-guide/uwp-mobile-settings-developer-mode.png[Developer mode in UWP Mobile settings,scaledwidth=20%]
+. Select "Developer mode"
+. Under "Device Discovery", make sure that the "Make your device visible to USB connections and your local network" is set to "On".
++
+image::img/developer-guide/uwp-mobile-settings-devicediscovery-on.png[Device discover on in UWP Mobile settings,scaledwidth=20%]
+. Make sure that "Device Portal" is set to "On"
++
+image::img/developer-guide/uwp-mobile-settings-deviceportal-on.png[Device Portal in UWP Mobile settings,scaledwidth=20%]
+. When you switch "Device Portal" to "On" it should show you an address that you can access the Phone at via wifi.  (E.g. https://10.0.1.11).  **Remember this address**, you're going to use it to install all of your apps onto the device.
++
+NOTE: This will be a local address within your local network.  It **won't** be available to the outside world.
+
+At this point, your phone should be ready to receive "Side-loaded" apps.  This was a one-time setup, so you shouldn't have to do it again, until you set up another device.
+
+===== Building App for UWP
+
+Now that your device is set up for development, you can proceed to build your app.
+
+. Select the "Mobile Debug Build" option in the UWP Codename One Settings.
++
+image::img/developer-guide/uwp-cn1settings-uwp.png[Windows panel of Codename One Settings,scaledwidth=40%]
+. Select the "Send Windows UWP Build" option in the Codename One menu of your IDE.  This will initiate the build on the Codename One build server.
++
+image::img/developer-guide/uwp-send-build.png[Send UWP Build,scaledwidth=20%]
+. Log into the Codename One dashboard to watch the build progress.  When it is complete, you'll be able to download the ".appxbundle" file to your desktop.
++
+image::img/developer-guide/uwp-dashboard-download-appxbundle.png[Download appxbundle file from dashboard,scaledwidth=20%]
++
+WARNING: You cannot simply download the .appxbundle file directly to your Windows Phone 10 mobile device and install it.  It will indeed allow you to download it, and will give you an option to install it, but the install will silently fail.
+
+===== Installing App On Device
+
+. Point your computer's web browser to the address for your mobile device.  (This is the address listed when you turned on the "Device Portal" in the "Enabling Developer Mode on Device" section above.  This will open the App Manager page.
+. Click on the "Apps" item in the left menu.
++
+image::img/developer-guide/uwp-app-manager-apps.png[UWP Apps Manager,scaledwidth=40%]
+. If this is the first time installing a UWP (debug) app on your device, you will need to install the dependencies. You can find the dependencies for mobile/ARM apps https://github.com/codenameone/cn1-binaries/tree/master/uwp/Dependencies/ARM[here].  You'll need to install both `Microsoft.NET.CoreRuntime.1.0.appx` and `Microsoft.VCLibs.ARM.Debug.14.00.appx`.  **If this is not the first time installing a UWP app, you can skip to the next step**.
+.. Under the "Install App" section, click the "Choose File" button and navigate through the file chooser to select the "Microsoft.NET.CoreRuntime.1.0.appx" file.  Then click "Go".
+.. Do the same for the "Microsoft.VCLibs.ARM.Debug.14.00.appx" file.
+. Under the "Install App" section, click the "Choose File" button and navigate through the file chooser to select the .appxbundle file for your app.
+. Once you have the appxbundle selected, you should press "Go" under the "Deploy" subheading.  This will install the app and, if all went well, your app will appear in the "Recently Added" section in the apps list of the phone.
++
+image::img/developer-guide/uwp-mobile-recently-added.png[UWP Recently added menu,scaledwidth=20%]
+
+==== Side-loading to Windows 10 Desktop Devices
+
+===== Enabling Developer Mode on PC
+
+The easiest way to be able to run your development apps on a Windows 10 PC is to enable developer mode.  This will allow you to install any app even if it is just "self-signed".
+
+To enable developer mode, open "Settings", then select "Updates an Security".  Under the "For Developers" menu item, select "Developer Mode" as shown below:
+
+image::img/developer-guide/uwp-pc-settings-developer-mode.png[UWP Windows 10 Developer Mode,scaledwidth=50%]
+
+===== Building the App
+
+Before building the app, you'll need to ensure that the build target is set to "Debug Desktop" in the Codename One Settings panel for Windows apps.
+
+Steps:
+
+. Open Codename One Settings (steps vary by IDE).  On Netbeans you will find "Codename One Settings" by right clicking your project's node in the project explorer, and look in the "Codename One" submenu:
++
+image::img/developer-guide/uwp-netbeans-codenameone-settings-menu.png[Codename One Settings menu in Netbeans,scaledwidth=20%]
+. Click on "Windows Settings":
++
+image::img/developer-guide/uwp-cn1settings-windows-settings-menu-item.png[Windows Settings menu item,scaledwidth=20%]
+. Under "Build Type", make sure that "Desktop Debug Build" is selected, as shown below:
++
+image::img/developer-guide/uwp-cn1settings-debug-desktop-selected.png[Desktop Debug Build Selected,scaledwidth=50%]
+. Save the changes by clicking the "Disk" icon in the upper right:
++
+image::img/developer-guide/uwp-cn1settings-disk-icon.png[Save icon,scaledwidth=2%]
+
+Now you can proceed to send the build to the build server.
+
+. Select the "Send Windows UWP Build" option in the Codename One menu of your IDE.  This will initiate the build on the Codename One build server.
++
+image::img/developer-guide/uwp-send-build.png[Send UWP Build,scaledwidth=20%]
+. Log into the Codename One dashboard to watch the build progress.  When it is complete, you'll be able to download the ".zip" file to the Windows 10 PC on which you wish to install the app.
++
+image::img/developer-guide/uwp-dashboard-download-appxbundle.png[Download appxbundle file from dashboard,scaledwidth=20%]
+
+===== Installing the App
+
+Start by extracting the .zip file.  (Navigate to the folder where the zip was downloaded, right click it, and select "Extract all" as shown below:
+
+.Extract UWP zip file
+image::img/developer-guide/uwp-extract-zip-file.png[Extract UWP zip file,scaledwidth=40%]
+
+After extraction, open the resulting directory.  You should see contents similar to the following:
+
+.UWP Zip file contents
+image::img/developer-guide/uwp-zip-file-contents.png[UWP Zip file contents,scaledwidth=40%]
+
+**Downloading Dependencies**
+
+If this is your first time installing a UWP app on this PC, you may need to add the dependencies before you can install.  You can download the dependencies https://github.com/codenameone/cn1-binaries/raw/master/uwp/Dependencies.zip[here].  Extract "Dependencies.zip" and copy the resulting "Dependencies" directory into the app install directory.  Your app install directory should now look like:
+
+.UWP Zip file contents with dependencies
+image::img/developer-guide/uwp-zip-contents-with-dependencies.png[UWP Zip file contents with dependencies,scaledwidth=30%]
+
+**Running the Powershell Script**
+
+We are *finally* at the point where we can run the installer.
+
+Right-click on the "Add-AppDevPackage" icon, and select "Run in Powershell", as shown:
+
+.UWP Install by run in powershell
+image::img/developer-guide/uwp-run-in-powershell.png[UWP Install by run in powershell,scaledwidth=30%]
+
+You may be prompted that you need to change the execution policy, in Powershell:
+
+.UWP Powershell change execution policy
+image::img/developer-guide/uwp-powershell-change-execution-policy.png[UWP Powershell change execution policy,scaledwidth=40%]
+
+Enter "Y" at the prompt to allow this.
+
+If all goes well, you should see a message saying that the app as successfully installed.
+
+.UWP Powershell app successfully installed
+image::img/developer-guide/uwp-powershell-success.png[UWP Powershell app successfully installed,scaledwidth=40%]
+
+And if you look in your "Windows Menu" under "All Apps", you should see your app listed there:
+
+.Windows 10 App listed in All Apps
+image::img/developer-guide/uwp-windows-10-start-menu-app-installed.png[Windows 10 App listed in All Apps,scaledwidth=15%]
+
+[[building-for-the-windows-store]]
+==== Building for the Windows Store
+
+If you want to be able to distribute your app to the public, the Windows Store is your best channel.  Building for the Windows store involves roughly 3 steps:
+
+. Reserve a name for your app in the Windows Store
+. Build your app using the "Windows Store Upload" build type.
+. Upload the resulting .appxupload file to the Windows store.
+
+Let's go through these steps in more detail.  Start https://developer.microsoft.com/en-us/windows/publish[here].
+
+.Publish windows apps webpage
+image::img/developer-guide/uwp-windows-store-publish.png[Publish windows apps webpage,scaledwidth=40%]
+
+If you don't already have an account, sign up for one.  Then log in.  Once logged in, you can click the "Dashboard" link on the toolbar.
+
+.Windows Store dashboard
+image::img/developer-guide/uwp-windows-store-dashboard.png[Windows Store dashboard,scaledwidth=40%]
+
+Under the "Your apps" section (on the left in the above screenshot), click the "Create new app" button.
+
+.Reserve name form
+image::img/developer-guide/uwp-windows-store-reserve-name.png[Reserve name form,scaledwidth=40%]
+
+Enter a name for your app, and click "Reserve app name".
+
+If the name was available, it should take you to the app overview page for your new app.   There's quite a few options there to play with, but we're not going to worry about any of them for now.  All we need to know is:
+
+. Your App's ID
+. Your App's Publisher ID
+
+You can get this information by scrolling down to the bottom of the "App overview" page and clicking the "View app identity details" under the "App Management" > "App identity" section:
+
+.App Identity section
+image::img/developer-guide/uwp-windows-store-app-identity.png[App Identity section,scaledwidth=40%]
+
+You'll see a page with the information we need shown below:
+
+.App identity details
+image::img/developer-guide/uwp-windows-store-wpp-identity-info.png[App identity details,scaledwidth=40%]
+
+The next step is to copy this information into your Codename One project.
+
+Open up the Codename One Settings for your project and go to the "Windows Settings" section.
+
+Copy and paste the "Package/Identity/Name" and "Package/Properties/PublisherDisplayName" values from the windows store into the "App ID" and "Publisher Display Name" fields respectively.
+
+WARNING: It is important that your App ID and Publisher Display Name match exactly what you have in the store, or your app will fail at the validation stage when you try to upload your app to the store.
+
+Next, click on the "Generate" button next to the Certificate field.
+
+This will open a dialog titled "Certificate Generator".  Paste the value from the "Package/Identity/Publisher" listed in the Windows Store into the Publisher ID field as shown below:
+
+.Certificate Generator
+image::img/developer-guide/uwp-certificate-generator.png[Certificate Generator,scaledwidth=20%]
+
+Then click OK.  This will generate a .pfx file inside your project folder.
+
+The "Display Name" must also match that app name in the store.
+
+Finally, make sure that "Windows Store Upload" is selected in the "Build Type" field.  For the example above, my settings form looks like the following screenshot when I am done.
+
+.Settings for Windows Store uploads
+image::img/developer-guide/uwp-store-upload-settings.png[Settings for Windows Store uploads,scaledwidth=40%]
+
+When you are done, hit the "Save" icon in the upper right corner of the window to save your changes.
+
+Finally, select "Codename One" > "Send Windows UWP Build" in your IDE's project explorer.
+
+This will produce an .appxupload file that you can upload to the Windows Store.
+
+See the https://msdn.microsoft.com/en-us/windows/uwp/publish/upload-app-packages[Microsoft's documentation on uploading app packages] for more information on the remaining steps.
+
+////
+==== Custom Builds
+
+TODO
+
+==== Build Hints
+
+TODO
+////
+
+=== Debugging UWP Apps
+
+On most platforms, there is a device log that records errors, exceptions, and messages written to STDOUT.  UWP, unfortunately, doesn't seem to provide this.  If you are running on Windows Phone 10, there doesn't seem to be any device log at all.  There is a separate program called "Field Medic" that you can use to do some logging, but it doesn't capture application errors or STDOUT messages.
+
+The best way to debug apps on device is to enable crash protection in your app.  This can be enabled by adding the following  to your app's `init()` method:
+
+[source,java]
+-----
+Log.bindCrashProtection(true);
+-----
+
+With crash protection enabled, you'll receive an email whenever an exception is thrown that isn't caught in your application code.  The email will include the stack trace of the error along with any output you had previously provided using the `com.codename1.io.Log` class (e.g. `Log.p()` and `Log.e()`).
+
+NOTE: A Pro account (or higher) is required to receive crash protection emails.
+
+==== No Line Numbers in Stack Traces
+
+One major annoyance of UWP is that it doesn't provide line numbers in its stack traces.  Here is what you can expect to see in a stack trace:
+
+-----
+[EDT] 0:0:7,683 - Results null
+[EDT] 0:0:7,799 - Exception: java.lang.NullPointerException - null
+   at com.codename1.ui.Display.invokeAndBlock(Runnable r, Boolean dropEvents)[EDT] 0:0:7,815 - Exception in AppName version 1.1
+[EDT] 0:0:7,830 - OS win
+[EDT] 0:0:7,836 - Error java.lang.NullPointerException
+[EDT] 0:0:7,836 - Current Form null
+[EDT] 0:0:7,836 - Exception: java.lang.NullPointerException - null
+at System.Environment.GetStackTrace(Exception e, Boolean needFileInfo)
+   at System.Environment.get_StackTrace()
+   at UWPApp.IKVMReflectionHelper.getCurrentStackTrace()
+   at java.lang.ThrowableHelper.getCurrentStackTrace()
+   at java.lang.Throwable..ctor()
+   at java.lang.Exception..ctor()
+   at java.lang.RuntimeException..ctor()
+   at java.lang.NullPointerException..ctor()
+   at java.lang.Throwable.__mapImpl(Exception )
+   at IKVM.Internal.ExceptionHelper.MapException[T](Exception x, Boolean remap, Boolean unused)
+   at IKVM.Runtime.ByteCodeHelper.MapException[T](Exception x, MapFlags mode)
+   at com.codename1.ui.Display.invokeAndBlock(Runnable r, Boolean dropEvents)
+   at com.codename1.ui.Display.invokeAndBlock(Runnable r)
+   at com.codename1.impl.SilverlightImplementation.editString(Component n1, Int32 n2, Int32 n3, String n4, Int32 n5)
+   at com.codename1.impl.CodenameOneImplementation.editStringImpl(Component cmp, Int32 maxSize, Int32 constraint, String text, Int32 initiatingKeycode)
+   at com.codename1.ui.Display.editString(Component cmp, Int32 maxSize, Int32 constraint, String text, Int32 initiatingKeycode)
+   at com.codename1.ui.Display.editString(Component cmp, Int32 maxSize, Int32 constraint, String text)
+   at com.codename1.ui.TextArea.editString()
+   at com.codename1.ui.TextArea.pointerReleased(Int32 x, Int32 y)
+   at com.codename1.ui.TextField.pointerReleased(Int32 x, Int32 y)
+   at com.codename1.ui.Form.pointerReleased(Int32 x, Int32 y)
+   at com.codename1.ui.Component.pointerReleased(Int32[] x, Int32[] y)
+   at com.codename1.ui.Display.handleEvent(Int32 offset)
+   at com.codename1.ui.Display.edtLoopImpl()
+   at com.codename1.ui.Display.mainEDTLoop()
+   at com.codename1.ui.RunnableWrapper.run()
+   at com.codename1.impl.CodenameOneThread.run()
+   at java.lang.Thread.threadProc2()
+   at java.lang.Thread.threadProc()
+   at java.lang.Thread.1.Invoke()
+   at com.codename1.impl.NativeThreadImpl.<>c__DisplayClass6_0.<init>b__0()
+   at System.Threading.Tasks.Task.InnerInvoke()
+   at System.Threading.Tasks.Task.Execute()
+   at System.Threading.Tasks.Task.ExecutionContextCallback(Object obj)
+   at System.Threading.ExecutionContext.Run(ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot)
+   at System.Threading.Tasks.Task.ExecuteEntry(Boolean bPreventDoubleExecution)
+   at System.Threading.Tasks.ThreadPoolTaskScheduler.LongRunningThreadWork(Object obj)
+   at System.Threading.ThreadHelper.ThreadStart_Context(Object state)
+   at System.Threading.ExecutionContext.Run(ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.ThreadHelper.ThreadStart(Object obj)
+Originating from:
+Message=Object reference not set to an instance of an object.
+   at com.propertycross.codename1.PropertyCross.1.run()
+   at com.codename1.ui.Display.processSerialCalls()
+   at com.codename1.ui.Display.edtLoopImpl()
+   at com.codename1.ui.Display.invokeAndBlock(Runnable r, Boolean dropEvents)
+-----
+
+It will show you the call stack with the names of the methods.  But it won't show you the line numbers.  If the stack trace isn't specific enough, you can add `Log.p()` statements in various positions in my code to help narrow down the source of the exception.
+
+=== Customizing the Status Bar
+
+On mobile, the status bar (the bar across the top of the screen with the time, battery level etc...) is updated each time a form is shown.  The foreground color, background color, and background opacity are set using the unselected style of the form being shown.
+
+You can override these colors application-wide using the following display properties:
+
+. `windows.StatusBar.ForegroundColor`  - A string representation of an integer RGB color.
+. `windows.StatusBar.BackgroundColor` - A string representation of an integer RGB color.
+. `windows.StatusBar.BackgroundTransparency` - A string representation of 0-255 integer.
+
+e.g.
+
+----
+Display d = Display.getInstance();
+d.setProperty("windows.StatusBar.ForegroundColor", String.valueOf(0xff0000));  // red
+d.setProperty("windows.StatusBar.BackgroundColor", String.valueOf(0xffffff));  // white
+d.setProperty("windows.StatusBar.BackgroundOpacity", String.valueOf(255));  // fully opaque
+----
+
+=== Associating App with File Types
+
+It is possible to associate your application with file types on UWP using the standard Codename One "AppArg" method in conjunction with the `windows.extensions` build hint.  Any content you place in the `windows.extensions` build hint will be embedded inside the `<Extensions/>` section of the Package.appxmanifest file.  Then if the app is opened as a result of the user opening a file of the specified type, then the path to that file will be made available to the app via  `Display.getProperty("AppArg")`.
+
+**Example `windows.extensions` Value**:
+
+The following value would associate the app with the file extension ".alsdk".  This example is taken from https://msdn.microsoft.com/vi-vn/windows/uwp/launch-resume/handle-file-activation?f=255&MSPPError=-2147217396[this MSDN document].
+
+----
+<uap:Extension Category="windows.fileTypeAssociation">
+  <uap:FileTypeAssociation Name="alsdk">
+    <uap:Logo>images\icon.png</uap:Logo>
+    <uap:SupportedFileTypes>
+      <uap:FileType>.alsdk</uap:FileType>
+    </uap:SupportedFileTypes>
+  </uap:FileTypeAssociation>
+</uap:Extension>
+----
+
+To register your app to be able to handle PDFs, you would add:
+
+----
+<uap:Extension Category="windows.fileTypeAssociation">
+    <uap:FileTypeAssociation Name="pdf">
+        <uap:Logo>images\icon.png</uap:Logo>
+        <uap:SupportedFileTypes>
+            <uap:FileType ContentType="application/pdf">.pdf</uap:FileType>
+        </uap:SupportedFileTypes>
+    </uap:FileTypeAssociation>
+</uap:Extension>
+----
+
+For more information about using the "AppArg" property, see https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html[this blog post] which describes its usage on iOS and Android for intercepting URL types.

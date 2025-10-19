@@ -1,0 +1,247 @@
+== Security
+
+Security is a "big word". It implies many things and that is also true for the mobile app development so before we get started lets try to define the scope of security.
+
+We will deal only with application security and its communication mechanisms while ignoring everything beyond that scope. Let's start with a simple fact:
+
+____
+Codename One applications are secure on the devices by the nature of the mobile OS security.
+____
+
+For most intents and purposes this will be enough, unless you are specifically concerned about security this section isn't for you. Mobile OS's isolate applications from one another so it's hard for an application to damage the OS or even damage/spy on a different app.
+
+The restrictions laid on apps are here to make them extra secure and on top of that Codename One lays a few big advantages in terms of security:
+
+- Codename One code is compiled (unlike e.g. PhoneGap/Cordova)
+- We obfuscate by default which makes the binaries harder to reverse engineer
+- We compile the UI to native code too which means typical reverse engineering code will have a harder time following
+- We disable debug flags so a hacker won't be able to debug your production app on the device
+
+Despite that you still need to keep in mind that the binary could still be reverse engineered and so it is important to avoid storing keys in the client side code. E.g. if you have an API key to access a service (e.g. Google Cloud key) it needs to be stored in your server and not as a constant in your app!
+
+Each section below discusses some attack vectors against applications and how they can be stopped. Pretty much all of these attacks require a very sophisticated attacker which will only exist for high value targets (e.g. bank apps, government etc.).
+
+=== Constant Obfuscation
+
+One of the first things a hacker will do when compromising an app is look at it. E.g. if I want to exploit a bank's login UI I would look at the label next to the login and then search for it in the decompiled code. So if the UI has the String "enter user name and password" I can search for that.
+
+It won't lead directly to a hack or exploit but it will show you the approximate area of the code where we should look and it makes the first step that much easier. Obfuscation helps as it removes descriptive method names but it can't hide the Strings we use in constants. If an app has a secret key within obfuscating it can make a difference (albeit a slight difference).
+
+Notice that this is a temporary roadblock as any savvy hacker would compile the app and connect a debugger eventually (although this is blocked in release builds) and would be able to inspect values of variables/flow. But the road to reverse engineering the app would be harder even with a simple xor obfuscation.
+
+NOTE: We're not calling this encoding or encryption since it's neither. It's a simple obfuscation of the data
+
+There are two simple methods in the `Util` class:
+
+[source,java]
+----
+public static String xorDecode(String s);
+public static String xorEncode(String s);
+----
+
+They use a simple xor based obfuscation to make a String less readable. E.g. if you have code like this:
+
+[source,java]
+----
+private static final String SECRET = "Don't let anyone see this....";
+----
+
+You might be concerned about the secret, then this would make it slightly harder to find out:
+
+[source,java]
+----
+// Don't let anyone see this....
+private static final String SECRET = Util.xorDecode("RW1tI3Ema219KmpidGFhdTFhdnE1Yn9xajQ1MjM=");
+----
+
+Notice that this is **not secure**, if you have a crucial value that must not be found you need to store it in the server. There is no alternative as everything that is sent to the client can be compromised by a determined hacker
+
+TIP: Use the comment to help you find the string in the code
+
+Our builtin user specific constants are obfuscated with this method, e.g. normally an app built with Codename One carries some internal data such as the user who built the app etc. This is obfuscated now. We built this small app to encode strings easily so we can copy and paste them into our app easily:
+
+[source,java]
+----
+Form hi = new Form("Encoder", BoxLayout.y());
+TextField bla = new TextField("", "Type Text Here", 20, TextArea.ANY);
+TextArea encoded = new TextArea();
+SpanLabel decoded = new SpanLabel();
+hi.addAll(bla, encoded, decoded);
+bla.addDataChangedListener((a, b) -> {
+    String s = bla.getText();
+    String e = Util.xorEncode(s);
+    encoded.setText(e);
+    decoded.setText(Util.xorDecode(e));
+    hi.getContentPane().animateLayout(100);
+});
+
+hi.show();
+----
+
+This allows you to type in the first text field and the second text area shows the encoded result. We used a text area so copy/paste would be easy.
+
+For your convenience this app can be accessed here: https://www.codenameone.com/demos/StringEncoder/index.html
+
+
+=== Storage Encryption
+
+Codename One had support for bouncy castle encryption for quite a while but it's not as intuitive as we'd like it to be. This makes
+securing/encrypting your app more painful than it should.
+
+Codename One supports full encryption of the `Storage` (notice the distinction, `Storage` is not `FileSystemStorage`).
+This is available by installing the bouncy castle cn1lib from the extensions menu then using one line of code
+
+[source,java]
+----
+EncryptedStorage.install("your-pass-encryption-key");
+----
+
+TIP: Normally you would want that code within your `init(Object)` method
+
+Notice that you can't use storage or preferences to store this data as it would be encrypted (`Preferences` uses
+`Storage` internally). You can use a password for this key and it would make it way more secure **but** if a user
+changes his password you might have a problem. In that case you might need the old password to migrate to
+a new password.
+
+This works thru a new mechanism in storage where you can replace the storage instance with another instance using:
+
+[source,java]
+----
+Storage.setStorageInstance(new MyCustomStorageSubclass());
+----
+
+We can leverage that knowledge to change the encryption password on the encryption storage using pseudo code like this:
+
+[source,java]
+----
+EncryptedStorage.install(oldKey);
+InputStream is = Storage.getInstance().createInputStream(storageFileName);
+byte[] data = Util.readInputStream(is);
+EncryptedStorage.install(newKey);
+OutputStream o = Storage.getInstance().createOutputStream("TestEncryption");
+o.write(data);
+o.close();
+----
+
+NOTE: It's not a good idea to replace storage objects when an app is running so this is purely for this special case...
+
+If you use preferences it might be a good idea to set their builtin location to a different path using something like `Preferences.setPreferencesLocation("EncryptedPreferences");`.
+
+This is useful as it prevents the encrypted preferences from colliding with the regular preferences.
+
+=== Disabling Screenshots
+
+One of the common security features some apps expect is the ability to block a screenshot. In the past apps like snapchat required that you touch the screen to view a photo to block the ability to grab a screenshot (on iOS). This no longer works...
+
+Blocking screenshots is an Android specific feature that can't be implemented on iOS. This is implemented by classifying the app window as secure and you can do that via the build hint `android.disableScreenshots=true`. Once that is added screenshots should no longer work for the app, this might impact other things as well such as the task view which will no longer show the screenshot either.
+
+=== Blocking Copy & Paste
+
+Blocking copy & paste is useful for cases where a device might have spyware installed that monitors the clipboard. This also prevents a user from using a password manager (which usually rely on the clipboard), those managers could be compromised and thus if you are building a very secure app this might be necessary.
+
+You can block copy & paste on Android & iOS. Blocking of copy & paste can be implemented globally or on a specific field.
+
+To block copy & paste globally use:
+
+[source,java]
+----
+Display.getInstance().setProperty("blockCopyPaste", "true");
+----
+
+To block copy & paste on a specific field do:
+
+[source,java]
+----
+textCmp.putClientProperty("blockCopyPaste", Boolean.TRUE);
+----
+
+NOTE: Notice that the inverse of using `false` might not work as expected
+
+=== Blocking Jailbreak
+
+iOS & Android are walled gardens which is both a blessing and a curse. Looking at the bright side the walled garden aspect of locked down devices means the devices are more secure by nature. E.g. on a PC that was compromised we can detect the banking details of a user logging into a bank. But on a phone it would be much harder due to the deep process isolation.
+
+This isn't true for jailbroken or rooted devices. In these devices security has been compromised often with good intentions (opening up the ecosystem) but it can also be used as a step in a serious attack on an application!
+
+For obvious reasons it's really hard to accurately detect a jailbroken or rooted device but when possible if you have a high security app you might want to block the functionality or even raise a "silent alarm" in such a case. To detect this you can use the `isJailbrokenDevice` method as such:
+
+[source,java]
+----
+if(Display.getInstance().isJailbrokenDevice()) {
+    // probably jailbroken or rooted
+} else {
+   // probably not
+}
+----
+
+Notice that this isn't accurate, we can't be 100% sure as there are no official ways to detect jailbreak. That is why it's crucial to encrypt everything and assume the device was compromised to begin with when dealing with very sensitive data. Still it's worthwhile to use these API's to make the life of an attacker just a little bit harder.
+
+=== Strong Android Certificates
+
+When Android launched RSA1024 with SHA1 was considered strong enough for the foreseeable future, this hasn't changed completely but the recommendation today is to use stronger cyphers for signing & encrypting as those can be compromised.
+
+APK's are signed as part of the build process when we upload an app to the Google Play Store. This process seems redundant as we generate the signature/certificate ourselves (unlike Apple which generates it for us). However, this is a crucial step as it allows the device to verify upgrades and make sure a new update is from the same original author!
+
+This means that if a hacker takes over your account on Google Play, he still won't be able to ship fake updates to your apps without your certificate. That's important since if a hacker would have access to your certificate he could create an app update that would just send him all the users private information e.g. if you are a bank this could be a disaster.
+
+Android launched with RSA1024/SHA1 as the signing certificates. This was good enough at the time and is still pretty secure. However, these algorithms are slowly eroding and it is conceivable that within the 10-15 year lifetime of an app they might be compromised using powerful hardware. That is why Google introduced support for stronger cryptographic signing into newer versions of Android and you can use that.
+
+==== The Bad News
+
+There is a downside...
+
+Google only introduced that capability in Android 4.3 so using these new keys will break compatibility with older devices. If you are building a highly secure app this is probably a tradeoff you should accept. If not this might not be worth it for some theoretical benefit.
+
+Furthermore, if your app is already shipping you are out of luck. Due to the obvious security implications once you shipped an app the certificate is final. Google doesn't provide a way to update the certificate of a shipping app. Thus this feature only applies to apps that aren't yet in the play store.
+
+==== The Good
+
+If you are building a new app this is pretty easy to integrate and requires no changes on your part. Just a new certificate. You can generate the new secure key using instructions in articles like https://guardianproject.info/2015/12/29/how-to-migrate-your-android-apps-signing-key/[this one].
+
+If you are using #Codename One Setting# you can check the box to generate an SHA512 key which will harden the security for the APK.
+
+=== Certificate Pinning
+
+When we connect to HTTPS servers our networking code checks the certificate on the server. If the certificate was issued by a trusted certificate authority then the connection goes thru otherwise it fails. Let's imagine a case where I'm sitting in a coffee shop connected to the local wifi, I try to connect to gmail to check my email. Since I use HTTPS to Google I trust my connection is secure.
+
+TIP: What if the coffee shop was hacked and the router is listening in on everything?
+
+So HTTPS is encrypted and the way encryption works is thru the certificate. The server sends me a certificate and we can use that to send encrypted data to it.
+
+TIP: What if the router grabs the servers certificate and communicates with Google in my name?
+
+This won't work since the data we send to the server is encrypted with the certificate from the server.
+
+TIP: So what if the router sends its own "fake certificate"?
+
+That won't work either. All certificates are signed by a "certificate authority" indicating that a google.com certificate is valid.
+
+TIP: What if I was able to get my fake certificate authorized by a real certificate authority?
+
+**That's a problem!**
+
+It's obviously hard to do but if someone was able to do this he could execute a "man in the middle" attack as described above. People were able to fool certificate authorities in the past and gain fake certificates using various methods so this is possible and probably doable for any government level attacker.
+
+==== Certificate Pinning
+
+This is the attack certificate pinning (or SSL pinning) aims to prevent. We code into our app the "fingerprint" of the certificate that is "good" and thus prevent the app from working when the certificate is changed. This might break the app if we replace the certificate at some point but that might be reasonable in such a case.
+
+To do this we have a https://github.com/codenameone/SSLCertificateFingerprint/[cn1lib]. that fetches the certificate fingerprint from the server, we can just check this fingerprint against a list of "authorized" keys to decide whether it is valid. You can install the `SSLCertificateFingerprint` from the extensions section in #Codename One Settings# and use something like this to verify your server:
+
+[source,java]
+----
+if(CheckCert.isCertCheckingSupported()) {
+    String f = CheckCert.getFingerprint(myHttpsURL);
+    if(validKeysList.contains(f)) {
+        // OK it's a good certificate proceed
+    } else {
+       if(Dialog.show("Security Warning", "WARNING: it is possible your commmunications are being tampered! We suggest quitting the app at once!", "Quit", "Continue")) {
+          Display.getInstance().exitApplication();
+       }
+    }
+} else {
+    // certificate fingerprint checking isn't supported on this platform... It's your decision whether to proceed or not
+}
+----
+
+Notice that once connection is established you don't need to verify again for the current application run.

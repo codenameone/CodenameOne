@@ -1,0 +1,118 @@
+== Video Capture Constraints API
+
+The new video capture constraints API allows you to specify "constraints" when capturing videos.  Constraints include:
+
+1. Video Quality (High or Low)
+2. Maximum duration
+3. Maximum file size
+4. Video Resolution (i.e. width and height).
+
+Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime.  Essentially, you set your "preferred" constraints, and the API will give you its best attempt at meeting those constraints.  This is similar to setting a visual Component's preferred width and height.  The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
+
+=== Example 1: Capturing a Low-Quality 5-Second Clip
+
+Suppose we want to allow the user to capture a short (5 second) clip, in a low resolution, appropriate for sharing on a social media platform.  We create our `VideoCaptureConstraints` object as follows:
+
+[source,java]
+----
+VideoCaptureConstraints cnst = new VideoCaptureConstraint()
+    .preferredQuality(VideoCaptureConstraints.QUALITY_LOW)
+    .preferredMaxLength(5);
+----
+
+This constraint can then be passed to `Capture.captureVideo()` to obtain the captured file.
+
+[source,java]
+----
+String videoPath = Capture.captureVideo(cnst);
+----
+
+=== Not all platforms support all constraints
+
+So how do we know if our constraints will be obeyed?  If the platform doesn't support the max length, constraint, we may want to do something different.  We can find out if a constraint is supported by simply asking out constraint object.
+
+E.g.
+
+[source,java]
+----
+if (cnst.isMaxLengthSupported()) {
+    // The max length constraint that we specified is supported on this platform.
+} else{
+    // The max length constraint is NOT supported.
+    // Check the effective max length constraint value to see if it may be partially
+    // supported
+    int effectiveMaxLength = cnst.getMaxLength();
+    if (effectiveMaxLength == 0) {
+        // Max length is not supported at all... the user will be able 
+        // to capture a video without duration restrictions
+    } else {
+        // Max length was set to some different value than we set in our 
+        // preferredMaxLength, but the platform is at least trying to accommodate us.
+    }
+}
+----
+
+You can probe a constraint to see whether the entire constraint is supported (i.e will be obeyed), or whether any particular aspect of it will be supported using the following methods:
+
+* `isSupported()` - True if all preferred constraints are supported.
+* `isQualitySupported()` - True if the preferred quality setting is supported.
+* `isMaxLengthSupported()` - True if the max length setting is supported.
+* `isMaxFileSizeSupported()` - True if the max file size setting is supported.
+* `isSizeSupported()` - True if the specified preferred width and height constraints are supported.
+
+=== Example 2: Specifying Explicit Width and Height
+
+Suppose we want to capture a video with resolution 320x240.  We would begin with this constraint:
+
+[source,java]
+----
+VideoCaptureConstraints cnst = new VideoCaptureConstraints()
+    .preferredWidth(320)
+    .preferredHeight(240);
+----
+
+Explicit width and height constraints currently aren't well supported across platforms.  Android doesn't support them at all.  iOS supports only 3 specific sizes.  Javascript supports it when running on a desktop browser or on Android - but not on iOS.  Etc..
+
+So let's find out if this constraint will be obeyed.
+
+[source,java]
+----
+if (cnst.isSizeSupported()) {
+   // Yay! This platform supports our constraint, so the captured video will
+   // be exactly 320x240.
+} else {
+   // Not supported... let's see if the platform will at least try to accommodate us
+   int effectiveWidth = cnst.getWidth();
+   int effectiveHeight = cnst.getHeight();
+   int quality = cnst.getQuality();
+   if (effectiveWidth == 0 && effectiveHeight == 0) {
+       // This platform has no control over width and height
+       // In many cases it will try to at least set the quality approximate
+       if (quality != 0) {
+          //  The platform set the quality for us to try to comply.
+          // Since 320x240 is pretty small, the quality would probably
+          // be set to QUALITY_LOW
+       }
+   } else {
+       // The platform couldn't capture at 320x240, but it has provided an
+       // alternate size that is as close to that as possible.
+   }
+}
+----
+
+=== Constraint Support By Platform
+
+
+[width="100%",options="header,footer"]
+|====================
+| Platform | Size  |  Quality | Max Length |  Max File Size
+| iOS | Limited | Yes | Yes |  No
+| Android | No*  | Yes | Yes | Yes  
+| Simulator/JavaSE | No | No | No |  No
+| UWP | No* | Yes | Yes |  No
+| Javascript (Desktop) | Yes | Yes | Yes |  No
+| Javascript (Android) | Yes | Yes | Yes |  No 
+| Javascript (iOS) | Yes | Yes | Yes |  No
+|====================
+`*` If size is specified, the platform will attempt to translate to the appropriate quality constraint.
+

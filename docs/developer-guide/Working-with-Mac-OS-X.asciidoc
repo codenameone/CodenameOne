@@ -1,0 +1,109 @@
+== Working with Mac OS X
+
+=== Mac OS Desktop Build Options
+
+You can configure Desktop Mac OS build settings, by opening Codename One Settings, and clicking the "Mac Desktop Settings" button:
+
+.Mac Desktop settings
+image::img/developer-guide/mac-desktop-settings-button.png[Mac Desktop settings,scaledwidth=30%]
+
+This will bring you to the following form:
+
+.Mac Desktop settings form
+image::img/developer-guide/mac-desktop-settings-form.png[Mac Desktop settings form,scaledwidth=30%]
+
+Here you can provide your certificate(s) as a .p12 file, and select a bundle type.
+
+==== Bundle Types
+
+There are three bundle types which dictate what the build server produces for you when you build your project as a Desktop Mac OS  App.
+
+. **DMG** - Produces a .DMG disk image with your app.  This is the preferred format for distributing your app outside of the Mac Appstore.  If you provide a Developer ID Application certificate (see "Understanding Certificates" below), this the app will be signed so that users won't receive warnings about "Unidentified developer" when they install your app.
+. **Sandboxed DMG** - Same as **DMG** bundle type except that your app is set up to use the app sandbox.  Generally this would be used to test an app that is being distributed via the Appstore, since Appstore apps *must* use the sandbox.  If you select this bundle type, you are *required* to provide a Mac App Distribution Certificate, and you should additionally specify entitlements required for your app to function properly.   For more information about the app sandbox, see https://developer.apple.com/app-sandboxing/[Apple's documentation on the subject].
+. **Mac Appstore Upload (PKG)** - Produces a .PKG file that you can upload to the Mac appstore.  This requires that you provide *both* a Mac App Distribution certificate, and a Mac App Installer certificate (see "Understanding Certificates" below).  Both of these certificates should be embedded into a single .p12 file (See "Exporting Certificates as p12" below).
+
+====  Understanding Mac Certificates
+
+WARNING: Currently (as of Jan. 5, 2020) the `mac.desktop-vm` build hint is ignored if you include a certificate with your app.  This limitation should be fixed soon.
+
+For the purposes of Mac application distribution, there are 3 types of certificates that we will be interested in.  The type(s) of certificate required will depend on the type of bundle you generate.  The certificate types are:
+
+. **Developer ID Application Certificate (Mac applications)**
++
+This type of certificate is used to sign an app to be distributed *outside* of the Mac Appstore as a DMG image.  This corresponds to the "DMG" bundle type in Codename one settings.  You can easily identity this kind of certificate because its identity will be of the form "Developer ID Application: YOUR COMPANY NAME (SOMECODE)".  E.g. Developer ID Application: Acme Widgets Corp. (XYSD5YF).
+. **Mac App Distribution Certificate (Mac Appstore)**
++
+This type of certificate is used to sign the .app bundle for an app that is to be distributed in the Mac Appstore.  This certificate is required for both the "Sandboxed DMG", and "Mac Appstore Upload (PKG)" bundle types.  You can easily identify this kind of certificate because its identity will be of the form "3rd Party Mac Developer Application: YOUR COMPANY NAME (SOMECODE)".  E.g. 3rd Party Mac Developer Application: Acme Widgets Corp. (XYSD5YF).
+. **Mac App Installer Certificate (Mac Appstore)**
++
+This type of certificate is used to sign the .pkg installer for an app that is being submitted to the Mac Appstore.  This certificate is required for the "Mac Appstore Upload (PKG)" bundle type only.  You can easily identify this kind of certificate because its identity will be of the form "3rd Party Mac Developer Installer: YOUR COMPANY NAME (SOMECODE)".  E.g. 3rd Party Mac Developer Installer: Acme Widgets Corp. (XYXD5YF).
+
+==== Obtaining Certificates
+
+NOTE: Apple provides documentation on obtaining certificates https://developer.apple.com/library/content/documentation/IDEs/Conceptual/AppDistributionGuide/MaintainingCertificates/MaintainingCertificates.html#//apple_ref/doc/uid/TP40012582-CH31-SW6[on its website] but the process described there involves Xcode.  This section describes an alternate process that doesn't require Xcode.
+
+If you have an Apple developer account, you can manage your certificates https://developer.apple.com/account/mac/certificate[here].
+
+.Mac Developer portal certificates
+image::img/developer-guide/mac-developer-certificates.png[Mac Developer portal certificates,scaledwidth=30%]
+
+The screenshot above shows an account that already has the three kinds of certificates we will require:
+
+. **Developer ID Application** - Used for the DMG bundle type.
+. **Mac App Distribution** - Used for the Sandboxed DMG and Mac Appstore Upload (PKG) bundle types.
+. **Mac App Installer** - Used for the Mac Appstore Upload (PKG) bundle type.
+
+If your account doesn't yet have a certificate of the required type, you should begin by pressing the "+" button in the upper right.  This will bring you to a page asking "What type of Certificate do you need?".  There are only two options on this page that we'll be interested in:
+
+.Creating a new certificate
+image::img/developer-guide/mac-developer-guide-what-type-of-certificate.png[Creating a new certificate,scaledwidth=30%]
+
+. **Production > Mac App Store** - For both the Mac App Distribution and Mac App Installer certificates.
+. **Production > Developer ID** - For the Developer ID Application certificate.
+
+Select the option corresponding to the certificate you wish to generate.  In either case, you'll be taken to a form to select whether you want an "Installer" certificate or an "Application" certificate.  Select the appropriate type.
+
+You will then be prompted to upload a Certificate Signing Request (CSR) file, and it will provide instructions on how to do this via the Keychain app.
+
+TIP: You can reuse the same CSR file for generating all 3 certificates.
+
+After generating the certificates, you should download them to your Mac, and import them into your keychain.  You should be able to accomplish this by simply double-clicking the downloaded ".cer" file, and following the prompts.
+
+==== Exporting Certificates as P12
+
+NOTE: The following section requires access to a Mac, and assumes that you have already generated your 3 certificates
+
+Notice that Mac apps may require three different kinds of certificates, yet the settings page only provides space for a single certificate (P12) file.  This is not a mistake.  P12 files may contain more than one certificate, and you are expected to include all of the certificates that the build server may require inside a single P12.  The build server will automatically extract the certificates it needs according to the bundle type.
+
+When building the "DMG" bundle type, the build server will look for a "Developer ID Application Certificate" inside the P12.  If one is found, it will be used to sign the app bundle.
+
+The "Sandboxed DMG" target will look for a "Mac App Distribution Certificate" certificate in the P12.
+
+The "Mac Appstore Upload (PKG)" target will require both a "Mac App Distribution Certificate" and a "Mac App Installer Certificate" to be included in the P12.
+
+The easiest way to produce a P12 that includes all 3 kinds of certificates is to export them from the Keychain Access app (Requires a Mac).  Select all 3 certificates at once (using CMD-click), then right click and select "Export 3 Items..."
+
+image::img/developer-guide/mac-desktop-export-certificates-as-p12.png[Exporting certificates as P12,scaledwidth=10%]
+
+You will then be prompted to select a location to save the .p12 file, as well as selecting a password for the file.
+
+
+==== Entitlements
+
+When distributing apps in the Mac Appstore, or when using the "Sandboxed DMG" bundle type, your app is run inside a sandboxed environment, meaning that it doesn't have access to the outside world. It is provided its own "sandboxed" container for file system access, and it doesn't get any network access.  If your app requires access to the "outside world", you need to request entitlements for that access.  If you select a bundle type that uses the sandbox, you you will be shown a list of all of the available entitlements from which you can "check" the ones that you wish to include.
+
+.App sandbox entitlements
+image::img/developer-guide/mac-desktop-entitlements.png[App sandbox entitlements,scaledwidth=30%]
+
+For more information about the app sandbox, and a full list of entitlements, see https://developer.apple.com/library/content/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html[Apple's documentation on the subject].
+
+TIP: You can specify entitlements using the build hint `desktop.mac.entitlement.XXXX` where XXX is the entitlement you wish to set.  E.g. `desktop.mac.entitlement.com.apple.security.network.client=true`
+
+==== Custom Info.plist Entries
+
+You can add custom entries to the https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Introduction/Introduction.html[Info.plist file] using the following build hints:
+
+desktop.mac.plist.KEYNAME::
+Injects the entry with key `KEYNAME` into the Info.plist file.  E.g. `desktop.mac.plist.LSApplicationCategoryType=public.app-category.business`
+
+
