@@ -4,6 +4,10 @@ set -euo pipefail
 
 bia_log() { echo "[build-ios-app] $1"; }
 
+# Pin Xcode so CN1’s Java subprocess sees xcodebuild
+export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
+export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
@@ -143,9 +147,6 @@ bia_log "Wrote main application class to $MAIN_FILE"
 DERIVED_DATA_DIR="${TMPDIR}/codenameone-ios-derived"
 rm -rf "$DERIVED_DATA_DIR"; mkdir -p "$DERIVED_DATA_DIR"
 
-# Pin Xcode so CN1’s Java subprocess sees xcodebuild
-export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
-export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 xcodebuild -version
 
 bia_log "Building iOS Xcode project using Codename One port"
@@ -276,8 +277,8 @@ scheme.add_build_target(app_target) if app_target
 scheme.test_action = Xcodeproj::XCScheme::TestAction.new
 scheme.test_action.xml_element.elements.delete_all("EnvironmentVariables")
 envs = Xcodeproj::XCScheme::EnvironmentVariables.new
-envs.assign_variable(name: "CN1SS_OUTPUT_DIR", value: "__CN1SS_OUTPUT_DIR__", enabled: true)
-envs.assign_variable(name: "CN1SS_PREVIEW_DIR", value: "__CN1SS_PREVIEW_DIR__", enabled: true)
+envs.assign_variable(key: "CN1SS_OUTPUT_DIR",  value: "__CN1SS_OUTPUT_DIR__",  enabled: true)
+envs.assign_variable(key: "CN1SS_PREVIEW_DIR", value: "__CN1SS_PREVIEW_DIR__", enabled: true)
 scheme.test_action.environment_variables = envs
 scheme.test_action.xml_element.elements.delete_all("Testables")
 scheme.add_test_target(ui_target)
