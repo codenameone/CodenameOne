@@ -206,73 +206,95 @@ if [ ! "$(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print -quit)" ] && [
 
   ATT_LIST="$SCREENSHOT_TMP_DIR/xcresult-attachments.txt"
 
+  # Walk the result bundle and collect (attachment_id, file_name)
   python3 - "$RESULT_BUNDLE" "$ATT_LIST" <<'PY'
-import json, subprocess, sys, os
+import json, subprocess, sys, os, shlex
 
 bundle = sys.argv[1]
 out_list = sys.argv[2]
 
+def norm_id(x):
+    # Accept strings or dicts like {"_value": "..."} or {"id": "..."}
+    if isinstance(x, dict):
+        v = x.get('_value') or x.get('id') or x.get('identifier')
+        if isinstance(v, dict):
+            v = v.get('_value')
+        return v
+    return x
+
 def xcget(obj_id=None):
-    cmd = ["xcrun","xcresulttool","get","object","--path",bundle,"--format","json"]
-    if obj_id: cmd += ["--id", obj_id]
-    # Fallback to deprecated form (older Xcode) if needed
+    # Xcode 16.4 wants --legacy even for "get object"
+    base = ["xcrun","xcresulttool","get","object","--legacy","--path",bundle,"--format","json"]
+    if obj_id:
+        base += ["--id", norm_id(obj_id)]
     try:
-        return json.loads(subprocess.check_output(cmd))
-    except subprocess.CalledProcessError:
-        cmd_legacy = ["xcrun","xcresulttool","get","--legacy","--path",bundle,"--format","json"]
-        if obj_id: cmd_legacy += ["--id", obj_id]
-        return json.loads(subprocess.check_output(cmd_legacy))
+        out = subprocess.check_output(base)
+        return json.loads(out)
+    except subprocess.CalledProcessError as e:
+        # Last-ditch: try non-legacy (older toolchains)
+        alt = ["xcrun","xcresulttool","get","object","--path",bundle,"--format","json"]
+        if obj_id:
+            alt += ["--id", norm_id(obj_id)]
+        out = subprocess.check_output(alt)
+        return json.loads(out)
 
-def values(node, key):
-    a = node.get(key) or {}
-    return a.get("_values") or []
+def arr(node, key):
+    v = node.get(key)
+    if isinstance(v, dict) and "_values" in v:
+        return v["_values"] or []
+    if isinstance(v, list):
+        return v
+    return []
 
-def strv(node, key):
-    a = node.get(key) or {}
-    return a.get("_value")
+def sval(node, key):
+    v = node.get(key)
+    if isinstance(v, dict) and "_value" in v:
+        return v["_value"]
+    if isinstance(v, str):
+        return v
+    return None
 
 def walk_tests(obj, hits):
-    # Traverse tests, subtests, activities, attachments
-    for test in values(obj, "tests"):
-        for st in values(test, "subtests"):
+    for test in arr(obj, "tests"):
+        # Recurse into subtests
+        for st in arr(test, "subtests"):
             walk_tests(st, hits)
-        for act in values(test, "activitySummaries"):
-            for att in values(act, "attachments"):
+        # Activities → attachments
+        for act in arr(test, "activitySummaries"):
+            for att in arr(act, "attachments"):
                 if (att.get("_type",{}).get("_name") == "ActionTestAttachment"):
-                    uti = strv(att, "uniformTypeIdentifier") or ""
-                    name = strv(att, "filename") or ""
+                    uti  = sval(att, "uniformTypeIdentifier") or ""
+                    name = sval(att, "filename") or ""
                     pref = (att.get("payloadRef") or {}).get("id")
-                    # accept likely image types
-                    if pref and (("png" in uti.lower()) or ("jpeg" in uti.lower()) or name.lower().endswith((".png",".jpg",".jpeg"))):
+                    if pref and (("png" in (uti or "").lower()) or ("jpeg" in (uti or "").lower()) or (name.lower().endswith((".png",".jpg",".jpeg")))):
                         if not name: name = "attachment.png"
-                        hits.append((pref, name))
+                        hits.append((norm_id(pref), name))
 
 root = xcget()
 hits = []
 
-# Follow each action's testsRef → summaries → testableSummaries → tests...
-for action in values(root, "actions"):
-    action_result = action.get("actionResult") or {}
-    tests_ref = action_result.get("testsRef") or {}
-    tests_id = tests_ref.get("id")
+# Dive: actions[] → actionResult.testsRef -> summaries -> testableSummaries -> tests...
+for action in arr(root, "actions"):
+    result = action.get("actionResult") or {}
+    tests_id = norm_id(result.get("testsRef", {}).get("id"))
     if not tests_id:
         continue
-    tests_obj = xcget(tests_id)  # ActionTestPlanRunSummaries
-    for summ in values(tests_obj, "summaries"):
-        for testable in values(summ, "testableSummaries"):
+    plan_summaries = xcget(tests_id)  # "ActionTestPlanRunSummaries"
+    for summ in arr(plan_summaries, "summaries"):
+        for testable in arr(summ, "testableSummaries"):
             walk_tests(testable, hits)
 
-# dedupe by id, and emit "ID NAME" lines
+# De-dupe on id
 seen=set()
 with open(out_list, "w") as f:
-    for pref, name in hits:
-        if pref in seen:
+    for att_id, fname in hits:
+        if not att_id or att_id in seen:
             continue
-        seen.add(pref)
-        base, ext = os.path.splitext(name)
+        seen.add(att_id)
+        base, ext = os.path.splitext(fname)
         if not ext: ext = ".png"
         if not base: base = "attachment"
-        f.write(f"{pref} {base}{ext}\n")
+        f.write(f"{att_id} {base}{ext}\n")
 PY
 
   # Export each attachment id as a file
@@ -284,9 +306,9 @@ PY
       n=2; while [ -f "$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}" ]; do n=$((n+1)); done
       OUT="$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}"
     fi
-    # New syntax; fallback to legacy if needed
-    if ! xcrun xcresulttool export --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" 2>/dev/null; then
-      xcrun xcresulttool export --legacy --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" || true
+    # Prefer --legacy on Xcode 16.4; fallback to non-legacy
+    if ! xcrun xcresulttool export --legacy --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" 2>/dev/null; then
+      xcrun xcresulttool export --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" || true
     fi
     [ -f "$OUT" ] && ri_log "Exported attachment -> $OUT"
   done < "$ATT_LIST"
