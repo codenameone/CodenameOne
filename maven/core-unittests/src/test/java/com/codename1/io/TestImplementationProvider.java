@@ -60,25 +60,29 @@ public final class TestImplementationProvider {
             return storage.containsKey(key);
         });
 
-        when(impl.createStorageOutputStream(anyString())).thenAnswer(invocation -> {
-            String key = invocation.getArgument(0);
-            return new ByteArrayOutputStream() {
-                @Override
-                public void close() throws IOException {
-                    storage.put(key, toByteArray());
-                    super.close();
-                }
-            };
-        });
+        try {
+            when(impl.createStorageOutputStream(anyString())).thenAnswer(invocation -> {
+                String key = invocation.getArgument(0);
+                return new ByteArrayOutputStream() {
+                    @Override
+                    public void close() throws IOException {
+                        storage.put(key, toByteArray());
+                        super.close();
+                    }
+                };
+            });
 
-        when(impl.createStorageInputStream(anyString())).thenAnswer(invocation -> {
-            String key = invocation.getArgument(0);
-            byte[] data = storage.get(key);
-            if (data == null) {
-                throw new IOException("Missing storage entry " + key);
-            }
-            return new ByteArrayInputStream(data);
-        });
+            when(impl.createStorageInputStream(anyString())).thenAnswer(invocation -> {
+                String key = invocation.getArgument(0);
+                byte[] data = storage.get(key);
+                if (data == null) {
+                    throw new IOException("Missing storage entry " + key);
+                }
+                return new ByteArrayInputStream(data);
+            });
+        } catch (IOException e) {
+            throw new AssertionError(e);
+        }
 
         when(impl.listStorageEntries()).thenAnswer(invocation -> storage.keySet().toArray(new String[0]));
         when(impl.getStorageEntrySize(anyString())).thenAnswer(invocation -> {
