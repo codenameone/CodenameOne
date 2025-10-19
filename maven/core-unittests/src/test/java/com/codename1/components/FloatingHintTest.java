@@ -48,8 +48,9 @@ class FloatingHintTest extends ComponentTestBase {
         textArea.setHint("Email");
         FloatingHint hint = new FloatingHint(textArea);
         Button hintButton = getPrivateField(hint, "hintButton", Button.class);
-        for (ActionListener listener : hintButton.getListeners()) {
-            listener.actionPerformed(new ActionEvent(hintButton));
+        java.util.Vector listeners = hintButton.getListeners();
+        for (Object listener : listeners) {
+            ((ActionListener) listener).actionPerformed(new ActionEvent(hintButton));
         }
         assertTrue(textArea.editingStarted);
     }

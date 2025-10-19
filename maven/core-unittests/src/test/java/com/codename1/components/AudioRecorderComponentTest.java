@@ -32,9 +32,13 @@ class AudioRecorderComponentTest extends ComponentTestBase {
     }
 
     private AudioRecorderComponent createRecorder(boolean redirect) {
-        MediaRecorderBuilder builder = new MediaRecorderBuilder()
-                .path("/tmp/record.m4a")
-                .redirectToAudioBuffer(redirect);
+        MediaRecorderBuilder builder = new MediaRecorderBuilder();
+        try {
+            builder.path("/tmp/record.m4a");
+        } catch (java.io.IOException e) {
+            fail("Unexpected IOException configuring MediaRecorderBuilder: " + e.getMessage());
+        }
+        builder.redirectToAudioBuffer(redirect);
         AudioRecorderComponent component = new AudioRecorderComponent(builder);
         flushSerialCalls();
         return component;
