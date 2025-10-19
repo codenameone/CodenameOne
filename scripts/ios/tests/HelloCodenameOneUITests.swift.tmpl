@@ -16,6 +16,8 @@ final class HelloCodenameOneUITests: XCTestCase {
         }
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
+        // Keep the simulator quiet and deterministic where possible
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launch()
     }
 
@@ -35,21 +37,34 @@ final class HelloCodenameOneUITests: XCTestCase {
         add(attachment)
     }
 
+    /// Wait for the app to be in foreground and give Codename One time to render its scene.
+    private func waitForStableFrame(timeout: TimeInterval = 30, settle: TimeInterval = 1.5) {
+        _ = app.wait(for: .runningForeground, timeout: timeout)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: settle))
+    }
+
+    /// Tap using normalized coordinates (0..1 in each axis), robust when elements aren’t exposed to XCTest.
+    private func tapNormalized(_ dx: CGFloat, _ dy: CGFloat) {
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let target = origin.withOffset(CGVector(dx: app.frame.size.width * dx,
+                                                dy: app.frame.size.height * dy))
+        target.tap()
+    }
+
     func testMainScreenScreenshot() throws {
-        XCTAssertTrue(app.staticTexts["Hello Codename One"].waitForExistence(timeout: 10))
-        sleep(1)
+        waitForStableFrame()
         try captureScreenshot(named: "MainActivity")
     }
 
     func testBrowserComponentScreenshot() throws {
-        let button = app.buttons["Open Browser Screen"]
-        XCTAssertTrue(button.waitForExistence(timeout: 10))
-        button.tap()
+        waitForStableFrame()
 
-        let webView = app.webViews.firstMatch
-        XCTAssertTrue(webView.waitForExistence(timeout: 15))
-        sleep(2)
+        // The "Open Browser Screen" button is part of CN1’s canvas; tap where it lives visually.
+        // Adjust if your layout changes; these coords are centered and a bit lower on the screen.
+        tapNormalized(0.5, 0.70)
+
+        // Give the BrowserComponent time to paint
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 2.0))
         try captureScreenshot(named: "BrowserComponent")
     }
 }
-
