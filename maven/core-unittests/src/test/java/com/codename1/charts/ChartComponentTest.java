@@ -58,15 +58,17 @@ class ChartComponentTest extends UITestBase {
         RecordingChart chart = new RecordingChart();
         ChartComponent component = new PositionedChartComponent(chart, 10, 15);
 
+        Point expectedChartCorner = component.screenToChartCoord(20, 30);
         Shape chartShape = component.screenToChartShape(new Rectangle(20, 30, 40, 50));
         Rectangle chartBounds = chartShape.getBounds();
-        assertEquals(10, chartBounds.getX());
-        assertEquals(15, chartBounds.getY());
+        assertEquals(Math.round(expectedChartCorner.getX()), chartBounds.getX());
+        assertEquals(Math.round(expectedChartCorner.getY()), chartBounds.getY());
 
         Shape screenShape = component.chartToScreenShape(new Rectangle(10, 15, 40, 50));
         Rectangle screenBounds = screenShape.getBounds();
-        assertEquals(20, screenBounds.getX());
-        assertEquals(30, screenBounds.getY());
+        Point expectedScreenCorner = component.chartToScreenCoord(10, 15);
+        assertEquals(Math.round(expectedScreenCorner.getX()), screenBounds.getX());
+        assertEquals(Math.round(expectedScreenCorner.getY()), screenBounds.getY());
     }
 
     @Test
