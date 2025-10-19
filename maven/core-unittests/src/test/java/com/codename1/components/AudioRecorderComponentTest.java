@@ -75,7 +75,7 @@ class AudioRecorderComponentTest extends ComponentTestBase {
 
         verify(media).cleanup();
         assertEquals(AudioRecorderComponent.RecorderState.Accepted, recorder.getState());
-        assertEquals(2, eventCount.get(), "Expected paused and accepted events");
+        assertEquals(1, eventCount.get(), "AudioRecorderComponent only fires action events when the recording is accepted");
     }
 
     @Test
