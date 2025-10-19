@@ -175,6 +175,8 @@ if ! xcodebuild \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   -resultBundlePath "$RESULT_BUNDLE" \
   "${XCODE_TEST_FILTERS[@]}" \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+  GENERATE_INFOPLIST_FILE=YES \
   test | tee "$TEST_LOG"; then
   ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
   exit 10
