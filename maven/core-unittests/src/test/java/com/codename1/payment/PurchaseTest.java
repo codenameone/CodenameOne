@@ -193,12 +193,10 @@ public class PurchaseTest {
     }
 
     @Test
-    public void testGetReceiptsHandlesInvalidStoredData() {
+    public void testGetReceiptsThrowsWhenStoredDataHasUnexpectedType() {
         Storage.getInstance().writeObject(receiptsKey, "bad-data");
 
-        List<Receipt> receipts = purchase.getReceipts();
-        assertNotNull(receipts);
-        assertTrue(receipts.isEmpty());
+        assertThrows(ClassCastException.class, () -> purchase.getReceipts());
     }
 
     @Test

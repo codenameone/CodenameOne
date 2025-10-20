@@ -60,8 +60,10 @@ public class ProcessingPackageTest {
         boolean[] flags = result.getAsBooleanArray("//active");
         assertArrayEquals(new boolean[]{true, false}, flags);
 
-        List list = result.getAsArray("/results[0]/meta/attributes");
+        List list = result.getAsArray("/results[0]/types");
         assertEquals(2, list.size());
+        assertEquals("neighborhood", list.get(0));
+        assertEquals("political", list.get(1));
     }
 
     @Test
