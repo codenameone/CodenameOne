@@ -7,27 +7,107 @@
 : "${CN1SS_RENDER_CLASS:=RenderScreenshotReport}"
 : "${CN1SS_POST_COMMENT_CLASS:=PostPrComment}"
 
+CN1SS_INITIALIZED=0
+CN1SS_JAVA_BIN=""
+CN1SS_JAVAC_BIN=""
+CN1SS_SOURCE_PATH=""
+CN1SS_CACHE_ROOT=""
+CN1SS_CLASS_DIR=""
+CN1SS_STAMP_FILE=""
+CN1SS_JAVA_CLASSPATH=""
+
+if ! declare -p CN1SS_JAVA_OPTS >/dev/null 2>&1; then
+  declare -a CN1SS_JAVA_OPTS=()
+fi
+if [ "${#CN1SS_JAVA_OPTS[@]}" -eq 0 ]; then
+  CN1SS_JAVA_OPTS+=(-Djava.awt.headless=true)
+fi
+
 cn1ss_setup() {
   CN1SS_JAVA_BIN="$1"
   CN1SS_SOURCE_PATH="$2"
+  local cache_override="${3:-}" tmp_root
+
+  if [ -z "$CN1SS_JAVA_BIN" ] || [ ! -x "$CN1SS_JAVA_BIN" ]; then
+    cn1ss_log "CN1SS setup failed: java binary not executable ($CN1SS_JAVA_BIN)"
+    return 1
+  fi
+  if [ -z "$CN1SS_SOURCE_PATH" ] || [ ! -d "$CN1SS_SOURCE_PATH" ]; then
+    cn1ss_log "CN1SS setup failed: source directory missing ($CN1SS_SOURCE_PATH)"
+    return 1
+  fi
+
+  if [ -z "$CN1SS_JAVAC_BIN" ]; then
+    local java_dir
+    java_dir="$(dirname "$CN1SS_JAVA_BIN")"
+    if [ -x "$java_dir/javac" ]; then
+      CN1SS_JAVAC_BIN="$java_dir/javac"
+    elif command -v javac >/dev/null 2>&1; then
+      CN1SS_JAVAC_BIN="$(command -v javac)"
+    else
+      cn1ss_log "CN1SS setup failed: unable to locate javac"
+      return 1
+    fi
+  fi
+
+  tmp_root="${TMPDIR:-/tmp}"
+  tmp_root="${tmp_root%/}"
+  CN1SS_CACHE_ROOT="${cache_override:-${CN1SS_CACHE_DIR:-$tmp_root/cn1ss-java-cache}}"
+  CN1SS_CLASS_DIR="$CN1SS_CACHE_ROOT/classes"
+  CN1SS_STAMP_FILE="$CN1SS_CACHE_ROOT/.stamp"
+
+  if [ "$CN1SS_INITIALIZED" -eq 1 ] && [ -n "$CN1SS_JAVA_CLASSPATH" ] && [ -d "$CN1SS_JAVA_CLASSPATH" ]; then
+    return 0
+  fi
+
+  local need_compile=1
+  if [ -d "$CN1SS_CLASS_DIR" ] && [ -f "$CN1SS_STAMP_FILE" ]; then
+    if ! find "$CN1SS_SOURCE_PATH" -type f -name '*.java' -newer "$CN1SS_STAMP_FILE" -print -quit | grep -q .; then
+      need_compile=0
+    fi
+  fi
+
+  if [ "$need_compile" -eq 1 ]; then
+    mkdir -p "$CN1SS_CACHE_ROOT"
+    rm -rf "$CN1SS_CLASS_DIR"
+    mkdir -p "$CN1SS_CLASS_DIR"
+    local -a sources=()
+    while IFS= read -r -d '' src; do
+      sources+=("$src")
+    done < <(find "$CN1SS_SOURCE_PATH" -type f -name '*.java' -print0)
+    if [ "${#sources[@]}" -eq 0 ]; then
+      cn1ss_log "CN1SS setup failed: no Java sources found under $CN1SS_SOURCE_PATH"
+      return 1
+    fi
+    cn1ss_log "Compiling CN1SS helpers -> $CN1SS_CLASS_DIR"
+    if ! "$CN1SS_JAVAC_BIN" -d "$CN1SS_CLASS_DIR" "${sources[@]}"; then
+      cn1ss_log "CN1SS setup failed: javac returned non-zero status"
+      return 1
+    fi
+    touch "$CN1SS_STAMP_FILE" 2>/dev/null || true
+  else
+    cn1ss_log "Reusing CN1SS helpers in $CN1SS_CLASS_DIR"
+  fi
+
+  CN1SS_JAVA_CLASSPATH="$CN1SS_CLASS_DIR"
+  CN1SS_INITIALIZED=1
 }
 
 cn1ss_log() {
   echo "[cn1ss] $*"
 }
 
-cn1ss_java_source() {
+cn1ss_java_run() {
   local class_name="$1"; shift
-  local source_file="${CN1SS_SOURCE_PATH%/}/$class_name.java"
   if [ -z "${CN1SS_JAVA_BIN:-}" ] || [ ! -x "$CN1SS_JAVA_BIN" ]; then
     cn1ss_log "CN1SS_JAVA_BIN is not configured"
     return 1
   fi
-  if [ ! -f "$source_file" ]; then
-    cn1ss_log "Missing CN1SS helper source: $source_file"
+  if [ -z "${CN1SS_JAVA_CLASSPATH:-}" ] || [ ! -d "$CN1SS_JAVA_CLASSPATH" ]; then
+    cn1ss_log "CN1SS Java helpers not initialized; call cn1ss_setup first"
     return 1
   fi
-  "$CN1SS_JAVA_BIN" "$source_file" "$@"
+  "$CN1SS_JAVA_BIN" "${CN1SS_JAVA_OPTS[@]}" -cp "$CN1SS_JAVA_CLASSPATH" "$class_name" "$@"
 }
 
 cn1ss_count_chunks() {
@@ -45,7 +125,7 @@ cn1ss_count_chunks() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  cn1ss_java_source "$CN1SS_MAIN_CLASS" "${args[@]}" 2>/dev/null || echo 0
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}" 2>/dev/null || echo 0
 }
 
 cn1ss_extract_base64() {
@@ -62,7 +142,7 @@ cn1ss_extract_base64() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  cn1ss_java_source "$CN1SS_MAIN_CLASS" "${args[@]}"
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}"
 }
 
 cn1ss_decode_binary() {
@@ -79,7 +159,7 @@ cn1ss_decode_binary() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  cn1ss_java_source "$CN1SS_MAIN_CLASS" "${args[@]}"
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}"
 }
 
 cn1ss_list_tests() {
@@ -87,7 +167,7 @@ cn1ss_list_tests() {
   if [ -z "$file" ] || [ ! -r "$file" ]; then
     return 1
   fi
-  cn1ss_java_source "$CN1SS_MAIN_CLASS" tests "$file"
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" tests "$file"
 }
 
 cn1ss_verify_png() {
@@ -181,7 +261,7 @@ cn1ss_post_pr_comment() {
   fi
   body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
   cn1ss_log "Attempting to post PR comment (payload bytes=${body_size})"
-  GITHUB_TOKEN="$comment_token" cn1ss_java_source "$CN1SS_POST_COMMENT_CLASS" \
+  GITHUB_TOKEN="$comment_token" cn1ss_java_run "$CN1SS_POST_COMMENT_CLASS" \
     --body "$body_file" \
     --preview-dir "$preview_dir"
   local rc=$?

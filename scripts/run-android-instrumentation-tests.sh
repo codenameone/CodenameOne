@@ -268,20 +268,26 @@ done
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 ra_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
-"$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$PROCESS_SCREENSHOTS_CLASS.java" \
+if ! cn1ss_java_run "$PROCESS_SCREENSHOTS_CLASS" \
   --reference-dir "$SCREENSHOT_REF_DIR" \
   --emit-base64 \
   --preview-dir "$SCREENSHOT_PREVIEW_DIR" \
-  "${COMPARE_ARGS[@]}" > "$COMPARE_JSON"
+  "${COMPARE_ARGS[@]}" > "$COMPARE_JSON"; then
+  ra_log "FATAL: Screenshot comparison helper failed"
+  exit 13
+fi
 
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
 ra_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
-"$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$RENDER_SCREENSHOT_REPORT_CLASS.java" \
+if ! cn1ss_java_run "$RENDER_SCREENSHOT_REPORT_CLASS" \
   --compare-json "$COMPARE_JSON" \
   --comment-out "$COMMENT_FILE" \
-  --summary-out "$SUMMARY_FILE"
+  --summary-out "$SUMMARY_FILE"; then
+  ra_log "FATAL: Failed to render screenshot summary/comment"
+  exit 14
+fi
 
 if [ -s "$SUMMARY_FILE" ]; then
   ra_log "  -> Wrote summary entries to $SUMMARY_FILE ($(wc -l < "$SUMMARY_FILE" 2>/dev/null || echo 0) line(s))"
