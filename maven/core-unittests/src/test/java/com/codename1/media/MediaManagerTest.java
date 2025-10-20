@@ -193,13 +193,17 @@ class MediaManagerTest extends UITestBase {
     }
 
     @Test
-    void mediaCreationMethodsDelegateToDisplay() throws IOException {
+    void mediaCreationMethodsDelegateToDisplay() {
         MediaManager.createBackgroundMedia("bg");
         MediaManager.createBackgroundMediaAsync("bg");
         MediaManager.createMedia("uri", true);
         MediaManager.createMedia("uri", true, null);
-        MediaManager.createMedia(new ByteArrayInputStream(new byte[]{1}), "audio/mp3");
-        MediaManager.createMedia(new ByteArrayInputStream(new byte[]{1}), "audio/mp3", null);
+        try {
+            MediaManager.createMedia(new ByteArrayInputStream(new byte[]{1}), "audio/mp3");
+            MediaManager.createMedia(new ByteArrayInputStream(new byte[]{1}), "audio/mp3", null);
+        } catch (IOException e) {
+            fail(e);
+        }
         MediaManager.createMediaAsync("uri", false, null);
         MediaManager.createMediaAsync(new ByteArrayInputStream(new byte[]{1}), "audio/wav", null);
 
