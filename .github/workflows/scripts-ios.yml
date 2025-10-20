@@ -7,6 +7,9 @@ on:
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/ios/tests/**'
+      - 'scripts/ios/screenshots/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -25,6 +28,9 @@ on:
       - 'scripts/setup-workspace.sh'
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/ios/tests/**'
+      - 'scripts/ios/screenshots/**'
       - 'scripts/templates/**'
       - '!scripts/templates/**/*.md'
       - 'CodenameOne/src/**'
@@ -39,11 +45,19 @@ on:
 
 jobs:
   build-ios:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
     timeout-minutes: 60         # allow enough time for dependency installs and full build
     concurrency:                # ensure only one mac build runs at once
-      group: mac-ci
-      cancel-in-progress: false # queue new ones instead of canceling in-flight
+      group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,12 +65,12 @@ jobs:
       - name: Ensure CocoaPods tooling
         run: |
           set -euo pipefail
-          if ! command -v pod >/dev/null 2>&1; then
-            sudo gem install cocoapods --no-document
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
           fi
-          if ! ruby -rrubygems -e "exit(Gem::Specification::find_all_by_name('xcodeproj').empty? ? 1 : 0)"; then
-            sudo gem install xcodeproj --no-document
-          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          gem install cocoapods xcodeproj --no-document --user-install
           pod --version
 
       - name: Restore cn1-binaries cache
@@ -77,6 +91,32 @@ jobs:
         timeout-minutes: 25
 
       - name: Build sample iOS app and compile workspace
+        id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
+
+      - name: Run iOS UI screenshot tests
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          
+          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          
+          ./scripts/run-ios-ui-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        timeout-minutes: 30
+
+      - name: Upload iOS artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-tests
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
 

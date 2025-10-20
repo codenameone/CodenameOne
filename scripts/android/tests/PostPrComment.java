@@ -22,8 +22,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class PostPrComment {
-    private static final String MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->";
-    private static final String LOG_PREFIX = "[run-android-instrumentation-tests]";
+    private static final String DEFAULT_MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->";
+    private static final String DEFAULT_LOG_PREFIX = "[run-android-instrumentation-tests]";
+    private static String marker = DEFAULT_MARKER;
+    private static String logPrefix = DEFAULT_LOG_PREFIX;
 
     public static void main(String[] args) throws Exception {
         int exitCode = execute(args);
@@ -35,6 +37,9 @@ public class PostPrComment {
         if (arguments == null) {
             return 2;
         }
+        marker = arguments.marker != null ? arguments.marker : DEFAULT_MARKER;
+        logPrefix = arguments.logPrefix != null ? arguments.logPrefix : DEFAULT_LOG_PREFIX;
+
         Path bodyPath = arguments.body;
         if (!Files.isRegularFile(bodyPath)) {
             return 0;
@@ -44,10 +49,10 @@ public class PostPrComment {
         if (body.isEmpty()) {
             return 0;
         }
-        if (!body.contains(MARKER)) {
-            body = body.stripTrailing() + "\n\n" + MARKER;
+        if (!body.contains(marker)) {
+            body = body.stripTrailing() + "\n\n" + marker;
         }
-        String bodyWithoutMarker = body.replace(MARKER, "").trim();
+        String bodyWithoutMarker = body.replace(marker, "").trim();
         if (bodyWithoutMarker.isEmpty()) {
             return 0;
         }
@@ -154,7 +159,7 @@ public class PostPrComment {
             for (Object comment : comments) {
                 Map<String, Object> commentMap = JsonUtil.asObject(comment);
                 String bodyText = stringValue(commentMap.get("body"), "");
-                if (bodyText.contains(MARKER)) {
+                if (bodyText.contains(marker)) {
                     existingComment = commentMap;
                     Map<String, Object> user = JsonUtil.asObject(commentMap.get("user"));
                     String login = stringValue(user.get("login"), null);
@@ -181,7 +186,7 @@ public class PostPrComment {
                     .uri(URI.create("https://api.github.com/repos/" + repo + "/issues/" + prNumber + "/comments"))
                     .timeout(Duration.ofSeconds(20))
                     .headers(headers.entrySet().stream().flatMap(e -> java.util.stream.Stream.of(e.getKey(), e.getValue())).toArray(String[]::new))
-                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.stringify(Map.of("body", MARKER))))
+                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.stringify(Map.of("body", marker))))
                     .build();
             HttpResponse<String> createResponse = client.send(createRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (createResponse.statusCode() >= 200 && createResponse.statusCode() < 300) {
@@ -406,11 +411,11 @@ public class PostPrComment {
     }
 
     private static void log(String message) {
-        System.out.println(LOG_PREFIX + " " + message);
+        System.out.println(logPrefix + " " + message);
     }
 
     private static void err(String message) {
-        System.err.println(LOG_PREFIX + " " + message);
+        System.err.println(logPrefix + " " + message);
     }
 
     private record CommentContext(long commentId, boolean createdPlaceholder) {
@@ -422,15 +427,21 @@ public class PostPrComment {
     private static class Arguments {
         final Path body;
         final Path previewDir;
+        final String marker;
+        final String logPrefix;
 
-        private Arguments(Path body, Path previewDir) {
+        private Arguments(Path body, Path previewDir, String marker, String logPrefix) {
             this.body = body;
             this.previewDir = previewDir;
+            this.marker = marker;
+            this.logPrefix = logPrefix;
         }
 
         static Arguments parse(String[] args) {
             Path body = null;
             Path previewDir = null;
+            String marker = null;
+            String logPrefix = null;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
@@ -448,6 +459,20 @@ public class PostPrComment {
                         }
                         previewDir = Path.of(args[i]);
                     }
+                    case "--marker" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --marker");
+                            return null;
+                        }
+                        marker = args[i];
+                    }
+                    case "--log-prefix" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --log-prefix");
+                            return null;
+                        }
+                        logPrefix = args[i];
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -458,7 +483,7 @@ public class PostPrComment {
                 System.err.println("--body is required");
                 return null;
             }
-            return new Arguments(body, previewDir);
+            return new Arguments(body, previewDir, marker, logPrefix);
         }
     }
 

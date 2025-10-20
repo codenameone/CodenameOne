@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.Map;
 
 public class RenderScreenshotReport {
-    private static final String MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->";
+    private static final String DEFAULT_MARKER = "<!-- CN1SS_SCREENSHOT_COMMENT -->";
+    private static final String DEFAULT_TITLE = "Android screenshot updates";
+    private static final String DEFAULT_SUCCESS_MESSAGE = "✅ Native Android screenshot tests passed.";
 
     public static void main(String[] args) throws Exception {
         Arguments arguments = Arguments.parse(args);
@@ -24,7 +26,11 @@ public class RenderScreenshotReport {
         String text = Files.readString(comparePath, StandardCharsets.UTF_8);
         Object parsed = JsonUtil.parse(text);
         Map<String, Object> data = JsonUtil.asObject(parsed);
-        SummaryAndComment output = buildSummaryAndComment(data);
+        String marker = arguments.marker != null ? arguments.marker : DEFAULT_MARKER;
+        String title = arguments.title != null ? arguments.title : DEFAULT_TITLE;
+        String successMessage = arguments.successMessage != null ? arguments.successMessage : DEFAULT_SUCCESS_MESSAGE;
+
+        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage);
         writeLines(arguments.summaryOut, output.summaryLines);
         writeLines(arguments.commentOut, output.commentLines);
     }
@@ -43,7 +49,7 @@ public class RenderScreenshotReport {
         Files.writeString(path, sb.toString(), StandardCharsets.UTF_8);
     }
 
-    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data) {
+    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage) {
         List<String> summaryLines = new ArrayList<>();
         List<String> commentLines = new ArrayList<>();
         Object resultsObj = data.get("results");
@@ -114,8 +120,10 @@ public class RenderScreenshotReport {
         }
 
         if (!commentEntries.isEmpty()) {
-            commentLines.add("### Android screenshot updates");
-            commentLines.add("");
+            if (title != null && !title.isEmpty()) {
+                commentLines.add("### " + title);
+                commentLines.add("");
+            }
             for (Map<String, Object> entry : commentEntries) {
                 String test = stringValue(entry.get("test"), "");
                 String status = stringValue(entry.get("status"), "");
@@ -127,11 +135,11 @@ public class RenderScreenshotReport {
             if (!commentLines.isEmpty() && !commentLines.get(commentLines.size() - 1).isEmpty()) {
                 commentLines.add("");
             }
-            commentLines.add(MARKER);
+            commentLines.add(marker);
         } else {
-            commentLines.add("✅ Native Android screenshot tests passed.");
+            commentLines.add(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
             commentLines.add("");
-            commentLines.add(MARKER);
+            commentLines.add(marker);
         }
         return new SummaryAndComment(summaryLines, commentLines);
     }
@@ -258,17 +266,26 @@ public class RenderScreenshotReport {
         final Path compareJson;
         final Path commentOut;
         final Path summaryOut;
+        final String marker;
+        final String title;
+        final String successMessage;
 
-        private Arguments(Path compareJson, Path commentOut, Path summaryOut) {
+        private Arguments(Path compareJson, Path commentOut, Path summaryOut, String marker, String title, String successMessage) {
             this.compareJson = compareJson;
             this.commentOut = commentOut;
             this.summaryOut = summaryOut;
+            this.marker = marker;
+            this.title = title;
+            this.successMessage = successMessage;
         }
 
         static Arguments parse(String[] args) {
             Path compare = null;
             Path comment = null;
             Path summary = null;
+            String marker = null;
+            String title = null;
+            String successMessage = null;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
@@ -293,6 +310,27 @@ public class RenderScreenshotReport {
                         }
                         summary = Path.of(args[i]);
                     }
+                    case "--marker" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --marker");
+                            return null;
+                        }
+                        marker = args[i];
+                    }
+                    case "--title" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --title");
+                            return null;
+                        }
+                        title = args[i];
+                    }
+                    case "--success-message" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --success-message");
+                            return null;
+                        }
+                        successMessage = args[i];
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -303,7 +341,7 @@ public class RenderScreenshotReport {
                 System.err.println("--compare-json, --comment-out, and --summary-out are required");
                 return null;
             }
-            return new Arguments(compare, comment, summary);
+            return new Arguments(compare, comment, summary, marker, title, successMessage);
         }
     }
 }

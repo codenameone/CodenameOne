@@ -1,0 +1,74 @@
+import XCTest
+
+final class HelloCodenameOneUITests: XCTestCase {
+    private var app: XCUIApplication!
+    private var outputDirectory: URL!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+
+        // Locale for determinism
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
+        // Tip: force light mode or content size if you need pixel-stable shots
+        // app.launchArguments += ["-uiuserInterfaceStyle", "Light"]
+
+        // IMPORTANT: write to the app's sandbox, not a host path
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        if let tag = ProcessInfo.processInfo.environment["CN1SS_OUTPUT_DIR"], !tag.isEmpty {
+            outputDirectory = tmp.appendingPathComponent(tag, isDirectory: true)
+        } else {
+            outputDirectory = tmp.appendingPathComponent("cn1screens", isDirectory: true)
+        }
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+
+        app.launch()
+        waitForStableFrame()
+    }
+
+    override func tearDownWithError() throws {
+        app?.terminate()
+        app = nil
+    }
+
+    private func captureScreenshot(named name: String) throws {
+        let shot = XCUIScreen.main.screenshot()
+
+        // Save into sandbox tmp (optional – mainly for local debugging)
+        let pngURL = outputDirectory.appendingPathComponent("\(name).png")
+        do { try shot.pngRepresentation.write(to: pngURL) } catch { /* ignore */ }
+
+        // ALWAYS attach so we can export from the .xcresult
+        let att = XCTAttachment(screenshot: shot)
+        att.name = name
+        att.lifetime = .keepAlways
+        add(att)
+    }
+
+    /// Wait for foreground + a short settle time
+    private func waitForStableFrame(timeout: TimeInterval = 30, settle: TimeInterval = 1.2) {
+        _ = app.wait(for: .runningForeground, timeout: timeout)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: settle))
+    }
+
+    /// Tap using normalized coordinates (0...1)
+    private func tapNormalized(_ dx: CGFloat, _ dy: CGFloat) {
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let target = origin.withOffset(.init(dx: app.frame.size.width * dx,
+                                             dy: app.frame.size.height * dy))
+        target.tap()
+    }
+
+    func testMainScreenScreenshot() throws {
+        waitForStableFrame()
+        try captureScreenshot(named: "MainActivity")
+    }
+
+    func testBrowserComponentScreenshot() throws {
+        waitForStableFrame()
+        tapNormalized(0.5, 0.70)
+        // tiny retry to allow BrowserComponent to render
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 2.0))
+        try captureScreenshot(named: "BrowserComponent")
+    }
+}
