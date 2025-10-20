@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -31,10 +32,10 @@ class MediaManagerTest extends UITestBase {
         when(implementation.getAvailableRecordingMimeTypes()).thenReturn(new String[]{"audio/aac", "audio/amr"});
         when(implementation.createBackgroundMedia(anyString())).thenReturn(mock(Media.class));
         when(implementation.createBackgroundMediaAsync(anyString())).thenReturn(mock(AsyncResource.class));
-        when(implementation.createMedia(anyString(), anyBoolean(), any(Runnable.class))).thenReturn(mock(Media.class));
-        when(implementation.createMediaAsync(anyString(), anyBoolean(), any(Runnable.class))).thenReturn(mock(AsyncResource.class));
-        when(implementation.createMedia(any(InputStream.class), anyString(), any(Runnable.class))).thenReturn(mock(Media.class));
-        when(implementation.createMediaAsync(any(InputStream.class), anyString(), any(Runnable.class))).thenReturn(mock(AsyncResource.class));
+        when(implementation.createMedia(anyString(), anyBoolean(), nullable(Runnable.class))).thenReturn(mock(Media.class));
+        when(implementation.createMediaAsync(anyString(), anyBoolean(), nullable(Runnable.class))).thenReturn(mock(AsyncResource.class));
+        when(implementation.createMedia(any(InputStream.class), anyString(), nullable(Runnable.class))).thenReturn(mock(Media.class));
+        when(implementation.createMediaAsync(any(InputStream.class), anyString(), nullable(Runnable.class))).thenReturn(mock(AsyncResource.class));
         when(implementation.createMediaRecorder(anyString(), anyString())).thenReturn(mock(Media.class));
         clearAudioBuffers();
         clearRemoteControlListener();
@@ -209,10 +210,10 @@ class MediaManagerTest extends UITestBase {
 
         verify(implementation).createBackgroundMedia("bg");
         verify(implementation).createBackgroundMediaAsync("bg");
-        verify(implementation, times(2)).createMedia(anyString(), anyBoolean(), any(Runnable.class));
-        verify(implementation, times(2)).createMedia(any(InputStream.class), anyString(), any(Runnable.class));
-        verify(implementation).createMediaAsync(anyString(), anyBoolean(), any(Runnable.class));
-        verify(implementation).createMediaAsync(any(InputStream.class), anyString(), any(Runnable.class));
+        verify(implementation, times(2)).createMedia(anyString(), anyBoolean(), nullable(Runnable.class));
+        verify(implementation, times(2)).createMedia(any(InputStream.class), anyString(), nullable(Runnable.class));
+        verify(implementation).createMediaAsync(anyString(), anyBoolean(), nullable(Runnable.class));
+        verify(implementation).createMediaAsync(any(InputStream.class), anyString(), nullable(Runnable.class));
     }
 
     @Test
