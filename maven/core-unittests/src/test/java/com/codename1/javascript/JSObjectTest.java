@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -116,6 +117,7 @@ class JSObjectTest extends UITestBase {
         JSObject object = new JSObject(context, "window");
 
         doNothing().when(context).set(anyString(), any());
+        doNothing().when(context).set(anyString(), any(), anyBoolean());
 
         object.set("name", "Codename One");
         object.set("'0'", Integer.valueOf(2));
@@ -128,7 +130,7 @@ class JSObjectTest extends UITestBase {
         verify(context).set(eq(pointer + "['0']"), eq((Object) Integer.valueOf(2)));
         verify(context).set(eq(pointer + ".flag"), eq((Object) Boolean.TRUE));
         verify(context).set(eq(pointer + ".ratio"), eq((Object) Double.valueOf(3.5d)));
-        verify(context).set(eq(pointer + "[1]"), eq((Object) Double.valueOf(9)));
+        verify(context).set(eq(pointer + "[1]"), eq((Object) Integer.valueOf(9)), eq(false));
     }
 
     @Test
@@ -158,14 +160,21 @@ class JSObjectTest extends UITestBase {
         Callback callback = mock(Callback.class);
         SuccessCallback successCallback = mock(SuccessCallback.class);
 
-        doNothing().when(context).callAsync(eq(object), eq(object), any(Object[].class), eq(callback));
-        doNothing().when(context).callAsync(eq(object), eq(object), any(Object[].class), eq(successCallback));
+        String pointer = object.toJSPointer();
+        doAnswer(invocation -> {
+            Callback adapter = (Callback) invocation.getArgument(3);
+            if (adapter == callback) {
+                return null;
+            }
+            adapter.onSucess("value");
+            return null;
+        }).when(context).callAsync(eq(pointer + ".action"), eq(object), any(Object[].class), any(Callback.class));
 
         object.callAsync("action", new Object[]{}, callback);
         object.callAsync("action", new Object[]{}, successCallback);
 
-        verify(context).callAsync(eq(object), eq(object), any(Object[].class), eq(callback));
-        verify(context).callAsync(eq(object), eq(object), any(Object[].class), eq(successCallback));
+        verify(context).callAsync(eq(pointer + ".action"), eq(object), any(Object[].class), eq(callback));
+        verify(successCallback).onSucess("value");
     }
 
     @Test

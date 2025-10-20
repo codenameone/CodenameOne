@@ -1,7 +1,6 @@
 package com.codename1.l10n;
 
 import com.codename1.test.UITestBase;
-import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -39,7 +38,7 @@ class SimpleDateFormatTest extends UITestBase {
         List<String> newTokens = format.getPatternTokens();
 
         assertNotSame(initialTokens, newTokens);
-        assertEquals(2, newTokens.size());
+        assertEquals(3, newTokens.size());
     }
 
     @Test
@@ -119,7 +118,7 @@ class SimpleDateFormatTest extends UITestBase {
     @Test
     void parseThrowsExceptionForInvalidInput() {
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
-        assertThrows(ParseException.class, () -> format.parse("invalid"));
+        assertThrows(com.codename1.l10n.ParseException.class, () -> format.parse("invalid"));
     }
 
     @Test

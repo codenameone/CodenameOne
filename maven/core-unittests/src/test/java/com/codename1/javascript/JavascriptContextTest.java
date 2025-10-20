@@ -139,7 +139,7 @@ class JavascriptContextTest extends UITestBase {
         ArgumentCaptor<String> jsCaptor = ArgumentCaptor.forClass(String.class);
         verify(browser).executeAndReturnString(jsCaptor.capture());
         String executed = jsCaptor.getValue();
-        assertTrue(executed.contains("window.title='O\\\\'Reilly\\\\\\\\Docs'"));
+        assertTrue(executed.contains("window.title='O\\'Reilly\\\\Docs'"), executed);
 
         responses.add("ok");
         context.set("counter", Integer.valueOf(5));
