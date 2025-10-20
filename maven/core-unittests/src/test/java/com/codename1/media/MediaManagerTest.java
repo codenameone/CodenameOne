@@ -193,7 +193,7 @@ class MediaManagerTest extends UITestBase {
     }
 
     @Test
-    void mediaCreationMethodsDelegateToDisplay() {
+    void mediaCreationMethodsDelegateToDisplay() throws IOException {
         MediaManager.createBackgroundMedia("bg");
         MediaManager.createBackgroundMediaAsync("bg");
         MediaManager.createMedia("uri", true);
