@@ -73,6 +73,10 @@ cn1ss_setup() {
     mkdir -p "$CN1SS_CLASS_DIR"
     local -a sources=()
     while IFS= read -r -d '' src; do
+      if grep -q '@PACKAGE@' "$src" 2>/dev/null; then
+        cn1ss_log "Skipping template source $src"
+        continue
+      fi
       sources+=("$src")
     done < <(find "$CN1SS_SOURCE_PATH" -type f -name '*.java' -print0)
     if [ "${#sources[@]}" -eq 0 ]; then
