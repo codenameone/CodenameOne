@@ -1,0 +1,135 @@
+name: Build Developer Guide Docs
+
+on:
+  pull_request:
+    paths:
+      - 'docs/developer-guide/**'
+      - '.github/workflows/developer-guide-docs.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+
+      - name: Install Asciidoctor tooling
+        run: |
+          gem install --no-document asciidoctor asciidoctor-pdf
+
+      - name: Build Developer Guide HTML and PDF
+        run: |
+          set -euo pipefail
+          OUTPUT_ROOT="build/developer-guide"
+          HTML_BUILD_DIR="${OUTPUT_ROOT}/html"
+          PDF_BUILD_DIR="${OUTPUT_ROOT}/pdf"
+          PACKAGE_DIR="${OUTPUT_ROOT}/html-package"
+          mkdir -p "$HTML_BUILD_DIR" "$PDF_BUILD_DIR"
+          asciidoctor -D "$HTML_BUILD_DIR" -o developer-guide.html docs/developer-guide/developer-guide.asciidoc
+          asciidoctor-pdf -D "$PDF_BUILD_DIR" -o developer-guide.pdf docs/developer-guide/developer-guide.asciidoc
+          rm -rf "$PACKAGE_DIR"
+          mkdir -p "$PACKAGE_DIR"
+          cp "$HTML_BUILD_DIR/developer-guide.html" "$PACKAGE_DIR/"
+          for asset_dir in docs/developer-guide/*; do
+            base_name="$(basename "$asset_dir")"
+            if [ -d "$asset_dir" ] && [ "$base_name" != "sketch" ]; then
+              cp -R "$asset_dir" "$PACKAGE_DIR/"
+            fi
+          done
+          (cd "$PACKAGE_DIR" && zip -r "../developer-guide-html.zip" .)
+
+      - name: Upload HTML artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-html
+          path: build/developer-guide/developer-guide-html.zip
+          if-no-files-found: error
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-pdf
+          path: build/developer-guide/pdf/developer-guide.pdf
+          if-no-files-found: error
+
+      - name: Comment with artifact download links
+        if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- developer-guide-artifacts -->';
+            const { owner, repo } = context.repo;
+            const runId = context.runId;
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner,
+              repo,
+              run_id: runId,
+              per_page: 100
+            });
+
+            const links = [];
+            for (const artifact of artifacts.data.artifacts) {
+              if (artifact.name === 'developer-guide-html') {
+                links.push(`- [Developer Guide HTML package](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id})`);
+              }
+              if (artifact.name === 'developer-guide-pdf') {
+                links.push(`- [Developer Guide PDF](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id})`);
+              }
+            }
+
+            if (!links.length) {
+              console.log('No artifacts found to report.');
+              return;
+            }
+
+            const body = `${marker}\nDeveloper Guide build artifacts are available for download from this workflow run:\n\n${links.join('\n')}\n`;
+            const comments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: context.issue.number,
+              per_page: 100
+            });
+
+            const existing = comments.data.find(comment => comment.body && comment.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
+
+      - name: Log skipped PR comment
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        run: echo "Skipping PR comment because the workflow run does not have permission to post on forked pull requests."
+
+      - name: Attach artifacts to release
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/developer-guide/developer-guide-html.zip
+            build/developer-guide/pdf/developer-guide.pdf
