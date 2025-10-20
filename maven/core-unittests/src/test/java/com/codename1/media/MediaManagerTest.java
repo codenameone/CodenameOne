@@ -111,7 +111,13 @@ class MediaManagerTest extends UITestBase {
     void createMediaRecorderThrowsForUnsupportedMime() {
         MediaRecorderBuilder builder = new MediaRecorderBuilder().path("/file").mimeType("audio/ogg");
 
-        assertThrows(IllegalArgumentException.class, () -> MediaManager.createMediaRecorder(builder));
+        assertThrows(IllegalArgumentException.class, () -> {
+            try {
+                MediaManager.createMediaRecorder(builder);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
         verify(implementation, never()).createMediaRecorder(anyString(), anyString());
     }
 
