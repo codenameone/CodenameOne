@@ -172,11 +172,6 @@ class LocationManagerTest extends UITestBase {
         }
 
         @Override
-        public Location getCurrentLocationSync(long timeout) {
-            return currentLocation;
-        }
-
-        @Override
         public Location getLastKnownLocation() {
             return lastLocation;
         }
