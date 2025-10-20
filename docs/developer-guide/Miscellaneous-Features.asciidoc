@@ -829,7 +829,7 @@ Alternatively, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder
     }
 ----
 
-image::https://user-images.githubusercontent.com/1997316/78480286-02131b00-7735-11ea-8a70-5ca5512e7d92.png[Example of recording and playback audio using Media API]
+image::img/developer-guide/media-audio-recording-example.png[Example of recording and playback audio using Media API]
 
 ==== Capture Asynchronous API
 
