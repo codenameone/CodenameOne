@@ -15,197 +15,6 @@ POST_COMMENT_CLASS="PostPrComment"
 PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
 RENDER_SCREENSHOT_REPORT_CLASS="RenderScreenshotReport"
 
-count_chunks() {
-  local f="${1:-}"
-  local test="${2:-}"
-  local channel="${3:-}"
-  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
-    echo 0
-    return
-  fi
-  if [ -z "$f" ] || [ ! -r "$f" ]; then
-    echo 0
-    return
-  fi
-  local args=("count" "$f")
-  if [ -n "$test" ]; then
-    args+=("--test" "$test")
-  fi
-  if [ -n "$channel" ]; then
-    args+=("--channel" "$channel")
-  fi
-  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" "${args[@]}" 2>/dev/null || echo 0
-}
-
-extract_cn1ss_base64() {
-  local f="${1:-}"
-  local test="${2:-}"
-  local channel="${3:-}"
-  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
-    return 1
-  fi
-  if [ -z "$f" ] || [ ! -r "$f" ]; then
-    return 1
-  fi
-  local args=("extract" "$f")
-  if [ -n "$test" ]; then
-    args+=("--test" "$test")
-  fi
-  if [ -n "$channel" ]; then
-    args+=("--channel" "$channel")
-  fi
-  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" "${args[@]}"
-}
-
-decode_cn1ss_binary() {
-  local f="${1:-}"
-  local test="${2:-}"
-  local channel="${3:-}"
-  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
-    return 1
-  fi
-  if [ -z "$f" ] || [ ! -r "$f" ]; then
-    return 1
-  fi
-  local args=("extract" "$f" "--decode")
-  if [ -n "$test" ]; then
-    args+=("--test" "$test")
-  fi
-  if [ -n "$channel" ]; then
-    args+=("--channel" "$channel")
-  fi
-  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" "${args[@]}"
-}
-
-list_cn1ss_tests() {
-  local f="${1:-}"
-  if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
-    return 1
-  fi
-  if [ -z "$f" ] || [ ! -r "$f" ]; then
-    return 1
-  fi
-  "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" tests "$f"
-}
-
-
-post_pr_comment() {
-  local body_file="${1:-}"
-  local preview_dir="${2:-}"
-  if [ -z "$body_file" ] || [ ! -s "$body_file" ]; then
-    ra_log "Skipping PR comment post (no content)."
-    return 0
-  fi
-  local comment_token="${GITHUB_TOKEN:-}"
-  if [ -z "$comment_token" ] && [ -n "${GH_TOKEN:-}" ]; then
-    comment_token="${GH_TOKEN}"
-    ra_log "PR comment auth using GH_TOKEN fallback"
-  fi
-  if [ -n "$comment_token" ]; then
-    ra_log "PR comment authentication token detected"
-  fi
-  if [ -z "$comment_token" ]; then
-    ra_log "PR comment skipped (no GitHub token available)"
-    return 0
-  fi
-  if [ -z "${GITHUB_EVENT_PATH:-}" ] || [ ! -f "$GITHUB_EVENT_PATH" ]; then
-    ra_log "PR comment skipped (GITHUB_EVENT_PATH unavailable)"
-    return 0
-  fi
-  local body_size
-  body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
-  ra_log "Attempting to post PR comment (payload bytes=${body_size})"
-  GITHUB_TOKEN="$comment_token" "$JAVA17_BIN" "$CN1SS_SOURCE_PATH/$POST_COMMENT_CLASS.java" \
-    --body "$body_file" \
-    --preview-dir "$preview_dir"
-  local rc=$?
-  if [ $rc -eq 0 ]; then
-    ra_log "Posted screenshot comparison comment to PR"
-  else
-    ra_log "STAGE:COMMENT_POST_FAILED (see stderr for details)"
-    if [ -n "${ARTIFACTS_DIR:-}" ]; then
-      local failure_flag="$ARTIFACTS_DIR/pr-comment-failed.txt"
-      printf 'Comment POST failed at %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > "$failure_flag" 2>/dev/null || true
-    fi
-  fi
-  return $rc
-}
-
-decode_test_asset() {
-  local test_name="${1:-}"
-  local dest="${2:-}"
-  local channel="${3:-}"
-  local verifier="${4:-}"
-  local source=""
-  local count="0"
-
-  if [ "${#XMLS[@]}" -gt 0 ]; then
-    for x in "${XMLS[@]}"; do
-      count="$(count_chunks "$x" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
-      [ "$count" -gt 0 ] || continue
-      ra_log "Reassembling test '$test_name' from XML: $x (chunks=$count)"
-      if decode_cn1ss_binary "$x" "$test_name" "$channel" > "$dest" 2>/dev/null; then
-        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="XML:$(basename "$x")"; break; fi
-      fi
-    done
-  fi
-
-  if [ -z "$source" ] && [ "${#LOGCAT_FILES[@]}" -gt 0 ]; then
-    for logcat in "${LOGCAT_FILES[@]}"; do
-      [ -s "$logcat" ] || continue
-      count="$(count_chunks "$logcat" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
-      [ "$count" -gt 0 ] || continue
-      ra_log "Reassembling test '$test_name' from logcat: $logcat (chunks=$count)"
-      if decode_cn1ss_binary "$logcat" "$test_name" "$channel" > "$dest" 2>/dev/null; then
-        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="LOGCAT:$(basename "$logcat")"; break; fi
-      fi
-    done
-  fi
-
-  if [ -z "$source" ] && [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
-    count="$(count_chunks "$TEST_EXEC_LOG" "$test_name" "$channel")"; count="${count//[^0-9]/}"; : "${count:=0}"
-    if [ "$count" -gt 0 ]; then
-      ra_log "Reassembling test '$test_name' from test-results.log: $TEST_EXEC_LOG (chunks=$count)"
-      if decode_cn1ss_binary "$TEST_EXEC_LOG" "$test_name" "$channel" > "$dest" 2>/dev/null; then
-        if [ -z "$verifier" ] || "$verifier" "$dest"; then source="EXECLOG:$(basename "$TEST_EXEC_LOG")"; fi
-      fi
-    fi
-  fi
-
-  if [ -n "$source" ]; then
-    printf '%s' "$source"
-    return 0
-  fi
-
-  rm -f "$dest" 2>/dev/null || true
-  return 1
-}
-
-decode_test_png() {
-  decode_test_asset "$1" "$2" "" verify_png
-}
-
-decode_test_preview() {
-  decode_test_asset "$1" "$2" "PREVIEW" verify_jpeg
-}
-
-# Verify PNG signature + non-zero size
-verify_png() {
-  local f="$1"
-  [ -s "$f" ] || return 1
-  head -c 8 "$f" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$'
-}
-
-verify_jpeg() {
-  local f="$1"
-  [ -s "$f" ] || return 1
-  local header
-  header="$(head -c 2 "$f" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
-  local trailer
-  trailer="$(tail -c 2 "$f" | od -An -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')"
-  [ "$header" = "FFD8" ] && [ "$trailer" = "FFD9" ]
-}
-
 # ---- Args & environment ----------------------------------------------------
 
 if [ $# -lt 1 ]; then
@@ -223,6 +32,9 @@ if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
   ra_log "Missing CN1SS helper: $CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" >&2
   exit 3
 fi
+
+source "$SCRIPT_DIR/lib/cn1ss.sh"
+cn1ss_log() { ra_log "$1"; }
 
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR}/codenameone-tools"
@@ -252,6 +64,8 @@ if [ ! -x "$JAVA17_BIN" ]; then
   ra_log "JDK 17 java binary missing at $JAVA17_BIN" >&2
   exit 3
 fi
+
+cn1ss_setup "$JAVA17_BIN" "$CN1SS_SOURCE_PATH"
 
 [ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
@@ -300,6 +114,17 @@ mapfile -t LOGCAT_FILES < <(
 TEST_EXEC_LOG="$(find "$RESULTS_ROOT" -type f -path '*/testlog/test-results.log' -print -quit 2>/dev/null || true)"
 [ -n "${TEST_EXEC_LOG:-}" ] || TEST_EXEC_LOG=""
 
+declare -a CN1SS_SOURCES=()
+for x in "${XMLS[@]}"; do
+  CN1SS_SOURCES+=("XML:$x")
+done
+for logcat in "${LOGCAT_FILES[@]}"; do
+  CN1SS_SOURCES+=("LOGCAT:$logcat")
+done
+if [ -n "${TEST_EXEC_LOG:-}" ]; then
+  CN1SS_SOURCES+=("EXEC:$TEST_EXEC_LOG")
+fi
+
 if [ "${#XMLS[@]}" -gt 0 ]; then
   ra_log "Found ${#XMLS[@]} test result file(s). First candidate: ${XMLS[0]}"
 else
@@ -316,15 +141,15 @@ fi
 
 XML_CHUNKS_TOTAL=0
 for x in "${XMLS[@]}"; do
-  c="$(count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
+  c="$(cn1ss_count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
   XML_CHUNKS_TOTAL=$(( XML_CHUNKS_TOTAL + c ))
 done
 LOGCAT_CHUNKS=0
 for logcat in "${LOGCAT_FILES[@]}"; do
-  c="$(count_chunks "$logcat")"; c="${c//[^0-9]/}"; : "${c:=0}"
+  c="$(cn1ss_count_chunks "$logcat")"; c="${c//[^0-9]/}"; : "${c:=0}"
   LOGCAT_CHUNKS=$(( LOGCAT_CHUNKS + c ))
 done
-EXECLOG_CHUNKS="$(count_chunks "${TEST_EXEC_LOG:-}")"; EXECLOG_CHUNKS="${EXECLOG_CHUNKS//[^0-9]/}"; : "${EXECLOG_CHUNKS:=0}"
+EXECLOG_CHUNKS="$(cn1ss_count_chunks "${TEST_EXEC_LOG:-}")"; EXECLOG_CHUNKS="${EXECLOG_CHUNKS//[^0-9]/}"; : "${EXECLOG_CHUNKS:=0}"
 
 ra_log "Chunk counts -> XML: ${XML_CHUNKS_TOTAL} | logcat: ${LOGCAT_CHUNKS} | test-results.log: ${EXECLOG_CHUNKS}"
 
@@ -347,7 +172,7 @@ if [ "${#XMLS[@]}" -gt 0 ]; then
     while IFS= read -r name; do
       [ -n "$name" ] || continue
       TEST_NAME_SET["$name"]=1
-    done < <(list_cn1ss_tests "$x" 2>/dev/null || true)
+    done < <(cn1ss_list_tests "$x" 2>/dev/null || true)
   done
 fi
 
@@ -356,14 +181,14 @@ for logcat in "${LOGCAT_FILES[@]}"; do
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     TEST_NAME_SET["$name"]=1
-  done < <(list_cn1ss_tests "$logcat" 2>/dev/null || true)
+  done < <(cn1ss_list_tests "$logcat" 2>/dev/null || true)
 done
 
 if [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     TEST_NAME_SET["$name"]=1
-  done < <(list_cn1ss_tests "$TEST_EXEC_LOG" 2>/dev/null || true)
+  done < <(cn1ss_list_tests "$TEST_EXEC_LOG" 2>/dev/null || true)
 fi
 
 if [ "${#TEST_NAME_SET[@]}" -eq 0 ] && { [ "${LOGCAT_CHUNKS:-0}" -gt 0 ] || [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ] || [ "${EXECLOG_CHUNKS:-0}" -gt 0 ]; }; then
@@ -391,14 +216,14 @@ ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
-  if source_label="$(decode_test_png "$test" "$dest")"; then
+  if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
     TEST_OUTPUTS["$test"]="$dest"
     TEST_SOURCES["$test"]="$source_label"
-    ra_log "Decoded screenshot for '$test' (source=${source_label}, size: $(stat -c '%s' "$dest") bytes)"
+    ra_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
     preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
-    if preview_source="$(decode_test_preview "$test" "$preview_dest")"; then
+    if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
       PREVIEW_OUTPUTS["$test"]="$preview_dest"
-      ra_log "Decoded preview for '$test' (source=${preview_source}, size: $(stat -c '%s' "$preview_dest") bytes)"
+      ra_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
     else
       rm -f "$preview_dest" 2>/dev/null || true
     fi
@@ -409,18 +234,18 @@ for test in "${TEST_NAMES[@]}"; do
       local count
       for logcat in "${LOGCAT_FILES[@]}"; do
         [ -s "$logcat" ] || continue
-        count="$(count_chunks "$logcat" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-        if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$logcat" "$test"; fi
+        count="$(cn1ss_count_chunks "$logcat" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+        if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$logcat" "$test"; fi
       done
       if [ "${#XMLS[@]}" -gt 0 ]; then
         for x in "${XMLS[@]}"; do
-          count="$(count_chunks "$x" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-          if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$x" "$test"; fi
+          count="$(cn1ss_count_chunks "$x" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+          if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$x" "$test"; fi
         done
       fi
       if [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
-        count="$(count_chunks "$TEST_EXEC_LOG" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-        if [ "$count" -gt 0 ]; then extract_cn1ss_base64 "$TEST_EXEC_LOG" "$test"; fi
+        count="$(cn1ss_count_chunks "$TEST_EXEC_LOG" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+        if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$TEST_EXEC_LOG" "$test"; fi
       fi
     } > "$RAW_B64_OUT" 2>/dev/null || true
     if [ -s "$RAW_B64_OUT" ]; then
@@ -494,7 +319,7 @@ fi
 
 ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
 comment_rc=0
-if ! post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
+if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
   comment_rc=$?
 fi
 
