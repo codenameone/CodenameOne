@@ -233,39 +233,30 @@ if [ "${LOG_CHUNKS:-0}" = "0" ]; then
   exit 12
 fi
 
-declare -A TEST_NAME_SET=()
-while IFS= read -r name; do
-  [ -n "$name" ] || continue
-  TEST_NAME_SET["$name"]=1
-done < <(cn1ss_list_tests "$TEST_LOG" 2>/dev/null || true)
-
-if [ "${#TEST_NAME_SET[@]}" -eq 0 ]; then
-  TEST_NAME_SET["default"]=1
-fi
-
+TEST_NAMES_RAW="$(cn1ss_list_tests "$TEST_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
 declare -a TEST_NAMES=()
-for name in "${!TEST_NAME_SET[@]}"; do
-  TEST_NAMES+=("$name")
-done
-IFS=$'\n' TEST_NAMES=($(printf '%s\n' "${TEST_NAMES[@]}" | sort))
-unset IFS
+if [ -n "$TEST_NAMES_RAW" ]; then
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    TEST_NAMES+=("$name")
+  done <<< "$TEST_NAMES_RAW"
+else
+  TEST_NAMES+=("default")
+fi
 ri_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 
-declare -A TEST_OUTPUTS=()
-declare -A TEST_SOURCES=()
-declare -A PREVIEW_OUTPUTS=()
+PAIR_SEP=$'\037'
+declare -a TEST_OUTPUT_ENTRIES=()
 
 ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
   if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
-    TEST_OUTPUTS["$test"]="$dest"
-    TEST_SOURCES["$test"]="$source_label"
+    TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
     ri_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
     preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
     if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
-      PREVIEW_OUTPUTS["$test"]="$preview_dest"
       ri_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
     else
       rm -f "$preview_dest" 2>/dev/null || true
@@ -289,11 +280,24 @@ for test in "${TEST_NAMES[@]}"; do
   fi
 done
 
+lookup_test_output() {
+  local key="$1" entry prefix
+  for entry in "${TEST_OUTPUT_ENTRIES[@]}"; do
+    prefix="${entry%%$PAIR_SEP*}"
+    if [ "$prefix" = "$key" ]; then
+      echo "${entry#*$PAIR_SEP}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 COMPARE_ARGS=()
 for test in "${TEST_NAMES[@]}"; do
-  dest="${TEST_OUTPUTS[$test]:-}"
-  [ -n "$dest" ] || continue
-  COMPARE_ARGS+=("--actual" "${test}=${dest}")
+  if dest="$(lookup_test_output "$test")"; then
+    [ -n "$dest" ] || continue
+    COMPARE_ARGS+=("--actual" "${test}=${dest}")
+  fi
 done
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
