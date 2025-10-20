@@ -16,6 +16,7 @@ import org.mockito.InOrder;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -200,7 +201,8 @@ class JavascriptContextTest extends UITestBase {
 
         context.cleanup();
 
-        verify(browser).execute(contains("delete " + context.jsLookupTable + "[3]"));
+        verify(browser).execute(argThat(script -> script.contains("var id = 3")
+                && script.contains("delete " + context.jsLookupTable + "[id]")));
         assertTrue(map.isEmpty());
     }
 
