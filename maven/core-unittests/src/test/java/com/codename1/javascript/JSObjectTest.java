@@ -30,6 +30,41 @@ class JSObjectTest extends UITestBase {
     private BrowserComponent browser;
     private Queue<String> responses;
 
+    private static class RecordingJavascriptContext extends JavascriptContext {
+        private final Queue<JSObject> recordedFunctions = new ArrayDeque<JSObject>();
+        private final Queue<JSObject> recordedSelfs = new ArrayDeque<JSObject>();
+        private final Queue<Object[]> recordedParams = new ArrayDeque<Object[]>();
+        private final Queue<Callback> recordedCallbacks = new ArrayDeque<Callback>();
+
+        RecordingJavascriptContext(BrowserComponent browser) {
+            super(browser);
+        }
+
+        @Override
+        public void callAsync(JSObject func, JSObject self, Object[] params, Callback callback) {
+            recordedFunctions.add(func);
+            recordedSelfs.add(self);
+            recordedParams.add(params);
+            recordedCallbacks.add(callback);
+        }
+
+        Callback removeNextCallback() {
+            return recordedCallbacks.remove();
+        }
+
+        JSObject removeNextFunction() {
+            return recordedFunctions.remove();
+        }
+
+        JSObject removeNextSelf() {
+            return recordedSelfs.remove();
+        }
+
+        Object[] removeNextParams() {
+            return recordedParams.remove();
+        }
+    }
+
     @BeforeEach
     void setUpBrowser() {
         browser = mock(BrowserComponent.class);
@@ -75,7 +110,7 @@ class JSObjectTest extends UITestBase {
         responses.add("ignored");
         responses.add("object");
         responses.add("3");
-        JavascriptContext context = createContextSpy();
+        RecordingJavascriptContext context = createContextSpy();
         JSObject object = new JSObject(context, "window");
 
         String pointer = object.toJSPointer();
@@ -162,21 +197,25 @@ class JSObjectTest extends UITestBase {
         SuccessCallback successCallback = mock(SuccessCallback.class);
 
         String pointer = object.toJSPointer();
-        doAnswer(invocation -> {
-            Callback adapter = (Callback) invocation.getArgument(3);
-            if (adapter == callback) {
-                return null;
-            }
-            adapter.onSucess("value");
-            return null;
-        }).when(context).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
-
         object.callAsync("action", new Object[]{}, callback);
         object.callAsync("action", new Object[]{}, successCallback);
 
         verify(context).callAsync(eq(object), eq(object), any(Object[].class), eq(callback));
         verify(context, times(2)).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
+
+        Callback first = context.removeNextCallback();
+        assertSame(callback, first);
+        assertSame(object, context.removeNextFunction());
+        assertSame(object, context.removeNextSelf());
+        assertArrayEquals(new Object[]{}, context.removeNextParams());
+
+        Callback second = context.removeNextCallback();
+        assertNotSame(successCallback, second);
+        second.onSucess("value");
         verify(successCallback).onSucess("value");
+        assertSame(object, context.removeNextFunction());
+        assertSame(object, context.removeNextSelf());
+        assertArrayEquals(new Object[]{}, context.removeNextParams());
     }
 
     @Test
@@ -194,9 +233,9 @@ class JSObjectTest extends UITestBase {
         verify(context).removeCallback(eq(object), eq("listener"), eq(false));
     }
 
-    private JavascriptContext createContextSpy() {
-        JavascriptContext context = new JavascriptContext(browser);
-        JavascriptContext spyContext = spy(context);
+    private RecordingJavascriptContext createContextSpy() {
+        RecordingJavascriptContext context = new RecordingJavascriptContext(browser);
+        RecordingJavascriptContext spyContext = spy(context);
         doAnswer(invocation -> {
             JSObject obj = invocation.getArgument(0);
             Map map = getObjectMap(spyContext);
