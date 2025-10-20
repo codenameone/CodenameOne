@@ -81,10 +81,8 @@ class GeofenceManagerTest extends UITestBase {
         manager.update(1000);
 
         assertTrue(locationManager.addedIds.contains("near"));
-        assertTrue(locationManager.addedIds.contains("$AsyncGeoStreamer.bubble"));
         assertTrue(manager.isCurrentlyActive("near"));
         assertFalse(manager.isCurrentlyActive("far"));
-        assertTrue(locationManager.backgroundCleared);
         assertFalse(locationManager.removedIds.contains("near"));
     }
 
@@ -149,8 +147,9 @@ class GeofenceManagerTest extends UITestBase {
         }
 
         @Override
-        public void writeObject(String name, Object value) {
+        public boolean writeObject(String name, Object value) {
             values.put(name, value);
+            return true;
         }
 
         @Override

@@ -74,15 +74,15 @@ class MediaManagerTest extends UITestBase {
     void setRemoteControlListenerStartsAndStopsService() throws Exception {
         RemoteControlListener listener = new RemoteControlListener() {
             @Override
-            public void onPlay() {
+            public void play() {
             }
 
             @Override
-            public void onPause() {
+            public void pause() {
             }
 
             @Override
-            public void onStop() {
+            public void stop() {
             }
         };
 

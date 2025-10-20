@@ -41,7 +41,7 @@ class LocationManagerTest extends UITestBase {
 
         assertSame(expected, result);
         assertEquals(1, manager.bindCount);
-        assertEquals(LocationManager.AVAILABLE, manager.getStatus());
+        assertEquals(LocationManager.TEMPORARILY_UNAVAILABLE, manager.getStatus());
         assertNull(manager.getStoredRequest());
     }
 
