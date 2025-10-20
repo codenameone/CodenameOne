@@ -43,9 +43,10 @@ jobs:
           rm -rf "$PACKAGE_DIR"
           mkdir -p "$PACKAGE_DIR"
           cp "$HTML_BUILD_DIR/developer-guide.html" "$PACKAGE_DIR/"
-          for asset_dir in img sketch; do
-            if [ -d "docs/developer-guide/${asset_dir}" ]; then
-              cp -R "docs/developer-guide/${asset_dir}" "$PACKAGE_DIR/"
+          for asset_dir in docs/developer-guide/*; do
+            base_name="$(basename "$asset_dir")"
+            if [ -d "$asset_dir" ] && [ "$base_name" != "sketch" ]; then
+              cp -R "$asset_dir" "$PACKAGE_DIR/"
             fi
           done
           (cd "$PACKAGE_DIR" && zip -r "../developer-guide-html.zip" .)
