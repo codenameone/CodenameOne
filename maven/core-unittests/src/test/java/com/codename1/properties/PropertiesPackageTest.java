@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -181,7 +182,8 @@ class PropertiesPackageTest {
         assertEquals("Dana", map.get("name"));
         assertEquals(28, map.get("age"));
         assertTrue(map.containsKey("address"));
-        assertEquals(Long.valueOf(123456789L), map.get("created"));
+        assertTrue(map.get("created") instanceof Date);
+        assertEquals(123456789L, ((Date) map.get("created")).getTime());
 
         Person copy = new Person();
         copy.getPropertyIndex().populateFromMap(map);
@@ -262,7 +264,7 @@ class PropertiesPackageTest {
 
     private Element parse(String xml) {
         XMLParser parser = new XMLParser();
-        return parser.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+        return parser.parse(new InputStreamReader(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
     }
 
     private void resetPreferencesState() throws Exception {

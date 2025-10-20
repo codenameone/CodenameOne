@@ -5,6 +5,7 @@ import com.codename1.xml.XMLParser;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -66,6 +67,6 @@ class PushBuilderTest {
 
     private Element parse(String xml) {
         XMLParser parser = new XMLParser();
-        return parser.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+        return parser.parse(new InputStreamReader(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
     }
 }
