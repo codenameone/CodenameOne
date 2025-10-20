@@ -14,6 +14,7 @@ on:
       - master
     paths-ignore:
       - 'scripts/**'
+      - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
 
