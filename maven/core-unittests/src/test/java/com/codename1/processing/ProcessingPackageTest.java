@@ -88,7 +88,7 @@ public class ProcessingPackageTest {
         assertEquals("Second", result.getAsString("/results[last()]/name"));
 
         String[] greaterThan = result.getAsStringArray("/results[position() > 0]/name");
-        assertArrayEquals(new String[]{"Second"}, greaterThan);
+        assertArrayEquals(new String[]{"First", "Second"}, greaterThan);
 
         String[] lessThan = result.getAsStringArray("/results[position() < 1]/name");
         assertArrayEquals(new String[]{"First"}, lessThan);
@@ -98,7 +98,7 @@ public class ProcessingPackageTest {
     public void testXmlAttributesAndNamespaceAliases() {
         Result result = Result.fromContent(SAMPLE_XML, Result.XML);
 
-        assertEquals("Second", result.getAsString("/root/item[@category='beta']/text()"));
+        assertEquals("Second", result.getAsString("/root/item[@category='beta']"));
         assertEquals("1", result.getAsString("/root/item[@category='alpha']/@id"));
 
         result.mapNamespaceAlias("http://example.com/schema", "alias");

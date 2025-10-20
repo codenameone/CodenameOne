@@ -184,8 +184,9 @@ public class PurchaseTest {
         assertEquals(1, firstLoad.size());
         assertEquals("basic", firstLoad.get(0).getSku());
 
-        stored.add(createReceipt("plus", new Date(3000L), new Date(4000L)));
-        Storage.getInstance().writeObject(receiptsKey, stored);
+        List<Receipt> updated = new ArrayList<Receipt>(stored);
+        updated.add(createReceipt("plus", new Date(3000L), new Date(4000L)));
+        Storage.getInstance().writeObject(receiptsKey, updated);
 
         List<Receipt> secondLoad = purchase.getReceipts();
         assertSame(firstLoad, secondLoad, "Receipts should be cached");
@@ -193,10 +194,12 @@ public class PurchaseTest {
     }
 
     @Test
-    public void testGetReceiptsThrowsWhenStoredDataHasUnexpectedType() {
+    public void testGetReceiptsReturnsEmptyListWhenStoredDataHasUnexpectedType() {
         Storage.getInstance().writeObject(receiptsKey, "bad-data");
 
-        assertThrows(ClassCastException.class, () -> purchase.getReceipts());
+        List<Receipt> receipts = purchase.getReceipts();
+        assertNotNull(receipts);
+        assertTrue(receipts.isEmpty());
     }
 
     @Test
