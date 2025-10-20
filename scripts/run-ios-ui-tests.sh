@@ -4,6 +4,8 @@ set -euo pipefail
 
 ri_log() { echo "[run-ios-ui-tests] $1"; }
 
+ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
+
 if [ $# -lt 1 ]; then
   ri_log "Usage: $0 <workspace_path> [app_bundle] [scheme]" >&2
   exit 2
@@ -31,6 +33,18 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
+
+CN1SS_MAIN_CLASS="Cn1ssChunkTools"
+PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
+RENDER_SCREENSHOT_REPORT_CLASS="RenderScreenshotReport"
+CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/android/tests"
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
+  ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
+  exit 3
+fi
+
+source "$SCRIPT_DIR/lib/cn1ss.sh"
+cn1ss_log() { ri_log "$1"; }
 
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR}/codenameone-tools"
@@ -60,6 +74,8 @@ if ! command -v xcrun >/dev/null 2>&1; then
 fi
 
 JAVA17_BIN="$JAVA17_HOME/bin/java"
+
+cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
@@ -199,124 +215,154 @@ if ! xcodebuild \
   exit 10
 fi
 set +o pipefail
-
-# --- If no PNG files in $SCREENSHOT_RAW_DIR, export from the .xcresult attachments ---
-if [ ! "$(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print -quit)" ] && [ -d "$RESULT_BUNDLE" ]; then
-  ri_log "No raw PNGs yet; exporting PNG attachments from $RESULT_BUNDLE"
-
-  ATT_LIST="$SCREENSHOT_TMP_DIR/xcresult-attachments.txt"
-
-  # Walk the result bundle and collect (attachment_id, file_name)
-  python3 - "$RESULT_BUNDLE" "$ATT_LIST" <<'PY'
-import json, subprocess, sys, os, shlex
-
-bundle = sys.argv[1]
-out_list = sys.argv[2]
-
-def norm_id(x):
-    # Accept strings or dicts like {"_value": "..."} or {"id": "..."}
-    if isinstance(x, dict):
-        v = x.get('_value') or x.get('id') or x.get('identifier')
-        if isinstance(v, dict):
-            v = v.get('_value')
-        return v
-    return x
-
-def xcget(obj_id=None):
-    # Xcode 16.4 wants --legacy even for "get object"
-    base = ["xcrun","xcresulttool","get","object","--legacy","--path",bundle,"--format","json"]
-    if obj_id:
-        base += ["--id", norm_id(obj_id)]
-    try:
-        out = subprocess.check_output(base)
-        return json.loads(out)
-    except subprocess.CalledProcessError as e:
-        # Last-ditch: try non-legacy (older toolchains)
-        alt = ["xcrun","xcresulttool","get","object","--path",bundle,"--format","json"]
-        if obj_id:
-            alt += ["--id", norm_id(obj_id)]
-        out = subprocess.check_output(alt)
-        return json.loads(out)
-
-def arr(node, key):
-    v = node.get(key)
-    if isinstance(v, dict) and "_values" in v:
-        return v["_values"] or []
-    if isinstance(v, list):
-        return v
-    return []
-
-def sval(node, key):
-    v = node.get(key)
-    if isinstance(v, dict) and "_value" in v:
-        return v["_value"]
-    if isinstance(v, str):
-        return v
-    return None
-
-def walk_tests(obj, hits):
-    for test in arr(obj, "tests"):
-        # Recurse into subtests
-        for st in arr(test, "subtests"):
-            walk_tests(st, hits)
-        # Activities → attachments
-        for act in arr(test, "activitySummaries"):
-            for att in arr(act, "attachments"):
-                if (att.get("_type",{}).get("_name") == "ActionTestAttachment"):
-                    uti  = sval(att, "uniformTypeIdentifier") or ""
-                    name = sval(att, "filename") or ""
-                    pref = (att.get("payloadRef") or {}).get("id")
-                    if pref and (("png" in (uti or "").lower()) or ("jpeg" in (uti or "").lower()) or (name.lower().endswith((".png",".jpg",".jpeg")))):
-                        if not name: name = "attachment.png"
-                        hits.append((norm_id(pref), name))
-
-root = xcget()
-hits = []
-
-# Dive: actions[] → actionResult.testsRef -> summaries -> testableSummaries -> tests...
-for action in arr(root, "actions"):
-    result = action.get("actionResult") or {}
-    tests_id = norm_id(result.get("testsRef", {}).get("id"))
-    if not tests_id:
-        continue
-    plan_summaries = xcget(tests_id)  # "ActionTestPlanRunSummaries"
-    for summ in arr(plan_summaries, "summaries"):
-        for testable in arr(summ, "testableSummaries"):
-            walk_tests(testable, hits)
-
-# De-dupe on id
-seen=set()
-with open(out_list, "w") as f:
-    for att_id, fname in hits:
-        if not att_id or att_id in seen:
-            continue
-        seen.add(att_id)
-        base, ext = os.path.splitext(fname)
-        if not ext: ext = ".png"
-        if not base: base = "attachment"
-        f.write(f"{att_id} {base}{ext}\n")
-PY
-
-  # Export each attachment id as a file
-  while IFS=$' \t' read -r ATT_ID FNAME; do
-    [ -n "$ATT_ID" ] || continue
-    OUT="$SCREENSHOT_RAW_DIR/$FNAME"
-    if [ -f "$OUT" ]; then
-      base="${FNAME%.*}"; ext="${FNAME##*.}"
-      n=2; while [ -f "$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}" ]; do n=$((n+1)); done
-      OUT="$SCREENSHOT_RAW_DIR/${base}-${n}.${ext}"
-    fi
-    # Prefer --legacy on Xcode 16.4; fallback to non-legacy
-    if ! xcrun xcresulttool export --legacy --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" 2>/dev/null; then
-      xcrun xcresulttool export --path "$RESULT_BUNDLE" --id "$ATT_ID" --output-path "$OUT" || true
-    fi
-    [ -f "$OUT" ] && ri_log "Exported attachment -> $OUT"
-  done < "$ATT_LIST"
+declare -a CN1SS_SOURCES=()
+if [ -s "$TEST_LOG" ]; then
+  CN1SS_SOURCES+=("XCODELOG:$TEST_LOG")
+else
+  ri_log "FATAL: Test log missing or empty at $TEST_LOG"
+  exit 11
 fi
 
-PNG_FILES=()
-while IFS= read -r png; do
-  [ -n "$png" ] || continue
-  PNG_FILES+=("$png")
-done < <(find "$SCREENSHOT_RAW_DIR" -type f -name '*.png' -print | sort)
+LOG_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"; LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"; : "${LOG_CHUNKS:=0}"
+ri_log "Chunk counts -> xcodebuild log: ${LOG_CHUNKS}"
+
+if [ "${LOG_CHUNKS:-0}" = "0" ]; then
+  ri_log "STAGE:MARKERS_NOT_FOUND -> xcodebuild output did not include CN1SS chunks"
+  ri_log "---- CN1SS lines (if any) ----"
+  (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
+  exit 12
+fi
+
+TEST_NAMES_RAW="$(cn1ss_list_tests "$TEST_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
+declare -a TEST_NAMES=()
+if [ -n "$TEST_NAMES_RAW" ]; then
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    TEST_NAMES+=("$name")
+  done <<< "$TEST_NAMES_RAW"
+else
+  TEST_NAMES+=("default")
+fi
+ri_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
+
+PAIR_SEP=$'\037'
+declare -a TEST_OUTPUT_ENTRIES=()
+
+ensure_dir "$SCREENSHOT_PREVIEW_DIR"
+
+for test in "${TEST_NAMES[@]}"; do
+  dest="$SCREENSHOT_TMP_DIR/${test}.png"
+  if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
+    TEST_OUTPUT_ENTRIES+=("${test}${PAIR_SEP}${dest}")
+    ri_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
+    preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
+    if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
+      ri_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
+    else
+      rm -f "$preview_dest" 2>/dev/null || true
+    fi
+  else
+    ri_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
+    RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
+    {
+      for entry in "${CN1SS_SOURCES[@]}"; do
+        path="${entry#*:}"
+        [ -s "$path" ] || continue
+        count="$(cn1ss_count_chunks "$path" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+        if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$path" "$test"; fi
+      done
+    } > "$RAW_B64_OUT" 2>/dev/null || true
+    if [ -s "$RAW_B64_OUT" ]; then
+      head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
+      ri_log "Partial base64 saved at: $RAW_B64_OUT"
+    fi
+    exit 12
+  fi
+done
+
+lookup_test_output() {
+  local key="$1" entry prefix
+  for entry in "${TEST_OUTPUT_ENTRIES[@]}"; do
+    prefix="${entry%%$PAIR_SEP*}"
+    if [ "$prefix" = "$key" ]; then
+      echo "${entry#*$PAIR_SEP}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+COMPARE_ARGS=()
+for test in "${TEST_NAMES[@]}"; do
+  if dest="$(lookup_test_output "$test")"; then
+    [ -n "$dest" ] || continue
+    COMPARE_ARGS+=("--actual" "${test}=${dest}")
+  fi
+done
+
+COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
+export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
+ri_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
+if ! cn1ss_java_run "$PROCESS_SCREENSHOTS_CLASS" \
+  --reference-dir "$SCREENSHOT_REF_DIR" \
+  --emit-base64 \
+  --preview-dir "$SCREENSHOT_PREVIEW_DIR" \
+  "${COMPARE_ARGS[@]}" > "$COMPARE_JSON"; then
+  ri_log "FATAL: Screenshot comparison helper failed"
+  exit 13
+fi
+
+SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
+COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
+
+ri_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
+if ! cn1ss_java_run "$RENDER_SCREENSHOT_REPORT_CLASS" \
+  --compare-json "$COMPARE_JSON" \
+  --comment-out "$COMMENT_FILE" \
+  --summary-out "$SUMMARY_FILE"; then
+  ri_log "FATAL: Failed to render screenshot summary/comment"
+  exit 14
+fi
+
+if [ -s "$SUMMARY_FILE" ]; then
+  ri_log "  -> Wrote summary entries to $SUMMARY_FILE ($(wc -l < "$SUMMARY_FILE" 2>/dev/null || echo 0) line(s))"
+else
+  ri_log "  -> No summary entries generated (all screenshots matched stored baselines)"
+fi
+
+if [ -s "$COMMENT_FILE" ]; then
+  ri_log "  -> Prepared PR comment payload at $COMMENT_FILE (bytes=$(wc -c < "$COMMENT_FILE" 2>/dev/null || echo 0))"
+else
+  ri_log "  -> No PR comment content produced"
+fi
+
+if [ -s "$SUMMARY_FILE" ]; then
+  while IFS='|' read -r status test message copy_flag path preview_note; do
+    [ -n "${test:-}" ] || continue
+    ri_log "Test '${test}': ${message}"
+    if [ "$copy_flag" = "1" ] && [ -n "${path:-}" ] && [ -f "$path" ]; then
+      cp -f "$path" "$ARTIFACTS_DIR/${test}.png" 2>/dev/null || true
+      ri_log "  -> Stored PNG artifact copy at $ARTIFACTS_DIR/${test}.png"
+    fi
+    if [ "$status" = "equal" ] && [ -n "${path:-}" ]; then
+      rm -f "$path" 2>/dev/null || true
+    fi
+    if [ -n "${preview_note:-}" ]; then
+      ri_log "  Preview note: ${preview_note}"
+    fi
+  done < "$SUMMARY_FILE"
+fi
+
+cp -f "$COMPARE_JSON" "$ARTIFACTS_DIR/screenshot-compare.json" 2>/dev/null || true
+if [ -s "$COMMENT_FILE" ]; then
+  cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
+fi
+
+ri_log "STAGE:COMMENT_POST -> Submitting PR feedback"
+comment_rc=0
+if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
+  comment_rc=$?
+fi
+
+exit $comment_rc
 
