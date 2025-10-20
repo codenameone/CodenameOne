@@ -107,7 +107,7 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 25
+        timeout-minutes: 30
 
       - name: Upload iOS artifacts
         if: always()
