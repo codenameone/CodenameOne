@@ -54,7 +54,7 @@ class RequestBuilderTest {
         assertTrue(request.isInsecure());
 
         LinkedHashMap args = getArguments(request);
-        assertEquals("hello world", args.get("search"));
+        assertEquals("hello%20world", args.get("search"));
         assertArrayEquals(new String[]{"one", "two"}, (String[]) args.get("filter"));
 
         Map headers = getHeaders(request);

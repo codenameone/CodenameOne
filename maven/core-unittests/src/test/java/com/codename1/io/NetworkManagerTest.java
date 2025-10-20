@@ -1,6 +1,7 @@
 package com.codename1.io;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -24,6 +25,7 @@ class NetworkManagerTest {
         implementation = TestImplementationProvider.installImplementation(true);
         manager = NetworkManager.getInstance();
         resetManagerState();
+        bootstrapDisplayThread();
     }
 
     @Test
@@ -188,6 +190,13 @@ class NetworkManagerTest {
         timeoutField.setInt(manager, 300000);
 
         getPendingQueue().clear();
+    }
+
+    private void bootstrapDisplayThread() throws Exception {
+        Display display = Display.getInstance();
+        Field edtField = Display.class.getDeclaredField("edt");
+        edtField.setAccessible(true);
+        edtField.set(display, Thread.currentThread());
     }
 
     private static class MockConnectionRequest extends ConnectionRequest {
