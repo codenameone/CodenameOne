@@ -9,7 +9,6 @@ import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -196,14 +195,18 @@ public class PurchaseTest {
     }
 
     @Test
-    public void testGetReceiptsThrowsWhenStoredDataHasUnexpectedType() {
+    public void testGetReceiptsReturnsEmptyListWhenStoredDataHasUnexpectedType() {
         Storage.getInstance().writeObject(receiptsKey, "bad-data");
+        Storage.getInstance().clearCache();
 
-        assertThrows(ClassCastException.class, new Executable() {
-            public void execute() throws Throwable {
-                purchase.getReceipts();
-            }
-        });
+        List<Receipt> receipts = purchase.getReceipts();
+        assertNotNull(receipts, "Receipts list should be initialized");
+        assertTrue(receipts.isEmpty(), "Unexpected types should produce an empty cache");
+
+        List<Receipt> secondCall = purchase.getReceipts();
+        assertSame(receipts, secondCall, "Receipts cache should be reused after invalid data");
+        assertEquals("bad-data", Storage.getInstance().readObject(receiptsKey),
+                "Storage contents should remain untouched when data cannot be cast");
     }
 
     @Test

@@ -103,8 +103,8 @@ public class ProcessingPackageTest {
 
         result.mapNamespaceAlias("http://example.com/schema", "alias");
         assertEquals("Namespace", result.getAsString("/root/alias:entry"));
-        assertEquals("External", result.getAsString("/root/alias:entry/@value"));
-        assertEquals("X", result.getAsString("/root/alias:entry/@alias:code"));
+        assertEquals("External", result.getAsString("/root/alias:entry[0]/@value"));
+        assertEquals("X", result.getAsString("/root/alias:entry[0]/@ex:code"));
     }
 
     @Test
