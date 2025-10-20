@@ -108,10 +108,10 @@ class MediaManagerTest extends UITestBase {
     }
 
     @Test
-    void createMediaRecorderThrowsForUnsupportedMime() {
+    void createMediaRecorderThrowsForUnsupportedMime() throws IOException {
         MediaRecorderBuilder builder = new MediaRecorderBuilder().path("/file").mimeType("audio/ogg");
 
-        assertThrows(IllegalArgumentException.class, () -> createMediaRecorderUnchecked(builder));
+        assertThrows(IllegalArgumentException.class, () -> MediaManager.createMediaRecorder(builder));
         verify(implementation, never()).createMediaRecorder(anyString(), anyString());
     }
 
@@ -245,14 +245,6 @@ class MediaManagerTest extends UITestBase {
         Field field = MediaManager.class.getDeclaredField("remoteControlListener");
         field.setAccessible(true);
         field.set(null, null);
-    }
-
-    private Media createMediaRecorderUnchecked(MediaRecorderBuilder builder) {
-        try {
-            return MediaManager.createMediaRecorder(builder);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private static class StubAsyncMedia extends AbstractMedia {
