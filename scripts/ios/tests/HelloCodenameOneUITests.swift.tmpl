@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import CoreGraphics
 
 final class HelloCodenameOneUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -37,9 +38,7 @@ final class HelloCodenameOneUITests: XCTestCase {
     }
 
     private func captureScreenshot(named name: String) throws {
-        // Allow Codename One an extra moment to render before grabbing the frame.
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))
-        let shot = XCUIScreen.main.screenshot()
+        let shot = waitForRenderedScreenshot(label: name)
 
         // Save into sandbox tmp (optional – mainly for local debugging)
         let pngURL = outputDirectory.appendingPathComponent("\(name).png")
@@ -79,6 +78,85 @@ final class HelloCodenameOneUITests: XCTestCase {
         // tiny retry to allow BrowserComponent to render
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 2.0))
         try captureScreenshot(named: "BrowserComponent")
+    }
+
+    private func waitForRenderedScreenshot(label: String, timeout: TimeInterval = 10, poll: TimeInterval = 0.4) -> XCUIScreenshot {
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))
+        var attempt = 0
+        var screenshot = XCUIScreen.main.screenshot()
+        while Date() < deadline {
+            if screenshotHasRenderableContent(screenshot) {
+                return screenshot
+            }
+            attempt += 1
+            print("CN1SS:INFO:test=\(label) waiting_for_rendered_frame attempt=\(attempt)")
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: poll))
+            screenshot = XCUIScreen.main.screenshot()
+        }
+        return screenshot
+    }
+
+    private func screenshotHasRenderableContent(_ screenshot: XCUIScreenshot) -> Bool {
+        guard let cgImage = screenshot.image.cgImage else {
+            return true
+        }
+        let width = cgImage.width
+        let height = cgImage.height
+        guard width > 0, height > 0 else {
+            return false
+        }
+
+        let insetX = max(0, width / 8)
+        let insetY = max(0, height / 8)
+        let cropRect = CGRect(
+            x: insetX,
+            y: insetY,
+            width: max(1, width - insetX * 2),
+            height: max(1, height - insetY * 2)
+        ).integral
+        guard let cropped = cgImage.cropping(to: cropRect) else {
+            return true
+        }
+
+        let sampleWidth = 80
+        let sampleHeight = 80
+        let bytesPerPixel = 4
+        let bytesPerRow = sampleWidth * bytesPerPixel
+        guard let context = CGContext(
+            data: nil,
+            width: sampleWidth,
+            height: sampleHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return true
+        }
+        context.interpolationQuality = .high
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: sampleWidth, height: sampleHeight))
+        guard let data = context.data else {
+            return true
+        }
+
+        let buffer = data.bindMemory(to: UInt8.self, capacity: sampleHeight * bytesPerRow)
+        var minLuma = 255
+        var maxLuma = 0
+        for y in 0..<sampleHeight {
+            let row = y * bytesPerRow
+            for x in 0..<sampleWidth {
+                let idx = row + x * bytesPerPixel
+                let r = Int(buffer[idx])
+                let g = Int(buffer[idx + 1])
+                let b = Int(buffer[idx + 2])
+                let luma = (r * 299 + g * 587 + b * 114) / 1000
+                if luma < minLuma { minLuma = luma }
+                if luma > maxLuma { maxLuma = luma }
+            }
+        }
+
+        return maxLuma - minLuma > 12
     }
 
     private func sanitizeTestName(_ name: String) -> String {
