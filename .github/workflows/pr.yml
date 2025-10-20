@@ -8,12 +8,14 @@ on:
       - 'scripts/**'
       - 'docs/**'
       - '**/*.md'
+      - '.github/workflows/developer-guide-docs.yml'
   push:
     branches:
       - master
     paths-ignore:
       - 'scripts/**'
       - '**/*.md'
+      - '.github/workflows/developer-guide-docs.yml'
 
 permissions:
   contents: write

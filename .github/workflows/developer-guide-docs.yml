@@ -32,27 +32,40 @@ jobs:
 
       - name: Build Developer Guide HTML and PDF
         run: |
-          OUTPUT_DIR="build/developer-guide"
-          mkdir -p "$OUTPUT_DIR"
-          asciidoctor -D "$OUTPUT_DIR" -o developer-guide.html docs/developer-guide/developer-guide.asciidoc
-          asciidoctor-pdf -D "$OUTPUT_DIR" -o developer-guide.pdf docs/developer-guide/developer-guide.asciidoc
+          set -euo pipefail
+          OUTPUT_ROOT="build/developer-guide"
+          HTML_BUILD_DIR="${OUTPUT_ROOT}/html"
+          PDF_BUILD_DIR="${OUTPUT_ROOT}/pdf"
+          PACKAGE_DIR="${OUTPUT_ROOT}/html-package"
+          mkdir -p "$HTML_BUILD_DIR" "$PDF_BUILD_DIR"
+          asciidoctor -D "$HTML_BUILD_DIR" -o developer-guide.html docs/developer-guide/developer-guide.asciidoc
+          asciidoctor-pdf -D "$PDF_BUILD_DIR" -o developer-guide.pdf docs/developer-guide/developer-guide.asciidoc
+          rm -rf "$PACKAGE_DIR"
+          mkdir -p "$PACKAGE_DIR"
+          cp "$HTML_BUILD_DIR/developer-guide.html" "$PACKAGE_DIR/"
+          for asset_dir in img sketch; do
+            if [ -d "docs/developer-guide/${asset_dir}" ]; then
+              cp -R "docs/developer-guide/${asset_dir}" "$PACKAGE_DIR/"
+            fi
+          done
+          (cd "$PACKAGE_DIR" && zip -r "../developer-guide-html.zip" .)
 
       - name: Upload HTML artifact
         uses: actions/upload-artifact@v4
         with:
           name: developer-guide-html
-          path: build/developer-guide/developer-guide.html
+          path: build/developer-guide/developer-guide-html.zip
           if-no-files-found: error
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
         with:
           name: developer-guide-pdf
-          path: build/developer-guide/developer-guide.pdf
+          path: build/developer-guide/pdf/developer-guide.pdf
           if-no-files-found: error
 
       - name: Comment with artifact download links
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -70,7 +83,7 @@ jobs:
             const links = [];
             for (const artifact of artifacts.data.artifacts) {
               if (artifact.name === 'developer-guide-html') {
-                links.push(`- [Developer Guide HTML](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id})`);
+                links.push(`- [Developer Guide HTML package](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id})`);
               }
               if (artifact.name === 'developer-guide-pdf') {
                 links.push(`- [Developer Guide PDF](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id})`);
@@ -108,10 +121,14 @@ jobs:
               });
             }
 
+      - name: Log skipped PR comment
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        run: echo "Skipping PR comment because the workflow run does not have permission to post on forked pull requests."
+
       - name: Attach artifacts to release
         if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            build/developer-guide/developer-guide.html
-            build/developer-guide/developer-guide.pdf
+            build/developer-guide/developer-guide-html.zip
+            build/developer-guide/pdf/developer-guide.pdf
