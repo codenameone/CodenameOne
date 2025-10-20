@@ -714,7 +714,7 @@ Images {
 
 ==== Generating 9-Piece Image Borders
 
-image::img/Image-270320-112406.063.png[]
+image::img/developer-guide/css-nine-piece-border.png[]
 
 9-Piece image borders can be created using the `image-border` and `image-border-slice` properties. 
 

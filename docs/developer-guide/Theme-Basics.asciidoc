@@ -79,7 +79,7 @@ When we add an entry to the style we can just type the desired UIID into the box
 TIP: You can use the Component Inspector tool in the simulator to locate a component and its UIID in a specific https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form]
 
 .When pressing the Add/Edit entry we can edit a specific style entry UIID
-image::/Users/shai/dev/CodenameOne.wiki/img/developer-guide/theme-add-edit-entry.png[When pressing the Add/Edit entry we can edit a specific style entry UIID,scaledwidth=50%]
+image::img/developer-guide/theme-add-edit-entry.png[When pressing the Add/Edit entry we can edit a specific style entry UIID,scaledwidth=50%]
 
 When we add/edit an entry an important piece of the puzzle is the #Derive# check box that appears next to all of the UIID entries. All styles derive from the base style and usually from the native theme defaults, so when this flag is checked the defaults will be used.
 
