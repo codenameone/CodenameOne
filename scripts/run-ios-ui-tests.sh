@@ -37,9 +37,9 @@ cd "$REPO_ROOT"
 CN1SS_MAIN_CLASS="Cn1ssChunkTools"
 PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
 RENDER_SCREENSHOT_REPORT_CLASS="RenderScreenshotReport"
-CN1SS_SOURCE_PATH="$SCRIPT_DIR/android/tests"
-if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
-  ri_log "Missing CN1SS helper: $CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" >&2
+CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/android/tests"
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
+  ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
   exit 3
 fi
 
@@ -75,7 +75,7 @@ fi
 
 JAVA17_BIN="$JAVA17_HOME/bin/java"
 
-cn1ss_setup "$JAVA17_BIN" "$CN1SS_SOURCE_PATH"
+cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"

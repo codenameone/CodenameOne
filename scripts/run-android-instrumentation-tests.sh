@@ -9,7 +9,6 @@ ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
 # CN1SS helpers are implemented in Java for easier maintenance
-CN1SS_SOURCE_PATH=""
 CN1SS_MAIN_CLASS="Cn1ssChunkTools"
 POST_COMMENT_CLASS="PostPrComment"
 PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
@@ -27,9 +26,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-CN1SS_SOURCE_PATH="$SCRIPT_DIR/android/tests"
-if [ ! -f "$CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" ]; then
-  ra_log "Missing CN1SS helper: $CN1SS_SOURCE_PATH/$CN1SS_MAIN_CLASS.java" >&2
+CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/android/tests"
+if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
+  ra_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
   exit 3
 fi
 
@@ -65,7 +64,7 @@ if [ ! -x "$JAVA17_BIN" ]; then
   exit 3
 fi
 
-cn1ss_setup "$JAVA17_BIN" "$CN1SS_SOURCE_PATH"
+cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 [ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
