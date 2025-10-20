@@ -87,7 +87,7 @@ class JSObjectTest extends UITestBase {
         responses.add("ignored");
         responses.add("object");
         responses.add("5");
-        JavascriptContext context = createContextSpy();
+        RecordingJavascriptContext context = createContextSpy();
 
         JSObject object = new JSObject(context, "window");
 
@@ -100,7 +100,7 @@ class JSObjectTest extends UITestBase {
     void constructorThrowsWhenExpressionIsNotObject() {
         responses.add("ignored");
         responses.add("string");
-        JavascriptContext context = createContextSpy();
+        RecordingJavascriptContext context = createContextSpy();
 
         assertThrows(JSException.class, () -> new JSObject(context, "1"));
     }
@@ -134,7 +134,7 @@ class JSObjectTest extends UITestBase {
         responses.add("ignored");
         responses.add("object");
         responses.add("4");
-        JavascriptContext context = createContextSpy();
+        RecordingJavascriptContext context = createContextSpy();
         JSObject object = new JSObject(context, "window");
 
         JSFunction function = mock(JSFunction.class);
@@ -149,7 +149,7 @@ class JSObjectTest extends UITestBase {
         responses.add("ignored");
         responses.add("object");
         responses.add("6");
-        JavascriptContext context = createContextSpy();
+        RecordingJavascriptContext context = createContextSpy();
         JSObject object = new JSObject(context, "window");
 
         doNothing().when(context).set(anyString(), any());
@@ -190,7 +190,7 @@ class JSObjectTest extends UITestBase {
         responses.add("ignored");
         responses.add("object");
         responses.add("9");
-        JavascriptContext context = createContextSpy();
+        RecordingJavascriptContext context = createContextSpy();
         JSObject object = new JSObject(context, "window");
 
         Callback callback = mock(Callback.class);
