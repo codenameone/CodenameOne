@@ -37,6 +37,8 @@ final class HelloCodenameOneUITests: XCTestCase {
     }
 
     private func captureScreenshot(named name: String) throws {
+        // Allow Codename One an extra moment to render before grabbing the frame.
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))
         let shot = XCUIScreen.main.screenshot()
 
         // Save into sandbox tmp (optional – mainly for local debugging)
