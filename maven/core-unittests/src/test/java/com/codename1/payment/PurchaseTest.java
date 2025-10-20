@@ -9,6 +9,7 @@ import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -178,7 +179,8 @@ public class PurchaseTest {
     public void testGetReceiptsLoadsFromStorageAndCaches() {
         List<Receipt> stored = new ArrayList<Receipt>();
         stored.add(createReceipt("basic", new Date(1000L), new Date(2000L)));
-        Storage.getInstance().writeObject(receiptsKey, stored);
+        Storage.getInstance().writeObject(receiptsKey, new ArrayList<Receipt>(stored));
+        Storage.getInstance().clearCache();
 
         List<Receipt> firstLoad = purchase.getReceipts();
         assertEquals(1, firstLoad.size());
@@ -194,12 +196,14 @@ public class PurchaseTest {
     }
 
     @Test
-    public void testGetReceiptsReturnsEmptyListWhenStoredDataHasUnexpectedType() {
+    public void testGetReceiptsThrowsWhenStoredDataHasUnexpectedType() {
         Storage.getInstance().writeObject(receiptsKey, "bad-data");
 
-        List<Receipt> receipts = purchase.getReceipts();
-        assertNotNull(receipts);
-        assertTrue(receipts.isEmpty());
+        assertThrows(ClassCastException.class, new Executable() {
+            public void execute() throws Throwable {
+                purchase.getReceipts();
+            }
+        });
     }
 
     @Test
