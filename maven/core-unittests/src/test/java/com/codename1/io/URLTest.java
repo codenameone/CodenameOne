@@ -72,7 +72,7 @@ class URLTest {
         assertEquals("x=1", url.getQuery());
         assertEquals("/path/resource", url.getPath());
         assertEquals("user:secret", url.getUserInfo());
-        assertEquals("example.com:8443", url.getAuthority());
+        assertEquals("user:secret@example.com:8443", url.getAuthority());
         assertEquals(8443, url.getPort());
         assertEquals(443, url.getDefaultPort());
         assertEquals("https", url.getProtocol());

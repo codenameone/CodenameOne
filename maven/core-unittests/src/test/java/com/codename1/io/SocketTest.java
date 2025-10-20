@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
@@ -181,8 +182,7 @@ class SocketTest {
     private FakeSocketState prepareSocketState(String host, int port) {
         FakeSocketState state = new FakeSocketState();
         when(implementation.isSocketAvailable()).thenReturn(true);
-        when(implementation.connectSocket(host, port, 0)).thenReturn(state);
-        when(implementation.connectSocket(host, port, anyInt())).thenReturn(state);
+        when(implementation.connectSocket(eq(host), eq(port), anyInt())).thenReturn(state);
         when(implementation.isSocketConnected(state)).thenAnswer(invocation -> state.connected);
         when(implementation.getSocketAvailableInput(state)).thenAnswer(invocation -> state.available());
         when(implementation.readFromSocketStream(state)).thenAnswer(invocation -> state.read());
@@ -192,12 +192,12 @@ class SocketTest {
         doAnswer(invocation -> {
             state.write(invocation.getArgument(1));
             return null;
-        }).when(implementation).writeToSocketStream(state, any(byte[].class));
+        }).when(implementation).writeToSocketStream(eq(state), any(byte[].class));
 
         doAnswer(invocation -> {
             state.connected = false;
             return null;
-        }).when(implementation).disconnectSocket(state);
+        }).when(implementation).disconnectSocket(eq(state));
 
         return state;
     }
