@@ -11,21 +11,21 @@ public class ProcessingPackageTest {
             "{" +
             "\"results\":[" +
             "{" +
-            "\"id\":1," +
+            "\"id\":\"1\"," +
             "\"name\":\"First\"," +
             "\"short_name\":\"New York\"," +
             "\"price\":10.5," +
-            "\"active\":true," +
+            "\"active\":\"true\"," +
             "\"tags\":[\"alpha\",\"beta\"]," +
             "\"types\":[\"neighborhood\",\"political\"]," +
             "\"meta\":{\"attributes\":[{\"key\":\"color\",\"value\":\"red\"},{\"key\":\"size\",\"value\":\"L\"}]}" +
             "}," +
             "{" +
-            "\"id\":2," +
+            "\"id\":\"2\"," +
             "\"name\":\"Second\"," +
             "\"short_name\":\"Albany\"," +
             "\"price\":20.75," +
-            "\"active\":false," +
+            "\"active\":\"false\"," +
             "\"tags\":[\"gamma\",\"delta\"]," +
             "\"types\":[\"political\"]," +
             "\"meta\":{\"attributes\":[{\"key\":\"color\",\"value\":\"blue\"},{\"key\":\"size\",\"value\":\"M\"}]}" +
