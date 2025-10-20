@@ -22,6 +22,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -168,12 +169,13 @@ class JSObjectTest extends UITestBase {
             }
             adapter.onSucess("value");
             return null;
-        }).when(context).callAsync(eq(pointer + ".action"), eq(object), any(Object[].class), any(Callback.class));
+        }).when(context).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
 
         object.callAsync("action", new Object[]{}, callback);
         object.callAsync("action", new Object[]{}, successCallback);
 
-        verify(context).callAsync(eq(pointer + ".action"), eq(object), any(Object[].class), eq(callback));
+        verify(context).callAsync(eq(object), eq(object), any(Object[].class), eq(callback));
+        verify(context, times(2)).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
         verify(successCallback).onSucess("value");
     }
 
