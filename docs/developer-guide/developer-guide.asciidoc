@@ -18,18 +18,27 @@
 :uuid: 92CA37B2-EB2B-4B8F-AC7C-1ED13683F7FB
 :front-cover-image: image:img/cover.png[Front Cover,1000,1600]
 :lang: en-US
-//:revdate: 2018-07-22
+:revdate: 2025-10-20
+:revnumber: DEV-SNAPSHOT
 :doctitle: Codename One Developer Guide
-:author: Shai Almog, Steve Hannah and Chen Fishbein
-:producer: Codename One Academy
+:author: Codename One Documentation Team; Shai Almog; Steve Hannah; Chen Fishbein
 :description: Build native mobile apps in Java
 :keywords: java, android, ios, iphone, mobile development
 :copyright: Codename One, all rights reserved
 :publication-type: book
+:producer: Codename One Ltd.
+:partnums:
+
+= {doctitle}
+{author}
+
+toc::[]
 
 include::About-This-Guide.asciidoc[]
 
-include::index.asciidoc[]
+= Part I. Foundations
+
+include::Index.asciidoc[]
 
 include::basics.asciidoc[]
 
@@ -39,15 +48,17 @@ include::Advanced-Theming.asciidoc[]
 
 include::css.asciidoc[]
 
+= Part II. User Interface and Experience
+
 include::The-Components-Of-Codename-One.asciidoc[]
 
 include::Animations.asciidoc[]
 
 include::The-EDT---Event-Dispatch-Thread.asciidoc[]
 
-include::Monetization.asciidoc[]
-
 include::graphics.asciidoc[]
+
+= Part III. Application Services
 
 include::Events.asciidoc[]
 
@@ -59,7 +70,13 @@ include::Miscellaneous-Features.asciidoc[]
 
 include::performance.asciidoc[]
 
+include::Monetization.asciidoc[]
+
+= Part IV. Platform and Deployment
+
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
+
+include::security.asciidoc[]
 
 include::signing.asciidoc[]
 
@@ -67,12 +84,14 @@ include::Working-With-iOS.asciidoc[]
 
 include::Working-With-Javascript.asciidoc[]
 
-include::Working-with-UWP.asciidoc[]
-
 include::Working-with-Mac-OS-X.asciidoc[]
 
-include::security.asciidoc[]
-
-include::Travis-CI-Integration.asciidoc[]
+= Part V. Contributing and Appendices
 
 include::Working-With-CodenameOne-Sources.asciidoc[]
+
+= Historical Reference
+
+include::Working-with-UWP.asciidoc[]
+
+include::Travis-CI-Integration.asciidoc[]

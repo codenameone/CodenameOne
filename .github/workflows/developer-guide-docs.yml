@@ -21,6 +21,24 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Update publication metadata for release
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          REV_DATE="$(date -u +%Y-%m-%d)"
+          VERSION="${RELEASE_TAG:-}"
+          if [ -z "$VERSION" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
+            VERSION="$GITHUB_REF_NAME"
+          fi
+          VERSION="${VERSION#v}"
+          if [ -z "$VERSION" ]; then
+            VERSION="UNKNOWN"
+          fi
+          sed -i -E "s/^:revdate: .*/:revdate: ${REV_DATE}/" docs/developer-guide/developer-guide.asciidoc
+          sed -i -E "s/^:revnumber: .*/:revnumber: ${VERSION}/" docs/developer-guide/developer-guide.asciidoc
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
