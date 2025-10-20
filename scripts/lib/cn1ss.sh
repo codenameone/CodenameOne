@@ -78,16 +78,22 @@ cn1ss_setup() {
         continue
       fi
       sources+=("$src")
-    done < <(find "$CN1SS_SOURCE_PATH" -type f -name '*.java' -print0)
+    done < <(find "$CN1SS_SOURCE_PATH" -type f -name '*.java' -print0 | sort -z)
     if [ "${#sources[@]}" -eq 0 ]; then
       cn1ss_log "CN1SS setup failed: no Java sources found under $CN1SS_SOURCE_PATH"
       return 1
     fi
     cn1ss_log "Compiling CN1SS helpers -> $CN1SS_CLASS_DIR"
-    if ! "$CN1SS_JAVAC_BIN" -d "$CN1SS_CLASS_DIR" "${sources[@]}"; then
-      cn1ss_log "CN1SS setup failed: javac returned non-zero status"
-      return 1
-    fi
+    local src display
+    for src in "${sources[@]}"; do
+      display="${src#$CN1SS_SOURCE_PATH/}"
+      display="${display:-$(basename "$src")}"
+      cn1ss_log "  javac $display"
+      if ! "$CN1SS_JAVAC_BIN" -d "$CN1SS_CLASS_DIR" -cp "$CN1SS_CLASS_DIR" "$src"; then
+        cn1ss_log "CN1SS setup failed: javac returned non-zero status ($display)"
+        return 1
+      fi
+    done
     touch "$CN1SS_STAMP_FILE" 2>/dev/null || true
   else
     cn1ss_log "Reusing CN1SS helpers in $CN1SS_CLASS_DIR"
