@@ -13,61 +13,29 @@ import com.codename1.ui.layouts.BoxLayout;
 public class @MAIN_NAME@ {
     private Form current;
     private Form mainForm;
-    private boolean initBootstrapScheduled;
 
     public void init(Object context) {
-        System.out.println("CN1SS:INFO:codenameone_init context=" + (context == null ? "null" : context.getClass().getName()));
-        System.out.println("CN1SS:INFO:codenameone_init_display_initialized=" + Display.isInitialized());
-        if (!initBootstrapScheduled) {
-            initBootstrapScheduled = true;
-            Display.getInstance().callSerially(() -> {
-                System.out.println("CN1SS:INFO:codenameone_init_serial_bootstrap begin=true");
-                ensureMainFormVisible("init_serial");
-            });
-        }
+        // No special initialization required for this sample
     }
 
     public void start() {
-        System.out.println("CN1SS:INFO:codenameone_start current_exists=" + (current != null));
-        Display display = Display.getInstance();
-        int density = display.getDeviceDensity();
-        String densityBucket;
-        try {
-            densityBucket = display.getDensityStr();
-        } catch (IllegalStateException ex) {
-            densityBucket = "unknown";
-        }
-        double densityScale = density > 0 ? ((double) density) / Display.DENSITY_MEDIUM : 0.0;
-        String densityScaleStr = formatScale(densityScale);
-        System.out.println("CN1SS:INFO:codenameone_start_display_initialized=" + display.isInitialized()
-                + " display_size=" + display.getDisplayWidth() + "x" + display.getDisplayHeight()
-                + " device_density=" + density
-                + " density_bucket=" + densityBucket
-                + " density_scale=" + densityScaleStr);
         if (current != null) {
-            System.out.println("CN1SS:INFO:codenameone_restore_previous_form title=" + current.getTitle());
             current.show();
             return;
         }
-        ensureMainFormVisible("start");
+        showMainForm();
     }
 
     public void stop() {
-        System.out.println("CN1SS:INFO:codenameone_stop capturing_current_form=true");
         current = Display.getInstance().getCurrent();
-        if (current != null) {
-            System.out.println("CN1SS:INFO:codenameone_stop_form title=" + current.getTitle());
-        }
     }
 
     public void destroy() {
-        System.out.println("CN1SS:INFO:codenameone_destroy invoked=true");
         // Nothing to clean up for this sample
     }
 
-    private void buildMainFormIfNeeded() {
+    private void showMainForm() {
         if (mainForm == null) {
-            System.out.println("CN1SS:INFO:codenameone_build_main_form start=true");
             mainForm = new Form("Main Screen", new BorderLayout());
 
             Container content = new Container(BoxLayout.y());
@@ -84,93 +52,32 @@ public class @MAIN_NAME@ {
             body.getAllStyles().setFgColor(0xf9fafb);
 
             Button openBrowser = new Button("Open Browser Screen");
-            openBrowser.addActionListener(evt -> {
-                System.out.println("CN1SS:INFO:codenameone_open_browser_action triggered=true");
-                showBrowserForm();
-            });
+            openBrowser.addActionListener(evt -> showBrowserForm());
 
             content.add(heading);
             content.add(body);
             content.add(openBrowser);
 
             mainForm.add(BorderLayout.CENTER, content);
-            System.out.println("CN1SS:INFO:codenameone_build_main_form complete=true");
         }
-    }
-
-    private void ensureMainFormVisible(String reason) {
-        buildMainFormIfNeeded();
-        Display display = Display.getInstance();
-        Form visible = display.getCurrent();
-        if (visible != mainForm) {
-            current = mainForm;
-            mainForm.show();
-            System.out.println("CN1SS:INFO:codenameone_main_form_presented reason=" + reason);
-        } else {
-            current = mainForm;
-            System.out.println("CN1SS:INFO:codenameone_main_form_already_visible reason=" + reason);
-        }
-        Display.getInstance().callSerially(() -> logFormMetrics("codenameone_main_form_ready", Display.getInstance().getCurrent()));
-    }
-
-    private void showMainForm() {
-        buildMainFormIfNeeded();
         current = mainForm;
         mainForm.show();
-        System.out.println("CN1SS:INFO:codenameone_main_form_shown title=" + mainForm.getTitle());
-        Display.getInstance().callSerially(() -> logFormMetrics("codenameone_main_form_ready", Display.getInstance().getCurrent()));
     }
 
     private void showBrowserForm() {
-        System.out.println("CN1SS:INFO:codenameone_build_browser_form start=true");
         Form browserForm = new Form("Browser Screen", new BorderLayout());
 
         BrowserComponent browser = new BrowserComponent();
-        String html = buildBrowserHtml();
-        System.out.println("CN1SS:INFO:codenameone_browser_html_length=" + html.length());
-        browser.setPage(html, null);
+        browser.setPage(buildBrowserHtml(), null);
         browserForm.add(BorderLayout.CENTER, browser);
         browserForm.getToolbar().addMaterialCommandToLeftBar(
                 "Back",
                 FontImage.MATERIAL_ARROW_BACK,
-                evt -> {
-                    System.out.println("CN1SS:INFO:codenameone_browser_back_action triggered=true");
-                    ensureMainFormVisible("browser_back");
-                }
+                evt -> showMainForm()
         );
 
         current = browserForm;
         browserForm.show();
-        System.out.println("CN1SS:INFO:codenameone_browser_form_shown title=" + browserForm.getTitle());
-        Display.getInstance().callSerially(() -> logFormMetrics("codenameone_browser_form_ready", Display.getInstance().getCurrent()));
-    }
-
-    private void logFormMetrics(String label, Form form) {
-        if (form == null) {
-            System.out.println("CN1SS:WARN:" + label + " form=null");
-            return;
-        }
-        System.out.println("CN1SS:INFO:" + label
-                + " title=" + form.getTitle()
-                + " width=" + form.getWidth()
-                + " height=" + form.getHeight()
-                + " component_count=" + form.getComponentCount());
-    }
-
-    private String formatScale(double scale) {
-        if (scale <= 0) {
-            return "0";
-        }
-        int rounded = (int) (scale * 100 + 0.5);
-        int integerPart = rounded / 100;
-        int fractionPart = Math.abs(rounded % 100);
-        if (fractionPart == 0) {
-            return Integer.toString(integerPart);
-        }
-        if (fractionPart < 10) {
-            return integerPart + ".0" + fractionPart;
-        }
-        return integerPart + "." + fractionPart;
     }
 
     private String buildBrowserHtml() {
