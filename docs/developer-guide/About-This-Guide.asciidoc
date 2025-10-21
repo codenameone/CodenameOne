@@ -3,15 +3,11 @@ toc::[]
 [preface]
 == Preface
 
-This developer guide is automatically generated from the wiki pages at https://github.com/codenameone/CodenameOne/wiki[https://github.com/codenameone/CodenameOne/wiki].
+This developer guide is sourced directly from the `docs` directory of the https://github.com/codenameone/CodenameOne/[Codename One Git repository]. The documentation is written in AsciiDoc, reviewed through pull requests, and published from the main branch to multiple targets.
 
-You can edit any page within the wiki pages using AsciiDoc. Your changes might make it (after review) into the  official documentation available on the web here: https://www.codenameone.com/manual/ and available as a PDF file here: https://www.codenameone.com/files/developer-guide.pdf[https://www.codenameone.com/files/developer-guide.pdf].
+To contribute updates, clone the repository, create a feature branch, and edit the AsciiDoc files in `docs/developer-guide`. Proposed changes are submitted as GitHub pull requests where they undergo automated and human review. Once merged, the content is rendered to the web manual at https://www.codenameone.com/manual/ and to the downloadable PDF at https://www.codenameone.com/files/developer-guide.pdf[https://www.codenameone.com/files/developer-guide.pdf]. Periodically, major revisions are collected for print-on-demand distribution.
 
-Occasionally this book is updated to the print edition available here: https://www.amazon.com/dp/1549910035
-
-We also recommend that you check out the full https://www.codenameone.com/javadoc/[JavaDoc] reference for Codename One which is very complete.
-
-You can download the full Codename One source code from the https://github.com/codenameone/CodenameOne/[Codename One git repository] where you can also edit the JavaDocs and submit pull requests to https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html[include new features into Codename One].
+While this guide focuses on tutorial and conceptual material, the complete API reference remains available in the https://www.codenameone.com/javadoc/[Codename One JavaDoc]. The source code for the framework and this manual lives alongside each other in Git, so improvements to documentation and code can evolve together through the same contribution workflow.
 
 <<<
 

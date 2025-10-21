@@ -1,16 +1,26 @@
-# The Codename One Wiki
+= Codename One Developer Guide
 
-In this Wiki we try to maintain the Codename One Developer guide. Check it out by clicking the links on the right hand side navigation bar. Also , you can check online Kotlin courses https://skillcombo.com/topic/kotlin/[here].
+Welcome to the Codename One Developer Guide. This manual brings together tutorials, patterns, and reference material to help you design, build, and ship cross-platform apps with Codename One. Use the table of contents to explore the topics most relevant to your project, or follow the guide sequentially for a comprehensive tour of the toolkit.
 
-This is an open edit wiki, so feel free to edit everything you see in a constructive way. You can also monitor changes to the wiki https://github.com/codenameone/CodenameOne/wiki.atom[via RSS] or by using https://ifttt.com/recipes/372144-codename-one-wiki-update-to-e-mail[ifttt].
+== Guide at a Glance
 
-To learn more about Codename One check out the following resources:
+* *Getting Started* – Installation, project creation, and first-run walkthroughs that help you configure your environment and build your first Codename One app.
+* *UI & UX* – Layout managers, themes, components, and best practices for crafting responsive user interfaces across platforms.
+* *Application Services* – Covers data storage, networking, push notifications, native interfaces, and other platform services you can integrate.
+* *Deployment & Distribution* – Instructions for packaging, signing, and publishing to the major app stores alongside troubleshooting tips.
+* *Appendices & Reference* – Supplemental material including glossary entries, configuration tables, and advanced topics for power users.
 
-* https://www.codenameone.com/javadoc/index.html[JavaDocs]
-* https://www.codenameone.com/how-do-i.html[How Do I? - Videos Covering common usages of Codename One]
-* https://www.codenameone.com/blog.html[The Codename One Blog for latest news]
-* https://www.codenameone.com/manual/[The developer guide as it is published on the Codename One site]
-* https://www.codenameone.com/hello-world.html[Hello World Tutorial]
-* https://www.udemy.com/learn-mobile-programming-by-example-with-codename-one/[Free Udemy course covering the creation of two simple applications]
-* http://stackoverflow.com/tags/codenameone[Stack overflow Codename One tag]
-* https://www.codenameone.com/discussion-forum.html[The Codename One Discussion Forum]
+Each section is organized to surface conceptual explanations first, followed by practical examples and deeper dives. Cross references within the guide link related topics so you can quickly pivot between beginner-friendly introductions and advanced techniques.
+
+== Recommended Resources
+
+These resources complement the manual and are maintained by the Codename One team:
+
+* https://www.codenameone.com/manual/[Web edition of this guide]
+* https://www.codenameone.com/files/developer-guide.pdf[Downloadable PDF release]
+* https://www.codenameone.com/javadoc/index.html[Codename One JavaDoc]
+* https://www.codenameone.com/how-do-i.html[How Do I? video tutorials]
+* https://www.codenameone.com/blog.html[Codename One blog]
+* https://www.codenameone.com/discussion-forum.html[Community discussion forum]
+
+For questions or improvements, open an issue or submit a pull request in the https://github.com/codenameone/CodenameOne/[Codename One GitHub repository].
