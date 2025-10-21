@@ -1,5 +1,6 @@
 package com.codename1.testing;
 
+import com.codename1.io.Util;
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Form;
 import org.junit.jupiter.api.AfterEach;
@@ -32,11 +33,13 @@ class DeviceRunnerTest extends UITestBase {
             currentForm = invocation.getArgument(0);
             return null;
         }).when(implementation).setCurrentForm(any(Form.class));
+        Util.setImplementation(implementation);
     }
 
     @AfterEach
     void resetReporting() {
         TestReporting.setInstance(null);
+        Util.setImplementation(null);
     }
 
     @Test
