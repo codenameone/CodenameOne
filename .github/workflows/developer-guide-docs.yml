@@ -55,22 +55,7 @@ jobs:
           GENERATED="docs/developer-guide/book-cover.generated.svg"
           cp "$SOURCE" "$GENERATED"
           export GENERATED
-          python - <<'PY'
-import os
-import re
-from pathlib import Path
-
-target = Path(os.environ["GENERATED"])
-rev = os.environ.get("REV_NUMBER", "UNKNOWN")
-date = os.environ.get("REV_HUMAN_DATE", os.environ.get("REV_DATE", ""))
-replacement = f"Version {rev} - {date}".strip()
-text = target.read_text(encoding="utf-8")
-pattern = re.compile(r"Version\s+[^<]+")
-if not pattern.search(text):
-    raise SystemExit("Could not find version text placeholder in cover artwork")
-text = pattern.sub(replacement, text, count=1)
-target.write_text(text, encoding="utf-8")
-PY
+          python3 -c "import os, re, pathlib; target = pathlib.Path(os.environ['GENERATED']); text = target.read_text(encoding='utf-8'); rev = os.environ.get('REV_NUMBER', 'UNKNOWN'); date = os.environ.get('REV_HUMAN_DATE') or os.environ.get('REV_DATE', ''); replacement = f\"Version {rev}\" + (f\" - {date}\" if date else ''); new_text, count = re.subn(r'Version\\s+[^<]+', replacement.strip(), text, count=1); assert count == 1, 'Could not find version text placeholder in cover artwork'; target.write_text(new_text, encoding='utf-8')"
           {
             echo "COVER_SVG_ATTR=$(basename "$GENERATED")"
             echo "GENERATED_COVER_PATH=$GENERATED"
