@@ -4,20 +4,17 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.TestImplementationProvider;
 import com.codename1.xml.Element;
-import com.codename1.xml.XMLParser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -179,8 +176,21 @@ class PropertiesPackageTest {
         assertEquals("admin", fromJson.attributes.get("role"));
 
         String xml = person.getPropertyIndex().toXML();
-        Element element = parse(xml);
-        assertEquals("Dana", element.getChildAt(0).getText());
+        assertTrue(xml.contains("<" + person.getPropertyIndex().getName()));
+
+        Element element = person.getPropertyIndex().asElement();
+        assertEquals("Dana", element.getAttribute("name"));
+        assertEquals("28", element.getAttribute("age"));
+
+        Vector addressChildren = element.getChildrenByTagName("address");
+        assertEquals(1, addressChildren.size());
+        Element addressElement = (Element) addressChildren.elementAt(0);
+        assertEquals("Address", addressElement.getTagName());
+        assertEquals("Metropolis", addressElement.getAttribute("city"));
+
+        Vector historyChildren = element.getChildrenByTagName("history");
+        assertTrue(historyChildren.isEmpty());
+
         Person fromXml = new Person();
         fromXml.getPropertyIndex().fromXml(element);
         assertEquals("Dana", fromXml.name.get());
@@ -195,9 +205,10 @@ class PropertiesPackageTest {
         index.setXmlTextElement(person.name, true);
         assertTrue(index.isXmlTextElement(person.name));
         assertSame(person.name, index.getXmlTextElement());
-        String xml = index.toXML();
-        Element element = parse(xml);
-        assertEquals("Eva", element.getChildAt(0).getText());
+        Element element = index.asElement();
+        Element textChild = element.getChildAt(0);
+        assertTrue(textChild.isTextElement());
+        assertEquals("Eva", textChild.getText());
         index.setXmlTextElement(person.name, false);
         assertNull(index.getXmlTextElement());
     }
@@ -238,11 +249,6 @@ class PropertiesPackageTest {
         assertEquals("Updated", Preferences.get("prefs.title", ""));
         assertFalse(Preferences.get("prefs.enabled", true));
         assertEquals(7, Preferences.get("prefs.total", 0));
-    }
-
-    private Element parse(String xml) {
-        XMLParser parser = new XMLParser();
-        return parser.parse(new InputStreamReader(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
     }
 
     private void resetPreferencesState() throws Exception {
