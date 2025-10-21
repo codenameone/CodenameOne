@@ -2,6 +2,7 @@ import XCTest
 import UIKit
 import CoreGraphics
 import Darwin
+import Foundation
 
 final class HelloCodenameOneUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -275,13 +276,10 @@ final class HelloCodenameOneUITests: XCTestCase {
         if let explicit = targetBundleIdentifier, !explicit.isEmpty {
             return explicit
         }
-        do {
-            let value = try app.value(forKey: "bundleID")
-            if let actual = value as? String, !actual.isEmpty {
-                return actual
+        if let bundle: String = dynamicAppValue("bundleID") {
+            if !bundle.isEmpty {
+                return bundle
             }
-        } catch {
-            print("CN1SS:WARN:ui_test_bundle_resolution_failed error=\(error)")
         }
         return nil
     }
@@ -449,20 +447,16 @@ private final class CodenameOneMainInvoker {
     }
 
     private func locateAppContainer(app: XCUIApplication, bundleIdentifier: String) -> String? {
-        do {
-            if let bundleURL = try app.value(forKey: "bundleURL") as? URL {
-                return bundleURL.path
-            }
-        } catch {
-            print("CN1SS:WARN:codenameone_main_kvc_failed key=bundleURL bundle=\(bundleIdentifier) error=\(error)")
+        if let bundleURL: URL = dynamicAppValue("bundleURL"), !bundleURL.path.isEmpty {
+            return bundleURL.path
         }
 
-        do {
-            if let bundlePath = try app.value(forKey: "bundlePath") as? String {
-                return bundlePath
-            }
-        } catch {
-            print("CN1SS:WARN:codenameone_main_kvc_failed key=bundlePath bundle=\(bundleIdentifier) error=\(error)")
+        if let bundlePath: String = dynamicAppValue("bundlePath"), !bundlePath.isEmpty {
+            return bundlePath
+        }
+
+        if let container = locateViaSimctl(bundleIdentifier: bundleIdentifier) {
+            return container
         }
 
         if let fallback = Bundle.main.infoDictionary?["CFBundleExecutable"] as? String {
@@ -484,6 +478,71 @@ private final class CodenameOneMainInvoker {
             return nil
         }
         return executable
+    }
+
+    private func locateViaSimctl(bundleIdentifier: String) -> String? {
+        let env = ProcessInfo.processInfo.environment
+        guard let udid = env["SIMULATOR_UDID"], !udid.isEmpty else {
+            return nil
+        }
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        task.arguments = ["simctl", "get_app_container", udid, bundleIdentifier]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        task.standardOutput = stdoutPipe
+        task.standardError = stderrPipe
+
+        do {
+            try task.run()
+        } catch {
+            print("CN1SS:WARN:codenameone_main_simctl_failed bundle=\(bundleIdentifier) error=\(error)")
+            return nil
+        }
+
+        task.waitUntilExit()
+        if task.terminationStatus != 0 {
+            let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            if let message = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !message.isEmpty {
+                print("CN1SS:WARN:codenameone_main_simctl_failed bundle=\(bundleIdentifier) status=\(task.terminationStatus) stderr=\(message)")
+            } else {
+                print("CN1SS:WARN:codenameone_main_simctl_failed bundle=\(bundleIdentifier) status=\(task.terminationStatus)")
+            }
+            return nil
+        }
+
+        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !output.isEmpty else {
+            print("CN1SS:WARN:codenameone_main_simctl_empty bundle=\(bundleIdentifier)")
+            return nil
+        }
+
+        return output
+    }
+
+    private func dynamicAppValue<T>(_ selectorName: String) -> T? {
+        let selector = NSSelectorFromString(selectorName)
+        guard app.responds(to: selector) else {
+            return nil
+        }
+        guard let unmanaged = app.perform(selector) else {
+            return nil
+        }
+        let value = unmanaged.takeUnretainedValue()
+        switch value {
+        case let typed as T:
+            return typed
+        case let number as NSNumber where T.self == Bool.self:
+            return (number.boolValue as? T)
+        case let string as NSString where T.self == String.self:
+            return (string as String) as? T
+        case let url as NSURL where T.self == URL.self:
+            return (url as URL) as? T
+        default:
+            return nil
+        }
     }
 
     private struct InvocationContext {
