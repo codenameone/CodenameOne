@@ -1,6 +1,6 @@
 == Introduction
 
-Codename One is a Write Once Run Anywhere mobile development platform for Java/Kotlin developers. It integrates with IntelliJ/IDEA, Eclipse or NetBeans to provide seamless native mobile development.
+Codename One is a Write Once Run Anywhere mobile development platform for Java/Kotlin developers. It fits naturally into modern Maven-capable IDEs such as IntelliJ IDEA, NetBeans, VS Code and Eclipse, and it can also be driven entirely from the command line.
 
 Codename One's mission statement is:
 
@@ -219,17 +219,43 @@ This means that in runtime a user might revoke a permission. A good example in t
 
 === Installing Codename One
 
-IMPORTANT: The minimum JDK for Codename One is JDK 8 notice that newer JDKs might not be supported immediately. Currently JDK 11 is known to work and JDK 17 support is in beta stages.
+IMPORTANT: Codename One requires either JDK 11 or JDK 8. Other JDK versions are not supported at this time.
 
-IMPORTANT: The IDE plugins for Codename One are no longer supported. They are required for legacy Ant applications which is why they are still available for download!
+Codename One projects are built with Maven. Typical Maven targets such as `package`, `clean` and `install` work out of the box, but the Codename One integrations that ship with each IDE provide dedicated Run and Build actions for a smoother workflow.
 
-Starting with version 7.0 a Codename One project is a standard Maven project. Typical Maven targets such as package, clean and install should work as expected. Dependencies can be added just like any other project.
+To create a new Codename One project visit https://start.codenameone.com/ and generate a starter project, or run the Codename One Application Project Archetype (`cn1app-archetype`) directly on the command line:
+
+[source,bash]
+----
+mvn archetype:generate \
+  -DarchetypeGroupId=com.codenameone \
+  -DarchetypeArtifactId=cn1app-archetype \
+  -DarchetypeVersion=LATEST \
+  -DgroupId=YOUR_GROUP_ID \
+  -DartifactId=YOUR_ARTIFACT_ID \
+  -Dversion=1.0-SNAPSHOT \
+  -DmainName=YOUR_MAIN_NAME \
+  -DinteractiveMode=false
+----
+
+This command generates a project in the current directory. The folder name matches the `artifactId` value. For example, specifying `-DartifactId=myapp` produces a project inside a new `myapp` directory.
+
+Import the generated Maven project into your preferred IDE and use the Codename One Run in Simulator task from the IDE toolbar or Run/Debug buttons:
+
+* *IntelliJ IDEA* – use *File > Open* on the project directory, then choose the Codename One Run in Simulator action from the toolbar or standard Run/Debug controls.
+* *NetBeans* – use *File > Open Project*, select the generated Maven project, and rely on the Codename One toolbar actions to run and debug the simulator.
+* *VS Code* – install the Java and Codename One extensions, open the folder, and trigger the Run in Simulator task from the command palette or the Run/Debug buttons.
+* *Eclipse* – use *File > Import > Existing Maven Projects*, then use the Codename One launch shortcuts provided by the plugin for simulator and build tasks.
+* *Command line* – invoke Maven goals directly whenever you need to integrate with CI/CD pipelines or scripting.
+
+For deeper coverage of the Maven goals and project structure, see the https://shannah.github.io/codenameone-maven-manual/[Codename One Maven Manual].
 
 NOTE: Arbitrary Maven dependencies probably won't work for Codename One. Many dependencies assume a full JDK which Codename One can't provide and they often assume functionality that might not be available e.g. reflection, Spring, etc.
 
-To create a new Codename One project visit https://start.codenameone.com/ and generate a starter project. For further details about configuring maven check out https://shannah.github.io/codenameone-maven-manual/
-
-The Codename One maven plugin supports for IntelliJ/IDEA, VSCode, Eclipse, NetBeans and the Command Line. Other targets might work.
+.Legacy onboarding resources
+****
+The retired Ant-based IDE plugins for NetBeans, Eclipse and IntelliJ IDEA – together with the simulator screenshots from those workflows – are still available in the legacy documentation for teams maintaining older projects. New projects should follow the Maven-based instructions above.
+****
 
 ==== Important Notes for New Projects
 
@@ -258,16 +284,13 @@ To come up with the right package name use a reverse domain notation. So if my w
 
 ==== Runtime
 
-Once maven is set up we can run the `HelloWorld` application by pressing the `Play` or `Run` button in the IDE. When we do that the Codename One simulator launches. You can use the menu of the simulator to control and inspect details related to the device. You can rotate it, determine it's location in the world, monitor networking calls etc.
+Once Maven is set up we can run the `HelloWorld` application by selecting the Codename One Run in Simulator task from the IDE run menu. The Codename One simulator launches and you can use its menus to control and inspect details related to the device. You can rotate it, determine its location in the world, monitor networking calls etc.
 
 With the `Skins` menu you can download device skins to see how your app will look on different devices.
 
 TIP: Some skins are bigger than the screen size, uncheck the `Scrollable` flag in the `Simulator` menu to handle them more effectively
 
-Debug works just like `Run` by pressing the IDE's debug button. It allows us to launch the simulator in debug mode where we can set breakpoints, inspect variables etc.
-
-.HelloWorld Running on the Simulator with an iPhone X Skin
-image::img/developer-guide/codenameone-hello-world-simulator.png[HelloWorld Running on the Simulator with an iPhone X Skin,scaledwidth=50%]
+Use your IDE's Debug button with the Run in Simulator task to launch the simulator under the debugger.
 
 .Simulator vs. Emulator
 ****
