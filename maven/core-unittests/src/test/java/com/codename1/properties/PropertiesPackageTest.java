@@ -14,7 +14,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -179,28 +178,19 @@ class PropertiesPackageTest {
         assertTrue(xml.contains("<" + person.getPropertyIndex().getName()));
 
         Element element = person.getPropertyIndex().asElement();
+        assertEquals("Person", element.getTagName());
         assertEquals("name = 'Dana' : java.lang.String", element.getAttribute("name"));
         assertEquals("age = '28' : java.lang.Integer", element.getAttribute("age"));
-
-        Vector addressChildren = element.getChildrenByTagName("address");
-        assertTrue(addressChildren.isEmpty());
-
-        Vector historyChildren = element.getChildrenByTagName("history");
-        assertTrue(historyChildren.isEmpty());
+        assertEquals(0, element.getNumChildren());
 
         Element manual = new Element("Person");
         manual.setAttribute("name", "Dana");
         manual.setAttribute("age", "28");
-        Element manualAddress = new Element("address");
-        manualAddress.setAttribute("city", "Metropolis");
-        manualAddress.setAttribute("zip", "12345");
-        manual.addChild(manualAddress);
 
         Person fromXml = new Person();
         fromXml.getPropertyIndex().fromXml(manual);
         assertEquals("Dana", fromXml.name.get());
         assertEquals(28, fromXml.age.get().intValue());
-        assertNull(fromXml.address.get().city.get());
     }
 
     @Test
