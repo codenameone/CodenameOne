@@ -1,0 +1,5 @@
+=== Compliance Check (`compliance-check`)
+
+Checks API usage in the project's "common" module to ensure that it doesn't use any classes or methods that aren't supported by Codename One.
+
+This goal is bound to the `process-classes` phase of both <<cn1app-archetype>> projects and <<cn1lib-archetype>> projects, so you generally shouldn't ever need to run this goal directly.

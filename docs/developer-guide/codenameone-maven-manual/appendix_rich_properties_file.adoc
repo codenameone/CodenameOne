@@ -1,0 +1,52 @@
+[#rich-properties-file]
+[appendix]
+== Rich Properties File (rpf) Format
+
+The rich properties file (rpf) format is used to store configuration for the `generate-app-project` goal.  The format is the same as a regular properties file except that it can more easily accommodate properties whose values are "rich" and lengthy.
+
+"Rich" properties use the following syntax.
+
+[source,rpf]
+----
+[keyname] <1>
+=== <2>
+Key value <3>
+=== <4>
+----
+<1> The property key appears on a new line wrapped in square brackets.
+<2> A separator consisting of 3 or more equals signs on the very next line.
+<3> The property value, which can be one or more lines of content.
+<4> The separator with the same number of equals signs on a line of its own.
+
+=== Example Rich Properties File
+
+[source,rpf]
+----
+firstName=Bob
+lastName=Smith
+[bio]
+====
+Bob is a hard worker.
+He attended Harvard and is looking for opportunities in the fast food industry.
+====
+age=23
+
+# A comment that it is ignored
+[xmldata]
+========
+<person>
+    <name>Bob Smith</name>
+    <age>23</age>
+</person>
+========
+
+favoriteColor=Brown
+
+----
+
+Many of the properties of this file are just regular properties.  There are two rich properties: `bio` and `xmldata`.
+
+
+
+
+

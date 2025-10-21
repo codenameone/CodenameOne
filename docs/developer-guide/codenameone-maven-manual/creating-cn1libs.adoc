@@ -1,0 +1,506 @@
+[#creating-cn1libs]
+== Codename One Libraries
+
+A Codename One Library (cn1lib) is a module that can be distributed and added to Codename One applications to add functionality.  It can be distributed as a self-contained bundle (a file with the .cn1lib extension), or deployed on Maven central to be included in application projects as a pom dependency.
+
+A cn1lib may contain any of the following:
+
+. Cross-platform Java classes.
+. Native code that targets specific platforms.
+. Build hints, which will affect how projects will be built that include this library.  These can contain things like gradle dependencies on Android, cocopods dependencies on iOS, and other hints to affect the build-server process.
+. CSS files.
+
+..cn1lib vs .jar
+[sidebar]
+****
+You may be wondering why the .cn1lib format is even necessary.  Why not just distribute libraries as .jar files?  The .cn1lib format offers several advantages over the plain .jar format:
+
+. *cn1libs can contain platform-specific native sources* that make use of native APIs on the various platforms.  E.g. they can contain Objective-C code which will be compiled on the build server when deploying on iOS.
+. *Codename One library projects perform a compliance check* at the time that the library is compiled to ensure it only uses supported Codename One APIs.  This provides a sort of "certification" that the library will be compatible with Codename One application projects.
+. *Codename One libraries can include CSS files and build hints* which will be appended to the build hints of application projects when they are built.
+
+All that said, you *can* still distribute libraries as plain old jars and include them in your Maven Codename One projects as *jar* dependencies.  Codename One application projects will perform an additional compliance check to ensure that the jar is compatible, and the build will fail if it uses APIs that are not available in Codename One.
+
+TIP: Codename One supports a subset of JavaSE8, as well as addition APIs for accessing device functionality and building beautiful user interfaces.  See https://www.codenameone.com/javadoc/[the Codename One javadocs] for a definitive list of supported APIs.
+
+****
+
+=== Creating a Library Project
+
+Use the `cn1lib-archetype` for generating a new Codename One library project as follows:
+
+==== CLI
+++++
+<env cli></env>
+++++
+
+[source,bash]
+----
+mvn archetype:generate \
+  -DarchetypeArtifactId=cn1lib-archetype \
+  -DarchetypeGroupId=com.codenameone \
+  -DarchetypeVersion=LATEST \
+  -DgroupId=com.example.mylib \
+  -DartifactId=mylib \
+  -Dversion=1.0-SNAPSHOT \
+  -DinteractiveMode=false
+----
+
+NOTE: This command is formatted for the bash prompt (e.g. Linux or Mac).  It will work on Windows also if you use bash.  If you are on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly.  In particular, the entire command would need to be on a single line.  (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+
+In the above snippet you would change the `groupId`, `artifactId`, and `version` properties to reflect your project settings.
+
+[TIP]
+====
+You can run the `archetype:generate` goal with as many or few properties as you like, and it will prompt you to enter any properties that are required.  E.g. You could just enter:
+
+[source,bash]
+----
+mvn archetype:generate
+----
+
+And then follow the prompts.  Or you could enter:
+
+[source, bash]
+----
+mvn archetype:generate -DarchetypeGroupId=com.codenameone \
+  -DarchetypeArtifactId=cn1lib-archetype
+----
+
+NOTE: This command is formatted for the bash prompt (e.g. Linux or Mac).  It will work on Windows also if you use bash.  If you are on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly.  In particular, the entire command would need to be on a single line.  (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+
+And follow the prompts.  This will, result in fewer prompts because you have already specified the archetype to use.
+====
+
+This will create a new project for you in the current directory, in a newly created directory named after the `artifactId` that you entered.
+
+==== IntelliJ
+++++
+<env intellij></env>
+++++
+
+. Select "File" > "New Project"...
++
+image::images/intellij-new-project-menu.png[]
+. Select "Maven" in the left menu.
++
+image::images/intellij-new-project-dialog-maven.png[]
+. Check the "Create from Archetype" checkbox. image:images/intellij-create-from-archetype-checkbox.png[]. This should allow you to choose from of archetypes that are already known to IntelliJ.
+. If you don't see an option for "com.codenameone:cn1lib-archetype", then IntelliJ doesn't know about it yet.  If, however you *do* see this option, you can skip to the next step.  Press the "Add Archetype..." button.  This will display a dialog for you to enter the details of the archetype.
++
+image::images/intellij-add-archetype.png[]
++
+Fill in this dialog as shown in the above image.  Specifically `groupId`="com.codenameone", `artifactId`="cn1lib-archetype", and `version`="LATEST"
++
+Then press "OK".
+. Select the option that says "com.codenameone:cn1lib-archetype"
++
+image::images/intellij-select-cn1lib-archetype.png[]
++
+Then press "Next"
+. This will display a form where you can enter the details of your project such as its location (where you want to create the project folder), the name, the artifact ID, and the groupID.  Fill in this form as you see fit.
++
+image::images/intellij-new-cn1lib-project-details-form.png[]
++
+Then click "Next"
+. The final form in this wizard summarizes the project details and gives you an opportunity to add additional properties to pass to the `archetype:generate` goal. In our case we don't need to add any additional properties.  If the information looks correct, you can just press "Next".
++
+image::images/intellij-new-cn1lib-project-details-summary.png[]
+
+At this point you will be prompted to open the project.
+
+==== NetBeans
+++++
+<env netbeans></env>
+++++
+
+. Select "File" > "New Project..."
++
+image::images/netbeans-new-project-menu.png[]
+. In the "New Project" dialog, select "Java with Maven" in the left panel, and "Project from Archetype" in the right panel, as shown below.
++
+image::images/netbeans-new-project-maven-dialog.png[]
++
+Then press "Next"
+. This will bring you to the "Maven Archetype" dialog as shown below:
++
+image::images/netbeans-maven-archetype-cn1lib-dialog.png[]
++
+Enter "com.codenameone" or "cn1lib-archetype" into the search field.  Then select "cn1lib-archetype" in the "Known archetypes:" panel.  This will prefill the *Group ID*, *Artifact ID* and *Version* fields for you.  You may want to change *Version* to LATEST to ensure that it tries to use the latest available version of the archetype.
++
+Then click "Next"
+. This will bring you to the "Name and Location" panel of the wizard.
++
+image::images/netbeans-new-project-name-and-location.png[]
++
+Enter in the project name (which you'll be forced to use as the artifact ID also), project location, groupId,
+version, and package.  The "Package" is unimportant here as it isn't used anywhere in the project.
++
+Once you have entered the information to your liking press the "Finish" button.
+
+This will create a new libary project for you at the location you specified.
+
+==== Eclipse
+++++
+<env eclipse></env>
+++++
+
+. Select "File" > "New Project..."
+. In the _New Project_ dialog, expand the _Maven_ item, and select _Maven Project_
++
+image::images/eclipse-new-project-wizard.png[]
++
+Then press "Next"
+. The next panel will look like the below image.  The default settings on this panel should be fine.  Press _Next_
++
+image::images/eclipse-new-project-wizard-new-maven-project.png[]
+. In the next panel, enter "cn1lib" in the _Filter_ field.  After a moment the _cn1lib-archetype_ should appear in the area below as shown here:
++
+image::images/eclipse-new-maven-project-cn1lib.png[]
++
+Select that option, and press _Next_
+. The next panel, allows you to enter your project details, such as group ID, and artifact ID.  Your project information here and then press _Finish_.
++
+image:images/eclipse-new-maven-project-details.png[]
+
+This will create a new libary project for you at the location you specified.
+
+==== Project Structure
+
+Let's take a look at the project that was created.  It is a multi-module Maven project with the following modules:
+
+common::
+The module where you'll add all of your cross-platform code and CSS, and build hint configuration. This module is in the "common" directory of the main project.
+javase::
+The module where you can implement native interfaces for the JavaSE platform.  This module is in the "javase" directory of the main project.
+ios::
+The module where you can implement native interfaces for the iOS platform.  This module is in the "ios" directory of the main project.
+android::
+The module where you can implement native interfaces for the Android platform. This module is in the "android" directory of the main project.
+javascript::
+The module where you can implement native interfaces for the Javascript platform. This module is in the "javascript" directory of the main project.
+lib::
+The library module which includes all of the other modules as dependencies, and can be used as a pom dependency in Codename One application projects that wish to use this library. This module is in the "lib" directory of the main project.
+tests::
+An application project for writing unit tests against your library. This module is in the "tests" directory of the main project.
+
+
+===== IntelliJ
+++++
+<env intellij></env>
+++++
+
+The project inspector will look like:
+
+image::images/intellij-myfirstlib-project-inspector.png[]
+
+This top-level view of the module structure may seem daunting.  Most of your development will occur inside the "common" module.  If we expand that module it will look more familiar to developers who have used the old Ant project structure:
+
+image::images/intellij-myfirstlibrary-common-project-files.png[]
+
+Your cross-platform Java source would go in the `common/src/main/java` directory.  Your CSS files go in the `common/src/main/css` directory.
+
+===== NetBeans
+++++
+<env netbeans></env>
+++++
+
+The project inspector will look like:
+
+image::images/netbeans-myfirstlibrary-project-inspector.png[]
+
+This top-level view of the modules doesn't provide a clear view of the project landscape, however, since 99% of your development will occur inside the `common` submodule.  Let's open that "common" sub-module project as well and take a peek.
+
+Right click on the "Common" sub-module, and select "Open Project" as shown below:
+
+image::images/netbeans-myfirstlibrary-open-common-submodule.png[]
+
+With the common subproject open, the project inspector will look like:
+
+image::images/netbeans-myfirstlibrary-project-inspector-with-common.png[]
+
+In this screenshot I have expanded "Source Packages" and "Other Sources/css" to highlight where your Java source files and CSS source files will be located.
+
+The project inspector hides a few important files, however, so here is a screenshot of the File inspector for the common project:
+
+image::images/netbeans-my-first-library-file-inspector-common.png[]
+
+===== Eclipse
+++++
+<env eclipse></env>
+++++
+
+The package explorer will look like:
+
+image::images/eclipse-cn1lib-package-explorer.png[]
+
+In this screenshot, I have expanded the _common/src/main/css_ and _common/src/main/java_ directories as this is where most of your module source will go.
+
+===== CLI
+++++
+<env cli></env>
+++++
+
+If we do a file listing on the project directory, it shows the following:
+
+[source,listing]
+----
+Steves-Mac-Pro:MyFirstLibrary shannah$ find .
+.
+./win
+./win/pom.xml
+./win/src
+./win/src/main
+./win/src/main/csharp
+./win/src/main/csharp/com
+./win/src/main/csharp/com/example
+./win/src/main/csharp/com/example/myfirstlib
+./tests
+./tests/pom.xml
+./tests/javase
+./tests/javase/pom.xml
+./tests/common
+./tests/common/codenameone_settings.properties
+./tests/common/pom.xml
+./tests/common/nbactions.xml
+./tests/common/src
+./tests/common/src/test
+./tests/common/src/test/java
+./tests/common/src/test/java/com
+./tests/common/src/test/java/com/example
+./tests/common/src/test/java/com/example/myfirstlib
+./tests/common/src/test/java/com/example/myfirstlib/MyFirstTest.java
+./tests/common/src/main
+./tests/common/src/main/css
+./tests/common/src/main/css/theme.css
+./tests/common/src/main/java
+./tests/common/src/main/java/com
+./tests/common/src/main/java/com/example
+./tests/common/src/main/java/com/example/myfirstlib
+./tests/common/src/main/java/com/example/myfirstlib/LibraryTests.java
+./tests/cn1libs
+./tests/.mvn
+./tests/.mvn/jvm.config
+./pom.xml
+./javase
+./javase/pom.xml
+./javase/src
+./javase/src/main
+./javase/src/main/java
+./javase/src/main/java/com
+./javase/src/main/java/com/example
+./javase/src/main/java/com/example/myfirstlib
+./ios
+./ios/pom.xml
+./ios/src
+./ios/src/main
+./ios/src/main/objectivec
+./common
+./common/codenameone_library_required.properties
+./common/pom.xml
+./common/codenameone_library_appended.properties
+./common/src
+./common/src/test
+./common/src/test/java
+./common/src/test/java/com
+./common/src/test/java/com/example
+./common/src/test/java/com/example/myfirstlib
+./common/src/test/java/com/example/myfirstlib/MyLibraryTest.java
+./common/src/main
+./common/src/main/css
+./common/src/main/css/theme.css
+./common/src/main/java
+./common/src/main/java/com
+./common/src/main/java/com/example
+./common/src/main/java/com/example/myfirstlib
+./common/src/main/java/com/example/myfirstlib/MyLibrary.java
+./android
+./android/pom.xml
+./android/src
+./android/src/main
+./android/src/main/java
+./android/src/main/java/com
+./android/src/main/java/com/example
+./android/src/main/java/com/example/myfirstlib
+./lib
+./lib/pom.xml
+./MyFirstLibrary.iml
+./javascript
+./javascript/pom.xml
+./javascript/src
+./javascript/src/main
+./javascript/src/main/javascript
+./.idea
+./.idea/encodings.xml
+./.idea/jarRepositories.xml
+./.idea/.gitignore
+./.idea/workspace.xml
+./.idea/misc.xml
+./.idea/compiler.xml
+----
+
+This may seem daunting at first, but it is important to realize that 99% of the time, you'll be working in the "common" module - most of the other stuff is boilerplate.
+
+===== Important Files
+
+There are a few key files in this project that you'll be using more than the others.
+
+pom.xml::
+The maven configuration file of the root module is where you will set project-wide properties such as the `cn1.version` property, which specifies the version of the Codename One libraries that the module should be compiled against.  Periodically, you'll want to update the `cn1.version` property to point to the latest version.
++
+When/if you decide to deploy your module to Maven central, you'll need to add additional deployment-related settings in this file.
+
+common/pom.xml::
+The maven configuration file for the "common" module, which will contain most of your cn1lib's soure code, CSS files, and properties files.  If your library depends on other libraries or jar files, you'll usually be adding them as dependencies in this file, and not the root pom.xml file.
+
+common/codenameone_library_appended.properties::
+This file is where you can specify properties that should be merged with the codenameone_settings.properties of application projects that include this library as a dependency.  This is where you would add, for example, gradle dependencies required for the Android builds, or cocoapods dependencies that are required for iOS builds.
+
+common/codenameone_library_required.properties::
+This file allows you to specific build hints that *must* be present in application projects that include this library.  If this libary requires a particular android build tools version, or a specific Java version, then those requirements should be specified in this file.
+
+===== Important Directories
+
+As mentioned previously, 99% of all of your development will likely occur inside the "common" module.  The other modules are mostly for native implementations of Native interfaces.
+
+common/src/main/java::
+This is where your cross-platform Java source files will be placed.
+
+common/src/main/css::
+If your library uses CSS, this is where all CSS-related files will be placed.
+
+common/src/main/resources::
+Other non-java resources that you want to have included in the classpath.
+
+[#building-library]
+==== Building the Library
+
+===== CLI
+++++
+<env cli></env>
+++++
+
+To build the library, simply run the "install" goal on the root module as follows:
+
+[source,bash]
+----
+mvn install
+----
+
+===== IntelliJ
+++++
+<env intellij></env>
+++++
+
+Press the "build" image:images/intellij-build-icon.png[] button on the toolbar.
+
+===== NetBeans
+++++
+<env netbeans></env>
+++++
+
+Right click on the "root" module in the project explorer and select "Build".
+
+image::images/netbeans-right-click-build.png[]
+
+IMPORTANT: You must build the root module and not one of the submodules.
+
+Alternatively you could have just selected the "root" module in the project explorer and pressed the "build" image:images/netbeans-build-button.png[] button on the toolbar.
+
+===== Eclipse
+++++
+<env eclipse></env>
+++++
+
+Right click on the "root" module in the project explorer and select _Run as_ > _Maven Install_
+
+image::images/eclipse-build-cn1lib.png[]
+
+TIP: If the build fails for any reason, check to make sure that your project is using the latest version of the Codename One plugin.  You can do this by opening the _pom.xml_ file, and changing the `cn1.version` and `cn1.plugin.version` properties to reference the latest version.  Check for the latest version https://search.maven.org/artifact/com.codenameone/codenameone[here].
+
+
+===== Building the Legacy .cnlib File
+
+When using the Maven build tool, we no longer require the .cn1lib file at all.  Your library projects can be handled entirely via Maven's dependency mechanism.  The preferred way to distribute your libraries is on Maven central, and the preferred way to add a library to an application is via a Maven "pom" dependency.
+
+That being said, you may still want to distribute your library as a .cn1lib file for the sake of users who are still using Ant as their build tool.  For that reason, when you bulid a library project, the cn1lib is automatically built as well.  After running a build, you can look in the common/target directory and find your .cn1lib file ready to be distributed.
+
+==== Editing Java Code
+
+In order to get acquainted with our project, let's add a "Hello World" java class that we want to make available as part of our cn1lib.
+
+Add a new class inside the "common/src/main/java" directory with package "com.example", and name "HelloWorld".  Enter the following contents into the class:
+
+[source,java]
+----
+package com.example;
+
+public class HelloWorld {
+    public static void helloWorld() {
+        System.out.println("Hello world");
+    }
+}
+----
+
+Now build the library again.  (See <<building-library>>).
+
+==== Using the Library in an Application Project
+
+Now that we've built our library and added a Java class, let's try adding it as a dependency in an application project.  If you haven't yet created an application project, do that now.  See <<creating-app-project>> for instructions on creating a new application project.
+
+Open the common/pom.xml file of your application project.
+
+IMPORTANT: Make sure you're editing the common/pom.xml file of the *application project* and not the library project.
+
+This file may look a little hairy as there's a lot of configuration in there.  We'll be looking for the `<dependencies>` section.
+
+
+The common/pom.xml file will have more than one `<dependencies>` tag, as it includes some profiles handling things like kotlin support.  There will be one particular `<dependencies>` tag that includes a comment like
+
+[source,xml]
+----
+<!-- INJECT DEPENDENCIES -->
+----
+
+You should add your dependencies just before this comment.
+
+For the sake of this example, suppose our library was set up with the following coordinates:
+
+|====
+| *groupId:* | `com.example`
+| *artifactId:* | `mylib`
+| *version:* | `1.0-SNAPSHOT`
+|====
+
+In this case we would add the following XML snippet to the `<dependencies>` section of our application's common/pom.xml file:
+
+[source,xml]
+----
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>mylib-lib</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <type>pom</type>
+</dependency>
+----
+
+IMPORTANT: Notice that we appended "-lib" to the `artifactId`.  This is because we are including the "lib" module of our library project as the dependency, and not the root module. Also the `<type>pom</type>` is important as it indicates that this is a pom dependency - not a regular jar dependency.
+
+Now let's try it out.  Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
+
+[source,java]
+----
+com.example.HelloWorld.helloWorld();
+----
+
+And build the project.  The project should build OK, and if you run it, you should see that the `helloWorld()` method works as designed.
+
+=== Distributing Your Library
+
+The recommended way to distribute your library is on Maven central.  That way users will be able to install your library by copying and pasting a familiar `<dependency>` snippet into their pom.xml file.
+
+
+
+
+
+
