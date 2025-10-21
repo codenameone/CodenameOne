@@ -1,7 +1,11 @@
 package com.codename1.push;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Preferences;
+import com.codename1.io.Storage;
+import com.codename1.io.TestImplementationProvider;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PushTest {
     private String originalPreferencesLocation;
+    private CodenameOneImplementation originalDisplayImpl;
+    private CodenameOneImplementation originalUtilImpl;
+    private Object originalStorageInstance;
 
     @BeforeEach
     void setup() throws Exception {
@@ -29,6 +36,21 @@ class PushTest {
         Field storageField = Display.class.getDeclaredField("localProperties");
         storageField.setAccessible(true);
         storageField.set(Display.getInstance(), null);
+
+        Field implField = Display.class.getDeclaredField("impl");
+        implField.setAccessible(true);
+        originalDisplayImpl = (CodenameOneImplementation) implField.get(null);
+
+        Field utilImplField = Util.class.getDeclaredField("implInstance");
+        utilImplField.setAccessible(true);
+        originalUtilImpl = (CodenameOneImplementation) utilImplField.get(null);
+
+        Field storageInstanceField = Storage.class.getDeclaredField("INSTANCE");
+        storageInstanceField.setAccessible(true);
+        originalStorageInstance = storageInstanceField.get(null);
+
+        CodenameOneImplementation implementation = TestImplementationProvider.installImplementation(true);
+        implField.set(null, implementation);
     }
 
     @AfterEach
@@ -36,6 +58,17 @@ class PushTest {
         if (originalPreferencesLocation != null) {
             Preferences.setPreferencesLocation(originalPreferencesLocation);
         }
+        try {
+            Field implField = Display.class.getDeclaredField("impl");
+            implField.setAccessible(true);
+            implField.set(null, originalDisplayImpl);
+            Field storageInstanceField = Storage.class.getDeclaredField("INSTANCE");
+            storageInstanceField.setAccessible(true);
+            storageInstanceField.set(null, originalStorageInstance);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        Util.setImplementation(originalUtilImpl);
     }
 
     @Test

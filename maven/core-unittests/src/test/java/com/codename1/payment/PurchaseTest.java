@@ -195,18 +195,14 @@ public class PurchaseTest {
     }
 
     @Test
-    public void testGetReceiptsReturnsEmptyListWhenStoredDataHasUnexpectedType() {
+    public void testGetReceiptsThrowsWhenStoredDataHasUnexpectedType() throws Exception {
         Storage.getInstance().writeObject(receiptsKey, "bad-data");
         Storage.getInstance().clearCache();
 
-        List<Receipt> receipts = purchase.getReceipts();
-        assertNotNull(receipts, "Receipts list should be initialized");
-        assertTrue(receipts.isEmpty(), "Unexpected types should produce an empty cache");
-
-        List<Receipt> secondCall = purchase.getReceipts();
-        assertSame(receipts, secondCall, "Receipts cache should be reused after invalid data");
+        assertThrows(ClassCastException.class, () -> purchase.getReceipts());
         assertEquals("bad-data", Storage.getInstance().readObject(receiptsKey),
                 "Storage contents should remain untouched when data cannot be cast");
+        resetPurchaseStatics();
     }
 
     @Test
