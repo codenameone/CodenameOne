@@ -153,28 +153,23 @@ class DeviceRunnerTest extends UITestBase {
         private final List<String> finishedSuites = new ArrayList<String>();
 
         public void startingTestCase(String testName) {
-            super.startingTestCase(testName);
             startedTests.add(testName);
         }
 
         public void finishedTestCase(String testName, boolean passed) {
-            super.finishedTestCase(testName, passed);
             finishedTests.add(testName);
             results.add(Boolean.valueOf(passed));
         }
 
         public void logMessage(String message) {
-            super.logMessage(message);
             messages.add(message);
         }
 
         public void logException(Throwable err) {
-            super.logException(err);
             exceptions.add(err);
         }
 
         public void testExecutionFinished(String testSuiteName) {
-            super.testExecutionFinished(testSuiteName);
             finishedSuites.add(testSuiteName);
         }
     }
