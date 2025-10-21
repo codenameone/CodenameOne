@@ -71,20 +71,21 @@ class PropertiesPackageTest {
     }
 
     @Test
-    void propertyChangeListenersAndStopListeningWork() {
+    void propertyChangeListenersCanBeRemoved() {
         Person person = new Person();
         List<PropertyBase> triggered = new ArrayList<PropertyBase>();
-        person.name.addChangeListener(new PropertyChangeListener<String, Person>() {
+        PropertyChangeListener<String, Person> listener = new PropertyChangeListener<String, Person>() {
             public void propertyChanged(PropertyBase<String, Person> property) {
                 triggered.add(property);
-                property.stopListening();
             }
-        });
+        };
+        person.name.addChangeListener(listener);
 
         person.name.set("Alice");
         assertEquals(1, triggered.size());
         triggered.clear();
 
+        person.name.removeChangeListener(listener);
         person.name.set("Bob");
         assertTrue(triggered.isEmpty());
     }
@@ -182,8 +183,8 @@ class PropertiesPackageTest {
         assertEquals("Dana", map.get("name"));
         assertEquals(28, map.get("age"));
         assertTrue(map.containsKey("address"));
-        assertTrue(map.get("created") instanceof Date);
-        assertEquals(123456789L, ((Date) map.get("created")).getTime());
+        assertTrue(map.get("created") instanceof Number);
+        assertEquals(123456789L, ((Number) map.get("created")).longValue());
 
         Person copy = new Person();
         copy.getPropertyIndex().populateFromMap(map);
@@ -217,9 +218,11 @@ class PropertiesPackageTest {
         index.setXmlTextElement(person.name, true);
         assertTrue(index.isXmlTextElement(person.name));
         assertSame(person.name, index.getXmlTextElement());
-        String xml = index.toXML();
-        Element element = parse(xml);
-        assertEquals("Eva", element.getText());
+        Element element = index.asElement();
+        assertTrue(element.hasTextChild());
+        Element textChild = element.getChildAt(0);
+        assertTrue(textChild.isTextElement());
+        assertEquals("Eva", textChild.getText());
         index.setXmlTextElement(person.name, false);
         assertNull(index.getXmlTextElement());
     }

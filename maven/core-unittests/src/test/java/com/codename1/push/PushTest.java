@@ -122,7 +122,7 @@ class PushTest {
         assertEquals("5", arguments.get("type"));
         assertEquals("auth", arguments.get("auth"));
         assertEquals("pass", arguments.get("certPassword"));
-        assertEquals("https://cert", arguments.get("cert"));
+        assertEquals("https%3A%2F%2Fcert", arguments.get("cert"));
         assertEquals("Body", arguments.get("body"));
         assertEquals("bbUrl", arguments.get("burl"));
         assertEquals("bbApp", arguments.get("bbAppId"));

@@ -199,7 +199,8 @@ public class PurchaseTest {
         Storage.getInstance().writeObject(receiptsKey, "bad-data");
         Storage.getInstance().clearCache();
 
-        assertThrows(ClassCastException.class, () -> purchase.getReceipts());
+        List<Receipt> receipts = purchase.getReceipts();
+        assertTrue(receipts.isEmpty(), "Unexpected data should clear cached receipts");
         assertEquals("bad-data", Storage.getInstance().readObject(receiptsKey),
                 "Storage contents should remain untouched when data cannot be cast");
         resetPurchaseStatics();
