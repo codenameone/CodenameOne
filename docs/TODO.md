@@ -1,16 +1,7 @@
 # Developer Guide Cleanup Plan
 
-## Structural & Editorial Overhaul
-
-- [ ] Rework the front matter and table of contents in `developer-guide.asciidoc` so the metadata (`:revdate:`, author credits, producer) and chapter ordering match today’s publication pipeline, and relocate legacy-only chapters (e.g., UWP, Travis CI) into an explicit "Historical" part instead of the main flow.【F:docs/developer-guide/developer-guide.asciidoc†L1-L78】
-- [ ] Replace the wiki-centric preface in `About-This-Guide.asciidoc` with guidance that reflects the Git-based docs workflow, current publication targets, and an up-to-date contributor roster (including pruning stale author links).【F:docs/developer-guide/About-This-Guide.asciidoc†L1-L71】
-- [ ] Transform `Home.asciidoc` into a true landing page for the manual (introduce the guide’s scope, key sections, and vetted resource links) and remove unrelated promotional content like the external Kotlin course plug.【F:docs/developer-guide/Home.asciidoc†L1-L16】
-- [ ] Refresh the onboarding narrative in `Index.asciidoc` to document the current JDK baseline, supported IDE workflows, and Maven-first project creation, trimming or relocating advice that assumes the retired IDE plugins or outdated runtime screenshots.【F:docs/developer-guide/Index.asciidoc†L220-L320】
-
 ## Tooling & Build Flow Modernization
 
-- [ ] Rewrite `Working-With-CodenameOne-Sources.asciidoc` around the Maven multi-module build in `/maven`, including local test commands, dependency management tips, and how our GitHub Actions replace the old Ant targets for CI.【F:docs/developer-guide/Working-With-CodenameOne-Sources.asciidoc†L1-L85】【F:maven/README.adoc†L1-L68】
-- [ ] Rework `Working-With-CodenameOne-Sources.asciidoc` to fold in the Maven project workflow guidance now embedded in the developer guide and eliminate duplicated setup steps between the chapters.【F:docs/developer-guide/Working-With-CodenameOne-Sources.asciidoc†L1-L85】【F:docs/developer-guide/Maven-Project-Workflow.asciidoc†L1-L14】
 - [ ] Retire or substantially revise `Travis-CI-Integration.asciidoc` to highlight our current CI guidance (GitHub Actions templates, self-hosted options) and archive Travis-specific screenshots and steps.【F:docs/developer-guide/Travis-CI-Integration.asciidoc†L1-L112】
 - [ ] Update the Designer/tooling coverage in `basics.asciidoc` so it walks through launching the modern Designer distribution from Maven projects without relying on `designer_1.jar` shell commands.【F:docs/developer-guide/basics.asciidoc†L1050-L1070】
 - [ ] Rebuild `Working-With-The-GUI-Builder.asciidoc` around the current GUI Builder experience (with Java 11+ support, IntelliJ/VScode integration), moving legacy troubleshooting for `guibuilder_1.jar` into an appendix or "legacy" callout.【F:docs/developer-guide/Working-With-The-GUI-Builder.asciidoc†L1-L126】

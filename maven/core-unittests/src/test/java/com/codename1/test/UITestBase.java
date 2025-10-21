@@ -64,6 +64,11 @@ public abstract class UITestBase {
             return length == null ? 0 : Math.max(0, length) * 8;
         });
         when(implementation.getHeight(any())).thenReturn(16);
+        when(implementation.getPlatformName()).thenReturn("and");
+        when(implementation.getProperty(anyString(), anyString())).thenAnswer(invocation -> (String) invocation.getArgument(1));
+        when(implementation.loadTrueTypeFont(anyString(), anyString())).thenAnswer(invocation -> new Object());
+        when(implementation.deriveTrueTypeFont(any(), anyFloat(), anyInt())).thenAnswer(invocation -> new Object());
+        when(implementation.loadNativeFont(anyString())).thenAnswer(invocation -> new Object());
 
         pluginSupport = new PluginSupport();
 
