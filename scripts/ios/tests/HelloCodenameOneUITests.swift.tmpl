@@ -16,7 +16,6 @@ final class HelloCodenameOneUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        print("CN1SS:INFO:setup_begin test_class=HelloCodenameOneUITests")
         let env = ProcessInfo.processInfo.environment
 
         if let bundleID = env["CN1_AUT_BUNDLE_ID"], !bundleID.isEmpty {
@@ -38,11 +37,7 @@ final class HelloCodenameOneUITests: XCTestCase {
         } else {
             outputDirectory = tmp.appendingPathComponent("cn1screens", isDirectory: true)
         }
-        do {
-            try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
-        } catch {
-            print("CN1SS:WARN:output_directory_create_failed path=\(outputDirectory.path) error=\(error)")
-        }
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
         print("CN1SS:INFO:ui_test_target_bundle_id=\(targetBundleIdentifier ?? "(scheme-default)")")
         print("CN1SS:INFO:ui_test_launch_arguments=\(app.launchArguments.joined(separator: " "))")
@@ -281,7 +276,7 @@ final class HelloCodenameOneUITests: XCTestCase {
         if let explicit = targetBundleIdentifier, !explicit.isEmpty {
             return explicit
         }
-        if let bundle: String = codenameApplicationValue("bundleID", for: app) {
+        if let bundle: String = dynamicAppValue("bundleID") {
             if !bundle.isEmpty {
                 return bundle
             }
@@ -376,29 +371,6 @@ final class HelloCodenameOneUITests: XCTestCase {
     }
 }
 
-private func codenameApplicationValue<T>(_ selectorName: String, for application: XCUIApplication) -> T? {
-    let selector = NSSelectorFromString(selectorName)
-    guard application.responds(to: selector) else {
-        return nil
-    }
-    guard let unmanaged = application.perform(selector) else {
-        return nil
-    }
-    let value = unmanaged.takeUnretainedValue()
-    switch value {
-    case let typed as T:
-        return typed
-    case let number as NSNumber where T.self == Bool.self:
-        return (number.boolValue as? T)
-    case let string as NSString where T.self == String.self:
-        return (string as String) as? T
-    case let url as NSURL where T.self == URL.self:
-        return (url as URL) as? T
-    default:
-        return nil
-    }
-}
-
 private final class CodenameOneMainInvoker {
     static let shared = CodenameOneMainInvoker()
 
@@ -421,9 +393,7 @@ private final class CodenameOneMainInvoker {
             return
         }
 
-        print("CN1SS:INFO:codenameone_main_invoking bundle=\(bundleIdentifier)")
         context.invoke()
-        print("CN1SS:INFO:codenameone_main_invocation_complete bundle=\(bundleIdentifier)")
 
         queue.sync {
             invokedBundles.insert(bundleIdentifier)
@@ -437,13 +407,11 @@ private final class CodenameOneMainInvoker {
             print("CN1SS:WARN:codenameone_main_skipped reason=container_missing bundle=\(bundleIdentifier)")
             return nil
         }
-        print("CN1SS:INFO:codenameone_main_container bundle=\(bundleIdentifier) path=\(container)")
 
         guard let executable = readExecutableName(appContainer: container) else {
             print("CN1SS:WARN:codenameone_main_skipped reason=executable_missing bundle=\(bundleIdentifier)")
             return nil
         }
-        print("CN1SS:INFO:codenameone_main_executable bundle=\(bundleIdentifier) name=\(executable)")
 
         let binaryPath = (container as NSString).appendingPathComponent(executable)
         guard let handle = dlopen(binaryPath, RTLD_NOW | RTLD_GLOBAL) else {
@@ -454,7 +422,6 @@ private final class CodenameOneMainInvoker {
             }
             return nil
         }
-        print("CN1SS:INFO:codenameone_main_dlopen_success bundle=\(bundleIdentifier) binary=\(binaryPath)")
 
         guard let initPtr = dlsym(handle, "initConstantPool") else {
             print("CN1SS:WARN:codenameone_main_skipped reason=missing_initConstantPool bundle=\(bundleIdentifier)")
@@ -480,11 +447,11 @@ private final class CodenameOneMainInvoker {
     }
 
     private func locateAppContainer(app: XCUIApplication, bundleIdentifier: String) -> String? {
-        if let bundleURL: URL = codenameApplicationValue("bundleURL", for: app), !bundleURL.path.isEmpty {
+        if let bundleURL: URL = dynamicAppValue("bundleURL"), !bundleURL.path.isEmpty {
             return bundleURL.path
         }
 
-        if let bundlePath: String = codenameApplicationValue("bundlePath", for: app), !bundlePath.isEmpty {
+        if let bundlePath: String = dynamicAppValue("bundlePath"), !bundlePath.isEmpty {
             return bundlePath
         }
 
@@ -553,6 +520,29 @@ private final class CodenameOneMainInvoker {
         }
 
         return output
+    }
+
+    private func dynamicAppValue<T>(_ selectorName: String) -> T? {
+        let selector = NSSelectorFromString(selectorName)
+        guard app.responds(to: selector) else {
+            return nil
+        }
+        guard let unmanaged = app.perform(selector) else {
+            return nil
+        }
+        let value = unmanaged.takeUnretainedValue()
+        switch value {
+        case let typed as T:
+            return typed
+        case let number as NSNumber where T.self == Bool.self:
+            return (number.boolValue as? T)
+        case let string as NSString where T.self == String.self:
+            return (string as String) as? T
+        case let url as NSURL where T.self == URL.self:
+            return (url as URL) as? T
+        default:
+            return nil
+        }
     }
 
     private struct InvocationContext {
