@@ -82,8 +82,14 @@ class TestRunnerComponentTest extends UITestBase {
         Container resultsPane = getResultsPane(component);
         Button status = (Button) resultsPane.getComponentAt(1);
         assertEquals("Explosive: Failed", status.getText());
-        ActionListener[] listeners = status.getListeners(ActionListener.class);
-        assertTrue(listeners.length > 0);
+        boolean found = false;
+        for (Object listener : status.getListeners()) {
+            if (listener instanceof ActionListener) {
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found);
     }
 
     private Container getResultsPane(TestRunnerComponent component) throws Exception {

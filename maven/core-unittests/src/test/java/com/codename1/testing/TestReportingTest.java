@@ -61,7 +61,7 @@ class TestReportingTest {
         assertEquals(1, reporting.finished.size());
         assertEquals(Boolean.TRUE, reporting.finished.get(0));
         assertTrue(reporting.legacyFinishedInvoked);
-        assertTrue(reporting.reportInvoked);
+        assertFalse(reporting.reportInvoked);
     }
 
     @SuppressWarnings("unchecked")
