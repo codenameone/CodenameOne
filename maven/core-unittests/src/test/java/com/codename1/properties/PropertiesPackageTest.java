@@ -179,8 +179,8 @@ class PropertiesPackageTest {
 
         Element element = person.getPropertyIndex().asElement();
         assertEquals("Person", element.getTagName());
-        assertEquals("name = 'Dana' : java.lang.String", element.getAttribute("name"));
-        assertEquals("age = '28' : java.lang.Integer", element.getAttribute("age"));
+        assertEquals("Dana", element.getAttribute("name"));
+        assertEquals("28", element.getAttribute("age"));
         assertEquals(0, element.getNumChildren());
 
         Element manual = new Element("Person");
