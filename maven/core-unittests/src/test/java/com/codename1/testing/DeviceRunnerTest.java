@@ -1,74 +1,22 @@
 package com.codename1.testing;
 
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Log;
-import com.codename1.io.TestImplementationProvider;
 import com.codename1.test.UITestBase;
-import com.codename1.ui.Display;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
+/**
+ * Unit tests for DeviceRunner class.
+ * Note: Tests that would trigger System.exit() are intentionally excluded as they would halt the test suite.
+ * Tests focus on the runTest() method which is the core testable functionality.
+ */
 class DeviceRunnerTest extends UITestBase {
     private TestDeviceRunner deviceRunner;
 
     @BeforeEach
     void setUp() {
         deviceRunner = new TestDeviceRunner();
-    }
-
-    @Test
-    void runTestsHandlesMissingTestDataFile() {
-        // When no tests.dat file exists, should log error and exit
-        when(implementation.getResourceAsStream(any(), eq("/tests.dat"))).thenReturn(null);
-
-        // Running tests should handle missing file gracefully
-        assertDoesNotThrow(() -> deviceRunner.runTests());
-    }
-
-    @Test
-    void runTestsLoadsAndExecutesTestsFromDataFile() throws IOException {
-        // Create a test data file with version 1 and two test classes
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        dos.writeInt(1); // version
-        dos.writeInt(2); // number of tests
-        dos.writeUTF("com.codename1.testing.DeviceRunnerTest$MockTest1");
-        dos.writeUTF("com.codename1.testing.DeviceRunnerTest$MockTest2");
-        dos.close();
-
-        InputStream testDataStream = new ByteArrayInputStream(baos.toByteArray());
-        when(implementation.getResourceAsStream(any(), eq("/tests.dat"))).thenReturn(testDataStream);
-
-        deviceRunner.runTests();
-
-        assertEquals(2, deviceRunner.getStartApplicationCallCount());
-        assertEquals(2, deviceRunner.getStopApplicationCallCount());
-    }
-
-    @Test
-    void runTestsHandlesNewerVersionGracefully() throws IOException {
-        // Create a test data file with version 2 (newer than supported)
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        dos.writeInt(2); // newer version
-        dos.close();
-
-        InputStream testDataStream = new ByteArrayInputStream(baos.toByteArray());
-        when(implementation.getResourceAsStream(any(), eq("/tests.dat"))).thenReturn(testDataStream);
-
-        assertDoesNotThrow(() -> deviceRunner.runTests());
     }
 
     @Test
@@ -129,31 +77,11 @@ class DeviceRunnerTest extends UITestBase {
     }
 
     @Test
-    void runTestsCountsPassedAndFailedTests() throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        dos.writeInt(1); // version
-        dos.writeInt(3); // number of tests
-        dos.writeUTF("com.codename1.testing.DeviceRunnerTest$MockPassingTest");
-        dos.writeUTF("com.codename1.testing.DeviceRunnerTest$MockFailingTest");
-        dos.writeUTF("com.codename1.testing.DeviceRunnerTest$MockPassingTest");
-        dos.close();
+    void runTestExecutesOffEDTWhenNotRequired() {
+        deviceRunner.runTest("com.codename1.testing.DeviceRunnerTest$MockNonEDTTest");
 
-        InputStream testDataStream = new ByteArrayInputStream(baos.toByteArray());
-        when(implementation.getResourceAsStream(any(), eq("/tests.dat"))).thenReturn(testDataStream);
-
-        deviceRunner.runTests();
-
-        assertEquals(3, deviceRunner.getStartApplicationCallCount());
-    }
-
-    @Test
-    void runTestsHandlesIOException() throws IOException {
-        InputStream failingStream = mock(InputStream.class);
-        when(failingStream.read(any(byte[].class))).thenThrow(new IOException("Test error"));
-        when(implementation.getResourceAsStream(any(), eq("/tests.dat"))).thenReturn(failingStream);
-
-        assertDoesNotThrow(() -> deviceRunner.runTests());
+        assertEquals(1, deviceRunner.getStartApplicationCallCount());
+        assertEquals(1, deviceRunner.getStopApplicationCallCount());
     }
 
     // Test implementation of DeviceRunner
@@ -323,30 +251,7 @@ class DeviceRunnerTest extends UITestBase {
         }
     }
 
-    public static class MockTest1 implements UnitTest {
-        @Override
-        public boolean runTest() {
-            return true;
-        }
-
-        @Override
-        public void prepare() {}
-
-        @Override
-        public void cleanup() {}
-
-        @Override
-        public int getTimeoutMillis() {
-            return 1000;
-        }
-
-        @Override
-        public boolean shouldExecuteOnEDT() {
-            return false;
-        }
-    }
-
-    public static class MockTest2 implements UnitTest {
+    public static class MockNonEDTTest implements UnitTest {
         @Override
         public boolean runTest() {
             return true;
