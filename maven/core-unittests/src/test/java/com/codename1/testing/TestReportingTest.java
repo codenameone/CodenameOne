@@ -109,7 +109,7 @@ class TestReportingTest {
 
     @Test
     void finishedTestCaseHandlesNullTestName() {
-        assertDoesNotThrow(() -> testReporting.finishedTestCase(null, true));
+        assertDoesNotThrow(() -> testReporting.finishedTestCase((String) null, true));
     }
 
     @Test

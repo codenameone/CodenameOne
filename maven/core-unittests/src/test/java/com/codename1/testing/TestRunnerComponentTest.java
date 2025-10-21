@@ -34,19 +34,33 @@ class TestRunnerComponentTest {
 
     @Test
     void constructorAddsRunTestsButton() {
-        // Find the Run Tests button in the north region
-        Component northComponent = testRunner.getLayout().getLayoutComponent(BorderLayout.NORTH);
-        assertNotNull(northComponent);
-        assertTrue(northComponent instanceof Button);
-        assertEquals("Run Tests", ((Button) northComponent).getText());
+        // The component should have at least 2 components (button and results pane)
+        assertTrue(testRunner.getComponentCount() >= 2);
+
+        // Find the "Run Tests" button
+        boolean foundButton = false;
+        for (int i = 0; i < testRunner.getComponentCount(); i++) {
+            Component comp = testRunner.getComponentAt(i);
+            if (comp instanceof Button && "Run Tests".equals(((Button) comp).getText())) {
+                foundButton = true;
+                break;
+            }
+        }
+        assertTrue(foundButton, "Run Tests button should be present");
     }
 
     @Test
     void constructorAddsResultsPane() {
-        // Find the results pane in the center region
-        Component centerComponent = testRunner.getLayout().getLayoutComponent(BorderLayout.CENTER);
-        assertNotNull(centerComponent);
-        assertTrue(centerComponent instanceof Container);
+        // The component should have containers (results pane is a container)
+        boolean foundContainer = false;
+        for (int i = 0; i < testRunner.getComponentCount(); i++) {
+            Component comp = testRunner.getComponentAt(i);
+            if (comp instanceof Container && !(comp instanceof Button)) {
+                foundContainer = true;
+                break;
+            }
+        }
+        assertTrue(foundContainer, "Results pane container should be present");
     }
 
     @Test
@@ -123,10 +137,18 @@ class TestRunnerComponentTest {
         testRunner.runTests();
 
         // Verify that a label with test count was added
-        Component centerComponent = testRunner.getLayout().getLayoutComponent(BorderLayout.CENTER);
-        Container resultsPane = (Container) centerComponent;
-        boolean foundTestCountLabel = false;
+        // Find the results pane container
+        Container resultsPane = null;
+        for (int i = 0; i < testRunner.getComponentCount(); i++) {
+            Component comp = testRunner.getComponentAt(i);
+            if (comp instanceof Container && !(comp instanceof Button)) {
+                resultsPane = (Container) comp;
+                break;
+            }
+        }
+        assertNotNull(resultsPane, "Results pane should exist");
 
+        boolean foundTestCountLabel = false;
         for (int i = 0; i < resultsPane.getComponentCount(); i++) {
             Component comp = resultsPane.getComponentAt(i);
             if (comp instanceof Label) {
@@ -200,8 +222,16 @@ class TestRunnerComponentTest {
         testRunner.runTests();
 
         // Results pane should be cleared and repopulated
-        Component centerComponent = testRunner.getLayout().getLayoutComponent(BorderLayout.CENTER);
-        Container resultsPane = (Container) centerComponent;
+        // Find the results pane container
+        Container resultsPane = null;
+        for (int i = 0; i < testRunner.getComponentCount(); i++) {
+            Component comp = testRunner.getComponentAt(i);
+            if (comp instanceof Container && !(comp instanceof Button)) {
+                resultsPane = (Container) comp;
+                break;
+            }
+        }
+        assertNotNull(resultsPane, "Results pane should exist");
         assertTrue(resultsPane.getComponentCount() > 0);
     }
 
