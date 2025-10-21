@@ -13,9 +13,6 @@ mvn cn:update
 
 [discrete]
 === CLI
-++++
-<env cli></env>
-++++
 
 Alternatively you can use the `run.sh/run.bat` script to run this goal as follows:
 
@@ -28,27 +25,21 @@ NOTE: Use `run.bat update` instead on Windows
 
 [discrete]
 === IntelliJ
-++++
-<env intellij></env>
-++++
 
 Alternatively you can click on the "Configuration" menu, and select "Tools" > "Update Codename One" as shown here:
 
-image::images/intellij-update-codenameone.png[]
+image::img/intellij-update-codenameone.png[]
 
-The press the image:images/intellij-run-icon.png[Run] button.
+Then press the image:img/intellij-run-icon.png[Run] button.
 
 [discrete]
 === NetBeans
-++++
-<env netbeans></env>
-++++
 
 Alternatively you can right click on the project in the project inspector, and select "Run Maven" > "Update Codename One" as shown here:
 
-image::images/netbeans-update-codenameone.png[]
+image::img/netbeans-update-codenameone.png[]
 
-Then press the image:images/netbeans-run-icon.png[Run] button.
+Then press the image:img/netbeans-run-icon.png[Run] button.
 
 [discrete]
 === Manually Updating the pom.xml file

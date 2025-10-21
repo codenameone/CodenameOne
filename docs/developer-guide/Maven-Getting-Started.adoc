@@ -7,7 +7,7 @@
 
 The easiest way to create a new project is to use the  https://start.codenameone.com[Codename One initializr].
 
-image::images/codenameone-initializr-screenshot.png[]
+image::img/codenameone-initializr-screenshot.png[]
 
 This tool will allow you to choose from a growing selection of project templates, and download a starter project that you can open in your preferred IDE (IntelliJ IDEA, NetBeans, etc..), or build directly on the command-line using Maven.
 
@@ -135,10 +135,7 @@ This will generate the new project in the current directory inside a folder name
 
 After building the project, try running it to make sure that the migration worked.  E.g. Assuming that your artifactId was myapp:
 
-==== CLI
-++++
-<env cli></env>
-++++
+==== Command Line
 
 [source,bash]
 ----
@@ -150,46 +147,37 @@ NOTE: On Windows it would be `run.bat` instead of `run.sh`.
 
 If All goes well, your app should open in the Codename One simulator.
 
-==== IntelliJ
-++++
-<env intellij></env>
-++++
+==== IntelliJ IDEA
 
-Open the `myapp` folder in IntelliJ.  Then press the "Run" image:images/intellij-run-icon.png[] button in the upper right of the toolbar.
+Open the `myapp` folder in IntelliJ.  Then press the "Run" image:img/intellij-run-icon.png[] button in the upper right of the toolbar.
 
 If All goes well, your app should open in the Codename One simulator.
 
 ==== NetBeans
-++++
-<env netbeans></env>
-++++
 
 IMPORTANT: Before opening the project in NetBeans, be sure to copy the files in the _tools/netbeans_ directory into the root directory.  These are necessary for NetBeans to properly run, build, and debug the project.
 
-Open the `myapp` folder as a project in NetBeans.  Then press the "Run" image:images/netbeans-run-icon.png[] button on the toolbar.
+Open the `myapp` folder as a project in NetBeans.  Then press the "Run" image:img/netbeans-run-icon.png[] button on the toolbar.
 
 If all goes well it should open in the Codename One simulator.
 
-==== Eclipse
-++++
-<env eclipse></env>
-++++
+==== Eclipse IDE
 
 Open Eclipse, and select "File" > "Import.."
 
-image::images/eclipse-file-menu-import.png[]
+image::img/eclipse-file-menu-import.png[]
 
 In the _Import_ dialog, expand _Maven_, select  _Existing Maven Projects_, and press _Next_.
 
-image::images/eclipse-import-dialog.png[]
+image::img/eclipse-import-dialog.png[]
 
 In the next panel, press the _Browse_ button, and, in the file dialog, select the "myapp" directory, and press _Next_.
 
-image::images/eclipse-import-browse-dialog.png[]
+image::img/eclipse-import-browse-dialog.png[]
 
 The next panel should look similar to the one below.  Make sure all of the projects are "checked", and press _Finish_.
 
-image::images/eclipse-import-list-projects-dialog.png[]
+image::img/eclipse-import-list-projects-dialog.png[]
 
 **Almost there, but not quite...**
 
@@ -197,19 +185,19 @@ Next we need to import the Eclipse launch configurations located inside the _too
 
 Select _File_ > _Import..._ again, but this time, in the _Import_ dialog, select _Run/Debug_ > _Launch Configurations_ and click _Next_.
 
-image::images/eclipse-import-launch-configurations-dialog.png[]
+image::img/eclipse-import-launch-configurations-dialog.png[]
 
 In the next panel, press _Browse..._ then select the _tools/eclipse_ directory.
 
-image::images/eclipse-launch-configurations-file-dialog.png[]
+image::img/eclipse-launch-configurations-file-dialog.png[]
 
 Then check the _eclipse_ option, and press _Finish_
 
-image::images/eclipse-import-launch-configurations-finish.png[]
+image::img/eclipse-import-launch-configurations-finish.png[]
 
 The "Run" button menu should now include options for all of the major build targets.  You can see them by pressing on the _Run_ button in the toolbar:
 
-image::images/eclipse-run-button-dropdown.png[]
+image::img/eclipse-run-button-dropdown.png[]
 
 Select the _MyApp - Run Simulator_ option from this menu.
 
@@ -348,17 +336,17 @@ As I mention throughout this guide, the best place to find and install add-ons f
 
 From the dashboard, select "Advanced Settings" > "Extensions" in the navigation menu on the left as shown below:
 
-image::images/image-2021-03-08-06-57-26-835.png[Control center navigation menu]
+image::img/image-2021-03-08-06-57-26-835.png[Control center navigation menu]
 
 This will bring up a list of available Codename One extensions as shown below:
 
-image::images/control-center-extensions.png[Control center extensions page]
+image::img/control-center-extensions.png[Control center extensions page]
 
 As an example, let's install the "Google Maps" library.
 
 Type in "Maps" into the search box, and it should narrow the options down to three libraries as shown below:
 
-image:images/control-center-extensions-search-maps.png[Control Center Extensions filtered on maps]
+image:img/control-center-extensions-search-maps.png[Control Center Extensions filtered on maps]
 
 The one in the middle "Codename One Google Native", is the Google maps lib that we want.
 

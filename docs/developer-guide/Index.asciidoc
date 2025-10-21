@@ -248,13 +248,13 @@ Import the generated Maven project into your preferred IDE and use the Codename 
 * *Eclipse* – use *File > Import > Existing Maven Projects*, then use the Codename One launch shortcuts provided by the plugin for simulator and build tasks.
 * *Command line* – invoke Maven goals directly whenever you need to integrate with CI/CD pipelines or scripting.
 
-For deeper coverage of the Maven goals and project structure, see the https://shannah.github.io/codenameone-maven-manual/[Codename One Maven Manual].
+For deeper coverage of the Maven goals, project structure, and automation tasks, continue with <<maven-project-workflow>>.
 
 NOTE: Arbitrary Maven dependencies probably won't work for Codename One. Many dependencies assume a full JDK which Codename One can't provide and they often assume functionality that might not be available e.g. reflection, Spring, etc.
 
 .Legacy onboarding resources
 ****
-The retired Ant-based IDE plugins for NetBeans, Eclipse and IntelliJ IDEA – together with the simulator screenshots from those workflows – are still available in the legacy documentation for teams maintaining older projects. New projects should follow the Maven-based instructions above.
+Legacy Ant-based project instructions remain available for teams maintaining older codebases. New projects should follow the Maven workflows described in this guide.
 ****
 
 ==== Important Notes for New Projects

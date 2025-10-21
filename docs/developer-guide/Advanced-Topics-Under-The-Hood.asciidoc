@@ -28,9 +28,6 @@ Here is the current list of supported arguments, notice that build hints are add
 |android.installLocation
 |Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.
 
-|android.gradle
-|Deprecated, this mode is no longer supported. true/false defaults to false prior to 3.3 and true after. Uses Gradle instead of Ant to build the Android app
-
 |android.xapplication
 |defaults to an empty string. Allows developers of native Android code to add text within the application block to define things such as widgets, services etc.
 
@@ -88,7 +85,7 @@ Here is the current list of supported arguments, notice that build hints are add
 |*Deprecated, please android.playService.+++*+++!* Indicates whether Goolge Play Services should be included into the build, defaults to false but that might change based on the functionality of the application and other build hints. Adding Google Play Services support allows us to use a more refined location implementation and invoke some Google specific functionality from native code.
 
 |android.playService.plus, android.playService.auth, android.playService.base, android.playService.identity, android.playService.indexing, android.playService.appInvite, android.playService.analytics, android.playService.cast, android.playService.gcm, android.playService.drive, android.playService.fitness, android.playService.location, android.playService.maps, android.playService.ads, android.playService.vision, android.playService.nearby, android.playService.panorama, android.playService.games, android.playService.safetynet, android.playService.wallet, android.playService.wearable
-|Allows including only a specific play services library portion. Notice that this setting conflicts with the deprecated `android.includeGPlayServices` and only works with the gradle build (which is on by default but can be toggled using `android.gradle`). +
+|Allows including only a specific play services library portion. Notice that this setting conflicts with the deprecated `android.includeGPlayServices` and only works with the Gradle-based Android build pipeline. +
 
 If none of the services are defined to true then plus, auth, base, analytics, gcm, location, maps & ads will be set to true. If one or more of the `android.playService` entries are defined to something then all entries will default to false.
 
@@ -2155,43 +2152,6 @@ In the drop target you can override the following methods:
 * `drop` - the logic for dropping/moving the component must be implemented here!
 
 
-
-=== Continuous Integration & Release Engineering
-
-Codename One was essentially built for continuous integration since the build servers are effectively a building block for such an architecture. However, there are several problems with that: the first of which is limited server capacity.
-
-If all users would start sending builds with every commit the servers would instantly become unusable due to the heavy load. To circumvent this CI support is limited only on the Enterprise level which allows Codename One to stock more servers and cope with the rise in demand related to the feature.
-
-To integrate with any CI solution just use the standard Ant targets such as `build-for-android-device`, `build-for-iphone-device` etc.
-
-Normally, this would be a problem since the build is sent but since it isn't blocking you wouldn't get the build result and wouldn't be able to determine if the build passed or failed. To enable this just edit the build XML and add the attribute `automated="true"` to the codeNameOne tag in the appropriate
-targets.
-
-This will deliver a `result.zip` file under the `dist` folder containing the binaries of a successful build. It will
-also block until the build is completed. This should be pretty easy to integrate with any CI system together with
-our automated testing solutions .
-
-E.g. we can do a synchronous build like this:
-
-[source,xml]
-----
-<target name="build-for-javascript-sync" depends="clean,copy-javascript-override,copy-libs,jar,clean-override">
-    <codeNameOne
-        jarFile="${dist.jar}"
-        displayName="${codename1.displayName}"
-        packageName = "${codename1.packageName}"
-        mainClassName = "${codename1.mainName}"
-        version="${codename1.version}"
-        icon="${codename1.icon}"
-        vendor="${codename1.vendor}"
-        subtitle="${codename1.secondaryTitle}"
-        automated="true"
-        targetType="javascript"
-        />
-</target>
-----
-
-This allows us to build a JavaScript version of the app automatically as part of a release build script.
 
 === Android Lollipop ActionBar Customization
 

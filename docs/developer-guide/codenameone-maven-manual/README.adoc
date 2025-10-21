@@ -1,3 +1,0 @@
-= Codename One Maven Developer Guide Repository
-
-This is the repository for the Codename One Maven Developer guide.  See https://shannah.github.io/codenameone-maven-manual[the HTML Version].

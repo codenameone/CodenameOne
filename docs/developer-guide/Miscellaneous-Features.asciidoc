@@ -361,9 +361,11 @@ image::img/developer-guide/ios_strings_directory_screenshot.png[]
 The _strings_ format is similar to the _properties_ file format, except that both the "key" and the "value" must be wrapped in quotes.  And if there are multiple strings, then they must be delimited by a semi-colon `;`.
 ====
 
-.Ant Projects
+.Legacy Ant Projects
 ****
-Ant projects have a different directory structure.  They have no equivalent location to the maven _ios/src/main/strings_ directory, but its equivalent of `ios/src/main/resources` can be found at _native/ios_.  To include native iOS localizations in Ant projects, you should place zipped versions of your .lproj directories inside the `native/ios` directory of your project.  E.g. _en.lproj.zip_, _fr.lproj.zip_, etc.
+Legacy Ant projects have a different directory structure. They have no equivalent location to the Maven _ios/src/main/strings_ directory, but the legacy `ios/src/main/resources` content can be replicated under _native/ios_. To include native iOS localizations in those projects, place zipped versions of your .lproj directories inside the `native/ios` directory.  E.g. _en.lproj.zip_, _fr.lproj.zip_, etc.
+
+TIP: Whenever possible, migrate legacy builds to Maven to take advantage of the modern workflow. See <<maven-project-workflow>> for automated migration options.
 ****
 
 ===== Example: Localization App Usage Description Strings
