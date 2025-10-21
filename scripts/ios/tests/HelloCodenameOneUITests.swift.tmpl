@@ -1,9 +1,13 @@
 import XCTest
 import UIKit
+import Foundation
 
 final class HelloCodenameOneUITests: XCTestCase {
     private var app: XCUIApplication!
     private var outputDirectory: URL!
+    private var targetBundleIdentifier: String?
+    private var simctlLaunchAttempted = false
+    private let fallbackBundleIdentifier = "com.codenameone.examples"
     private let chunkSize = 2000
     private let previewChannel = "PREVIEW"
     private let previewQualities: [CGFloat] = [0.60, 0.50, 0.40, 0.35, 0.30, 0.25, 0.20, 0.18, 0.16, 0.14, 0.12, 0.10, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01]
@@ -11,6 +15,16 @@ final class HelloCodenameOneUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+
+        let env = ProcessInfo.processInfo.environment
+        if let explicitBundle = env["CN1_AUT_BUNDLE_ID"], !explicitBundle.isEmpty {
+            targetBundleIdentifier = explicitBundle
+            print("CN1SS:INFO:ui_test_target_bundle_id=\(explicitBundle)")
+        } else {
+            targetBundleIdentifier = fallbackBundleIdentifier
+            print("CN1SS:INFO:ui_test_target_bundle_id=fallback(\(fallbackBundleIdentifier))")
+        }
+
         app = XCUIApplication()
 
         // Locale for determinism
@@ -20,14 +34,14 @@ final class HelloCodenameOneUITests: XCTestCase {
 
         // IMPORTANT: write to the app's sandbox, not a host path
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        if let tag = ProcessInfo.processInfo.environment["CN1SS_OUTPUT_DIR"], !tag.isEmpty {
+        if let tag = env["CN1SS_OUTPUT_DIR"], !tag.isEmpty {
             outputDirectory = tmp.appendingPathComponent(tag, isDirectory: true)
         } else {
             outputDirectory = tmp.appendingPathComponent("cn1screens", isDirectory: true)
         }
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
-        app.launch()
+        ensureAppLaunched()
         waitForStableFrame()
     }
 
@@ -37,7 +51,9 @@ final class HelloCodenameOneUITests: XCTestCase {
     }
 
     private func captureScreenshot(named name: String) throws {
-        let shot = XCUIScreen.main.screenshot()
+        ensureAppLaunched()
+        waitForStableFrame()
+        let shot = app.screenshot()
 
         // Save into sandbox tmp (optional – mainly for local debugging)
         let pngURL = outputDirectory.appendingPathComponent("\(name).png")
@@ -50,6 +66,70 @@ final class HelloCodenameOneUITests: XCTestCase {
         add(att)
 
         emitScreenshotPayloads(for: shot, name: name)
+    }
+
+    private func ensureAppLaunched(timeout: TimeInterval = 45) {
+        if app.state == .runningForeground {
+            return
+        }
+
+        if !simctlLaunchAttempted, let bundleID = targetBundleIdentifier, launchViaSimctl(bundleIdentifier: bundleID) {
+            simctlLaunchAttempted = true
+            print("CN1SS:INFO:simctl_launch_attempted bundle=\(bundleID) result=success")
+            if app.wait(for: .runningForeground, timeout: timeout) {
+                return
+            }
+            app.activate()
+            if app.wait(for: .runningForeground, timeout: 10) {
+                return
+            }
+        } else if !simctlLaunchAttempted, let bundleID = targetBundleIdentifier {
+            simctlLaunchAttempted = true
+            print("CN1SS:INFO:simctl_launch_attempted bundle=\(bundleID) result=failure")
+        }
+
+        print("CN1SS:INFO:xcui_launch_invoked")
+        app.launch()
+    }
+
+    private func launchViaSimctl(bundleIdentifier: String) -> Bool {
+        let env = ProcessInfo.processInfo.environment
+        guard let udid = env["SIMULATOR_UDID"], !udid.isEmpty else {
+            return false
+        }
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        task.arguments = ["simctl", "launch", "--terminate-running", udid, bundleIdentifier]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        task.standardOutput = stdoutPipe
+        task.standardError = stderrPipe
+
+        do {
+            try task.run()
+        } catch {
+            print("CN1SS:WARN:simctl_launch_failed bundle=\(bundleIdentifier) error=\(error)")
+            return false
+        }
+
+        task.waitUntilExit()
+        if task.terminationStatus != 0 {
+            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            if let stderrMessage = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !stderrMessage.isEmpty {
+                print("CN1SS:WARN:simctl_launch_nonzero_status bundle=\(bundleIdentifier) status=\(task.terminationStatus) stderr=\(stderrMessage)")
+            } else {
+                print("CN1SS:WARN:simctl_launch_nonzero_status bundle=\(bundleIdentifier) status=\(task.terminationStatus)")
+            }
+            return false
+        }
+
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: stdoutData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !output.isEmpty {
+            print("CN1SS:INFO:simctl_launch_output bundle=\(bundleIdentifier) output=\(output)")
+        }
+        return true
     }
 
     /// Wait for foreground + a short settle time
