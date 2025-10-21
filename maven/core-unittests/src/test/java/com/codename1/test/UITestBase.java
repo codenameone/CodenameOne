@@ -1,6 +1,7 @@
 package com.codename1.test;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Util;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.ui.Display;
 import com.codename1.ui.plaf.UIManager;
@@ -53,6 +54,7 @@ public abstract class UITestBase {
         setDisplayField("pluginSupport", pluginSupport);
         setDisplayField("codenameOneRunning", true);
         setDisplayField("edt", Thread.currentThread());
+        Util.setImplementation(implementation);
     }
 
     @AfterEach
@@ -62,6 +64,7 @@ public abstract class UITestBase {
         setDisplayField("pluginSupport", null);
         setDisplayField("codenameOneRunning", false);
         setDisplayField("edt", null);
+        Util.setImplementation(null);
     }
 
     private void setDisplayField(String fieldName, Object value) throws Exception {
