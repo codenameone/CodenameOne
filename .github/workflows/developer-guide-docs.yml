@@ -2,6 +2,7 @@ name: Build Developer Guide Docs
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'docs/developer-guide/**'
       - '.github/workflows/developer-guide-docs.yml'
@@ -21,23 +22,49 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Update publication metadata for release
-        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+      - name: Determine publication metadata
         run: |
           set -euo pipefail
           REV_DATE="$(date -u +%Y-%m-%d)"
-          VERSION="${RELEASE_TAG:-}"
+          VERSION="${GITHUB_HEAD_REF:-}"
           if [ -z "$VERSION" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
             VERSION="$GITHUB_REF_NAME"
+          fi
+          if [ -z "$VERSION" ] && [ -n "${GITHUB_SHA:-}" ]; then
+            VERSION="${GITHUB_SHA:0:7}"
           fi
           VERSION="${VERSION#v}"
           if [ -z "$VERSION" ]; then
             VERSION="UNKNOWN"
           fi
-          sed -i -E "s/^:revdate: .*/:revdate: ${REV_DATE}/" docs/developer-guide/developer-guide.asciidoc
-          sed -i -E "s/^:revnumber: .*/:revnumber: ${VERSION}/" docs/developer-guide/developer-guide.asciidoc
+          if date -u -d "$REV_DATE" '+%B %-d, %Y' >/tmp/rev_human 2>/dev/null; then
+            REV_HUMAN_DATE="$(cat /tmp/rev_human)"
+          else
+            REV_HUMAN_DATE="$(date -u '+%B %-d, %Y')"
+          fi
+          {
+            echo "REV_DATE=$REV_DATE"
+            echo "REV_NUMBER=$VERSION"
+            echo "REV_HUMAN_DATE=$REV_HUMAN_DATE"
+          } >> "$GITHUB_ENV"
+
+      - name: Render publication cover artwork
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+          SOURCE="docs/developer-guide/book-cover.svg"
+          GENERATED_SVG="docs/developer-guide/book-cover.generated.svg"
+          GENERATED_PNG="docs/developer-guide/book-cover.generated.png"
+          cp "$SOURCE" "$GENERATED_SVG"
+          export GENERATED_SVG
+          python3 -c "import os, re, pathlib; target = pathlib.Path(os.environ['GENERATED_SVG']); text = target.read_text(encoding='utf-8'); rev = os.environ.get('REV_NUMBER', 'UNKNOWN'); date = os.environ.get('REV_HUMAN_DATE') or os.environ.get('REV_DATE', ''); replacement = f\"Version {rev}\" + (f\" - {date}\" if date else ''); new_text, count = re.subn(r'Version\\s+[^<]+', replacement.strip(), text, count=1); assert count == 1, 'Could not find version text placeholder in cover artwork'; target.write_text(new_text, encoding='utf-8')"
+          rsvg-convert -w 2551 -h 3579 "$GENERATED_SVG" -o "$GENERATED_PNG"
+          {
+            echo "COVER_IMAGE_ATTR=$(basename "$GENERATED_PNG")"
+            echo "GENERATED_COVER_IMAGE=$GENERATED_PNG"
+            echo "GENERATED_COVER_SVG=$GENERATED_SVG"
+          } >> "$GITHUB_ENV"
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -55,11 +82,29 @@ jobs:
           HTML_BUILD_DIR="${OUTPUT_ROOT}/html"
           PDF_BUILD_DIR="${OUTPUT_ROOT}/pdf"
           PACKAGE_DIR="${OUTPUT_ROOT}/html-package"
+          COVER_IMAGE_ATTR_VALUE="${COVER_IMAGE_ATTR:-book-cover.svg}"
+          GENERATED_COVER_IMAGE="${GENERATED_COVER_IMAGE:-}"
+          GENERATED_COVER_SVG="${GENERATED_COVER_SVG:-}"
           mkdir -p "$HTML_BUILD_DIR" "$PDF_BUILD_DIR"
-          asciidoctor -D "$HTML_BUILD_DIR" -o developer-guide.html docs/developer-guide/developer-guide.asciidoc
-          asciidoctor-pdf -D "$PDF_BUILD_DIR" -o developer-guide.pdf docs/developer-guide/developer-guide.asciidoc
+          asciidoctor \
+            -a revdate="$REV_DATE" \
+            -a revnumber="$REV_NUMBER" \
+            -a cover-image="$COVER_IMAGE_ATTR_VALUE" \
+            -D "$HTML_BUILD_DIR" \
+            -o developer-guide.html \
+            docs/developer-guide/developer-guide.asciidoc
+          asciidoctor-pdf \
+            -a revdate="$REV_DATE" \
+            -a revnumber="$REV_NUMBER" \
+            -a cover-image="$COVER_IMAGE_ATTR_VALUE" \
+            -D "$PDF_BUILD_DIR" \
+            -o developer-guide.pdf \
+            docs/developer-guide/developer-guide.asciidoc
           rm -rf "$PACKAGE_DIR"
           mkdir -p "$PACKAGE_DIR"
+          if [ -n "$GENERATED_COVER_IMAGE" ] && [ -f "$GENERATED_COVER_IMAGE" ]; then
+            cp "$GENERATED_COVER_IMAGE" "$HTML_BUILD_DIR/$(basename "$GENERATED_COVER_IMAGE")"
+          fi
           cp "$HTML_BUILD_DIR/developer-guide.html" "$PACKAGE_DIR/"
           for asset_dir in docs/developer-guide/*; do
             base_name="$(basename "$asset_dir")"
@@ -67,7 +112,16 @@ jobs:
               cp -R "$asset_dir" "$PACKAGE_DIR/"
             fi
           done
+          if [ -n "$GENERATED_COVER_IMAGE" ] && [ -f "$GENERATED_COVER_IMAGE" ]; then
+            cp "$GENERATED_COVER_IMAGE" "$PACKAGE_DIR/$(basename "$GENERATED_COVER_IMAGE")"
+          fi
           (cd "$PACKAGE_DIR" && zip -r "../developer-guide-html.zip" .)
+          if [ -n "$GENERATED_COVER_IMAGE" ] && [ -f "$GENERATED_COVER_IMAGE" ]; then
+            rm -f "$GENERATED_COVER_IMAGE"
+          fi
+          if [ -n "$GENERATED_COVER_SVG" ] && [ -f "$GENERATED_COVER_SVG" ]; then
+            rm -f "$GENERATED_COVER_SVG"
+          fi
 
       - name: Upload HTML artifact
         uses: actions/upload-artifact@v4
