@@ -23,29 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PropertiesPackageTest {
-    private static final MapAdapter DATE_ADAPTER = new MapAdapter(Date.class) {
-        @Override
-        public void placeInMap(PropertyBase b, Map m) {
-            Property property = (Property) b;
-            Date value = (Date) property.get();
-            m.put(b.getName(), value == null ? null : Long.valueOf(value.getTime()));
-        }
-
-        @Override
-        public void setFromMap(PropertyBase b, Map m) {
-            Property property = (Property) b;
-            Object raw = m.get(b.getName());
-            if (raw == null) {
-                property.set(null);
-                return;
-            }
-            if (raw instanceof Number) {
-                property.set(new Date(((Number) raw).longValue()));
-                return;
-            }
-            property.set(new Date(Long.parseLong(String.valueOf(raw))));
-        }
-    };
 
     private String originalPreferencesLocation;
 
@@ -183,8 +160,8 @@ class PropertiesPackageTest {
         assertEquals("Dana", map.get("name"));
         assertEquals(28, map.get("age"));
         assertTrue(map.containsKey("address"));
-        assertTrue(map.get("created") instanceof Number);
-        assertEquals(123456789L, ((Number) map.get("created")).longValue());
+        assertTrue(map.get("created") instanceof Date);
+        assertEquals(123456789L, ((Date) map.get("created")).getTime());
 
         Person copy = new Person();
         copy.getPropertyIndex().populateFromMap(map);
@@ -218,11 +195,9 @@ class PropertiesPackageTest {
         index.setXmlTextElement(person.name, true);
         assertTrue(index.isXmlTextElement(person.name));
         assertSame(person.name, index.getXmlTextElement());
-        Element element = index.asElement();
-        assertTrue(element.hasTextChild());
-        Element textChild = element.getChildAt(0);
-        assertTrue(textChild.isTextElement());
-        assertEquals("Eva", textChild.getText());
+        String xml = index.toXML();
+        Element element = parse(xml);
+        assertEquals("Eva", element.getChildAt(0).getText());
         index.setXmlTextElement(person.name, false);
         assertNull(index.getXmlTextElement());
     }

@@ -195,7 +195,7 @@ public class PurchaseTest {
     }
 
     @Test
-    public void testGetReceiptsThrowsWhenStoredDataHasUnexpectedType() throws Exception {
+    public void testGetReceiptsReturnsEmptyListWhenStoredDataHasUnexpectedType() throws Exception {
         Storage.getInstance().writeObject(receiptsKey, "bad-data");
         Storage.getInstance().clearCache();
 
