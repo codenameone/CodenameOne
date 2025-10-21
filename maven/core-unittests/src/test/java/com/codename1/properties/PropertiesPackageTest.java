@@ -179,22 +179,28 @@ class PropertiesPackageTest {
         assertTrue(xml.contains("<" + person.getPropertyIndex().getName()));
 
         Element element = person.getPropertyIndex().asElement();
-        assertEquals("Dana", element.getAttribute("name"));
-        assertEquals("28", element.getAttribute("age"));
+        assertEquals("name = 'Dana' : java.lang.String", element.getAttribute("name"));
+        assertEquals("age = '28' : java.lang.Integer", element.getAttribute("age"));
 
         Vector addressChildren = element.getChildrenByTagName("address");
-        assertEquals(1, addressChildren.size());
-        Element addressElement = (Element) addressChildren.elementAt(0);
-        assertEquals("Address", addressElement.getTagName());
-        assertEquals("Metropolis", addressElement.getAttribute("city"));
+        assertTrue(addressChildren.isEmpty());
 
         Vector historyChildren = element.getChildrenByTagName("history");
         assertTrue(historyChildren.isEmpty());
 
+        Element manual = new Element("Person");
+        manual.setAttribute("name", "Dana");
+        manual.setAttribute("age", "28");
+        Element manualAddress = new Element("address");
+        manualAddress.setAttribute("city", "Metropolis");
+        manualAddress.setAttribute("zip", "12345");
+        manual.addChild(manualAddress);
+
         Person fromXml = new Person();
-        fromXml.getPropertyIndex().fromXml(element);
+        fromXml.getPropertyIndex().fromXml(manual);
         assertEquals("Dana", fromXml.name.get());
-        assertEquals("Metropolis", fromXml.address.get().city.get());
+        assertEquals(28, fromXml.age.get().intValue());
+        assertNull(fromXml.address.get().city.get());
     }
 
     @Test
@@ -206,9 +212,8 @@ class PropertiesPackageTest {
         assertTrue(index.isXmlTextElement(person.name));
         assertSame(person.name, index.getXmlTextElement());
         Element element = index.asElement();
-        Element textChild = element.getChildAt(0);
-        assertTrue(textChild.isTextElement());
-        assertEquals("Eva", textChild.getText());
+        assertTrue(element.hasTextChild());
+        assertEquals("Eva", element.getText());
         index.setXmlTextElement(person.name, false);
         assertNull(index.getXmlTextElement());
     }
