@@ -1,7 +1,6 @@
 import XCTest
 import UIKit
 import CoreGraphics
-import Darwin
 
 final class HelloCodenameOneUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -42,7 +41,6 @@ final class HelloCodenameOneUITests: XCTestCase {
         print("CN1SS:INFO:ui_test_launch_arguments=\(app.launchArguments.joined(separator: " "))")
 
         ensureAppLaunched()
-        triggerCodenameOneMainIfPossible()
         waitForStableFrame()
     }
 
@@ -135,7 +133,6 @@ final class HelloCodenameOneUITests: XCTestCase {
 
     private func captureScreenshot(named name: String) throws {
         ensureAppLaunched()
-        triggerCodenameOneMainIfPossible()
         waitForStableFrame()
         let result = pollForRenderableContent(label: name, timeout: 30, poll: 0.6)
         let shot = result.screenshot
@@ -286,14 +283,6 @@ final class HelloCodenameOneUITests: XCTestCase {
         return nil
     }
 
-    private func triggerCodenameOneMainIfPossible() {
-        guard let bundleID = resolveBundleIdentifier(), !bundleID.isEmpty else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=no_bundle_identifier")
-            return
-        }
-        CodenameOneMainInvoker.shared.invokeIfNeeded(app: app, bundleIdentifier: bundleID)
-    }
-
     private func sanitizeTestName(_ name: String) -> String {
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
         let underscore: UnicodeScalar = "_"
@@ -370,136 +359,5 @@ final class HelloCodenameOneUITests: XCTestCase {
         }
         print("CN1SS:INFO:test=\(name) chunks=\(chunkCount) total_b64_len=\(base64.count)")
         print("\(prefix):END:\(name)")
-    }
-}
-
-private final class CodenameOneMainInvoker {
-    static let shared = CodenameOneMainInvoker()
-
-    private let queue = DispatchQueue(label: "codenameone.main.invoker")
-    private var invokedBundles: Set<String> = []
-    private var handles: [String: UnsafeMutableRawPointer] = [:]
-
-    private init() {}
-
-    func invokeIfNeeded(app: XCUIApplication, bundleIdentifier: String) {
-        var alreadyInvoked = false
-        queue.sync {
-            alreadyInvoked = invokedBundles.contains(bundleIdentifier)
-        }
-        if alreadyInvoked {
-            return
-        }
-
-        guard let context = prepareInvocation(app: app, bundleIdentifier: bundleIdentifier) else {
-            return
-        }
-
-        context.invoke()
-
-        queue.sync {
-            invokedBundles.insert(bundleIdentifier)
-            handles[bundleIdentifier] = context.handle
-        }
-        print("CN1SS:INFO:codenameone_main_invoked bundle=\(bundleIdentifier)")
-    }
-
-    private func prepareInvocation(app: XCUIApplication, bundleIdentifier: String) -> InvocationContext? {
-        guard let container = locateAppContainer(app: app, bundleIdentifier: bundleIdentifier) else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=container_missing bundle=\(bundleIdentifier)")
-            return nil
-        }
-
-        guard let executable = readExecutableName(appContainer: container) else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=executable_missing bundle=\(bundleIdentifier)")
-            return nil
-        }
-
-        let binaryPath = (container as NSString).appendingPathComponent(executable)
-        guard let handle = dlopen(binaryPath, RTLD_NOW | RTLD_GLOBAL) else {
-            if let error = dlerror() {
-                print("CN1SS:WARN:codenameone_main_skipped reason=dlopen_failed bundle=\(bundleIdentifier) error=\(String(cString: error))")
-            } else {
-                print("CN1SS:WARN:codenameone_main_skipped reason=dlopen_failed bundle=\(bundleIdentifier)")
-            }
-            return nil
-        }
-
-        guard let initPtr = dlsym(handle, "initConstantPool") else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=missing_initConstantPool bundle=\(bundleIdentifier)")
-            return nil
-        }
-
-        guard let threadPtr = dlsym(handle, "getThreadLocalData") else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=missing_getThreadLocalData bundle=\(bundleIdentifier)")
-            return nil
-        }
-
-        let mainSymbol = "com_codenameone_examples_HelloCodenameOne_main___java_lang_String_1ARRAY"
-        guard let mainPtr = dlsym(handle, mainSymbol) else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=missing_main_symbol bundle=\(bundleIdentifier) symbol=\(mainSymbol)")
-            return nil
-        }
-
-        let initFn = unsafeBitCast(initPtr, to: InvocationContext.InitConstantPoolFn.self)
-        let threadFn = unsafeBitCast(threadPtr, to: InvocationContext.GetThreadLocalDataFn.self)
-        let mainFn = unsafeBitCast(mainPtr, to: InvocationContext.CodenameOneMainFn.self)
-
-        return InvocationContext(handle: handle, initConstantPool: initFn, getThreadLocalData: threadFn, mainFunction: mainFn)
-    }
-
-    private func locateAppContainer(app: XCUIApplication, bundleIdentifier: String) -> String? {
-        do {
-            if let bundleURL = try app.value(forKey: "bundleURL") as? URL {
-                return bundleURL.path
-            }
-        } catch {
-            print("CN1SS:WARN:codenameone_main_kvc_failed key=bundleURL bundle=\(bundleIdentifier) error=\(error)")
-        }
-
-        do {
-            if let bundlePath = try app.value(forKey: "bundlePath") as? String {
-                return bundlePath
-            }
-        } catch {
-            print("CN1SS:WARN:codenameone_main_kvc_failed key=bundlePath bundle=\(bundleIdentifier) error=\(error)")
-        }
-
-        if let fallback = Bundle.main.infoDictionary?["CFBundleExecutable"] as? String {
-            print("CN1SS:WARN:codenameone_main_skipped reason=bundle_path_unavailable bundle=\(bundleIdentifier) fallbackExecutable=\(fallback)")
-        } else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=bundle_path_unavailable bundle=\(bundleIdentifier)")
-        }
-        return nil
-    }
-
-    private func readExecutableName(appContainer: String) -> String? {
-        let infoPath = (appContainer as NSString).appendingPathComponent("Info.plist")
-        guard let info = NSDictionary(contentsOfFile: infoPath) as? [String: Any] else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=info_plist_unreadable path=\(infoPath)")
-            return nil
-        }
-        guard let executable = info["CFBundleExecutable"] as? String, !executable.isEmpty else {
-            print("CN1SS:WARN:codenameone_main_skipped reason=cfbundleexecutablenotfound path=\(infoPath)")
-            return nil
-        }
-        return executable
-    }
-
-    private struct InvocationContext {
-        typealias InitConstantPoolFn = @convention(c) () -> Void
-        typealias GetThreadLocalDataFn = @convention(c) () -> UnsafeMutableRawPointer?
-        typealias CodenameOneMainFn = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
-
-        let handle: UnsafeMutableRawPointer
-        let initConstantPool: InitConstantPoolFn
-        let getThreadLocalData: GetThreadLocalDataFn
-        let mainFunction: CodenameOneMainFn
-
-        func invoke() {
-            initConstantPool()
-            let threadState = getThreadLocalData()
-            mainFunction(threadState, nil)
-        }
     }
 }
