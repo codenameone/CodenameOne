@@ -3,6 +3,7 @@ package com.codename1.testing;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.io.TestImplementationProvider;
+import com.codename1.test.UITestBase;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,13 +20,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-class DeviceRunnerTest {
-    private CodenameOneImplementation implementation;
+class DeviceRunnerTest extends UITestBase {
     private TestDeviceRunner deviceRunner;
 
     @BeforeEach
     void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
         deviceRunner = new TestDeviceRunner();
     }
 

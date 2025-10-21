@@ -2,6 +2,7 @@ package com.codename1.testing;
 
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.TestImplementationProvider;
+import com.codename1.test.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -16,13 +17,11 @@ import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class TestRunnerComponentTest {
-    private CodenameOneImplementation implementation;
+class TestRunnerComponentTest extends UITestBase {
     private TestRunnerComponent testRunner;
 
     @BeforeEach
     void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
         testRunner = new TestRunnerComponent();
     }
 

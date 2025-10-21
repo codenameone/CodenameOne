@@ -3,6 +3,7 @@ package com.codename1.testing;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Log;
 import com.codename1.io.TestImplementationProvider;
+import com.codename1.test.UITestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,13 +12,11 @@ import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class TestReportingTest {
-    private CodenameOneImplementation implementation;
+class TestReportingTest extends UITestBase {
     private TestReporting testReporting;
 
     @BeforeEach
     void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
         testReporting = new TestReporting();
         TestReporting.setInstance(testReporting);
     }
