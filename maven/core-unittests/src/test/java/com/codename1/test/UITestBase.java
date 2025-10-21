@@ -4,6 +4,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Util;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,7 @@ public abstract class UITestBase {
     protected Display display;
     protected CodenameOneImplementation implementation;
     protected PluginSupport pluginSupport;
+    private Graphics codenameOneGraphics;
 
     @BeforeEach
     protected void setUpDisplay() throws Exception {
@@ -47,6 +49,9 @@ public abstract class UITestBase {
         when(implementation.loadTrueTypeFont(anyString(), anyString())).thenAnswer(invocation -> new Object());
         when(implementation.deriveTrueTypeFont(any(), anyFloat(), anyInt())).thenAnswer(invocation -> new Object());
         when(implementation.loadNativeFont(anyString())).thenAnswer(invocation -> new Object());
+        when(implementation.getNativeGraphics()).thenReturn(new Object());
+        when(implementation.paintNativePeersBehind()).thenReturn(false);
+        when(implementation.handleEDTException(any(Throwable.class))).thenReturn(false);
 
         pluginSupport = new PluginSupport();
 
@@ -54,12 +59,15 @@ public abstract class UITestBase {
         setDisplayField("pluginSupport", pluginSupport);
         setDisplayField("codenameOneRunning", true);
         setDisplayField("edt", Thread.currentThread());
+        codenameOneGraphics = createGraphics();
+        setDisplayField("codenameOneGraphics", codenameOneGraphics);
         Util.setImplementation(implementation);
     }
 
     @AfterEach
     protected void tearDownDisplay() throws Exception {
         resetUIManager();
+        setDisplayField("codenameOneGraphics", null);
         setDisplayField("impl", null);
         setDisplayField("pluginSupport", null);
         setDisplayField("codenameOneRunning", false);
@@ -81,5 +89,15 @@ public abstract class UITestBase {
         Field instanceField = UIManager.class.getDeclaredField("instance");
         instanceField.setAccessible(true);
         instanceField.set(null, null);
+    }
+
+    private Graphics createGraphics() throws Exception {
+        java.lang.reflect.Constructor<Graphics> constructor = Graphics.class.getDeclaredConstructor(Object.class);
+        constructor.setAccessible(true);
+        Graphics graphics = constructor.newInstance(new Object());
+        Field paintPeersField = Graphics.class.getDeclaredField("paintPeersBehind");
+        paintPeersField.setAccessible(true);
+        paintPeersField.setBoolean(graphics, false);
+        return graphics;
     }
 }
