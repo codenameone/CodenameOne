@@ -5,6 +5,9 @@ import CoreGraphics
 final class HelloCodenameOneUITests: XCTestCase {
     private var app: XCUIApplication!
     private var outputDirectory: URL!
+    private var targetBundleIdentifier: String?
+    private var resolvedBundleIdentifier: String?
+    private let codenameOneSurfaceIdentifier = "cn1.glview"
     private let chunkSize = 2000
     private let previewChannel = "PREVIEW"
     private let previewQualities: [CGFloat] = [0.60, 0.50, 0.40, 0.35, 0.30, 0.25, 0.20, 0.18, 0.16, 0.14, 0.12, 0.10, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01]
@@ -12,7 +15,13 @@ final class HelloCodenameOneUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
+        if let bundleID = ProcessInfo.processInfo.environment["CN1_AUT_BUNDLE_ID"], !bundleID.isEmpty {
+            targetBundleIdentifier = bundleID
+            app = XCUIApplication(bundleIdentifier: bundleID)
+        } else {
+            app = XCUIApplication()
+            targetBundleIdentifier = nil
+        }
 
         // Locale for determinism
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
@@ -29,7 +38,26 @@ final class HelloCodenameOneUITests: XCTestCase {
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
         app.launch()
+        let reportedBundleId = targetBundleIdentifier ?? "(scheme-default)"
+        print("CN1SS:INFO:ui_test_target_bundle_id=\(reportedBundleId)")
+        print("CN1SS:INFO:ui_test_launch_arguments=\(app.launchArguments.joined(separator: " "))")
+        if let resolved = resolveBundleIdentifier() {
+            resolvedBundleIdentifier = resolved
+            print("CN1SS:INFO:ui_test_resolved_bundle_id=\(resolved)")
+        } else {
+            print("CN1SS:WARN:ui_test_resolved_bundle_id_unavailable=true")
+        }
+
+        let launchSurface = waitForCodenameOneSurface(timeout: 40, context: "post_launch")
+        logSurfaceMetrics(launchSurface, context: "post_launch")
         waitForStableFrame()
+
+        let launchProbe = pollForRenderableContent(label: "launch_probe", timeout: 25, poll: 0.75)
+        if launchProbe.hasRenderableContent {
+            print("CN1SS:INFO:test=launch_probe rendered_content_detected=true attempts=\(launchProbe.attempts)")
+        } else {
+            print("CN1SS:WARN:test=launch_probe rendered_content_detected=false attempts=\(launchProbe.attempts)")
+        }
     }
 
     override func tearDownWithError() throws {
@@ -38,7 +66,19 @@ final class HelloCodenameOneUITests: XCTestCase {
     }
 
     private func captureScreenshot(named name: String) throws {
-        let shot = waitForRenderedScreenshot(label: name)
+        let surface = waitForCodenameOneSurface(timeout: 20, context: "\(name)_pre_capture")
+        logSurfaceMetrics(surface, context: "\(name)_pre_capture")
+
+        let result = pollForRenderableContent(label: name, timeout: 25, poll: 0.5)
+        let shot = result.screenshot
+        if !result.hasRenderableContent {
+            print("CN1SS:WARN:test=\(name) rendered_content_not_detected_after_timeout=true attempts=\(result.attempts)")
+            print("CN1SS:ERROR:test=\(name) codenameone_render_assertion_failed attempts=\(result.attempts)")
+            attachDebugDescription(name: "\(name)_ui_tree")
+            XCTFail("Codename One UI did not render for test \(name) after \(result.attempts) attempt(s)")
+        }
+
+        logSurfaceMetrics(surface, context: "\(name)_post_capture")
 
         // Save into sandbox tmp (optional – mainly for local debugging)
         let pngURL = outputDirectory.appendingPathComponent("\(name).png")
@@ -75,36 +115,78 @@ final class HelloCodenameOneUITests: XCTestCase {
     func testBrowserComponentScreenshot() throws {
         waitForStableFrame()
         tapNormalized(0.5, 0.70)
-        // tiny retry to allow BrowserComponent to render
+        print("CN1SS:INFO:navigation_tap=browser_screen normalized_x=0.50 normalized_y=0.70")
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 2.0))
         try captureScreenshot(named: "BrowserComponent")
     }
 
-    private func waitForRenderedScreenshot(label: String, timeout: TimeInterval = 10, poll: TimeInterval = 0.4) -> XCUIScreenshot {
+    private func pollForRenderableContent(label: String, timeout: TimeInterval, poll: TimeInterval) -> (screenshot: XCUIScreenshot, hasRenderableContent: Bool, attempts: Int) {
         let deadline = Date(timeIntervalSinceNow: timeout)
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))
-        var attempt = 0
-        var screenshot = XCUIScreen.main.screenshot()
-        while Date() < deadline {
-            if screenshotHasRenderableContent(screenshot) {
-                return screenshot
+        var attempts = 0
+        while true {
+            attempts += 1
+            let screenshot = app.screenshot()
+            let analysis = analyzeScreenshot(screenshot)
+            let hasContent = analysis.hasRenderableContent
+            if hasContent {
+                print("CN1SS:INFO:test=\(label) rendered_frame_detected_attempt=\(attempts)")
+                return (screenshot, true, attempts)
             }
-            attempt += 1
-            print("CN1SS:INFO:test=\(label) waiting_for_rendered_frame attempt=\(attempt)")
-            RunLoop.current.run(until: Date(timeIntervalSinceNow: poll))
-            screenshot = XCUIScreen.main.screenshot()
+
+            let now = Date()
+            if now >= deadline {
+                print("CN1SS:INFO:test=\(label) rendered_frame_luma_variance=\(analysis.lumaVariance)")
+                return (screenshot, false, attempts)
+            }
+
+            print("CN1SS:INFO:test=\(label) waiting_for_rendered_frame attempt=\(attempts) luma_variance=\(analysis.lumaVariance)")
+            let nextInterval = min(poll, deadline.timeIntervalSince(now))
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: nextInterval))
         }
-        return screenshot
     }
 
-    private func screenshotHasRenderableContent(_ screenshot: XCUIScreenshot) -> Bool {
+    private func waitForCodenameOneSurface(timeout: TimeInterval, context: String) -> XCUIElement? {
+        let surface = app.otherElements[codenameOneSurfaceIdentifier]
+        let exists = surface.waitForExistence(timeout: timeout)
+        print("CN1SS:INFO:codenameone_surface_wait context=\(context) identifier=\(codenameOneSurfaceIdentifier) timeout=\(timeout) exists=\(exists)")
+        if exists {
+            return surface
+        }
+        let fallback = app.screenshot()
+        let screenshotAttachment = XCTAttachment(screenshot: fallback)
+        screenshotAttachment.name = "\(context)_missing_surface_screen"
+        screenshotAttachment.lifetime = .keepAlways
+        add(screenshotAttachment)
+        attachDebugDescription(name: "\(context)_missing_surface")
+        print("CN1SS:WARN:codenameone_surface_missing context=\(context)")
+        return nil
+    }
+
+    private func logSurfaceMetrics(_ surface: XCUIElement?, context: String) {
+        guard let surface = surface else {
+            print("CN1SS:INFO:codenameone_surface_metrics context=\(context) frame=absent hittable=false")
+            return
+        }
+        let frame = surface.frame
+        let formatted = String(format: "x=%.1f y=%.1f width=%.1f height=%.1f", frame.origin.x, frame.origin.y, frame.size.width, frame.size.height)
+        print("CN1SS:INFO:codenameone_surface_metrics context=\(context) frame=\(formatted) hittable=\(surface.isHittable)")
+    }
+
+    private func attachDebugDescription(name: String) {
+        let attachment = XCTAttachment(string: app.debugDescription)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func analyzeScreenshot(_ screenshot: XCUIScreenshot) -> (hasRenderableContent: Bool, lumaVariance: Int) {
         guard let cgImage = screenshot.image.cgImage else {
-            return true
+            return (true, 255)
         }
         let width = cgImage.width
         let height = cgImage.height
         guard width > 0, height > 0 else {
-            return false
+            return (false, 0)
         }
 
         let insetX = max(0, width / 8)
@@ -116,7 +198,7 @@ final class HelloCodenameOneUITests: XCTestCase {
             height: max(1, height - insetY * 2)
         ).integral
         guard let cropped = cgImage.cropping(to: cropRect) else {
-            return true
+            return (true, 255)
         }
 
         let sampleWidth = 80
@@ -132,12 +214,12 @@ final class HelloCodenameOneUITests: XCTestCase {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
-            return true
+            return (true, 255)
         }
         context.interpolationQuality = .high
         context.draw(cropped, in: CGRect(x: 0, y: 0, width: sampleWidth, height: sampleHeight))
         guard let data = context.data else {
-            return true
+            return (true, 255)
         }
 
         let buffer = data.bindMemory(to: UInt8.self, capacity: sampleHeight * bytesPerRow)
@@ -156,7 +238,23 @@ final class HelloCodenameOneUITests: XCTestCase {
             }
         }
 
-        return maxLuma - minLuma > 12
+        let variance = maxLuma - minLuma
+        return (variance > 12, variance)
+    }
+
+    private func resolveBundleIdentifier() -> String? {
+        if let explicit = targetBundleIdentifier, !explicit.isEmpty {
+            return explicit
+        }
+        do {
+            let value = try app.value(forKey: "bundleID")
+            if let actual = value as? String, !actual.isEmpty {
+                return actual
+            }
+        } catch {
+            print("CN1SS:WARN:ui_test_bundle_resolution_failed error=\(error)")
+        }
+        return nil
     }
 
     private func sanitizeTestName(_ name: String) -> String {
