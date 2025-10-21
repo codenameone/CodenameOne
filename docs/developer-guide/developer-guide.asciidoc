@@ -36,7 +36,11 @@ toc::[]
 
 include::About-This-Guide.asciidoc[]
 
-= Part I. Foundations
+= Part I. Project Setup
+
+include::Maven-Project-Workflow.asciidoc[]
+
+= Part II. Foundations
 
 include::Index.asciidoc[]
 
@@ -48,7 +52,7 @@ include::Advanced-Theming.asciidoc[]
 
 include::css.asciidoc[]
 
-= Part II. User Interface and Experience
+= Part III. User Interface and Experience
 
 include::The-Components-Of-Codename-One.asciidoc[]
 
@@ -58,7 +62,7 @@ include::The-EDT---Event-Dispatch-Thread.asciidoc[]
 
 include::graphics.asciidoc[]
 
-= Part III. Application Services
+= Part IV. Application Services
 
 include::Events.asciidoc[]
 
@@ -72,7 +76,7 @@ include::performance.asciidoc[]
 
 include::Monetization.asciidoc[]
 
-= Part IV. Platform and Deployment
+= Part V. Platform and Deployment
 
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
@@ -86,7 +90,7 @@ include::Working-With-Javascript.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
 
-= Part V. Contributing and Appendices
+= Part VI. Contributing and Appendices
 
 include::Working-With-CodenameOne-Sources.asciidoc[]
 

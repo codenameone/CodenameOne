@@ -8,9 +8,6 @@ The Codename One Settings app (aka Codename One Preferences, aka Control Center)
 === Opening Codename One Settings
 
 ==== Opening Codename One Settings from Command-line
-++++
-<env cli ></env>
-++++
 
 Use the `run.sh` (or run.bat, if on Windows) to open Codename One settings:
 
@@ -20,36 +17,27 @@ Use the `run.sh` (or run.bat, if on Windows) to open Codename One settings:
 ----
 
 ==== Opening Codename One Settings from IntelliJ
-++++
-<env intellij ></env>
-++++
 
 Click on the "Configuration" menu in the upper right of the toolbar, and select "Tools" > "Codename One Settings" as shown below.
 
-image::images/intellij-open-settings.png[]
+image::img/intellij-open-settings.png[]
 
 
 ==== Opening Codename One Settings from NetBeans
-++++
-<env netbeans></env>
-++++
 
 Right-click on the project in the project inspector, and select "Maven" > "Open Control Center" as shown below:
 
-image::images/netbeans-open-control-center.png[]
+image::img/netbeans-open-control-center.png[]
 
 ==== Opening Codename One Settings from Eclipse
-++++
-<env eclipse ></env>
-++++
 
-Press the image:images/eclipse-run-as-button.png[] button, and select the "_My Project_ Settings" option. (Where _My Project_ is the name of your project).  E.g.
+Press the image:img/eclipse-run-as-button.png[] button, and select the "_My Project_ Settings" option. (Where _My Project_ is the name of your project).  E.g.
 
-image:images/eclipse-open-settings.png[]
+image:img/eclipse-open-settings.png[]
 
 [#dashboard]
 === The Dashboard
 
 Once inside Codename One Settings, you'll see a dashboard like the following:
 
-image::images/control-center-dashboard.png[]
+image::img/control-center-dashboard.png[]

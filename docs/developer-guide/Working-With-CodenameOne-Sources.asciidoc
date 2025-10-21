@@ -13,73 +13,35 @@ NOTE: Creating a clean "workspace" directory is optional, and there is nothing s
 
 === Building Sources
 
+The Maven aggregator for the SDK lives in the _maven_ directory. Run the following command to build every module and install the artifacts into your local Maven repository:
+
 [source,bash]
 ----
-$ cd CodenameOne
-$ ant
+$ cd CodenameOne/maven
+$ mvn -DskipTests install
 ----
 
-NOTE: The `cd CodenameOne` command should take you to the root project directory which contains subfolders "CodenameOne", "Ports", etc.. - not the subfolder named "CodenameOne".
+TIP: Omit the `-DskipTests` flag if you want the build to execute the full test suite as part of the build.
 
 === Running Unit Tests
 
-You can run the unit test suite locally in the Codename One simulator using the "test-javase" ant target.
+Codename One's automated tests are expressed as standard Maven modules. You can run the core unit tests with:
 
 [source,bash]
 ----
-$ ant test-javase
+$ cd CodenameOne/maven
+$ mvn -pl core-unittests test
 ----
 
+The integration tests that drive the simulator and build client live under the `tests` directory. From the same _maven_ directory you can run them with:
+
+[source,bash]
+----
+$ mvn -pl tests -am verify
+----
+
+Consult the module READMEs inside `maven/core-unittests` and `maven/tests` for additional configuration options and environment variables.
 
 === Running iOS Unit Tests
 
-NOTE: Running iOS Unit tests is currently limited to interal use only by Codename One.
-
-TLDR: You can run Codename One's unit tests on a local iOS simulator by running the "test-ios" ant target in the main CodenameOne directory.  E.g.
-
-[source,bash]
-----
-ant test-ios
-----
-
-This assumes the following requirements
-
-1. You are running Mac OS X with Xcode 7.3 or higher installed.
-2. You have npm installed and in your environment PATH.
-3. You have appium installed and running.
-
-==== Installing npm
-
-Either download the installer from https://nodejs.org/en/ OR run `brew install node` from terminal.
-
-==== Installing and Running Appium
-
-Open a new terminal window, then
-
-[source,bash]
-----
-$ mkdir appium
-$ cd appium
-$ npm install appium
-$ ./node_modules/.bin/appium
-----
-
-NOTE: You may want to run the last command `./node_modules/.bin/appium` as a daemon so that you can continue to use the same terminal window.  E.g. `./node_modules/.bin/appium &`
-
-
-==== Running the Unit tests
-
-[source,bash]
-----
-$ cd CodenameOne
-$ ant test-ios
-----
-
-==== Overriding the Codename One Build Server Target
-
-[source,bash]
-----
-$ ant test-ios -Dcn1.iphone.target=iphone_new
-----
-
-This will send to the "iphone_new" build server instead of the default "iphone" server.
+Codename One's Appium-based iOS simulator tests require macOS, Xcode, and an Enterprise subscription. If you have access to that infrastructure, coordinate with Codename One support for credentials and provisioning, then follow the instructions in the `maven/tests` module to execute the suite with Maven. The legacy Ant targets documented in older guides are no longer part of the supported workflow.

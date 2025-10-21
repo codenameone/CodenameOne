@@ -29,10 +29,7 @@ TIP: Codename One supports a subset of JavaSE8, as well as addition APIs for acc
 
 Use the `cn1lib-archetype` for generating a new Codename One library project as follows:
 
-==== CLI
-++++
-<env cli></env>
-++++
+==== Command Line
 
 [source,bash]
 ----
@@ -74,64 +71,58 @@ And follow the prompts.  This will, result in fewer prompts because you have alr
 
 This will create a new project for you in the current directory, in a newly created directory named after the `artifactId` that you entered.
 
-==== IntelliJ
-++++
-<env intellij></env>
-++++
+==== IntelliJ IDEA
 
 . Select "File" > "New Project"...
 +
-image::images/intellij-new-project-menu.png[]
+image::img/intellij-new-project-menu.png[]
 . Select "Maven" in the left menu.
 +
-image::images/intellij-new-project-dialog-maven.png[]
-. Check the "Create from Archetype" checkbox. image:images/intellij-create-from-archetype-checkbox.png[]. This should allow you to choose from of archetypes that are already known to IntelliJ.
+image::img/intellij-new-project-dialog-maven.png[]
+. Check the "Create from Archetype" checkbox. image:img/intellij-create-from-archetype-checkbox.png[]. This should allow you to choose from of archetypes that are already known to IntelliJ.
 . If you don't see an option for "com.codenameone:cn1lib-archetype", then IntelliJ doesn't know about it yet.  If, however you *do* see this option, you can skip to the next step.  Press the "Add Archetype..." button.  This will display a dialog for you to enter the details of the archetype.
 +
-image::images/intellij-add-archetype.png[]
+image::img/intellij-add-archetype.png[]
 +
 Fill in this dialog as shown in the above image.  Specifically `groupId`="com.codenameone", `artifactId`="cn1lib-archetype", and `version`="LATEST"
 +
 Then press "OK".
 . Select the option that says "com.codenameone:cn1lib-archetype"
 +
-image::images/intellij-select-cn1lib-archetype.png[]
+image::img/intellij-select-cn1lib-archetype.png[]
 +
 Then press "Next"
 . This will display a form where you can enter the details of your project such as its location (where you want to create the project folder), the name, the artifact ID, and the groupID.  Fill in this form as you see fit.
 +
-image::images/intellij-new-cn1lib-project-details-form.png[]
+image::img/intellij-new-cn1lib-project-details-form.png[]
 +
 Then click "Next"
 . The final form in this wizard summarizes the project details and gives you an opportunity to add additional properties to pass to the `archetype:generate` goal. In our case we don't need to add any additional properties.  If the information looks correct, you can just press "Next".
 +
-image::images/intellij-new-cn1lib-project-details-summary.png[]
+image::img/intellij-new-cn1lib-project-details-summary.png[]
 
 At this point you will be prompted to open the project.
 
 ==== NetBeans
-++++
-<env netbeans></env>
-++++
 
 . Select "File" > "New Project..."
 +
-image::images/netbeans-new-project-menu.png[]
+image::img/netbeans-new-project-menu.png[]
 . In the "New Project" dialog, select "Java with Maven" in the left panel, and "Project from Archetype" in the right panel, as shown below.
 +
-image::images/netbeans-new-project-maven-dialog.png[]
+image::img/netbeans-new-project-maven-dialog.png[]
 +
 Then press "Next"
 . This will bring you to the "Maven Archetype" dialog as shown below:
 +
-image::images/netbeans-maven-archetype-cn1lib-dialog.png[]
+image::img/netbeans-maven-archetype-cn1lib-dialog.png[]
 +
 Enter "com.codenameone" or "cn1lib-archetype" into the search field.  Then select "cn1lib-archetype" in the "Known archetypes:" panel.  This will prefill the *Group ID*, *Artifact ID* and *Version* fields for you.  You may want to change *Version* to LATEST to ensure that it tries to use the latest available version of the archetype.
 +
 Then click "Next"
 . This will bring you to the "Name and Location" panel of the wizard.
 +
-image::images/netbeans-new-project-name-and-location.png[]
+image::img/netbeans-new-project-name-and-location.png[]
 +
 Enter in the project name (which you'll be forced to use as the artifact ID also), project location, groupId,
 version, and package.  The "Package" is unimportant here as it isn't used anywhere in the project.
@@ -140,28 +131,25 @@ Once you have entered the information to your liking press the "Finish" button.
 
 This will create a new libary project for you at the location you specified.
 
-==== Eclipse
-++++
-<env eclipse></env>
-++++
+==== Eclipse IDE
 
 . Select "File" > "New Project..."
 . In the _New Project_ dialog, expand the _Maven_ item, and select _Maven Project_
 +
-image::images/eclipse-new-project-wizard.png[]
+image::img/eclipse-new-project-wizard.png[]
 +
 Then press "Next"
 . The next panel will look like the below image.  The default settings on this panel should be fine.  Press _Next_
 +
-image::images/eclipse-new-project-wizard-new-maven-project.png[]
+image::img/eclipse-new-project-wizard-new-maven-project.png[]
 . In the next panel, enter "cn1lib" in the _Filter_ field.  After a moment the _cn1lib-archetype_ should appear in the area below as shown here:
 +
-image::images/eclipse-new-maven-project-cn1lib.png[]
+image::img/eclipse-new-maven-project-cn1lib.png[]
 +
 Select that option, and press _Next_
 . The next panel, allows you to enter your project details, such as group ID, and artifact ID.  Your project information here and then press _Finish_.
 +
-image:images/eclipse-new-maven-project-details.png[]
+image:img/eclipse-new-maven-project-details.png[]
 
 This will create a new libary project for you at the location you specified.
 
@@ -185,61 +173,49 @@ tests::
 An application project for writing unit tests against your library. This module is in the "tests" directory of the main project.
 
 
-===== IntelliJ
-++++
-<env intellij></env>
-++++
+===== IntelliJ IDEA IDEA
 
 The project inspector will look like:
 
-image::images/intellij-myfirstlib-project-inspector.png[]
+image::img/intellij-myfirstlib-project-inspector.png[]
 
 This top-level view of the module structure may seem daunting.  Most of your development will occur inside the "common" module.  If we expand that module it will look more familiar to developers who have used the old Ant project structure:
 
-image::images/intellij-myfirstlibrary-common-project-files.png[]
+image::img/intellij-myfirstlibrary-common-project-files.png[]
 
 Your cross-platform Java source would go in the `common/src/main/java` directory.  Your CSS files go in the `common/src/main/css` directory.
 
 ===== NetBeans
-++++
-<env netbeans></env>
-++++
 
 The project inspector will look like:
 
-image::images/netbeans-myfirstlibrary-project-inspector.png[]
+image::img/netbeans-myfirstlibrary-project-inspector.png[]
 
 This top-level view of the modules doesn't provide a clear view of the project landscape, however, since 99% of your development will occur inside the `common` submodule.  Let's open that "common" sub-module project as well and take a peek.
 
 Right click on the "Common" sub-module, and select "Open Project" as shown below:
 
-image::images/netbeans-myfirstlibrary-open-common-submodule.png[]
+image::img/netbeans-myfirstlibrary-open-common-submodule.png[]
 
 With the common subproject open, the project inspector will look like:
 
-image::images/netbeans-myfirstlibrary-project-inspector-with-common.png[]
+image::img/netbeans-myfirstlibrary-project-inspector-with-common.png[]
 
 In this screenshot I have expanded "Source Packages" and "Other Sources/css" to highlight where your Java source files and CSS source files will be located.
 
 The project inspector hides a few important files, however, so here is a screenshot of the File inspector for the common project:
 
-image::images/netbeans-my-first-library-file-inspector-common.png[]
+image::img/netbeans-my-first-library-file-inspector-common.png[]
 
-===== Eclipse
-++++
-<env eclipse></env>
-++++
+===== Eclipse IDE IDE
 
 The package explorer will look like:
 
-image::images/eclipse-cn1lib-package-explorer.png[]
+image::img/eclipse-cn1lib-package-explorer.png[]
 
 In this screenshot, I have expanded the _common/src/main/css_ and _common/src/main/java_ directories as this is where most of your module source will go.
 
-===== CLI
-++++
-<env cli></env>
-++++
+===== Command Line
 
 If we do a file listing on the project directory, it shows the following:
 
@@ -375,10 +351,7 @@ Other non-java resources that you want to have included in the classpath.
 [#building-library]
 ==== Building the Library
 
-===== CLI
-++++
-<env cli></env>
-++++
+===== Command Line
 
 To build the library, simply run the "install" goal on the root module as follows:
 
@@ -387,34 +360,25 @@ To build the library, simply run the "install" goal on the root module as follow
 mvn install
 ----
 
-===== IntelliJ
-++++
-<env intellij></env>
-++++
+===== IntelliJ IDEA IDEA
 
-Press the "build" image:images/intellij-build-icon.png[] button on the toolbar.
+Press the "build" image:img/intellij-build-icon.png[] button on the toolbar.
 
 ===== NetBeans
-++++
-<env netbeans></env>
-++++
 
 Right click on the "root" module in the project explorer and select "Build".
 
-image::images/netbeans-right-click-build.png[]
+image::img/netbeans-right-click-build.png[]
 
 IMPORTANT: You must build the root module and not one of the submodules.
 
-Alternatively you could have just selected the "root" module in the project explorer and pressed the "build" image:images/netbeans-build-button.png[] button on the toolbar.
+Alternatively you could have just selected the "root" module in the project explorer and pressed the "build" image:img/netbeans-build-button.png[] button on the toolbar.
 
-===== Eclipse
-++++
-<env eclipse></env>
-++++
+===== Eclipse IDE IDE
 
 Right click on the "root" module in the project explorer and select _Run as_ > _Maven Install_
 
-image::images/eclipse-build-cn1lib.png[]
+image::img/eclipse-build-cn1lib.png[]
 
 TIP: If the build fails for any reason, check to make sure that your project is using the latest version of the Codename One plugin.  You can do this by opening the _pom.xml_ file, and changing the `cn1.version` and `cn1.plugin.version` properties to reference the latest version.  Check for the latest version https://search.maven.org/artifact/com.codenameone/codenameone[here].
 
