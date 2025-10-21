@@ -1,0 +1,5 @@
+=== Prepare Simulator Classpath (`prepare-simulator-classpath`)
+
+Sets up some properties and environment variables required for the Codename One simulator to run propertly.
+
+This goal is bound to the `initialize` phase of the `javase` module of the <<cn1app-archetype>>  and should not be executed directly.

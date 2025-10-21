@@ -1,0 +1,5 @@
+=== Open Settings (`settings`)
+
+Opens the Control Center (aka Codename One Settings; aka Codename One Preferences).
+
+See <<settings>>
