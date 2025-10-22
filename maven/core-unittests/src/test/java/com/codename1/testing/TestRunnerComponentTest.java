@@ -3,7 +3,6 @@ package com.codename1.testing;
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.AfterEach;
@@ -11,8 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
-import java.util.LinkedList;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -74,14 +71,18 @@ class TestRunnerComponentTest extends UITestBase {
         RuntimeException failure = new RuntimeException("explode");
         TestRunnerComponent component = new TestRunnerComponent();
         component.add(new SimpleTest("Explosive", true, true, failure));
-        component.showForm();
+
+        Form form = component.showForm();
+        assertNotNull(form);
 
         component.runTests();
         flushSerialCalls();
 
         Container resultsPane = getResultsPane(component);
+        assertEquals(2, resultsPane.getComponentCount());
         Button status = (Button) resultsPane.getComponentAt(1);
         assertEquals("Explosive: Failed", status.getText());
+
         boolean found = false;
         for (Object listener : status.getListeners()) {
             if (listener instanceof ActionListener) {
@@ -96,25 +97,6 @@ class TestRunnerComponentTest extends UITestBase {
         Field field = TestRunnerComponent.class.getDeclaredField("resultsPane");
         field.setAccessible(true);
         return (Container) field.get(component);
-    }
-
-    private void flushSerialCalls() throws Exception {
-        Field pendingField = Display.class.getDeclaredField("pendingSerialCalls");
-        pendingField.setAccessible(true);
-        Field runningField = Display.class.getDeclaredField("runningSerialCallsQueue");
-        runningField.setAccessible(true);
-        List<Runnable> pending = (List<Runnable>) pendingField.get(Display.getInstance());
-        LinkedList<Runnable> running = (LinkedList<Runnable>) runningField.get(Display.getInstance());
-        while (!pending.isEmpty() || !running.isEmpty()) {
-            while (!pending.isEmpty()) {
-                Runnable next = pending.remove(0);
-                next.run();
-            }
-            while (!running.isEmpty()) {
-                Runnable next = running.removeFirst();
-                next.run();
-            }
-        }
     }
 
     private static class SimpleTest extends AbstractTest {
