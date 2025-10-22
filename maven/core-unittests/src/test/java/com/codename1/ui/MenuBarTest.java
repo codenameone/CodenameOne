@@ -5,6 +5,7 @@ import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -160,7 +161,7 @@ class MenuBarTest extends UITestBase {
         public UIManager getUIManager() {
             UIManager manager = super.getUIManager();
             if (manager.getLookAndFeel() == null) {
-                manager.setLookAndFeel(new com.codename1.ui.plaf.LookAndFeel());
+                manager.setLookAndFeel(new DefaultLookAndFeel(manager));
             }
             return manager;
         }

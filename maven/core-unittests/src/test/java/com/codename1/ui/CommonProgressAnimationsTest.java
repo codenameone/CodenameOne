@@ -132,29 +132,12 @@ class CommonProgressAnimationsTest extends UITestBase {
     private Transition mockTransition() {
         return new Transition() {
             @Override
-            public boolean isFinished() {
-                return true;
-            }
-
-            @Override
             public boolean animate() {
                 return false;
             }
 
             @Override
-            public void initTransition() {
-            }
-
-            @Override
-            public void cleanup() {
-            }
-
-            @Override
             public void paint(Graphics g) {
-            }
-
-            @Override
-            public void paint(final Graphics g, final com.codename1.ui.Component cmp) {
             }
         };
     }
