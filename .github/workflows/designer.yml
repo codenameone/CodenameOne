@@ -69,7 +69,7 @@ jobs:
           test -s "$output_file"
 
       - name: Upload designer jar artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: designer-jar
           path: CodenameOneDesigner/dist/designer.jar
