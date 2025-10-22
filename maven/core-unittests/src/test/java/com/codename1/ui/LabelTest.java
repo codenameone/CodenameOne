@@ -56,6 +56,8 @@ class LabelTest extends UITestBase {
         label.setGap(7);
         label.setEndsWith3Points(false);
         label.setShiftMillimeters(5);
+        assertEquals(5, label.getShiftMillimeters());
+
         label.setShiftMillimeters(2.5f);
         label.setShowEvenIfBlank(true);
 
@@ -63,7 +65,7 @@ class LabelTest extends UITestBase {
         assertEquals("rounded", label.getMaskName());
         assertEquals(7, label.getGap());
         assertFalse(label.isEndsWith3Points());
-        assertEquals(5, label.getShiftMillimeters());
+        assertEquals(3, label.getShiftMillimeters());
         assertEquals(2.5f, label.getShiftMillimetersF(), 0.0001f);
         assertTrue(label.isShowEvenIfBlank());
     }
