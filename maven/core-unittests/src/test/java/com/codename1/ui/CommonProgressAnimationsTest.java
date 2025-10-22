@@ -8,6 +8,7 @@ import com.codename1.ui.CommonProgressAnimations.ProgressAnimation;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.geom.Dimension;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -34,6 +35,8 @@ class CommonProgressAnimationsTest extends UITestBase {
 
         ProgressAnimation again = ProgressAnimation.markComponentLoading(content, CircleProgress.class);
         assertSame(progress, again);
+
+        ProgressAnimation.markComponentReady(content);
     }
 
     @Test
@@ -140,5 +143,10 @@ class CommonProgressAnimationsTest extends UITestBase {
             public void paint(Graphics g) {
             }
         };
+    }
+
+    @AfterEach
+    void drainSerialCalls() {
+        flushSerialCalls();
     }
 }

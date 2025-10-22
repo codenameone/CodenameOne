@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 
 class MenuBarTest extends UITestBase {
     private boolean originalGlobalToolbar;
+    private boolean originalTouchScreen;
 
     @BeforeEach
     void configureImplementation() {
@@ -26,12 +27,15 @@ class MenuBarTest extends UITestBase {
         when(implementation.getSoftkeyCount()).thenReturn(2);
         when(implementation.isThirdSoftButton()).thenReturn(false);
         when(implementation.isNativeTitle()).thenReturn(false);
-        Display.getInstance().setTouchScreenDevice(true);
+        Display display = Display.getInstance();
+        originalTouchScreen = display.isTouchScreenDevice();
+        display.setTouchScreenDevice(true);
     }
 
     @AfterEach
     void restoreGlobalToolbar() {
         Toolbar.setGlobalToolbar(originalGlobalToolbar);
+        Display.getInstance().setTouchScreenDevice(originalTouchScreen);
     }
 
     @Test
