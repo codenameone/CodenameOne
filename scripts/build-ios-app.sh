@@ -179,13 +179,13 @@ fi
 bia_log "Found generated iOS project at $PROJECT_DIR"
 
 # --- Ensure a real UITest source file exists on disk ---
-UITEST_TEMPLATE="$SCRIPT_DIR/ios/tests/HelloCodenameOneUITests.swift.tmpl"
+UITEST_TEMPLATE="$SCRIPT_DIR/ios/tests/HelloCodenameOneUITests.m.tmpl"
 UITEST_DIR="$PROJECT_DIR/HelloCodenameOneUITests"
-UITEST_SWIFT="$UITEST_DIR/HelloCodenameOneUITests.swift"
+UITEST_SOURCE="$UITEST_DIR/HelloCodenameOneUITests.m"
 if [ -f "$UITEST_TEMPLATE" ]; then
   mkdir -p "$UITEST_DIR"
-  cp -f "$UITEST_TEMPLATE" "$UITEST_SWIFT"
-  bia_log "Installed UITest source: $UITEST_SWIFT"
+  cp -f "$UITEST_TEMPLATE" "$UITEST_SOURCE"
+  bia_log "Installed UITest source: $UITEST_SOURCE"
 else
   bia_log "UITest template missing at $UITEST_TEMPLATE"; exit 1
 fi
@@ -233,7 +233,7 @@ end
 # Ensure a group and file reference exist, then add to the UITest target
 proj_dir   = File.dirname(proj_path)
 ui_dir     = File.join(proj_dir, ui_name)
-ui_file    = File.join(ui_dir, "#{ui_name}.swift")
+ui_file    = File.join(ui_dir, "#{ui_name}.m")
 ui_group   = proj.main_group.find_subpath(ui_name, true)
 ui_group.set_source_tree("<group>")
 file_ref = ui_group.files.find { |f| File.expand_path(f.path, proj_dir) == ui_file }
@@ -249,7 +249,6 @@ ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.fi
   xc = ui_target.build_configuration_list[cfg]
   next unless xc
   bs = xc.build_settings
-  bs["SWIFT_VERSION"]                = "5.0"
   bs["GENERATE_INFOPLIST_FILE"]      = "YES"
   bs["CODE_SIGNING_ALLOWED"]         = "NO"
   bs["CODE_SIGNING_REQUIRED"]        = "NO"
@@ -257,7 +256,6 @@ ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.fi
   bs["PRODUCT_NAME"]               ||= ui_name
   bs["TEST_TARGET_NAME"]           ||= app_target&.name || "HelloCodenameOne"
   # Optional but harmless on simulators; avoids other edge cases:
-  bs["ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES"] = "YES"
   bs["TARGETED_DEVICE_FAMILY"] ||= "1,2"
 end
 

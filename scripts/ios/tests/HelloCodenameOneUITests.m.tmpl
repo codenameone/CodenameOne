@@ -1,0 +1,172 @@
+#import <XCTest/XCTest.h>
+#import <UIKit/UIKit.h>
+#import <math.h>
+
+@interface HelloCodenameOneUITests : XCTestCase
+@property(nonatomic, strong) XCUIApplication *app;
+@property(nonatomic, strong) NSURL *outputDirectory;
+@end
+
+@implementation HelloCodenameOneUITests {
+    NSUInteger _chunkSize;
+    NSArray<NSNumber *> *_previewQualities;
+    NSUInteger _maxPreviewBytes;
+}
+
+- (void)setUpWithError:(NSError *__autoreleasing  _Nullable *)error {
+    [super setUpWithError:error];
+    self.continueAfterFailure = NO;
+
+    _chunkSize = 2000;
+    _previewQualities = @[@60, @50, @40, @35, @30, @25, @20, @18, @16, @14, @12, @10, @8, @6, @5, @4, @3, @2, @1];
+    _maxPreviewBytes = 20 * 1024;
+
+    NSDictionary<NSString *, NSString *> *env = [[NSProcessInfo processInfo] environment];
+    NSString *bundleID = env[@"CN1_AUT_BUNDLE_ID"];
+    if (bundleID.length == 0) {
+        bundleID = @"com.codenameone.examples";
+        printf("CN1SS:INFO:ui_test_target_bundle_id=fallback(%s)\n", bundleID.UTF8String);
+    } else {
+        printf("CN1SS:INFO:ui_test_target_bundle_id=%s\n", bundleID.UTF8String);
+    }
+
+    self.app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
+    self.app.launchArguments = @[@"-AppleLocale", @"en_US", @"-AppleLanguages", @"(en)"];
+
+    NSString *tmpPath = NSTemporaryDirectory();
+    NSURL *tmpURL = [NSURL fileURLWithPath:tmpPath isDirectory:YES];
+    NSString *tag = env[@"CN1SS_OUTPUT_DIR"];
+    NSString *dirName = (tag.length > 0) ? tag : @"cn1screens";
+    self.outputDirectory = [tmpURL URLByAppendingPathComponent:dirName isDirectory:YES];
+    [[NSFileManager defaultManager] createDirectoryAtURL:self.outputDirectory withIntermediateDirectories:YES attributes:nil error:nil];
+
+    [self.app launch];
+    [self waitForStableFrameWithTimeout:30 settle:1.2];
+}
+
+- (void)tearDownWithError:(NSError *__autoreleasing  _Nullable *)error {
+    [self.app terminate];
+    self.app = nil;
+    [super tearDownWithError:error];
+}
+
+- (void)testMainScreenScreenshot {
+    [self waitForStableFrameWithTimeout:30 settle:1.2];
+    [self captureScreenshotNamed:@"MainActivity"];
+}
+
+- (void)testBrowserComponentScreenshot {
+    [self waitForStableFrameWithTimeout:30 settle:1.2];
+    [self tapNormalizedX:0.5 y:0.70];
+    [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
+    [self captureScreenshotNamed:@"BrowserComponent"];
+}
+
+#pragma mark - Helpers
+
+- (void)waitForStableFrameWithTimeout:(NSTimeInterval)timeout settle:(NSTimeInterval)settle {
+    [self.app waitForState:XCUIApplicationStateRunningForeground timeout:timeout];
+    [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:settle]];
+}
+
+- (void)tapNormalizedX:(CGFloat)dx y:(CGFloat)dy {
+    XCUICoordinate *origin = [self.app coordinateWithNormalizedOffset:CGVectorMake(0, 0)];
+    CGSize size = self.app.frame.size;
+    XCUICoordinate *target = [origin coordinateWithOffset:CGVectorMake(size.width * dx, size.height * dy)];
+    [target tap];
+}
+
+- (void)captureScreenshotNamed:(NSString *)name {
+    XCUIScreenshot *shot = [XCUIScreen mainScreen].screenshot;
+    NSData *pngData = shot.PNGRepresentation;
+
+    NSURL *pngURL = [self.outputDirectory URLByAppendingPathComponent:[name stringByAppendingString:@".png"]];
+    [pngData writeToURL:pngURL atomically:NO];
+
+    XCTAttachment *attachment = [XCTAttachment attachmentWithScreenshot:shot];
+    attachment.name = name;
+    attachment.lifetime = XCTAttachmentLifetimeKeepAlways;
+    [self addAttachment:attachment];
+
+    [self emitScreenshotPayloadsForShot:shot name:name pngData:pngData];
+}
+
+- (NSString *)sanitizeTestName:(NSString *)name {
+    NSMutableString *result = [NSMutableString stringWithCapacity:name.length];
+    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"];
+    for (NSUInteger i = 0; i < name.length; i++) {
+        unichar ch = [name characterAtIndex:i];
+        if ([allowed characterIsMember:ch]) {
+            [result appendFormat:@"%C", ch];
+        } else {
+            [result appendString:@"_"];
+        }
+    }
+    return result;
+}
+
+- (void)emitScreenshotPayloadsForShot:(XCUIScreenshot *)shot name:(NSString *)name pngData:(NSData *)pngData {
+    NSString *safeName = [self sanitizeTestName:name];
+    printf("CN1SS:INFO:test=%s png_bytes=%lu\n", safeName.UTF8String, (unsigned long)pngData.length);
+    [self emitScreenshotChannelWithData:pngData name:safeName channel:@""];
+
+    NSData *previewData = nil;
+    NSInteger previewQuality = 0;
+    UIImage *image = [UIImage imageWithData:pngData];
+    if (image) {
+        NSUInteger smallest = NSUIntegerMax;
+        for (NSNumber *qualityNumber in _previewQualities) {
+            CGFloat quality = qualityNumber.doubleValue / 100.0;
+            NSData *jpeg = UIImageJPEGRepresentation(image, quality);
+            if (!jpeg) {
+                continue;
+            }
+            NSUInteger length = jpeg.length;
+            if (length < smallest) {
+                smallest = length;
+                previewData = jpeg;
+                previewQuality = (NSInteger)lrint(quality * 100.0);
+            }
+            if (length <= _maxPreviewBytes) {
+                break;
+            }
+        }
+    }
+
+    if (previewData.length > 0) {
+        printf("CN1SS:INFO:test=%s preview_jpeg_bytes=%lu preview_quality=%ld\n", safeName.UTF8String, (unsigned long)previewData.length, (long)previewQuality);
+        if (previewData.length > _maxPreviewBytes) {
+            printf("CN1SS:WARN:test=%s preview_exceeds_limit_bytes=%lu max_preview_bytes=%lu\n", safeName.UTF8String, (unsigned long)previewData.length, (unsigned long)_maxPreviewBytes);
+        }
+        [self emitScreenshotChannelWithData:previewData name:safeName channel:@"PREVIEW"];
+    } else {
+        printf("CN1SS:INFO:test=%s preview_jpeg_bytes=0 preview_quality=0\n", safeName.UTF8String);
+    }
+}
+
+- (void)emitScreenshotChannelWithData:(NSData *)data name:(NSString *)name channel:(NSString *)channel {
+    NSMutableString *prefix = [NSMutableString stringWithString:@"CN1SS"];
+    if (channel.length > 0) {
+        [prefix appendString:channel];
+    }
+    if (data.length == 0) {
+        printf("%s:END:%s\n", prefix.UTF8String, name.UTF8String);
+        return;
+    }
+
+    NSString *base64 = [data base64EncodedStringWithOptions:0];
+    NSUInteger position = 0;
+    NSUInteger chunkCount = 0;
+    while (position < base64.length) {
+        NSUInteger length = MIN(_chunkSize, base64.length - position);
+        NSRange range = NSMakeRange(position, length);
+        NSString *chunk = [base64 substringWithRange:range];
+        printf("%s:%s:%06lu:%s\n", prefix.UTF8String, name.UTF8String, (unsigned long)position, chunk.UTF8String);
+        position += length;
+        chunkCount += 1;
+    }
+    printf("CN1SS:INFO:test=%s chunks=%lu total_b64_len=%lu\n", name.UTF8String, (unsigned long)chunkCount, (unsigned long)base64.length);
+    printf("%s:END:%s\n", prefix.UTF8String, name.UTF8String);
+}
+
+@end
