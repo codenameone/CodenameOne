@@ -32,7 +32,27 @@ import java.util.List;
 
 
 /**
- * The bar chart rendering class.
+ * Renders a bar chart based on an {@link XYMultipleSeriesDataset}.
+ * <p>
+ * Create an instance together with a matching {@link XYMultipleSeriesRenderer}
+ * and wrap it in a {@link com.codename1.charts.ChartComponent} to display it in
+ * the UI. A minimal setup looks like this:
+ *
+ * <pre>
+ * XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+ * dataset.addSeries(mySeries);
+ *
+ * XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
+ * renderer.addSeriesRenderer(new XYSeriesRenderer());
+ *
+ * BarChart chart = new BarChart(dataset, renderer, BarChart.Type.DEFAULT);
+ * Form form = new Form(new BorderLayout());
+ * form.add(BorderLayout.CENTER, new ChartComponent(chart));
+ * form.show();
+ * </pre>
+ *
+ * The {@link Type} supplied to the constructor controls whether the bars are
+ * rendered in their default style, stacked or heaped.
  */
 public class BarChart extends XYChart {
     /** The constant to identify this chart type. */

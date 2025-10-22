@@ -27,7 +27,12 @@ import com.codename1.ui.Component;
 
 
 /**
- * The dial chart rendering class.
+ * Presents values from a {@link CategorySeries} as gauges on a dial.
+ * <p>
+ * Configure the dial appearance via a {@link DialRenderer} and supply both the
+ * dataset and renderer to the constructor. Dial charts are typically wrapped in
+ * a {@link com.codename1.charts.ChartComponent} so they can be placed inside
+ * regular Codename One layouts.
  */
 public class DialChart extends RoundChart {
     /** The radius of the needle. */

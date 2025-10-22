@@ -1377,3 +1377,94 @@ private Map<String, Object> createListEntry(String name, String date, String cov
 
 .A URL image fetched dynamically into the list model
 image::img/developer-guide/graphics-urlimage-multilist.png[A URL image fetched dynamically into the list model,scaledwidth=20%]
+
+=== Charts
+
+Codename One includes a charting toolkit in the `com.codename1.charts` package
+that is designed to integrate with regular UI layouts. Charts are drawn by
+creating an appropriate dataset and renderer pair, instantiating the matching
+chart view class, and wrapping it in a
+https://www.codenameone.com/javadoc/com/codename1/charts/ChartComponent.html[`ChartComponent`]
+so it can be added to a form.
+
+[source,java]
+----
+XYSeriesRenderer seriesRenderer = new XYSeriesRenderer();
+seriesRenderer.setColor(0xff0000);
+
+XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
+renderer.addSeriesRenderer(seriesRenderer);
+
+XYSeries series = new XYSeries("Sales");
+series.add(1, 42);
+series.add(2, 57);
+
+XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
+dataset.addSeries(series);
+
+BarChart chart = new BarChart(dataset, renderer, BarChart.Type.DEFAULT);
+Form form = new Form(new BorderLayout());
+form.add(BorderLayout.CENTER, new ChartComponent(chart));
+form.show();
+----
+
+The following classes are available for different kinds of visualisations:
+
+[cols="1,1,2", options="header"]
+|===
+| Chart class
+| Dataset & renderer
+| Notes
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/BarChart.html[`BarChart`]
+| `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
+| Draws categorical data as vertical bars. The `Type` constructor parameter controls default, stacked, or heaped bars.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/BubbleChart.html[`BubbleChart`]
+| `XYMultipleSeriesDataset` containing `XYValueSeries` / `XYMultipleSeriesRenderer`
+| Represents each data point as a circle whose size is proportional to a third value.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/CombinedXYChart.html[`CombinedXYChart`]
+| `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
+| Combines several XY chart types in a single plot using `XYCombinedChartDef` to map series to chart implementations.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/CubicLineChart.html[`CubicLineChart`]
+| `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
+| Smooths line series with cubic interpolation. Pass a smoothness factor to the constructor to control the curve.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/DialChart.html[`DialChart`]
+| `CategorySeries` / `DialRenderer`
+| Renders one or more gauges on a dial, making it useful for KPI dashboards.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/DoughnutChart.html[`DoughnutChart`]
+| `MultipleCategorySeries` / `DefaultRenderer`
+| Shows hierarchical proportions as concentric rings around a common centre.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/LineChart.html[`LineChart`]
+| `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
+| Connects series of points using straight line segments. Supports optional fill areas and point markers.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/PieChart.html[`PieChart`]
+| `CategorySeries` / `DefaultRenderer`
+| Splits a circle into slices that are proportional to each category value.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/RadarChart.html[`RadarChart`]
+| `AreaSeries` / `DefaultRenderer`
+| Draws a spider/web chart that compares multiple categories across the same set of axes.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/RangeBarChart.html[`RangeBarChart`]
+| `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
+| Variation of `BarChart` that uses paired min/max values to render ranges.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/RoundChart.html[`RoundChart`]
+| `CategorySeries` / `DefaultRenderer`
+| Abstract base class for circular charts. Use subclasses such as `PieChart`, `DoughnutChart`, or `DialChart` directly.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/ScatterChart.html[`ScatterChart`]
+| `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
+| Plots unconnected X/Y points with configurable marker shapes.
+
+| https://www.codenameone.com/javadoc/com/codename1/charts/views/TimeChart.html[`TimeChart`]
+| `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
+| Extends `LineChart` with date-aware labelling on the X axis for time series data.
+|===

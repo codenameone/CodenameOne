@@ -29,7 +29,15 @@ import java.util.List;
 
 
 /**
- * The combined XY chart rendering class.
+ * Aggregates multiple {@link XYChart} implementations into a single plot so
+ * different series can be visualised using different renderers (for example a
+ * line overlaid on top of a bar chart).
+ * <p>
+ * Provide the constructor with an {@link XYMultipleSeriesDataset}, a matching
+ * {@link XYMultipleSeriesRenderer} and an array of
+ * {@link XYCombinedChartDef} instances that describe which inner chart type
+ * should render each data series. The combined chart can then be wrapped in a
+ * {@link com.codename1.charts.ChartComponent} for display.
  */
 public class CombinedXYChart extends XYChart {
 
