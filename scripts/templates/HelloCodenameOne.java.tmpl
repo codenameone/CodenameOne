@@ -1,6 +1,5 @@
 package @PACKAGE@;
 
-import com.codename1.io.Log;
 import com.codename1.ui.Button;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Container;
@@ -17,11 +16,9 @@ public class @MAIN_NAME@ {
 
     public void init(Object context) {
         // No special initialization required for this sample
-        Log.p("CN1_APP:init invoked");
     }
 
     public void start() {
-        Log.p("CN1_APP:start invoked current=" + (current != null));
         if (current != null) {
             current.show();
             return;
@@ -39,7 +36,6 @@ public class @MAIN_NAME@ {
 
     private void showMainForm() {
         if (mainForm == null) {
-            Log.p("CN1_APP:showMainForm building UI");
             mainForm = new Form("Main Screen", new BorderLayout());
 
             Container content = new Container(BoxLayout.y());
@@ -65,12 +61,10 @@ public class @MAIN_NAME@ {
             mainForm.add(BorderLayout.CENTER, content);
         }
         current = mainForm;
-        Log.p("CN1_APP:showMainForm showing form");
         mainForm.show();
     }
 
     private void showBrowserForm() {
-        Log.p("CN1_APP:showBrowserForm invoked");
         Form browserForm = new Form("Browser Screen", new BorderLayout());
 
         BrowserComponent browser = new BrowserComponent();
@@ -83,7 +77,6 @@ public class @MAIN_NAME@ {
         );
 
         current = browserForm;
-        Log.p("CN1_APP:showBrowserForm showing form");
         browserForm.show();
     }
 

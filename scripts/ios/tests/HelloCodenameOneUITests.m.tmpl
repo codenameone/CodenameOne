@@ -1,5 +1,6 @@
 #import <XCTest/XCTest.h>
 #import <UIKit/UIKit.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <math.h>
 
 @interface HelloCodenameOneUITests : XCTestCase
@@ -44,7 +45,8 @@
     [[NSFileManager defaultManager] createDirectoryAtURL:self.outputDirectory withIntermediateDirectories:YES attributes:nil error:nil];
 
     [self.app launch];
-    [self waitForStableFrameWithTimeout:30 settle:1.2];
+    [self waitForAppToEnterForegroundWithTimeout:40.0];
+    [self waitForRenderedContentInContext:@"launch" timeout:45.0 settle:1.2];
 }
 
 - (void)tearDownWithError:(NSError *__autoreleasing  _Nullable *)error {
@@ -54,25 +56,84 @@
 }
 
 - (void)testMainScreenScreenshot {
-    [self waitForStableFrameWithTimeout:30 settle:1.2];
+    BOOL rendered = [self waitForRenderedContentInContext:@"MainActivity" timeout:45.0 settle:1.0];
+    if (!rendered) {
+        XCTFail(@"Codename One UI did not render before capturing MainActivity");
+    }
     [self captureScreenshotNamed:@"MainActivity"];
 }
 
 - (void)testBrowserComponentScreenshot {
-    [self waitForStableFrameWithTimeout:30 settle:1.2];
+    BOOL renderedBeforeTap = [self waitForRenderedContentInContext:@"BrowserComponent_pre_tap" timeout:30.0 settle:0.5];
+    if (!renderedBeforeTap) {
+        XCTFail(@"Codename One UI did not render before BrowserComponent tap");
+    }
     [self tapNormalizedX:0.5 y:0.70];
     [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
+    BOOL renderedAfterTap = [self waitForRenderedContentInContext:@"BrowserComponent" timeout:40.0 settle:0.8];
+    if (!renderedAfterTap) {
+        XCTFail(@"BrowserComponent UI did not render after navigation");
+    }
     [self captureScreenshotNamed:@"BrowserComponent"];
 }
 
 #pragma mark - Helpers
 
-- (void)waitForStableFrameWithTimeout:(NSTimeInterval)timeout settle:(NSTimeInterval)settle {
-    BOOL foreground = [self.app waitForState:XCUIApplicationStateRunningForeground timeout:timeout];
-    if (!foreground) {
-        printf("CN1SS:WARN:app_foreground_timeout=true timeout=%.1f\n", timeout);
+- (void)waitForAppToEnterForegroundWithTimeout:(NSTimeInterval)timeout {
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSUInteger attempt = 0;
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        XCUIApplicationState state = self.app.state;
+        if (state == XCUIApplicationStateRunningForeground) {
+            printf("CN1SS:INFO:launch_state attempt=%lu state=running_foreground\n", (unsigned long)(attempt + 1));
+            return;
+        }
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.5]];
+        attempt += 1;
     }
-    [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:settle]];
+    printf("CN1SS:WARN:launch_state_timeout=true attempts=%lu timeout=%.1f\n", (unsigned long)attempt, timeout);
+}
+
+- (BOOL)waitForRenderedContentInContext:(NSString *)context timeout:(NSTimeInterval)timeout settle:(NSTimeInterval)settle {
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSUInteger attempt = 0;
+    BOOL detected = NO;
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        attempt += 1;
+        XCUIScreenshot *shot = self.app.screenshot;
+        if (shot == nil) {
+            shot = [XCUIScreen mainScreen].screenshot;
+        }
+        UIImage *image = shot.image;
+        if (image == nil) {
+            printf("CN1SS:WARN:context=%s missing_image_for_variance attempt=%lu\n",
+                   context.UTF8String,
+                   (unsigned long)attempt);
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.75]];
+            continue;
+        }
+        double variance = [self luminanceVarianceForImage:image sampleStride:8];
+        printf("CN1SS:INFO:context=%s attempt=%lu luma_variance=%.3f size=%.0fx%.0f\n",
+               context.UTF8String,
+               (unsigned long)attempt,
+               variance,
+               image.size.width,
+               image.size.height);
+        if (variance > 8.0) {
+            detected = YES;
+            break;
+        }
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.75]];
+    }
+    if (!detected) {
+        printf("CN1SS:WARN:context=%s rendered_content_timeout=true attempts=%lu\n",
+               context.UTF8String,
+               (unsigned long)attempt);
+    }
+    if (settle > 0) {
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:settle]];
+    }
+    return detected;
 }
 
 - (void)tapNormalizedX:(CGFloat)dx y:(CGFloat)dy {
@@ -88,6 +149,10 @@
         shot = [XCUIScreen mainScreen].screenshot;
     }
     NSData *pngData = shot.PNGRepresentation;
+
+    UIImage *image = shot.image;
+    double variance = [self luminanceVarianceForImage:image sampleStride:6];
+    printf("CN1SS:INFO:test=%s capture_luma_variance=%.3f\n", name.UTF8String, variance);
 
     NSURL *pngURL = [self.outputDirectory URLByAppendingPathComponent:[name stringByAppendingString:@".png"]];
     [pngData writeToURL:pngURL atomically:NO];
@@ -176,6 +241,73 @@
     }
     printf("CN1SS:INFO:test=%s chunks=%lu total_b64_len=%lu\n", name.UTF8String, (unsigned long)chunkCount, (unsigned long)base64.length);
     printf("%s:END:%s\n", prefix.UTF8String, name.UTF8String);
+}
+
+- (double)luminanceVarianceForImage:(UIImage *)image sampleStride:(NSUInteger)stride {
+    if (image == nil) {
+        return 0.0;
+    }
+    CGImageRef cgImage = image.CGImage;
+    if (cgImage == nil) {
+        return 0.0;
+    }
+    CGDataProviderRef provider = CGImageGetDataProvider(cgImage);
+    if (provider == nil) {
+        return 0.0;
+    }
+    CFDataRef dataRef = CGDataProviderCopyData(provider);
+    if (dataRef == nil) {
+        return 0.0;
+    }
+
+    const UInt8 *bytes = CFDataGetBytePtr(dataRef);
+    size_t length = CFDataGetLength(dataRef);
+    size_t bytesPerRow = CGImageGetBytesPerRow(cgImage);
+    size_t bitsPerPixel = CGImageGetBitsPerPixel(cgImage);
+    size_t components = bitsPerPixel / 8;
+    if (length == 0 || components < 3) {
+        CFRelease(dataRef);
+        return 0.0;
+    }
+
+    if (stride == 0) {
+        stride = 1;
+    }
+
+    size_t width = CGImageGetWidth(cgImage);
+    size_t height = CGImageGetHeight(cgImage);
+    stride = MIN(stride, MAX((NSUInteger)1, (NSUInteger)width));
+
+    CGBitmapInfo info = CGImageGetBitmapInfo(cgImage);
+    BOOL littleEndian = (info & kCGBitmapByteOrderMask) == kCGBitmapByteOrder32Little;
+
+    double sum = 0.0;
+    double sumSq = 0.0;
+    NSUInteger count = 0;
+
+    for (size_t y = 0; y < height; y += stride) {
+        const UInt8 *row = bytes + y * bytesPerRow;
+        for (size_t x = 0; x < width; x += stride) {
+            const UInt8 *pixel = row + x * components;
+            double r = littleEndian ? pixel[2] : pixel[0];
+            double g = littleEndian ? pixel[1] : pixel[1];
+            double b = littleEndian ? pixel[0] : pixel[2];
+            double luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            sum += luma;
+            sumSq += luma * luma;
+            count += 1;
+        }
+    }
+
+    CFRelease(dataRef);
+
+    if (count == 0) {
+        return 0.0;
+    }
+
+    double mean = sum / (double)count;
+    double variance = (sumSq / (double)count) - (mean * mean);
+    return variance;
 }
 
 @end
