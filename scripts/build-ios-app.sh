@@ -254,7 +254,7 @@ frameworks_group.set_source_tree("<group>") if frameworks_group.respond_to?(:set
     ref = frameworks_group.new_reference(path)
   end
   ref.name = name if ref.respond_to?(:name=)
-  ref.set_source_tree('SDKROOT') if ref.respond_to?(:set_source_tree)
+  ref.set_source_tree("SDKROOT") if ref.respond_to?(:set_source_tree)
   ref.path = path if ref.respond_to?(:path=)
   ref.last_known_file_type = 'wrapper.framework' if ref.respond_to?(:last_known_file_type=)
   phase = ui_target.frameworks_build_phase
