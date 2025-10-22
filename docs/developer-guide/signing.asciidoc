@@ -34,7 +34,7 @@ The UDID is the Universal Device Identifier. It identifies mobile devices unique
 You need the iOS device UDID value during development to add the device into the list of allowed devices.
 
 IMPORTANT: Don't use an app to get the UDID! +
-Most return the wrong value, the official way to get the UDID is thru itunes. We can also recommend trying http://get.udid.io/ which seems to work rather well
+Most return the wrong value. Use the Finder device summary (macOS), Apple Configurator, or a trusted service such as http://get.udid.io/ which seems to work rather well
 
 ==== Should I Reuse the Same Certificate for All Apps?
 
@@ -57,8 +57,7 @@ If you already have valid certificates and profiles, you can just enter their lo
 
 ==== Logging into the Wizard
 
-After clicking #Generate# you'll be shown a login form. Log into this form using your *iTunes Connect* user ID and
-password.  **NOT YOUR CODENAME ONE LOGIN**.
+After clicking #Generate# you'll be shown a login form. Log into this form using the *App Store Connect* Apple ID that is registered on your Apple Developer Program team.  **NOT YOUR CODENAME ONE LOGIN**.
 
 .Wizard login form
 image::img/developer-guide/ios-cert-wizard-2-login.png[Wizard login form,scaledwidth=20%]
@@ -73,7 +72,7 @@ image::img/developer-guide/ios-cert-wizard-3-devices.png[Devices form,scaledwidt
 
 Select the ones that you want to include in your provisioning profile and click next.
 
-NOTE: Apple supports up to 100 devices for testing purposes so if you want to install the built app on your device you need to add it here
+NOTE: Apple currently allows up to 100 devices per device type (iPhone, iPad, Apple Watch, Apple TV, and Apple Vision) for testing purposes in each membership year. Make sure every device you intend to install builds on is registered here before you generate a new provisioning profile.
 
 .After selecting devices
 image::img/developer-guide/ios-cert-wizard-4-devices-selected.png[After selecting devices,scaledwidth=20%]
@@ -95,7 +94,9 @@ image::img/developer-guide/ios-cert-wizard-4.1-overwrite-cert.png[Prompt to over
 .Prompt to overwrite other certificate
 image::img/developer-guide/ios-cert-wizard-4.2-overwrite-cert.png[Prompt to overwrite other certificate,scaledwidth=20%]
 
-The same decision need to be made twice:  Once for the development certificate, and once for the Apptore certificate.
+The same decision need to be made twice:  Once for the development certificate, and once for the App Store distribution certificate.
+
+TIP: Each Apple Developer account can only have three active iOS Development certificates and three active iOS Distribution certificates at a time. Reuse existing certificates whenever possible to avoid hitting this limit.
 
 TIP: You can revoke a certificate when you have an application in the store shipping with said certificate! +
 This won't affect the shipping app see http://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with[this].
@@ -106,7 +107,7 @@ A typical iOS app has at least two certificates:
 
 - Development - this is used during development and can't be shipped to 3rd parties. An application signed with this certificate can only be installed on one of the up to 100 devices listed above.
 
-- Distribution - this is used when you are ready to upload your app to itunes whether for final shipping or beta testing. Notice that you can't install a distribution build on your own device. You need to upload it to itunes.
+- Distribution - this is used when you are ready to upload your app to App Store Connect whether for final shipping or beta testing. Notice that you can't install a distribution build on your own device. You need to upload it to App Store Connect.
 
 - There are two push certificates, they are separate from the signing certificates. Don't confuse them! +
 They are used to authenticate with Apple when sending push messages.
@@ -149,7 +150,7 @@ TIP: You can see the password for the P12 files in the `codenameone_settings.pro
 ==== Building Your App
 
 After selecting your local install location, and closing the wizard, you should see the fields of the "iOS Signing"
-properties panel filled in correctly.  You should now be able to send iOS debug or Appstore builds without the usual hassles.
+properties panel filled in correctly.  You should now be able to send iOS debug or App Store builds without the usual hassles.
 
 .Filled in signing panel after wizard complete
 image::img/developer-guide/ios-cert-wizard-9-signing-panel.png[Filled in signing panel after wizard complete,scaledwidth=40%]
@@ -158,14 +159,14 @@ image::img/developer-guide/ios-cert-wizard-9-signing-panel.png[Filled in signing
 
 WARNING: You should use the certificate wizard, especially if you don't have a Mac. This section is here mostly for reference and edge cases that don't work with the certificate wizard
 
-iOS signing has two distinct modes: App Store signing which is only valid for distribution via iTunes (you won't be able to run the resulting application without submitting it to Apple) and development mode signing.
+iOS signing has two distinct modes: App Store signing which is only valid for distribution via App Store Connect (you won't be able to run the resulting application without submitting it to Apple) and development mode signing.
 
 You have two major files to keep track of:
 
 1. *Certificate* - your signature
 2. *Provisioning Profile* - details about the application and who is allowed to execute it
 
-You need two versions of each file (4 total files) one pair is for development and the other pair is for uploading to the itunes App Store.
+You need two versions of each file (4 total files) one pair is for development and the other pair is for uploading to App Store Connect.
 
 IMPORTANT: You need to use a Mac in order to create a certificate file for iOS
 
@@ -225,7 +226,7 @@ Refresh the screen to see the profile you just created and press the download bu
 .Create provisioning profile step 3
 image::img/developer-guide/ios-create-prov-profile-3.png[Create provisioning profile step 3,scaledwidth=30%]
 
-Create a distribution provisioning profile; it will be used when uploading to the app store. There is no need to specify devices here.
+Create a distribution provisioning profile; it will be used when uploading to the App Store. There is no need to specify devices here.
 
 .Create distribution provisioning profile
 image::img/developer-guide/ios-create-dist-prov-profile.png[Create distribution provisioning profile,scaledwidth=30%]
@@ -249,6 +250,26 @@ In the IDE we enter the project settings, configure our provisioning profile, th
 
 .IOS Project Settings
 image::img/developer-guide/ios-project-settings.png[IOS Project Settings,scaledwidth=30%]
+
+==== Configuring `codenameone_settings.properties` for Manual Signing
+
+The Codename One build servers read signing assets from `codenameone_settings.properties`. When you bypass the signing wizard, populate the following keys manually so the packaging process can locate your certificates, provisioning profiles, and keystores:
+
+*iOS*
+
+* `codename1.ios.debug.certificate` / `codename1.ios.debug.certificatePassword` / `codename1.ios.debug.provision` – Development P12 and provisioning profile for device/debug builds.
+* `codename1.ios.release.certificate` / `codename1.ios.release.certificatePassword` / `codename1.ios.release.provision` – Distribution P12 and provisioning profile for App Store/TestFlight builds.
+* `codename1.ios.certificate`, `codename1.ios.certificatePassword`, and `codename1.ios.provision` – Legacy/global defaults. The IDE uses these as fallbacks when the debug/release-specific properties are blank, so keep them aligned with your preferred certificates.
+
+Paths may be absolute or relative to the project directory. The passwords must match the values you used when exporting the P12 files from Keychain Access.
+
+*Android*
+
+* `codename1.android.keystore` – Path to the Android keystore (`.ks` or `.keystore`).
+* `codename1.android.keystorePassword` – Password protecting the keystore and key entry.
+* `codename1.android.keystoreAlias` – Alias of the keypair used to sign the APK/AAB.
+
+If the keystore fields are empty the Maven and Ant builders will create a default keystore, but production apps should commit the real paths and credentials so reproducible builds use your long-lived signing key.
 
 ==== iOS Code Signing Failure Checklist
 
@@ -285,7 +306,7 @@ image::img/developer-guide/provisioning-profile-with-app-id.png[Provisioning Pro
 
 -	Make sure the certificate and provisioning profile are from the same source (if you work with multiple accounts), notice that provisioning profiles and certificates expire so you will need to regenerate provisioning when your certificate expires or is revoked.
 
--	If you declare push in the provisioning profile then `ios.includePush` (in the build arguments) MUST be set to true, otherwise it *MUST* be set to false (see pictures below). Notice that this should be configured via the UI in the iOS section.
+-	If you declare push in the provisioning profile then `ios.includePush` (in the build arguments) MUST be set to true, otherwise it *MUST* be set to false (see pictures below). Notice that this should be configured via the UI in the iOS section. The build server automatically enables the notification entitlement when your project uses `LocalNotification`, even if `ios.includePush` is false, so do not try to disable the entitlement manually to "fix" warning messages from App Store Connect.
 +
 .Include push build hint
 image::img/developer-guide/include-push-build-hint.png[Include push build hint,scaledwidth=30%]
