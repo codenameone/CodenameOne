@@ -63,7 +63,10 @@ class CommonProgressAnimationsTest extends UITestBase {
     @Test
     void testMarkComponentLoadingWithoutParentThrowsException() {
         Label orphan = new Label("Missing Parent");
-        assertThrows(IllegalStateException.class, () -> ProgressAnimation.markComponentLoading(orphan, CircleProgress.class));
+        RuntimeException failure = assertThrows(RuntimeException.class,
+                () -> ProgressAnimation.markComponentLoading(orphan, CircleProgress.class));
+        assertNotNull(failure.getMessage());
+        assertTrue(failure.getMessage().contains("Component has no parent"));
     }
 
     @Test
