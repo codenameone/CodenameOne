@@ -45,3 +45,31 @@ jobs:
 
       - name: Run designer CSS localization tests
         run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml test-css-localization
+
+      - name: Build designer release jar
+        run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml release
+
+      - name: Verify designer CLI CSS compilation
+        run: |
+          tmp_dir="CodenameOneDesigner/tmp-cli-test"
+          css_file="$tmp_dir/test.css"
+          l10n_dir="$tmp_dir/localization"
+          output_file="$tmp_dir/output.res"
+          mkdir -p "$l10n_dir"
+          cat <<'EOF' > "$css_file"
+          Label {
+              color: rgb(255, 0, 0);
+          }
+          EOF
+          cat <<'EOF' > "$l10n_dir/Strings.properties"
+          greeting=Hello from CLI
+          EOF
+          xvfb-run -a java -Dcli=true -jar CodenameOneDesigner/dist/designer.jar \
+            -css -stateless -input "$css_file" -output "$output_file" -localization "$l10n_dir"
+          test -s "$output_file"
+
+      - name: Upload designer jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: designer-jar
+          path: CodenameOneDesigner/dist/designer.jar
