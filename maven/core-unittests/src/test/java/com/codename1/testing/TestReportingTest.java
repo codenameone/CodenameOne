@@ -1,6 +1,9 @@
 package com.codename1.testing;
 
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Util;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -12,11 +15,25 @@ import java.util.List;
 import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class TestReportingTest {
+    private CodenameOneImplementation implementation;
+
+    @BeforeEach
+    void installImplementation() {
+        implementation = mock(CodenameOneImplementation.class);
+        when(implementation.isInitialized()).thenReturn(true);
+        when(implementation.handleEDTException(any(Throwable.class))).thenReturn(false);
+        Util.setImplementation(implementation);
+    }
+
     @AfterEach
     void resetSingleton() {
         TestReporting.setInstance(null);
+        Util.setImplementation(null);
     }
 
     @Test

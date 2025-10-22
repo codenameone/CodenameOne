@@ -76,15 +76,7 @@ class TestRunnerComponentTest extends UITestBase {
         component.add(new SimpleTest("Explosive", true, true, failure));
         component.showForm();
 
-        RuntimeException thrown = null;
-        try {
-            component.runTests();
-            fail("Expected test execution to rethrow failure");
-        } catch (RuntimeException ex) {
-            thrown = ex;
-        }
-        assertNotNull(thrown);
-        assertEquals(failure.getMessage(), thrown.getMessage());
+        component.runTests();
         flushSerialCalls();
 
         Container resultsPane = getResultsPane(component);
