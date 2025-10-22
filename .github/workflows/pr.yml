@@ -49,6 +49,21 @@ jobs:
         cd maven
         mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase
         cd ..
+    - name: Prepare Codename One binaries for Maven plugin tests
+      run: |
+        set -euo pipefail
+        rm -rf maven/target/cn1-binaries
+        git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries maven/target/cn1-binaries
+    - name: Run Maven plugin tests
+      working-directory: maven
+      env:
+        CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+      run: |
+        mvn -B -Dmaven.javadoc.skip=true \
+          -DunitTests=true \
+          -Dcodename1.platform=javase \
+          -Dcn1.binaries="${CN1_BINARIES}" \
+          -pl codenameone-maven-plugin -am -Plocal-dev-javase test
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}
       env:
