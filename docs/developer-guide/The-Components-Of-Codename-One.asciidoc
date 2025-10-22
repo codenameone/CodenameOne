@@ -83,6 +83,74 @@ As you can see from <<form-layout-layers-graphic,the graphic>>, `Form` has two l
 
 NOTE: You still need to place components using layout managers in order to get them to appear in the right place when using the layered pane.
 
+[[safe-areas]]
+==== Safe Areas
+
+Modern phones frequently include display cut-outs, rounded corners, or persistent gesture/navigation indicators that overlap the physical screen edges. These intrusions are no longer limited to iOS—many recent Android devices behave the same way—so Codename One provides a "safe area" API to ensure your UI remains visible regardless of the device. The safe area is the portion of the display that is guaranteed to be unobstructed.
+
+.Tabs with safe-area padding enabled
+image::img/safe-area-good.png[Tabs with safe-area padding enabled,scaledwidth=40%]
+
+.Tabs without safe-area padding
+image::img/safe-area-missing.png[Tabs without safe-area padding,scaledwidth=40%]
+
+===== Automatic Safe-Area Handling
+
+`Form` calculates the safe region automatically, and core UI components that anchor themselves to the screen edges apply that information without additional work:
+
+* `Toolbar` and the status bar placeholder respect the top safe margins so that titles and action buttons remain legible around notches.
+* `Tabs`, `Sheet`, and `FloatingActionButton` instances mark their internal containers as safe areas so navigation controls are padded above gesture/navigation bars.
+* UI fragment templates can opt-in to safe areas declaratively using the `safeArea` flag, ensuring generated components stay within the padded region.
+
+This means that many applications will "just work" on devices such as the iPhone X/14 family or Android devices with edge-to-edge displays. You only need to intervene when you use custom containers that you position flush against a screen edge or when you perform your own painting.
+
+===== Marking Your Own Containers as Safe
+
+If you create a container that should always stay clear of the unsafe portions of the screen (for example, a bottom navigation bar, an on-screen joystick, or a floating tool palette), enable safe-area padding explicitly:
+
+[source,java]
+----
+Form form = new Form(new BorderLayout());
+
+Container bottomBar = new Container(BoxLayout.x());
+bottomBar.setSafeArea(true);
+bottomBar.addAll(new Button("Home"), new Button("Search"), new Button("Profile"));
+
+form.add(BorderLayout.SOUTH, bottomBar);
+form.show();
+----
+
+Safe-area padding is only applied when the container does **not** have a scrollable parent. For scrollable content we assume the user can scroll the component into view instead.
+
+Most layouts never need to know where the safe area begins, but if you draw manually (e.g., inside `paint()` or on the glass pane) you can query it directly:
+
+[source,java]
+----
+Form form = Display.getInstance().getCurrent();
+Rectangle safe = form.getSafeArea();
+
+Graphics g = ...; // e.g. inside paint()
+g.setClip(safe.getX(), safe.getY(), safe.getWidth(), safe.getHeight());
+// Custom drawing code that should avoid the notch/gesture areas
+----
+
+The rectangle returned by `Form#getSafeArea()` is updated automatically whenever the OS reports a change (rotation, multitasking gestures, showing/hiding the system navigation area, and so on). In unusual situations where you adjust the safe-area root yourself (for example, when animating a container in from off-screen) you can force a recalculation by calling `Form#setSafeAreaChanged()`.
+
+===== Safe-Area Roots and Advanced Layouts
+
+Safe-area padding is calculated relative to a "safe-area root". Forms are roots by default, but you can mark any container as a root using `Container#setSafeAreaRoot(true)` when you need precise control—for example, when preparing a side menu that starts off-screen and slides in:
+
+[source,java]
+----
+Container drawer = new Container(BoxLayout.y());
+drawer.setSafeAreaRoot(true); // Ensure safe margins apply before the drawer is visible
+drawer.setSafeArea(true);
+----
+
+Marking the drawer as both a root and a safe area prevents a "jump" the moment it becomes visible, because the safe padding is already applied while it is off-screen.
+
+Remember that safe areas apply across platforms. Always verify your screens on actual devices (or in the Codename One simulator with a device skin that exposes cut-outs) to make sure critical UI elements remain inside the padded region.
+
 The second layer is the glass pane which allows you to draw arbitrary things on top of everything. The order in the image is indeed accurate:
 
 1. `ContentPane` is lowest
