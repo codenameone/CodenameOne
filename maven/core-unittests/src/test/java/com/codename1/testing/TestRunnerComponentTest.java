@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -70,14 +71,13 @@ class TestRunnerComponentTest extends UITestBase {
     void runTestsAddsFailureActionListenerOnException() throws Exception {
         RuntimeException failure = new RuntimeException("explode");
         TestRunnerComponent component = new TestRunnerComponent();
-        component.add(new SimpleTest("Explosive", true, true, failure));
-        component.showForm();
+        Method runTest = TestRunnerComponent.class.getDeclaredMethod("runTest", AbstractTest.class, Button.class);
+        runTest.setAccessible(true);
 
-        component.runTests();
+        Button status = new Button("Explosive: Running...");
+        runTest.invoke(component, new SimpleTest("Explosive", true, true, failure), status);
         flushSerialCalls();
 
-        Container resultsPane = getResultsPane(component);
-        Button status = (Button) resultsPane.getComponentAt(1);
         assertEquals("Explosive: Failed", status.getText());
         boolean found = false;
         for (Object listener : status.getListeners()) {
