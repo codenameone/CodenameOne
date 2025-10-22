@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.net.MalformedURLException;
 import java.net.Socket;
@@ -73,6 +74,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -136,6 +138,7 @@ public class CN1CSSCLI {
     public static boolean mergeMode;
     public static boolean watchmode;
     private static Thread watchThread;
+    private static File localizationDir;
     
     
     
@@ -609,6 +612,7 @@ public class CN1CSSCLI {
             System.out.println(" -i, -input         Input CSS file path.  Multiple files separated by commas.");
             System.out.println(" -o, -output        Output res file path.");
             System.out.println(" -m, -merge         Path to merge file, used in  case there are multipl input files.");
+            System.out.println(" -l, -localization  Directory containing Java resource bundle .properties files to include.");
             System.out.println(" -w, -watch         Run in watch mode.");
             System.out.println("                    Watches input files for changes and automatically recompiles.");
             System.out.println("\nSystem Properties:");
@@ -621,6 +625,15 @@ public class CN1CSSCLI {
             
         }
         statelessMode = getArgByName(args, "i", "input") != null;
+        String localizationPath = getArgByName(args, "l", "localization");
+        if (localizationPath != null) {
+            if ("true".equals(localizationPath)) {
+                throw new IllegalArgumentException("Localization path is required when using -l or -localization");
+            }
+            localizationDir = new File(localizationPath);
+        } else {
+            localizationDir = null;
+        }
         String inputPath;
         String outputPath;
         String mergedFile;
@@ -919,8 +932,13 @@ public class CN1CSSCLI {
                     theme.loadSelectorCacheStatus(cacheFile);
                 }
 
+                Map<String, Map<String, Map<String, String>>> localizationBundles = loadLocalizationBundles(localizationDir);
+
                 theme.createImageBorders(webViewProvider);
                 theme.updateResources();
+                if (!localizationBundles.isEmpty()) {
+                    theme.applyLocalizationBundles(localizationBundles);
+                }
                 theme.save(outputFile);
                 
                 theme.saveSelectorChecksums(cacheFile);
@@ -1022,6 +1040,199 @@ public class CN1CSSCLI {
                 out.println(key+":"+map.get(key));
             }
         }
-       
+
    }
+
+    private static Map<String, Map<String, Map<String, String>>> loadLocalizationBundles(File localizationDirectory) throws IOException {
+        Map<String, Map<String, Map<String, String>>> bundles = new LinkedHashMap<>();
+        if (localizationDirectory == null) {
+            return bundles;
+        }
+        if (!localizationDirectory.exists()) {
+            throw new IOException("Localization directory does not exist: " + localizationDirectory.getAbsolutePath());
+        }
+        if (!localizationDirectory.isDirectory()) {
+            throw new IOException("Localization path is not a directory: " + localizationDirectory.getAbsolutePath());
+        }
+        Path root = localizationDirectory.toPath();
+        try (java.util.stream.Stream<Path> stream = Files.walk(root)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().endsWith(".properties"))
+                    .forEach(p -> {
+                        try {
+                            Path relPath = root.relativize(p);
+                            String rel = relPath.toString().replace(File.separatorChar, '/');
+                            if (rel.isEmpty() || !rel.endsWith(".properties")) {
+                                return;
+                            }
+                            String withoutExt = rel.substring(0, rel.length() - ".properties".length());
+                            int lastSlash = withoutExt.lastIndexOf('/');
+                            String packagePath = lastSlash >= 0 ? withoutExt.substring(0, lastSlash) : "";
+                            String fileNamePart = lastSlash >= 0 ? withoutExt.substring(lastSlash + 1) : withoutExt;
+                            if (fileNamePart.isEmpty()) {
+                                return;
+                            }
+                            String[] tokens = fileNamePart.split("_");
+                            String baseNamePart = fileNamePart;
+                            String locale = "";
+                            if (tokens.length > 1) {
+                                for (int start = 1; start < tokens.length; start++) {
+                                    String localeCandidate = joinTokens(tokens, start, tokens.length);
+                                    if (isValidLocale(localeCandidate)) {
+                                        baseNamePart = joinTokens(tokens, 0, start);
+                                        locale = normalizeLocale(localeCandidate);
+                                        break;
+                                    }
+                                }
+                            }
+                            String baseName;
+                            if (!packagePath.isEmpty()) {
+                                baseName = packagePath.replace('/', '.');
+                                if (!baseNamePart.isEmpty()) {
+                                    baseName = baseName + "." + baseNamePart;
+                                }
+                            } else {
+                                baseName = baseNamePart;
+                            }
+                            if (baseName == null || baseName.isEmpty()) {
+                                return;
+                            }
+                            Properties props = new Properties();
+                            try (InputStream is = Files.newInputStream(p)) {
+                                props.load(is);
+                            }
+                            Map<String, Map<String, String>> baseBundles = bundles.computeIfAbsent(baseName, k -> new LinkedHashMap<>());
+                            Map<String, String> translations = new LinkedHashMap<>();
+                            for (Map.Entry<Object, Object> entry : props.entrySet()) {
+                                translations.put(entry.getKey().toString(), entry.getValue().toString());
+                            }
+                            baseBundles.put(locale, translations);
+                        } catch (IOException ex) {
+                            throw new UncheckedIOException(ex);
+                        }
+                    });
+        } catch (UncheckedIOException ex) {
+            throw ex.getCause();
+        }
+        return bundles;
+    }
+
+    private static String joinTokens(String[] parts, int start, int end) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = start; i < end; i++) {
+            if (i > start) {
+                sb.append('_');
+            }
+            sb.append(parts[i]);
+        }
+        return sb.toString();
+    }
+
+    private static boolean isValidLocale(String localeCandidate) {
+        if (localeCandidate == null || localeCandidate.isEmpty()) {
+            return false;
+        }
+        String[] parts = localeCandidate.split("_");
+        if (parts.length == 0 || !isValidLanguage(parts[0])) {
+            return false;
+        }
+        int index = 1;
+        if (index < parts.length && isValidScript(parts[index])) {
+            index++;
+        }
+        if (index < parts.length && isValidCountry(parts[index])) {
+            index++;
+        }
+        while (index < parts.length) {
+            if (!isValidVariant(parts[index])) {
+                return false;
+            }
+            index++;
+        }
+        return true;
+    }
+
+    private static boolean isValidLanguage(String token) {
+        if (token.length() < 2 || token.length() > 8) {
+            return false;
+        }
+        for (int i = 0; i < token.length(); i++) {
+            char c = token.charAt(i);
+            if (!Character.isLetter(c) || !Character.isLowerCase(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isValidScript(String token) {
+        if (token.length() != 4) {
+            return false;
+        }
+        for (int i = 0; i < token.length(); i++) {
+            if (!Character.isLetter(token.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isValidCountry(String token) {
+        if (token.length() == 2) {
+            for (int i = 0; i < token.length(); i++) {
+                if (!Character.isLetter(token.charAt(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (token.length() == 3) {
+            for (int i = 0; i < token.length(); i++) {
+                if (!Character.isDigit(token.charAt(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isValidVariant(String token) {
+        if (token.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < token.length(); i++) {
+            char c = token.charAt(i);
+            if (!(Character.isLetterOrDigit(c) || c == '_')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String normalizeLocale(String locale) {
+        if (locale == null || locale.isEmpty()) {
+            return "";
+        }
+        String[] parts = locale.split("_");
+        if (parts.length == 0) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(parts[0].toLowerCase());
+        int index = 1;
+        if (index < parts.length && isValidScript(parts[index])) {
+            String token = parts[index];
+            sb.append('_').append(Character.toUpperCase(token.charAt(0))).append(token.substring(1).toLowerCase());
+            index++;
+        }
+        if (index < parts.length && isValidCountry(parts[index])) {
+            sb.append('_').append(parts[index].toUpperCase());
+            index++;
+        }
+        while (index < parts.length) {
+            sb.append('_').append(parts[index]);
+            index++;
+        }
+        return sb.toString();
+    }
 }
