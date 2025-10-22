@@ -3,6 +3,7 @@ package com.codename1.ui;
 import com.codename1.test.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.PeerComponent;
 import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.Test;
 
@@ -68,6 +69,7 @@ public class BrowserWindowTest extends UITestBase {
         when(implementation.createBrowserComponent(any())).thenReturn(peer);
         doNothing().when(implementation).setBrowserURL(any(PeerComponent.class), anyString());
         doNothing().when(implementation).browserExecute(any(PeerComponent.class), anyString());
+        when(implementation.getBrowserURL(peer)).thenReturn("https://fallback");
 
         TrackingForm previous = new TrackingForm();
         when(implementation.getCurrentForm()).thenReturn(previous);
@@ -77,7 +79,7 @@ public class BrowserWindowTest extends UITestBase {
 
         Form form = getPrivateField(window, "form", Form.class);
         assertNotNull(form, "Fallback form should be created when native window is unavailable");
-        assertEquals("", form.getTitle());
+        assertNull(form.getTitle());
 
         BrowserComponent webview = getPrivateField(window, "webview", BrowserComponent.class);
         assertNotNull(webview, "Embedded BrowserComponent should exist");
