@@ -23,14 +23,17 @@
 
     NSDictionary<NSString *, NSString *> *env = [[NSProcessInfo processInfo] environment];
     NSString *bundleID = env[@"CN1_AUT_BUNDLE_ID"];
-    if (bundleID.length == 0) {
-        bundleID = @"com.codenameone.examples";
-        printf("CN1SS:INFO:ui_test_target_bundle_id=fallback(%s)\n", bundleID.UTF8String);
-    } else {
+    XCUIApplication *app = nil;
+    if (bundleID.length > 0) {
         printf("CN1SS:INFO:ui_test_target_bundle_id=%s\n", bundleID.UTF8String);
+        app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
+    }
+    if (app == nil) {
+        printf("CN1SS:INFO:ui_test_target_bundle_id=(default)\n");
+        app = [[XCUIApplication alloc] init];
     }
 
-    self.app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
+    self.app = app;
     self.app.launchArguments = @[@"-AppleLocale", @"en_US", @"-AppleLanguages", @"(en)"];
 
     NSString *tmpPath = NSTemporaryDirectory();
@@ -65,7 +68,10 @@
 #pragma mark - Helpers
 
 - (void)waitForStableFrameWithTimeout:(NSTimeInterval)timeout settle:(NSTimeInterval)settle {
-    [self.app waitForState:XCUIApplicationStateRunningForeground timeout:timeout];
+    BOOL foreground = [self.app waitForState:XCUIApplicationStateRunningForeground timeout:timeout];
+    if (!foreground) {
+        printf("CN1SS:WARN:app_foreground_timeout=true timeout=%.1f\n", timeout);
+    }
     [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:settle]];
 }
 
@@ -77,7 +83,10 @@
 }
 
 - (void)captureScreenshotNamed:(NSString *)name {
-    XCUIScreenshot *shot = [XCUIScreen mainScreen].screenshot;
+    XCUIScreenshot *shot = self.app.screenshot;
+    if (shot == nil) {
+        shot = [XCUIScreen mainScreen].screenshot;
+    }
     NSData *pngData = shot.PNGRepresentation;
 
     NSURL *pngURL = [self.outputDirectory URLByAppendingPathComponent:[name stringByAppendingString:@".png"]];
