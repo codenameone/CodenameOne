@@ -64,7 +64,8 @@ public class BrowserWindowTest extends UITestBase {
     @Test
     void fallbackUsesEmbeddedBrowserWhenNativeUnavailable() throws Exception {
         when(implementation.createNativeBrowserWindow(anyString())).thenReturn(null);
-        when(implementation.createBrowserComponent(any())).thenReturn(new DummyPeerComponent());
+        DummyPeerComponent peer = new DummyPeerComponent();
+        when(implementation.createBrowserComponent(any())).thenReturn(peer);
         doNothing().when(implementation).setBrowserURL(any(PeerComponent.class), anyString());
         doNothing().when(implementation).browserExecute(any(PeerComponent.class), anyString());
 

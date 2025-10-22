@@ -48,7 +48,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
     @Test
     void focusAnimationFollowsThemeAndManualOverrides() {
         Hashtable theme = new Hashtable();
-        theme.put("textComponentAnimBool", "true");
+        theme.put("@textComponentAnimBool", "true");
         UIManager.getInstance().setThemeProps(theme);
 
         AutoCompleteTextComponent component = new AutoCompleteTextComponent(suggestionModel, AcceptAllFilter.INSTANCE);
