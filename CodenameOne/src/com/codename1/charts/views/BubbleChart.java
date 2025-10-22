@@ -28,7 +28,14 @@ import java.util.List;
 
 
 /**
- * The bubble chart rendering class.
+ * Displays series of {@link XYValueSeries} entries as proportional bubbles on
+ * top of an {@link XYChart} plot.
+ * <p>
+ * Combine the chart with an {@link XYMultipleSeriesDataset} that contains one
+ * or more {@link XYValueSeries} instances and supply an
+ * {@link XYMultipleSeriesRenderer}. The resulting {@code BubbleChart} can be
+ * wrapped in a {@link com.codename1.charts.ChartComponent} to embed it inside a
+ * Codename One UI.
  */
 public class BubbleChart extends XYChart {
     /** The constant to identify this chart type. */

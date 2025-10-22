@@ -28,7 +28,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The radar chart rendering class.
+ * Draws multi-dimensional data as a web chart (also known as a radar or spider
+ * chart).
+ * <p>
+ * The chart consumes an {@link AreaSeries} where each category represents an
+ * axis radiating from the centre. Configure colours and labelling through a
+ * {@link DefaultRenderer} and wrap the instance in a
+ * {@link com.codename1.charts.ChartComponent} to present it inside your UI.
  */
 public class RadarChart extends RoundChart {
 

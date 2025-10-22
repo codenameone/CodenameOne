@@ -29,7 +29,12 @@ import java.util.List;
 
 
 /**
- * The line chart rendering class.
+ * Plots series of X/Y points using straight line segments.
+ * <p>
+ * Supply the chart with an {@link XYMultipleSeriesDataset} and configure its
+ * appearance via an {@link XYMultipleSeriesRenderer}. The chart is commonly
+ * wrapped in a {@link com.codename1.charts.ChartComponent} before being added
+ * to a Codename One form.
  */
 public class LineChart extends XYChart {
     /** The constant to identify this chart type. */
