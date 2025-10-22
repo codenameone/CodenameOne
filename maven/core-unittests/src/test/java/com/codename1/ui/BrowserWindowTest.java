@@ -1,6 +1,6 @@
 package com.codename1.ui;
 
-import com.codename1.components.ComponentTestBase;
+import com.codename1.test.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.Style;
@@ -17,7 +17,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class BrowserWindowTest extends ComponentTestBase {
+public class BrowserWindowTest extends UITestBase {
 
     @Test
     void nativeWindowDelegatesToImplementation() {

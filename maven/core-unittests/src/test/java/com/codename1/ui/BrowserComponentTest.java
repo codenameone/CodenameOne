@@ -1,6 +1,6 @@
 package com.codename1.ui;
 
-import com.codename1.components.ComponentTestBase;
+import com.codename1.test.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
@@ -23,7 +23,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
-class BrowserComponentTest extends ComponentTestBase {
+public class BrowserComponentTest extends UITestBase {
 
     @Test
     void constructorCreatesPeerComponentWhenImplementationProvidesOne() throws Exception {

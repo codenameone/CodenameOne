@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.components.ComponentTestBase;
+import com.codename1.test.UITestBase;
+import com.codename1.ui.Image;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.UIManager;
@@ -14,7 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class AutoCompleteTextComponentTest extends ComponentTestBase {
+public class AutoCompleteTextComponentTest extends UITestBase {
 
     private ListModel<String> suggestionModel;
 
