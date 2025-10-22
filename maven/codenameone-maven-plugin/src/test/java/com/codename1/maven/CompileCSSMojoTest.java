@@ -51,7 +51,7 @@ class CompileCSSMojoTest {
 
     private TestCompileCSSMojo createMojo(Path projectDir) throws IOException {
         MavenProject mavenProject = new MavenProject();
-        mavenProject.setBasedir(projectDir.toFile());
+        mavenProject.setFile(projectDir.resolve("pom.xml").toFile());
         mavenProject.addCompileSourceRoot(projectDir.resolve("src/main/java").toString());
         Build build = new Build();
         build.setDirectory(projectDir.resolve("target").toString());
@@ -81,6 +81,16 @@ class CompileCSSMojoTest {
         Files.write(projectDir.resolve("codenameone_settings.properties"), Arrays.asList("codename1.cssTheme=true"));
         Files.createDirectories(projectDir.resolve("target/classes"));
         Files.createFile(projectDir.resolve("designer.jar"));
+        Files.write(projectDir.resolve("pom.xml"), Arrays.asList(
+                "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"",
+                "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+                "         xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">",
+                "  <modelVersion>4.0.0</modelVersion>",
+                "  <groupId>com.codename1</groupId>",
+                "  <artifactId>test-project</artifactId>",
+                "  <version>1.0-SNAPSHOT</version>",
+                "</project>"
+        ));
 
         if (includeLocalization) {
             Path localizationDir = Files.createDirectories(projectDir.resolve("src/main/l10n"));
