@@ -163,4 +163,19 @@
     <target name="mac_os">
         <copy file="dist/designer.jar" todir="Designer.app/Contents/Resources/Java" />
     </target>
+    <target name="test-css-localization" depends="compile">
+        <mkdir dir="${build.test.classes.dir}"/>
+        <javac srcdir="${test.src.dir}" destdir="${build.test.classes.dir}"
+               encoding="${source.encoding}" source="${javac.source}" target="${javac.target}"
+               includeantruntime="false">
+            <classpath>
+                <path path="${javac.test.classpath}"/>
+            </classpath>
+        </javac>
+        <java classname="com.codename1.designer.css.CSSLocalizationTest" fork="true" failonerror="true">
+            <classpath>
+                <path path="${run.test.classpath}"/>
+            </classpath>
+        </java>
+    </target>
 </project>
