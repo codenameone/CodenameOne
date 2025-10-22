@@ -57,7 +57,7 @@ jobs:
           output_file="$tmp_dir/output.res"
           mkdir -p "$l10n_dir"
           cat <<'EOF' > "$css_file"
-          #TestLabel {
+          Label {
               color: rgb(255, 0, 0);
           }
           EOF

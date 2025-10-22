@@ -143,9 +143,9 @@
       <copy file="../../cn1-binaries/designer/jaxb-api-2.2.3.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/jaxb-impl-2.3.0.1.jar" todir="dist/lib" />
       <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="dist/lib" />
-      
+      <copy file="../Ports/JavaSEWithSVGSupport/dist/JavaSEWithSVGSupport.jar" todir="dist/lib" />
       <jar destfile="dist/tempJar.jar">
-        <zipgroupfileset dir="dist/lib" excludes="META-INF/**"/>          
+        <zipgroupfileset dir="dist/lib" excludes="META-INF/**"/>
       </jar>
       <jar destfile="dist/designer.jar" compress="false">
         <zipfileset src="dist/CodenameOneDesigner.jar" excludes="META-INF/**" />
