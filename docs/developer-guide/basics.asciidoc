@@ -756,7 +756,7 @@ The two active lines here are the last two:
 <1> Sets the left inset on `btn` to 0.
 <2> Links `btn`'s left inset to `tf` so that it is measured from the text field.  The third parameter (`1.0`) is the reference position.  This will generally either be `0` (meaning the reference point is the left edge of the text field), or `1` (meaning the reference point is the right edge of the text field).  In this case we set a reference position of `1.0` because we want the button to be aligned to the text field's right edge.
 
-NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured.  A reference position of 0 means that the inset is measured from the leading edge of the reference component.  A value of 1.0 means that the inset is measured from the trailing edge of the reference component.  A value of 0.5 means that the inset is measured from the center of the reference component.  Etc...  Any floating point value can be used.  The designer currently only makes use of 0 and 1.
+NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured.  A reference position of 0 means that the inset is measured from the leading edge of the reference component.  A value of 1.0 means that the inset is measured from the trailing edge of the reference component.  A value of 0.5 means that the inset is measured from the center of the reference component.  Etc...  Any floating point value can be used, though the most common values are 0 and 1.
 
 The definition above may make reference components and reference position seem more complex than it is.  Some examples:
 
@@ -1023,13 +1023,9 @@ As you can see, it's a bit of a hassle to change styles from code which is why t
 
 ==== Theme
 
-A theme allows the designer to define the styles externally via a set of UIID’s (User Interface ID’s), the themes are created from CSS or using the Codename One Designer tool. The theme lets us separate the look of the component from the application logic.
-
-TIP: The preferred way for customizing the theme is CSS which we'll discuss a bit later
+A theme allows you to define the styles externally via a set of UIID’s (User Interface ID’s). Themes can be authored directly in CSS and then compiled into the Codename One resource file, which keeps styling concerns separate from application logic.
 
 The theme is stored in the `theme.res` file in the project.
-
-TIP: You can use the designer tool to open a css generated theme resource file. This is useful to inspect how the css code translated to low level styles
 
 We load the theme file using this line of code in the `init(Object)` method in the main class of the application:
 
@@ -1038,7 +1034,7 @@ We load the theme file using this line of code in the `init(Object)` method in t
 theme = UIManager.initFirstTheme("/theme");
 ----
 
-In a CSS project this file is generated automatically from the CSS file. In legacy projects you can edit it directly with the designer tool.
+In a CSS project this file is generated automatically from the stylesheet. Legacy applications that still edit the resource file by hand can continue to do so, but new projects should prefer the CSS workflow described below.
 
 This code is shorthand for resource file loading and for the installation of theme. You could technically have more than one theme in a resource file at which point you could use `initNamedTheme()` instead. The resource file is a special file format that includes inside it several features:
 
@@ -1047,134 +1043,11 @@ This code is shorthand for resource file loading and for the installation of the
 * Localization Bundles
 * Data files
 
-The designer also includes some legacy features such as the old GUI builder. The old GUI builder is no longer supported and code should be migrated to the current GUI builder.
+==== Working with CSS Themes
 
-NOTE: We're mentioning the legacy GUI builder for reference only we won't discuss the old GUI builders in this guide
+Modern Codename One projects ship with a `src/main/css/theme.css` file (or an equivalent stylesheet). Editing this file allows you to define UIIDs using standard CSS syntax together with Codename One–specific extensions such as `cn1-derive` for inheritance and the `#Constants` block for theme constants. Each time you build or run the project, the build tool compiles the CSS into the `theme.res` resource file automatically. Saving the CSS while the simulator is running will also trigger a refresh so you can iterate on styling quickly.
 
-We can open the designer tool by double clicking the res file in the legacy ant project. For maven projects you would need to run it manually using code like this:
-
-[source,bash,title='Launch Designer Mac/Linux']
-----
-java -jar ~/.codenameone/designer_1.jar
-----
-
-For Windows you would need to use something similar, notice you would need to replace `MY_HOME_DIRECTORY` with your user directory:
-
-[source,cmd,title='Launch Designer Windows']
-----
-java -jar MY_HOME_DIRECTORY\.codenameone\designer_1.jar
-----
-
-NOTE: If this doesn't work run the "Update Codename One" maven target.
-
-The UI can be a bit overwhelming at first so I'll try to walk slowly through the steps.
-
-.Codename One Designer Feature Map
-image::img/developer-guide/codenameone-designer-feature-map.png[Codename One Designer Feature Map]
-
-TIP: If you end up using CSS this section isn't crucial but it's worth browsing through as using the designer tool helps in tracking CSS issues
-
-There are two crucial features in this tool: theming and images.
-
-.Add a New Image
-image::img/developer-guide/codenameone-add-image.png[Add a New Image]
-
-You will notice there is more than one type of image. We'll discuss multi-images later.
-
-Now we can go back to the theme view in the designer tool and press the Add button in the #Unselected# tab. Notice we have tabs for every state of `Style` as well as a special tabl for theme constants that we will discuss later.
-
-.The Add Button
-image::img/developer-guide/codenameone-add-theme-entry-button.png[The Add Button, scaledwidth=50%]
-
-After pressing that button we should see something that looks like this:
-
-.Add the Theme Entry for the Toolbar
-image::img/developer-guide/codenameone-add-theme-entry.png[Add the Theme Entry for the Toolbar]
-
-TIP: Don't forget to press the save button in the designer after making changes
-
-There are several other options in the add theme entry dialog. Lets go over them and review what we should do for each tab in this UI:
-
-.The Rest of the Add Theme Entry Dialog - Part I
-image::img/developer-guide/codenameone-add-theme-entry-dialog-options-1.png[The Rest of the Add Theme Entry Dialog]
-
-.The Rest of the Add Theme Entry Dialog - Part II
-image::img/developer-guide/codenameone-add-theme-entry-dialog-options-2.png[The Rest of the Add Theme Entry Dialog]
-
-We'll cover these options in-depth in the theming chapters.
-
-===== Native Theme
-
-By default Codename One applications are created with a theme
-that derives from the builtin OS native theme. You can add
-additional themes into the resource file by pressing the #Add
-A New Theme# button. You can also create multiple themes and
-ship them with your app or download them dynamically.
-
-You can create a theme from scratch or customize one of the Codename one themes to any look you desire.
-
-TIP: To preview the look of your theme in the various platforms use the #Native Theme# <<designer-native-theme-menu,menu option>> in the designer
-
-[[designer-native-theme-menu]]
-.The native theme menu option
-image::img/developer-guide/designer-native-theme-menu.png[The native theme menu option,scaledwidth=30%]
-
-You can easily create deep customizations that span across
-all themes by adding a UIID or changing an existing UIID.
-E.g. looking at the getting started application that ships with the plugin you will notice a green button. This button is defined using the "GetStarted" UIID which is defined within the designer as:
-
-- A green background
-- White foreground
-- A thin medium sized font
-- Center aligned text
-- A small amount of spacing between the text and the edges
-
-To achieve the colors we <<get-started-theme-color,define them in the color tab>>.
-
-IMPORTANT: We define the transparency to 255 which means the
-background will be a solid green color. This is important since
-the native OS's might vary with the default value for background
-transparency so this should be defined explicitly
-
-[[get-started-theme-color]]
-.The Color tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-color.png[The Color tab for the get started button theme settings]
-
-The alignment of the text is pretty simple, notice that the
-alignment style attribute applies to text and doesn't apply
-to other elements. To align other elements we use layout manager logic.
-
-.The alignment tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-alignment.png[The alignment tab for the get started button theme settings]
-
-Padding can be expressed in pixels, millimeters (approximate)
-or percentages of the screen size.
-
-TIP: We recommend using millimeters for all measurements to
-keep the code portable for various device DPI's.
-
-.The padding tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-padding.png[The padding tab for the get started button theme settings]
-
-The font uses native OS light font but has a fallback for
-older OS's that don't support truetype fonts. The "True Type"
-font will be applicable for most modern OS's. In the case of
-the "native:" fonts Android devices will use #Roboto# whereas
-iOS devices will use #Helvetica Neue#. You can supply your
-own TTF and work with that.
-
-IMPORTANT: Since Codename One cannot legally ship
-#Helvetica Neue# fonts the simulator will fallback to #Roboto#
-on PC's.
-
-WARNING: At the time of this writing the desktop/simulator
-version of the Roboto font doesn't support many common character
-sets (languages). This will have no effect on an Android
-device where thenative font works properly.
-
-.The font tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-font.png[The font tab for the get started button theme settings]
-
+Because the CSS compiler produces the final resource file, you should treat the generated `theme.res` as an output artifact and keep your changes in the CSS source. Images referenced from CSS rules (e.g. background images or multi-images) should be placed alongside the stylesheet so that they are picked up by the compiler. Additional details about the supported selectors and properties are covered in the dedicated CSS chapter later in this guide.
 
 === GUI Builder
 
@@ -1182,26 +1055,7 @@ The GUI builder allows us to arrange components visually within a UI using drag 
 
 .Why two GUI Builders?
 ****
-The original old GUI builder has its roots in our work at Sun Microsystems, it was developed directly into the designer tool and stores it's data as part of the resource file. When creating an application for the old GUI builder you must define it as a "visual application" which will make it use the old GUI builder.
-
-The roots of this GUI builder are pretty old. When we initially built it we still had to support feature phones with 2mb of RAM and the iPad wasn't announced yet. Due to that we picked an architecture that made sense for those phones with a greater focus on navigation and resource usage. Newer mobile applications are rivaling desktop applications in complexity and in those situations the old GUI builder doesn't make as much sense
-
-The old GUI builder is in the designer tool, it's a Swing application that includes the theme design etc. +
-It generates a `Statemachine` class that contains all the main user GUI interaction code.
-
-The new GUI builder is a standalone application that you launch from the right click menu by selecting a form as explained below. Here are screenshots of both to help you differentiate:
-
-.The old GUI builder
-image::img/developer-guide/old-gui-builder-sample.png[The old GUI builder,scaledwidth=50%]
-
-.The same UI in the new GUI builder
-image::img/developer-guide/new-gui-builder-sample.png[The new GUI builder,scaledwidth=50%]
-
-As of version 3.7, the new GUI Builder also supports an auto layout mode which allows you to freely position and resize components on a canvas.  This mode is now the default for new GUI forms, and it always uses LayeredLayout as the root layout manager.
-
-.The new GUI builder in auto-layout mode
-image::img/developer-guide/guibuilder-2-screenshot.png[The new GUI builder auto layout mode,scaledwidth=50%]
-
+Codename One originally shipped with a GUI builder that generated a `Statemachine` class and stored its data directly inside the resource file. That legacy tool targeted very constrained devices and has since been deprecated. Modern projects should rely on the standalone GUI builder launched from the IDE, which is the focus of the remainder of this section. The current builder includes an auto layout mode (introduced in version 3.7) that lets you freely position and resize components on a canvas while using `LayeredLayout` behind the scenes.
 ****
 
 ==== Hello World
@@ -1461,10 +1315,9 @@ As of version 3.7, new forms created with the GUI Builder will use auto-layout m
 .All forms designed in auto-layout mode use `LayeredLayout`
 NOTE: Auto-Layout Mode is built upon the inset support in LayeredLayout.  Component positioning uses <<insets-and-reference-components,insets and reference components>>, not absolute positioning
 
-As an example, let's drag a button onto a blank form and see what happens.  The button will be "selected" initially after adding, it so you'll see its outline, and resize handles for adjusting its size and position.  You'll also see four floating labels (above, below, to the left, and to the right) that show the corresponding side's inset values and allow you to adjust them.
+As an example, let's drag a button onto a blank form and see what happens.  The button will be "selected" initially after adding it, so you'll see its outline and resize handles for adjusting its size and position.  You'll also see four floating labels (above, below, to the left, and to the right) that show the corresponding side's inset values and allow you to adjust them.
 
-.A button selected on the canvas in auto-layout mode.  You can drag it to reposition it, or resize it using the resize handles.
-image::img/developer-guide/guibuilder-2-designer-selected-cmp.png[Selected component in designer allows you to freely drag it to a new position, or resize using the resize handles.,scaledwidth=20%]
+When a component is selected you can drag it to reposition it or use the resize handles to change its size.  The floating inset labels update as you drag so you can fine tune spacing without leaving the canvas.
 
 Press the mouse inside the bounds of the button and drag it around to reposition it.  You will notice that the inset labels change to reflect the new inset values.  If you drag the button close to the edge of the form, the corresponding inset value will change to millimetres.  If you move farther away from the edge, it will change to percentage values.
 
@@ -1485,7 +1338,7 @@ image::img/developer-guide/guibuilder-2-insets-dropdown-menu.png[Inset drop-down
 
 ===== Auto Snap
 
-Notice the "auto-snap" checkbox that appears in the top-right corner of the designer.
+Notice the "auto-snap" checkbox that appears in the top-right corner of the GUI builder window.
 
 .Auto-snap checkbox
 image::img/developer-guide/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Auto-snap checkbox,scaledwidth=10%]
@@ -1499,7 +1352,7 @@ Beside the "auto-snap" checkbox is another checkbox named "Smart Insets".
 .Smart insets checkbox
 image::img/developer-guide/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Smart insets checkbox,scaledwidth=10%]
 
-Smart Inset uses some heuristics during a drag to try to determine how the insets should be linked.  Currently the heuristics are quite basic (it tries to link to the nearest neighbor component in most cases), but we will be working on improving this for future releases.  This feature is turned off by default while it is still being refined.  The goal is to improve this to the point where it *always* makes the correct link choices - at which time you will be able to use the designer without having any knowledge of insets or reference components.
+Smart Inset uses some heuristics during a drag to try to determine how the insets should be linked.  Currently the heuristics are quite basic (it tries to link to the nearest neighbor component in most cases), but we will be working on improving this for future releases.  This feature is turned off by default while it is still being refined.  The goal is to improve this to the point where it *always* makes the correct link choices - at which time you will be able to use the GUI builder without having any knowledge of insets or reference components.
 
 ===== The Widget Control Pad
 
@@ -1522,7 +1375,7 @@ This control pad also includes game-pad-like controls (up, down, left, right), t
 
 In some cases, you may need to add sub-containers to your form to aid in grouping your components together.  You can drag a container onto your form using the "Container" palette item (under "Core Components").  The default layout the subcontainer will be LayeredLayout so that you are able to position components within the sub-container with precision, just like on the root container.
 
-You can also change the layout of subcontainers to another classical layout manager (e.g. grid layout, box layout, etc..) and drag components directly into it just as you did with the old designer.  This is very useful if parts of your form lend themselves.  As an example, let's drag a container onto the canvas that uses BoxLayout Y.  (You can find this under the "Containers" section of the component palette).
+You can also change the layout of subcontainers to another classical layout manager (e.g. grid layout, box layout, etc..) and drag components directly into it just as you did with the old GUI builder.  This is very useful if parts of your form lend themselves.  As an example, let's drag a container onto the canvas that uses BoxLayout Y.  (You can find this under the "Containers" section of the component palette).
 
 Drag the button (that was previously on the form) over that container, and you should see a drop-zone become highlighted.
 
@@ -1536,4 +1389,4 @@ image::img/developer-guide/guibuilder-2-subcontainer-add-child-2.png[Box Layout 
 
 ===== The Canvas Resize Tool
 
-When designing a UI with the new designer it is *very* important that you periodically test the form's "resizing" behavior so that you know how it will behave on different devices.  Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized.  After nearly every manipulation you perform, it is good practice to drag the canvas resize tool (the button in the lower right corner of the designer) smaller and bigger so you can see how the positions are changed.  If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behavior matches your expectations.
+When designing a UI with the new GUI builder it is *very* important that you periodically test the form's "resizing" behavior so that you know how it will behave on different devices.  Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized.  After nearly every manipulation you perform, it is good practice to drag the canvas resize tool (the button in the lower right corner of the GUI builder) smaller and bigger so you can see how the positions are changed.  If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behavior matches your expectations.
