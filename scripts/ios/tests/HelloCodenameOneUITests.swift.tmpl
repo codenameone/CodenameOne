@@ -73,7 +73,7 @@ final class HelloCodenameOneUITests: XCTestCase {
             return
         }
 
-        if !simctlLaunchAttempted, let bundleID = targetBundleIdentifier, launchViaSimctl(bundleIdentifier: bundleID) {
+        if !simctlLaunchAttempted, let bundleID = targetBundleIdentifier, launchViaSimctl(bundleIdentifier: bundleID, arguments: app.launchArguments) {
             simctlLaunchAttempted = true
             print("CN1SS:INFO:simctl_launch_attempted bundle=\(bundleID) result=success")
             if app.wait(for: .runningForeground, timeout: timeout) {
@@ -92,7 +92,7 @@ final class HelloCodenameOneUITests: XCTestCase {
         app.launch()
     }
 
-    private func launchViaSimctl(bundleIdentifier: String) -> Bool {
+    private func launchViaSimctl(bundleIdentifier: String, arguments: [String]) -> Bool {
         let env = ProcessInfo.processInfo.environment
         guard let udid = env["SIMULATOR_UDID"], !udid.isEmpty else {
             return false
@@ -100,7 +100,12 @@ final class HelloCodenameOneUITests: XCTestCase {
 
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        task.arguments = ["simctl", "launch", "--terminate-running", udid, bundleIdentifier]
+        var taskArguments = ["simctl", "launch", "--terminate-running", udid, bundleIdentifier]
+        if !arguments.isEmpty {
+            taskArguments.append("--args")
+            taskArguments.append(contentsOf: arguments)
+        }
+        task.arguments = taskArguments
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
