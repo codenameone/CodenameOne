@@ -51,7 +51,6 @@ class LabelTest extends UITestBase {
     void testMaskGapAndShiftSettingsPersist() {
         Label label = new Label();
         Object mask = new Object();
-        label.setMask(mask);
         label.setMaskName("rounded");
         label.setGap(7);
         label.setEndsWith3Points(false);
@@ -60,6 +59,11 @@ class LabelTest extends UITestBase {
 
         label.setShiftMillimeters(2.5f);
         label.setShowEvenIfBlank(true);
+
+        assertEquals("rounded", label.getMaskName());
+        assertNull(label.getMask());
+
+        label.setMask(mask);
 
         assertSame(mask, label.getMask());
         assertEquals("rounded", label.getMaskName());
