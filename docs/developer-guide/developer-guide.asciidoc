@@ -16,7 +16,8 @@
 :autofit-option:
 //:hide-uri-scheme:
 :uuid: 92CA37B2-EB2B-4B8F-AC7C-1ED13683F7FB
-:front-cover-image: image:img/cover.png[Front Cover,1000,1600]
+:cover-image: book-cover.svg
+:front-cover-image: image:{cover-image}[Front Cover]
 :lang: en-US
 :revdate: 2025-10-20
 :revnumber: DEV-SNAPSHOT
