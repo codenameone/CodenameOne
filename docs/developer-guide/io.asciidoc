@@ -127,6 +127,19 @@ You can then read the token like this:
 String token = Preferences.get("token", null);
 ----
 
+The backing store filename defaults to `"codenameone.properties"`, but you can
+override it by calling `Preferences.setPreferencesLocation(String)` before your
+app touches the API.  This is useful when you need to segregate preference
+namespaces per user or plug in an encrypted storage layer.
+
+When you have a batch of updates, prefer the `Preferences.set(Map<String,Object>)`
+overload so that all values are persisted with a single disk write.
+
+Preferences can also notify interested parties when a key changes.  Register a
+`PreferenceListener` via `addPreferenceListener()` to react to updates made in
+other parts of your code (or even triggered remotely via `Codename One Push`).
+Remember to remove listeners you no longer need to avoid leaks.
+
 WARNING: This gets somewhat confusing with primitive numbers e.g. if you use `Preferences.set("primitiveLongValue", myLongNumber)` then invoke `Preferences.get("primitiveLongValue", 0)` you might get an exception! +
 This would happen because the value is physically a `Long` object but you are trying to get an `Integer`. The workaround is to remain consistent and use code like this `Preferences.get("primitiveLongValue", (long)0)`.
 
@@ -250,9 +263,9 @@ In general SQL seems overly complex for most embedded device programming tasks.
 
 .Portability Of SQLite
 ****
-SQLite is supported on iOS, Android, RIM, Desktop & JavaScript builds. However, the JavaScript version of SQL has been deprecated and isn't supported on all platforms.
-
-You will notice that at this time support is still missing from the Windows builds.
+SQLite is supported on iOS, Android, JavaScript, Desktop/Simulator, and UWP
+builds.  The JavaScript port relies on the browser's WebSQL implementation, so
+it may be unavailable in environments that have already removed that feature.
 
 The biggest issue with SQLite portability is in iOS. The SQLite version for most platforms is threadsafe and as a result very stable. However, the iOS version is not!
 
@@ -414,6 +427,17 @@ byte[] resultOfRequest = request.getData();
 ----
 
 Notice that in this case the `addToQueueAndWait` method returned after the connection completed. Also notice that this was totally legal to do on the EDT!
+
+
+==== Timeouts & Retries
+
+Each request can override the global timeout using `setTimeout(int)`, which
+expects a duration in milliseconds.  This is especially useful when you are
+talking to endpoints that occasionally need a longer window than the default
+NetworkManager setting.  You can also configure how many times Codename One
+should retry a failing call silently by using `setSilentRetryCount(int)`.  When
+the silent retry limit is reached the standard error handling kicks in (e.g.
+listeners fire, fail dialogs show, etc.).
 
 
 ==== Threading
@@ -1295,6 +1319,18 @@ Map<String, Object> jsonData = Rest.post(myUrl).body(bodyValueAsString).getAsJso
 ----
 
 Notice the usage of post and the body builder method. There are MANY methods in the builder class that cover pretty much everything you would expect and then some when it comes to the needs of rest services.
+
+Some highlights that are easy to miss:
+
+* `.priority(byte)` lets you change the underlying `ConnectionRequest` priority
+  when you need certain calls to jump the queue.
+* `.cookiesEnabled(boolean)` controls whether cookies are persisted for the
+  request when you need stateless behavior.
+* `.useBoolean(boolean)` and `.useLongs(boolean)` toggle how the JSON parser
+  materializes number and boolean types inside the resulting `Map`, which is
+  handy when your backend is strict about data types.
+* `.cacheMode(...)` and `.postParameters(...)` expose the same knobs as
+  `ConnectionRequest`, keeping you in the fluent API even for advanced tweaks.
 
 I changed the code in the kitchen sink webservice sample to use this API. I was able to make it shorter and more readable without sacrificing anything.
 

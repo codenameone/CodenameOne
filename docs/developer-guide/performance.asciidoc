@@ -52,11 +52,17 @@ The Performance Monitor tool can be accessible via the #Simulator# -> #Performan
 .Main tab of the performance monitor: Logs and timings
 image::img/developer-guide/performance-monitor-tab-1.png[Main tab of the performance monitor: Logs and timings]
 
-The first tab of the performance monitor includes a table of the drawn components. Each entry includes the number of times it was drawn and the slowest/fastest and average drawing time.
+The first tab of the performance monitor includes a table of the drawn components. Each entry includes the number of times it was drawn and the slowest/fastest and average drawing time.  The toolbar across the top
+includes Pause/Continue buttons so you can freeze the counters while you inspect
+the current snapshot, a "Clear Data" action to reset the tables, and a "GC"
+button that invokes the simulator's garbage collector so you can see how memory
+usage changes.
 
 This is useful if a `Form` is slow. You might be able to pinpoint it to a specific component using this tool.
 
-The Log on the bottom includes debug related information. E.g. it warns about the usage of mutable images which might be slow on some platforms. This also displays warnings when an unlocked image is drawn etc.
+The Log on the bottom includes debug related information. E.g. it warns about the usage of mutable images which might be slow on some platforms. This also displays warnings when an unlocked image is drawn etc.  A live
+"Image Memory Overhead" meter summarizes how much native image memory the
+current form consumes so you can correlate spikes with your drawing code.
 
 .Rendering tree
 image::img/developer-guide/performance-monitor-tab-2.png[Rendering tree]
@@ -137,6 +143,17 @@ Log.bindCrashProtection(true);
 ----
 
 We normally place this in the `init(Object)` method so all future on-device errors are emailed to you. Internally this method uses the `Display.getInstance().addEdtErrorHandler()` API to bind error listeners to the EDT. When an exception is thrown there it is swallowed (using `ActionEvent.consume()`). The `Log` data is then sent using `Log.sendLog()`.
+
+If your crash handler runs while networking is unavailable or you want to avoid
+blocking the EDT, use `Log.sendLogAsync()` instead.  It performs the upload in a
+background thread and is what Codename One's lifecycle helper falls back to when
+regular error reporting fails.
+
+You can also plug in your own crash reporting pipeline by calling
+`Display.getInstance().setCrashReporter(CrashReport)`.  The
+https://www.codenameone.com/javadoc/com/codename1/system/CrashReport.html[`CrashReport`]
+callback will receive the exception, device information, and log payload so you
+can forward it to services like Firebase Crashlytics or your in-house tools.
 
 To truly benefit from this feature we need to use the `Log` class for all logging and exception handling instead of API's such as `System.out`.
 

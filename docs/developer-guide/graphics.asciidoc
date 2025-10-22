@@ -60,6 +60,37 @@ hi.show();
 .Hi world demo code, notice that the blue bar on top is the iOS7+ status bar
 image::img/developer-guide/graphics-hiworld.png[Hi world demo code, notice that the blue bar on top is the iOS7+ status bar,scaledwidth=20%]
 
+==== Painting with Gradients
+
+Solid colors are only the starting point. `Graphics` also understands "paint" objects
+that describe gradients and other patterns.  You can pass an instance of
+https://www.codenameone.com/javadoc/com/codename1/ui/Paint.html[`Paint`]
+to `setColor(Paint)` in place of an integer color value to activate a gradient for
+subsequent fill and draw operations.  The
+https://www.codenameone.com/javadoc/com/codename1/ui/LinearGradientPaint.html[`LinearGradientPaint`]
+class is the most common option and accepts a list of color stops along a line:
+
+[source,java]
+----
+LinearGradientPaint gradient = new LinearGradientPaint(
+        0, 0, getWidth(), 0,  // horizontal gradient
+        new int[] {0xff4285f4, 0xff34a853, 0xfffbbc05},
+        new float[] {0f, 0.5f, 1f}
+);
+g.setColor(gradient);
+g.fillRect(getX(), getY(), getWidth(), getHeight());
+----
+
+The `fillLinearGradient()` convenience methods (with optional `repeat` flag)
+provide a shorthand when you just need a two-color gradient without constructing
+your own `Paint` object.
+
+Radial gradients are equally straightforward using
+`fillRadialGradient()` or `fillRectRadialGradient()`, which can render circular
+and rectangular radial transitions respectively.  These APIs accept the
+inner/outer colors, focal point, and spread so you can combine them with linear
+gradients to build sophisticated backgrounds and lighting effects.
+
 === Glass Pane
 
 The `GlassPane `in Codename One is inspired by the Swing `GlassPane` & `LayeredPane` with quite a few twists.
@@ -139,9 +170,13 @@ paths and curves and caching the shape drawn in the GPU.
 
 === Device Support
 
-Shapes and transforms are available on most smartphone platforms with some caveats for the current Windows Phone port.
+Shapes and transforms ship with all of Codename One's actively maintained ports
+(Android, iOS, JavaScript, desktop/Simulator, and UWP).  Older platforms that
+have reached end of life may lack these APIs, so keep the guard code shown below
+if you still target them with legacy builds.
 
-Notice that perspective transform is missing from the desktop/simulator port. Unfortunately there is no real equivalent to perspective transform in JavaSE that we could use.
+Notice that perspective transform is missing from the desktop/simulator port.
+Unfortunately there is no real equivalent to perspective transform in JavaSE that we could use.
 
 === A 2D Drawing App
 
@@ -316,8 +351,9 @@ NOTE: `scale()` and `rotate()` methods are only available on platforms that supp
 
 ==== Device Support
 
-As of this writing, not all devices support transforms (i.e. `scale()` and `rotate()`).  The following is a list of platforms
-and their respective levels of support.
+All current Codename One ports expose affine transforms (i.e. `scale()` and
+`rotate()`).  Use the following table as a quick reference when deciding whether
+you need a fallback path.
 
 .Transforms Device Support
 [cols="2*"]
@@ -325,7 +361,7 @@ and their respective levels of support.
 |Platform
 |Affine Supported
 
-| Simulator
+| Simulator/Desktop
 | Yes
 
 | iOS
@@ -337,14 +373,8 @@ and their respective levels of support.
 | JavaScript
 | Yes
 
-| J2ME
-| No
-
-| BlackBerry (4.2 & 5)
-| No
-
-| Windows Phone
-| No (pending)
+| UWP
+| Yes
 |===
 
 
@@ -1000,6 +1030,24 @@ image::img/developer-guide/rotation3.png[Rotating the rectangle with the center 
 
 You could also use the `Graphics.setTransform()` class to apply rotations and other complex transformations
 (including 3D perspective transforms), but I'll leave that for its own topic as it is a little bit more complex.
+
+
+==== Global Alpha & Anti-Aliasing
+
+So far we have relied on the per-pixel alpha stored in images and gradients.  `Graphics`
+also lets you apply a global alpha multiplier to every draw call by using
+`setAlpha(int)` or `concatenateAlpha(int)` after checking `isAlphaSupported()`.
+Both methods accept values from `0` (fully transparent) to `255` (fully opaque)
+and remain active until you change them again.  `concatenateAlpha()` is
+especially handy when you need to temporarily fade a component because it
+returns the previous alpha so you can restore it later.
+
+Anti-aliasing can likewise be toggled at runtime.  Call `isAntiAliasingSupported()`
+and `isAntiAliasedTextSupported()` to discover which hints the current port
+exposes, then use `setAntiAliased(boolean)` and `setAntiAliasedText(boolean)` to
+opt into smoother edges for shapes and glyphs respectively.  These switches make
+it easy to balance rendering quality versus speed depending on the type of
+content you draw.
 
 
 ==== Event Coordinates
