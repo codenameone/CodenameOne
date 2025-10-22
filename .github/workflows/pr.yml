@@ -49,6 +49,9 @@ jobs:
         cd maven
         mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase
         cd ..
+    - name: Run Maven plugin tests
+      working-directory: maven
+      run: mvn -B -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin -am test
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}
       env:

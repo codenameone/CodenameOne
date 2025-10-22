@@ -70,9 +70,59 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
             if (themeCss.exists()) {
                 return cssSibling;
             }
-            
+
         }
         return null;
+    }
+
+    protected File findLocalizationDirectory() {
+        if (project.getCompileSourceRoots() != null) {
+            for (String dir : project.getCompileSourceRoots()) {
+                File dirFile = new File(dir);
+                File parent = dirFile.getParentFile();
+                if (parent == null) {
+                    continue;
+                }
+                File localizationSibling = new File(parent, "l10n");
+                if (hasLocalizationBundles(localizationSibling)) {
+                    return localizationSibling;
+                }
+            }
+        }
+
+        File cn1ProjectDir = getCN1ProjectDir();
+        if (cn1ProjectDir != null) {
+            File defaultLocalization = new File(cn1ProjectDir, path("src", "main", "l10n"));
+            if (hasLocalizationBundles(defaultLocalization)) {
+                return defaultLocalization;
+            }
+            File rootLocalization = new File(cn1ProjectDir, "l10n");
+            if (hasLocalizationBundles(rootLocalization)) {
+                return rootLocalization;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean hasLocalizationBundles(File directory) {
+        if (directory == null || !directory.isDirectory()) {
+            return false;
+        }
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return false;
+        }
+        for (File file : files) {
+            if (file.isDirectory()) {
+                if (hasLocalizationBundles(file)) {
+                    return true;
+                }
+            } else if (file.getName().endsWith(".properties")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void executeImpl(String themePrefix) throws MojoExecutionException, MojoFailureException {
@@ -201,6 +251,11 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
 
         java.createArg().setValue("-merge");
         java.createArg().setFile(mergeFile);
+        File localizationDir = findLocalizationDirectory();
+        if (localizationDir != null) {
+            java.createArg().setValue("-l");
+            java.createArg().setFile(localizationDir);
+        }
         int res = java.executeJava();
         if (res != 0) {
             throw new MojoExecutionException("An error occurred while compiling the CSS files.  Inputs: "+inputs+", output: " + new File(project.getBuild().getOutputDirectory() + File.separator + themePrefix + "theme.res") +", merge file: "+mergeFile);
