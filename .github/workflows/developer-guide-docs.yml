@@ -42,6 +42,10 @@ jobs:
           else
             REV_HUMAN_DATE="$(date -u '+%B %-d, %Y')"
           fi
+          echo "Developer guide workflow metadata:" >&2
+          echo "  REV_DATE=$REV_DATE" >&2
+          echo "  REV_NUMBER=$VERSION" >&2
+          echo "  REV_HUMAN_DATE=$REV_HUMAN_DATE" >&2
           {
             echo "REV_DATE=$REV_DATE"
             echo "REV_NUMBER=$VERSION"
@@ -58,8 +62,48 @@ jobs:
           GENERATED_PNG="docs/developer-guide/book-cover.generated.png"
           cp "$SOURCE" "$GENERATED_SVG"
           export GENERATED_SVG
-          python3 -c "import os, re, pathlib; target = pathlib.Path(os.environ['GENERATED_SVG']); text = target.read_text(encoding='utf-8'); rev = os.environ.get('REV_NUMBER', 'UNKNOWN'); date = os.environ.get('REV_HUMAN_DATE') or os.environ.get('REV_DATE', ''); replacement = f\"Version {rev}\" + (f\" - {date}\" if date else ''); new_text, count = re.subn(r'Version\\s+[^<]+', replacement.strip(), text, count=1); assert count == 1, 'Could not find version text placeholder in cover artwork'; target.write_text(new_text, encoding='utf-8')"
+          python3 - <<'PY'
+import os
+import pathlib
+import re
+
+target = pathlib.Path(os.environ['GENERATED_SVG'])
+text = target.read_text(encoding='utf-8')
+
+rev = os.environ.get('REV_NUMBER', 'UNKNOWN')
+date = os.environ.get('REV_HUMAN_DATE') or os.environ.get('REV_DATE', '')
+replacement = f"Version {rev}" + (f" - {date}" if date else '')
+
+new_text, count = re.subn(r'Version\s+[^<]+', replacement.strip(), text, count=1)
+if count != 1:
+    raise RuntimeError('Could not find version text placeholder in cover artwork')
+
+variables = {
+    name: value.strip()
+    for name, value in re.findall(r'--([\w-]+):\s*([^;]+);', new_text)
+}
+
+var_counter = {'count': 0}
+
+def replace_var(match):
+    name = match.group(1)
+    value = variables.get(name)
+    if value is None:
+        return match.group(0)
+    var_counter['count'] += 1
+    return value
+
+new_text = re.sub(r'var\(--([\w-]+)\)', replace_var, new_text)
+
+target.write_text(new_text, encoding='utf-8')
+
+print(f"Injected cover legend: {replacement.strip()}")
+print(f"Resolved {var_counter['count']} CSS variable references for rasterization")
+PY
+          echo "Rasterizing cover artwork to ${GENERATED_PNG}" >&2
           rsvg-convert -w 2551 -h 3579 "$GENERATED_SVG" -o "$GENERATED_PNG"
+          ls -l "$GENERATED_PNG"
+          file "$GENERATED_PNG"
           {
             echo "COVER_IMAGE_ATTR=$(basename "$GENERATED_PNG")"
             echo "GENERATED_COVER_IMAGE=$GENERATED_PNG"
@@ -85,6 +129,7 @@ jobs:
           COVER_IMAGE_ATTR_VALUE="${COVER_IMAGE_ATTR:-book-cover.svg}"
           GENERATED_COVER_IMAGE="${GENERATED_COVER_IMAGE:-}"
           GENERATED_COVER_SVG="${GENERATED_COVER_SVG:-}"
+          echo "Building with cover image attribute: ${COVER_IMAGE_ATTR_VALUE}" >&2
           mkdir -p "$HTML_BUILD_DIR" "$PDF_BUILD_DIR"
           asciidoctor \
             -a revdate="$REV_DATE" \
