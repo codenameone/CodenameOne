@@ -247,11 +247,19 @@ frameworks_group.set_source_tree("<group>") if frameworks_group.respond_to?(:set
   "UIKit.framework" => "System/Library/Frameworks/UIKit.framework"
 }.each do |name, path|
   ref = frameworks_group.files.find do |f|
-    File.expand_path(f.path, proj_dir) == path || f.path == name || f.path == path
+    f.path == name || f.path == path ||
+      (f.respond_to?(:real_path) && File.expand_path(f.real_path.to_s) == File.expand_path(path, "/"))
   end
-  ref ||= frameworks_group.new_file(path)
-  unless ui_target.frameworks_build_phase.files_references.include?(ref)
-    ui_target.frameworks_build_phase.add_file_reference(ref)
+  unless ref
+    ref = frameworks_group.new_reference(path)
+  end
+  ref.name = name if ref.respond_to?(:name=)
+  ref.set_source_tree('SDKROOT') if ref.respond_to?(:set_source_tree)
+  ref.path = path if ref.respond_to?(:path=)
+  ref.last_known_file_type = 'wrapper.framework' if ref.respond_to?(:last_known_file_type=)
+  phase = ui_target.frameworks_build_phase
+  unless phase.files_references.include?(ref)
+    phase.add_file_reference(ref)
   end
 end
 
