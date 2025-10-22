@@ -158,6 +158,24 @@ jobs:
             const marker = '<!-- developer-guide-artifacts -->';
             const { owner, repo } = context.repo;
             const runId = context.runId;
+            const prNumber = context.payload.pull_request?.number;
+            const runHeadSha = context.payload.pull_request?.head?.sha;
+
+            if (prNumber && runHeadSha) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: prNumber
+              });
+
+              if (pr.head.sha !== runHeadSha) {
+                console.log(
+                  `Skipping PR comment update because workflow run head ${runHeadSha} is not the latest PR head ${pr.head.sha}.`
+                );
+                return;
+              }
+            }
+
             const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
               owner,
               repo,
