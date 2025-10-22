@@ -240,6 +240,21 @@ file_ref = ui_group.files.find { |f| File.expand_path(f.path, proj_dir) == ui_fi
 file_ref ||= ui_group.new_file(ui_file)
 ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.files_references.include?(file_ref)
 
+# Ensure required system frameworks (e.g. UIKit for UIImage helpers) are linked
+frameworks_group = proj.frameworks_group || proj.main_group.find_subpath("Frameworks", true)
+frameworks_group.set_source_tree("<group>") if frameworks_group.respond_to?(:set_source_tree)
+{
+  "UIKit.framework" => "System/Library/Frameworks/UIKit.framework"
+}.each do |name, path|
+  ref = frameworks_group.files.find do |f|
+    File.expand_path(f.path, proj_dir) == path || f.path == name || f.path == path
+  end
+  ref ||= frameworks_group.new_file(path)
+  unless ui_target.frameworks_build_phase.files_references.include?(ref)
+    ui_target.frameworks_build_phase.add_file_reference(ref)
+  end
+end
+
 #
 # Required settings so Xcode creates a non-empty .xctest and a proper "-Runner.app"
 # PRODUCT_NAME feeds the bundle name; TEST_TARGET_NAME feeds the runner name.
