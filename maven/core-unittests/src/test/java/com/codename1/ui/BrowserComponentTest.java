@@ -238,6 +238,10 @@ class BrowserComponentTest extends UITestBase {
             @Override
             public void onSucess(BrowserComponent.JSRef value) {
             }
+
+            @Override
+            public void onError(Object context, Throwable err, int errorCode, String message) {
+            }
         };
         browser.execute("callback.onSuccess('done')", callback);
         ArgumentCaptor<String> script = ArgumentCaptor.forClass(String.class);
