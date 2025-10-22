@@ -244,7 +244,8 @@ ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.fi
 frameworks_group = proj.frameworks_group || proj.main_group.find_subpath("Frameworks", true)
 frameworks_group.set_source_tree("<group>") if frameworks_group.respond_to?(:set_source_tree)
 {
-  "UIKit.framework" => "System/Library/Frameworks/UIKit.framework"
+  "UIKit.framework"        => "System/Library/Frameworks/UIKit.framework",
+  "CoreGraphics.framework" => "System/Library/Frameworks/CoreGraphics.framework"
 }.each do |name, path|
   ref = frameworks_group.files.find do |f|
     f.path == name || f.path == path ||
