@@ -79,10 +79,30 @@ def summarize_asciidoc(report: Path, status: str, summary_key: str, output: Path
     text = ""
     if report.is_file():
         text = report.read_text(encoding="utf-8", errors="ignore")
-    issues = re.findall(r"\b(?:WARN|ERROR|SEVERE)\b", text)
 
-    if issues:
-        summary = f"{len(issues)} issue(s) flagged"
+    pattern = re.compile(r"^\s*[^:\n]+:\d+:\d+:\s+(ERROR|WARN(?:ING)?|INFO)\b", re.MULTILINE)
+    matches = pattern.findall(text)
+
+    counts = {"error": 0, "warning": 0, "info": 0}
+    for severity in matches:
+        normalized = severity.upper()
+        if normalized == "ERROR":
+            counts["error"] += 1
+        elif normalized in {"WARN", "WARNING"}:
+            counts["warning"] += 1
+        elif normalized == "INFO":
+            counts["info"] += 1
+
+    total = sum(counts.values())
+
+    if total:
+        parts = [f"{counts['error']} errors"] if counts["error"] else []
+        if counts["warning"]:
+            parts.append(f"{counts['warning']} warnings")
+        if counts["info"]:
+            parts.append(f"{counts['info']} info")
+        detail = f" ({', '.join(parts)})" if parts else ""
+        summary = f"{total} issue(s) flagged{detail}"
         if _has_nonzero_status(status):
             summary += f" (exit code {_normalize_status(status)})"
     elif _has_nonzero_status(status):
@@ -162,7 +182,7 @@ def summarize_unused_images(
 
     output_lines = [f"{summary_key}={summary}"]
     if details_key and lines:
-        details_value = "\\n".join(lines)
+        details_value = "\n".join(lines)
         output_lines.append(f"{details_key}={details_value}")
 
     write_output(output_lines, output)

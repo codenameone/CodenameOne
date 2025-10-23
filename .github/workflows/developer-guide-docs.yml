@@ -82,41 +82,28 @@ jobs:
         with:
           ruby-version: '3.1'
 
-      - name: Set up Java for docToolchain
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
       - name: Install Asciidoctor tooling
         run: |
-          gem install --no-document asciidoctor asciidoctor-pdf
+          gem install --no-document asciidoctor asciidoctor-pdf asciidoctor-lint
 
-      - name: Download docToolchain
-        run: |
-          set -euo pipefail
-          DT_VERSION="3.4.2"
-          DT_ROOT="${RUNNER_TEMP}/doctoolchain"
-          mkdir -p "$DT_ROOT"
-          curl -fsSL -o "$DT_ROOT/doctoolchain.zip" "https://github.com/docToolchain/docToolchain/releases/download/v${DT_VERSION}/docToolchain-${DT_VERSION}.zip"
-          unzip -q "$DT_ROOT/doctoolchain.zip" -d "$DT_ROOT"
-          DOC_TOOLCHAIN_HOME="$DT_ROOT/docToolchain-${DT_VERSION}"
-          echo "DOC_TOOLCHAIN_HOME=$DOC_TOOLCHAIN_HOME" >> "$GITHUB_ENV"
-
-      - name: Run docToolchain AsciiDoc linter
+      - name: Run Asciidoctor lint
         run: |
           set -euo pipefail
           REPORT_DIR="build/developer-guide/reports"
           REPORT_FILE="${REPORT_DIR}/asciidoc-lint-report.txt"
           mkdir -p "$REPORT_DIR"
+          if ! command -v asciidoctor-lint >/dev/null 2>&1; then
+            echo "asciidoctor-lint is not available" >&2
+            exit 1
+          fi
           set +e
-          "$DOC_TOOLCHAIN_HOME/bin/doctoolchain" docs/developer-guide asciidocLint | tee "$REPORT_FILE"
+          asciidoctor-lint docs/developer-guide/developer-guide.asciidoc | tee "$REPORT_FILE"
           STATUS=${PIPESTATUS[0]}
           set -e
           echo "ASCII_DOC_LINT_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
           echo "ASCII_DOC_LINT_STATUS=$STATUS" >> "$GITHUB_ENV"
           if [ "$STATUS" -ne 0 ]; then
-            echo "docToolchain AsciiDoc linter exited with status $STATUS" >&2
+            echo "asciidoctor-lint exited with status $STATUS" >&2
           fi
 
       - name: Build Developer Guide HTML and PDF
