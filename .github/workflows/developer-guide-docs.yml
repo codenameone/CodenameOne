@@ -36,7 +36,7 @@ jobs:
           touch "$HOME/.codenameone/guibuilder.jar"
           printf 'Manifest-Version: 1.0\n' > /tmp/cn1-manifest.mf
           jar cfm "$HOME/.codenameone/CodeNameOneBuildClient.jar" /tmp/cn1-manifest.mf
-          mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml test
+          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml test
 
       - name: Determine publication metadata
         run: |
