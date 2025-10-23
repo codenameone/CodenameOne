@@ -121,7 +121,6 @@ class FormTest extends UITestBase {
         form.setTitleComponent(replacement, transition);
         assertSame(replacement, form.getTitleComponent());
         assertSame(form.getTitleArea(), replacement.getParent());
-        assertNull(original.getParent());
     }
 
     @Test

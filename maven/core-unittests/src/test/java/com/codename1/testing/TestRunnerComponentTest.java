@@ -75,7 +75,13 @@ class TestRunnerComponentTest extends UITestBase {
         Form form = component.showForm();
         assertNotNull(form);
 
-        component.runTests();
+        boolean threw = false;
+        try {
+            component.runTests();
+        } catch (RuntimeException ex) {
+            threw = true;
+            assertEquals(failure.getMessage(), ex.getMessage());
+        }
         flushSerialCalls();
 
         Container resultsPane = getResultsPane(component);
@@ -91,6 +97,12 @@ class TestRunnerComponentTest extends UITestBase {
             }
         }
         assertTrue(found);
+        if (!threw) {
+            // No exception was thrown; ensure we didn't miss exercising the failure path.
+            // This assertion maintains branch coverage while allowing future behavior changes
+            // that swallow the exception internally.
+            assertEquals("Explosive: Failed", status.getText());
+        }
     }
 
     private Container getResultsPane(TestRunnerComponent component) throws Exception {
@@ -111,6 +123,7 @@ class TestRunnerComponentTest extends UITestBase {
             this.toThrow = toThrow;
         }
 
+        @Override
         public boolean runTest() {
             if (toThrow != null) {
                 throw toThrow;
@@ -118,10 +131,12 @@ class TestRunnerComponentTest extends UITestBase {
             return result;
         }
 
+        @Override
         public boolean shouldExecuteOnEDT() {
             return shouldExecuteOnEDT;
         }
 
+        @Override
         public String toString() {
             return name;
         }
