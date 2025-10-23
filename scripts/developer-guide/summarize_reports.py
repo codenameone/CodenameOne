@@ -32,7 +32,9 @@ def summarize_asciidoc(report: Path, status: str, summary_key: str, output: Path
     write_output([f"{summary_key}={summary}"], output)
 
 
-def summarize_vale(report: Path, summary_key: str, output: Path | None) -> None:
+def summarize_vale(
+    report: Path, status: str, summary_key: str, output: Path | None
+) -> None:
     alerts: list[dict[str, object]] = []
     if report.is_file():
         try:
@@ -60,6 +62,10 @@ def summarize_vale(report: Path, summary_key: str, output: Path | None) -> None:
         summary = f"{total} alert(s) ({', '.join(parts)})"
     else:
         summary = "No alerts found"
+
+    status = status.strip()
+    if status and status != "0":
+        summary += f" (exit code {status})"
 
     write_output([f"{summary_key}={summary}"], output)
 
@@ -124,6 +130,7 @@ def parse_args() -> argparse.Namespace:
         help="Summarize Vale style linter results.",
     )
     vale_parser.add_argument("--report", type=Path, required=True)
+    vale_parser.add_argument("--status", default="0")
     vale_parser.add_argument("--summary-key", default="summary")
 
     unused_parser = subparsers.add_parser(
@@ -145,7 +152,7 @@ def main() -> None:
     if command == "ascii":
         summarize_asciidoc(args.report, args.status, args.summary_key, output)
     elif command == "vale":
-        summarize_vale(args.report, args.summary_key, output)
+        summarize_vale(args.report, args.status, args.summary_key, output)
     elif command == "unused-images":
         summarize_unused_images(
             args.report,

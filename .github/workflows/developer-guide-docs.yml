@@ -189,8 +189,15 @@ jobs:
           REPORT_DIR="build/developer-guide/reports"
           REPORT_FILE="${REPORT_DIR}/vale-report.json"
           mkdir -p "$REPORT_DIR"
+          set +e
           vale --config docs/developer-guide/.vale.ini --output=JSON docs/developer-guide > "$REPORT_FILE"
+          STATUS=$?
+          set -e
           echo "VALE_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
+          echo "VALE_STATUS=$STATUS" >> "$GITHUB_ENV"
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Vale exited with status $STATUS" >&2
+          fi
 
       - name: Check for unused developer guide images
         run: |
@@ -216,6 +223,7 @@ jobs:
         run: |
           python3 scripts/developer-guide/summarize_reports.py vale \
             --report "${VALE_REPORT}" \
+            --status "${VALE_STATUS:-0}" \
             --output "${GITHUB_OUTPUT}"
 
       - name: Summarize unused image findings
