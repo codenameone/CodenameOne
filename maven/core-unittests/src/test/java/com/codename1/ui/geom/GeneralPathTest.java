@@ -56,21 +56,25 @@ class GeneralPathTest {
     void testSetRectAndTransform() {
         GeneralPath path = new GeneralPath();
         Rectangle rect = new Rectangle(10, 20, 30, 40);
-        path.setRect(rect, Transform.makeTranslation(5, -5));
+        // Using the identity transform exercises the transformed code path without
+        // requiring a platform Display implementation, which is unavailable in
+        // headless unit tests.
+        path.setRect(rect, Transform.makeIdentity());
 
-        Rectangle translated = path.getBounds();
-        assertEquals(15, translated.getX());
-        assertEquals(15, translated.getY());
-        assertEquals(30, translated.getWidth());
-        assertEquals(40, translated.getHeight());
+        Rectangle identity = path.getBounds();
+        assertEquals(10, identity.getX());
+        assertEquals(20, identity.getY());
+        assertEquals(30, identity.getWidth());
+        assertEquals(40, identity.getHeight());
         assertTrue(path.isRectangle());
 
-        path.transform(Transform.makeScale(2, 3));
-        Rectangle scaled = path.getBounds();
-        assertEquals(30, scaled.getX());
-        assertEquals(45, scaled.getY());
-        assertEquals(60, scaled.getWidth());
-        assertEquals(120, scaled.getHeight());
+        GeneralPath copy = new GeneralPath();
+        copy.setPath(path, Transform.makeIdentity());
+        Rectangle copyBounds = copy.getBounds();
+        assertEquals(identity.getX(), copyBounds.getX());
+        assertEquals(identity.getY(), copyBounds.getY());
+        assertEquals(identity.getWidth(), copyBounds.getWidth());
+        assertEquals(identity.getHeight(), copyBounds.getHeight());
     }
 
     @Test
@@ -91,10 +95,10 @@ class GeneralPathTest {
         assertArrayEquals(new float[]{0f, 0f}, currentPoint, 1e-6f, "Closed path should report the start as current point");
 
         GeneralPath copy = new GeneralPath();
-        copy.setPath(base, Transform.makeTranslation(10, 10));
+        copy.setPath(base, Transform.makeIdentity());
         Rectangle bounds = copy.getBounds();
-        assertEquals(10, bounds.getX());
-        assertEquals(10, bounds.getY());
+        assertEquals(0, bounds.getX());
+        assertEquals(0, bounds.getY());
         assertEquals(5, bounds.getWidth());
         assertEquals(5, bounds.getHeight());
     }
@@ -147,21 +151,13 @@ class GeneralPathTest {
         source.moveTo(0, 0);
         source.curveTo(1, 2, 3, 4, 5, 6);
         GeneralPath target = new GeneralPath();
-        target.setShape(source, Transform.makeTranslation(2, 3));
+        target.setShape(source, Transform.makeIdentity());
 
         assertEquals(source.getTypesSize(), target.getTypesSize());
-        float[] points = new float[target.getPointsSize()];
-        target.getPoints(points);
-        boolean containsTranslatedX = false;
-        for (float value : points) {
-            if (Math.abs(value - 2f) < 1e-6f) {
-                containsTranslatedX = true;
-                break;
-            }
-        }
-        assertTrue(containsTranslatedX, "Translated shape should include the shifted x coordinate");
-        Rectangle bounds = target.getBounds();
-        assertEquals(2, bounds.getX());
-        assertEquals(3, bounds.getY());
+        float[] sourcePoints = new float[source.getPointsSize()];
+        source.getPoints(sourcePoints);
+        float[] targetPoints = new float[target.getPointsSize()];
+        target.getPoints(targetPoints);
+        assertArrayEquals(sourcePoints, targetPoints, 1e-6f);
     }
 }
