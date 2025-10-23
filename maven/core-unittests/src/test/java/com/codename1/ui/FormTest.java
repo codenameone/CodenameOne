@@ -1,10 +1,19 @@
 package com.codename1.ui;
 
 import com.codename1.test.UITestBase;
+import com.codename1.ui.Painter;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.FlowLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
@@ -86,6 +95,63 @@ class FormTest extends UITestBase {
         assertEquals("Dashboard", form.getTitle());
     }
 
+    @Test
+    void testSetGlassPaneTriggersRepaint() {
+        RepaintTrackingForm form = new RepaintTrackingForm();
+        Painter painter = (g, rect) -> { };
+        form.setGlassPane(painter);
+        assertTrue(form.repaintTriggered);
+        assertSame(painter, form.getGlassPane());
+    }
+
+    @Test
+    void testSetTitleComponentWithTransitionReplacesComponent() {
+        TestForm form = new TestForm();
+        Label original = form.getTitleComponent();
+        Label replacement = new Label("Replacement");
+        Transition transition = new Transition() {
+            public boolean animate() {
+                return false;
+            }
+
+            public void paint(Graphics g) {
+            }
+        };
+
+        form.setTitleComponent(replacement, transition);
+        assertSame(replacement, form.getTitleComponent());
+        assertSame(form.getTitleArea(), replacement.getParent());
+        assertNull(original.getParent());
+    }
+
+    @Test
+    void testAddAndRemoveKeyListenerManageInternalMap() throws Exception {
+        TestForm form = new TestForm();
+        ActionListener<ActionEvent> listener = evt -> { };
+
+        form.addKeyListener(42, listener);
+        HashMap<Integer, ArrayList<ActionListener>> listeners = extractKeyListeners(form);
+        assertNotNull(listeners);
+        assertTrue(listeners.containsKey(Integer.valueOf(42)));
+
+        form.removeKeyListener(42, listener);
+        HashMap<Integer, ArrayList<ActionListener>> after = extractKeyListeners(form);
+        assertNotNull(after);
+        assertFalse(after.containsKey(Integer.valueOf(42)));
+        assertTrue(after.isEmpty());
+    }
+
+    @SuppressWarnings("unchecked")
+    private HashMap<Integer, ArrayList<ActionListener>> extractKeyListeners(Form form) throws Exception {
+        Field field = Form.class.getDeclaredField("keyListeners");
+        field.setAccessible(true);
+        HashMap<Integer, ArrayList<ActionListener>> value = (HashMap<Integer, ArrayList<ActionListener>>) field.get(form);
+        if (value == null) {
+            return new HashMap<Integer, ArrayList<ActionListener>>();
+        }
+        return value;
+    }
+
     private static class TestForm extends Form {
         TestForm() {
             super();
@@ -93,6 +159,16 @@ class FormTest extends UITestBase {
 
         @Override
         protected void initGlobalToolbar() {
+        }
+    }
+
+    private static class RepaintTrackingForm extends TestForm {
+        boolean repaintTriggered;
+
+        @Override
+        public void repaint() {
+            repaintTriggered = true;
+            super.repaint();
         }
     }
 
