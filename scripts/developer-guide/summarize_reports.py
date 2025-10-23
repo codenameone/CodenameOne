@@ -80,7 +80,10 @@ def summarize_asciidoc(report: Path, status: str, summary_key: str, output: Path
     if report.is_file():
         text = report.read_text(encoding="utf-8", errors="ignore")
 
-    pattern = re.compile(r"^\s*[^:\n]+:\d+:\d+:\s+(ERROR|WARN(?:ING)?|INFO)\b", re.MULTILINE)
+    pattern = re.compile(
+        r"^\s*(?:[^:\n]+:\d+:\d+:\s+|asciidoctor:\s+)(ERROR|WARN(?:ING)?|INFO)\b",
+        re.MULTILINE,
+    )
     matches = pattern.findall(text)
 
     counts = {"error": 0, "warning": 0, "info": 0}
@@ -206,7 +209,7 @@ def parse_args() -> argparse.Namespace:
 
     ascii_parser = subparsers.add_parser(
         "ascii",
-        help="Summarize docToolchain AsciiDoc linter results.",
+        help="Summarize Asciidoctor diagnostics.",
         parents=[common],
     )
     ascii_parser.add_argument("--report", type=Path, required=True)

@@ -84,7 +84,7 @@ jobs:
 
       - name: Install Asciidoctor tooling
         run: |
-          gem install --no-document asciidoctor asciidoctor-pdf asciidoctor-lint
+          gem install --no-document asciidoctor asciidoctor-pdf rouge
 
       - name: Run Asciidoctor lint
         run: |
@@ -92,18 +92,21 @@ jobs:
           REPORT_DIR="build/developer-guide/reports"
           REPORT_FILE="${REPORT_DIR}/asciidoc-lint-report.txt"
           mkdir -p "$REPORT_DIR"
-          if ! command -v asciidoctor-lint >/dev/null 2>&1; then
-            echo "asciidoctor-lint is not available" >&2
-            exit 1
-          fi
           set +e
-          asciidoctor-lint docs/developer-guide/developer-guide.asciidoc | tee "$REPORT_FILE"
+          asciidoctor \
+            --require rouge \
+            --failure-level WARN \
+            --verbose \
+            --trace \
+            -o /dev/null \
+            docs/developer-guide/developer-guide.asciidoc \
+            2>&1 | tee "$REPORT_FILE"
           STATUS=${PIPESTATUS[0]}
           set -e
           echo "ASCII_DOC_LINT_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
           echo "ASCII_DOC_LINT_STATUS=$STATUS" >> "$GITHUB_ENV"
           if [ "$STATUS" -ne 0 ]; then
-            echo "asciidoctor-lint exited with status $STATUS" >&2
+            echo "Asciidoctor exited with status $STATUS" >&2
           fi
 
       - name: Build Developer Guide HTML and PDF
