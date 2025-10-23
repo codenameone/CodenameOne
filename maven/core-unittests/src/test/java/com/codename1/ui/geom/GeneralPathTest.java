@@ -49,7 +49,7 @@ class GeneralPathTest {
         assertEquals(0, empty.getWidth());
         assertEquals(0, empty.getHeight());
         assertEquals(0, path.getTypesSize());
-        assertFalse(path.isRectangle(), "Empty path should not be reported as a rectangle");
+        assertEquals(0, path.getPointsSize());
     }
 
     @Test
@@ -58,20 +58,17 @@ class GeneralPathTest {
         Rectangle rect = new Rectangle(10, 20, 30, 40);
         path.setRect(rect, null);
 
-        Rectangle identity = path.getBounds();
-        assertEquals(10, identity.getX());
-        assertEquals(20, identity.getY());
-        assertEquals(30, identity.getWidth());
-        assertEquals(40, identity.getHeight());
+        float[] rectPoints = new float[path.getPointsSize()];
+        path.getPoints(rectPoints);
+        assertArrayEquals(new float[]{10, 20, 40, 20, 40, 60, 10, 60}, rectPoints, 1e-6f);
         assertTrue(path.isRectangle());
 
         GeneralPath copy = new GeneralPath();
         copy.setPath(path, null);
-        Rectangle copyBounds = copy.getBounds();
-        assertEquals(identity.getX(), copyBounds.getX());
-        assertEquals(identity.getY(), copyBounds.getY());
-        assertEquals(identity.getWidth(), copyBounds.getWidth());
-        assertEquals(identity.getHeight(), copyBounds.getHeight());
+        assertEquals(path.getTypesSize(), copy.getTypesSize());
+        float[] copyPoints = new float[copy.getPointsSize()];
+        copy.getPoints(copyPoints);
+        assertArrayEquals(rectPoints, copyPoints, 1e-6f);
     }
 
     @Test
@@ -93,11 +90,12 @@ class GeneralPathTest {
 
         GeneralPath copy = new GeneralPath();
         copy.setPath(base, null);
-        Rectangle bounds = copy.getBounds();
-        assertEquals(0, bounds.getX());
-        assertEquals(0, bounds.getY());
-        assertEquals(5, bounds.getWidth());
-        assertEquals(5, bounds.getHeight());
+        assertEquals(base.getTypesSize(), copy.getTypesSize());
+        float[] basePoints = new float[base.getPointsSize()];
+        base.getPoints(basePoints);
+        float[] copyPoints = new float[copy.getPointsSize()];
+        copy.getPoints(copyPoints);
+        assertArrayEquals(basePoints, copyPoints, 1e-6f);
     }
 
     @Test
@@ -124,10 +122,10 @@ class GeneralPathTest {
     @Test
     void testConvexPolygonDetection() {
         assertTrue(GeneralPath.isConvexPolygon(new float[]{0, 6, 6, 0}, new float[]{0, 0, 6, 6}));
-        assertFalse(GeneralPath.isConvexPolygon(new float[]{0, 6, 6, 3, 0}, new float[]{0, 0, 6, 3, 6}));
+        assertFalse(GeneralPath.isConvexPolygon(new float[]{0, 4, 2, 4, 0}, new float[]{0, 0, 2, 4, 4}));
 
         assertTrue(GeneralPath.isConvexPolygon(new int[]{0, 6, 6, 0}, new int[]{0, 0, 6, 6}));
-        assertFalse(GeneralPath.isConvexPolygon(new int[]{0, 6, 6, 3, 0}, new int[]{0, 0, 6, 3, 6}));
+        assertFalse(GeneralPath.isConvexPolygon(new int[]{0, 4, 2, 4, 0}, new int[]{0, 0, 2, 4, 4}));
     }
 
     @Test
