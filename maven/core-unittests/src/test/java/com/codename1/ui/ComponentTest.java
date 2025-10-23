@@ -41,17 +41,26 @@ class ComponentTest extends UITestBase {
         Component chained = component.stripMarginAndPadding();
         assertSame(component, chained);
 
-        assertEquals(0f, style.getMarginFloatValue(false, Component.TOP));
-        assertEquals(0f, style.getMarginFloatValue(false, Component.BOTTOM));
-        assertEquals(0f, style.getMarginFloatValue(false, Component.LEFT));
-        assertEquals(0f, style.getMarginFloatValue(false, Component.RIGHT));
+        Style[] states = new Style[]{
+                component.getUnselectedStyle(),
+                component.getSelectedStyle(),
+                component.getPressedStyle(),
+                component.getDisabledStyle()
+        };
 
-        assertEquals(0f, style.getPaddingFloatValue(false, Component.TOP));
-        assertEquals(0f, style.getPaddingFloatValue(false, Component.BOTTOM));
-        assertEquals(0f, style.getPaddingFloatValue(false, Component.LEFT));
-        assertEquals(0f, style.getPaddingFloatValue(false, Component.RIGHT));
+        for (Style state : states) {
+            assertEquals(0f, state.getMarginFloatValue(false, Component.TOP));
+            assertEquals(0f, state.getMarginFloatValue(false, Component.BOTTOM));
+            assertEquals(0f, state.getMarginFloatValue(false, Component.LEFT));
+            assertEquals(0f, state.getMarginFloatValue(false, Component.RIGHT));
 
-        assertTrue(style.getBorder().isEmptyBorder());
+            assertEquals(0f, state.getPaddingFloatValue(false, Component.TOP));
+            assertEquals(0f, state.getPaddingFloatValue(false, Component.BOTTOM));
+            assertEquals(0f, state.getPaddingFloatValue(false, Component.LEFT));
+            assertEquals(0f, state.getPaddingFloatValue(false, Component.RIGHT));
+
+            assertTrue(state.getBorder().isEmptyBorder());
+        }
     }
 
     @Test
