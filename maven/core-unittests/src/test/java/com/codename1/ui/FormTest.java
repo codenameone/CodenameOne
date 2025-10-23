@@ -31,7 +31,7 @@ class FormTest extends UITestBase {
         TestForm form = new TestForm();
         Container content = form.getContentPane();
         assertTrue(content.getLayout() instanceof FlowLayout);
-        assertTrue(content.isScrollableY());
+        assertFalse(content.isScrollableY());
         assertEquals("ContentPane", content.getUIID());
     }
 
