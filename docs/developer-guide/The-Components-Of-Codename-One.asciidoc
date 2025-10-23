@@ -395,6 +395,12 @@ This will show the dialog on the right hand side of the screen, which is pretty 
 
 NOTE: The `InteractionDialog` can only be shown at absolute or popup locations. This is inherent to its use case which is "non-blocking". When using this component you need to be very aware of its location.
 
+To make popup behaviour feel natural on touch devices you can call `setDisposeWhenPointerOutOfBounds(true)` so the dialog auto-dismisses as soon as the user taps outside the title or content area. Internally the dialog listens for pointer pressed/released events and will call `dispose()` for you when the interaction happens beyond its bounds, so you no longer need to wire that logic manually.
+
+By default the dialog is placed on the form's layered pane, but you can switch between the global layered pane and form-specific layered pane using `setFormMode(boolean)`. Setting form mode to `true` keeps the dialog coupled with the showing form even when the global layered pane is used elsewhere in your app.
+
+Finally, recent updates added animation toggles so you can fine-tune presentation. `setAnimateShow(boolean)` turns the show/dispose animations on or off, while `setRepositionAnimation(boolean)` enables a "grow/shrink" reposition effect during those animations when you want a more dynamic transition.
+
 [[label-section]]
 === Label
 
@@ -765,12 +771,14 @@ These varying looks are implemented via a combination of layouts, theme constant
 There are several theme constants related that can manipulate some pieces of this functionality:
 
 - `textComponentErrorColor` a hex RGB color which defaults to null in which case this has no effect. When defined this will change the color of the border and label to the given color to match the material design styling. This implements the red border underline in cases of error and the label text color change
+- `textComponentErrorLineBorderBool` toggles the material-style underline that appears on validation errors. Set it to `false` if you prefer to supply a different border when errors are shown
 
 - `textComponentOnTopBool` toggles the on top mode which makes things look like they do on Android. This defaults to true on Android and false on other OS's. This can also be manipulated via the `onTopMode(boolean)` method in `InputComponent` however the layout will only use the theme constant
 
 - `textComponentAnimBool` toggles the animation mode which again can be manipulated by a method in `InputComponent`. If you want to keep the UI static without the floating hint effect set this to false. Notice this defaults to true only on Android
 
  - `textComponentFieldUIID`  sets the UIID of the text field to something other than `TextField` this is useful for platforms such as iOS where the look of the text field is different within the text component. This allows us to make the background of the text field transparent when it's within the `TextComponent` and make it different from the regular text field
+ - `inputComponentErrorMultilineBool` makes error labels multi-line by default so longer validation messages can wrap instead of being clipped
 
 
 [[button-section]]
@@ -1048,6 +1056,8 @@ Since the `MultiButton` is a composite component setting its `UIID` will only im
 To customize everything you need to customize the UIID's for `MultiLine1`, `MultiLine2`, `MultiLine3`, `MultiLine4` & `Emblem`.
 
 You can customize the individual `UIID's` thru the API directly using the `setIconUIID`, `setUIIDLine1`, `setUIIDLine2`, `setUIIDLine3`, `setUIIDLine4` & `setEmblemUIID`.
+
+Recent versions also include a badge overlay that can be rendered in the corner of the main icon. Use `setBadgeText()` to display a value (for example a notification count) and `setBadgeUIID()` if you need a custom UIID instead of the default `Badge` styling. When you need to inspect or adjust the badge style programmatically, `getBadgeStyleComponent()` returns the component whose styles are applied to the badge so you can tweak padding, colors or borders before showing the `MultiButton`.
 
 
 === SpanButton
