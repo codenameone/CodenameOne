@@ -1,6 +1,5 @@
 package com.codename1.ui.geom;
 
-import com.codename1.ui.Transform;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,16 +49,14 @@ class GeneralPathTest {
         assertEquals(0, empty.getWidth());
         assertEquals(0, empty.getHeight());
         assertEquals(0, path.getTypesSize());
+        assertFalse(path.isRectangle(), "Empty path should not be reported as a rectangle");
     }
 
     @Test
     void testSetRectAndTransform() {
         GeneralPath path = new GeneralPath();
         Rectangle rect = new Rectangle(10, 20, 30, 40);
-        // Using the identity transform exercises the transformed code path without
-        // requiring a platform Display implementation, which is unavailable in
-        // headless unit tests.
-        path.setRect(rect, Transform.makeIdentity());
+        path.setRect(rect, null);
 
         Rectangle identity = path.getBounds();
         assertEquals(10, identity.getX());
@@ -69,7 +66,7 @@ class GeneralPathTest {
         assertTrue(path.isRectangle());
 
         GeneralPath copy = new GeneralPath();
-        copy.setPath(path, Transform.makeIdentity());
+        copy.setPath(path, null);
         Rectangle copyBounds = copy.getBounds();
         assertEquals(identity.getX(), copyBounds.getX());
         assertEquals(identity.getY(), copyBounds.getY());
@@ -95,7 +92,7 @@ class GeneralPathTest {
         assertArrayEquals(new float[]{0f, 0f}, currentPoint, 1e-6f, "Closed path should report the start as current point");
 
         GeneralPath copy = new GeneralPath();
-        copy.setPath(base, Transform.makeIdentity());
+        copy.setPath(base, null);
         Rectangle bounds = copy.getBounds();
         assertEquals(0, bounds.getX());
         assertEquals(0, bounds.getY());
@@ -127,10 +124,10 @@ class GeneralPathTest {
     @Test
     void testConvexPolygonDetection() {
         assertTrue(GeneralPath.isConvexPolygon(new float[]{0, 6, 6, 0}, new float[]{0, 0, 6, 6}));
-        assertFalse(GeneralPath.isConvexPolygon(new float[]{0, 6, 3, 6, 0}, new float[]{0, 0, 3, 6, 6}));
+        assertFalse(GeneralPath.isConvexPolygon(new float[]{0, 6, 6, 3, 0}, new float[]{0, 0, 6, 3, 6}));
 
         assertTrue(GeneralPath.isConvexPolygon(new int[]{0, 6, 6, 0}, new int[]{0, 0, 6, 6}));
-        assertFalse(GeneralPath.isConvexPolygon(new int[]{0, 6, 3, 6, 0}, new int[]{0, 0, 3, 6, 6}));
+        assertFalse(GeneralPath.isConvexPolygon(new int[]{0, 6, 6, 3, 0}, new int[]{0, 0, 6, 3, 6}));
     }
 
     @Test
@@ -151,7 +148,7 @@ class GeneralPathTest {
         source.moveTo(0, 0);
         source.curveTo(1, 2, 3, 4, 5, 6);
         GeneralPath target = new GeneralPath();
-        target.setShape(source, Transform.makeIdentity());
+        target.setShape(source, null);
 
         assertEquals(source.getTypesSize(), target.getTypesSize());
         float[] sourcePoints = new float[source.getPointsSize()];
