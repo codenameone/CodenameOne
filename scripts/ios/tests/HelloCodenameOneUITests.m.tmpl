@@ -26,14 +26,14 @@
 
     NSDictionary<NSString *, NSString *> *env = [[NSProcessInfo processInfo] environment];
     NSString *bundleID = env[@"CN1_AUT_BUNDLE_ID"];
-    if (bundleID.length == 0) {
-        bundleID = @"com.codenameone.examples.hellocodenameone";
-        printf("CN1SS:INFO:ui_test_target_bundle_id=fallback(%s)\n", bundleID.UTF8String);
-    } else {
+    XCUIApplication *app = nil;
+    if (bundleID.length > 0) {
         printf("CN1SS:INFO:ui_test_target_bundle_id=%s\n", bundleID.UTF8String);
+        app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
+    } else {
+        printf("CN1SS:INFO:ui_test_target_bundle_id=(scheme-default)\n");
+        app = [[XCUIApplication alloc] init];
     }
-
-    XCUIApplication *app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
 
     NSMutableDictionary<NSString *, NSString *> *launchEnv = [NSMutableDictionary dictionary];
     for (NSString *key in env) {
