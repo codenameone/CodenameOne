@@ -107,19 +107,26 @@ def summarize_unused_images(
     write_output(output_lines, output)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+def build_common_parser() -> argparse.ArgumentParser:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
         "--output",
         type=Path,
         default=None,
         help="File to append GitHub Actions outputs to (defaults to stdout).",
     )
+    return common
+
+
+def parse_args() -> argparse.Namespace:
+    common = build_common_parser()
+    parser = argparse.ArgumentParser(description=__doc__, parents=[common])
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     ascii_parser = subparsers.add_parser(
         "ascii",
         help="Summarize docToolchain AsciiDoc linter results.",
+        parents=[common],
     )
     ascii_parser.add_argument("--report", type=Path, required=True)
     ascii_parser.add_argument("--status", default="0")
@@ -128,6 +135,7 @@ def parse_args() -> argparse.Namespace:
     vale_parser = subparsers.add_parser(
         "vale",
         help="Summarize Vale style linter results.",
+        parents=[common],
     )
     vale_parser.add_argument("--report", type=Path, required=True)
     vale_parser.add_argument("--status", default="0")
@@ -136,6 +144,7 @@ def parse_args() -> argparse.Namespace:
     unused_parser = subparsers.add_parser(
         "unused-images",
         help="Summarize unused image report results.",
+        parents=[common],
     )
     unused_parser.add_argument("--report", type=Path, required=True)
     unused_parser.add_argument("--summary-key", default="summary")
