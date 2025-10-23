@@ -77,7 +77,6 @@
 ## Advanced Topics / Under the Hood Updates
 
 - [ ] Replace the Marshmallow-era target SDK guidance in `Advanced-Topics-Under-The-Hood.asciidoc` so it documents the current Gradle 8/target SDK defaults instead of claiming the build still targets API 21 by default.【F:docs/developer-guide/Advanced-Topics-Under-The-Hood.asciidoc†L681-L687】【F:maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java†L637-L663】【F:maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java†L900-L923】
-- [ ] Update the offline build prerequisites section to match today’s toolchain requirements (managed Gradle 8+, Java 17 via `JAVA17_HOME`) instead of the legacy Gradle 2.11/JDK 8 walkthrough.【F:docs/developer-guide/Advanced-Topics-Under-The-Hood.asciidoc†L500-L579】【F:maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java†L80-L507】
 - [ ] Refresh the Android permissions mapping to cover new runtime prompts (e.g., `POST_NOTIFICATIONS`, background location) and remove stale entries like `ACCESS_MOCK_LOCATION` so it reflects what the builder and Android implementation request now.【F:docs/developer-guide/Advanced-Topics-Under-The-Hood.asciidoc†L632-L660】【F:maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java†L123-L299】【F:Ports/Android/src/com/codename1/impl/android/AndroidImplementation.java†L8731-L8734】
 
 ## Miscellaneous Features Chapter Updates

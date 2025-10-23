@@ -35,8 +35,6 @@ When we develop an app in Codename One we use the builtin simulator when running
 
 IMPORTANT: Codename One doesn't send source code to the build cloud, only compiled bytecode!
 
-Notice that Codename One also provides an option to build offline which means corporations that have policies forbidding such cloud architectures can still use Codename One with some additional overhead/complexity of setting up the native build tools. Since Codename One is open source some developers use the source code to compile applications offline but that's outside the scope of this book.
-
 ==== Why Build Servers?
 
 The build servers allow building native iOS Apps without a Mac and native Windows apps without a Windows machine. They remove the need to install/update complex toolchains and simplify the process of building a native app to a right click.
