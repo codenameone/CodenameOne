@@ -261,11 +261,23 @@ SoftKey, Touch, Bar, Title, Right, Native
 |hideLeftSideMenuBool
 |Hides the side menu icon that appears on the left side of the UI
 
+|hideRightSideMenuBool
+|Hides the toolbar menu icon that appears on the right side of the title area
+
 |ignorListFocusBool
 |Hide the focus component of the list when the list doesn't have focus
 
 |infiniteImage
 |The image used by the infinite progress component, the component will rotate it as needed
+
+|infiniteMaterialDesignSize
+|Size (in millimeters) of the generated material design spinner when `InfiniteProgress` runs in material mode. Defaults to 6.667mm
+
+|infiniteMaterialImageSize
+|Size (in millimeters) of the generated spinner image when no custom `infiniteImage` is provided. Defaults to 7mm
+
+|infiniteDefaultColor
+|Hex RGB color used for the auto-generated material spinner when `infiniteImage` isn't supplied. Defaults to `777777`
 
 |includeNativeBool
 |True to derive from the platform native theme, false to create a blank theme that only uses the basic defaults
@@ -306,6 +318,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |menuButtonTopBool
 |When set to true this flag aligns the menu button to the top portion of the title. Defaults to false
 
+|landscapeTitleUiidBool
+|When true the toolbar swaps to landscape-specific UIIDs (such as `ToolbarLandscape`/`BackCommandLandscape`) for layout and icon styling
+
 |menuHeightPercent
 |Allows positioning and sizing the menu
 
@@ -342,6 +357,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |menuWidthPercent
 |Allows positioning and sizing the menu
 
+|iosStyleBackArrowBool
+|Renders the back command using the iOS-style chevron arrow (with a small icon gap) when the toolbar shows back text
+
 |minimizeOnBackBool
 |Indicates whether the form should minimize the entire application when the physical back button is pressed (if available) and no command is defined as the back command. Defaults to true
 
@@ -356,6 +374,12 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |paintsTitleBarBool
 |Indicates that the StatusBar UIID should be added to the top of the form to space down the title area, as is the case on iOS 7+ where the status bar is painted on top of the UI
+
+|rightSideMenuImage
+|Overrides the default icon used for the right-side toolbar menu button
+
+|rightSideMenuPressImage
+|Optional pressed-state icon for the right-side toolbar menu button
 
 |popupCancelBodyBool
 |Indicates that a cancel button should appear within the combo box popup
