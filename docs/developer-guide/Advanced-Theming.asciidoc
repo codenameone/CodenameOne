@@ -186,6 +186,15 @@ SoftKey, Touch, Bar, Title, Right, Native
 |defaultEmblemImage
 |The emblem painted on the side of the multibutton, by default this is an arrow on some platforms
 
+|emblemUiid
+|Overrides the UIID applied to emblem labels rendered by composite buttons such as `MultiButton` and `SpanMultiButton`.
+
+|iconUiid
+|Allows theming the icon component used by `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` when they fetch icon styling via theme constants.
+
+|textUiid
+|Overrides the text component UIID for `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` instances when provided as a theme constant.
+
 |dialogTransitionOutImage
 |Default transition https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] for dialog, causes a https://www.codenameone.com/javadoc/com/codename1/ui/animations/Timeline.html[Timeline] transition effect
 
@@ -278,6 +287,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |infiniteDefaultColor
 |Hex RGB color used for the auto-generated material spinner when `infiniteImage` isn't supplied. Defaults to `777777`
+
+|interactionDialogSpeedInt
+|Controls the duration in milliseconds that `InteractionDialog` uses when animating into and out of the layered pane (including the directional dispose helpers). Defaults to `400` if the constant is not defined.
 
 |includeNativeBool
 |True to derive from the platform native theme, false to create a blank theme that only uses the basic defaults
@@ -503,6 +515,15 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |sideSwipeSensitiveInt
 |Indicates the region of the screen that is sensitive to side swipe in the side menu bar, defaults to 10 (percent)
+
+|sigButtonOKUIID
+|Defines the UIID applied to the confirmation button in the signature capture dialog (defaults to `Button`).
+
+|sigButtonResetUIID
+|Defines the UIID applied to the reset/clear button in the signature capture dialog (defaults to `Button`).
+
+|sigButtonCancelUIID
+|Defines the UIID applied to the cancel button in the signature capture dialog (defaults to `Button`).
 
 |slideDirection
 |Default slide transition settings
