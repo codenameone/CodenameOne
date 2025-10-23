@@ -197,20 +197,13 @@ You can use `createContact(String firstName, String familyName, String officePho
 Localization (l10n) means adapting to a locale which is more than just translating to a specific language but also to a specific language within environment e.g. `en_US != en_UK`.
 Internationalization (i18n) is the process of creating one application that adapts to all locales and regional requirements.
 
-Codename One supports automatic localization and seamless internationalization of an application using the Codename One design tool.
+Codename One supports automatic localization and seamless internationalization of an application using Java properties bundles.
 
-IMPORTANT: Although localization is performed in the design tool most features apply to hand coded applications as well. The only exception is the tool that automatically extracts localizable strings from the GUI.
+Place locale-specific properties files inside an `l10n` directory directly under your module’s `main` directory (e.g. `common/src/main/l10n`).
+Each file inside this directory is treated as a resource bundle and will be packaged automatically with your app, allowing you to version translations alongside the rest of your source code.
 
-.Localization tool in the Designer
-image::img/developer-guide/l10nform.png[Localization tool in the Designer,scaledwidth=50%]
-
-To translate an application you need to use the localization section of the Codename One Designer. This section features a handy tool to extract localization called Sync With UI, it's a great tool to get you started assuming you used the old GUI builder.
-
-Some fields on some components (e.g. `Commands`) are not added when using "Sync With UI" button. But you can add them manually on the localization bundle and they will be automatically localized. You can just use the #Property Key# used in the localization bundle in the Command name of the form.
-
-You can add additional languages by pressing the #Add Locale# button.
-
-This generates “bundles” in the resource file which are really just key/value pairs mapping a string in one language to another language.
+When you are iterating on translations you can also use the simulator to capture bundles automatically.
+Open the Simulator menu and enable *Auto Update Default Bundle* so that running your app in the Codename One simulator will create any missing resource bundles on the fly as you interact with the UI, which makes it simple to populate keys without manually editing files during development.
 You can install the bundle using code like this:
 
 [source,java]
@@ -241,8 +234,6 @@ Enumeration locales = res.listL10NLocales( "l10n" );
 ----
 
 An exception for localization is the `TextField`/`TextArea` components both of which contain user data, in those cases the text will not be localized to avoid accidental localization of user input.
-
-You can preview localization in the theme mode within the Codename One designer by selecting #Advanced#, picking your locale then clicking the theme again.
 
 TIP: You can export and import resource bundles as standard Java properties files, CSV and XML. The formats are pretty standard for most localization shops, the XML format Codename One supports is the one used by Android’s string bundles which means most localization specialists should easily localize it
 
