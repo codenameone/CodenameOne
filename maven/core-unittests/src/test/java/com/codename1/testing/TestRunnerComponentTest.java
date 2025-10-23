@@ -8,6 +8,7 @@ import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.lang.reflect.Field;
 
@@ -75,13 +76,13 @@ class TestRunnerComponentTest extends UITestBase {
         Form form = component.showForm();
         assertNotNull(form);
 
-        boolean threw = false;
-        try {
-            component.runTests();
-        } catch (RuntimeException ex) {
-            threw = true;
-            assertEquals(failure.getMessage(), ex.getMessage());
-        }
+        RuntimeException thrown = assertThrows(RuntimeException.class, new Executable() {
+            @Override
+            public void execute() {
+                component.runTests();
+            }
+        });
+        assertEquals(failure.getMessage(), thrown.getMessage());
         flushSerialCalls();
 
         Container resultsPane = getResultsPane(component);
@@ -97,12 +98,6 @@ class TestRunnerComponentTest extends UITestBase {
             }
         }
         assertTrue(found);
-        if (!threw) {
-            // No exception was thrown; ensure we didn't miss exercising the failure path.
-            // This assertion maintains branch coverage while allowing future behavior changes
-            // that swallow the exception internally.
-            assertEquals("Explosive: Failed", status.getText());
-        }
     }
 
     private Container getResultsPane(TestRunnerComponent component) throws Exception {
