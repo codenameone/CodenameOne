@@ -41,15 +41,15 @@ class ComponentTest extends UITestBase {
         Component chained = component.stripMarginAndPadding();
         assertSame(component, chained);
 
-        assertEquals(0, style.getMargin(Component.TOP));
-        assertEquals(0, style.getMargin(Component.BOTTOM));
-        assertEquals(0, style.getMargin(Component.LEFT));
-        assertEquals(0, style.getMargin(Component.RIGHT));
+        assertEquals(0f, style.getMarginFloatValue(false, Component.TOP));
+        assertEquals(0f, style.getMarginFloatValue(false, Component.BOTTOM));
+        assertEquals(0f, style.getMarginFloatValue(false, Component.LEFT));
+        assertEquals(0f, style.getMarginFloatValue(false, Component.RIGHT));
 
-        assertEquals(0, style.getPadding(Component.TOP));
-        assertEquals(0, style.getPadding(Component.BOTTOM));
-        assertEquals(0, style.getPadding(Component.LEFT));
-        assertEquals(0, style.getPadding(Component.RIGHT));
+        assertEquals(0f, style.getPaddingFloatValue(false, Component.TOP));
+        assertEquals(0f, style.getPaddingFloatValue(false, Component.BOTTOM));
+        assertEquals(0f, style.getPaddingFloatValue(false, Component.LEFT));
+        assertEquals(0f, style.getPaddingFloatValue(false, Component.RIGHT));
 
         assertTrue(style.getBorder().isEmptyBorder());
     }
