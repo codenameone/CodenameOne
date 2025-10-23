@@ -6,17 +6,23 @@ Most of the low level phone functionality is accessible in the https://www.coden
 
 ==== SMS
 
-Codename One supports sending SMS messages but not receiving them as this functionality isn't portable. You can send an SMS using:
+Codename One supports sending SMS messages but not receiving them as this functionality isn't portable. You can send an SMS using either the `Display` singleton or the static helper methods on `CN`. Both APIs throw `IOException`, which you should handle in case the native layer reports a failure:
 
 [source,java]
 ----
-Display.getInstance().setSMS("+999999999", "My SMS Message");
+try {
+    Display.getInstance().sendSMS("+999999999", "My SMS Message");
+    // Or: CN.sendSMS("+999999999", "My SMS Message");
+} catch(IOException err) {
+    Log.e(err);
+    Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
+}
 ----
 
-Android/Blackberry support sending SMS's in the background without showing the user anything. iOS & Windows Phone just don't have that ability, the best they can offer is to launch the native SMS app with your message already in that app. Android supports that capability as well (launching the OS native SMS app).
+Android supports sending SMS messages in the background without any UI. iOS doesn't provide that ability, so the best it can offer is to launch the native SMS app with your message composed for the user to send. Android supports that interactive flow as well (launching the OS native SMS app).
 
-The default `sendSMS` API ignores that difference and simply works interactively on iOS/Windows Phone while sending
-in the background for the other platforms.
+The default `sendSMS` API ignores that difference and simply works interactively on iOS while sending
+in the background for Android when the platform allows it.
 
 The `getSMSSupport` API returns one of the following options:
 
@@ -35,16 +41,21 @@ A typical use of this API would be something like this:
 
 [source,java]
 ----
-switch(Display.getInstance().getSMSSupport()) {
-    case Display.SMS_NOT_SUPPORTED:
-        return;
-    case Display.SMS_SEAMLESS:
-        showUIDialogToEditMessageData();
-        Display.getInstance().sendSMS(phone, data);
-        return;
-    default:
-        Display.getInstance().sendSMS(phone, data);
-        return;
+try {
+    switch(Display.getInstance().getSMSSupport()) {
+        case Display.SMS_NOT_SUPPORTED:
+            return;
+        case Display.SMS_SEAMLESS:
+            showUIDialogToEditMessageData();
+            Display.getInstance().sendSMS(phone, data);
+            return;
+        default:
+            Display.getInstance().sendSMS(phone, data);
+            return;
+    }
+} catch(IOException err) {
+    Log.e(err);
+    Dialog.show("SMS Failed", "Unable to send the SMS", "OK", null);
 }
 ----
 
@@ -85,19 +96,6 @@ Display.getInstance().sendMessage(new String[] {"someone@gmail.com"}, "Subject o
 
 NOTE: Some features such as attachments etc. don't work correctly in the simulator but should work on iOS/Android
 
-The email messaging API has an additional ability within the https://www.codenameone.com/javadoc/com/codename1/messaging/Message.html[Message] class. The `sendMessageViaCloud`
-method allows you to use the Codename One cloud to send an email without end user interaction. This feature is available to pro users only since it makes use of the Codename One cloud:
-
-[source,java]
-----
-Message m = new Message("<html><body>Check out <a href=\"https://www.codenameone.com/\">Codename One</a></body></html>");
-m.setMimeType(Message.MIME_HTML);
-
-// notice that we provide a plain text alternative as well in the send method
-boolean success = m.sendMessageViaCloudSync("Codename One", "destination@domain.com", "Name Of User", "Message Subject",
-                            "Check out Codename One at https://www.codenameone.com/");
-----
-
 === Contacts API
 
 The contacts API provides us with the means to query the phone’s address book, delete elements from it and create new entries into it. To get the platform specific list of contacts you can use
@@ -118,7 +116,7 @@ Here you can specify true only for the attributes that actually matter to you.
 
 Another capability of the contacts API is the ability to extract all of the contacts very quickly. This isn't supported on all platforms but platforms such as Android can really get a boost from this API as extracting the contacts one by one is remarkably slow on Android.
 
-You can check if a platform supports the extraction of all the contacts quickly thru `ContactsManager.isGetAllContactsFast()`.
+You can check if a platform supports the extraction of all the contacts quickly thru `ContactsManager.isAllContactsFast()`.
 
 IMPORTANT: When retrieving all the contacts, notice that you should probably not retrieve all the data and should set some fields to false to perform a more efficient query
 
@@ -129,7 +127,7 @@ You can then extract all the contacts using code that looks a bit like this, not
 Form hi = new Form("Contacts", new BoxLayout(BoxLayout.Y_AXIS));
 hi.add(new InfiniteProgress());
 Display.getInstance().scheduleBackgroundTask(() -> {
-    Contact[] contacts = ContactsManager.getAllContacts(true, true, false, true, false, false);
+    Contact[] contacts = ContactsManager.getContacts(true, true, false, true, false, false);
     Display.getInstance().callSerially(() -> {
         hi.removeAll();
         for(Contact c : contacts) {
