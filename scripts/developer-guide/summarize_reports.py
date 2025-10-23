@@ -10,6 +10,52 @@ from pathlib import Path
 from typing import Iterable
 
 
+def _is_alert(candidate: dict[str, object]) -> bool:
+    required_keys = {"Severity", "Check", "Message"}
+    return required_keys.issubset(candidate.keys())
+
+
+def _collect_alerts(node: object, path_hint: str = "") -> list[dict[str, object]]:
+    alerts: list[dict[str, object]] = []
+
+    if isinstance(node, dict):
+        if _is_alert(node):
+            alert = dict(node)
+            if path_hint and not alert.get("Path"):
+                alert["Path"] = path_hint
+            alerts.append(alert)
+            return alerts
+
+        node_path = path_hint
+        path_value = node.get("Path")
+        if isinstance(path_value, str) and path_value:
+            node_path = path_value
+
+        alert_list = node.get("alerts")
+        if isinstance(alert_list, list):
+            alerts.extend(_collect_alerts(alert_list, node_path))
+
+        file_map = node.get("files")
+        if isinstance(file_map, dict):
+            for file_path, file_node in file_map.items():
+                hint = file_path if isinstance(file_path, str) else node_path
+                alerts.extend(_collect_alerts(file_node, hint))
+
+        for key, value in node.items():
+            if key in {"alerts", "files", "Path"}:
+                continue
+            hint = node_path
+            if isinstance(key, str) and ("/" in key or key.endswith(".adoc") or key.endswith(".asciidoc")):
+                hint = key
+            alerts.extend(_collect_alerts(value, hint))
+
+    elif isinstance(node, list):
+        for item in node:
+            alerts.extend(_collect_alerts(item, path_hint))
+
+    return alerts
+
+
 def write_output(lines: Iterable[str], output: Path | None) -> None:
     content = "\n".join(lines) + "\n"
     if output:
@@ -56,17 +102,7 @@ def summarize_vale(
             data = json.loads(report.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             data = {}
-        if isinstance(data, dict):
-            if isinstance(data.get("alerts"), list):
-                alerts.extend(data["alerts"])
-            files = data.get("files")
-            if isinstance(files, dict):
-                for file_result in files.values():
-                    if not isinstance(file_result, dict):
-                        continue
-                    file_alerts = file_result.get("alerts")
-                    if isinstance(file_alerts, list):
-                        alerts.extend(file_alerts)
+        alerts = _collect_alerts(data)
 
     counts = {"error": 0, "warning": 0, "suggestion": 0}
     total = 0
