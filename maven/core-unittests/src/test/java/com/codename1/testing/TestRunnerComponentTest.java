@@ -8,7 +8,6 @@ import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -75,7 +74,7 @@ class TestRunnerComponentTest extends UITestBase {
         Form form = component.showForm();
         assertNotNull(form);
 
-        component.runTests();
+        assertDoesNotThrow(component::runTests);
         flushSerialCalls();
 
         Container resultsPane = getResultsPane(component);
@@ -111,6 +110,7 @@ class TestRunnerComponentTest extends UITestBase {
             this.toThrow = toThrow;
         }
 
+        @Override
         public boolean runTest() {
             if (toThrow != null) {
                 throw toThrow;
@@ -118,10 +118,12 @@ class TestRunnerComponentTest extends UITestBase {
             return result;
         }
 
+        @Override
         public boolean shouldExecuteOnEDT() {
             return shouldExecuteOnEDT;
         }
 
+        @Override
         public String toString() {
             return name;
         }
