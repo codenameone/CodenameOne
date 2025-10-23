@@ -67,12 +67,6 @@ GROUP_ID="com.codenameone.examples"
 ARTIFACT_ID="hello-codenameone-ios"
 MAIN_NAME="HelloCodenameOne"
 PACKAGE_NAME="$GROUP_ID"
-# Derive a deterministic bundle identifier by appending the lower-cased main
-# class name (Codename One historically mirrors this in generated Xcode
-# projects). Using a fixed suffix allows the UITest harness to target the
-# correct bundle regardless of template updates.
-BUNDLE_SUFFIX="$(printf '%s' "$MAIN_NAME" | tr '[:upper:]' '[:lower:]')"
-AUT_BUNDLE_ID="${GROUP_ID}.${BUNDLE_SUFFIX}"
 
 SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
 if [ ! -d "$SOURCE_PROJECT" ]; then
@@ -131,7 +125,6 @@ set_property() {
 
 set_property "codename1.packageName" "$PACKAGE_NAME"
 set_property "codename1.mainName" "$MAIN_NAME"
-set_property "codename1.ios.appid" "$AUT_BUNDLE_ID"
 
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
@@ -186,13 +179,13 @@ fi
 bia_log "Found generated iOS project at $PROJECT_DIR"
 
 # --- Ensure a real UITest source file exists on disk ---
-UITEST_TEMPLATE="$SCRIPT_DIR/ios/tests/HelloCodenameOneUITests.m.tmpl"
+UITEST_TEMPLATE="$SCRIPT_DIR/ios/tests/HelloCodenameOneUITests.swift.tmpl"
 UITEST_DIR="$PROJECT_DIR/HelloCodenameOneUITests"
-UITEST_SOURCE="$UITEST_DIR/HelloCodenameOneUITests.m"
+UITEST_SWIFT="$UITEST_DIR/HelloCodenameOneUITests.swift"
 if [ -f "$UITEST_TEMPLATE" ]; then
   mkdir -p "$UITEST_DIR"
-  cp -f "$UITEST_TEMPLATE" "$UITEST_SOURCE"
-  bia_log "Installed UITest source: $UITEST_SOURCE"
+  cp -f "$UITEST_TEMPLATE" "$UITEST_SWIFT"
+  bia_log "Installed UITest source: $UITEST_SWIFT"
 else
   bia_log "UITest template missing at $UITEST_TEMPLATE"; exit 1
 fi
@@ -221,8 +214,6 @@ export XCODEPROJ
 bia_log "Using Xcode project: $XCODEPROJ"
 
 # --- Ensure UITests target + CI scheme (save_as gets a PATH, not a Project) ---
-export CN1_AUT_BUNDLE_ID_VALUE="$AUT_BUNDLE_ID"
-
 ruby -rrubygems -rxcodeproj -e '
 require "fileutils"
 proj_path = ENV["XCODEPROJ"] or abort("XCODEPROJ env not set")
@@ -242,46 +233,12 @@ end
 # Ensure a group and file reference exist, then add to the UITest target
 proj_dir   = File.dirname(proj_path)
 ui_dir     = File.join(proj_dir, ui_name)
-ui_file    = File.join(ui_dir, "#{ui_name}.m")
+ui_file    = File.join(ui_dir, "#{ui_name}.swift")
 ui_group   = proj.main_group.find_subpath(ui_name, true)
 ui_group.set_source_tree("<group>")
 file_ref = ui_group.files.find { |f| File.expand_path(f.path, proj_dir) == ui_file }
 file_ref ||= ui_group.new_file(ui_file)
 ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.files_references.include?(file_ref)
-
-# Ensure required system frameworks (e.g. UIKit for UIImage helpers) are linked
-frameworks_group = proj.frameworks_group || proj.main_group.find_subpath("Frameworks", true)
-frameworks_group.set_source_tree("<group>") if frameworks_group.respond_to?(:set_source_tree)
-{
-  "UIKit.framework"        => "System/Library/Frameworks/UIKit.framework",
-  "CoreGraphics.framework" => "System/Library/Frameworks/CoreGraphics.framework"
-}.each do |name, path|
-  ref = frameworks_group.files.find do |f|
-    f.path == name || f.path == path ||
-      (f.respond_to?(:real_path) && File.expand_path(f.real_path.to_s) == File.expand_path(path, "/"))
-  end
-  unless ref
-    ref = frameworks_group.new_reference(path)
-  end
-  ref.name = name if ref.respond_to?(:name=)
-  ref.set_source_tree("SDKROOT") if ref.respond_to?(:set_source_tree)
-  ref.path = path if ref.respond_to?(:path=)
-  ref.last_known_file_type = "wrapper.framework" if ref.respond_to?(:last_known_file_type=)
-  phase = ui_target.frameworks_build_phase
-  unless phase.files_references.include?(ref)
-    phase.add_file_reference(ref)
-  end
-end
-
-bundle_identifier = ENV["CN1_AUT_BUNDLE_ID_VALUE"]
-if bundle_identifier && !bundle_identifier.empty?
-  %w[Debug Release].each do |cfg|
-    xc = app_target&.build_configuration_list&.[](cfg)
-    next unless xc
-    bs = xc.build_settings
-    bs["PRODUCT_BUNDLE_IDENTIFIER"] = bundle_identifier
-  end
-end
 
 #
 # Required settings so Xcode creates a non-empty .xctest and a proper "-Runner.app"
@@ -292,6 +249,7 @@ end
   xc = ui_target.build_configuration_list[cfg]
   next unless xc
   bs = xc.build_settings
+  bs["SWIFT_VERSION"]                = "5.0"
   bs["GENERATE_INFOPLIST_FILE"]      = "YES"
   bs["CODE_SIGNING_ALLOWED"]         = "NO"
   bs["CODE_SIGNING_REQUIRED"]        = "NO"
@@ -299,6 +257,7 @@ end
   bs["PRODUCT_NAME"]               ||= ui_name
   bs["TEST_TARGET_NAME"]           ||= app_target&.name || "HelloCodenameOne"
   # Optional but harmless on simulators; avoids other edge cases:
+  bs["ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES"] = "YES"
   bs["TARGETED_DEVICE_FAMILY"] ||= "1,2"
 end
 
