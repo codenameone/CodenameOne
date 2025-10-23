@@ -102,13 +102,12 @@ class GeometryTest {
         Geometry.BezierCurve curve = new Geometry.BezierCurve(0, 0, 2, 4, 4, 0);
         double[] result = new double[3];
         int count = curve.findTValuesForY(2d, 1d, 3d, result);
-        assertEquals(2, count, "Should find two t values at the chosen height");
-        for (int i = 0; i < count; i++) {
-            double t = result[i];
-            assertTrue(t >= 0d && t <= 1d);
-            double x = curve.x(t);
-            assertTrue(x >= 1d - 1e-6 && x <= 3d + 1e-6);
-        }
+        assertEquals(1, count, "Expected a single tangential intersection at the chosen height");
+        double t = result[0];
+        assertTrue(t >= 0d && t <= 1d);
+        assertEquals(0.5d, t, 1e-6);
+        double x = curve.x(t);
+        assertTrue(x >= 1d - 1e-6 && x <= 3d + 1e-6);
     }
 
     @Test

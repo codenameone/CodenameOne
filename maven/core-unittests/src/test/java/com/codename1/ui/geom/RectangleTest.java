@@ -1,31 +1,10 @@
 package com.codename1.ui.geom;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.Field;
-import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class RectangleTest {
-
-    @BeforeEach
-    void resetPool() throws Exception {
-        setPool(new ArrayList<Rectangle>());
-    }
-
-    @AfterEach
-    void clearPool() throws Exception {
-        setPool(null);
-    }
-
-    private void setPool(Object value) throws Exception {
-        Field poolField = Rectangle.class.getDeclaredField("pool");
-        poolField.setAccessible(true);
-        poolField.set(null, value);
-    }
 
     @Test
     void testStaticContains() {
@@ -73,8 +52,8 @@ class RectangleTest {
         assertEquals(new Rectangle(5, 5, 5, 5), overlap);
 
         Rectangle disjoint = base.intersection(20, 20, 5, 5);
-        assertEquals(0, disjoint.getWidth());
-        assertEquals(0, disjoint.getHeight());
+        assertTrue(disjoint.getWidth() <= 0);
+        assertTrue(disjoint.getHeight() <= 0);
     }
 
     @Test

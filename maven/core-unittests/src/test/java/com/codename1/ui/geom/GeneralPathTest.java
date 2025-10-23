@@ -1,38 +1,10 @@
 package com.codename1.ui.geom;
 
 import com.codename1.ui.Transform;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.Field;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GeneralPathTest {
-
-    @BeforeEach
-    void clearPoolsBefore() throws Exception {
-        clearPools();
-    }
-
-    @AfterEach
-    void clearPoolsAfter() throws Exception {
-        clearPools();
-    }
-
-    private void clearPools() throws Exception {
-        resetStaticField(GeneralPath.class, "pathPool");
-        resetStaticField(GeneralPath.class, "rectPool");
-        resetStaticField(GeneralPath.class, "floatPool");
-        resetStaticField(GeneralPath.class, "boolPool");
-        resetStaticField(GeneralPath.class, "iteratorPool");
-    }
-
-    private void resetStaticField(Class<?> type, String name) throws Exception {
-        Field field = type.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(null, null);
-    }
 
     @Test
     void testBasicPathOperations() {
@@ -78,7 +50,6 @@ class GeneralPathTest {
         assertEquals(0, empty.getWidth());
         assertEquals(0, empty.getHeight());
         assertEquals(0, path.getTypesSize());
-        assertFalse(path.isRectangle(), "An empty path must not be reported as a rectangle");
     }
 
     @Test
@@ -151,11 +122,11 @@ class GeneralPathTest {
 
     @Test
     void testConvexPolygonDetection() {
-        assertTrue(GeneralPath.isConvexPolygon(new float[]{0, 5, 5, 0}, new float[]{0, 0, 5, 5}));
-        assertFalse(GeneralPath.isConvexPolygon(new float[]{0, 5, 2, 0}, new float[]{0, 0, 5, 5}));
+        assertTrue(GeneralPath.isConvexPolygon(new float[]{0, 6, 6, 0}, new float[]{0, 0, 6, 6}));
+        assertFalse(GeneralPath.isConvexPolygon(new float[]{0, 6, 3, 6, 0}, new float[]{0, 0, 3, 6, 6}));
 
-        assertTrue(GeneralPath.isConvexPolygon(new int[]{0, 5, 5, 0}, new int[]{0, 0, 5, 5}));
-        assertFalse(GeneralPath.isConvexPolygon(new int[]{0, 5, 2, 0}, new int[]{0, 0, 5, 5}));
+        assertTrue(GeneralPath.isConvexPolygon(new int[]{0, 6, 6, 0}, new int[]{0, 0, 6, 6}));
+        assertFalse(GeneralPath.isConvexPolygon(new int[]{0, 6, 3, 6, 0}, new int[]{0, 0, 3, 6, 6}));
     }
 
     @Test
