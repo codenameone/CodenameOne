@@ -119,4 +119,33 @@ class GeometryTest {
         assertTrue(bounds.getX() <= 0);
         assertTrue(bounds.getX() + bounds.getWidth() >= 3);
     }
+
+    @Test
+    void testAddToPathHonorsJoinFlag() {
+        Geometry.BezierCurve quad = new Geometry.BezierCurve(0, 0, 1, 2, 2, 0);
+        GeneralPath fresh = new GeneralPath();
+        quad.addToPath(fresh, false);
+        assertEquals(2, fresh.getTypesSize());
+        assertEquals(6, fresh.getPointsSize());
+        byte[] freshTypes = new byte[fresh.getTypesSize()];
+        fresh.getTypes(freshTypes);
+        assertEquals(PathIterator.SEG_MOVETO, freshTypes[0]);
+        assertEquals(PathIterator.SEG_QUADTO, freshTypes[1]);
+
+        GeneralPath seeded = new GeneralPath();
+        seeded.moveTo(0, 0);
+        quad.addToPath(seeded, true);
+        assertEquals(2, seeded.getTypesSize());
+        assertEquals(6, seeded.getPointsSize());
+        byte[] seededTypes = new byte[seeded.getTypesSize()];
+        seeded.getTypes(seededTypes);
+        assertEquals(PathIterator.SEG_MOVETO, seededTypes[0]);
+        assertEquals(PathIterator.SEG_QUADTO, seededTypes[1]);
+        float[] coords = new float[seeded.getPointsSize()];
+        seeded.getPoints(coords);
+        assertEquals(0f, coords[0], 1e-6f);
+        assertEquals(0f, coords[1], 1e-6f);
+        assertEquals(2f, coords[4], 1e-6f);
+        assertEquals(0f, coords[5], 1e-6f);
+    }
 }

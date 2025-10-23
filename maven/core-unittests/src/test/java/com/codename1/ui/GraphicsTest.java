@@ -151,4 +151,21 @@ class GraphicsTest extends UITestBase {
         graphics.drawLine(1, 1, 4, 4);
         verify(implementation).drawLine(nativeGraphics, 3, 4, 6, 7);
     }
+
+    @Test
+    void testGetClipReflectsCurrentTranslation() throws Exception {
+        when(implementation.getClipX(nativeGraphics)).thenReturn(50);
+        when(implementation.getClipY(nativeGraphics)).thenReturn(60);
+        Graphics graphics = newGraphics();
+        graphics.translate(5, 7);
+        assertEquals(45, graphics.getClipX());
+        assertEquals(53, graphics.getClipY());
+    }
+
+    @Test
+    void testSetAlphaDelegatesToImplementation() throws Exception {
+        Graphics graphics = newGraphics();
+        graphics.setAlpha(128);
+        verify(implementation).setAlpha(nativeGraphics, 128);
+    }
 }
