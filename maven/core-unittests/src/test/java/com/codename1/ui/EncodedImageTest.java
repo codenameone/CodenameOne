@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 class EncodedImageTest extends UITestBase {
@@ -73,6 +74,11 @@ class EncodedImageTest extends UITestBase {
     void testCreateFromImageUsesRequestedFormatAndCachesDimensions() {
         RecordingImageIO imageIO = new RecordingImageIO(true, true);
         when(implementation.getImageIO()).thenReturn(imageIO);
+
+        Object nativeImage = new Object();
+        when(implementation.createMutableImage(eq(12), eq(18), anyInt())).thenReturn(nativeImage);
+        when(implementation.getImageWidth(nativeImage)).thenReturn(12);
+        when(implementation.getImageHeight(nativeImage)).thenReturn(18);
 
         Image image = Image.createImage(12, 18);
         EncodedImage encoded = EncodedImage.createFromImage(image, true);
