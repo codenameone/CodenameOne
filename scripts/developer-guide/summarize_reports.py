@@ -56,7 +56,18 @@ def _collect_alerts(node: object, path_hint: str = "") -> list[dict[str, object]
     return alerts
 
 
-def write_output(lines: Iterable[str], output: Path | None) -> None:
+def write_outputs(entries: Iterable[tuple[str, str]], output: Path | None) -> None:
+    lines: list[str] = []
+    for key, value in entries:
+        delimiter = ""
+        if "\n" in value:
+            delimiter = "__GH_OUTPUT__"
+            while delimiter in value:
+                delimiter += "_X"
+            lines.append(f"{key}<<{delimiter}\n{value}\n{delimiter}")
+        else:
+            lines.append(f"{key}={value}")
+
     content = "\n".join(lines) + "\n"
     if output:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -113,7 +124,7 @@ def summarize_asciidoc(report: Path, status: str, summary_key: str, output: Path
     else:
         summary = "No issues found"
 
-    write_output([f"{summary_key}={summary}"], output)
+    write_outputs([(summary_key, summary)], output)
 
 
 def summarize_vale(
@@ -151,7 +162,7 @@ def summarize_vale(
     else:
         summary = "No alerts found"
 
-    write_output([f"{summary_key}={summary}"], output)
+    write_outputs([(summary_key, summary)], output)
 
 
 def summarize_unused_images(
@@ -183,12 +194,12 @@ def summarize_unused_images(
         summary = "No unused images detected"
         lines = []
 
-    output_lines = [f"{summary_key}={summary}"]
+    output_entries: list[tuple[str, str]] = [(summary_key, summary)]
     if details_key and lines:
         details_value = "\n".join(lines)
-        output_lines.append(f"{details_key}={details_value}")
+        output_entries.append((details_key, details_value))
 
-    write_output(output_lines, output)
+    write_outputs(output_entries, output)
 
 
 def build_common_parser() -> argparse.ArgumentParser:
