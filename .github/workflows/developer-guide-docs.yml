@@ -188,12 +188,15 @@ jobs:
           set -euo pipefail
           REPORT_DIR="build/developer-guide/reports"
           REPORT_FILE="${REPORT_DIR}/vale-report.json"
+          HTML_REPORT="${REPORT_DIR}/vale-report.html"
           mkdir -p "$REPORT_DIR"
           set +e
           vale --config docs/developer-guide/.vale.ini --output=JSON docs/developer-guide > "$REPORT_FILE"
           STATUS=$?
           set -e
+          python3 scripts/developer-guide/vale_report_to_html.py --input "$REPORT_FILE" --output "$HTML_REPORT"
           echo "VALE_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
+          echo "VALE_HTML_REPORT=$HTML_REPORT" >> "$GITHUB_ENV"
           echo "VALE_STATUS=$STATUS" >> "$GITHUB_ENV"
           if [ "$STATUS" -ne 0 ]; then
             echo "Vale exited with status $STATUS" >&2
@@ -260,7 +263,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: developer-guide-vale-report
-          path: ${{ env.VALE_REPORT }}
+          path: |
+            ${{ env.VALE_REPORT }}
+            ${{ env.VALE_HTML_REPORT }}
           if-no-files-found: warn
 
       - name: Upload unused image report

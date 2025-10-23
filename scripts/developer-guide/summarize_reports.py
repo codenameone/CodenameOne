@@ -20,15 +20,30 @@ def write_output(lines: Iterable[str], output: Path | None) -> None:
         print(content, end="")
 
 
+def _normalize_status(status: str) -> str:
+    return status.strip()
+
+
+def _has_nonzero_status(status: str) -> bool:
+    status = _normalize_status(status)
+    return bool(status and status != "0")
+
+
 def summarize_asciidoc(report: Path, status: str, summary_key: str, output: Path | None) -> None:
     text = ""
     if report.is_file():
         text = report.read_text(encoding="utf-8", errors="ignore")
     issues = re.findall(r"\b(?:WARN|ERROR|SEVERE)\b", text)
-    summary = f"{len(issues)} issue(s) flagged" if issues else "No issues found"
-    status = status.strip()
-    if status and status != "0":
-        summary += f" (exit code {status})"
+
+    if issues:
+        summary = f"{len(issues)} issue(s) flagged"
+        if _has_nonzero_status(status):
+            summary += f" (exit code {_normalize_status(status)})"
+    elif _has_nonzero_status(status):
+        summary = f"Linter failed (exit code {_normalize_status(status)})"
+    else:
+        summary = "No issues found"
+
     write_output([f"{summary_key}={summary}"], output)
 
 
@@ -41,7 +56,17 @@ def summarize_vale(
             data = json.loads(report.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             data = {}
-        alerts = data.get("alerts", []) if isinstance(data, dict) else []
+        if isinstance(data, dict):
+            if isinstance(data.get("alerts"), list):
+                alerts.extend(data["alerts"])
+            files = data.get("files")
+            if isinstance(files, dict):
+                for file_result in files.values():
+                    if not isinstance(file_result, dict):
+                        continue
+                    file_alerts = file_result.get("alerts")
+                    if isinstance(file_alerts, list):
+                        alerts.extend(file_alerts)
 
     counts = {"error": 0, "warning": 0, "suggestion": 0}
     total = 0
@@ -60,12 +85,12 @@ def summarize_vale(
             f"{counts['suggestion']} suggestions",
         ]
         summary = f"{total} alert(s) ({', '.join(parts)})"
+        if _has_nonzero_status(status):
+            summary += f" (exit code {_normalize_status(status)})"
+    elif _has_nonzero_status(status):
+        summary = f"Vale failed (exit code {_normalize_status(status)})"
     else:
         summary = "No alerts found"
-
-    status = status.strip()
-    if status and status != "0":
-        summary += f" (exit code {status})"
 
     write_output([f"{summary_key}={summary}"], output)
 
