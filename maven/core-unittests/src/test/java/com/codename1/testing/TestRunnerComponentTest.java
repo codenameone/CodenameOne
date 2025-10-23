@@ -8,8 +8,6 @@ import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -76,12 +74,14 @@ class TestRunnerComponentTest extends UITestBase {
         Form form = component.showForm();
         assertNotNull(form);
 
-        RuntimeException thrown = assertThrows(RuntimeException.class, new Executable() {
-            @Override
-            public void execute() {
-                component.runTests();
-            }
-        });
+        RuntimeException thrown = null;
+        try {
+            component.runTests();
+            fail("Expected component.runTests() to propagate the runtime failure");
+        } catch (RuntimeException e) {
+            thrown = e;
+        }
+        assertNotNull(thrown);
         assertEquals(failure.getMessage(), thrown.getMessage());
         flushSerialCalls();
 
