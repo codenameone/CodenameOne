@@ -1,0 +1,58 @@
+{"maven.terminal.favorites": [
+  {
+    "alias": "Cloud > iOS Release Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=ios-device-release\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Tools > Codename One Settings",
+    "command": "\"cn1:settings\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Run in Simulator",
+    "command": "\"verify\" \"-Psimulator\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Mac Desktop Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=mac-os-x-desktop\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Android Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=android\" \"-Dcodename1.buildTarget=android-device\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Tools > Update Codename One",
+    "command": "\"cn1:update\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Cloud > iOS Debug Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=ios-device\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Local > Xcode iOS Project",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=ios-source\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Javascript Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javascript\" \"-Dcodename1.buildTarget=javascript\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Windows Desktop Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=windows-desktop\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Run as Desktop App",
+    "command": "\"verify\" \"-Prun-desktop\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Windows Device Build (UWP)",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=win\" \"-Dcodename1.buildTarget=windows-device\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Local > Gradle Android Project",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=android\" \"-Dcodename1.buildTarget=android-source\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Local > Cross-platform (JavaSE) Desktop App",
+    "command": "\"-Pexecutable-jar\" \"package\" \"-Dcodename1.platform=javase\" \"-DskipTests\" \"-U\" \"-e\""
+  }
+]}
