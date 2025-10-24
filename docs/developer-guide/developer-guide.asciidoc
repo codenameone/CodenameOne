@@ -99,4 +99,3 @@ include::Working-With-CodenameOne-Sources.asciidoc[]
 
 include::Working-with-UWP.asciidoc[]
 
-include::Travis-CI-Integration.asciidoc[]

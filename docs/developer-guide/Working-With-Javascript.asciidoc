@@ -230,7 +230,7 @@ Display.getInstance().setProperty("javascript.useProxyForSameDomain", "true");
 
 The browser shields some HTTP headers (e.g. "Set-Cookie") from Javascript so that your app cannot access them. Going through the proxy works around this limitation by copying and encoding such headers in a format that the browser will allow, and then decoding them client-side to make them available to your app seamlessly.
 
-===== Using Apache as a Proxy
+==== Using Apache as a Proxy
 
 If you are hosting your application on an Apache 2 web server with mod_proxy installed, and you only need to make CORS requests to a single domain (or a limited set of domains), you can use Apache to serve as your proxy.  One sample configuration (which you would place either in your VirtualHost definition or your .htaccess file is as follows:
 

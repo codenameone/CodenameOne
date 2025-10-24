@@ -1125,7 +1125,7 @@ Several rules govern the creation of NativeInterfaces and we only briefly covere
 - `hashCode`, `equals` & `toString` are reserved and won't be mapped to native code
 
 .NativeInterface Supported Types
-[cols="6*",options="header"]
+[cols="5*",options="header"]
 |====
 | Java         | Android   | JavaSE    | Obj-C     | C#
 |byte          | byte      | byte      | char      | sbyte
