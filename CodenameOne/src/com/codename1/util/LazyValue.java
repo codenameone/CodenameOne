@@ -29,7 +29,6 @@ package com.codename1.util;
  *
  * @author Shai Almog
  */
-// tag::lazyValueInterface[]
 public interface LazyValue<T> {
     /**
      * Returns the actual value
@@ -39,4 +38,3 @@ public interface LazyValue<T> {
      */
     T get(Object... args);
 }
-// end::lazyValueInterface[]
