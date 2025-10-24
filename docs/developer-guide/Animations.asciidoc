@@ -35,7 +35,7 @@ This sort of behavior creates a special case where setting the size/position mak
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LayoutAnimationsDemo.java[tag=layoutAnimations]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LayoutAnimationsDemo.java[tag=layoutAnimations,indent=0]
 ----
 
 There are a couple of things that you should notice about this example:
@@ -68,7 +68,7 @@ WARNING: An unlayout animation always leaves the container in an invalidated sta
 [[animateUnlayutSampleCode]]
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/UnlayoutAnimationsDemo.java[tag=unlayoutAnimation]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/UnlayoutAnimationsDemo.java[tag=unlayoutAnimation,indent=0]
 ----
 
 You will notice some similarities with the unlayout animation but the differences represent the exact opposite of the layout animation:
@@ -90,7 +90,7 @@ This functionality might be undesirable which is why there is a version of the `
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/HiddenComponentDemo.java[tag=hiddenComponent]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/HiddenComponentDemo.java[tag=hiddenComponent,indent=0]
 ----
 
 TIP: Notice that the code above uses `setVisible()`, which shouldn't be confused with `setHidden`. `setVisible()` just toggles the visibility of the component it would still occupy the same amount of space
@@ -111,7 +111,7 @@ The `AndWait` variant blocks the calling thread until the animation completes. T
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationSynchronicityDemo.java[tag=animationSequence]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationSynchronicityDemo.java[tag=animationSequence,indent=0]
 ----
 
 First the UI goes thru an "unlayout" animation, once that completes the layout itself is performed.
@@ -132,7 +132,7 @@ The callback variant is similar to the `invokeAndBlock` variant but uses a more 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/UnlayoutAnimationsDemo.java[tag=unlayoutCallback]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/UnlayoutAnimationsDemo.java[tag=unlayoutCallback,indent=0]
 ----
 
 ===== Animation Fade and Hierarchy
@@ -145,7 +145,7 @@ Some animate layout methods are hierarchy based. They work just like the regular
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/HierarchyAnimationDemo.java[tag=hierarchyAnimation]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/HierarchyAnimationDemo.java[tag=hierarchyAnimation,indent=0]
 ----
 
 The `demoComponents` `Vector` contains components from separate containers and this code would not work with a simple animate layout.
@@ -159,7 +159,7 @@ This effectively prevents two animations from mutating the UI in parallel so we 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerProblem]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerProblem,indent=0]
 ----
 
 The reason this happens is that the second remove gets postponed to the end of the animation so it won't break the animation. This works for remove and add operations on a https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] as well as other animations.
@@ -168,7 +168,7 @@ The simple *yet problematic* fix would be:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerWait]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerWait,indent=0]
 ----
 
 So why that might still fail?
@@ -185,7 +185,7 @@ We can flush the animation queue and run synchronously after all the animations 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerFlush]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerFlush,indent=0]
 ----
 
 === Low Level Animations
@@ -206,12 +206,12 @@ E.g. you can add additional animation logic using code like this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LowLevelAnimationDemo.java[tag=registerAnimated]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LowLevelAnimationDemo.java[tag=registerAnimated,indent=0]
 ----
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LowLevelAnimationDemo.java[tag=lowLevelAnimate]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LowLevelAnimationDemo.java[tag=lowLevelAnimate,indent=0]
 ----
 
 ==== Why Not Just Write Code In Paint?
@@ -273,7 +273,7 @@ To apply a transition to a component we can just use the `Container.replace()` m
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/ReplaceTransitionDemo.java[tag=replaceTransition]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/ReplaceTransitionDemo.java[tag=replaceTransition,indent=0]
 ----
 
 TIP: Replace even works when you have a layout constraint in place e.g. replacing a component in a border layout will do the "right thing". However, some layouts such as `TableLayout` might be tricky in such cases so we recommend wrapping a potentially replaceable `Component` in a border layout and replacing the content.
@@ -293,7 +293,7 @@ The code below demonstrates the usage of all the main transitions:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SlideTransitionsDemo.java[tag=slideTransitions]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SlideTransitionsDemo.java[tag=slideTransitions,indent=0]
 ----
 
 
@@ -340,7 +340,7 @@ NOTE: The code below manipulates styles and look. This is done to make the code 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/BubbleTransitionDemo.java[tag=bubbleTransition]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/BubbleTransitionDemo.java[tag=bubbleTransition,indent=0]
 ----
 
 .Bubble transition converting a circular button to a Dialog
@@ -371,7 +371,7 @@ forms so the transition will be able to find them.
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/MorphTransitionDemo.java[tag=morphTransition]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/MorphTransitionDemo.java[tag=morphTransition,indent=0]
 ----
 
 ==== SwipeBackSupport
@@ -380,14 +380,14 @@ iOS7+ allows swiping back one form to the previous form, Codenmae One has an API
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SwipeBackSupportDemo.java[tag=swipeBackBind]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SwipeBackSupportDemo.java[tag=swipeBackBind,indent=0]
 ----
 
 That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows us to pass a value lazily:
 
 [source,java]
 ----
-include::../../CodenameOne/src/com/codename1/util/LazyValue.java[tag=lazyValueInterface]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LazyValueDocSnippet.java[tag=lazyValueInterface,indent=0]
 ----
 
 This effectively allows us to pass a form and only create it as necessary (e.g. for a GUI builder app we don't
@@ -398,5 +398,5 @@ The code below should work for the transition sample above. Notice that this API
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SwipeBackSupportDemo.java[tag=swipeBackBindExample]
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SwipeBackSupportDemo.java[tag=swipeBackBindExample,indent=0]
 ----
