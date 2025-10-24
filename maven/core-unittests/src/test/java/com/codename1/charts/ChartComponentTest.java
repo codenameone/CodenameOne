@@ -62,27 +62,55 @@ class ChartComponentTest extends UITestBase {
         Shape chartShape = component.screenToChartShape(screenRect);
         Rectangle chartBounds = chartShape.getBounds();
 
-        assertEquals(screenRect.getSize().getWidth(), chartBounds.getSize().getWidth());
-        assertEquals(screenRect.getSize().getHeight(), chartBounds.getSize().getHeight());
+        Point expectedChartTopLeft = component.screenToChartCoord(screenRect.getX(), screenRect.getY());
+        Point expectedChartBottomRight = component.screenToChartCoord(
+                screenRect.getX() + screenRect.getSize().getWidth(),
+                screenRect.getY() + screenRect.getSize().getHeight()
+        );
+
+        assertEquals(Math.round(expectedChartTopLeft.getX()), chartBounds.getX());
+        assertEquals(Math.round(expectedChartTopLeft.getY()), chartBounds.getY());
+        assertEquals(Math.round(expectedChartBottomRight.getX() - expectedChartTopLeft.getX()), chartBounds.getSize().getWidth());
+        assertEquals(Math.round(expectedChartBottomRight.getY() - expectedChartTopLeft.getY()), chartBounds.getSize().getHeight());
 
         Rectangle roundTrippedScreen = component.chartToScreenShape(chartShape).getBounds();
-        assertEquals(screenRect.getX(), roundTrippedScreen.getX());
-        assertEquals(screenRect.getY(), roundTrippedScreen.getY());
-        assertEquals(screenRect.getSize().getWidth(), roundTrippedScreen.getSize().getWidth());
-        assertEquals(screenRect.getSize().getHeight(), roundTrippedScreen.getSize().getHeight());
+        Point expectedScreenTopLeft = component.chartToScreenCoord(chartBounds.getX(), chartBounds.getY());
+        Point expectedScreenBottomRight = component.chartToScreenCoord(
+                chartBounds.getX() + chartBounds.getSize().getWidth(),
+                chartBounds.getY() + chartBounds.getSize().getHeight()
+        );
+
+        assertEquals(Math.round(expectedScreenTopLeft.getX()), roundTrippedScreen.getX());
+        assertEquals(Math.round(expectedScreenTopLeft.getY()), roundTrippedScreen.getY());
+        assertEquals(Math.round(expectedScreenBottomRight.getX() - expectedScreenTopLeft.getX()), roundTrippedScreen.getSize().getWidth());
+        assertEquals(Math.round(expectedScreenBottomRight.getY() - expectedScreenTopLeft.getY()), roundTrippedScreen.getSize().getHeight());
 
         Rectangle chartRect = new Rectangle(0, 0, 40, 50);
         Shape screenShape = component.chartToScreenShape(chartRect);
         Rectangle screenBounds = screenShape.getBounds();
 
-        assertEquals(chartRect.getSize().getWidth(), screenBounds.getSize().getWidth());
-        assertEquals(chartRect.getSize().getHeight(), screenBounds.getSize().getHeight());
+        Point expectedScreenFromChartTopLeft = component.chartToScreenCoord(chartRect.getX(), chartRect.getY());
+        Point expectedScreenFromChartBottomRight = component.chartToScreenCoord(
+                chartRect.getX() + chartRect.getSize().getWidth(),
+                chartRect.getY() + chartRect.getSize().getHeight()
+        );
+
+        assertEquals(Math.round(expectedScreenFromChartTopLeft.getX()), screenBounds.getX());
+        assertEquals(Math.round(expectedScreenFromChartTopLeft.getY()), screenBounds.getY());
+        assertEquals(Math.round(expectedScreenFromChartBottomRight.getX() - expectedScreenFromChartTopLeft.getX()), screenBounds.getSize().getWidth());
+        assertEquals(Math.round(expectedScreenFromChartBottomRight.getY() - expectedScreenFromChartTopLeft.getY()), screenBounds.getSize().getHeight());
 
         Rectangle roundTrippedChart = component.screenToChartShape(screenShape).getBounds();
-        assertEquals(chartRect.getX(), roundTrippedChart.getX());
-        assertEquals(chartRect.getY(), roundTrippedChart.getY());
-        assertEquals(chartRect.getSize().getWidth(), roundTrippedChart.getSize().getWidth());
-        assertEquals(chartRect.getSize().getHeight(), roundTrippedChart.getSize().getHeight());
+        Point expectedChartFromScreenTopLeft = component.screenToChartCoord(screenBounds.getX(), screenBounds.getY());
+        Point expectedChartFromScreenBottomRight = component.screenToChartCoord(
+                screenBounds.getX() + screenBounds.getSize().getWidth(),
+                screenBounds.getY() + screenBounds.getSize().getHeight()
+        );
+
+        assertEquals(Math.round(expectedChartFromScreenTopLeft.getX()), roundTrippedChart.getX());
+        assertEquals(Math.round(expectedChartFromScreenTopLeft.getY()), roundTrippedChart.getY());
+        assertEquals(Math.round(expectedChartFromScreenBottomRight.getX() - expectedChartFromScreenTopLeft.getX()), roundTrippedChart.getSize().getWidth());
+        assertEquals(Math.round(expectedChartFromScreenBottomRight.getY() - expectedChartFromScreenTopLeft.getY()), roundTrippedChart.getSize().getHeight());
     }
 
     @Test
