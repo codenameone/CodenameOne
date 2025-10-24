@@ -1,0 +1,14 @@
+=== Open Designer (`designer`)
+
+Opens the legacy Codename One designer app to edit the project "theme.res" file.
+
+NOTE: If your project is using CSS it may not have a theme.res file, thus this goal will fail in this case.
+
+==== Usage Example
+
+[source,bash]
+----
+mvn cn1:designer
+----
+
+This will open the Codename One designer.

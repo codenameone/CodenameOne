@@ -1,0 +1,48 @@
+=== Codename One Build (`build`)
+
+The `build` goal is used to send builds to the Codename One build server.  It also supports a few local build targets, such as `ios-source`, which generates an Xcode project, and `android-source` which generates an Android gradle project.
+
+This goal is bound to the `package` phase of the <<cn1app-archetype>>, so you generally don't need to run this directly.
+
+==== Example
+
+.Submitting a Mac Desktop build directly using this goal.
+[source,bash]
+----
+mvn cn1:build -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop
+----
+
+==== Properties
+
+codename1.platform::
+Specifies the platform to build for.  Values include javase, android, ios, javascript, and win.
+
+codename1.buildTarget::
+The build target.  Different platforms support different build sets of build targets.
++
+[options="header"]
+|====
+| Build Target | Platform | Description
+| mac-os-x-desktop | javase | Sends a Mac desktop build to the Codename One build server.
+| windows-desktop | javase | Sends a Windows desktop build to the Codename One build server.
+| android-device | android | Sends an Android build to the Codename One build server.
+| android-source | android | Generates an Android Gradle project locally that can be opened and built in Android Studio.
+| ios-device | ios | Sends an iOS build to the Codename One build server.
+| ios-source | ios | Generates an iOS Xcode project locally that can be opened and built in Xcode.
+| javascript | javascript | Sends a Javascript build to the Codename One build server.
+|====
+
+automated::
+Set to `true` to submit build as an automated build.  When using this flag, the goal will wait for the build server to complete the build, then download it and save it in the target directory (of the associated module) using standard maven artifact file naming conventions.  This allows you to set up automated CI workflows more easily.
++
+Default value is `false`.
++
+Requires a Codename One enterprise subscription.
+
+open::
+If set to `true`, this will automatically open the generated gradle or xcode project in Android studio or Xcode.  Only applicable to the `ios-source` and `android-source` buildTargets.
++
+Default is `false`
+
+
+

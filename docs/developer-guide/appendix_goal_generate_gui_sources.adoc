@@ -1,0 +1,3 @@
+=== Generate GUI Sources (`generate-gui-sources`)
+
+Generates Java sources from the Codename One GUI builder files.  This goal is bound to the `process-sources` phase of <<cn1app-archetype>> projects, so you generally should never need to run this goal explicitly.

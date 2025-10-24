@@ -1,0 +1,118 @@
+[#generate-app-project]
+=== Generate App Project (`generate-app-project`)
+
+Generates a Maven project using the <<cn1app-archetype>> as a basis, and applying an optional project template.  This goal can also be used to migrate legacy Codename One Ant-based Application projects into maven.
+
+==== Usage Example
+
+This goal should not be run inside an existing Maven project directory.  It will output a project into a directory named after the `artifactId` parameter.
+
+Because there is no existing project, you will need to provide the full maven path to the goal.
+
+[source,bash]
+----
+mvn com.codenameone:codenameone-maven-plugin:$CN1VERSION:generate-app-project \
+  -DsourceProject=/path/to/my/ProjectTemplate \
+  -DgroupId=com.example \
+  -DartifactId=myapp \
+  -Dcn1Version=$CN1VERSION
+----
+
+NOTE: Substitute the https://search.maven.org/artifact/com.codenameone/codenameone-maven-plugin[latest Codename One plugin version] for the `$CN1VERSION` in the above example.
+
+NOTE: This command is formatted for the bash prompt (e.g. Linux or Mac).  It will work on Windows also if you use bash.  If you are on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly.  In particular, the entire command would need to be on a single line.  (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+
+In the above example, assuming all went well, it would output your project into a directory named `myapp`.
+
+==== Parameters
+
+cn1Version::
+The Codename One version that you want to use for the project.  This will be manifested as the `cn1.version` and `cn1.plugin.version` properties in the common/pom.xml file of the generated project.  If omitted it will default to the cn1Version that is hard-coded in the cn1app-archetype artifact.
+
+sourceProject::
+The path to an optional project template to use.  This may be either a legacy Ant project, or a Maven project that follows the structure of <<cn1app-archetype>>.
+
+artifactId::
+The `artifactId` to use for the new project.
+
+groupId::
+The `groupId` to use for the new project.
+
+version::
+The `version` to use for the new project.  Optional.
++
+Default value is "1.0-SNAPSHOT"
+
+packageName::
+The package name to use for the new project.
++
+This is only necessary if the `sourceProject` property is a Maven project.  If the `sourceProject` is a legacy Ant project, then this property is ignored.
+
+mainName::
+The main class name to use for the new project.
++
+This is only necessary if the `sourceProject` property is a Maven project.  If the `sourceProject` is a legacy Ant project, then this property is ignored.
+
+==== Migrating Legacy Ant Projects into Maven
+
+When providing an Ant-based Codename One application project as the `sourceProject` parameter, this goal will simply generate an equivalent Maven project to the Ant project, with the same settings and sources.
+
+See <<migrate-existing-project>> for examples using this goal to migrate an existing project into Maven.
+
+[#project-templates]
+==== Project Templates
+
+When using a <<cn1app-archetype>> maven project as the `sourceProject` parameter, the project will be treated project template template, and perform some basic processing of the source files as necessary convert the template into a *real* project.  This includes replacing all occurrences of `${mainName}` and `${packageName}` in project sources with the value of the `mainName` and `packageName` parameters provided on the command-line.
+
+Additionally any occurrences of `__mainName__` and `__packagePath__` in file or directory names will be swapped with the values of `mainName` and `packagePath` (which is automatically derived from `packageName` by substituting '.' with file separators).
+
+===== The `generate-app-project.rpf` File
+
+The (optional) secret sauce that differentiates a regular Maven project from a Maven project template is the existence of a `generate-app-project.rpf` file in the root project directory.  This file is in <<rich-properties-file, rich property file format>>, and allows you to define a minimal amount of configuration details that the `generate-app-project` goal needs to convert the template into a real project.
+
+This file may contain the following properties:
+
+template.mainName::
+The name of the main class that is currently used in this project.  This property is not required if the project is already using the `__mainName__` placeholder in the file name that contains the main class, and the `${mainName}` placeholder in any source code referring to the main class.
++
+Often times it is just easier to specify this property here rather than injecting placeholders into the template source base, because that way the template itself can be used as a valid project.
+
+template.packageName::
+The package name for the app.  This property is not required if the project is already using the `__packagePath__` placeholder in directories containing your main package files, and the `${packageName}` placeholder in any source code that refers to the main package.
++
+Often times it is just easier to specify this property here rather than injecting placeholders into the template source base, because that way the template itself can be used as a valid project.
+
+template.type::
+Either `maven` or `ant`, depending on the project type.
+
+dependencies::
+An XML snippet containing any additional Maven dependencies that should be added to the project.  This is handy of the project template relies on other cn1libs that are on Maven central.
+
+[#sample-generate-app-project-file]
+===== Sample `generate-app-project.rpf` file
+
+[source,rpf]
+----
+template.mainName=MyApp
+template.packageName=com.example
+template.type=maven
+
+[dependencies]
+====
+<dependency>
+  <groupId>com.codenameone</groupId>
+  <artifactId>googlemaps-lib</artifactId>
+  <version>1.0.1</version>
+  <type>pom</type>
+</dependency>
+====
+----
+
+==== Sample: The Bare-bones Kotlin App Project
+
+As a more complete example of a project template, see the https://github.com/shannah/cn1app-archetype-kotlin-template/blob/master/generate-app-project.rpf[generate-app-project.rpf] file in the https://github.com/shannah/cn1app-archetype-kotlin-template[bare-bones kotlin app template].
+
+This is the template that is used in https://start.codenameone.com[Codename One initializr] for the Bare-bones Kotlin project.
+
+
+

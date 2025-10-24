@@ -1,0 +1,20 @@
+[#update-goal]
+=== Update Codename One (`update`)
+
+Updates Codename One.  This will update the Codename One tools that reside inside `$HOME/.codenameone` such as the GUI builder and Control Center.  This will also attempt to update the `cn1.version` and `cn1.plugin.version` properties in your project's pom.xml file.
+
+==== Usage Example
+
+[source,bash]
+----
+mvn cn1:update
+----
+
+**Parameters**
+
+newVersion::
+(Optional) The version to update to.  This should be a version number available on Maven central.  Will accept a value of "LATEST" to cause it to resolve to the latest version available on Maven central.
++
+If this parameter is omitted, then it will be implicitly set to "LATEST", but it will not update the `cn1.version` or `cn1.plugin.version` properties if they are currently set to a SNAPSHOT version.
+
+See <<updating>> for more information about updating Codename One.

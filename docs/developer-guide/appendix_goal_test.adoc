@@ -1,0 +1,22 @@
+=== Run Tests (`test`)
+
+Runs Codename One unit tests.
+
+This goal is bound to the `test` phase of <<cn1app-archetype>> projects, so that running it directly is not necessary.  If you build a <<cn1app-archetype, cn1app-archetype project>> using:
+
+[source,bash]
+----
+mvn install
+----
+
+or
+
+[source,bash]
+----
+mvn package
+----
+
+Then this goal will be executed automatically.
+
+TIP: Prevent tests from running using the `skipTests` flag.   E.g. `mvn install -DskipTests`
+

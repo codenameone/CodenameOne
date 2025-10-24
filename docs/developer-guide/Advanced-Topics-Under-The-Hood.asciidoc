@@ -9,7 +9,7 @@ These hints are often referred to as "build hints" or "build arguments", they ar
 You can set these hints by right clicking the project in the IDE and selecting #Codename One# -> #Codename One Settings# -> #Build Hints#. The hints use the `key=value` style of data.
 
 .The build hints UI in Codename One Settings
-image::img/developer-guide/build-hints-codenameone-settings.png[The build hints UI in Codename One Settings,scaledwidth=50%]
+image::img/build-hints-codenameone-settings.png[The build hints UI in Codename One Settings,scaledwidth=50%]
 
 You can set the build hints in the `codenameone_settings.properties` file directly notice that when you do that all settings need to start with the `codename1.arg.` prefix. When editing the properties file directly we would need to define something like `android.debug=true` as  `codename1.arg.android.debug=true`.
 
@@ -27,9 +27,6 @@ Here is the current list of supported arguments, notice that build hints are add
 
 |android.installLocation
 |Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.
-
-|android.gradle
-|Deprecated, this mode is no longer supported. true/false defaults to false prior to 3.3 and true after. Uses Gradle instead of Ant to build the Android app
 
 |android.xapplication
 |defaults to an empty string. Allows developers of native Android code to add text within the application block to define things such as widgets, services etc.
@@ -88,7 +85,7 @@ Here is the current list of supported arguments, notice that build hints are add
 |*Deprecated, please android.playService.+++*+++!* Indicates whether Goolge Play Services should be included into the build, defaults to false but that might change based on the functionality of the application and other build hints. Adding Google Play Services support allows us to use a more refined location implementation and invoke some Google specific functionality from native code.
 
 |android.playService.plus, android.playService.auth, android.playService.base, android.playService.identity, android.playService.indexing, android.playService.appInvite, android.playService.analytics, android.playService.cast, android.playService.gcm, android.playService.drive, android.playService.fitness, android.playService.location, android.playService.maps, android.playService.ads, android.playService.vision, android.playService.nearby, android.playService.panorama, android.playService.games, android.playService.safetynet, android.playService.wallet, android.playService.wearable
-|Allows including only a specific play services library portion. Notice that this setting conflicts with the deprecated `android.includeGPlayServices` and only works with the gradle build (which is on by default but can be toggled using `android.gradle`). +
+|Allows including only a specific play services library portion. Notice that this setting conflicts with the deprecated `android.includeGPlayServices` and only works with the Gradle-based Android build pipeline. +
 
 If none of the services are defined to true then plus, auth, base, analytics, gcm, location, maps & ads will be set to true. If one or more of the `android.playService` entries are defined to something then all entries will default to false.
 
@@ -483,152 +480,6 @@ rim.nativeBrowser	true/false defaults to false. Enables the native blackberry br
 |Defaults to 48x48. The size of the icon in the format of width x height (without the spacing).
 |===
 
-=== Offline Build
-
-IMPORTANT: Offline build is an enterprise feature
-
-At this time Codename One supports iOS & Android targets for offline builds. We require an Enterprise grade subscription as explained in the sidebar.
-
-NOTE: If you signup for Enterprise and cancel you can still do the offline build. You won't be able to update the builder though
-
-.Why only Enterprise?
-****
-There are several reasons, the technical one is that offline builds are no panacea. Things fail. The support effort for offline builds is huge, as evidence despite the fact that all of our code is open source very few people bothered trying to compile it because of the complexities.
-
-We don’t think building offline is convenient and we always recommended avoiding it. When we build our own apps we use the cloud just like everyone else because it’s surprisingly faster and more convenient…​
-
-However, some government and regulated industries have issues with SaaS delivered solutions and thus must use offline build. These organizations also require enterprise grade support for most cases and so it makes sense to bundle as an enterprise only solution.
-****
-
-
-==== Prerequisites for iOS Builds
-
-You need the following installed tools/versions for Codename One's offline build process:
-
-- Mac ideally with El Capitan, newer should work
-- Xcode 7+ (but not 8+ at this time)
-- Oracle's JDK 8
-- Cocoapods - in the terminal type `sudo gem install cocoapods --pre`.
-- xcodeproj - in the terminal type `sudo gem install xcodeproj`
-
-==== Prerequisites for Android Builds
-
-Android builds need the following:
-
-- Android Studio
-- Oracle's JDK 8
-- Gradle version 2.11
-
-==== Installation
-
-To build offline you need to install the offline builder code which is a stripped down version of the build servers. When you install a version of the offline builder it maps to the time in which you downloaded it...
-
-That means that features like versioned builds won't work. You can download/keep multiple offline builders and toggle between them which is similar in scope.
-
-E.g. if you installed an offline builder then installed a newer version and the newer version has a bug you can revert to the old version. Notice that the older version might not have features that exist in a newer version.
-
-TIP: Since installation requires an enterprise account, you might need to re-login in the Codename One Settings UI
-
-To install an offline builder open the Codename One Settings UI by right clicking the project and selecting #Codename One# -> #Codname One Settings#.
-
-.Open Codename One settings
-image::img/developer-guide/newsettings-ui.png[Open Codename One settings,scaledwidth=20%]
-
-TIP: Even though the settings are a part of a project, the offline build settings are global and apply to all the projects...
-
-Once the Codename One settings UI launches select the #Offline Builds# entry:
-
-.Offline build entry
-image::img/developer-guide/offline-builds-section.png[Offline build entry,scaledwidth=20%]
-
-This should launch the settings UI which would be blank the first time around:
-
-.Offline builds setting UI
-image::img/developer-guide/offline-builds-settings.png[Offline builds setting UI,scaledwidth=40%]
-
-When you are in this form you can press the download button to download the current version from the build server. If there is no update nothing will happen. If there is the latest version will  download and tag with a version number/date.
-
-You can see/change the selected version in this UI. This allows building against an older version. You can also delete older builds to save space.
-
-==== Building
-
-Offline building is almost like building with the cloud. In the right click menu you can select one of the offline build targets as such:
-
-.The offline build targets
-image::img/developer-guide/offline-build-targets.png[The offline build targets,scaledwidth=40%]
-
-Once selected build generates a project under the `build/and` or `build/iphone` respectively.
-
-Open these directories in Android Studio or xcode to run/build in the native IDE to the device or native emulator/simulator.
-
-WARNING: Build deletes previous offline builds, if you want to keep the sources of a build you need to move it to a different directory!
-
-To get this to work with Android Studio you will need one more step. You will need to configure Android studio to use your local version of gradle 2.11 by following these steps:
-
-- Open the Android Studio preferences
-
-.Android Studio Preferences
-image::img/developer-guide/android-studio-preferences.png[Android Studio Preferences,scaledwidth=30%]
-
-- Select #Build, Execution, Deployment# -> #Build Tools# -> #Gradle#
-
-- Select the #Use Local gradle distribution#
-
-- Press the #...# and pick your local gradle 2.11 install
-
-.Local gradle config
-image::img/developer-guide/offline-gradle-config.png[Local gradle config,scaledwidth=50%]
-
-
-==== FAQ
-
-===== Should I use the Offline Builder?
-
-Probably not.
-
-Cloud build is far more convenient, simple. Doesn't require any installs (other than the plugin) and is much faster.
-
-We built this tool for developers who work in situations that prohibit cloud build. E.g. government, banking etc. where regulation is restrictive.
-
-===== Can I Move/Backup my Builders?
-
-No.
-
-We protect all the builders to avoid abuse. If you backup and restore on a new system the builders might stop working even if you are a paying enterprise customer.
-
-===== Can I install the builders for all our developers?
-
-Our licensing terms require a parallel developer seat for the Codename One developers in your company. If you have 5 Codename One developers they must all have an enterprise developer account to comply.
-
-E.g. You can't have one enterprise account and 4 basic accounts.
-
-The reason behind this is simple, in the past we saw a lot of funneling from developers who built such a licensing structure.
-
-===== What Happens if I Cancel?
-
-If you cancel your enterprise subscription all your existing installed offline builders should work as before but you won't be able to update them or get support for this.
-
-===== When are Versions Released?
-
-We will try to keep this in the same release pace as library updates i.e. once a week typically on a Friday.
-
-===== Are Version Numbers Sequential?
-
-They grow but we sometimes skip versions. Versions map to our cloud deployment versioning scheme and we might skip versions in some cases.
-
-===== Why is this Feature Limited to Enterprise Subscribers?
-
-This is a complex tool to support & maintain. SaaS has a well defined business model where we can reduce prices and maintenance costs.
-
-Offline builds are more like a shrinkwrap business model in which case our pricing needs to align itself to shrinkwrap pricing models for long term sustainability.
-
-The main use case this product tries to address is government and highly regulated industries who are in effect enterprise users.
-
-===== How Different is the Code From Cloud Builds?
-
-We use the same code as we do in the cloud build process with minor modifications in the process. Since the cloud servers are setup by us they work differently but should align reasonably well.
-
-
 === Android Permissions
 
 One of the annoying tasks when programming native Android applications is tuning all the required permissions
@@ -637,36 +488,23 @@ to match your codes requirements, Codename One aims to simplify this. The build 
 However, sometimes developers might find the permissions that come up a bit confusing and might not understand why
 a specific permission came up. This maps Android permissions to the methods/classes in Codename One that would trigger them. Notice that this list isn't exhaustive as the API is rather large:
 
-`android.permission.WRITE_EXTERNAL_STORAGE` - this permission appears by default for Codename One
-applications, since the `FileSystemStorage` API (which is used extensively) might have some dependencies on it. You can explicitly disable it using the build hint `android.blockExternalStoragePermission=true`, notice that this is something we don't test and it might fail on devices.
+`android.permission.WRITE_EXTERNAL_STORAGE` - included by default (up to Android 13) so file APIs continue to work unless you block it with `android.blockExternalStoragePermission=true`.
 
-`android.permission.INTERNET` - this is a hardcoded permission in Codename One, the ability to connect to the network is coded into all Codename One applications.
+`android.permission.INTERNET` - always requested because the networking stack depends on it even for offline features like local web views.
 
-`android.hardware.camera` & `android.permission.RECORD_AUDIO` - are triggered by com.codename1.Capture
+`android.permission.CAMERA` & `android.permission.RECORD_AUDIO` - required when capturing photos, video, or audio. The builder injects them automatically and the Android port prompts the user the first time the API is used.
 
-`android.permission.RECORD_AUDIO` - is triggered by usage of `MediaManager.createMediaRecorder()` & `Display.createMediaRecorder()`
+`android.permission.READ_PHONE_STATE` - used by telephony-aware APIs like `Display.getMsisdn()` and by media integration so audio pauses correctly on calls.
 
-`android.permission.READ_PHONE_STATE` - is triggered by `com.codename1.ads` package, `com.codename1.components.Ads`,
-`com.codename1.components.ShareButton`, `com.codename1.media`, `com.codename1.push`, `Display.getUdid()` &
-`Display.getMsisdn()`. This permission is required for media in order to suspend audio playback when you get a phone call.
+`android.permission.ACCESS_FINE_LOCATION` & `android.permission.ACCESS_COARSE_LOCATION` - requested when using `com.codename1.location` or embedded maps so location fixes can be delivered.
 
-`android.hardware.location`, `android.hardware.location.gps`, `android.permission.ACCESS_FINE_LOCATION`,
-`android.permission.ACCESS_MOCK_LOCATION` & `android.permission.ACCESS_COARSE_LOCATION` -
-map to `com.codename1.maps` & `com.codename1.location`.
+`android.permission.ACCESS_BACKGROUND_LOCATION` - added when background geofencing or fetch tasks are enabled; the Android port verifies the permission separately on Android 10+.
 
-`package.permission.C2D_MESSAGE`, `com.google.android.c2dm.permission.RECEIVE`, `android.permission.RECEIVE_BOOT_COMPLETED` -
-are requested by the `com.codename1.push` package
+`android.permission.POST_NOTIFICATIONS` - prompted on Android 13+ for both push registration and local notifications.
 
-`android.permission.READ_CONTACTS` - triggers by the package `com.codename1.contacts` & `Display.getAllContacts()`.
+`package.permission.C2D_MESSAGE`, `com.google.android.c2dm.permission.RECEIVE`, and `android.permission.RECEIVE_BOOT_COMPLETED` - bundled with the push subsystem so Firebase Cloud Messaging can wake the app after device restarts.
 
-`android.permission.VIBRATE` - is triggered by `Display.vibrate()` and `Display.notifyStatusBar()`
-
-`android.permission.SEND_SMS` - is triggered by `Display.sendSMS()`
-
-`android.permission.WAKE_LOCK` - is triggered by `Display.lockScreen()` & `Display.setScreenSaverEnabled()`
-
-`android.permission.WRITE_CONTACTS` - is triggered by `Display.createContact()`, `Display.deleteContact()`,
-`ContactsManager.createContact()` & `ContactsManager.deleteContact()`
+`android.permission.READ_CONTACTS` - requested when accessing the device address book through `Display.getAllContacts()` and related APIs.
 
 ==== Permissions Under Marshmallow (Android 6+)
 
@@ -678,13 +516,7 @@ This is really great as it allows apps to be installed with a single click and n
 
 ===== Enabling Permissions
 
-Codenmae One compiles Android targets with SDK level 23 but not with target level 23!
-
-This means that by default the new permission mode is still off and you won't see any of the effects mentioned below.
-
-WARNING: This will probably change to the default in the future but at the moment the target SDK defaults to 21
-
-To activate this functionality you will need to set the target SDK to level 23 by using the `android.targetSDKVersion=23` build hint.
+Codename One's Gradle 8 based Android builder detects the highest Android SDK you have installed and uses that value (with a minimum of API 33) for both the compile and target SDK versions, so the modern runtime permission flow is enabled by default. If you override the target version via the `android.targetSDKVersion` build hint the builder will honour it, but lowering the target may disable some compatibility libraries. Keeping the target current is strongly recommended for Play Store compliance.
 
 ===== Permission Prompts
 
@@ -710,25 +542,25 @@ Display.getInstance().invokeAndBlock(() -> {
 f.show();
 ----
 
-When we try to install this app without changing anything on an Android 6 device we see this UI:
+If you explicitly lower the target SDK (e.g. `android.targetSDKVersion=21`) and install this app on an Android 6 device you will still see the legacy install prompt with all permissions listed up front:
 
 .Install UI when using the old permissions system
-image::img/developer-guide/marshmallow-permissions-level21.png[Install UI when using the old permissions system,scaledwidth=20%]
+image::img/marshmallow-permissions-level21.png[Install UI when using the old permissions system,scaledwidth=20%]
 
-When we set `android.targetSDKVersion=23` in the build hints and try to install again the UI looks like this:
+When you keep the default target (API 33+) the installer defers to the runtime permission flow and the install UI looks like this instead:
 
 .Install UI when using the new permissions system
-image::img/developer-guide/marshmallow-permissions-level23.png[Install UI when using the new permissions system,scaledwidth=20%]
+image::img/marshmallow-permissions-level23.png[Install UI when using the new permissions system,scaledwidth=20%]
 
 When we launch the UI under the old permissions system we see the contacts instantly. In the new system we are presented with this UI:
 
 .Native permission prompt first time
-image::img/developer-guide/marshmallow-permissions-first-request.png[Native permission prompt first time,scaledwidth=20%]
+image::img/marshmallow-permissions-first-request.png[Native permission prompt first time,scaledwidth=20%]
 
 If we accept and allow all is good and the app loads as usual but if we deny then Codename One gives the user another chance to request the permission. Notice that in this case you can customize the prompt string as explained below.
 
 .Codename One permission prompt
-image::img/developer-guide/marshmallow-permissions-codenameone-prompt.png[Codename One permission prompt,scaledwidth=20%]
+image::img/marshmallow-permissions-codenameone-prompt.png[Codename One permission prompt,scaledwidth=20%]
 
 If we select don't ask then you will get a blank screen since the contacts will return as a 0 length array. This makes
 sense as the user is aware he denied permission and the app will still function as expected on a device where
@@ -736,7 +568,7 @@ no contacts are available.  However, if the user realizes his mistake he can dou
 permission in which case he will see this native prompt:
 
 .Native permission prompt second time
-image::img/developer-guide/marshmallow-permissions-second-request.png[Native permission prompt second time,scaledwidth=20%]
+image::img/marshmallow-permissions-second-request.png[Native permission prompt second time,scaledwidth=20%]
 
 Notice that denying this second request will not trigger another Codename One prompt.
 
@@ -768,7 +600,7 @@ The following permission keys are supported: "android.permission.READ_PHONE_STAT
 You can simulate permission prompts by checking that option in the simulator menu.
 
 .Simulate permission prompts menu item in the simulator
-image::img/developer-guide/simulate-permission-prompts.png[Simulate permission prompts menu item in the simulator,scaledwidth=10%]
+image::img/simulate-permission-prompts.png[Simulate permission prompts menu item in the simulator,scaledwidth=10%]
 
 This will produce a dialog to the user whenever this happens in Android and will try to act in a similar way to the device. Notice that you can test it in the iOS simulator too.
 
@@ -808,7 +640,7 @@ With Android Studio this is sometimes as very easy task as it is possible to act
 By default you should be able to open the gradle project in Android Studio and just run it. To get this to work open the Android Studio #Setting# and select gradle *2.11*.
 
 .Gradle settings UI in Android Studio (notice you need gradle 2.11 and not 2.8 as pictured here)
-image::img/developer-guide/gradle-settings.png[Gradle settings UI in Android Studio,scaledwidth=50%]
+image::img/gradle-settings.png[Gradle settings UI in Android Studio,scaledwidth=50%]
 
 If this works for you then you can ignore the section below.
 
@@ -870,22 +702,22 @@ public interface MyNative extends NativeInterface {
 We now need to right click the class in the IDE and select the #Generate Native Access# menu item:
 
 .Generating the native code
-image::img/developer-guide/native-interfaces-generate-menu.png[Generating the native code,scaledwidth=20%]
+image::img/native-interfaces-generate-menu.png[Generating the native code,scaledwidth=20%]
 
 .Once generated we are prompted that the native code is in the "native" directory
-image::img/developer-guide/native-interfaces-generated.png[Once generated we are prompted that the native code is in the "native" directory,scaledwidth=40%]
+image::img/native-interfaces-generated.png[Once generated we are prompted that the native code is in the "native" directory,scaledwidth=40%]
 
 We can now look int the #native# directory in the project root (in NetBeans you can see that in the #Files# tab) and you can see something that looks like this:
 
 .Native directory structure containing stubs for the various platforms
-image::img/developer-guide/native-interfaces-native-hierarchy.png[Native directory structure containing stubs for the various platforms,scaledwidth=30%]
+image::img/native-interfaces-native-hierarchy.png[Native directory structure containing stubs for the various platforms,scaledwidth=30%]
 
 These are effectively stubs you can edit to implement the methods in native code.
 
 TIP: If you re-run the #Generate Native Access# tool you will get this dialog, if you answer yes all the files will be overwritten, if you answer no only files you deleted/renamed will be recreated
 
 .Running "Generate Native Access" when some/all of the native files exist already
-image::img/developer-guide/native-interfaces-generated-existing.png[Running "Generate Native Access" when some/all of the native files exist already,scaledwidth=40%]
+image::img/native-interfaces-generated-existing.png[Running "Generate Native Access" when some/all of the native files exist already,scaledwidth=40%]
 
 For now lets leave the stubs and come back to them soon. From the Codename One Java code we can call the implementation of this native interface using:
 
@@ -1293,7 +1125,7 @@ Several rules govern the creation of NativeInterfaces and we only briefly covere
 - `hashCode`, `equals` & `toString` are reserved and won't be mapped to native code
 
 .NativeInterface Supported Types
-[cols="6*",options="header"]
+[cols="5*",options="header"]
 |====
 | Java         | Android   | JavaSE    | Obj-C     | C#
 |byte          | byte      | byte      | char      | sbyte
@@ -1854,7 +1686,7 @@ Support for JAR files in Codename One has been a source of confusion so its prob
 The first source of confusion is changing the classpath. You should NEVER change the classpath or add an external JAR via the IDE classpath UI. The reasoning here is very simple, these IDE's don't package the JAR's into the final executable and even if they did these JAR's would probably use features unavailable or inappropriate for the device (e.g. `java.io.File` etc.).
 
 .Don't change the classpath, this is how it should look for a typical Java 8 Codename One application
-image::img/developer-guide/cn1libs-dont-change-classpath.png[Don't change the classpath, this is how it should look for a typical Java 8 Codename One application,scaledwidth=40%]
+image::img/cn1libs-dont-change-classpath.png[Don't change the classpath, this is how it should look for a typical Java 8 Codename One application,scaledwidth=40%]
 
 Cn1libs are Codename One's file format for 3rd party extensions. It's physicially a zip file containing other zip files and some meta-data.
 
@@ -1879,7 +1711,7 @@ Cn1lib’s address the modularity aspect allowing you to break that down. Existi
 Codename One has a large repository of https://www.codenameone.com/cn1libs.html[3rd party cn1libs], you can install a cn1lib by placing it in the lib directory of your project then right clicking the project and selecting #Codename One# -> #Refresh cn1lib files#.
 
 .Refresh cn1lib files menu option
-image::img/developer-guide/cn1libs-refresh.png[Refresh cn1lib files menu option,scaledwidth=40%]
+image::img/cn1libs-refresh.png[Refresh cn1lib files menu option,scaledwidth=40%]
 
 Once refreshed the content of the cn1lib will be available to code completion and you could just use it.
 
@@ -1899,10 +1731,10 @@ The native files are extracted to `lib/impl/native`. The classpath for the main 
 Creating a cn1lib is trivial, we will get into more elaborate uses soon enough but for a hello world cn1lib we can just use this 2 step process:
 
 .Select the CodenameOne Library Option
-image::img/developer-guide/cn1lib-create-step1.png[Select the CodenameOne Library Option,scaledwidth=30%]
+image::img/cn1lib-create-step1.png[Select the CodenameOne Library Option,scaledwidth=30%]
 
 .Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!
-image::img/developer-guide/cn1lib-create-step2.png[Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!,scaledwidth=30%]
+image::img/cn1lib-create-step2.png[Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!,scaledwidth=30%]
 
 Once we go thru these steps we can define any source file within the library and it will be accessible to the users of the library.
 
@@ -2132,7 +1964,7 @@ hi.show();
 ----
 
 .Drag and drop demo
-image::img/developer-guide/draganddrop-rearrange-game.png[Drag and drop demo,scaledwidth=20%]
+image::img/draganddrop-rearrange-game.png[Drag and drop demo,scaledwidth=20%]
 
 
 To enable dragging a component it must be flagged as draggable using `setDraggable(true)`, to allow dropping the component onto another component you must first enable the drop target with `setDropTarget(true)` and override some methods (more on that later).
@@ -2155,43 +1987,6 @@ In the drop target you can override the following methods:
 * `drop` - the logic for dropping/moving the component must be implemented here!
 
 
-
-=== Continuous Integration & Release Engineering
-
-Codename One was essentially built for continuous integration since the build servers are effectively a building block for such an architecture. However, there are several problems with that: the first of which is limited server capacity.
-
-If all users would start sending builds with every commit the servers would instantly become unusable due to the heavy load. To circumvent this CI support is limited only on the Enterprise level which allows Codename One to stock more servers and cope with the rise in demand related to the feature.
-
-To integrate with any CI solution just use the standard Ant targets such as `build-for-android-device`, `build-for-iphone-device` etc.
-
-Normally, this would be a problem since the build is sent but since it isn't blocking you wouldn't get the build result and wouldn't be able to determine if the build passed or failed. To enable this just edit the build XML and add the attribute `automated="true"` to the codeNameOne tag in the appropriate
-targets.
-
-This will deliver a `result.zip` file under the `dist` folder containing the binaries of a successful build. It will
-also block until the build is completed. This should be pretty easy to integrate with any CI system together with
-our automated testing solutions .
-
-E.g. we can do a synchronous build like this:
-
-[source,xml]
-----
-<target name="build-for-javascript-sync" depends="clean,copy-javascript-override,copy-libs,jar,clean-override">
-    <codeNameOne
-        jarFile="${dist.jar}"
-        displayName="${codename1.displayName}"
-        packageName = "${codename1.packageName}"
-        mainClassName = "${codename1.mainName}"
-        version="${codename1.version}"
-        icon="${codename1.icon}"
-        vendor="${codename1.vendor}"
-        subtitle="${codename1.secondaryTitle}"
-        automated="true"
-        targetType="javascript"
-        />
-</target>
-----
-
-This allows us to build a JavaScript version of the app automatically as part of a release build script.
 
 === Android Lollipop ActionBar Customization
 
@@ -2383,13 +2178,13 @@ The following diagram shows the dependencies in a native library:
 
 [[fc8a77d2-61e0-11e5-9ecf-bf381d4ac966]]
 .Relationship between native & Codename One API UML Diagram
-image::img/developer-guide/fc8a77d2-61e0-11e5-9ecf-bf381d4ac966.png[Relationship between native and Codename One API UML Diagram,scaledwidth=50%]
+image::img/fc8a77d2-61e0-11e5-9ecf-bf381d4ac966.png[Relationship between native and Codename One API UML Diagram,scaledwidth=50%]
 
 In the specific case of our FreshDesk API, the public API and classes will look like:
 
 [[a5fe88406-61e4-11e5-951e-e09bd28a93c9]]
 .Freshdesk API Integration
-image::img/developer-guide/5fe88406-61e4-11e5-951e-e09bd28a93c9.png[Freshdesk API Integration,scaledwidth=30%]
+image::img/5fe88406-61e4-11e5-951e-e09bd28a93c9.png[Freshdesk API Integration,scaledwidth=30%]
 
 ===== Things to Notice
 
@@ -2897,13 +2692,13 @@ Now that we have set up our public API and our native interface, it is time to w
 
 [[c9d4b9cc-61f6-11e5-8b67-4691600188cd]]
 .Generate Native Access Menu Item
-image::img/developer-guide/c9d4b9cc-61f6-11e5-8b67-4691600188cd.png[Generate Native Access Menu Item,scaledwidth=20%]
+image::img/c9d4b9cc-61f6-11e5-8b67-4691600188cd.png[Generate Native Access Menu Item,scaledwidth=20%]
 
 This will generate a separate directory for each platform inside your project's `native` directory:
 
 [[eef6d078-61f6-11e5-91cd-2e1836916359]]
 .Native generated sources directory view
-image::img/developer-guide/eef6d078-61f6-11e5-91cd-2e1836916359.png[Native generated sources directory view,scaledwidth=15%]
+image::img/eef6d078-61f6-11e5-91cd-2e1836916359.png[Native generated sources directory view,scaledwidth=15%]
 
 Inside the `android` directory, this generates a `com/codename1/freshdesk/MobihelpNativeImpl` class with stubs for each method.
 
@@ -3279,13 +3074,13 @@ The iOS integration guide for the FreshDesk SDK lists the following core framewo
 
 [[IOSlinkoptions]]
 .IOS link options
-image::img/developer-guide/12c5303e-620c-11e5-9dbb-bcb4bebc0c87.png[iOS link options,scaledwidth=35%]
+image::img/12c5303e-620c-11e5-9dbb-bcb4bebc0c87.png[iOS link options,scaledwidth=35%]
 
 We can add these dependencies to our project using the `ios.add_libs` build hint.  E.g.
 
 [[a65e31df8-620c-11e5-87ff-6b926a3f2090]]
 .iOS's "add libs" build hint
-image::img/developer-guide/65e31df8-620c-11e5-87ff-6b926a3f2090.png[iOS's "add libs" build hint,scaledwidth=30%]
+image::img/65e31df8-620c-11e5-87ff-6b926a3f2090.png[iOS's "add libs" build hint,scaledwidth=30%]
 
 I.e. we just list the framework names separated by semicolons.   Notice that my list in the above image doesn't include all of the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by simply building the project with "include sources" checked, then looked at the frameworks that were included).
 
@@ -3373,7 +3168,7 @@ hi.show();
 ----
 
 .Center layout staircase effect with margin
-image::img/developer-guide/center-layout.png[Center layout staircase effect with margin,scaledwidth=20%]
+image::img/center-layout.png[Center layout staircase effect with margin,scaledwidth=20%]
 
 ==== Porting a Swing/AWT Layout Manager
 
@@ -3835,4 +3630,3 @@ You will notice 3 big things that aren't covered in this unified framework:
 
 - Versioned builds - there is a lot of complexity in the versioned build system. This might be something we address in the future but for now I wanted to keep the framework simple.
 
-- Offline builds - Offline builds work through manual download and aren't subjected to this framework

@@ -188,12 +188,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     
     private static final int ICON_SIZE=24;
+    private static final String PREF_AUTO_UPDATE_DEFAULT_BUNDLE = "cn1.autoDefaultResourceBundle";
     public final static boolean IS_MAC;
     private static boolean isIOS;
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
     private Boolean darkMode;
+    private AutoLocalizationBundle autoLocalizationBundle;
+    private boolean autoUpdateDefaultResourceBundle;
 
     /**
      * @return the fullScreen
@@ -227,6 +230,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean isFullScreenSupported() {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false);
+        if (autoUpdateDefaultResourceBundle) {
+            enableAutoLocalizationBundle();
+        } else {
+            disableAutoLocalizationBundle();
+        }
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (isSimulator() && !desktopSkin) {
             return false;
@@ -3484,6 +3493,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulatorMenu.add(useAppFrameMenu);
 
+        final JCheckBoxMenuItem autoLocalizationMenu = new JCheckBoxMenuItem("Auto Update Default Bundle");
+        autoLocalizationMenu.setSelected(autoUpdateDefaultResourceBundle);
+        autoLocalizationMenu.addItemListener(new ItemListener() {
+
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                boolean selected = autoLocalizationMenu.isSelected();
+                autoUpdateDefaultResourceBundle = selected;
+                pref.putBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, selected);
+                if (selected) {
+                    enableAutoLocalizationBundle();
+                } else {
+                    disableAutoLocalizationBundle();
+                }
+            }
+        });
+        simulatorMenu.add(autoLocalizationMenu);
+
         final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
         if (appFrame == null) simulatorMenu.add(zoomMenu);
 
@@ -5281,6 +5308,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }*/
                 
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false);
+        if (autoUpdateDefaultResourceBundle) {
+            enableAutoLocalizationBundle();
+        } else {
+            disableAutoLocalizationBundle();
+        }
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
             safeAreaLandscape = null;
@@ -13623,7 +13656,260 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.canExecute(url);
     }
 
-    
+
+    private void enableAutoLocalizationBundle() {
+        File bundleFile = findDefaultLocalizationBundleFile();
+        if (bundleFile == null) {
+            return;
+        }
+        Map<String, String> current = UIManager.getInstance().getBundle();
+        if (current instanceof AutoLocalizationBundle) {
+            AutoLocalizationBundle existing = (AutoLocalizationBundle) current;
+            if (existing.isForFile(bundleFile)) {
+                autoLocalizationBundle = existing;
+                existing.ensureFileExists();
+                return;
+            }
+        }
+        AutoLocalizationBundle newBundle = new AutoLocalizationBundle(bundleFile, current);
+        autoLocalizationBundle = newBundle;
+        UIManager.getInstance().setBundle(newBundle);
+    }
+
+    private void disableAutoLocalizationBundle() {
+        Map<String, String> current = UIManager.getInstance().getBundle();
+        if (current instanceof AutoLocalizationBundle) {
+            AutoLocalizationBundle existing = (AutoLocalizationBundle) current;
+            Map<String, String> snapshot = new HashMap<String, String>(existing);
+            UIManager.getInstance().setBundle(snapshot);
+        }
+        autoLocalizationBundle = null;
+    }
+
+    private File findDefaultLocalizationBundleFile() {
+        File localizationDir = findLocalizationDirectory();
+        if (localizationDir == null) {
+            return null;
+        }
+        java.util.List<File> bundles = new java.util.ArrayList<File>();
+        collectLocalizationBundles(localizationDir, bundles);
+        File preferred = new File(localizationDir, "Bundle.properties");
+        if (preferred.exists()) {
+            return preferred;
+        }
+        File best = null;
+        for (File f : bundles) {
+            String name = f.getName();
+            if (!name.endsWith(".properties")) {
+                continue;
+            }
+            String base = name.substring(0, name.length() - ".properties".length());
+            if (base.indexOf('_') < 0) {
+                if (best == null) {
+                    best = f;
+                }
+                if ("Bundle".equals(base)) {
+                    best = f;
+                    break;
+                }
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        if (!bundles.isEmpty()) {
+            java.util.Collections.sort(bundles);
+            return bundles.get(0);
+        }
+        return preferred;
+    }
+
+    private void collectLocalizationBundles(File dir, java.util.List<File> out) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            if (f.isDirectory()) {
+                collectLocalizationBundles(f, out);
+            } else if (f.getName().endsWith(".properties")) {
+                out.add(f);
+            }
+        }
+    }
+
+    private File findLocalizationDirectory() {
+        File projectDir = getCWD();
+        File[] candidates = new File[]{
+            new File(projectDir, "src" + File.separator + "main" + File.separator + "l10n"),
+            new File(projectDir, "l10n"),
+            new File(projectDir, "src" + File.separator + "l10n")
+        };
+        for (File dir : candidates) {
+            if (dir.exists() && dir.isDirectory()) {
+                return dir;
+            }
+        }
+        File fallback = candidates[0];
+        if (!fallback.exists()) {
+            fallback.mkdirs();
+        }
+        if (fallback.exists() && fallback.isDirectory()) {
+            return fallback;
+        }
+        return null;
+    }
+
+    private static class AutoLocalizationBundle extends Hashtable<String, String> {
+        private static final long serialVersionUID = 1L;
+
+        private File bundleFile;
+        private final java.util.Properties properties = new java.util.Properties();
+        private boolean dirty;
+
+        AutoLocalizationBundle(File bundleFile, Map<String, String> base) {
+            this.bundleFile = bundleFile;
+            ensureParentExists();
+            if (bundleFile.exists()) {
+                loadFromFile();
+            } else {
+                persist();
+            }
+            if (base != null && !base.isEmpty()) {
+                for (Map.Entry<String, String> entry : base.entrySet()) {
+                    if (entry.getKey() == null || entry.getValue() == null) {
+                        continue;
+                    }
+                    putInternal(entry.getKey(), entry.getValue());
+                    storeEntry(entry.getKey(), entry.getValue(), false);
+                }
+                persistIfNeeded(true);
+            }
+        }
+
+        private void loadFromFile() {
+            try (InputStream in = new FileInputStream(bundleFile)) {
+                properties.clear();
+                properties.load(in);
+                super.clear();
+                for (String name : properties.stringPropertyNames()) {
+                    putInternal(name, properties.getProperty(name));
+                }
+                dirty = false;
+            } catch (IOException err) {
+                Log.e(err);
+            }
+        }
+
+        private void ensureParentExists() {
+            File parent = bundleFile.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+        }
+
+        private void persist() {
+            ensureParentExists();
+            try (OutputStream out = new FileOutputStream(bundleFile)) {
+                properties.store(out, "Codename One auto-generated bundle");
+            } catch (IOException err) {
+                Log.e(err);
+            }
+            dirty = false;
+        }
+
+        private void persistIfNeeded(boolean force) {
+            if (force) {
+                if (dirty || !bundleFile.exists()) {
+                    persist();
+                } else {
+                    ensureParentExists();
+                }
+            } else if (dirty) {
+                persist();
+            }
+        }
+
+        private void storeEntry(String key, String value, boolean flush) {
+            if (key == null || value == null) {
+                return;
+            }
+            String current = properties.getProperty(key);
+            if (current == null || !current.equals(value)) {
+                properties.setProperty(key, value);
+                dirty = true;
+            }
+            if (flush) {
+                persistIfNeeded(true);
+            }
+        }
+
+        private String putInternal(String key, String value) {
+            return (String) super.put(key, value);
+        }
+
+        @Override
+        public synchronized String get(Object key) {
+            String value = super.get(key);
+            if (key instanceof String) {
+                String strKey = (String) key;
+                if (value == null) {
+                    String autoValue = strKey;
+                    putInternal(strKey, autoValue);
+                    storeEntry(strKey, autoValue, true);
+                    value = autoValue;
+                }
+            }
+            return value;
+        }
+
+        @Override
+        public synchronized String put(String key, String value) {
+            String result = putInternal(key, value);
+            storeEntry(key, value, true);
+            return result;
+        }
+
+        @Override
+        public synchronized String remove(Object key) {
+            String result = super.remove(key);
+            if (key instanceof String) {
+                if (properties.containsKey(key)) {
+                    properties.remove(key);
+                    dirty = true;
+                    persistIfNeeded(true);
+                } else {
+                    ensureParentExists();
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public synchronized void clear() {
+            super.clear();
+            if (!properties.isEmpty()) {
+                properties.clear();
+                dirty = true;
+                persistIfNeeded(true);
+            } else {
+                ensureParentExists();
+            }
+        }
+
+        boolean isForFile(File file) {
+            return bundleFile.equals(file);
+        }
+
+        void ensureFileExists() {
+            ensureParentExists();
+            if (!bundleFile.exists()) {
+                persist();
+            }
+        }
+    }
+
+
     public static File getCWD() {
         return new File(System.getProperty("user.dir"));
     }

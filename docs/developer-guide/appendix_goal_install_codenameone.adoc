@@ -1,0 +1,3 @@
+=== Install Codename One (`install-codenameone`)
+
+Installs/Updates Codename One into the user's home directory.  This goal is automtically run if a Maven build is attempted and it detects that Codename One is not yet installed (in the `$HOME/.codenameone`) directory.

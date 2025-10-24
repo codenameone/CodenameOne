@@ -1,0 +1,5 @@
+=== Compile CSS (`css`)
+
+Compiles the project's CSS files, generating a theme.res file which is placed in the build/classes directory.
+
+This goal is bound to the `process-classes` phase of  <<cn1app-archetype>> projects, so you generally shouldn't need to run this goal directly.

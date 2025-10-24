@@ -74,7 +74,7 @@ When we want to adapt the look of an application to different OS conventions one
 Codename One allows you to override a resource for a specific platform when doing this you can redefine a resource differently for that specific platform and also add platform specific resources.
 
 .Override resources for specific platform
-image::img/developer-guide/override-resource.png[Override resources for specific platform]
+image::img/override-resource.png[Override resources for specific platform]
 
 `Overriden` resources take precedence over embedded resources thus allowing us to change the look or even behavior (when overriding a GUI builder element) for a specific platform/OS.
 
@@ -84,7 +84,7 @@ To override select the platform where overriding is applicable
 
 [[override-platform]]
 .Override for platform, allows us to override the checked resources and replace them with another resource
-image::img/developer-guide/override-platform.png[Override for platform, allows us to override the checked resources and replace them with another resource]
+image::img/override-platform.png[Override for platform, allows us to override the checked resources and replace them with another resource]
 
 You can then click the green checkbox to define that this resource is specific to this platform. All resources added when the platform is selected will only apply to the selected platform. If you change your mind and are no longer interested in a particular override just delete it in the override mode and it will no longer be overridden.
 
@@ -186,6 +186,15 @@ SoftKey, Touch, Bar, Title, Right, Native
 |defaultEmblemImage
 |The emblem painted on the side of the multibutton, by default this is an arrow on some platforms
 
+|emblemUiid
+|Overrides the UIID applied to emblem labels rendered by composite buttons such as `MultiButton` and `SpanMultiButton`.
+
+|iconUiid
+|Allows theming the icon component used by `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` when they fetch icon styling via theme constants.
+
+|textUiid
+|Overrides the text component UIID for `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` instances when provided as a theme constant.
+
 |dialogTransitionOutImage
 |Default transition https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] for dialog, causes a https://www.codenameone.com/javadoc/com/codename1/ui/animations/Timeline.html[Timeline] transition effect
 
@@ -261,11 +270,26 @@ SoftKey, Touch, Bar, Title, Right, Native
 |hideLeftSideMenuBool
 |Hides the side menu icon that appears on the left side of the UI
 
+|hideRightSideMenuBool
+|Hides the toolbar menu icon that appears on the right side of the title area
+
 |ignorListFocusBool
 |Hide the focus component of the list when the list doesn't have focus
 
 |infiniteImage
 |The image used by the infinite progress component, the component will rotate it as needed
+
+|infiniteMaterialDesignSize
+|Size (in millimeters) of the generated material design spinner when `InfiniteProgress` runs in material mode. Defaults to 6.667mm
+
+|infiniteMaterialImageSize
+|Size (in millimeters) of the generated spinner image when no custom `infiniteImage` is provided. Defaults to 7mm
+
+|infiniteDefaultColor
+|Hex RGB color used for the auto-generated material spinner when `infiniteImage` isn't supplied. Defaults to `777777`
+
+|interactionDialogSpeedInt
+|Controls the duration in milliseconds that `InteractionDialog` uses when animating into and out of the layered pane (including the directional dispose helpers). Defaults to `400` if the constant is not defined.
 
 |includeNativeBool
 |True to derive from the platform native theme, false to create a blank theme that only uses the basic defaults
@@ -306,6 +330,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |menuButtonTopBool
 |When set to true this flag aligns the menu button to the top portion of the title. Defaults to false
 
+|landscapeTitleUiidBool
+|When true the toolbar swaps to landscape-specific UIIDs (such as `ToolbarLandscape`/`BackCommandLandscape`) for layout and icon styling
+
 |menuHeightPercent
 |Allows positioning and sizing the menu
 
@@ -342,6 +369,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |menuWidthPercent
 |Allows positioning and sizing the menu
 
+|iosStyleBackArrowBool
+|Renders the back command using the iOS-style chevron arrow (with a small icon gap) when the toolbar shows back text
+
 |minimizeOnBackBool
 |Indicates whether the form should minimize the entire application when the physical back button is pressed (if available) and no command is defined as the back command. Defaults to true
 
@@ -356,6 +386,12 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |paintsTitleBarBool
 |Indicates that the StatusBar UIID should be added to the top of the form to space down the title area, as is the case on iOS 7+ where the status bar is painted on top of the UI
+
+|rightSideMenuImage
+|Overrides the default icon used for the right-side toolbar menu button
+
+|rightSideMenuPressImage
+|Optional pressed-state icon for the right-side toolbar menu button
 
 |popupCancelBodyBool
 |Indicates that a cancel button should appear within the combo box popup
@@ -479,6 +515,15 @@ SoftKey, Touch, Bar, Title, Right, Native
 
 |sideSwipeSensitiveInt
 |Indicates the region of the screen that is sensitive to side swipe in the side menu bar, defaults to 10 (percent)
+
+|sigButtonOKUIID
+|Defines the UIID applied to the confirmation button in the signature capture dialog (defaults to `Button`).
+
+|sigButtonResetUIID
+|Defines the UIID applied to the reset/clear button in the signature capture dialog (defaults to `Button`).
+
+|sigButtonCancelUIID
+|Defines the UIID applied to the cancel button in the signature capture dialog (defaults to `Button`).
 
 |slideDirection
 |Default slide transition settings
@@ -615,7 +660,7 @@ are abstracted by native theming. Without it you will need to do everything from
 You can simulate different OS platforms by using the native theme menu option
 
 .The native theme menu option
-image::img/developer-guide/designer-native-theme-menu.png[The native theme menu option,scaledwidth=30%]
+image::img/designer-native-theme-menu.png[The native theme menu option,scaledwidth=30%]
 
 Developers can pick the platform of their liking and see how the theme will appear in that particular platform by selecting it and having the preview update on the fly.
 
@@ -709,7 +754,7 @@ TIP: This relies on the common use case of asking your designer to design for on
 
 Alternatively, you can use the standard add multi-image dialog and set it like this:
 
-image::img/developer-guide/select-image-resolutions.png[Multi-image resolution dialog,scaledwidth=50%]
+image::img/select-image-resolutions.png[Multi-image resolution dialog,scaledwidth=50%]
 
 Notice that we selected the square image option, essentially eliminating the height option. Setting values to 0 prevents the
 system from generating a multi-image entry for that resolution, which will mean a device in that category will fall
@@ -768,7 +813,7 @@ myButton.getAllStyles().setPadding(pixels, pixels, pixels, pixels);
 === Creating a Great Looking Side Menu
 
 .Side Menu final result
-image::img/developer-guide/styled-sidemenu-result.png[Side Menu final result,scaledwidth=50%]
+image::img/styled-sidemenu-result.png[Side Menu final result,scaledwidth=50%]
 
 A side menu is a crucial piece of an elegant application. We'll explain how one creates a simple side menu that's elegant, portable and easy to build. This is a good "starting point" side menu from which you can build more elaborate designs.
 
@@ -804,62 +849,62 @@ hi.show();
 Next we'll open the designer tool to style the UI
 
 .Open the side menu so we will get the right values in the combo box on add
-image::img/developer-guide/styled-sidemenu-1.png[Open the side menu so we will get the right values in the combo box on add,scaledwidth=40%]
+image::img/styled-sidemenu-1.png[Open the side menu so we will get the right values in the combo box on add,scaledwidth=40%]
 
 Now when we press #Add# the side menu entries will appear in the combo box (you can type them but this is more convenient). We'll start with the #SideNavigationPanel# style:
 
 .The SideNavigationPanel has an opaque white background
-image::img/developer-guide/styled-sidemenu-2.png[The SideNavigationPanel has an opaque white background,scaledwidth=40%]
+image::img/styled-sidemenu-2.png[The SideNavigationPanel has an opaque white background,scaledwidth=40%]
 
 The #SideCommand# style is a bit more elaborate, we start with a white foreground and an opaque bluish/purple color:
 
 .The SideCommand has a white foreground and opaque bluish background
-image::img/developer-guide/styled-sidemenu-3.png[The SideCommand has a white foreground and opaque bluish background,scaledwidth=40%]
+image::img/styled-sidemenu-3.png[The SideCommand has a white foreground and opaque bluish background,scaledwidth=40%]
 
 We'll set padding to 3 millimeters which gives everything a good feel and spacing. This is important for finger touch sensitivity.
 
 .Padding is 3mm so it will feel spacious and touch friendly
-image::img/developer-guide/styled-sidemenu-4.png[Padding is 3mm so it will feel spacious and touch friendly,scaledwidth=40%]
+image::img/styled-sidemenu-4.png[Padding is 3mm so it will feel spacious and touch friendly,scaledwidth=40%]
 
 We'll set margin to 0 except for the bottom one pixel which will leave a nice white line by showing off the background. This means the commands will have a space between them and the white style we gave to the #SideNavigationPanel# will appear thru that space.
 
 .Margin is 0 except for a thin line below each command
-image::img/developer-guide/styled-sidemenu-5.png[Margin is 0 except for a thin line below each command,scaledwidth=40%]
+image::img/styled-sidemenu-5.png[Margin is 0 except for a thin line below each command,scaledwidth=40%]
 
 Setting the border to empty is crucial!
 
 The iOS version of the side command inherits a border style so we must "remove" it by defining a different border in this case an empty border. Since borders take precedence over color this would have prevented the color changes we made from appearing.
 
 .Border must be defined as Empty
-image::img/developer-guide/styled-sidemenu-6.png[Border must be defined as Empty,scaledwidth=40%]
+image::img/styled-sidemenu-6.png[Border must be defined as Empty,scaledwidth=40%]
 
 Next we need to pick a good looking font and make sure it's large enough. We use millimeters size it correctly for all OS’s and override the derived text decoration which has a value in the iOS native theme so it can impact the final look.
 
 .Pick a good looking font for the side command
-image::img/developer-guide/styled-sidemenu-7.png[Pick a good looking font for the side command,scaledwidth=40%]
+image::img/styled-sidemenu-7.png[Pick a good looking font for the side command,scaledwidth=40%]
 
 Next we need to move to the selected tab and add a new side command entry that derives from the unselected version. We'll pick a new color that’s slightly deeper and will make the selected style appear selected. We'll also copy and paste this selected style to the pressed style.
 
 .Selected & Pressed SideCommand
-image::img/developer-guide/styled-sidemenu-8.png[Selected & Pressed SideCommand,scaledwidth=40%]
+image::img/styled-sidemenu-8.png[Selected & Pressed SideCommand,scaledwidth=40%]
 
 .Color for the Selected/Pressed SideCommand
-image::img/developer-guide/styled-sidemenu-9.png[Color for the Selected/Pressed SideCommand,scaledwidth=40%]
+image::img/styled-sidemenu-9.png[Color for the Selected/Pressed SideCommand,scaledwidth=40%]
 
 The #SidemenuTagline# is just a #SideCommand# style that was slightly adapted. We'll remove the padding and margin because the whole section is wrapped in a side command and we don't want double padding. We'll leave 1mm padding at the top for a bit of spacing from the logo.
 
 .Padding of the SidemenuTagline
-image::img/developer-guide/styled-sidemenu-10.png[Padding of the SidemenuTagline,scaledwidth=40%]
+image::img/styled-sidemenu-10.png[Padding of the SidemenuTagline,scaledwidth=40%]
 
 We'll also update the font to a smaller size and italic styling so it will feel like a tagline.
 
 .Font for the SideMenuTagline is slightly smaller and italic
-image::img/developer-guide/styled-sidemenu-11.png[Font for the SideMenuTagline is slightly smaller and italic,scaledwidth=40%]
+image::img/styled-sidemenu-11.png[Font for the SideMenuTagline is slightly smaller and italic,scaledwidth=40%]
 
 The last change for the theme is for the #StatusBarSideMenu# UIID which is a spacing on the top of the sidemenu. This spacing is there for iOS devices which render the clock/battery/reception symbols on top of the app. We'll set the padding to 0.
 
 .StatusBarSideMenu padding for the top of the side menu
-image::img/developer-guide/styled-sidemenu-11.png[StatusBarSideMenu padding for the top of the side menu,scaledwidth=40%]
+image::img/styled-sidemenu-11.png[StatusBarSideMenu padding for the top of the side menu,scaledwidth=40%]
 
 Finally, we'll add the icon image (or a logo if you have it) into the theme as a multi image so we can use it within the side menu as a good looking logo. A relatively large icon image works as a 2HD multi-image but you can use many strategies to get a fitting image for this spot.
 
@@ -881,12 +926,12 @@ The process we followed was:
 http://freebiesbug.com/psd-freebies/iphone-6-ui-kit/[this PSD file] created by https://dribbble.com/adrianchiran[Adrian Chiran] (we mirrored it https://www.codenameone.com/files/iOS_UI-Kit.psd[here] in case it goes offline):
 +
 .Sign Up form Design
-image::img/developer-guide/psd2app-image1.png[Sign Up form Design,scaledwidth=25%]
+image::img/psd2app-image1.png[Sign Up form Design,scaledwidth=25%]
 
 . Re-create the general structure and layout of the design in a Codename One `Form` using nested components and layout managers.  Here is a break-down of how we structured the component hierarchy in the `Form`:
 +
 .Component hierarchy and layouts
-image::img/developer-guide/psd2app-image2.png[Component hierarchy and layouts,scaledwidth=50%]
+image::img/psd2app-image2.png[Component hierarchy and layouts,scaledwidth=50%]
 . Extract the images we needed using Photoshop - this process is often referred to as "cutting"
 
 . Extract the fonts, colors, and styles we needed to reproduce the design in Codename One
@@ -896,7 +941,7 @@ image::img/developer-guide/psd2app-image2.png[Component hierarchy and layouts,sc
 Here is a screenshot of the resulting component running inside the Codename One simulator:
 
 .Resulting app in the Codename One simulator
-image::img/developer-guide/psd2app-image3.png[Resulting app in the Codename One simulator,scaledwidth=25%]
+image::img/psd2app-image3.png[Resulting app in the Codename One simulator,scaledwidth=25%]
 
 ==== Breaking Down the PSD
 
@@ -914,24 +959,24 @@ In this PSD we want only one of the screen designs so initially we want to remov
 You should end up with something like this where a layer is selected in the layers window:
 
 .Selecting a layer from the region you are interested in
-image::img/developer-guide/psd2app-image4.png[Selecting a layer from the region you are interested in]
+image::img/psd2app-image4.png[Selecting a layer from the region you are interested in]
 
 Scroll up the hierarchy a bit and uncheck/recheck the eye icon on the left until you locate the right element layer.
 
 .Selecting a layer from the region you are interested in
-image::img/developer-guide/psd2app-image5.png[Find the right element layer you are interested in,scaledwidth=30%]
+image::img/psd2app-image5.png[Find the right element layer you are interested in,scaledwidth=30%]
 
 Right click the layer and select #Convert To Smart Object#.
 
 IMPORTANT: The right click menu will present different options when you click different areas of the layer, clicking on the left area of the layer works
 
 .In the right click menu option select "Convert To Smart Object"
-image::img/developer-guide/psd2app-image6.png[In the right click menu option select "Convert To Smart Object",scaledwidth=40%]
+image::img/psd2app-image6.png[In the right click menu option select "Convert To Smart Object",scaledwidth=40%]
 
 Once the layer hierarchy is a smart object you can just double click it which will open the sub hierarchy in a new tab and you now only have the pieces of the image you care about.
 
 .Double clicking the smart object allows us to edit only the form we need
-image::img/developer-guide/psd2app-image7.png[Double clicking the smart object allows us to edit only the form we need,scaledwidth=40%]
+image::img/psd2app-image7.png[Double clicking the smart object allows us to edit only the form we need,scaledwidth=40%]
 
 ===== Removing the Noise
 
@@ -944,19 +989,19 @@ We don't need the "Sign Up" or "Done" strings in the title either but before rem
 To discover that I can click them to select the layer then switch to the text tool:
 
 .The text tool allows us to inspect the font used
-image::img/developer-guide/psd2app-image8.png[The text tool allows us to inspect the font used,scaledwidth=5%]
+image::img/psd2app-image8.png[The text tool allows us to inspect the font used,scaledwidth=5%]
 
 Then I can double click the text area layer to find out the font in the top of the UI like this:
 
 .The Done toolbar entry uses SourceSansPro Regular
-image::img/developer-guide/psd2app-image9.png[The Done toolbar entry uses SourceSansPro Regular]
+image::img/psd2app-image9.png[The Done toolbar entry uses SourceSansPro Regular]
 
 TIP: Notice that I don't actually need to have the font installed in this case I don't (hence the square brackets)
 
 Also notice that the color of the font is accessible in that toolbar, by clicking the color element we get this dialog which shows the color value to be #f73267#, this is something we will use later
 
 .The color dialog lists the hex color at the bottom, we can paste that directly to the designer tool
-image::img/developer-guide/psd2app-image10.png[The color dialog lists the hex color at the bottom, we can paste that directly to the designer tool,scaledwidth=40%]
+image::img/psd2app-image10.png[The color dialog lists the hex color at the bottom, we can paste that directly to the designer tool,scaledwidth=40%]
 
 We can now hide both text layers so they won't pose a problem later.
 
@@ -967,13 +1012,13 @@ The camera button includes an icon and the button background itself. You can jus
 When you click on the camera icon you will notice that the camera icon is comprised of two separate layers: the camera and the "x" symbol above it. We can select both layers using #ctrl-click# (command click on the Mac) and convert both to a smart object together using the same method as before:
 
 .The camera smart object
-image::img/developer-guide/psd2app-image11.png[The camera smart object]
+image::img/psd2app-image11.png[The camera smart object]
 
 Since the image is used as an icon we want it to be completely square which isn't the situation here! +
 This is important as a non-square image can trigger misalignment when dealing with icons and the background. So we need to use the #Image# -> #Canvas Size# menu and set the values to be the same (the higher value of the two).
 
 .The canvas size dialog for the camera.png file
-image::img/developer-guide/psd-image-size.png[The canvas size dialog for the camera.png file,scaledwidth=40%]
+image::img/psd-image-size.png[The canvas size dialog for the camera.png file,scaledwidth=40%]
 
 We can now use #File# -> #Export# and save the first image resource we will need into a temporary directory. Make sure to save a PNG file to preserve quality and transparency!
 
@@ -982,13 +1027,13 @@ TIP: Use #File# -> #Export# and never use #File# -> #Save As#. The latter can pr
 For convenience we'll refer to the file as `camera.png` when we need it later.
 
 .The camera icon image
-image::img/developer-guide/camera.png[The camera icon image,scaledwidth=4%]
+image::img/camera.png[The camera icon image,scaledwidth=4%]
 
 We can follow the exact same procedure with the parent button layer (the white portion) which we can convert to a smart object and export `camera-button.png`.
 
 ****
 .The camera button image set to a gray background so it will be visible
-image::img/developer-guide/camera-button.png[The camera button image set to a gray background so it will be visible,scaledwidth=15%]
+image::img/camera-button.png[The camera button image set to a gray background so it will be visible,scaledwidth=15%]
 ****
 
 Now we can hide both of these elements and proceed to get the background image for the title.
@@ -998,7 +1043,7 @@ Here the "smart object trick" won't work... There is an effects layer in place a
 We need to switch to the rectangular select tool:
 
 .The select tool and the clean image we want to select
-image::img/developer-guide/psd2app-image12.png[The select tool and the clean image we want to select]
+image::img/psd2app-image12.png[The select tool and the clean image we want to select]
 
 Now drag the select tool to select the image don't cross into the white pixels below the image. You can use the zoom value and set it to a very high value to get the selection right.
 
@@ -1009,12 +1054,12 @@ Now click #File# -> #New# it should have the #Presets# set to #Clipboard# which 
 You can now save the image, since it's just a background using JPEG is totally acceptable in this case. We named it `background.jpg`.
 
 .The background image
-image::img/developer-guide/background.jpg[The background image,scaledwidth=40%]
+image::img/background.jpg[The background image,scaledwidth=40%]
 
 The last thing we need is the colors used in the UI. We can use the "eye drop" tool in a high zoom level to discover the colors of various elements e.g. the text color is `4d606f` and the separator color is `f5f5f5`:
 
 .The eye drop tool can be pointed at an area of the image to get the color in that region
-image::img/developer-guide/psd2app-image13.png[The eye drop tool can be pointed at an area of the image to get the color in that region]
+image::img/psd2app-image13.png[The eye drop tool can be pointed at an area of the image to get the color in that region]
 
 ==== The Code
 
@@ -1023,7 +1068,7 @@ While that was verbose it was relatively simple. We'll create a simple barebones
 NOTE: The reason for this is to avoid "noise", if we use a more elaborate theme it would have some existing settings. This can make the tutorial harder to follow
 
 .Simple bare bones app settings
-image::img/developer-guide/psd2app-image14.png[Simple bare bones app settings]
+image::img/psd2app-image14.png[Simple bare bones app settings]
 
 Once the project is created double click the `theme.res` file and within the designer select #Images# -> #Quick Add Multi Images#. Select the 3 images we created above: `background.jpg`, `camera.png` & `camera-button.png`. Leave the default setting on #Very High# and press #OK#.
 
@@ -1128,10 +1173,10 @@ public void start() {
 So the code above is most of the work but we still need to put everything together using the theme. This is what we have so far:
 
 .Before applying the changes to the theme this is what we have
-image::img/developer-guide/psd2app-image15.png[Before applying the changes to the theme this is what we have,scaledwidth=20%]
+image::img/psd2app-image15.png[Before applying the changes to the theme this is what we have,scaledwidth=20%]
 
 .This is what we are aiming at with no additional code changes
-image::img/developer-guide/psd2app-image16.png[This is what we are aiming at with no additional code changes,scaledwidth=20%]
+image::img/psd2app-image16.png[This is what we are aiming at with no additional code changes,scaledwidth=20%]
 
 This looks like a major set of changes but it requires exactly 10 UIID definitions to get to this look!
 

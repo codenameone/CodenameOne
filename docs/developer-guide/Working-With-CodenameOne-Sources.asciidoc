@@ -1,85 +1,103 @@
 == Working with Codename One Sources
 
-=== Checking out the Sources
+The Codename One SDK is published as a Maven multi-module project. Building the
+aggregator in the `/maven` directory compiles every module, installs the
+artifacts into your local Maven repository, and lets you depend on the exact
+snapshot you cloned from GitHub.
+
+=== Prerequisites
+
+Codename One uses multiple JDKs and Maven profiles during the build. Make sure
+your development machine includes the following tooling (see
+`BUILDING.md` for platform-specific installation tips):
+
+* JDK 8 (required for the core build and Maven invocations)
+* JDK 17 (required when compiling the Android port)
+* Apache Maven 3.6 or newer
+* macOS with Xcode (only if you plan to build or test the iOS port)
+
+=== Preparing the Maven workspace
+
+Clone the repository and run the Maven aggregator from inside the `maven`
+subdirectory. This installs the complete SDK (core runtime, simulator, and
+ports) into your local Maven cache:
 
 [source,bash]
 ----
-$ mkdir workspace
-$ cd workspace
 $ git clone https://github.com/codenameone/CodenameOne
+$ cd CodenameOne/maven
+$ mvn install
 ----
 
-NOTE: Creating a clean "workspace" directory is optional, and there is nothing special about the name "workspace".  It is just recommended to create a clean directory into which you check out Codename One, because building Codename One will check out a few dependent projects and place then at the same level as the CodenameOne folder, so having a clean workspace will make it easier to manage.
+The default build runs every module and its unit tests. Append `-DskipTests`
+if you want to skip the test phases to speed up local builds.
 
-=== Building Sources
+The version printed by Maven will usually end with `-SNAPSHOT` when you build
+from the `master` branch. Release builds from Maven Central omit the suffix.
+
+=== Installing the Maven archetypes
+
+Codename One ships its project archetypes in a companion repository. Install
+them once so that `mvn archetype:generate` (and the Codename One Initializr)
+can reference your locally built SDK artifacts:
 
 [source,bash]
 ----
-$ cd CodenameOne
-$ ant
+$ git clone https://github.com/shannah/cn1-maven-archetypes
+$ cd cn1-maven-archetypes
+$ mvn install
 ----
 
-NOTE: The `cd CodenameOne` command should take you to the root project directory which contains subfolders "CodenameOne", "Ports", etc.. - not the subfolder named "CodenameOne".
+=== Running tests selectively
 
-=== Running Unit Tests
+The Maven aggregator exposes modules for the different automated test suites.
+Run any of these from the `CodenameOne/maven` directory:
 
-You can run the unit test suite locally in the Codename One simulator using the "test-javase" ant target.
-
+* Core unit tests:
++
 [source,bash]
 ----
-$ ant test-javase
+$ mvn -pl core-unittests test
 ----
 
-
-=== Running iOS Unit Tests
-
-NOTE: Running iOS Unit tests is currently limited to interal use only by Codename One.
-
-TLDR: You can run Codename One's unit tests on a local iOS simulator by running the "test-ios" ant target in the main CodenameOne directory.  E.g.
-
+* Integration tests (simulator and build client):
++
 [source,bash]
 ----
-ant test-ios
+$ mvn -pl tests -am verify
 ----
 
-This assumes the following requirements
+Refer to the READMEs in `maven/core-unittests` and `maven/tests` for additional
+configuration flags, platform requirements, and environment variables.
 
-1. You are running Mac OS X with Xcode 7.3 or higher installed.
-2. You have npm installed and in your environment PATH.
-3. You have appium installed and running.
+=== Using your local build in application projects
 
-==== Installing npm
+After running the `mvn install` commands above, the Codename One artifacts are
+available in your local Maven repository. To consume that build in an
+application generated from the Codename One Initializr (or any other Maven
+project), adjust the `pom.xml` properties to reference your snapshot version:
 
-Either download the installer from https://nodejs.org/en/ OR run `brew install node` from terminal.
-
-==== Installing and Running Appium
-
-Open a new terminal window, then
-
-[source,bash]
+[source,xml]
 ----
-$ mkdir appium
-$ cd appium
-$ npm install appium
-$ ./node_modules/.bin/appium
+<properties>
+    <!-- Replace with the snapshot printed during mvn install -->
+    <cn1.version>7.0.21-SNAPSHOT</cn1.version>
+    <cn1.plugin.version>7.0.21-SNAPSHOT</cn1.plugin.version>
+</properties>
 ----
 
-NOTE: You may want to run the last command `./node_modules/.bin/appium` as a daemon so that you can continue to use the same terminal window.  E.g. `./node_modules/.bin/appium &`
+Open the project in your IDE and build or run it. Maven will resolve the local
+snapshot instead of downloading the latest release from Maven Central.
 
+=== Why build from source?
 
-==== Running the Unit tests
+Building the SDK yourself gives you:
 
-[source,bash]
-----
-$ cd CodenameOne
-$ ant test-ios
-----
+* Immediate access to fixes and features before they reach Maven Central.
+* The ability to inspect, debug, and modify the framework when you need custom
+  behavior.
+* A path to contribute improvements back to the Codename One core.
 
-==== Overriding the Codename One Build Server Target
-
-[source,bash]
-----
-$ ant test-ios -Dcn1.iphone.target=iphone_new
-----
-
-This will send to the "iphone_new" build server instead of the default "iphone" server.
+Once you are comfortable with the baseline build, continue with the scripts in
+`scripts/` or the `BUILDING.md` guide to compile specific ports (Android or
+iOS) or to automate CI workflows.

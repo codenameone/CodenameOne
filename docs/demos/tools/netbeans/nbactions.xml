@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+    <action>
+        <actionName>run</actionName>
+        <goals>
+            <goal>verify</goal>
+        </goals>
+        <properties>
+            <skipTests>true</skipTests>
+            <codename1.platform>javase</codename1.platform>
+        </properties>
+        <activatedProfiles>
+            <activatedProfile>simulator</activatedProfile>
+        </activatedProfiles>
+    </action>
+    <action>
+        <actionName>debug</actionName>
+        <goals>
+            <goal>verify</goal>
+        </goals>
+        <properties>
+            <skipTests>true</skipTests>
+            <codename1.platform>javase</codename1.platform>
+            <jpda.listen>true</jpda.listen>
+
+
+
+
+
+
+
+
+        </properties>
+        <activatedProfiles>
+            <activatedProfile>debug-simulator</activatedProfile>
+        </activatedProfiles>
+    </action>
+    <action>
+        <actionName>CUSTOM-Open Control Center</actionName>
+        <displayName>Open Control Center</displayName>
+        <goals>
+            <goal>cn1:settings</goal>
+        </goals>
+    </action>
+    <action>
+        <actionName>build</actionName>
+        <packagings>
+            <packaging>*</packaging>
+        </packagings>
+        <goals>
+            <goal>package</goal>
+        </goals>
+        <properties>
+            <skipTests>true</skipTests>
+
+            <codename1.buildTarget>android-device</codename1.buildTarget>
+        </properties>
+    </action>
+    <action>
+        <actionName>clean</actionName>
+        <packagings>
+            <packaging>*</packaging>
+        </packagings>
+        <goals>
+            <goal>clean</goal>
+        </goals>
+        <properties>
+            <skipTests>true</skipTests>
+
+
+        </properties>
+    </action>
+    <action>
+        <actionName>rebuild</actionName>
+        <packagings>
+            <packaging>*</packaging>
+        </packagings>
+        <goals>
+            <goal>clean</goal>
+            <goal>package</goal>
+        </goals>
+        <properties>
+            <skipTests>true</skipTests>
+
+            <codename1.buildTarget>android-device</codename1.buildTarget>
+        </properties>
+    </action>
+    <action>
+        <actionName>build-with-dependencies</actionName>
+        <reactor>also-make</reactor>
+        <packagings>
+            <packaging>*</packaging>
+        </packagings>
+        <goals>
+            <goal>package</goal>
+        </goals>
+        <properties>
+            <skipTests>true</skipTests>
+
+            <codename1.buildTarget>android-device</codename1.buildTarget>
+        </properties>
+    </action>
+    <action>
+        <actionName>test</actionName>
+        <packagings>
+            <packaging>*</packaging>
+        </packagings>
+        <goals>
+            <goal>test</goal>
+        </goals>
+        <properties>
+
+            <codename1.platform>javase</codename1.platform>
+
+        </properties>
+        <activatedProfiles>
+            <activatedProfile>simulator</activatedProfile>
+        </activatedProfiles>
+    </action>
+    <action>
+        <actionName>CUSTOM-Open in GUI Builder</actionName>
+        <displayName>Open in GUI Builder</displayName>
+        <goals>
+            <goal>cn1:guibuilder</goal>
+        </goals>
+        <properties>
+            <className>${packageClassName}</className>
+
+
+
+        </properties>
+    </action>
+    <action>
+        <actionName>CUSTOM-Update Codename One</actionName>
+        <displayName>Update Codename One</displayName>
+        <goals>
+            <goal>cn1:update</goal>
+        </goals>
+    </action>
+
+
+
+
+
+
+
+
+
+</actions>

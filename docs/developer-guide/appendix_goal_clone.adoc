@@ -1,0 +1,27 @@
+[#clone]
+=== Clone Project (`clone`)
+
+Clones the current project as a new project with a different _groupId_, _artifactId_, _packageName_, and _mainName_.  Resulting project will be made available in the _common/target/generated-sources/cn1-cloned-projects_ directory.
+
+==== Usage Example
+
+
+[source,bash]
+----
+mvn cn1:clone \
+  -DgroupId=com.example.newgroup \
+  -DartifactId=newapp \
+----
+
+NOTE: This command is formatted for the bash prompt (e.g. Linux or Mac).  It will work on Windows also if you use bash.  If you are on Windows and are using PowerShell or the regular command prompt, then you'll need to modiy the command slightly.  In particular, the entire command would need to be on a single line.  (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
+
+In the above example, assuming all went well, it would output your project into a directory named `myapp`.
+
+==== Parameters
+
+artifactId::
+The `artifactId` to use for the cloned project.
+
+groupId::
+The `groupId` to use for the cloned project.
+

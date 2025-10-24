@@ -1,0 +1,14 @@
+== Introduction
+
+Codename One uses Maven as its primary build tool. This guide aims to be the definitive source of information for this project structure.
+
+=== Conventions
+
+The instructions throughout this chapter provide parallel guidance for the supported development environments. Each subsection heading clearly identifies the target tooling so you can follow the directions that match your workflow:
+
+* **Command Line (CLI)** – Focused on running Maven from a terminal. The commands use a Unix-style shell syntax; adapt the examples for Windows when necessary.
+* **IntelliJ IDEA** – Step-by-step directions for working inside IntelliJ.
+* **NetBeans** – Equivalent instructions tailored to NetBeans.
+* **Eclipse** – Maven-based guidance for Eclipse users.
+
+When you encounter environment-specific sections later in the guide, simply follow the subsection corresponding to your preferred tools.

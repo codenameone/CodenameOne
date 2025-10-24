@@ -12,10 +12,10 @@ Codename One applications always use the resource file. The CSS support compiles
 To enable CSS support in Codename One you need to flip a switch in `Codename One Settings`.
 
 .The CSS Option in Codename One Settings Part I
-image::img/developer-guide/css-in-codenameone-settings-1.png[The CSS Option in Codename One Settings]
+image::img/css-in-codenameone-settings-1.png[The CSS Option in Codename One Settings]
 
 .The CSS Option in Codename One Settings Part II
-image::img/developer-guide/css-in-codenameone-settings-2.png[The CSS Option in Codename One Settings]
+image::img/css-in-codenameone-settings-2.png[The CSS Option in Codename One Settings]
 
 Once enabled your `theme.res` file will regenerate from a CSS file that resides under the `css` directory. Changes you make to the CSS file will instantly update the simulator as you save. However, there are some limits to this live update so in some cases a simulator restart would be necessary.
 
@@ -271,13 +271,13 @@ This section isn't as comprehensive as it should be due to the breadth of CSS.
 |No text decoration.  E.g. `text-decoration: none;`
 
 |cn1-3d
-a|3D text.  E.g. `text-decoraton: cn1-3d;` image:img/developer-guide/cn1-3d.png[cn1-3d screenshot]
+a|3D text.  E.g. `text-decoraton: cn1-3d;` image:img/cn1-3d.png[cn1-3d screenshot]
 
 |cn1-3d-lowered
-a|3D lowered text.  E.g. `text-decoration: cn1-3d-lowered;` image:img/developer-guide/cn1-3d-lowered.png[cn1-3d-lowered screenshot]
+a|3D lowered text.  E.g. `text-decoration: cn1-3d-lowered;` image:img/cn1-3d-lowered.png[cn1-3d-lowered screenshot]
 
 |cn1-3d-shadow-north
-|3D text with north shadow.  E.g. `text-decoration: cn1-3d-shadow-north;` image:img/developer-guide/cn1-3d-shadow-north.png[cn1-3d-shadow-north screenshot]
+|3D text with north shadow.  E.g. `text-decoration: cn1-3d-shadow-north;` image:img/cn1-3d-shadow-north.png[cn1-3d-shadow-north screenshot]
 |===
 
 For other CSS font settings see link:Fonts[the Fonts section]
@@ -399,7 +399,7 @@ MyContainer {
 ----
 
 .Native linear gradient 0 degrees
-image::img/developer-guide/linear-gradient-0deg.png[Native linear gradient 0 degrees]
+image::img/linear-gradient-0deg.png[Native linear gradient 0 degrees]
 
 [source,css]
 ----
@@ -409,7 +409,7 @@ MyContainer {
 ----
 
 .Native linear gradient to top
-image::img/developer-guide/linear-gradient-to-top.png[Native linear gradient to top]
+image::img/linear-gradient-to-top.png[Native linear gradient to top]
 
 [source,css]
 ----
@@ -419,7 +419,7 @@ MyContainer {
 ----
 
 .Native linear gradient 90deg
-image::img/developer-guide/linear-gradient-90deg.png[Native linear gradient 90deg]
+image::img/linear-gradient-90deg.png[Native linear gradient 90deg]
 
 [source,css]
 ----
@@ -429,7 +429,7 @@ MyContainer {
 ----
 
 .Native linear gradient to left
-image::img/developer-guide/linear-gradient-to-left.png[Native linear gradient to left]
+image::img/linear-gradient-to-left.png[Native linear gradient to left]
 
 **Unsupported `linear-gradient` syntax**
 
@@ -443,7 +443,7 @@ MyComponent {
 ----
 
 .45deg gradient rendered at compile-time -- uses background image
-image::img/developer-guide/linear-gradient-45deg.png[45deg gradient rendered at compile-time - uses background image]
+image::img/linear-gradient-45deg.png[45deg gradient rendered at compile-time - uses background image]
 
 The above example is not supported natively because the gradient direction is 45 degrees.  Codename One only supports 0, 90, 180, and 270 degrees natively.  Therefore this would result in a background image being generated at compile-time with the appropriate gradient.
 
@@ -455,7 +455,7 @@ MyComponent {
 ----
 
 .Linear gradient with different alpha
-image::img/developer-guide/linear-gradient-diff-alpha.png[Linear gradient with different alpha]
+image::img/linear-gradient-diff-alpha.png[Linear gradient with different alpha]
 
 The above linear-gradient is not supported natively because the stop colors have different transparencies.  The first color has an opacity of 0.5, and the second as an opacity of 1.0 (implicitly).  Therefore, this would result in the gradient being generated as an image at compile-time.
 
@@ -483,7 +483,7 @@ MyContainer {
 ----
 
 .Radial gradient 0 to 100
-image::img/developer-guide/radial-gradient-c100.png[Radial gradient 0 to 100]
+image::img/radial-gradient-c100.png[Radial gradient 0 to 100]
 
 [source,css]
 ----
@@ -493,7 +493,7 @@ MyContainer {
 ----
 
 .Radial gradient 0 to 200
-image::img/developer-guide/radial-gradient-c200.png[Radial gradient 0 to 200]
+image::img/radial-gradient-c200.png[Radial gradient 0 to 200]
 
 [source,css]
 ----
@@ -503,7 +503,7 @@ MyContainer {
 ----
 
 .Radial gradient at left
-image::img/developer-guide/radial-gradient-xeq0.png[Radial gradient at left]
+image::img/radial-gradient-xeq0.png[Radial gradient at left]
 
 [source,css]
 ----
@@ -513,7 +513,7 @@ MyContainer {
 ----
 
 .Radial gradient at right
-image::img/developer-guide/radial-gradient-xeq1.png[Radial gradient at right]
+image::img/radial-gradient-xeq1.png[Radial gradient at right]
 
 
 [[cn1-background-type]]
@@ -714,7 +714,7 @@ Images {
 
 ==== Generating 9-Piece Image Borders
 
-image::img/developer-guide/css-nine-piece-border.png[]
+image::img/css-nine-piece-border.png[]
 
 9-Piece image borders can be created using the `image-border` and `image-border-slice` properties. 
 

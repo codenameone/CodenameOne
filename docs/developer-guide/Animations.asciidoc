@@ -29,7 +29,7 @@ This won't work since these methods are meant for the layout manager, which is i
 
 If you add components to a form that is currently showing, it is your responsibility to invoke `revalidate`/`layoutContainer` to arrange the newly added components (see <<layout-reflows,Layout Reflows>>).
 
-`animateLayout()` method is a fancy form of revalidate that animates the components into their laid out position. After changing the layout & invoking this method the components move to their new sizes/positions seamlessly.
+`animateLayout()` method is a fancy form of revalidate that animates the components into their laid out position. After changing the layout & invoking this method the components move to their new sizes/positions seamlessly. `Form` exposes convenience wrappers such as `animateLayout*()` that simply forward to the underlying content pane, so you can usually call the methods directly on the form unless you specifically need to animate a nested container.
 
 This sort of behavior creates a special case where setting the size/position makes sense. When we set the size/position in the demo code here we are positioning the components at the animation start position above the frame.
 
@@ -45,7 +45,7 @@ fall.addActionListener((e) -> {
         b.setY(-fall.getHeight());
         hi.add(b);
     }
-    hi.getContentPane().animateLayout(20000); // <2>
+    hi.animateLayout(20000); // <2>
 });
 hi.add(fall);
 ----
@@ -53,25 +53,25 @@ hi.add(fall);
 There are a couple of things that you should notice about this example:
 
 <1> We used a button to do the animation rather than doing it on show. Since `show()` implicitly lays out the components it wouldn't have worked correctly.
-<2> We used `hi.getContentPane().animateLayout(20000);` & not `hi.animateLayout(20000);`. You need to animate the "actual" container and `Form` is a special case.
+<2> We used `hi.animateLayout(20000);`, which delegates to the `Form` content pane. If you need to animate a specific container (e.g. a nested layout), call `animateLayout()` on that container instead.
 
 
 This results in:
 
-image:img/developer-guide/layout-animation-1.png[Frame 1]
-image:img/developer-guide/layout-animation-2.png[Frame 2]
-image:img/developer-guide/layout-animation-3.png[Frame 3]
-image:img/developer-guide/layout-animation-4.png[Frame 4]
-image:img/developer-guide/layout-animation-5.png[Frame 5]
-image:img/developer-guide/layout-animation-6.png[Frame 6]
-image:img/developer-guide/layout-animation-7.png[Frame 7]
+image:img/layout-animation-1.png[Frame 1]
+image:img/layout-animation-2.png[Frame 2]
+image:img/layout-animation-3.png[Frame 3]
+image:img/layout-animation-4.png[Frame 4]
+image:img/layout-animation-5.png[Frame 5]
+image:img/layout-animation-6.png[Frame 6]
+image:img/layout-animation-7.png[Frame 7]
 
 
 ==== Unlayout Animations
 
 While layout animations are really powerful effects for adding elements into the UI and drawing attention to them. The inverse of removing an element from the UI is often more important. E.g. when we delete or remove an element we want to animate it out.
 
-Layout animations don't really do that since they will try to bring the animated item into place. What we want is the exact opposite of a layout animation and that is the "unlayout animation".
+Layout animations don't really do that since they will try to bring the animated item into place. What we want is the exact opposite of a layout animation and that is the "unlayout animation". `Container.animateUnlayout(int, int, Runnable)` and the `Form.animateUnlayout*()` helpers let you trigger this transition either asynchronously (with a completion callback) or synchronously via the `AndWait` variants.
 
 The "unlayout animation" takes a valid laid out state and shifts the components to an invalid state that we defined in advance. E.g. we can fix the example above to flip the "fall" button into a "rise" button when the buttons come into place and this will allow the buttons to float back up to where they came from in the exact reverse order.
 
@@ -92,14 +92,14 @@ fall.addActionListener((e) -> {
             b.setY(-fall.getHeight());
             hi.add(b);
         }
-        hi.getContentPane().animateLayout(20000);
+        hi.animateLayout(20000);
     } else {
         fall.setText("Fall");
         for(int iter = 1 ; iter < hi.getContentPane().getComponentCount() ; iter++) { // <1>
             Component c = hi.getContentPane().getComponentAt(iter);
             c.setY(-fall.getHeight()); // <2>
         }
-        hi.getContentPane().animateUnlayoutAndWait(20000, 255); // <3>
+        hi.animateUnlayoutAndWait(20000, 255); // <3>
         hi.removeAll(); // <4>
         hi.add(fall);
         hi.revalidate();
@@ -112,7 +112,7 @@ You will notice some similarities with the unlayout animation but the difference
 
 <1> We loop over existing components (not newly created ones)
 <2> We set the desired end position not the desired starting position
-<3> We used the `AndWait` variant of the animate unlayout call. We could have used the async call as well.
+<3> We used the `animateUnlayoutAndWait(...)` variant to block until completion; `animateUnlayout(duration, opacity, callback)` provides the non-blocking alternative when you want to continue immediately and run code from a callback instead.
 <4> After the animation completes we need to actually remove the elements since the UI is now in an invalid position with elements outside of the screen but still physically there!
 
 ==== Hiding & Visibility
@@ -121,9 +121,9 @@ A common trick for animating Components in Codename One is to set their preferre
 
 Instead of using that trick you can use `setHidden`/`isHidden` who effectively encapsulate this functionality and a bit more.
 
-One of the issues `setHidden` tries to solve is the fact that preferred size doesn't include the margin in the total and thus a component might still occupy space despite being hidden. To solve this the margin is set to `0` when hiding and restored to its original value when showing the component again by resetting the UIID (which resets all style modifications).
+One of the issues `setHidden` tries to solve is the fact that preferred size doesn't include the margin in the total and thus a component might still occupy space despite being hidden. When you request the margin adjustment the current margins are cached, the component is given zero margins while hidden, and those cached values are restored when it is shown again—without resetting the UIID or other style state.
 
-This functionality might be undesirable which is why there is a version of the `setHidden` method that accepts a boolean flag indicating whether the margin/UIID should be manipulated. You can effectively `hide`/`show` a component without deprecated code using something like this:
+This functionality might be undesirable which is why there is a version of the `setHidden` method that accepts a boolean flag indicating whether the margin cache should be manipulated. You can effectively `hide`/`show` a component without deprecated code using something like this:
 
 [source,java]
 ----
@@ -145,13 +145,13 @@ TIP: Notice that the code above uses `setVisible()`, which shouldn't be confused
 
 Most animations have two or three variants:
 
-- Standard animation e.g. `animateLayout(int)`
-- And wait variant e.g. `animateLayoutAndWait(int)`
-- Callback variant e.g. `animateUnlayout(int, int, Runnable)`
+- Standard animation e.g. `animateLayout(int)` or the non-blocking `animateUnlayout(int, int, Runnable)`
+- And wait variant e.g. `animateLayoutAndWait(int)` / `animateUnlayoutAndWait(int, int)`
+- Callback variant e.g. `animateLayoutFade(int, int, Runnable)`
 
 The standard animation is invoked when we don't care about the completion of the animation. We can do this for a standard animation.
 
-NOTE: The unlayout animations don't have a standard variant. Since they leave the UI in an invalid state we must always do something once the animation completes so a standard variant makes no sense
+NOTE: Unlayout animations always leave the container in an invalid state, so even the standard helper expects you to tidy up either in the callback or immediately after the animation finishes.
 
 The `AndWait` variant blocks the calling thread until the animation completes. This is really useful for sequencing animations one after the other e.g this code from the kitchen sink demo:
 
@@ -180,7 +180,7 @@ The callback variant is similar to the `invokeAndBlock` variant but uses a more 
 
 [source,java]
 ----
-hi.getContentPane().animateUnlayout(20000, 255, () -> {
+hi.animateUnlayout(20000, 255, () -> {
     hi.removeAll();
     hi.add(fall);
     hi.revalidate();
@@ -456,36 +456,36 @@ hi.show();
 
 
 .The slide transition moves both incoming and outgoing forms together
-image::img/developer-guide/transition-slide.jpg[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
+image::img/transition-slide.jpg[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
 
 .The slide transition can be applied vertically as well
-image::img/developer-guide/transition-slide-vertical.jpg[The slide transition can be applied vertically as well,scaledwidth=70%]
+image::img/transition-slide-vertical.jpg[The slide transition can be applied vertically as well,scaledwidth=70%]
 
 .Slide fade fades in the destination title while sliding the content pane it is the default on iOS
-image::img/developer-guide/transition-slide-fade.jpg[Slide fade fades in the destination title while sliding the content pane its the default on iOS,scaledwidth=70%]
+image::img/transition-slide-fade.jpg[Slide fade fades in the destination title while sliding the content pane its the default on iOS,scaledwidth=70%]
 
 TIP: `SlideFade` is problematic without a title area. If you have a `Form` that lacks a title area we would recommend to disable `SlideFade` at least for that `Form`.
 
 .With cover transitions the source form stays in place as it is covered by the destination. This transition can be played both horizontally and vertically
-image::img/developer-guide/transition-cover.jpg[With cover transitions the source form stays in place as it is covered by the destination. This transition can be played both horizontally and vertically,scaledwidth=70%]
+image::img/transition-cover.jpg[With cover transitions the source form stays in place as it is covered by the destination. This transition can be played both horizontally and vertically,scaledwidth=70%]
 
 
 .Uncover is the inverse of cover. The destination form stays in place while the departing form moves away
-image::img/developer-guide/transition-uncover.jpg[Uncover is the inverse of cover. The destination form stays in place while the departing form moves away,scaledwidth=70%]
+image::img/transition-uncover.jpg[Uncover is the inverse of cover. The destination form stays in place while the departing form moves away,scaledwidth=70%]
 
 ==== Fade and Flip Transitions
 
 The fade transition is pretty trivial and only accepts a time value since it has no directional context.
 
 .Fade transition is probably the simplest one around
-image::img/developer-guide/transition-fade.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
+image::img/transition-fade.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/animations/FlipTransition.html[FlipTransition] is also pretty simple but unlike the others it isn't a part of the `CommonTransitions`. It has its own `FlipTransition` class.
 
 IMPORTANT: This transition looks very different on devices as it uses native perspective transforms available only there
 
 .Fade transition is probably the simplest one around
-image::img/developer-guide/transition-flip.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
+image::img/transition-flip.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
 
 ==== Bubble Transition
 
@@ -546,7 +546,7 @@ hi.show();
 ----
 
 .Bubble transition converting a circular button to a Dialog
-image::img/developer-guide/transition-bubble.png[Bubble transition converting a circular button to a Dialog,scaledwidth=12%]
+image::img/transition-bubble.png[Bubble transition converting a circular button to a Dialog,scaledwidth=12%]
 
 
 
@@ -561,7 +561,7 @@ once.
 
 [[mighty-morphing-components-1]]
 .Morph Transition
-image::img/developer-guide/mighty-morphing-components-1.png[Morph Transition,scaledwidth=15%]
+image::img/mighty-morphing-components-1.png[Morph Transition,scaledwidth=15%]
 
 To support this behavior we have the https://www.codenameone.com/javadoc/com/codename1/ui/animations/MorphTransition.html[MorphTransition] class that provides this same effect coupled with a fade to
 the rest of the UI (see <<mighty-morphing-components-1>>).

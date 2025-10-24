@@ -50,7 +50,7 @@ The first step is creating the splash animation as you can see in the screenshot
 
 [[game-figure-2]]
 .Animation stages for the splash screen opening animation
-image::img/developer-guide/gaming-fig2.png[Figure 2,scaledwidth=40%]
+image::img/gaming-fig2.png[Figure 2,scaledwidth=40%]
 
 The animation in the splash screen and most of the following animations are achieved using the simple tool of layout animations. In Codename One components are automatically arranged into position using layout managers, however this isn’t implicit unless the device is rotated. A layout animation relies on this fact, it allows you to place components in a position (whether by using a layout manager or by using `setX`/`setY`) then invoke the layout animation code so they will slide into their “proper” position based on the layout manager rules.
 
@@ -66,7 +66,7 @@ Initially when entering the game form we have another animation where all the ca
 
 [[game-figure-3]]
 .Game form startup animation and deal animation
-image::img/developer-guide/game-figure-3.png[Game UI,scaledwidth=40%]
+image::img/game-figure-3.png[Game UI,scaledwidth=40%]
 
 
 This animation is really easy to accomplish although it does have several stages. In the first stage we layout the cards within a grid layout (13x4), then when the animation starts (see the https://www.codenameone.com/javadoc/com/codename1/ui/util/UITimer.html[UITimer] code within `showGameUI()`) we just change the layout to a layered layout, add the back card (so it will come out on top based on z-ordering) and invoke animate layout.

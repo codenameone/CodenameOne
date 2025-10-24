@@ -116,7 +116,7 @@ $(".even", table)
     .setBgTransparency(255);
 ----
 
-image::img/developer-guide/component-selector-table-striping.png[Table striping screenshot]
+image::img/component-selector-table-striping.png[Table striping screenshot]
 
 In the above example we add a tag to each label when we add it to the table or either "even" or "odd".  We then use the "even" in our ComponentSelector to set the background color and transparency of all labels in even rows.  In this example, we actually build the table and set the striping in the same place, but consider the situation when the table is constructed by another API.  This approach would allow the API to provide more extensibility by simply tagging the elements and allowing the library user to decide how to style the even and odd rows.
 

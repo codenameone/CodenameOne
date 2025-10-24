@@ -1,0 +1,7 @@
+=== Generate Legacy cn1lib (`cn1lib`)
+
+This goal generates a legacy .cn1lib file.  It is bound to the `package` phase of `cn1lib-archetype` projects so you generally will never need to run this goal directly.
+
+==== Output Location
+
+This will output the cn1lib file inside the common/target directory of the root multimodule maven project.

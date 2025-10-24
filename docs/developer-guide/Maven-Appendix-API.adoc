@@ -1,0 +1,32 @@
+[appendix]
+[#api]
+== API
+
+NOTE: This section is not a comprehensive treatment of the Codename One API.  For a more in-depth discussion of Codename One and it's supported APIs, refer to the https://www.codenameone.com/developer-guide.html[Developer Guide].
+
+Codename One apps support a subset of the JavaSE 8 API as well as its own light-weight runtime and UI component library that includes support for everything that would expect in a mobile application platform.
+
+See https://www.codenameone.com/javadoc/[the JavaDocs] for a full list of supported classes, and check out the source in the https://github.com/codenameone/CodenameOne[git repository].
+
+NOTE: The Codename One source is open source.  Released under GPLv2 with Classpath Exception.
+
+Codename One is much more than just an API library.  It provides a full tool-chain and eco-system for developing beautiful, performant native mobile apps with a single codebase in Java and Kotlin.  Please see the https://www.codenameone.com/developer-guide.html#_introduction[introduction in the Developer guide] for a proper overview of Codename One.
+
+=== Limitations
+
+No reflection::
+Codename One apps do not support reflection because reflection makes it impossible to keep app-size down.
+
+=== Kotlin API Support
+
+Codename One apps support the https://kotlinlang.org/api/latest/jvm/stdlib/[Kotlin Standard Library].  Kotlin support is still relatively new, so are still discovering which libraries are compatible.  APIs that rely on reflection will not be supported, but most other libraries should work.
+
+=== Add-on Libraries
+
+Add-on libraries can be added to your library in the common/pom.xml file, however, if you use APIs that are not supported by Codename One (e.g. which use reflection), then your app will fail to build.
+
+Codename One supports its own library format (cn1lib) which sort of "certifies" that it is compatible with Codename One.  You can browse the growing catalog of available cn1libs inside <<settings,Codename One Settings>>.
+
+For more information about cn1libs, see https://www.codenameone.com/developer-guide.html#_libraries_cn1lib[the cn1libs section] of the developer guide.
+
+

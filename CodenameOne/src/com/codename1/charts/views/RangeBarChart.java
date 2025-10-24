@@ -27,7 +27,13 @@ import java.util.List;
 
 
 /**
- * The range bar chart rendering class.
+ * Extends {@link BarChart} to support values that represent ranges rather than
+ * single points. Each bar is drawn from the lower value to the upper value in
+ * the dataset.
+ * <p>
+ * Use this chart with an {@link XYMultipleSeriesDataset} containing
+ * {@link XYSeries} instances where consecutive entries form the minimum/maximum
+ * pair for a category.
  */
 public class RangeBarChart extends BarChart {
     /** The chart type. */
