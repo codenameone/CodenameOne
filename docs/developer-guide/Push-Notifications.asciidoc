@@ -160,6 +160,8 @@ When active this will trigger the push(String) method twice, once with the visua
 
 - `101` - identical to 100 with an added message payload separated with a space. E.g. `30 You have 30 unread messages` will set the badge to "30" and present the push notification text of "You have 30 unread messages".  Supported on Android, iOS, and Windows.
 
+- `102` - Combines badge, title, and body in a single payload formatted as `badge;title;body`.  Supported on Android, iOS, and Windows.
+
 The following sections will show examples of the various kinds of pushes.  You can try them out yourself by opening the push simulator.
 
 ==== Example Push Type 1
@@ -252,6 +254,14 @@ On platforms that do not support badges, Push type 101 will behave exactly as pu
 
 The `push()` callback will be called only if the user taps the notification.  `Display.getInstance().getProperty("pushType")` will return "1" for this type.
 
+==== Example Push Type 102
+
+**Push Type 102; Message Body "5;Hello World;You have 5 new tasks"**
+
+Push type 102 allows you to set the badge, title, and body in a single payload.  The first segment (before the first semicolon) is the badge value, the second segment is the notification title, and the remainder after the second semicolon is the body that will be displayed to the user.
+
+On platforms that do not support badges or titles, the payload will fall back to the features that are supported.  When your `push()` callback is invoked it will receive the `title;body` portion ("Hello World;You have 5 new tasks" in this example).
+
 
 .Badging on iOS
 ****
@@ -281,6 +291,20 @@ The message body should be an XML string.  A minimal example of a push type 99 t
 <push type="1" body="Hello World"><img src="https://exmaple.com/myimage.jpg"/></push>
 ----
 
+To avoid hand-coding this XML you can use the `com.codename1.push.PushBuilder` helper which assembles the payload for you and returns the correct push type to send:
+
+[source,java]
+----
+PushBuilder builder = new PushBuilder()
+        .type(1)
+        .body("Hello World")
+        .imageUrl("https://example.com/myimage.jpg");
+String payload = builder.build();
+int pushType = builder.getType(); // Will be 99 when image/category metadata is present
+----
+
+You can then send `payload` as the message body with `pushType` as the type via the REST API, the `Push` helper, or any of the other examples below.
+
 IMPORTANT: The image URL *must* be a secure URL (i.e. start with "https:" and not "http:", otherwise, iOS will simply ignore it.
 
 .Push type 99 with attached image in simulator.
@@ -303,14 +327,19 @@ You can access additional information about the push content using the `com.code
 public void push(String message) {
     PushContent content = PushContent.get();
     if (content != null) {
+        String title = content.getTitle();
+        String body = content.getBody();
+        String hiddenMeta = content.getMetaData();
         String imageUrl = content.getImageUrl();
-            // The image attachment URL in the push notification
-            // or `null` if there was no image attachment.
+        String replyText = content.getTextResponse();
+        // Use these values (title/body/hiddenMeta/imageUrl/replyText) as needed in your application logic.
     }
 }
 ----
 
 WARNING: Make sure to only call `PushContent.get()` *once* inside your `push()` callback, and store the return value.  `PushContent.get()` works like a queue of size=1, and it pops off the item from the front of the queue when it is called.  If you call it twice, the second time will return `null`.
+
+`PushContent` exposes all of the fields that might accompany a rich notification: `getTitle()`/`getBody()` for the visible text, `getMetaData()` for hidden metadata (such as the second segment of a type 3 payload), `getImageUrl()` for attachments, `getCategory()`/`getActionId()` for actions, and `getTextResponse()` for any user-entered reply text.
 
 ==== Notification Actions
 
@@ -345,7 +374,8 @@ public class MyApplication implements PushCallback, PushActionsProvider {
             new PushActionCategory("invite", new PushAction[]{
                 new PushAction("yes", "Yes"),
                 new PushAction("no", "No"),
-                new PushAction("maybe", "Maybe")
+                new PushAction("maybe", "Maybe"),
+                new PushAction("reply", "Reply", null, "Type your response...", "Send")
             })
 
         };
@@ -353,7 +383,7 @@ public class MyApplication implements PushCallback, PushActionsProvider {
 }
 ----
 
-In the above example, we create only a single category, "invite" that has actions "yes", "no", and "maybe".
+In the above example, we create only a single category, "invite" that has actions "yes", "no", "maybe", and a "reply" action that prompts the user for text input.  A text-input action is enabled by providing either a placeholder, button text, or both when constructing the `PushAction`.
 
 **Sending a Push Notification with "invite" Category**
 
@@ -376,7 +406,7 @@ image::img/push-actions-ios.png[Push with actions on iOS,scaledwidth=30%]
 .Push notification with "invite" category on the Chrome desktop includes a "More" dropdown where user can select the action.
 image::img/push-actions-chrome-desktop.png[Push with actions on Chrome Desktop,scaledwidth=30%]
 
-The `push()` callback will be fired after the user taps on the notification, or one of its actions.  If the user taps the notification itself, and not one of the actions, then your `PushContent.getActionId()` will return `null`.  If they selected one of the actions, then the action ID of that action can be obtained from `getActionId()`.
+The `push()` callback will be fired after the user taps on the notification, or one of its actions.  If the user taps the notification itself, and not one of the actions, then your `PushContent.getActionId()` will return `null`.  If they selected one of the actions, then the action ID of that action can be obtained from `getActionId()`.  For text-input actions, the user's reply text is returned by `PushContent.getTextResponse()`.
 
 The *category* of the notification will be made available via the `getCategory()` method of `PushContent`.
 
@@ -389,7 +419,10 @@ public void push(String message) {
     if (content != null) {
         if ("invite".equals(content.getCategory())) {
             if (content.getActionId() != null) {
-                System.out.println("The user selected the "+content.getActionid()+" action");
+                System.out.println("The user selected the "+content.getActionId()+" action");
+                if (content.getTextResponse() != null) {
+                    System.out.println("They replied: "+content.getTextResponse());
+                }
             } else {
                 System.out.println("The user clicked on the invite notification, but didn't select an action.");
             }
@@ -664,7 +697,16 @@ if(ITUNES_PRODUCTION_PUSH) {
     cert = ITUNES_PRODUCTION_PUSH_CERT;
     pass = ITUNES_PRODUCTION_PUSH_CERT_PASSWORD;
 }
-new Push(PUSH_TOKEN, "Hello World", deviceKey)
+
+PushBuilder builder = new PushBuilder()
+        .type(102)
+        .badge(5)
+        .title("Hello World")
+        .body("You have 5 new tasks")
+        .metaData("taskListId=123");
+
+new Push(PUSH_TOKEN, builder.build(), deviceKey)
+    .pushType(builder.getType())
     .apnsAuth(cert, pass, ITUNES_PRODUCTION_PUSH)
     .gcmAuth(FCM_SERVER_API_KEY)
     .wnsAuth(WNS_SID, WNS_CLIENT_SECRET)
