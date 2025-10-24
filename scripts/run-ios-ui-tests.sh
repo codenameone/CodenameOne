@@ -119,56 +119,44 @@ else
 fi
 
 auto_select_destination() {
-  if ! command -v python3 >/dev/null 2>&1; then
-    return
-  fi
-
-  local show_dest selected
-  if show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null)"; then
+  # Prefer xcodebuild -showdestinations (no Python, robust on CI)
+  local selected
+  if command -v xcodebuild >/dev/null 2>&1; then
     selected="$(
-      printf '%s\n' "$show_dest" | python3 - <<'PY'
-import re, sys
-def parse_version_tuple(v): return tuple(int(p) if p.isdigit() else 0 for p in v.split('.') if p)
-for block in re.findall(r"\{([^}]+)\}", sys.stdin.read()):
-    f = dict(s.split(':',1) for s in block.split(',') if ':' in s)
-    if f.get('platform')!='iOS Simulator': continue
-    name=f.get('name',''); os=f.get('OS') or f.get('os') or ''
-    pri=2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
-    print(f"__CAND__|{pri}|{'.'.join(map(str,parse_version_tuple(os.replace('latest',''))))}|{name}|{os}|{f.get('id','')}")
-cands=[l.split('|',5) for l in sys.stdin if False]
-PY
+      xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null |
+      awk '
+        /platform:iOS Simulator/ && /name:/ && /id:/ {
+          os=""; name=""; id="";
+          for (i=1;i<=NF;i++) {
+            if ($i ~ /^OS:/)   { sub(/^OS:/,"",$i);   os=$i }
+            if ($i ~ /^name:/) { sub(/^name:/,"",$i); name=$i }
+            if ($i ~ /^id:/)   { sub(/^id:/,"",$i);   id=$i }
+          }
+          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0);
+          gsub(/[^0-9.]/,"",os);
+          printf("%d|%s|%s|%s\n", pri, os, name, id);
+        }
+      ' | sort -t'|' -k1,1nr -k2,2nr | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$4}'
     )"
   fi
 
-  if [ -z "${selected:-}" ]; then
-    if command -v xcrun >/dev/null 2>&1; then
-      selected="$(
-        xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
-import json, sys
-def parse_version_tuple(v): return tuple(int(p) if p.isdigit() else 0 for p in v.split('.') if p)
-try: data=json.load(sys.stdin)
-except: sys.exit(0)
-c=[]
-for runtime, entries in (data.get('devices') or {}).items():
-    if 'iOS' not in runtime: continue
-    ver=runtime.split('iOS-')[-1].replace('-','.')
-    vt=parse_version_tuple(ver)
-    for e in entries or []:
-        if not e.get('isAvailable'): continue
-        name=e.get('name') or ''; ident=e.get('udid') or ''
-        pri=2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
-        c.append((pri, vt, name, ident))
-if c:
-    pri, vt, name, ident = sorted(c, reverse=True)[0]
-    print(f"platform=iOS Simulator,id={ident}")
-PY
-      )"
-    fi
+  # Fallback to simctl (plain text)
+  if [ -z "$selected" ] && command -v xcrun >/dev/null 2>&1; then
+    selected="$(
+      xcrun simctl list devices available 2>/dev/null |
+      awk '
+        /\[/ && /[)]/ {
+          # e.g.: "    iPhone 16 (18.0) [UDID] (Available)"
+          name=$0; sub(/ *\(.*/,"",name); sub(/^ +/,"",name)
+          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0);
+          if (match($0, /\[([0-9A-F-]+)\]/, a)) udid=a[1]; else next;
+          printf("%d|%s|%s\n", pri, name, udid);
+        }
+      ' | sort -t'|' -k1,1nr | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$3}'
+    )"
   fi
 
-  if [ -n "${selected:-}" ]; then
-    echo "$selected"
-  fi
+  [ -n "$selected" ] && echo "$selected"
 }
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
@@ -218,52 +206,29 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
     ri_log "Exported CN1_AUT_BUNDLE_ID=$AUT_BUNDLE_ID"
   fi
 
-  # Resolve a UDID for the chosen destination name
+  # Resolve a UDID for the chosen destination name (no Python/heredocs)
   SIM_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
-# Resolve a UDID for the chosen destination name (robust to empty JSON)
-SIM_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
+  SIM_UDID="$(
+    xcrun simctl list devices available 2>/dev/null | \
+    awk -v name="$SIM_NAME" '
+      $0 ~ name" \\(" && /\[/ {
+        # Example: "iPhone 16 (18.0) [UDID] (Available)"
+        if (match($0, /\[([0-9A-F-]+)\]/, a)) { print a[1]; exit }
+      }'
+  )"
 
-SIM_UDID="$(
-  { xcrun simctl list devices --json 2>/dev/null || true; } | /usr/bin/python3 - "$SIM_NAME" <<'PY'
-import json, sys
-name = sys.argv[1]
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    print("")  # empty -> triggers shell fallback
-    sys.exit(0)
-for _, devs in (data.get("devices") or {}).items():
-    for d in devs:
-        if d.get("isAvailable") and d.get("name") == name:
-            print(d.get("udid", ""))
-            sys.exit(0)
-print("")
-PY
-)"
-
-# Fallback parser for non-JSON output (older/newer simctl quirks)
-if [ -z "$SIM_UDID" ]; then
-  SIM_UDID="$(xcrun simctl list devices 2>/dev/null | awk -v name="$SIM_NAME" '
-    $0 ~ name" \\(" {
-      line=$0
-      # extract the last parenthesized token which is the UDID
-      sub(/^.*\(/,"",line); sub(/\).*/,"",line); print line; exit
-    }
-  ' || true)"
-fi
-
-if [ -n "$SIM_UDID" ]; then
-  xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
-  xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
-  if [ -n "$AUT_BUNDLE_ID" ]; then
-    # Warm launch so the GL surface is alive before XCTest attaches
-    xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
-    sleep 1
+  if [ -n "$SIM_UDID" ]; then
+    xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
+    xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
+    if [ -n "$AUT_BUNDLE_ID" ]; then
+      # Warm launch so the GL surface is alive before XCTest attaches
+      xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
+      sleep 1
+    fi
+  else
+    ri_log "WARN: Could not resolve simulator UDID for '$SIM_NAME'; skipping warm launch"
   fi
-else
-  ri_log "WARN: Could not resolve simulator UDID for '$SIM_NAME'; skipping warm launch"
-fi
-
+  
 # Run only the UI test bundle
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
 XCODE_TEST_FILTERS=(
