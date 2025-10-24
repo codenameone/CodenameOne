@@ -67,12 +67,6 @@ GROUP_ID="com.codenameone.examples"
 ARTIFACT_ID="hello-codenameone-ios"
 MAIN_NAME="HelloCodenameOne"
 PACKAGE_NAME="$GROUP_ID"
-# Derive a deterministic bundle identifier by appending the lower-cased main
-# class name (Codename One historically mirrors this in generated Xcode
-# projects). Using a fixed suffix allows the UITest harness to target the
-# correct bundle regardless of template updates.
-BUNDLE_SUFFIX="$(printf '%s' "$MAIN_NAME" | tr '[:upper:]' '[:lower:]')"
-AUT_BUNDLE_ID="${GROUP_ID}.${BUNDLE_SUFFIX}"
 
 SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
 if [ ! -d "$SOURCE_PROJECT" ]; then
@@ -131,7 +125,7 @@ set_property() {
 
 set_property "codename1.packageName" "$PACKAGE_NAME"
 set_property "codename1.mainName" "$MAIN_NAME"
-set_property "codename1.ios.appid" "$AUT_BUNDLE_ID"
+set_property "codename1.ios.appid" "$GROUP_ID"
 
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
@@ -221,7 +215,7 @@ export XCODEPROJ
 bia_log "Using Xcode project: $XCODEPROJ"
 
 # --- Ensure UITests target + CI scheme (save_as gets a PATH, not a Project) ---
-export CN1_AUT_BUNDLE_ID_VALUE="$AUT_BUNDLE_ID"
+export CN1_AUT_BUNDLE_ID_VALUE="$GROUP_ID"
 export CN1_AUT_MAIN_CLASS_VALUE="${PACKAGE_NAME}.${MAIN_NAME}"
 
 ruby -rrubygems -rxcodeproj -e '
@@ -271,16 +265,6 @@ frameworks_group.set_source_tree("<group>") if frameworks_group.respond_to?(:set
   phase = ui_target.frameworks_build_phase
   unless phase.files_references.include?(ref)
     phase.add_file_reference(ref)
-  end
-end
-
-bundle_identifier = ENV["CN1_AUT_BUNDLE_ID_VALUE"]
-if bundle_identifier && !bundle_identifier.empty?
-  %w[Debug Release].each do |cfg|
-    xc = app_target&.build_configuration_list&.[](cfg)
-    next unless xc
-    bs = xc.build_settings
-    bs["PRODUCT_BUNDLE_IDENTIFIER"] = bundle_identifier
   end
 end
 
