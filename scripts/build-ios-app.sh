@@ -222,6 +222,7 @@ bia_log "Using Xcode project: $XCODEPROJ"
 
 # --- Ensure UITests target + CI scheme (save_as gets a PATH, not a Project) ---
 export CN1_AUT_BUNDLE_ID_VALUE="$AUT_BUNDLE_ID"
+export CN1_AUT_MAIN_CLASS_VALUE="${PACKAGE_NAME}.${MAIN_NAME}"
 
 ruby -rrubygems -rxcodeproj -e '
 require "fileutils"
@@ -320,6 +321,12 @@ scheme.test_action.xml_element.elements.delete_all("EnvironmentVariables")
 envs = Xcodeproj::XCScheme::EnvironmentVariables.new
 envs.assign_variable(key: "CN1SS_OUTPUT_DIR",  value: "__CN1SS_OUTPUT_DIR__",  enabled: true)
 envs.assign_variable(key: "CN1SS_PREVIEW_DIR", value: "__CN1SS_PREVIEW_DIR__", enabled: true)
+if (bundle_id = ENV["CN1_AUT_BUNDLE_ID_VALUE"]) && !bundle_id.empty?
+  envs.assign_variable(key: "CN1_AUT_BUNDLE_ID", value: bundle_id, enabled: true)
+end
+if (main_class = ENV["CN1_AUT_MAIN_CLASS_VALUE"]) && !main_class.empty?
+  envs.assign_variable(key: "CN1_AUT_MAIN_CLASS", value: main_class, enabled: true)
+end
 scheme.test_action.environment_variables = envs
 scheme.test_action.xml_element.elements.delete_all("Testables")
 scheme.add_test_target(ui_target)
