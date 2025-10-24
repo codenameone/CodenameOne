@@ -228,7 +228,8 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   else
     ri_log "WARN: Could not resolve simulator UDID for '$SIM_NAME'; skipping warm launch"
   fi
-  
+fi
+
 # Run only the UI test bundle
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
 XCODE_TEST_FILTERS=(
