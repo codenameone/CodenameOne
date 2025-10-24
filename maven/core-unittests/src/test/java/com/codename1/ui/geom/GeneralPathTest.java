@@ -1,6 +1,8 @@
 package com.codename1.ui.geom;
 
+import com.codename1.ui.Transform;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class GeneralPathTest {
@@ -69,6 +71,20 @@ class GeneralPathTest {
         float[] copyPoints = new float[copy.getPointsSize()];
         copy.getPoints(copyPoints);
         assertArrayEquals(rectPoints, copyPoints, 1e-6f);
+    }
+
+    @Test
+    void testSetRectAppliesProvidedTransform() {
+        GeneralPath path = new GeneralPath();
+        Rectangle rect = new Rectangle(0, 0, 10, 20);
+        Transform translation = Transform.makeTranslation(5, -5);
+
+        path.setRect(rect, translation);
+
+        float[] transformed = new float[path.getPointsSize()];
+        path.getPoints(transformed);
+
+        assertArrayEquals(new float[]{5f, -5f, 15f, -5f, 15f, 15f, 5f, 15f}, transformed, 1e-6f);
     }
 
     @Test
