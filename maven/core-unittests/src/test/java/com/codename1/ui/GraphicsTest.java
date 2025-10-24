@@ -28,7 +28,7 @@ class GraphicsTest {
         originalImpl = (CodenameOneImplementation) implField.get(null);
         impl = mock(CodenameOneImplementation.class, withSettings().lenient());
         when(impl.isTranslationSupported()).thenReturn(false);
-        when(impl.isShapeSupported()).thenReturn(true);
+        when(impl.isShapeSupported(any())).thenReturn(true);
         when(impl.getClipX(any())).thenReturn(0);
         when(impl.getClipY(any())).thenReturn(0);
         when(impl.getClipWidth(any())).thenReturn(100);

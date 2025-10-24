@@ -1,6 +1,6 @@
 package com.codename1.ui.geom;
 
-import com.codename1.ui.geom.GeneralPath.PathIterator;
+import com.codename1.ui.geom.PathIterator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

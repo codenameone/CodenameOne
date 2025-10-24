@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 class GeometryTest {
     private CodenameOneImplementation originalDisplayImpl;
     private CodenameOneImplementation impl;
+    private Field nativeGraphicsField;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -31,12 +32,15 @@ class GeometryTest {
         originalDisplayImpl = (CodenameOneImplementation) implField.get(null);
         impl = mock(CodenameOneImplementation.class, withSettings().lenient());
         implField.set(null, impl);
-        when(impl.isShapeSupported()).thenReturn(true);
+        when(impl.isShapeSupported(any())).thenReturn(true);
         when(impl.getClipX(any())).thenReturn(0);
         when(impl.getClipY(any())).thenReturn(0);
         when(impl.getClipWidth(any())).thenReturn(100);
         when(impl.getClipHeight(any())).thenReturn(100);
         when(impl.isTranslationSupported()).thenReturn(false);
+
+        nativeGraphicsField = Graphics.class.getDeclaredField("nativeGraphics");
+        nativeGraphicsField.setAccessible(true);
     }
 
     @AfterEach
@@ -44,6 +48,10 @@ class GeometryTest {
         Field implField = com.codename1.ui.Display.class.getDeclaredField("impl");
         implField.setAccessible(true);
         implField.set(null, originalDisplayImpl);
+    }
+
+    private Object nativeGraphics(Graphics graphics) throws IllegalAccessException {
+        return nativeGraphicsField.get(graphics);
     }
 
     @Test
@@ -138,7 +146,7 @@ class GeometryTest {
         curve.stroke(graphics, stroke, 3, 4);
 
         ArgumentCaptor<Shape> shapeCaptor = ArgumentCaptor.forClass(Shape.class);
-        verify(impl).drawShape(eq(graphics.getGraphics()), shapeCaptor.capture(), eq(stroke));
+        verify(impl).drawShape(eq(nativeGraphics(graphics)), shapeCaptor.capture(), eq(stroke));
         Shape drawnShape = shapeCaptor.getValue();
         assertNotNull(drawnShape);
         Rectangle bounds = drawnShape.getBounds();
