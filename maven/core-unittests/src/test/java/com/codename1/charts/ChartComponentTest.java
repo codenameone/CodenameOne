@@ -60,17 +60,25 @@ class ChartComponentTest extends UITestBase {
 
         Rectangle screenRect = new Rectangle(component.getAbsoluteX(), component.getAbsoluteY(), 40, 50);
         Rectangle chartBounds = component.screenToChartShape(screenRect).getBounds();
-        assertEquals(0, chartBounds.getX());
-        assertEquals(0, chartBounds.getY());
-        assertEquals(0, chartBounds.getSize().getWidth());
-        assertEquals(0, chartBounds.getSize().getHeight());
+
+        Point chartTopLeft = component.screenToChartCoord(screenRect.getX(), screenRect.getY());
+        Point chartBottomRight = component.screenToChartCoord(screenRect.getX() + screenRect.getSize().getWidth(),
+                screenRect.getY() + screenRect.getSize().getHeight());
+        assertEquals(chartTopLeft.getX(), chartBounds.getX());
+        assertEquals(chartTopLeft.getY(), chartBounds.getY());
+        assertEquals(chartBottomRight.getX() - chartTopLeft.getX(), chartBounds.getSize().getWidth());
+        assertEquals(chartBottomRight.getY() - chartTopLeft.getY(), chartBounds.getSize().getHeight());
 
         Rectangle chartRect = new Rectangle(0, 0, 40, 50);
         Rectangle screenBounds = component.chartToScreenShape(chartRect).getBounds();
-        assertEquals(0, screenBounds.getX());
-        assertEquals(0, screenBounds.getY());
-        assertEquals(0, screenBounds.getSize().getWidth());
-        assertEquals(0, screenBounds.getSize().getHeight());
+
+        Point screenTopLeft = component.chartToScreenCoord(chartRect.getX(), chartRect.getY());
+        Point screenBottomRight = component.chartToScreenCoord(chartRect.getX() + chartRect.getSize().getWidth(),
+                chartRect.getY() + chartRect.getSize().getHeight());
+        assertEquals(screenTopLeft.getX(), screenBounds.getX());
+        assertEquals(screenTopLeft.getY(), screenBounds.getY());
+        assertEquals(screenBottomRight.getX() - screenTopLeft.getX(), screenBounds.getSize().getWidth());
+        assertEquals(screenBottomRight.getY() - screenTopLeft.getY(), screenBounds.getSize().getHeight());
     }
 
     @Test
