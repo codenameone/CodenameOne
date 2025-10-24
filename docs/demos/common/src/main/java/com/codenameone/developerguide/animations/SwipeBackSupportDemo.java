@@ -3,7 +3,7 @@ package com.codenameone.developerguide.animations;
 import com.codename1.ui.Button;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.animations.SwipeBackSupport;
+import com.codename1.ui.util.SwipeBackSupport;
 import com.codename1.util.LazyValue;
 import com.codenameone.developerguide.Demo;
 
