@@ -3,7 +3,7 @@ package com.codename1.testing;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.lang.annotation.AnnotatedElement;
+import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
