@@ -284,7 +284,7 @@ If your application crashes and you don't have a clue where to begin, follow the
 4. Step through each exception until you reach the one you are interested in.  Chrome will then show you a stack trace that includes the name of the Java source file and line numbers.
 +
 .Debugging using Chrome tools
-image::img/developer-guide/chrome-debugger.png[Debugging using Chrome tools,scaledwidth=50%]
+image::img/chrome-debugger.png[Debugging using Chrome tools,scaledwidth=50%]
 
 
 [id="third_party_libs", reftext="Including Third-Party Javascript Libraries"]
@@ -550,7 +550,7 @@ if (d.getProperty("User-Agent", "Unknown").indexOf("Android") != -1) {
 
 By default, apps will display warning/confirm dialog when the user attempts to leave the page.
 
-image::img/developer-guide/js-beforeunload-prompt.png[onbeforeunload prompt dialog,scaledwidth=20%]
+image::img/js-beforeunload-prompt.png[onbeforeunload prompt dialog,scaledwidth=20%]
 
 
 You can explicitly enable or disable this behaviour by setting the "platformHint.javascript.beforeUnloadMessage" display property.  Setting the property to `null` will disable this behaviour, so that users will not be harassed by this dialog when they navigate away from the app.  Setting it to a string value, like "leaving so soon?", will re-enable this behaviour.
@@ -583,12 +583,12 @@ Out of the box, your app is ready to be deployed as a progressive web app (PWA).
 Below is a screenshot from Chrome for Android where the browser is prompting the user to add the app to their home screen.
 
 .Add app to homescreen banner
-image::img/developer-guide/javascript-pwa-add-app-banner.png[Add app to homescreen banner,scaledwidth=20%]
+image::img/javascript-pwa-add-app-banner.png[Add app to homescreen banner,scaledwidth=20%]
 
 If the app is available as a native app, in the Play store, you can indicate this using the `javascript.manifest.related_applications` and `javascript.manifest.prefer_related_applications` build hints.  Then, instead of prompting the user to add the web app to their home screen, they'll be prompted to install the native app from the Play store, as shown below.
 
 .Add native app banner
-image::img/developer-guide/javascript-pwa-add-native-app-banner.png[Add native app banner,scaledwidth=20%]
+image::img/javascript-pwa-add-native-app-banner.png[Add native app banner,scaledwidth=20%]
 
 
 NOTE:  The PWA standard requires that you host your app on over HTTPS.  For testing purposes, it will also work when accessed at a `localhost` address.  You can use the https://developers.google.com/web/ilt/pwa/lighthouse-pwa-analysis-tool[Lighthoust PWA analysis tool] to ensure compliance.
@@ -626,19 +626,19 @@ Chrome and Firefox both support PWAs on desktop and on Android.  iOS doesn't sup
 On the desktop, Chrome provides an analogous feature to "add to your homescreen":  "Add to shelf".  If it looks like the user is using the app on a regular basis, and it isn't yet installed, it will show a banner at the top of the page asking the user if they want to add to their shelf.
 
 .Add to shelf banner
-image::img/developer-guide/javascript-pwa-add-to-shelf-banner.png[Add to shelf banner,scaledwidth=20%]
+image::img/javascript-pwa-add-to-shelf-banner.png[Add to shelf banner,scaledwidth=20%]
 
 Clicking the "Add button" prompts the user for the name they wish the app to appear as:
 
 .Add to shelf prompt
-image::img/developer-guide/javascript-pwa-add-to-shelf-prompt.png[Add to shelf prompt,scaledwidth=20%]
+image::img/javascript-pwa-add-to-shelf-prompt.png[Add to shelf prompt,scaledwidth=20%]
 
 Upon submission, Chrome will generate a real application (on Mac, it will be a ".app", on Windows, an "exe", etc..) which the user can double click to open the app directly in the Chrome.  And, importantly, the app will still work when the user is offline.
 
 The app will also appear in their "Shelf" which you can always access at `chrome://apps`, or by opening the "Chrome App Launcher" app (on OS X this is located in "~/Applications/Chrome Apps/Application Launcher").
 
 .Chrome App Launcher
-image::img/developer-guide/javascript-pwa-chrome-app-launcher.png[Chrome App Launcher,scaledwidth=20%]
+image::img/javascript-pwa-chrome-app-launcher.png[Chrome App Launcher,scaledwidth=20%]
 
 NOTE: The Chrome App Launcher lists apps installed both via the Chrome Web Store and via the "Add to Shelf" feature that we discuss here.  The features we describe in this article are orthogonal to the Chrome Web Store and will not be affected by its closure.
 

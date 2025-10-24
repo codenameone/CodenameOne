@@ -130,7 +130,7 @@ When a version of Codename One is released the version number refers to the libr
 === History
 
 .LWUIT App Screenshot circa 2007
-image::img/developer-guide/lwuit-screenshot.png[LWUIT App Screenshot,scaledwidth=15%]
+image::img/lwuit-screenshot.png[LWUIT App Screenshot,scaledwidth=15%]
 
 Codename One was started by Chen Fishbein and Shai Almog who authored the Open Source LWUIT project at Sun Microsystems (circa 2007). The LWUIT project aimed to solve the fragmentation within J2ME/Blackberry devices by creating a higher standard of user interface than the common baseline at the time. LWUIT received critical acclaim and traction within multiple industries but was limited by the declining feature phone market. It was forked by several companies including Nokia. It was used as the base standard for DTV in Brazil. Another fork has brought a LWUIT into high end cars from Toyota and other companies. This fork later adapted Codename One as well.
 
@@ -149,13 +149,13 @@ Density is also known as DPI (Dots Per Inch) or PPI (pixels or points per inch).
 As the following figure shows, if a Pixel 2 XL had pixels the size of an iPad it would have been twice the size of that iPad. While in reality it's nearly half the height of the iPad!
 
 .Device Density vs. Resolution
-image::img/developer-guide/dpi.png[Device Density vs Resolution]
+image::img/dpi.png[Device Density vs Resolution]
 
 Differences in density can be extreme. A second generation iPad has 132 PPI, where modern phones have PPI that crosses the 600 mark.
 Low resolution images on high PPI devices will look either small or pixelated. High resolution images on low PPI devices will look huge, overscaled (artifacts) and will consume too much memory.
 
 .How the Same Image Looks in Different Devices
-image::img/developer-guide/image-sizes-different-dpis.png[How the Same Image Looks in Different Devices]
+image::img/image-sizes-different-dpis.png[How the Same Image Looks in Different Devices]
 
 The exact same image will look different on each device, sometimes to a comical effect. One of the solutions for this problem is multi-images. All OS’s support the ability to define different images for various densities. I will discuss multi-images later in Chapter 2.
 
@@ -389,7 +389,7 @@ public void start() {
 <5> The `show()` method places the `Form` on the screen. Only one `Form` can be shown at a time
 
 .Title and Label in the UI
-image::img/developer-guide/codenameone-hello-world-title-label.png[Title and Label in the UI,scaledwidth=50%]
+image::img/codenameone-hello-world-title-label.png[Title and Label in the UI,scaledwidth=50%]
 
 There are some complex ideas within this short snippet which I'll address later in this chapter when talking about layout. The gist of it is that we create and show a `Form`. `Form` is the top level UI element, it takes over the whole screen. We can add UI elements to that `Form` object, in this case the `Label`. We use the `BoxLayout` to arrange the elements within the `Form` from top to the bottom vertically.
 
@@ -408,7 +408,7 @@ Simply explained an application has three states:
 The lifecycle is the process of transitioning between these 3 states and the callbacks invoked when such a transition occurs. The first time we launch the app we start from a "`Cold Start`" (Not Running State) but on subsequent launches the app is usually started from the "Warm Start" (Suspended State).
 
 .Codename One Application Lifecycle
-image::img/developer-guide/codenameone-application-lifecycle.png[Codename One Application Lifecycle]
+image::img/codenameone-application-lifecycle.png[Codename One Application Lifecycle]
 
 Codename One has four standard callback methods in the lifecycle API:
 
@@ -451,7 +451,7 @@ That's it. Hopefully you have a general sense of the code. It's time to run on t
 ==== Building and Deploying On Devices
 
 .Codename One Control Center
-image::img/developer-guide/control-center-main.png[Codename One Settings/Control Center,scaledwidth=50%]
+image::img/control-center-main.png[Codename One Settings/Control Center,scaledwidth=50%]
 
 You can use the Control Center to configure almost anything. Specifically, the application title, application version, application icon etc. are all found in the Codename One Settings maven target.
 
@@ -460,7 +460,7 @@ There are many options within this UI that control almost every aspect of the ap
 Your device builds using the Codename One Cloud can also be found right here as well as subscription information.
 
 .Device Builds in Logged out State
-image::img/developer-guide/control-center-builds-empty.png[Builds in Empty State,scaledwidth=50%]
+image::img/control-center-builds-empty.png[Builds in Empty State,scaledwidth=50%]
 
 ===== Signing/Certificates
 
@@ -486,7 +486,7 @@ With that in mind generating an Android certificate is trivial.
 NOTE: The following chart illustrates a process that's identical on all IDE's
 
 .Process of Certificate Generation for Android
-image::img/developer-guide/android-certificate-generator.png[]
+image::img/android-certificate-generator.png[]
 
 .Your certificate will generate into the file `Keychain.ks` in your home directory
 TIP: Make sure to back that up and the password as losing these can have dire consequences
@@ -514,7 +514,7 @@ TIP: The 99USD price and requirement have been around since the introduction of 
 Apple also requires a "`provisioning profile`" which is a special file bound to your certificate and app. This file describes some details about the app to the iOS installation process. One of the details it includes during development is the list of permitted devices.
 
 .The Four Files Required for iOS Signing and Provisioning
-image::img/developer-guide/ios-certificates-provisioning.png[The 4 files Required for iOS Signing and Provisioning]
+image::img/ios-certificates-provisioning.png[The 4 files Required for iOS Signing and Provisioning]
 
 We need 4 files for signing. Two certificates and two provisioning profiles:
 
@@ -525,13 +525,13 @@ We need 4 files for signing. Two certificates and two provisioning profiles:
 The certificate wizard automatically creates these 4 files and configures them for you.
 
 .Using the iOS Certificate Wizard Steps 1 and 2
-image::img/developer-guide/ios-certificate-wizard-1.png[Using the iOS Certificate Wizard Steps 1 and 2]
+image::img/ios-certificate-wizard-1.png[Using the iOS Certificate Wizard Steps 1 and 2]
 
 .Using the iOS Certificate Wizard Steps 3 and 4
-image::img/developer-guide/ios-certificate-wizard-2.png[Using the iOS Certificate Wizard Steps 3 and 4]
+image::img/ios-certificate-wizard-2.png[Using the iOS Certificate Wizard Steps 3 and 4]
 
 .Using the iOS Certificate Wizard Steps 5 and 6
-image::img/developer-guide/ios-certificate-wizard-3.png[Using the iOS Certificate Wizard Steps 5 and 6]
+image::img/ios-certificate-wizard-3.png[Using the iOS Certificate Wizard Steps 5 and 6]
 
 [TIP]
 ====
@@ -543,7 +543,7 @@ One important aspect of provisioning on iOS is the device list in the provisioni
 WARNING: There are several apps and tools that offer the UDID of the device, they aren't necessarily reliable and might give a fake number!
 
 .Get the UDID of a Device
-image::img/developer-guide/get-device-udid.png[Get the UDID of a Device]
+image::img/get-device-udid.png[Get the UDID of a Device]
 
 TIP: You can right click the UDID and select #copy# to copy it
 
@@ -558,14 +558,14 @@ Before we continue with the build we should sign up at https://www.codenameone.c
 Now that we have certificates the process of device builds is literally a right click away for both OS's. We can right click the project and select #Codename One# -> #Send iOS Debug Build# or #Codename One# -> #Send Android Build#.
 
 .Right click menu options for sending device builds
-image::img/developer-guide/getting-started-right-click-menu.png[Right click menu options for sending device builds,scaledwidth=50%]
+image::img/getting-started-right-click-menu.png[Right click menu options for sending device builds,scaledwidth=50%]
 
 NOTE: The first time you send a build you will be prompted for the email and password you provided when signing up for Codename One
 
 Once you send a build you should see the results in the build server page:
 
 .Build Results
-image::img/developer-guide/build-server-results.png[Build Results,scaledwidth=80%]
+image::img/build-server-results.png[Build Results,scaledwidth=80%]
 
 TIP: On iOS make sure you use Safari when installing, as 3rd party browsers might have issues
 

@@ -58,13 +58,13 @@ There are a couple of things that you should notice about this example:
 
 This results in:
 
-image:img/developer-guide/layout-animation-1.png[Frame 1]
-image:img/developer-guide/layout-animation-2.png[Frame 2]
-image:img/developer-guide/layout-animation-3.png[Frame 3]
-image:img/developer-guide/layout-animation-4.png[Frame 4]
-image:img/developer-guide/layout-animation-5.png[Frame 5]
-image:img/developer-guide/layout-animation-6.png[Frame 6]
-image:img/developer-guide/layout-animation-7.png[Frame 7]
+image:img/layout-animation-1.png[Frame 1]
+image:img/layout-animation-2.png[Frame 2]
+image:img/layout-animation-3.png[Frame 3]
+image:img/layout-animation-4.png[Frame 4]
+image:img/layout-animation-5.png[Frame 5]
+image:img/layout-animation-6.png[Frame 6]
+image:img/layout-animation-7.png[Frame 7]
 
 
 ==== Unlayout Animations
@@ -456,36 +456,36 @@ hi.show();
 
 
 .The slide transition moves both incoming and outgoing forms together
-image::img/developer-guide/transition-slide.jpg[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
+image::img/transition-slide.jpg[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
 
 .The slide transition can be applied vertically as well
-image::img/developer-guide/transition-slide-vertical.jpg[The slide transition can be applied vertically as well,scaledwidth=70%]
+image::img/transition-slide-vertical.jpg[The slide transition can be applied vertically as well,scaledwidth=70%]
 
 .Slide fade fades in the destination title while sliding the content pane it is the default on iOS
-image::img/developer-guide/transition-slide-fade.jpg[Slide fade fades in the destination title while sliding the content pane its the default on iOS,scaledwidth=70%]
+image::img/transition-slide-fade.jpg[Slide fade fades in the destination title while sliding the content pane its the default on iOS,scaledwidth=70%]
 
 TIP: `SlideFade` is problematic without a title area. If you have a `Form` that lacks a title area we would recommend to disable `SlideFade` at least for that `Form`.
 
 .With cover transitions the source form stays in place as it is covered by the destination. This transition can be played both horizontally and vertically
-image::img/developer-guide/transition-cover.jpg[With cover transitions the source form stays in place as it is covered by the destination. This transition can be played both horizontally and vertically,scaledwidth=70%]
+image::img/transition-cover.jpg[With cover transitions the source form stays in place as it is covered by the destination. This transition can be played both horizontally and vertically,scaledwidth=70%]
 
 
 .Uncover is the inverse of cover. The destination form stays in place while the departing form moves away
-image::img/developer-guide/transition-uncover.jpg[Uncover is the inverse of cover. The destination form stays in place while the departing form moves away,scaledwidth=70%]
+image::img/transition-uncover.jpg[Uncover is the inverse of cover. The destination form stays in place while the departing form moves away,scaledwidth=70%]
 
 ==== Fade and Flip Transitions
 
 The fade transition is pretty trivial and only accepts a time value since it has no directional context.
 
 .Fade transition is probably the simplest one around
-image::img/developer-guide/transition-fade.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
+image::img/transition-fade.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/animations/FlipTransition.html[FlipTransition] is also pretty simple but unlike the others it isn't a part of the `CommonTransitions`. It has its own `FlipTransition` class.
 
 IMPORTANT: This transition looks very different on devices as it uses native perspective transforms available only there
 
 .Fade transition is probably the simplest one around
-image::img/developer-guide/transition-flip.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
+image::img/transition-flip.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
 
 ==== Bubble Transition
 
@@ -546,7 +546,7 @@ hi.show();
 ----
 
 .Bubble transition converting a circular button to a Dialog
-image::img/developer-guide/transition-bubble.png[Bubble transition converting a circular button to a Dialog,scaledwidth=12%]
+image::img/transition-bubble.png[Bubble transition converting a circular button to a Dialog,scaledwidth=12%]
 
 
 
@@ -561,7 +561,7 @@ once.
 
 [[mighty-morphing-components-1]]
 .Morph Transition
-image::img/developer-guide/mighty-morphing-components-1.png[Morph Transition,scaledwidth=15%]
+image::img/mighty-morphing-components-1.png[Morph Transition,scaledwidth=15%]
 
 To support this behavior we have the https://www.codenameone.com/javadoc/com/codename1/ui/animations/MorphTransition.html[MorphTransition] class that provides this same effect coupled with a fade to
 the rest of the UI (see <<mighty-morphing-components-1>>).

@@ -9,7 +9,7 @@ These hints are often referred to as "build hints" or "build arguments", they ar
 You can set these hints by right clicking the project in the IDE and selecting #Codename One# -> #Codename One Settings# -> #Build Hints#. The hints use the `key=value` style of data.
 
 .The build hints UI in Codename One Settings
-image::img/developer-guide/build-hints-codenameone-settings.png[The build hints UI in Codename One Settings,scaledwidth=50%]
+image::img/build-hints-codenameone-settings.png[The build hints UI in Codename One Settings,scaledwidth=50%]
 
 You can set the build hints in the `codenameone_settings.properties` file directly notice that when you do that all settings need to start with the `codename1.arg.` prefix. When editing the properties file directly we would need to define something like `android.debug=true` as  `codename1.arg.android.debug=true`.
 
@@ -545,22 +545,22 @@ f.show();
 If you explicitly lower the target SDK (e.g. `android.targetSDKVersion=21`) and install this app on an Android 6 device you will still see the legacy install prompt with all permissions listed up front:
 
 .Install UI when using the old permissions system
-image::img/developer-guide/marshmallow-permissions-level21.png[Install UI when using the old permissions system,scaledwidth=20%]
+image::img/marshmallow-permissions-level21.png[Install UI when using the old permissions system,scaledwidth=20%]
 
 When you keep the default target (API 33+) the installer defers to the runtime permission flow and the install UI looks like this instead:
 
 .Install UI when using the new permissions system
-image::img/developer-guide/marshmallow-permissions-level23.png[Install UI when using the new permissions system,scaledwidth=20%]
+image::img/marshmallow-permissions-level23.png[Install UI when using the new permissions system,scaledwidth=20%]
 
 When we launch the UI under the old permissions system we see the contacts instantly. In the new system we are presented with this UI:
 
 .Native permission prompt first time
-image::img/developer-guide/marshmallow-permissions-first-request.png[Native permission prompt first time,scaledwidth=20%]
+image::img/marshmallow-permissions-first-request.png[Native permission prompt first time,scaledwidth=20%]
 
 If we accept and allow all is good and the app loads as usual but if we deny then Codename One gives the user another chance to request the permission. Notice that in this case you can customize the prompt string as explained below.
 
 .Codename One permission prompt
-image::img/developer-guide/marshmallow-permissions-codenameone-prompt.png[Codename One permission prompt,scaledwidth=20%]
+image::img/marshmallow-permissions-codenameone-prompt.png[Codename One permission prompt,scaledwidth=20%]
 
 If we select don't ask then you will get a blank screen since the contacts will return as a 0 length array. This makes
 sense as the user is aware he denied permission and the app will still function as expected on a device where
@@ -568,7 +568,7 @@ no contacts are available.  However, if the user realizes his mistake he can dou
 permission in which case he will see this native prompt:
 
 .Native permission prompt second time
-image::img/developer-guide/marshmallow-permissions-second-request.png[Native permission prompt second time,scaledwidth=20%]
+image::img/marshmallow-permissions-second-request.png[Native permission prompt second time,scaledwidth=20%]
 
 Notice that denying this second request will not trigger another Codename One prompt.
 
@@ -600,7 +600,7 @@ The following permission keys are supported: "android.permission.READ_PHONE_STAT
 You can simulate permission prompts by checking that option in the simulator menu.
 
 .Simulate permission prompts menu item in the simulator
-image::img/developer-guide/simulate-permission-prompts.png[Simulate permission prompts menu item in the simulator,scaledwidth=10%]
+image::img/simulate-permission-prompts.png[Simulate permission prompts menu item in the simulator,scaledwidth=10%]
 
 This will produce a dialog to the user whenever this happens in Android and will try to act in a similar way to the device. Notice that you can test it in the iOS simulator too.
 
@@ -640,7 +640,7 @@ With Android Studio this is sometimes as very easy task as it is possible to act
 By default you should be able to open the gradle project in Android Studio and just run it. To get this to work open the Android Studio #Setting# and select gradle *2.11*.
 
 .Gradle settings UI in Android Studio (notice you need gradle 2.11 and not 2.8 as pictured here)
-image::img/developer-guide/gradle-settings.png[Gradle settings UI in Android Studio,scaledwidth=50%]
+image::img/gradle-settings.png[Gradle settings UI in Android Studio,scaledwidth=50%]
 
 If this works for you then you can ignore the section below.
 
@@ -702,22 +702,22 @@ public interface MyNative extends NativeInterface {
 We now need to right click the class in the IDE and select the #Generate Native Access# menu item:
 
 .Generating the native code
-image::img/developer-guide/native-interfaces-generate-menu.png[Generating the native code,scaledwidth=20%]
+image::img/native-interfaces-generate-menu.png[Generating the native code,scaledwidth=20%]
 
 .Once generated we are prompted that the native code is in the "native" directory
-image::img/developer-guide/native-interfaces-generated.png[Once generated we are prompted that the native code is in the "native" directory,scaledwidth=40%]
+image::img/native-interfaces-generated.png[Once generated we are prompted that the native code is in the "native" directory,scaledwidth=40%]
 
 We can now look int the #native# directory in the project root (in NetBeans you can see that in the #Files# tab) and you can see something that looks like this:
 
 .Native directory structure containing stubs for the various platforms
-image::img/developer-guide/native-interfaces-native-hierarchy.png[Native directory structure containing stubs for the various platforms,scaledwidth=30%]
+image::img/native-interfaces-native-hierarchy.png[Native directory structure containing stubs for the various platforms,scaledwidth=30%]
 
 These are effectively stubs you can edit to implement the methods in native code.
 
 TIP: If you re-run the #Generate Native Access# tool you will get this dialog, if you answer yes all the files will be overwritten, if you answer no only files you deleted/renamed will be recreated
 
 .Running "Generate Native Access" when some/all of the native files exist already
-image::img/developer-guide/native-interfaces-generated-existing.png[Running "Generate Native Access" when some/all of the native files exist already,scaledwidth=40%]
+image::img/native-interfaces-generated-existing.png[Running "Generate Native Access" when some/all of the native files exist already,scaledwidth=40%]
 
 For now lets leave the stubs and come back to them soon. From the Codename One Java code we can call the implementation of this native interface using:
 
@@ -1686,7 +1686,7 @@ Support for JAR files in Codename One has been a source of confusion so its prob
 The first source of confusion is changing the classpath. You should NEVER change the classpath or add an external JAR via the IDE classpath UI. The reasoning here is very simple, these IDE's don't package the JAR's into the final executable and even if they did these JAR's would probably use features unavailable or inappropriate for the device (e.g. `java.io.File` etc.).
 
 .Don't change the classpath, this is how it should look for a typical Java 8 Codename One application
-image::img/developer-guide/cn1libs-dont-change-classpath.png[Don't change the classpath, this is how it should look for a typical Java 8 Codename One application,scaledwidth=40%]
+image::img/cn1libs-dont-change-classpath.png[Don't change the classpath, this is how it should look for a typical Java 8 Codename One application,scaledwidth=40%]
 
 Cn1libs are Codename One's file format for 3rd party extensions. It's physicially a zip file containing other zip files and some meta-data.
 
@@ -1711,7 +1711,7 @@ Cn1lib’s address the modularity aspect allowing you to break that down. Existi
 Codename One has a large repository of https://www.codenameone.com/cn1libs.html[3rd party cn1libs], you can install a cn1lib by placing it in the lib directory of your project then right clicking the project and selecting #Codename One# -> #Refresh cn1lib files#.
 
 .Refresh cn1lib files menu option
-image::img/developer-guide/cn1libs-refresh.png[Refresh cn1lib files menu option,scaledwidth=40%]
+image::img/cn1libs-refresh.png[Refresh cn1lib files menu option,scaledwidth=40%]
 
 Once refreshed the content of the cn1lib will be available to code completion and you could just use it.
 
@@ -1731,10 +1731,10 @@ The native files are extracted to `lib/impl/native`. The classpath for the main 
 Creating a cn1lib is trivial, we will get into more elaborate uses soon enough but for a hello world cn1lib we can just use this 2 step process:
 
 .Select the CodenameOne Library Option
-image::img/developer-guide/cn1lib-create-step1.png[Select the CodenameOne Library Option,scaledwidth=30%]
+image::img/cn1lib-create-step1.png[Select the CodenameOne Library Option,scaledwidth=30%]
 
 .Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!
-image::img/developer-guide/cn1lib-create-step2.png[Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!,scaledwidth=30%]
+image::img/cn1lib-create-step2.png[Select the file name/destination. Notice that a Java 8 cn1lib requires Java 8 support in the parent project!,scaledwidth=30%]
 
 Once we go thru these steps we can define any source file within the library and it will be accessible to the users of the library.
 
@@ -1964,7 +1964,7 @@ hi.show();
 ----
 
 .Drag and drop demo
-image::img/developer-guide/draganddrop-rearrange-game.png[Drag and drop demo,scaledwidth=20%]
+image::img/draganddrop-rearrange-game.png[Drag and drop demo,scaledwidth=20%]
 
 
 To enable dragging a component it must be flagged as draggable using `setDraggable(true)`, to allow dropping the component onto another component you must first enable the drop target with `setDropTarget(true)` and override some methods (more on that later).
@@ -2178,13 +2178,13 @@ The following diagram shows the dependencies in a native library:
 
 [[fc8a77d2-61e0-11e5-9ecf-bf381d4ac966]]
 .Relationship between native & Codename One API UML Diagram
-image::img/developer-guide/fc8a77d2-61e0-11e5-9ecf-bf381d4ac966.png[Relationship between native and Codename One API UML Diagram,scaledwidth=50%]
+image::img/fc8a77d2-61e0-11e5-9ecf-bf381d4ac966.png[Relationship between native and Codename One API UML Diagram,scaledwidth=50%]
 
 In the specific case of our FreshDesk API, the public API and classes will look like:
 
 [[a5fe88406-61e4-11e5-951e-e09bd28a93c9]]
 .Freshdesk API Integration
-image::img/developer-guide/5fe88406-61e4-11e5-951e-e09bd28a93c9.png[Freshdesk API Integration,scaledwidth=30%]
+image::img/5fe88406-61e4-11e5-951e-e09bd28a93c9.png[Freshdesk API Integration,scaledwidth=30%]
 
 ===== Things to Notice
 
@@ -2692,13 +2692,13 @@ Now that we have set up our public API and our native interface, it is time to w
 
 [[c9d4b9cc-61f6-11e5-8b67-4691600188cd]]
 .Generate Native Access Menu Item
-image::img/developer-guide/c9d4b9cc-61f6-11e5-8b67-4691600188cd.png[Generate Native Access Menu Item,scaledwidth=20%]
+image::img/c9d4b9cc-61f6-11e5-8b67-4691600188cd.png[Generate Native Access Menu Item,scaledwidth=20%]
 
 This will generate a separate directory for each platform inside your project's `native` directory:
 
 [[eef6d078-61f6-11e5-91cd-2e1836916359]]
 .Native generated sources directory view
-image::img/developer-guide/eef6d078-61f6-11e5-91cd-2e1836916359.png[Native generated sources directory view,scaledwidth=15%]
+image::img/eef6d078-61f6-11e5-91cd-2e1836916359.png[Native generated sources directory view,scaledwidth=15%]
 
 Inside the `android` directory, this generates a `com/codename1/freshdesk/MobihelpNativeImpl` class with stubs for each method.
 
@@ -3074,13 +3074,13 @@ The iOS integration guide for the FreshDesk SDK lists the following core framewo
 
 [[IOSlinkoptions]]
 .IOS link options
-image::img/developer-guide/12c5303e-620c-11e5-9dbb-bcb4bebc0c87.png[iOS link options,scaledwidth=35%]
+image::img/12c5303e-620c-11e5-9dbb-bcb4bebc0c87.png[iOS link options,scaledwidth=35%]
 
 We can add these dependencies to our project using the `ios.add_libs` build hint.  E.g.
 
 [[a65e31df8-620c-11e5-87ff-6b926a3f2090]]
 .iOS's "add libs" build hint
-image::img/developer-guide/65e31df8-620c-11e5-87ff-6b926a3f2090.png[iOS's "add libs" build hint,scaledwidth=30%]
+image::img/65e31df8-620c-11e5-87ff-6b926a3f2090.png[iOS's "add libs" build hint,scaledwidth=30%]
 
 I.e. we just list the framework names separated by semicolons.   Notice that my list in the above image doesn't include all of the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by simply building the project with "include sources" checked, then looked at the frameworks that were included).
 
@@ -3168,7 +3168,7 @@ hi.show();
 ----
 
 .Center layout staircase effect with margin
-image::img/developer-guide/center-layout.png[Center layout staircase effect with margin,scaledwidth=20%]
+image::img/center-layout.png[Center layout staircase effect with margin,scaledwidth=20%]
 
 ==== Porting a Swing/AWT Layout Manager
 

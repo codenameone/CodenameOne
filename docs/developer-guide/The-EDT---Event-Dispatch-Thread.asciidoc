@@ -125,7 +125,7 @@ It’s an imperfect tool. It might fire “false positives” meaning it might d
 To activate this tool just select the Debug EDT menu option in the simulator and pick the level of output you wish to receive:
 
 .Debug EDT
-image::img/developer-guide/debug-edt.png[Debug EDT,scaledwidth=40%]
+image::img/debug-edt.png[Debug EDT,scaledwidth=40%]
 
 Full output will include stack traces to the area in the code that is suspected in the violation.
 

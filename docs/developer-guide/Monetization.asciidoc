@@ -13,7 +13,7 @@ The most effective network is the simplest banner ad support. To enable mobile a
 To enable this for Android just define the `android.googleAdUnitId=ca-app-pub-8610616152754010/3413603324` in the build arguments and for iOS use the same as in `ios.googleAdUnitId`. The rest is seamless, the right ad will be created for you at the bottom of the screen and the form should automatically shrink to fit the ad. This shrinking is implemented differently between iOS and Android due to some constraints but the result should be similar and this should work reasonably well with device rotation as well.
 
 .Google play ads
-image::img/developer-guide/google-play-ads.png[Google play ads,scaledwidth=20%]
+image::img/google-play-ads.png[Google play ads,scaledwidth=20%]
 
 There's a special ad unit id to use for test ads. If you specify `ca-app-pub-3940256099942544/6300978111`, you'll get test ads for your development phase. This is important because you're not allowed to click on your own ads. When it's time to create a production release, you should replace this with the real value you generated in adMob.
 
@@ -139,17 +139,17 @@ NOTE: You can test out this code in the simulator without doing any additional s
 When the app first opens we see our button:
 
 .In-app purchase demo app
-image::img/developer-guide/iap-demo-1.png[In-app purchase demo app,scaledwidth=20%]
+image::img/iap-demo-1.png[In-app purchase demo app,scaledwidth=20%]
 
 In the simulator, clicking on the "Buy World" button will bring up a prompt to ask you if you want to approve the purchase.
 
 .Approving the purchase in the simulator
-image::img/developer-guide/iap-demo2.png[Approving the purchase in the simulator,scaledwidth=30%]
+image::img/iap-demo2.png[Approving the purchase in the simulator,scaledwidth=30%]
 
 Now if I try to buy the product again, it pops up the dialog to let me know that I already own it.
 
 .In App purchase already owned
-image::img/developer-guide/iap-demo3.png[In App purchase already owned,scaledwidth=20%]
+image::img/iap-demo3.png[In App purchase already owned,scaledwidth=20%]
 
 ==== Making it Consumable
 
@@ -280,7 +280,7 @@ NOTE: The receipt store is intended to interface with a server so that the subsc
 
 
 .The Receipt store is a layer between your server and Codename One
-image::img/developer-guide/in-app-purchase-receipt-store-diagram.png[The Receipt store is a layer between your server and Codename One]
+image::img/in-app-purchase-receipt-store-diagram.png[The Receipt store is a layer between your server and Codename One]
 
 
 A basic receipt store needs to implement just two methods:
@@ -577,16 +577,16 @@ Notice that, in `itemPurchased()` we don't need to explicitly create any receipt
 ==== Screenshots
 
 .Main form
-image::img/developer-guide/in-app-purchase-subscription-main-form.png[Main form,scaledwidth=25%]
+image::img/in-app-purchase-subscription-main-form.png[Main form,scaledwidth=25%]
 
 .Dialog shown when subscribing to a product
-image::img/developer-guide/in-app-purchase-subscription-dialog.png[Dialog shown when subscribing to a product,scaledwidth=25%]
+image::img/in-app-purchase-subscription-dialog.png[Dialog shown when subscribing to a product,scaledwidth=25%]
 
 .Simulator confirm dialog when purchasing a subscription
-image::img/developer-guide/in-app-purchase-subscription-confirm.png[Simulator confirm dialog when purchasing a subscription,scaledwidth=40%]
+image::img/in-app-purchase-subscription-confirm.png[Simulator confirm dialog when purchasing a subscription,scaledwidth=40%]
 
 .Upon successful purchase, the toastbar message is shown
-image::img/developer-guide/in-app-purchase-subscription-toastbar-success.png[Upon successful purchase, the toastbar message is shown,scaledwidth=20%]
+image::img/in-app-purchase-subscription-toastbar-success.png[Upon successful purchase, the toastbar message is shown,scaledwidth=20%]
 
 ==== Summary
 
@@ -670,10 +670,10 @@ create TABLE RECEIPTS
 ----
 3. Open the "persistence.xml" file in the server netbeans project.
 +
-image::img/developer-guide/iap3-persistence-file.png[Persistence File,scaledwidth=40%]
+image::img/iap3-persistence-file.png[Persistence File,scaledwidth=40%]
 4. Change the data source to the database you just created.
 +
-image::img/developer-guide/iap3-persistence-file.png[Edit persistence.xml file data source,scaledwidth=40%]
+image::img/iap3-persistence-file.png[Edit persistence.xml file data source,scaledwidth=40%]
 
 If you're not sure how to create a data source, see my https://www.codenameone.com/blog/connecting-to-a-mysql-database-part-2.html[previous tutorial on connecting to a MySQL database].
 
@@ -687,34 +687,34 @@ At this point we should be able to test out the project in the Codename One simu
 When the app first opens you'll see a screen as follows:
 
 .First screen of app
-image::img/developer-guide/iap3-first-screen.png[First screen of app,scaledwidth=20%]
+image::img/iap3-first-screen.png[First screen of app,scaledwidth=20%]
 
 This screen is for testing consumable products, so we won't be making use of this right now.
 
 Open the hamburger menu and select "Subscriptions".  You should see something like this:
 
 .Subscriptions form
-image::img/developer-guide/iap3-subscriptions-form.png[Subscriptions form,scaledwidth=20%]
+image::img/iap3-subscriptions-form.png[Subscriptions form,scaledwidth=20%]
 
 Click on the "Subscribe 1 Month No Ads" button.  You will be prompted to accept the purchase:
 
 .Approve purchase dialog
-image::img/developer-guide/iap3-approve-purchase.png[Approve purchase dialog,scaledwidth=40%]
+image::img/iap3-approve-purchase.png[Approve purchase dialog,scaledwidth=40%]
 
 Upon completion, the app will submit the purchase to your server, and if all went well, it will retrieve the updated list of receipts from your server also, and update the label on this form to say "No Ads.  Expires <some date>":
 
 .After successful purchase
-image::img/developer-guide/iap3-successful-purchase.png[After successful purchase,scaledwidth=20%]
+image::img/iap3-successful-purchase.png[After successful purchase,scaledwidth=20%]
 
 NOTE: This project is set up to use an expedited expiry date schedule for purchases from the simulator.  1 month = 5 minutes.  3 months = 15 minutes.  This helps for testing.  That is why your expiry date may be different than expected.
 
 Just to verify that the receipt was inserted correctly, you should check the contents of your "RECEIPTS" table in your database.  In Netbeans, I can do this easily from the "Services" pane.  Expand the database connection down to the RECEIPTS table, right click "RECEIPTS" and select "View Data".  This will open a data table similar the the following:
 
 .Receipts table after insertion
-image::img/developer-guide/iap3-view-table-data.png[Receipts table after insertion,scaledwidth=20%]
+image::img/iap3-view-table-data.png[Receipts table after insertion,scaledwidth=20%]
 
 .Table view
-image::img/developer-guide/iap3-table-view.png[Table view,scaledwidth=40%]
+image::img/iap3-table-view.png[Table view,scaledwidth=40%]
 
 A few things to mention here:
 
@@ -1112,7 +1112,7 @@ For more information about setting up alpha testing on Google play see https://s
 Once you have set your app up for alpha testing, you can send an invite link to your test accounts.  You can find the link in the Google Play console under the APK section, under the "Alpha" tab (and assuming you've enabled alpha testing.
 
 .Alpha testing tab in google play
-image::img/developer-guide/iap3-alpha-testing-tab.png[Alpha testing tab in google play,scaledwidth=40%]
+image::img/iap3-alpha-testing-tab.png[Alpha testing tab in google play,scaledwidth=40%]
 
 The format of the link is `https://play.google.com/apps/testing/your-app-id` in case you can't find it.  You can email this to your alpha testers.  Make sure that you have added all testers to your tester lists so that their purchases will be made in the sandbox environment.
 
@@ -1134,12 +1134,12 @@ IMPORTANT: Since we will be adding products as "Subscriptions" in the pay store,
 3. Select "Subscription", and enter "iapdemo.noads.month.auto" for the Product ID.  Then click "Continue"
 
 .Add new product dialog
-image::img/developer-guide/iap3-play-add-new-product.png[Add new product dialog,scaledwidth=30%]
+image::img/iap3-play-add-new-product.png[Add new product dialog,scaledwidth=30%]
 
 Now fill in the form.  You can choose your own price and name for the product.  The following is a screenshot of the options I chose.
 
 .Add product to google
-image::img/developer-guide/iap3-add-product-google.png[Add product to google]
+image::img/iap3-add-product-google.png[Add product to google]
 
 **Adding 3 month Subscription**
 
@@ -1163,21 +1163,21 @@ Steps:
 2. Click on the "Library" menu item in the left menu, and then click the "Google Play Developer API" link. +
 +
 .Google Play Developer API Link
-image::img/developer-guide/iap3-play-developer-api-link.png[Google Play Developer API Link,scaledwidth=20%]
+image::img/iap3-play-developer-api-link.png[Google Play Developer API Link,scaledwidth=20%]
 
 3. Click on the button that says "Enable".  (If you already have it enabled, then just proceed to the next step).
 +
 .Enable API button
-image::img/developer-guide/iap3-enable-api.png[Enable API button,scaledwidth=20%]
+image::img/iap3-enable-api.png[Enable API button,scaledwidth=20%]
 4. Click on the "Credentials" menu item in the left menu.
 5. In the "Credentials" drop-down menu, select the "Service Account Key" option.
 +
 .Credentials dropdown
-image::img/developer-guide/iap3-credentials-dropdown.png[Credentials dropdown,scaledwidth=20%]
+image::img/iap3-credentials-dropdown.png[Credentials dropdown,scaledwidth=20%]
 6. You will be presented with a new form.  In the "Service Account" drop-down, select "New Service Account".  This will give you some additional options.
 +
 .Create service account key
-image::img/developer-guide/iap3-create-service-account-key.png[Create service account key,scaledwidth=20%]
+image::img/iap3-create-service-account-key.png[Create service account key,scaledwidth=20%]
 7. Enter anything you like for the "Service account name".  For the role, we'll select "Project" > "Owner" for now just so we don't run into permissions issues.  You'll probably want to investigate further to fine a more limited role that only allows receipt verification, but for now, I don't want any unnecessary road blocks for getting this to work.  We're probably going to run into "permission denied" errors at first anyways, so the fewer reasons for this, the better.
 8. It will auto-generate an account ID for you.
 9. Finally, for the "Key type", select "JSON".  Then click the "Create" button.
@@ -1227,15 +1227,15 @@ Steps:
 2. You should see your app listed on this page.  Click the "Link" button next to your app.
 +
 .Link to API
-image::img/developer-guide/iap3-link-to-api.png[Link to API,scaledwidth=20%]
+image::img/iap3-link-to-api.png[Link to API,scaledwidth=20%]
 3. This should reveal some more options on the page.  You should see a "Service Accounts"  section with a list of all of the service accounts that you have created.  Find the one we just created, and click the "Grant Access" button in its row.
 +
 .Grant access
-image::img/developer-guide/iap3-grant-access.png[Grant access,scaledwidth=20%]
+image::img/iap3-grant-access.png[Grant access,scaledwidth=20%]
 4. This will open a dialog titled "Add New User".  Leave everything default, except change the "Role" to "Administrator". This provides "ALL" permissions to this account, which probably isn't a good idea for production.  Later on, after everything is working, you can circle back and try to refine permissions.  For the purpose of this tutorial, I just want to pull out all of the potential road blocks.
 +
 .New User
-image::img/developer-guide/iap3-new-user.png[New User,scaledwidth=30%]
+image::img/iap3-new-user.png[New User,scaledwidth=30%]
 5. Press the "Add User" button.
 
 At this point, the service account *should* be active so we can try to validate receipts.
