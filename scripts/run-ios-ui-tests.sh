@@ -118,45 +118,61 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
+# Derive desired simulator OS from SDKROOT (e.g., iphonesimulator18.5 -> 18 / 5)
+SDKROOT_OS="${SDKROOT#iphonesimulator}"
+DESIRED_OS_MAJOR="${SDKROOT_OS%%.*}"
+DESIRED_OS_MINOR="${SDKROOT_OS#*.}"; [ "$DESIRED_OS_MINOR" = "$SDKROOT_OS" ] && DESIRED_OS_MINOR=""
+
 auto_select_destination() {
-  # Prefer xcodebuild -showdestinations (no Python, robust on CI)
-  local selected
+  # 1) Try xcodebuild -showdestinations, but skip placeholder ids
   if command -v xcodebuild >/dev/null 2>&1; then
-    selected="$(
+    sel="$(
       xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null |
-      awk '
+      awk -v wantMajor="${DESIRED_OS_MAJOR:-}" -v wantMinor="${DESIRED_OS_MINOR:-}" '
+        function is_uuid(s) { return match(s, /^[0-9A-Fa-f-]{8}-[0-9A-Fa-f-]{4}-[0-9A-Fa-f-]{4}-[0-9A-Fa-f-]{4}-[0-9A-Fa-f-]{12}$/) }
         /platform:iOS Simulator/ && /name:/ && /id:/ {
           os=""; name=""; id="";
           for (i=1;i<=NF;i++) {
-            if ($i ~ /^OS:/)   { sub(/^OS:/,"",$i);   os=$i }
+            if ($i ~ /^OS:/)   { sub(/^OS:/,"",$i); os=$i }
             if ($i ~ /^name:/) { sub(/^name:/,"",$i); name=$i }
-            if ($i ~ /^id:/)   { sub(/^id:/,"",$i);   id=$i }
+            if ($i ~ /^id:/)   { sub(/^id:/,"",$i); id=$i }
           }
-          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0);
-          gsub(/[^0-9.]/,"",os);
-          printf("%d|%s|%s|%s\n", pri, os, name, id);
+          if (!is_uuid(id)) next;                    # skip placeholders
+          gsub(/[^0-9.]/,"",os)                      # keep 18.5 form if present
+          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0)
+          # preference score: major-match first, then minor proximity if same major
+          split(os, p, "."); major=p[1]; minor=p[2]
+          major_ok = (wantMajor=="" || major==wantMajor) ? 1 : 0
+          minor_pen = (wantMinor=="" || major!=wantMajor) ? 999 : (minor=="" ? 500 : (minor<wantMinor ? wantMinor-minor : minor-wantMinor))
+          printf("%d|%d|%03d|%s|%s\n", pri, major_ok, minor_pen, name, id)
         }
-      ' | sort -t'|' -k1,1nr -k2,2nr | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$4}'
+      ' | sort -t'|' -k2,2nr -k1,1nr -k3,3n | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$5}'
     )"
+    [ -n "$sel" ] && { echo "$sel"; return; }
   fi
 
-  # Fallback to simctl (plain text)
-  if [ -z "$selected" ] && command -v xcrun >/dev/null 2>&1; then
-    selected="$(
+  # 2) Fallback: simctl list devices available (plain text)
+  if command -v xcrun >/dev/null 2>&1; then
+    sel="$(
       xcrun simctl list devices available 2>/dev/null |
-      awk '
-        /\[/ && /[)]/ {
-          # e.g.: "    iPhone 16 (18.0) [UDID] (Available)"
-          name=$0; sub(/ *\(.*/,"",name); sub(/^ +/,"",name)
-          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0);
-          if (match($0, /\[([0-9A-F-]+)\]/, a)) udid=a[1]; else next;
-          printf("%d|%s|%s\n", pri, name, udid);
+      awk -v wantMajor="${DESIRED_OS_MAJOR:-}" -v wantMinor="${DESIRED_OS_MINOR:-}" '
+        # Example: "iPhone 16e (18.5) [UDID] (Available)"
+        /\[/ && /\)/ {
+          line=$0
+          name=line; sub(/ *\(.*/,"",name); sub(/^ +/,"",name)
+          os=""; if (match(line, /\(([0-9.]+)\)/, a)) os=a[1]
+          udid=""; if (match(line, /\[([0-9A-Fa-f-]+)\]/, b)) udid=b[1]
+          if (udid=="") next
+          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0)
+          split(os, p, "."); major=p[1]; minor=p[2]
+          major_ok = (wantMajor=="" || major==wantMajor) ? 1 : 0
+          minor_pen = (wantMinor=="" || major!=wantMajor) ? 999 : (minor=="" ? 500 : (minor<wantMinor ? wantMinor-minor : minor-wantMinor))
+          printf("%d|%d|%03d|%s|%s\n", pri, major_ok, minor_pen, name, udid)
         }
-      ' | sort -t'|' -k1,1nr | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$3}'
+      ' | sort -t'|' -k2,2nr -k1,1nr -k3,3n | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$5}'
     )"
+    [ -n "$sel" ] && { echo "$sel"; return; }
   fi
-
-  [ -n "$selected" ] && echo "$selected"
 }
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
