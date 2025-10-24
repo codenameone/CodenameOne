@@ -118,24 +118,26 @@ public class TestRunnerComponent extends Container {
 
             }
 
-        } catch (final Throwable t) {
-            Log.e(t);
-            CN.callSerially(new Runnable() {
-                public void run() {
-                    statusLabel.setText(test + ": Failed");
-                    $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
-
-                    statusLabel.addActionListener(new ActionListener() {
-                        public void actionPerformed(ActionEvent ev) {
-                            ToastBar.showInfoMessage(t.getMessage());
-                            Log.e(t);
-                        }
-                    });
-                }
-            });
-
-
+        } catch (Throwable t) {
+            reportFailure(test, statusLabel, t);
         }
+    }
+
+    private void reportFailure(final AbstractTest test, final Button statusLabel, final Throwable t) {
+        Log.e(t);
+        CN.callSerially(new Runnable() {
+            public void run() {
+                statusLabel.setText(test + ": Failed");
+                $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
+
+                statusLabel.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent ev) {
+                        ToastBar.showInfoMessage(t.getMessage());
+                        Log.e(t);
+                    }
+                });
+            }
+        });
     }
 
     /**
@@ -155,14 +157,18 @@ public class TestRunnerComponent extends Container {
             $(statusLabel).selectAllStyles().setBgColor(0xffff00).setBgTransparency(0xff);
             resultsPane.add(statusLabel);
             resultsPane.revalidate();
-            if (test.shouldExecuteOnEDT()) {
-                runTest(test, statusLabel);
-            } else {
-                CN.invokeAndBlock(new Runnable() {
-                    public void run() {
-                        runTest(test, statusLabel);
-                    }
-                });
+            try {
+                if (test.shouldExecuteOnEDT()) {
+                    runTest(test, statusLabel);
+                } else {
+                    CN.invokeAndBlock(new Runnable() {
+                        public void run() {
+                            runTest(test, statusLabel);
+                        }
+                    });
+                }
+            } catch (Throwable t) {
+                reportFailure(test, statusLabel, t);
             }
             resultsPane.revalidate();
         }

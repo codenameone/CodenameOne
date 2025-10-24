@@ -15,7 +15,6 @@ import java.lang.reflect.Constructor;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,7 +38,6 @@ class GraphicsTest extends UITestBase {
         when(implementation.getClipHeight(any())).thenReturn(100);
         when(implementation.isShapeSupported(any())).thenReturn(true);
         when(implementation.isShapeClipSupported(any())).thenReturn(true);
-        clearInvocations(implementation);
     }
 
     @AfterEach
