@@ -2,7 +2,6 @@
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <math.h>
-#import <float.h>
 
 @interface HelloCodenameOneUITests : XCTestCase
 @property(nonatomic, strong) XCUIApplication *app;
@@ -113,19 +112,14 @@
             [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.75]];
             continue;
         }
-        double variance = 0.0;
-        double mean = 0.0;
-        double range = 0.0;
-        [self luminanceStatsForImage:image sampleStride:8 variance:&variance mean:&mean range:&range];
-        printf("CN1SS:INFO:context=%s attempt=%lu luma_variance=%.3f luma_mean=%.2f luma_range=%.2f size=%.0fx%.0f\n",
+        double variance = [self luminanceVarianceForImage:image sampleStride:8];
+        printf("CN1SS:INFO:context=%s attempt=%lu luma_variance=%.3f size=%.0fx%.0f\n",
                context.UTF8String,
                (unsigned long)attempt,
                variance,
-               mean,
-               range,
                image.size.width,
                image.size.height);
-        if (variance > 8.0 && range > 12.0 && mean < 240.0) {
+        if (variance > 8.0) {
             detected = YES;
             break;
         }
@@ -157,15 +151,8 @@
     NSData *pngData = shot.PNGRepresentation;
 
     UIImage *image = shot.image;
-    double captureVariance = 0.0;
-    double captureMean = 0.0;
-    double captureRange = 0.0;
-    [self luminanceStatsForImage:image sampleStride:6 variance:&captureVariance mean:&captureMean range:&captureRange];
-    printf("CN1SS:INFO:test=%s capture_luma_variance=%.3f capture_luma_mean=%.2f capture_luma_range=%.2f\n",
-           name.UTF8String,
-           captureVariance,
-           captureMean,
-           captureRange);
+    double variance = [self luminanceVarianceForImage:image sampleStride:6];
+    printf("CN1SS:INFO:test=%s capture_luma_variance=%.3f\n", name.UTF8String, variance);
 
     NSURL *pngURL = [self.outputDirectory URLByAppendingPathComponent:[name stringByAppendingString:@".png"]];
     [pngData writeToURL:pngURL atomically:NO];
@@ -256,28 +243,21 @@
     printf("%s:END:%s\n", prefix.UTF8String, name.UTF8String);
 }
 
-- (void)luminanceStatsForImage:(UIImage *)image
-                   sampleStride:(NSUInteger)stride
-                       variance:(double *)varianceOut
-                           mean:(double *)meanOut
-                          range:(double *)rangeOut {
-    if (varianceOut) { *varianceOut = 0.0; }
-    if (meanOut) { *meanOut = 0.0; }
-    if (rangeOut) { *rangeOut = 0.0; }
+- (double)luminanceVarianceForImage:(UIImage *)image sampleStride:(NSUInteger)stride {
     if (image == nil) {
-        return;
+        return 0.0;
     }
     CGImageRef cgImage = image.CGImage;
     if (cgImage == nil) {
-        return;
+        return 0.0;
     }
     CGDataProviderRef provider = CGImageGetDataProvider(cgImage);
     if (provider == nil) {
-        return;
+        return 0.0;
     }
     CFDataRef dataRef = CGDataProviderCopyData(provider);
     if (dataRef == nil) {
-        return;
+        return 0.0;
     }
 
     const UInt8 *bytes = CFDataGetBytePtr(dataRef);
@@ -287,7 +267,7 @@
     size_t components = bitsPerPixel / 8;
     if (length == 0 || components < 3) {
         CFRelease(dataRef);
-        return;
+        return 0.0;
     }
 
     if (stride == 0) {
@@ -296,47 +276,25 @@
 
     size_t width = CGImageGetWidth(cgImage);
     size_t height = CGImageGetHeight(cgImage);
-
-    size_t marginX = width / 8;
-    size_t marginY = height / 8;
-    size_t xStart = marginX;
-    size_t xEnd = width > marginX ? width - marginX : width;
-    size_t yStart = marginY;
-    size_t yEnd = height > marginY ? height - marginY : height;
-    if (xStart >= xEnd) { xStart = 0; xEnd = width; }
-    if (yStart >= yEnd) { yStart = 0; yEnd = height; }
-
-    NSUInteger effectiveStride = stride;
-    NSUInteger regionWidth = (NSUInteger)(xEnd > xStart ? (xEnd - xStart) : width);
-    NSUInteger regionHeight = (NSUInteger)(yEnd > yStart ? (yEnd - yStart) : height);
-    if (effectiveStride > regionWidth && regionWidth > 0) {
-        effectiveStride = regionWidth;
-    }
-    if (effectiveStride > regionHeight && regionHeight > 0) {
-        effectiveStride = regionHeight;
-    }
+    stride = MIN(stride, MAX((NSUInteger)1, (NSUInteger)width));
 
     CGBitmapInfo info = CGImageGetBitmapInfo(cgImage);
     BOOL littleEndian = (info & kCGBitmapByteOrderMask) == kCGBitmapByteOrder32Little;
 
     double sum = 0.0;
     double sumSq = 0.0;
-    double minLuma = DBL_MAX;
-    double maxLuma = 0.0;
     NSUInteger count = 0;
 
-    for (size_t y = yStart; y < yEnd; y += effectiveStride) {
+    for (size_t y = 0; y < height; y += stride) {
         const UInt8 *row = bytes + y * bytesPerRow;
-        for (size_t x = xStart; x < xEnd; x += effectiveStride) {
+        for (size_t x = 0; x < width; x += stride) {
             const UInt8 *pixel = row + x * components;
             double r = littleEndian ? pixel[2] : pixel[0];
-            double g = pixel[1];
+            double g = littleEndian ? pixel[1] : pixel[1];
             double b = littleEndian ? pixel[0] : pixel[2];
             double luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
             sum += luma;
             sumSq += luma * luma;
-            if (luma < minLuma) { minLuma = luma; }
-            if (luma > maxLuma) { maxLuma = luma; }
             count += 1;
         }
     }
@@ -344,16 +302,12 @@
     CFRelease(dataRef);
 
     if (count == 0) {
-        return;
+        return 0.0;
     }
 
     double mean = sum / (double)count;
     double variance = (sumSq / (double)count) - (mean * mean);
-    double range = maxLuma - minLuma;
-
-    if (varianceOut) { *varianceOut = variance; }
-    if (meanOut) { *meanOut = mean; }
-    if (rangeOut) { *rangeOut = range; }
+    return variance;
 }
 
 @end

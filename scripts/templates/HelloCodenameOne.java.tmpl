@@ -7,7 +7,6 @@ import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.io.Log;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -16,11 +15,10 @@ public class @MAIN_NAME@ {
     private Form mainForm;
 
     public void init(Object context) {
-        log("init context=" + (context == null ? "<null>" : context.getClass().getName()));
+        // No special initialization required for this sample
     }
 
     public void start() {
-        log("start invoked current=" + (current == null ? "<null>" : current.getClass().getName()));
         if (current != null) {
             current.show();
             return;
@@ -29,21 +27,16 @@ public class @MAIN_NAME@ {
     }
 
     public void stop() {
-        log("stop invoked");
         current = Display.getInstance().getCurrent();
-        log("stop stored current=" + (current == null ? "<null>" : current.getClass().getName()));
     }
 
     public void destroy() {
-        log("destroy invoked");
+        // Nothing to clean up for this sample
     }
 
     private void showMainForm() {
-        log("showMainForm invoked");
         if (mainForm == null) {
             mainForm = new Form("Main Screen", new BorderLayout());
-            mainForm.getContentPane().getAllStyles().setBgColor(0x0b1120);
-            mainForm.getContentPane().getAllStyles().setBgTransparency(255);
 
             Container content = new Container(BoxLayout.y());
             content.getAllStyles().setBgColor(0x1f2937);
@@ -69,11 +62,9 @@ public class @MAIN_NAME@ {
         }
         current = mainForm;
         mainForm.show();
-        log("mainForm shown componentCount=" + mainForm.getComponentCount());
     }
 
     private void showBrowserForm() {
-        log("showBrowserForm invoked");
         Form browserForm = new Form("Browser Screen", new BorderLayout());
 
         BrowserComponent browser = new BrowserComponent();
@@ -87,7 +78,6 @@ public class @MAIN_NAME@ {
 
         current = browserForm;
         browserForm.show();
-        log("browserForm shown components=" + browserForm.getComponentCount());
     }
 
     private String buildBrowserHtml() {
@@ -97,9 +87,5 @@ public class @MAIN_NAME@ {
                 + "p{font-size:16px;line-height:1.4;}span{color:#4cc9f0;}</style></head>"
                 + "<body><div class='container'><h1>Codename One</h1>"
                 + "<p>BrowserComponent <span>instrumentation</span> test content.</p></div></body></html>";
-    }
-
-    private void log(String message) {
-        Log.p("CN1SS:APP:" + message);
     }
 }
