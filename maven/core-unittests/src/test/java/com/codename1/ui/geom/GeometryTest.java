@@ -111,6 +111,19 @@ class GeometryTest {
     }
 
     @Test
+    void testFindTValuesForXWithinRange() {
+        Geometry.BezierCurve curve = new Geometry.BezierCurve(0, 0, 2, 4, 4, 0);
+        double[] result = new double[3];
+        int count = curve.findTValuesForX(2d, 0d, 4d, result);
+        assertEquals(1, count, "Expected a single intersection with the vertical line at x=2");
+        assertEquals(0.5d, result[0], 1e-6);
+        assertEquals(2d, curve.y(result[0]), 1e-6);
+
+        int filtered = curve.findTValuesForX(2d, 3d, 4d, result);
+        assertEquals(0, filtered, "Filtering outside of the y-range should produce no matches");
+    }
+
+    @Test
     void testBoundingRectCoversCurveExtents() {
         Geometry.BezierCurve curve = new Geometry.BezierCurve(0, 0, 1, 3, 2, -3, 3, 0);
         Rectangle2D bounds = curve.getBoundingRect();

@@ -155,4 +155,40 @@ class GeneralPathTest {
         target.getPoints(targetPoints);
         assertArrayEquals(sourcePoints, targetPoints, 1e-6f);
     }
+
+    @Test
+    void testPathIteratorTraversesCommandsInInsertionOrder() {
+        GeneralPath path = new GeneralPath();
+        path.moveTo(0, 0);
+        path.lineTo(10, 0);
+        path.lineTo(10, 10);
+        path.closePath();
+
+        PathIterator iterator = path.getPathIterator();
+        float[] coords = new float[6];
+
+        assertFalse(iterator.isDone());
+        assertEquals(PathIterator.SEG_MOVETO, iterator.currentSegment(coords));
+        assertEquals(0f, coords[0], 1e-6f);
+        assertEquals(0f, coords[1], 1e-6f);
+
+        iterator.next();
+        assertFalse(iterator.isDone());
+        assertEquals(PathIterator.SEG_LINETO, iterator.currentSegment(coords));
+        assertEquals(10f, coords[0], 1e-6f);
+        assertEquals(0f, coords[1], 1e-6f);
+
+        iterator.next();
+        assertFalse(iterator.isDone());
+        assertEquals(PathIterator.SEG_LINETO, iterator.currentSegment(coords));
+        assertEquals(10f, coords[0], 1e-6f);
+        assertEquals(10f, coords[1], 1e-6f);
+
+        iterator.next();
+        assertFalse(iterator.isDone());
+        assertEquals(PathIterator.SEG_CLOSE, iterator.currentSegment(coords));
+
+        iterator.next();
+        assertTrue(iterator.isDone());
+    }
 }
