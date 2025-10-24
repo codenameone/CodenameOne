@@ -84,7 +84,30 @@ jobs:
 
       - name: Install Asciidoctor tooling
         run: |
-          gem install --no-document asciidoctor asciidoctor-pdf
+          gem install --no-document asciidoctor asciidoctor-pdf rouge
+
+      - name: Run Asciidoctor lint
+        run: |
+          set -euo pipefail
+          REPORT_DIR="build/developer-guide/reports"
+          REPORT_FILE="${REPORT_DIR}/asciidoc-lint-report.txt"
+          mkdir -p "$REPORT_DIR"
+          set +e
+          asciidoctor \
+            --require rouge \
+            --failure-level WARN \
+            --verbose \
+            --trace \
+            -o /dev/null \
+            docs/developer-guide/developer-guide.asciidoc \
+            2>&1 | tee "$REPORT_FILE"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          echo "ASCII_DOC_LINT_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
+          echo "ASCII_DOC_LINT_STATUS=$STATUS" >> "$GITHUB_ENV"
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Asciidoctor exited with status $STATUS" >&2
+          fi
 
       - name: Build Developer Guide HTML and PDF
         run: |
@@ -135,6 +158,76 @@ jobs:
             rm -f "$GENERATED_COVER_SVG"
           fi
 
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          VALE_VERSION="3.13.0"
+          VALE_ARCHIVE="vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          curl -fsSL -o "$VALE_ARCHIVE" "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/${VALE_ARCHIVE}"
+          tar -xzf "$VALE_ARCHIVE"
+          sudo mv vale /usr/local/bin/vale
+          rm -f "$VALE_ARCHIVE"
+
+      - name: Sync Vale styles
+        run: |
+          set -euo pipefail
+          vale sync --config docs/developer-guide/.vale.ini
+
+      - name: Run Vale style linter
+        run: |
+          set -euo pipefail
+          REPORT_DIR="build/developer-guide/reports"
+          REPORT_FILE="${REPORT_DIR}/vale-report.json"
+          HTML_REPORT="${REPORT_DIR}/vale-report.html"
+          mkdir -p "$REPORT_DIR"
+          set +e
+          vale --config docs/developer-guide/.vale.ini --output=JSON docs/developer-guide > "$REPORT_FILE"
+          STATUS=$?
+          set -e
+          python3 scripts/developer-guide/vale_report_to_html.py --input "$REPORT_FILE" --output "$HTML_REPORT"
+          echo "VALE_REPORT=$REPORT_FILE" >> "$GITHUB_ENV"
+          echo "VALE_HTML_REPORT=$HTML_REPORT" >> "$GITHUB_ENV"
+          echo "VALE_STATUS=$STATUS" >> "$GITHUB_ENV"
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Vale exited with status $STATUS" >&2
+          fi
+
+      - name: Check for unused developer guide images
+        run: |
+          set -euo pipefail
+          REPORT_DIR="build/developer-guide/reports"
+          JSON_REPORT="${REPORT_DIR}/unused-images.json"
+          TEXT_REPORT="${REPORT_DIR}/unused-images.txt"
+          mkdir -p "$REPORT_DIR"
+          python3 scripts/developer-guide/find_unused_images.py docs/developer-guide --output "$JSON_REPORT" | tee "$TEXT_REPORT"
+          echo "UNUSED_IMAGES_JSON=$JSON_REPORT" >> "$GITHUB_ENV"
+          echo "UNUSED_IMAGES_TEXT=$TEXT_REPORT" >> "$GITHUB_ENV"
+
+      - name: Summarize AsciiDoc linter findings
+        id: summarize_asciidoc_lint
+        run: |
+          python3 scripts/developer-guide/summarize_reports.py ascii \
+            --report "${ASCII_DOC_LINT_REPORT}" \
+            --status "${ASCII_DOC_LINT_STATUS:-0}" \
+            --output "${GITHUB_OUTPUT}"
+
+      - name: Summarize Vale findings
+        id: summarize_vale
+        run: |
+          python3 scripts/developer-guide/summarize_reports.py vale \
+            --report "${VALE_REPORT}" \
+            --status "${VALE_STATUS:-0}" \
+            --output "${GITHUB_OUTPUT}"
+
+      - name: Summarize unused image findings
+        id: summarize_unused_images
+        run: |
+          python3 scripts/developer-guide/summarize_reports.py unused-images \
+            --report "${UNUSED_IMAGES_JSON}" \
+            --output "${GITHUB_OUTPUT}" \
+            --details-key details \
+            --preview-limit 10
+
       - name: Upload HTML artifact
         uses: actions/upload-artifact@v4
         with:
@@ -149,9 +242,39 @@ jobs:
           path: build/developer-guide/pdf/developer-guide.pdf
           if-no-files-found: error
 
+      - name: Upload AsciiDoc linter report
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-asciidoc-lint
+          path: ${{ env.ASCII_DOC_LINT_REPORT }}
+          if-no-files-found: warn
+
+      - name: Upload Vale report
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-vale-report
+          path: |
+            ${{ env.VALE_REPORT }}
+            ${{ env.VALE_HTML_REPORT }}
+          if-no-files-found: warn
+
+      - name: Upload unused image report
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-unused-images
+          path: |
+            ${{ env.UNUSED_IMAGES_JSON }}
+            ${{ env.UNUSED_IMAGES_TEXT }}
+          if-no-files-found: warn
+
       - name: Comment with artifact download links
         if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
         uses: actions/github-script@v7
+        env:
+          ASCII_SUMMARY: ${{ steps.summarize_asciidoc_lint.outputs.summary }}
+          VALE_SUMMARY: ${{ steps.summarize_vale.outputs.summary }}
+          UNUSED_SUMMARY: ${{ steps.summarize_unused_images.outputs.summary }}
+          UNUSED_DETAILS: ${{ steps.summarize_unused_images.outputs.details }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -183,14 +306,29 @@ jobs:
               per_page: 100
             });
 
-            const links = [];
+            const artifactLinks = new Map();
             for (const artifact of artifacts.data.artifacts) {
-              if (artifact.name === 'developer-guide-html') {
-                links.push(`- [Developer Guide HTML package](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id})`);
-              }
-              if (artifact.name === 'developer-guide-pdf') {
-                links.push(`- [Developer Guide PDF](https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id})`);
-              }
+              artifactLinks.set(
+                artifact.name,
+                `https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id}`
+              );
+            }
+
+            const links = [];
+            if (artifactLinks.has('developer-guide-html')) {
+              links.push(`- [Developer Guide HTML package](${artifactLinks.get('developer-guide-html')})`);
+            }
+            if (artifactLinks.has('developer-guide-pdf')) {
+              links.push(`- [Developer Guide PDF](${artifactLinks.get('developer-guide-pdf')})`);
+            }
+            if (artifactLinks.has('developer-guide-asciidoc-lint')) {
+              links.push(`- [AsciiDoc linter report](${artifactLinks.get('developer-guide-asciidoc-lint')})`);
+            }
+            if (artifactLinks.has('developer-guide-vale-report')) {
+              links.push(`- [Vale report](${artifactLinks.get('developer-guide-vale-report')})`);
+            }
+            if (artifactLinks.has('developer-guide-unused-images')) {
+              links.push(`- [Unused image report](${artifactLinks.get('developer-guide-unused-images')})`);
             }
 
             if (!links.length) {
@@ -198,7 +336,46 @@ jobs:
               return;
             }
 
-            const body = `${marker}\nDeveloper Guide build artifacts are available for download from this workflow run:\n\n${links.join('\n')}\n`;
+            const qualityLines = [];
+            const asciiSummary = process.env.ASCII_SUMMARY?.trim();
+            const valeSummary = process.env.VALE_SUMMARY?.trim();
+            const unusedSummary = process.env.UNUSED_SUMMARY?.trim();
+            const asciiLink = artifactLinks.get('developer-guide-asciidoc-lint');
+            const valeLink = artifactLinks.get('developer-guide-vale-report');
+            const unusedLink = artifactLinks.get('developer-guide-unused-images');
+
+            if (asciiSummary) {
+              qualityLines.push(`- AsciiDoc linter: ${asciiSummary}${asciiLink ? ` ([report](${asciiLink}))` : ''}`);
+            }
+            if (valeSummary) {
+              qualityLines.push(`- Vale: ${valeSummary}${valeLink ? ` ([report](${valeLink}))` : ''}`);
+            }
+            if (unusedSummary) {
+              qualityLines.push(`- Image references: ${unusedSummary}${unusedLink ? ` ([report](${unusedLink}))` : ''}`);
+            }
+
+            let unusedDetails = process.env.UNUSED_DETAILS ? process.env.UNUSED_DETAILS.split('\n') : [];
+            unusedDetails = unusedDetails.filter(Boolean);
+            const detailsSection = unusedDetails.length
+              ? `\nUnused image preview:\n\n${unusedDetails.map(line => `  ${line}`).join('\n')}\n`
+              : '';
+
+            const sections = [
+              `${marker}`,
+              'Developer Guide build artifacts are available for download from this workflow run:',
+              '',
+              links.join('\n')
+            ];
+
+            if (qualityLines.length) {
+              sections.push('', 'Developer Guide quality checks:', '', qualityLines.join('\n'));
+            }
+
+            if (detailsSection) {
+              sections.push(detailsSection.trimEnd());
+            }
+
+            const body = sections.join('\n') + '\n';
             const comments = await github.rest.issues.listComments({
               owner,
               repo,
