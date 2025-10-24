@@ -1,7 +1,6 @@
 package com.codename1.properties;
 
 import com.codename1.io.Preferences;
-import com.codename1.io.Storage;
 import com.codename1.io.TestImplementationProvider;
 import com.codename1.xml.Element;
 import org.junit.jupiter.api.AfterEach;
@@ -20,10 +19,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PropertiesPackageTest {
 
-    private String originalPreferencesLocation;
-
     @BeforeEach
     void setup() throws Exception {
+        TestImplementationProvider.resetImplementation();
         TestImplementationProvider.installImplementation(true);
         resetPreferencesState();
         resetMetadata();
@@ -35,11 +33,7 @@ class PropertiesPackageTest {
     void tearDown() throws Exception {
         PropertyBase.bindGlobalGetListener(null);
         PropertyBase.bindGlobalSetListener(null);
-        resetPreferencesState();
-        if (originalPreferencesLocation != null) {
-            Preferences.setPreferencesLocation(originalPreferencesLocation);
-        }
-        Storage.setStorageInstance(null);
+        TestImplementationProvider.resetImplementation();
         resetMetadata();
     }
 
@@ -246,14 +240,8 @@ class PropertiesPackageTest {
         assertEquals(7, Preferences.get("prefs.total", 0));
     }
 
-    private void resetPreferencesState() throws Exception {
-        FieldAccessor.resetStaticField(Preferences.class, "p", null);
-        FieldAccessor.resetStaticMap(Preferences.class, "listenerMap");
-        if (originalPreferencesLocation == null) {
-            originalPreferencesLocation = Preferences.getPreferencesLocation();
-        }
+    private void resetPreferencesState() {
         Preferences.setPreferencesLocation("PropertiesTest-" + System.nanoTime());
-        Storage.setStorageInstance(null);
     }
 
     private void resetMetadata() throws Exception {
@@ -262,12 +250,6 @@ class PropertiesPackageTest {
 
     private static class FieldAccessor {
         private FieldAccessor() {
-        }
-
-        static void resetStaticField(Class<?> type, String name, Object value) throws Exception {
-            java.lang.reflect.Field field = type.getDeclaredField(name);
-            field.setAccessible(true);
-            field.set(null, value);
         }
 
         @SuppressWarnings("unchecked")

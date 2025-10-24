@@ -1,11 +1,15 @@
 package com.codename1.io;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Preferences;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.util.Hashtable;
 import java.util.Map;
+import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -22,6 +26,9 @@ import static org.mockito.Mockito.when;
 public final class TestImplementationProvider {
     private TestImplementationProvider() {
     }
+
+    private static final String DEFAULT_AUTO_DETECT_URL = NetworkManager.getAutoDetectURL();
+    private static final String DEFAULT_PREFERENCES_LOCATION = Preferences.getPreferencesLocation();
 
     public static CodenameOneImplementation installImplementation(boolean timeoutSupported) {
         Storage.setStorageInstance(null);
@@ -101,5 +108,83 @@ public final class TestImplementationProvider {
 
         Util.setImplementation(impl);
         return impl;
+    }
+
+    public static void resetImplementation() {
+        Util.setImplementation(null);
+        Storage.setStorageInstance(null);
+        resetNetworkManager();
+        resetPreferences();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void resetNetworkManager() {
+        NetworkManager manager = NetworkManager.getInstance();
+        try {
+            Field runningField = NetworkManager.class.getDeclaredField("running");
+            runningField.setAccessible(true);
+            runningField.setBoolean(manager, false);
+
+            Field threadCountField = NetworkManager.class.getDeclaredField("threadCount");
+            threadCountField.setAccessible(true);
+            threadCountField.setInt(manager, 1);
+
+            Field networkThreadsField = NetworkManager.class.getDeclaredField("networkThreads");
+            networkThreadsField.setAccessible(true);
+            networkThreadsField.set(manager, null);
+
+            Field errorField = NetworkManager.class.getDeclaredField("errorListeners");
+            errorField.setAccessible(true);
+            errorField.set(manager, null);
+
+            Field progressField = NetworkManager.class.getDeclaredField("progressListeners");
+            progressField.setAccessible(true);
+            progressField.set(manager, null);
+
+            Field pendingField = NetworkManager.class.getDeclaredField("pending");
+            pendingField.setAccessible(true);
+            ((Vector) pendingField.get(manager)).clear();
+
+            Field threadAssignmentsField = NetworkManager.class.getDeclaredField("threadAssignements");
+            threadAssignmentsField.setAccessible(true);
+            ((Hashtable) threadAssignmentsField.get(manager)).clear();
+
+            Field userHeadersField = NetworkManager.class.getDeclaredField("userHeaders");
+            userHeadersField.setAccessible(true);
+            userHeadersField.set(manager, null);
+
+            Field timeoutField = NetworkManager.class.getDeclaredField("timeout");
+            timeoutField.setAccessible(true);
+            timeoutField.setInt(manager, 300000);
+
+            Field autoDetectedField = NetworkManager.class.getDeclaredField("autoDetected");
+            autoDetectedField.setAccessible(true);
+            autoDetectedField.setBoolean(manager, false);
+
+            Field nextConnectionIdField = NetworkManager.class.getDeclaredField("nextConnectionId");
+            nextConnectionIdField.setAccessible(true);
+            nextConnectionIdField.setInt(manager, 1);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Unable to reset NetworkManager state", e);
+        }
+
+        NetworkManager.setAutoDetectURL(DEFAULT_AUTO_DETECT_URL);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void resetPreferences() {
+        try {
+            Field pField = Preferences.class.getDeclaredField("p");
+            pField.setAccessible(true);
+            pField.set(null, null);
+
+            Field listenerField = Preferences.class.getDeclaredField("listenerMap");
+            listenerField.setAccessible(true);
+            ((Map<?, ?>) listenerField.get(null)).clear();
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Unable to reset Preferences state", e);
+        }
+
+        Preferences.setPreferencesLocation(DEFAULT_PREFERENCES_LOCATION);
     }
 }

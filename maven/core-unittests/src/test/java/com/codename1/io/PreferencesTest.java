@@ -1,6 +1,5 @@
 package com.codename1.io;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -13,14 +12,14 @@ import static org.junit.jupiter.api.Assertions.*;
 class PreferencesTest {
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
+        TestImplementationProvider.resetImplementation();
         TestImplementationProvider.installImplementation(true);
-        resetPreferencesState();
     }
 
     @AfterEach
-    void tearDown() throws Exception {
-        resetPreferencesState();
+    void tearDown() {
+        TestImplementationProvider.resetImplementation();
     }
 
     @Test
@@ -99,20 +98,4 @@ class PreferencesTest {
         assertEquals("original", Preferences.get("shared", ""));
     }
 
-    @SuppressWarnings("unchecked")
-    private void resetPreferencesState() throws Exception {
-        Field pField = Preferences.class.getDeclaredField("p");
-        pField.setAccessible(true);
-        pField.set(null, null);
-
-        Field listenerField = Preferences.class.getDeclaredField("listenerMap");
-        listenerField.setAccessible(true);
-        ((Map) listenerField.get(null)).clear();
-
-        Field locationField = Preferences.class.getDeclaredField("preferencesLocation");
-        locationField.setAccessible(true);
-        locationField.set(null, "CN1Preferences");
-
-        Storage.setStorageInstance(null);
-    }
 }

@@ -2,6 +2,7 @@ package com.codename1.io;
 
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.Display;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,11 @@ class SocketTest {
     void setUp() {
         implementation = TestImplementationProvider.installImplementation(true);
         Display.getInstance();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestImplementationProvider.resetImplementation();
     }
 
     @Test

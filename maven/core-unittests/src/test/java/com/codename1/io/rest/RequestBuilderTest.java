@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,11 @@ class RequestBuilderTest {
     @BeforeEach
     void setUp() {
         TestImplementationProvider.installImplementation(true);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestImplementationProvider.resetImplementation();
     }
 
     @Test
