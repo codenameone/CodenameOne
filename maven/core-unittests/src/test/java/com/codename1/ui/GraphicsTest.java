@@ -45,6 +45,7 @@ class GraphicsTest extends UITestBase {
     @AfterEach
     @Override
     protected void tearDownDisplay() throws Exception {
+        flushSerialCalls();
         super.tearDownDisplay();
     }
 
