@@ -8,6 +8,7 @@ import java.lang.reflect.Field;
 import java.util.Enumeration;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +27,17 @@ class NetworkManagerTest {
         manager = NetworkManager.getInstance();
         resetManagerState();
         bootstrapDisplayThread();
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        Field edtField = Display.class.getDeclaredField("edt");
+        edtField.setAccessible(true);
+        edtField.set(Display.getInstance(), null);
+        Field runningField = Display.class.getDeclaredField("codenameOneRunning");
+        runningField.setAccessible(true);
+        runningField.set(Display.getInstance(), Boolean.FALSE);
+        TestImplementationProvider.resetImplementation();
     }
 
     @Test

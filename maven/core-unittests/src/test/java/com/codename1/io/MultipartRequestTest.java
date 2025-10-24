@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +14,11 @@ class MultipartRequestTest {
     @BeforeEach
     void resetImplementation() {
         TestImplementationProvider.installImplementation(true);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestImplementationProvider.resetImplementation();
     }
 
     @Test
