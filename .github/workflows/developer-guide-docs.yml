@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'docs/developer-guide/**'
+      - 'docs/demos/**'
       - '.github/workflows/developer-guide-docs.yml'
   release:
     types: [published]
@@ -21,6 +22,32 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Determine changed components
+        id: changes
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            demos:
+              - 'docs/demos/**'
+            docs:
+              - 'docs/developer-guide/**'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Build Codename One demos
+        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.codenameone"
+          touch "$HOME/.codenameone/guibuilder.jar"
+          cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
+          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml test
 
       - name: Determine publication metadata
         run: |
@@ -110,6 +137,7 @@ jobs:
           fi
 
       - name: Build Developer Guide HTML and PDF
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true'
         run: |
           set -euo pipefail
           OUTPUT_ROOT="build/developer-guide"
