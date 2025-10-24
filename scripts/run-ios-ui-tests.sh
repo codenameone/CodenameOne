@@ -220,27 +220,48 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
 
   # Resolve a UDID for the chosen destination name
   SIM_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
-  SIM_UDID="$(xcrun simctl list devices available -j | python3 - "$SIM_NAME" <<'PY'
-import json,sys
-name=sys.argv[1]
-j=json.load(sys.stdin)
-for _,devs in j.get("devices",{}).items():
-  for d in devs:
-    if d.get("isAvailable") and d.get("name")==name:
-      print(d["udid"]); sys.exit(0)
+# Resolve a UDID for the chosen destination name (robust to empty JSON)
+SIM_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
+
+SIM_UDID="$(
+  { xcrun simctl list devices --json 2>/dev/null || true; } | /usr/bin/python3 - "$SIM_NAME" <<'PY'
+import json, sys
+name = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print("")  # empty -> triggers shell fallback
+    sys.exit(0)
+for _, devs in (data.get("devices") or {}).items():
+    for d in devs:
+        if d.get("isAvailable") and d.get("name") == name:
+            print(d.get("udid", ""))
+            sys.exit(0)
 print("")
 PY
 )"
-  if [ -n "$SIM_UDID" ]; then
-    xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
-    xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
-    if [ -n "$AUT_BUNDLE_ID" ]; then
-      # Warm launch so the GL surface is alive before XCTest attaches;
-      # UITest still calls [self.app launch] with locale args afterwards.
-      xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
-      sleep 1
-    fi
+
+# Fallback parser for non-JSON output (older/newer simctl quirks)
+if [ -z "$SIM_UDID" ]; then
+  SIM_UDID="$(xcrun simctl list devices 2>/dev/null | awk -v name="$SIM_NAME" '
+    $0 ~ name" \\(" {
+      line=$0
+      # extract the last parenthesized token which is the UDID
+      sub(/^.*\(/,"",line); sub(/\).*/,"",line); print line; exit
+    }
+  ' || true)"
+fi
+
+if [ -n "$SIM_UDID" ]; then
+  xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
+  xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
+  if [ -n "$AUT_BUNDLE_ID" ]; then
+    # Warm launch so the GL surface is alive before XCTest attaches
+    xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
+    sleep 1
   fi
+else
+  ri_log "WARN: Could not resolve simulator UDID for '$SIM_NAME'; skipping warm launch"
 fi
 
 # Run only the UI test bundle
