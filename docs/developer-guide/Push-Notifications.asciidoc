@@ -93,7 +93,7 @@ TIP: You can set the `android.background_push_handling` build hint to "true" to 
 The easiest way to test push notifications in your app is to use the push simulation feature of the Codename One Simulator.
 
 .The "Push Simulation" menu item in the simulator opens the push simulator tool.
-image::img/developer-guide/push-push-simulation-menuitem.png[Push simulation menu item,scaledwidth=30%]
+image::img/push-push-simulation-menuitem.png[Push simulation menu item,scaledwidth=30%]
 
 The "Registered Successfully" button will trigger your app's `registeredForPush()` method, and the "Registration Error" button will trigger your app's `pushRegistrationError()` method.
 
@@ -102,7 +102,7 @@ The "Send" button will trigger the `push()` callback with the message body that 
 The "Push Type" drop-down allows you to select the "type" of the push message.  This dictates how the message body (i.e. the contents of the "Send Message" field) is interpreted.  Some push types simply pass the message to the device verbatim, while others assume that the message contains structure that is meant to be parsed by the client to extract such things as badges, sounds, images, and actions that are associated with the message.  We'll go over the available push types in a moment, but for now, we'll keep it simple by just using a push type of "1" - which just sends the message verbatim.
 
 .Sending a basic hello world push from the push simulator
-image::img/developer-guide/push-push-simulator-test-1.png[Sending a basic Hello World push,scaledwidth=30%]
+image::img/push-push-simulator-test-1.png[Sending a basic Hello World push,scaledwidth=30%]
 
 Let's try a simple "hello world" push message.  Select "1" from the "Push Type" drop-down menu, and enter "Hello World" into the "Send Message" field as shown above.  Then press "send".
 
@@ -124,14 +124,14 @@ Received push message: Hello World
 This experiment simulated a push notification while the app is running in the foreground.  Now let's simulate the case where the app is not running, or running in the background.  We can simulate this by pausing the app.  Return to the Codename One simulator window, and select "Pause App" from the "Simulate" menu as shown below.
 
 .Pausing the app in the simulator so we can simulate push notifications while app is in the background.
-image::img/developer-guide/push-pause-app.png[Pausing app in the simulator,scaledwidth=30%]
+image::img/push-pause-app.png[Pausing app in the simulator,scaledwidth=30%]
 
 When the app is paused it will simply display a white screen in the simulator with the text "Paused" in the middle.
 
 Now return to the push simulator again, and press "Send" again with same values in the other fields (Push type 1, and Message "Hello World").  Rather than running the `push()` callback this time, it will display a popup dialog outside the app, as shown below.
 
 .Push message causes a popup dialog in the simulator when the app is paused.
-image::img/developer-guide/push-hello-world-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
+image::img/push-hello-world-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
 
 While this popup dialog doesn't replicate what a push notification will look like in a device's notifications stream when the app is closed, it does simulate the conceptual workflow.  The process whereby the user is notified of the message outside of the app, and the app is not notified until/unless the user taps on the notification.
 
@@ -167,16 +167,16 @@ The following sections will show examples of the various kinds of pushes.  You c
 **Push Type 1; Message Body: "Hello World"**
 
 .Push type 1 "Hello World" message in simulator.
-image::img/developer-guide/push-hello-world-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
+image::img/push-hello-world-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
 
 .Push type 1 "Hello World" message in Android when app is in background.
-image::img/developer-guide/push-type-1-example-hello-android.png[Push type 1 on Android,scaledwidth=30%]
+image::img/push-type-1-example-hello-android.png[Push type 1 on Android,scaledwidth=30%]
 
 .Push type 1 "Hello World" message in iOS when app is in background.
-image::img/developer-guide/push-type-1-example-hello-ios.png[Push type 1 on iOS,scaledwidth=30%]
+image::img/push-type-1-example-hello-ios.png[Push type 1 on iOS,scaledwidth=30%]
 
 .Push type 1 "Hello World" message in Chrome desktop.
-image::img/developer-guide/push-type-1-example-hello-chrome-desktop.png[Push type 1 on Chrome desktop,scaledwidth=30%]
+image::img/push-type-1-example-hello-chrome-desktop.png[Push type 1 on Chrome desktop,scaledwidth=30%]
 
 In all cases, if the user taps/clicks the notification, it will bring the app to the foreground and call the `push()` callback with "Hello World" as the argument.
 
@@ -199,7 +199,7 @@ Push type 3 combines an alert message with some hidden content that the user won
 If the app is in the background, then the alert message will be posted to the user's notifications. See "Example Push Type 1" above as this message will be identical.
 
 .Push type 3 shows only the alert message (the portion before the first ";").
-image::img/developer-guide/push-type-3-simulator.png[Push type 3,scaledwidth=30%]
+image::img/push-type-3-simulator.png[Push type 3,scaledwidth=30%]
 
 This push will result in our `push()` callback being fired twice; once with the alert message, and once with the hidden content.  When it is fired with the alert message, `Display.getInstance().getProperty("pushType")` will report a type of "1".  When it is fired with the JSON hidden content, it will report a push type of "2".
 
@@ -210,16 +210,16 @@ This push will result in our `push()` callback being fired twice; once with the 
 Push type 4 specifies a title and a message body.  In this example, alert title will be "Hello World", and the body will by "I'm just saying hello".
 
 .Push type 4 "Hello World" message in simulator.
-image::img/developer-guide/push-type-4-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
+image::img/push-type-4-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
 
 .Push type 4 "Hello World" message in Android when app is in background.
-image::img/developer-guide/push-type-4-example-hello-android.png[Push type 4 on Android,scaledwidth=30%]
+image::img/push-type-4-example-hello-android.png[Push type 4 on Android,scaledwidth=30%]
 
 .Push type 4 "Hello World" message in iOS when app is in background.
-image::img/developer-guide/push-type-4-example-hello-ios.png[Push type 4 on iOS,scaledwidth=30%]
+image::img/push-type-4-example-hello-ios.png[Push type 4 on iOS,scaledwidth=30%]
 
 .Push type 4 "Hello World" message in Firefox desktop.
-image::img/developer-guide/push-type-4-example-hello-firefox-desktop.png[Push type 4 on Firefox desktop,scaledwidth=30%]
+image::img/push-type-4-example-hello-firefox-desktop.png[Push type 4 on Firefox desktop,scaledwidth=30%]
 
 With this push type, the `push()` callback will be fired only if the user taps/opens the notification, and the argument will contain the entire message ("Title;Body").
 
@@ -238,7 +238,7 @@ Push type 5 will behave identically to push type 1, except that the notification
 Push type 100 just expects an integer in the message body.  This is interpreted as the badge that should be set on the app. This is currently only supported on Windows and iOS.
 
 .Push type 100 on iOS, setting the badge to "5"
-image::img/developer-guide/push-type-100-example-5-ios.png[Push type 100 with badge set to 5 on iOS,scaledwidth=30%]
+image::img/push-type-100-example-5-ios.png[Push type 100 with badge set to 5 on iOS,scaledwidth=30%]
 
 Push type 100 should not trigger the `push()` callback.
 
@@ -284,13 +284,13 @@ The message body should be an XML string.  A minimal example of a push type 99 t
 IMPORTANT: The image URL *must* be a secure URL (i.e. start with "https:" and not "http:", otherwise, iOS will simply ignore it.
 
 .Push type 99 with attached image in simulator.
-image::img/developer-guide/push-type-99-hello-world-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
+image::img/push-type-99-hello-world-simulator-paused.png[Push popup when app paused,scaledwidth=30%]
 
 .Push type 99 with attached image in Android when app is in background.
-image::img/developer-guide/push-type-99-example-hello-android.png[Push type 99 on Android with attached image,scaledwidth=30%]
+image::img/push-type-99-example-hello-android.png[Push type 99 on Android with attached image,scaledwidth=30%]
 
 .Push type 99 with attached image in iOS when app is in background.
-image::img/developer-guide/push-type-99-example-hello-ios.png[Push type 99 on iOS with attached image,scaledwidth=30%]
+image::img/push-type-99-example-hello-ios.png[Push type 99 on iOS with attached image,scaledwidth=30%]
 
 NOTE: The image will only be shown if you press and pull down on the notification.  When the notification initially appears in the user's notifications it will appear like a normal alert - but possibly with the image shown as a small thumbnail.
 
@@ -365,16 +365,16 @@ Now we can test our new category.  In the push simulator, you can select Push Ty
 ----
 
 .Push notification with "invite" category on the simulator will show dialog with buttons to select between the actions defined in the "invite" category.
-image::img/developer-guide/push-actions-simulator.png[Push with actions in simulator,scaledwidth=30%]
+image::img/push-actions-simulator.png[Push with actions in simulator,scaledwidth=30%]
 
 .Push notification with "invite" category on the android will show dialog with buttons to select between the actions defined in the "invite" category.
-image::img/developer-guide/push-actions-android.png[Push with actions on Android,scaledwidth=30%]
+image::img/push-actions-android.png[Push with actions on Android,scaledwidth=30%]
 
 .Push notification with "invite" category on the android will show dialog with buttons to select between the actions defined in the "invite" category.
-image::img/developer-guide/push-actions-ios.png[Push with actions on iOS,scaledwidth=30%]
+image::img/push-actions-ios.png[Push with actions on iOS,scaledwidth=30%]
 
 .Push notification with "invite" category on the Chrome desktop includes a "More" dropdown where user can select the action.
-image::img/developer-guide/push-actions-chrome-desktop.png[Push with actions on Chrome Desktop,scaledwidth=30%]
+image::img/push-actions-chrome-desktop.png[Push with actions on Chrome Desktop,scaledwidth=30%]
 
 The `push()` callback will be fired after the user taps on the notification, or one of its actions.  If the user taps the notification itself, and not one of the actions, then your `PushContent.getActionId()` will return `null`.  If they selected one of the actions, then the action ID of that action can be obtained from `getActionId()`.
 
@@ -412,29 +412,29 @@ Android Push goes thru Google servers and to do that we need to register with Go
 Go to https://console.firebase.google.com/ and click #Add project#:
 
 .Click "Add project"
-image::img/developer-guide/push-android-firebase-console-1.png[Click "click Add project",scaledwidth=30%]
+image::img/push-android-firebase-console-1.png[Click "click Add project",scaledwidth=30%]
 
 This will open a form as shown here:
 
 .Enter project name
-image::img/developer-guide/push-fcm-add-project.png[Enter project name,scaledwidth=30%]
+image::img/push-fcm-add-project.png[Enter project name,scaledwidth=30%]
 
 Enter the project name, select your country, read/accept their terms, and press "Create Project".
 
 Once the project has been created (should take only a few seconds), you'll be sent to your new project's dashboard.
 
 .Firebase Project Dashboard
-image::img/developer-guide/push-fcm-dashboard.png[Firebase project dashboard,scaledwidth=30%]
+image::img/push-fcm-dashboard.png[Firebase project dashboard,scaledwidth=30%]
 
 Expand the "Grow" section of the left menu bar, then click on the "Cloud Messaging" link.
 
 .Expand "Grow" Section and select "Cloud Messaging"
-image::img/developer-guide/push-fcm-grow-menu.png[Expand Grow section and select Cloud Messaging,scaledwidth=30%]
+image::img/push-fcm-grow-menu.png[Expand Grow section and select Cloud Messaging,scaledwidth=30%]
 
 On the next screen, click on the Android icon where is says "Add an app to get started".
 
 .Click on the "Android" icon to add an Android App to the project
-image::img/developer-guide/push-fcm-enable-notifications.png[Click on the Android icon,scaledwidth=30%]
+image::img/push-fcm-enable-notifications.png[Click on the Android icon,scaledwidth=30%]
 
 This will bring us to the "Add Application Form", which visually shows us the remainder of the steps.
 
@@ -443,14 +443,14 @@ Fill in the Android package name with the package name of your project, and the 
 The Debug signing certificate SHA-1 is optional, but you can paste the SHA-1 from your app's certificate here if you like.
 
 .Fill in the package name
-image::img/developer-guide/push-fcm-add-app-form.png[Fill in the package name,scaledwidth=30%]
+image::img/push-fcm-add-app-form.png[Fill in the package name,scaledwidth=30%]
 
 Press "Register app" once you have filled in the required fields.
 
 This will expand "Step 2" of this form: "Download config file".
 
 .Download the google-services.json file
-image::img/developer-guide/push-fcm-download-config-file.png[Download google-services.json,scaledwidth=30%]
+image::img/push-fcm-download-config-file.png[Download google-services.json,scaledwidth=30%]
 
 All we need to do here is press the "Download google-services.json" file, then copy the file into your project's native/android directory.
 
@@ -462,14 +462,14 @@ There is one last piece of information that we need so that we can *send* push n
 Go to your project dashboard in Firebase console.  Then click the "Settings" menu (the "Gear" icon next to "Project Overview" in the upper left):
 
 .Select "Project settings"
-image::img/developer-guide/push-fcm-project-settings-context-menu.png[Press Project Settings,scaledwidth=30%]
+image::img/push-fcm-project-settings-context-menu.png[Press Project Settings,scaledwidth=30%]
 
 Then select the "Cloud Messaging" tab.
 
 The "Server Key" displayed here is the `FCM_SERVER_API_KEY` that we refer to throughout this document.  It will be used to send push notifications to your app from a server, or from another device. You can copy and paste this value now, or you can retrieve it later by logging into the Firebase console.
 
 .Save the Server key for later use.
-image::img/developer-guide/push-fcm-server-key.png[Save the Server Key for later use,scaledwidth=30%]
+image::img/push-fcm-server-key.png[Save the Server Key for later use,scaledwidth=30%]
 
 NOTE: The Sender ID shown in the above is not required for our Android app, however it it is helpful/required to support Push notifications in Javascript builds (in Chrome).  This value is referred to elsewhere in this document as `GCM_SENDER_ID`.
 
@@ -486,7 +486,7 @@ They are *completely different certificates* that have nothing to do with the bu
 The certificate wizard can generate these additional push certificates and do quite a few other things if you just check this flag in the end of the wizard:
 
 .Enable Push in the certificate wizard
-image::img/developer-guide/certificate-wizard-enable-push.png[Enable Push in the certificate wizard,scaledwidth=40%]
+image::img/certificate-wizard-enable-push.png[Enable Push in the certificate wizard,scaledwidth=40%]
 
 IMPORTANT: If you already have signing certificated defined for your app just skip the certificate generation phase (answer no) the rest will work as usual.
 
@@ -537,17 +537,17 @@ Once you have registered your app in the Windows Store, and completed the corres
 Navigate to the App overview page for your app inside the Windows store dashboard.  Under the "Services" menu (left side), select "Push notifications".
 
 .Push notifications menu item in Windows Store dashboard
-image::img/developer-guide/windows-store-push-notications-menu.png[Push notifications menu item in Windows Store dashboard,scaledwidth=10%]
+image::img/windows-store-push-notications-menu.png[Push notifications menu item in Windows Store dashboard,scaledwidth=10%]
 
 Then, select the "WNS/MPNS" option that appears in the left menu under "Push notifications"
 
 .WNS menu item in Windows Store dashboard
-image::img/developer-guide/windows-store-wns-menu-item.png[WNS menu item in Windows Store dashboard,scaledwidth=10%]
+image::img/windows-store-wns-menu-item.png[WNS menu item in Windows Store dashboard,scaledwidth=10%]
 
 This will bring you to a page with information about WNS push notifications.  You'll be interested in the paragraph shown here:
 
 .Live services link
-image::img/developer-guide/wns-live-services-link.png[Live services link,scaledwidth=20%]
+image::img/wns-live-services-link.png[Live services link,scaledwidth=20%]
 
 Click on the "Live Services Site" link.
 
@@ -556,12 +556,12 @@ You'll be prompted to log in using your Windows Store account.  Then you'll be t
 Package SID.  (It will be of the form "ms-app://XXXXXXXXXXX...")
 
 .WNS Package SID
-image::img/developer-guide/wns-package-id.png[WNS Package SID,scaledwidth=20%]
+image::img/wns-package-id.png[WNS Package SID,scaledwidth=20%]
 
 Client Secret.  This will be listed in a section called "Application Secrets"
 
 .WNS Client secret
-image::img/developer-guide/wns-client-secret.png[WNS Client secret,scaledwidth=20%]
+image::img/wns-client-secret.png[WNS Client secret,scaledwidth=20%]
 
 You will use these two values for sending push notifications to your app.
 
@@ -606,7 +606,7 @@ You can get it by going to the Codename One build server dashboard at https://ww
 The token should appear at the bottom as such:
 
 .Push Token from the build server
-image::img/developer-guide/push-token.png[Push Token from the build server,scaledwidth=30%]
+image::img/push-token.png[Push Token from the build server,scaledwidth=30%]
 
 The instructions for extracting the API key for Google are <<push-bureaucracy-android-section,listed above>>.
 

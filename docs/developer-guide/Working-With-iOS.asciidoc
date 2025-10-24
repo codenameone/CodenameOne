@@ -108,7 +108,7 @@ Display.getInstance().scheduleLocalNotification(
 The resulting notification will look like
 
 .Resulting notification in iOS
-image::img/developer-guide/f7200840-677e-11e5-8fd7-41eb027f8a6c.png[Resulting notification in iOS,scaledwidth=20%]
+image::img/f7200840-677e-11e5-8fd7-41eb027f8a6c.png[Resulting notification in iOS,scaledwidth=20%]
 
 
 ==== Receiving Notifications

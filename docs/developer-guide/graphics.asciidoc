@@ -58,7 +58,7 @@ hi.show();
 ----
 
 .Hi world demo code, notice that the blue bar on top is the iOS7+ status bar
-image::img/developer-guide/graphics-hiworld.png[Hi world demo code, notice that the blue bar on top is the iOS7+ status bar,scaledwidth=20%]
+image::img/graphics-hiworld.png[Hi world demo code, notice that the blue bar on top is the iOS7+ status bar,scaledwidth=20%]
 
 ==== Painting with Gradients
 
@@ -101,7 +101,7 @@ the background painters are responsible for drawing the background of all compon
 component draws its own content (which might overrule the painter) and the glass pane paints last...
 
 .Form layout graphic
-image::img/developer-guide/perspective-form-layers.png[Form layout graphic,scaledwidth=20%]
+image::img/perspective-form-layers.png[Form layout graphic,scaledwidth=20%]
 
 Essentially the glass pane is a painter that allows us to draw an overlay on top of the Codename One application.
 
@@ -161,7 +161,7 @@ hi.show();
 ----
 
 .The glass pane draws the warning sign on the border of the component partially peeking out
-image::img/developer-guide/graphics-glasspane.png[The glass pane draws the warning sign on the border of the component partially peeking out,scaledwidth=20%]
+image::img/graphics-glasspane.png[The glass pane draws the warning sign on the border of the component partially peeking out,scaledwidth=20%]
 
 === Shapes & Transforms
 
@@ -263,7 +263,7 @@ A drawing might look like this:
 
 [[linetoexample]]
 .lineTo example
-image::img/developer-guide/lineto-example.png[lineTo example,scaledwidth=20%]
+image::img/lineto-example.png[lineTo example,scaledwidth=20%]
 
 ==== Using Bezier Curves
 
@@ -311,7 +311,7 @@ above the line and below the line.
 A drawing from the resulting app looks like:
 
 .Result of quadTo example
-image::img/developer-guide/quadto-example.png[Result of quadTo example,scaledwidth=20%]
+image::img/quadto-example.png[Result of quadTo example,scaledwidth=20%]
 
 
 ==== Detecting Platform Support
@@ -516,7 +516,7 @@ the angle and the radius.  If math isn't your thing, don't worry.  This example 
 At this point our clock should include a series of tick marks orbiting a blank center as shown below:
 
 .Drawing tick marks on the watch face
-image::img/developer-guide/tick_marks.png[Drawing tick marks on the watch face,scaledwidth=40%]
+image::img/tick_marks.png[Drawing tick marks on the watch face,scaledwidth=40%]
 
 ==== Drawing the Numbers
 
@@ -585,7 +585,7 @@ center and translate to the correct location.
 Now, we should have a clock with tick marks _and_ numbers as shown below:
 
 .Drawing the numbers on the watch face
-image::img/developer-guide/numbers.png[Drawing the numbers on the watch face,scaledwidth=40%]
+image::img/numbers.png[Drawing the numbers on the watch face,scaledwidth=40%]
 
 
 ==== Drawing the Hands
@@ -720,7 +720,7 @@ g.resetAffine();
 At this point, we have a complete clock as shown below:
 
 .The final result - fully rendered watch face
-image::img/developer-guide/final.png[The final result - fully rendered watch face,scaledwidth=40%]
+image::img/final.png[The final result - fully rendered watch face,scaledwidth=40%]
 
 [[clock-animation-section]]
 ==== Animating the Clock
@@ -831,7 +831,7 @@ hi.show();
 ----
 
 .Shape Clipping used to clip the image of duke within the given shape
-image::img/developer-guide/shaped-clipping.png[Shape Clipping used to clip the image of duke within the given shape,scaledwidth=20%]
+image::img/shaped-clipping.png[Shape Clipping used to clip the image of duke within the given shape,scaledwidth=20%]
 
 TIP: Notice that this functionality isn't available on all platforms so you normally need to test if shaped clipping is supported using https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeClipSupported--[isShapeClipSupported()].
 
@@ -843,7 +843,7 @@ libraries) and places the origin in the upper left corner of the screen.  X-valu
 grow downward as illustrated below:
 
 .The Codename One graphics coordinate space
-image::img/developer-guide/coordinate_system.png[The Codename One graphics coordinate space,scaledwidth=20%]
+image::img/coordinate_system.png[The Codename One graphics coordinate space,scaledwidth=20%]
 
 Therefore the screen origin is at the top left corner of the screen.  Given this information, consider the method
 call on the https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html[Graphics] context `g`:
@@ -916,7 +916,7 @@ class RectangleComponent extends Component {
 The result is as follows:
 
 .The rectangle component
-image::img/developer-guide/rectangle_component1.png[The rectangle component,scaledwidth=20%]
+image::img/rectangle_component1.png[The rectangle component,scaledwidth=20%]
 
 NOTE: The `x` and `y` coordinates that are passed to the `drawRect(x,y,w,h)` method are relative to the
 component's _parent’s_ origin -- *not the component itself .. its parent.*  This is why we the _x_ position is `getX()+5`
@@ -980,7 +980,7 @@ demonstrate this, let's try to place five of these components on a form inside a
 The result is as follows:
 
 .Rotating the rectangle
-image::img/developer-guide/rotation1.png[Rotating the rectangle,scaledwidth=20%]
+image::img/rotation1.png[Rotating the rectangle,scaledwidth=20%]
 
 This may not be an intuitive outcome since we drew 10 rectangle components, be we only see a portion of one
 rectangle.  The reason is that the `rotate(angle)` method uses the screen origin as the pivot point for the rotation.
@@ -1003,7 +1003,7 @@ Top Left Corner:
 ----
 
 .Rotating the rectangle with wrong pivot point
-image::img/developer-guide/rotation2.png[Rotating the rectangle with wrong pivot point,scaledwidth=20%]
+image::img/rotation2.png[Rotating the rectangle with wrong pivot point,scaledwidth=20%]
 
 Center:
 
@@ -1026,7 +1026,7 @@ public void paint(Graphics g) {
 ----
 
 .Rotating the rectangle with the center pivot point
-image::img/developer-guide/rotation3.png[Rotating the rectangle with the center pivot point,scaledwidth=20%]
+image::img/rotation3.png[Rotating the rectangle with the center pivot point,scaledwidth=20%]
 
 You could also use the `Graphics.setTransform()` class to apply rotations and other complex transformations
 (including 3D perspective transforms), but I'll leave that for its own topic as it is a little bit more complex.
@@ -1191,7 +1191,7 @@ hi.show();
 ----
 
 .Icon font from material design icons created with the fixed size of display width
-image::img/developer-guide/graphics-fontimage-fixed.png[Icon font from material design icons created with the fixed size of display width,scaledwidth=20%]
+image::img/graphics-fontimage-fixed.png[Icon font from material design icons created with the fixed size of display width,scaledwidth=20%]
 
 NOTE: The samples use the builtin material design icon font. This is for convenience so the sample will work out of the box, for everyone. However you should be able to do this with any arbitrary icon font off the internet as long as its a valid TTF file.
 
@@ -1212,7 +1212,7 @@ hi.show();
 ----
 
 .An image created from the Style object
-image::img/developer-guide/graphics-fontimage-style.png[An image created from the Style object,scaledwidth=20%]
+image::img/graphics-fontimage-style.png[An image created from the Style object,scaledwidth=20%]
 
 WARNING: Notice that for this specific version of the method the size of the font is used to determine the icon size. In the other methods for `FontImage` creation the size of the font is ignored!
 
@@ -1235,7 +1235,7 @@ hi.add(myButton);
 ----
 
 .Material save icon
-image::img/developer-guide/graphics-fontimage-material.png[Material save icon,scaledwidth=20%]
+image::img/graphics-fontimage-material.png[Material save icon,scaledwidth=20%]
 
 NOTE: Notice that the icon is smaller now as it's calculated based on the font size of the `Button` UIID.
 
@@ -1293,7 +1293,7 @@ hi.getToolbar().addCommandToRightBar("", camera, (ev) -> {
 ----
 
 .Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable
-image::img/developer-guide/graphics-image-masking.png[Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable,scaledwidth=20%]
+image::img/graphics-image-masking.png[Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable,scaledwidth=20%]
 
 Notice that this example is simplistic in order to be self contained. We often recommend that developers ship "ready made" mask images with their application which can allow very complex effects on the images.
 
@@ -1424,7 +1424,7 @@ private Map<String, Object> createListEntry(String name, String date, String cov
 ----
 
 .A URL image fetched dynamically into the list model
-image::img/developer-guide/graphics-urlimage-multilist.png[A URL image fetched dynamically into the list model,scaledwidth=20%]
+image::img/graphics-urlimage-multilist.png[A URL image fetched dynamically into the list model,scaledwidth=20%]
 
 === Charts
 

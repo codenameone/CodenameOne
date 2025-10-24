@@ -51,7 +51,7 @@ Codename One features a wizard to generate certificates/provisioning for iOS wit
 To generate your certificates and profiles, open project's properties and click on "iOS" in the left menu. This will show the "iOS Signing" panel that includes fields to select your certificates and mobile provisioning profiles.
 
 .Netbeans iOS Signing properties panel
-image::img/developer-guide/ios-cert-wizard-1-signing.png[Netbeans iOS Signing properties panel,scaledwidth=50%]
+image::img/ios-cert-wizard-1-signing.png[Netbeans iOS Signing properties panel,scaledwidth=50%]
 
 If you already have valid certificates and profiles, you can just enter their locations here.  If you don't, then you can use the wizard by clicking the #Generate# button in the lower part of the form.
 
@@ -61,7 +61,7 @@ After clicking #Generate# you'll be shown a login form. Log into this form using
 password.  **NOT YOUR CODENAME ONE LOGIN**.
 
 .Wizard login form
-image::img/developer-guide/ios-cert-wizard-2-login.png[Wizard login form,scaledwidth=20%]
+image::img/ios-cert-wizard-2-login.png[Wizard login form,scaledwidth=20%]
 
 ==== Selecting Devices
 
@@ -69,14 +69,14 @@ Once you are logged in you will be shown a list of all of the devices that you c
 Apple developer account.
 
 .Devices form
-image::img/developer-guide/ios-cert-wizard-3-devices.png[Devices form,scaledwidth=20%]
+image::img/ios-cert-wizard-3-devices.png[Devices form,scaledwidth=20%]
 
 Select the ones that you want to include in your provisioning profile and click next.
 
 NOTE: Apple supports up to 100 devices for testing purposes so if you want to install the built app on your device you need to add it here
 
 .After selecting devices
-image::img/developer-guide/ios-cert-wizard-4-devices-selected.png[After selecting devices,scaledwidth=20%]
+image::img/ios-cert-wizard-4-devices-selected.png[After selecting devices,scaledwidth=20%]
 
 If you don't have any devices registered yet, you can click the "Add New Device" button, which will prompt you to enter the UDID for your device.
 
@@ -90,10 +90,10 @@ account, then it will just use the same certificate.  If the certificate doesn't
 haven't provided a certificate, you will be prompted to overwrite the old certificate with a new one.
 
 .Prompt to overwrite existing certificate
-image::img/developer-guide/ios-cert-wizard-4.1-overwrite-cert.png[Prompt to overwrite existing certificate,scaledwidth=20%]
+image::img/ios-cert-wizard-4.1-overwrite-cert.png[Prompt to overwrite existing certificate,scaledwidth=20%]
 
 .Prompt to overwrite other certificate
-image::img/developer-guide/ios-cert-wizard-4.2-overwrite-cert.png[Prompt to overwrite other certificate,scaledwidth=20%]
+image::img/ios-cert-wizard-4.2-overwrite-cert.png[Prompt to overwrite other certificate,scaledwidth=20%]
 
 The same decision need to be made twice:  Once for the development certificate, and once for the Apptore certificate.
 
@@ -118,7 +118,7 @@ The next form in the wizard asks for your app's bundle ID.  This should have bee
 the app ID to a wildcard ID if you prefer.
 
 .Enter the app bundle ID
-image::img/developer-guide/ios-cert-wizard-5-bundle-id.png[Enter the app bundle ID,scaledwidth=20%]
+image::img/ios-cert-wizard-5-bundle-id.png[Enter the app bundle ID,scaledwidth=20%]
 
 .Wildcard Card Provisioning
 ****
@@ -127,7 +127,7 @@ Wildcard ids such as com.mycompany.\* or even \* allow you to create one generic
 You can set the global defaults for the IDE by going to IDE settings/preferences and setting default values e.g.:
 
 .Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the certificate wizard. Notice that you will need to run it when going into production
-image::img/developer-guide/ios-cert-global-settings.png[Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the certificate wizard. Notice that you will need to run it when going into production]
+image::img/ios-cert-global-settings.png[Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the certificate wizard. Notice that you will need to run it when going into production]
 ****
 
 ==== Installing Files Locally
@@ -136,13 +136,13 @@ Once the wizard is finished generating your provisioning profiles, you should cl
 open a file dialog for you to navigate to a folder in which to store the generated files.
 
 .Install files locally
-image::img/developer-guide/ios-cert-wizard-6-install-now.png[Install files locally,scaledwidth=20%]
+image::img/ios-cert-wizard-6-install-now.png[Install files locally,scaledwidth=20%]
 
 .Select directory to save files in
-image::img/developer-guide/ios-cert-wizard-7-select-directory.png[Select directory to save files in,scaledwidth=20%]
+image::img/ios-cert-wizard-7-select-directory.png[Select directory to save files in,scaledwidth=20%]
 
 .Final Done Message
-image::img/developer-guide/ios-cert-wizard-8-complete.png[Final Done Message,scaledwidth=20%]
+image::img/ios-cert-wizard-8-complete.png[Final Done Message,scaledwidth=20%]
 
 TIP: You can see the password for the P12 files in the `codenameone_settings.properties` file. You can use the values defined there when creating a new application
 
@@ -152,7 +152,7 @@ After selecting your local install location, and closing the wizard, you should 
 properties panel filled in correctly.  You should now be able to send iOS debug or Appstore builds without the usual hassles.
 
 .Filled in signing panel after wizard complete
-image::img/developer-guide/ios-cert-wizard-9-signing-panel.png[Filled in signing panel after wizard complete,scaledwidth=40%]
+image::img/ios-cert-wizard-9-signing-panel.png[Filled in signing panel after wizard complete,scaledwidth=40%]
 
 === Advanced iOS Signing
 
@@ -189,66 +189,66 @@ Start by logging in to the iOS-provisioning portal
 
 [[login-ios-provisioning]]
 .Login for the iOS provisioning portal
-image::img/developer-guide/login-ios-provisioning.png[Log into IOS provisioning portal,scaledwidth=30%]
+image::img/login-ios-provisioning.png[Log into IOS provisioning portal,scaledwidth=30%]
 
 In the certificates section you can download your development and distribution certificates.
 
 [[download-dev-provisioning-profile]]
 .Download development provisioning profile
-image::img/developer-guide/download-dev-provisioning-profile.png[Download development provisioning profile,scaledwidth=30%]
+image::img/download-dev-provisioning-profile.png[Download development provisioning profile,scaledwidth=30%]
 
 [[download-dist-provisioning-profile]]
 .Download distribution provisioning profile
-image::img/developer-guide/download-dist-provisioning-profile.png[Download distribution provisioning profile,scaledwidth=30%]
+image::img/download-dist-provisioning-profile.png[Download distribution provisioning profile,scaledwidth=30%]
 
 In the devices section add device ids for the development devices you want to support. Notice no more than 100 devices are supported!
 
 [[ios-add-devices]]
 .Add devices
-image::img/developer-guide/ios-add-devices.png[Add devices,scaledwidth=30%]
+image::img/ios-add-devices.png[Add devices,scaledwidth=30%]
 
 Create an application id; it should match the package identifier of your application perfectly!
 
 .Create application id
-image::img/developer-guide/ios-create-app-id.png[Create application id,scaledwidth=30%]
+image::img/ios-create-app-id.png[Create application id,scaledwidth=30%]
 
 Create a provisioning profile for development, make sure to select the right app and make sure to add the devices you want to use during debug.
 
 .Create provisioning profile step 1
-image::img/developer-guide/ios-create-prov-profile-1.png[Create provisioning profile step 1,scaledwidth=30%]
+image::img/ios-create-prov-profile-1.png[Create provisioning profile step 1,scaledwidth=30%]
 
 .Create provisioning profile step 2
-image::img/developer-guide/ios-create-prov-profile-2.png[Create provisioning profile step 2,scaledwidth=30%]
+image::img/ios-create-prov-profile-2.png[Create provisioning profile step 2,scaledwidth=30%]
 
 Refresh the screen to see the profile you just created and press the download button to download your development provisioning profile.
 
 .Create provisioning profile step 3
-image::img/developer-guide/ios-create-prov-profile-3.png[Create provisioning profile step 3,scaledwidth=30%]
+image::img/ios-create-prov-profile-3.png[Create provisioning profile step 3,scaledwidth=30%]
 
 Create a distribution provisioning profile; it will be used when uploading to the app store. There is no need to specify devices here.
 
 .Create distribution provisioning profile
-image::img/developer-guide/ios-create-dist-prov-profile.png[Create distribution provisioning profile,scaledwidth=30%]
+image::img/ios-create-dist-prov-profile.png[Create distribution provisioning profile,scaledwidth=30%]
 
 Download the distribution provisioning profile.
 
 .Download distribution provisioning profile
-image::img/developer-guide/ios-download-dist-prov-profile.png[Download distribution provisioning profile,scaledwidth=30%]
+image::img/ios-download-dist-prov-profile.png[Download distribution provisioning profile,scaledwidth=30%]
 
 We can now import the cer files into the key chain tool on a Mac by double clicking the file, on Windows the process is slightly more elaborate
 
 .Import cer files
-image::img/developer-guide/ios-import-cer-files.png[Import cer files,scaledwidth=30%]
+image::img/ios-import-cer-files.png[Import cer files,scaledwidth=30%]
 
 We can export the p12 files for the distribution and development profiles through the keychain tool
 
 .Export p12 files
-image::img/developer-guide/ios-export-p12.png[Export p12 files,scaledwidth=30%]
+image::img/ios-export-p12.png[Export p12 files,scaledwidth=30%]
 
 In the IDE we enter the project settings, configure our provisioning profile, the password we typed when exporting and the p12 certificates. It is now possible to send the build to the server.
 
 .IOS Project Settings
-image::img/developer-guide/ios-project-settings.png[IOS Project Settings,scaledwidth=30%]
+image::img/ios-project-settings.png[IOS Project Settings,scaledwidth=30%]
 
 ==== iOS Code Signing Failure Checklist
 
@@ -263,32 +263,32 @@ Notice that this is something you need to do once a year (generate P12), you wil
 -	When exporting the P12 certificate *make sure that you selected BOTH the public and the private keys* as illustrated here. If you only see one entry (no private key) then you created the CSR (singing request) on a different machine than the one where you imported the resulting CER file.
 +
 .p12 export
-image::img/developer-guide/p12-export.png[P12 Export,scaledwidth=30%]
+image::img/p12-export.png[P12 Export,scaledwidth=30%]
 
 -	Make sure the package matches between the main preferences screen in the IDE and the iOS settings screen.
 +
 .Package ID matching App ID
-image::img/developer-guide/package-id-app-id.png[Package ID matching App ID,scaledwidth=30%]
+image::img/package-id-app-id.png[Package ID matching App ID,scaledwidth=30%]
 
 -	Make sure the prefix for the app id in the iOS section of the preferences matches the one you have from Apple
 +
 .App prefix
-image::img/developer-guide/app-prefix.png[App prefix,scaledwidth=30%]
+image::img/app-prefix.png[App prefix,scaledwidth=30%]
 
 -	Make sure your provisioning profile's app id matches your package name or is a * provisioning profile. Both are sampled in the pictures below, notice that you would need an actual package name for push/in-app-purchase support as well as for app store distribution.
 +
 .The star (*) Provisioning Profile
-image::img/developer-guide/provisioning-profile-details.png[The star (*) Provisioning Profile,scaledwidth=30%]
+image::img/provisioning-profile-details.png[The star (*) Provisioning Profile,scaledwidth=30%]
 +
 .Provisioning Profile with app id
-image::img/developer-guide/provisioning-profile-with-app-id.png[Provisioning Profile with app id,scaledwidth=30%]
+image::img/provisioning-profile-with-app-id.png[Provisioning Profile with app id,scaledwidth=30%]
 
 -	Make sure the certificate and provisioning profile are from the same source (if you work with multiple accounts), notice that provisioning profiles and certificates expire so you will need to regenerate provisioning when your certificate expires or is revoked.
 
 -	If you declare push in the provisioning profile then `ios.includePush` (in the build arguments) MUST be set to true, otherwise it *MUST* be set to false (see pictures below). Notice that this should be configured via the UI in the iOS section.
 +
 .Include push build hint
-image::img/developer-guide/include-push-build-hint.png[Include push build hint,scaledwidth=30%]
+image::img/include-push-build-hint.png[Include push build hint,scaledwidth=30%]
 
 === Android
 
@@ -297,12 +297,12 @@ Signing Android applications is trivial when compared to the pain of iOS signing
 The NetBeans and Eclipse plugins have a simple wizard to generate the certificate that you can launch by pressing this button:
 
 .Android keystore generation wizard
-image::img/developer-guide/android-certificate-wizard.png[Android keystore generation wizard,scaledwidth=50%]
+image::img/android-certificate-wizard.png[Android keystore generation wizard,scaledwidth=50%]
 
 Then fill out your details and password in the form:
 
 .UI for Android certificate details
-image::img/developer-guide/android-certificate-wizard2.png[UI for Android certificate details,scaledwidth=30%]
+image::img/android-certificate-wizard2.png[UI for Android certificate details,scaledwidth=30%]
 
 This will seamlessly generate a certificate for your project, you can reuse it for other projects as well.
 

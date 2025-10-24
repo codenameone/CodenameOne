@@ -9,14 +9,14 @@ TIP: Images will take up 95-99% of the resource file size; everything else pales
 Like every optimization the first rule is to reduce the size of the biggest images which will provide your biggest improvements, for this purpose we introduced the ability to see image sizes in kilobytes. To launch that feature use the menu item #Images# -> #Image Sizes (KB)# in the designer.
 
 .Image sizes window that allows us to find the biggest impact on our RAM/Storage
-image::img/developer-guide/performance-image-sizes.png[Image sizes window that allows us to find the biggest impact on our RAM/Storage,scaledwidth=20%]
+image::img/performance-image-sizes.png[Image sizes window that allows us to find the biggest impact on our RAM/Storage,scaledwidth=20%]
 
 This produces a list of images sorted by size with their sizes. Often the top entries will be multi-images, which include HD resolution values that can be pretty large. These very high-resolution images take up a significant amount of space!
 
 Just going to the multi-images, selecting the unnecessary resolutions & deleting these images can saves significant amounts of space:
 
 .Removing unused DPI's
-image::img/developer-guide/performance-image-remove-dpi.png[Removing unused DPI's,scaledwidth=50%]
+image::img/performance-image-remove-dpi.png[Removing unused DPI's,scaledwidth=50%]
 
 TIP: You can see the size in KB at the top right side in the designers image viewer
 
@@ -25,7 +25,7 @@ Applications using the old GUI builder can use the #Images# -> #Delete Unused Im
 If you have a very large image that is opaque you might want to consider converting it to JPEG and replacing the built in PNG’s. Notice that JPEG's work on all supported devices and are typically smaller.
 
 .Convert a MultiImage to use JPEGs instead of PNGs
-image::img/developer-guide/performance-image-to-jpen.png[Convert a MultiImage to use JPEGs instead of PNGs]
+image::img/performance-image-to-jpen.png[Convert a MultiImage to use JPEGs instead of PNGs]
 
 You can use the excellent http://optipng.sourceforge.net/[OptiPng] tool to optimize image files right from the Codename One designer. To use this feature you need to install OptiPng then select #Images# -> #Launch OptiPng# from the menu. Once you do that the tool will automatically optimize all your PNG's.
 
@@ -50,7 +50,7 @@ The simulator contains some tools to measure performance overhead of a specific 
 The Performance Monitor tool can be accessible via the #Simulator# -> #Performance Monitor# menu option in the simulator. This launches the following UI that can help you improve application performance:
 
 .Main tab of the performance monitor: Logs and timings
-image::img/developer-guide/performance-monitor-tab-1.png[Main tab of the performance monitor: Logs and timings]
+image::img/performance-monitor-tab-1.png[Main tab of the performance monitor: Logs and timings]
 
 The first tab of the performance monitor includes a table of the drawn components. Each entry includes the number of times it was drawn and the slowest/fastest and average drawing time.  The toolbar across the top
 includes Pause/Continue buttons so you can freeze the counters while you inspect
@@ -65,7 +65,7 @@ The Log on the bottom includes debug related information. E.g. it warns about th
 current form consumes so you can correlate spikes with your drawing code.
 
 .Rendering tree
-image::img/developer-guide/performance-monitor-tab-2.png[Rendering tree]
+image::img/performance-monitor-tab-2.png[Rendering tree]
 
 The rendering tree view allows us to inspect the hierarchy painting. You can press the refresh button which will trigger the painting of the current `Form`. Every graphics operation is logged and so is the stack to it.
 
@@ -78,7 +78,7 @@ TIP: Android devices have a very nice overdraw debugging tool
 === Network Speed
 
 .Network speed tool
-image::img/developer-guide/network-speed.png[Network speed tool,scaledwidth=10%]
+image::img/network-speed.png[Network speed tool,scaledwidth=10%]
 
 This feature is actually more useful for general debugging however it's sometimes useful to simulate a slow/disconnected network to see how this affects performance.
 
@@ -110,12 +110,12 @@ Codename One includes a built in testing framework and test recorder tool as par
 To get started with the testing framework, launch the application and open the test recorder in the simulator menu.
 
 .The test recorder tool in the simulator
-image::img/developer-guide/test-recorder-blank.png[The test recorder tool in the simulator,scaledwidth=50%]
+image::img/test-recorder-blank.png[The test recorder tool in the simulator,scaledwidth=50%]
 
 Once you press record a test will be generate for you as you use the application.
 
 .Test recording in progress, when done just press the save icon
-image::img/developer-guide/test-recorder-in-progress.png[Test recording in progress, when done just press the save icon,scaledwidth=50%]
+image::img/test-recorder-in-progress.png[Test recording in progress, when done just press the save icon,scaledwidth=50%]
 
 You can build tests using the Codename One testing package to manipulate the Codename One UI programmatically and perform various assertions.
 
@@ -127,7 +127,7 @@ Unlike frameworks such as JUnit which assign a method per test, the Codename One
 Handling errors or exceptions in a deployed product is pretty difficult, most users would just throw away your app and some would give it a negative rating without providing you with the opportunity to actually fix the bug that might have happened.
 
 .Default error dialog
-image::img/developer-guide/error-dialog.png[Default error dialog,scaledwidth=10%]
+image::img/error-dialog.png[Default error dialog,scaledwidth=10%]
 
 Google improved on this a bit by allowing users to submit stack traces for failures on Android devices but this requires the users approval for sending personal data which you might not need if you only want to receive the stack trace and maybe some basic application state (without violating user privacy).
 

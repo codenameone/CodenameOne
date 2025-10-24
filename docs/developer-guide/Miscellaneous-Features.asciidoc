@@ -143,7 +143,7 @@ hi.show();
 ----
 
 .List of contacts
-image::img/developer-guide/contacts-list.png[List of contacts,scaledwidth=20%]
+image::img/contacts-list.png[List of contacts,scaledwidth=20%]
 
 Notice that we didn't fetch the image of the contact as the performance of loading these images might be prohibitive. We can enhance the code above to include images by using slightly more complex code such as this:
 
@@ -183,7 +183,7 @@ Display.getInstance().scheduleBackgroundTask(() -> {
 ----
 
 .Contacts with the default photos on the simulator, on device these will use actual user photos when available
-image::img/developer-guide/contacts-with-photos.png[Contacts with the default photos on the simulator, on device these will use actual user photos when available,scaledwidth=20%]
+image::img/contacts-with-photos.png[Contacts with the default photos on the simulator, on device these will use actual user photos when available,scaledwidth=20%]
 
 TIP: Notice that the code above uses `callSerially` & `scheduleBackgroundTask` in a liberal nested way. This is important to avoid an EDT violation
 
@@ -248,7 +248,7 @@ hi.show();
 ----
 
 .Localized label
-image::img/developer-guide/l10n-basic.png[Localized label,scaledwidth=30%]
+image::img/l10n-basic.png[Localized label,scaledwidth=30%]
 
 ==== Localization Manager
 
@@ -280,7 +280,7 @@ hi.show();
 ----
 
 .Localization formatting/parsing and information
-image::img/developer-guide/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
+image::img/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
 
 ==== RTL/Bidi
 
@@ -331,7 +331,7 @@ TIP: You will need to create the _strings_ directory manually, if it doesn't exi
 
 
 .Maven project with English, French, and Spanish localizations for Info.plist.  English and French language bundles are contained in the _ios/src/main/strings_ directory.  The Spanish bundle is included as a zip file in _ios/src/main/resources_.  Both methods are supported (zipped in _resources_ and unzipped in _strings_).
-image::img/developer-guide/ios_strings_directory_screenshot.png[]
+image::img/ios_strings_directory_screenshot.png[]
 
 .ios/src/main/strings/en.lproj/InfoPlist.strings
 [source,strings]
@@ -547,7 +547,7 @@ hi.show();
 ----
 
 .Captured photos previewed in the ImageViewer
-image::img/developer-guide/capture-photo.png[Captured photos previewed in the ImageViewer,scaledwidth=20%]
+image::img/capture-photo.png[Captured photos previewed in the ImageViewer,scaledwidth=20%]
 
 // HTML_ONLY_START
 We demonstrate video capture in the https://www.codenameone.com/manual/components.html#mediamanager-section[MediaManager section].
@@ -614,7 +614,7 @@ hi.show();
 ----
 
 .Captured recordings in the demo
-image::img/developer-guide/capture-audio.png[Captured recordings in the demo,scaledwidth=20%]
+image::img/capture-audio.png[Captured recordings in the demo,scaledwidth=20%]
 
 Alternatively, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
 
@@ -820,7 +820,7 @@ Alternatively, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder
     }
 ----
 
-image::img/developer-guide/media-audio-recording-example.png[Example of recording and playback audio using Media API]
+image::img/media-audio-recording-example.png[Example of recording and playback audio using Media API]
 
 ==== Capture Asynchronous API
 
@@ -951,40 +951,40 @@ To get started first you will need to create a facebook app on the Facebook deve
 at https://developers.facebook.com/apps/
 
 .Create New App
-image::img/developer-guide/chat-app-tutorial-facebook-login-1.png[Create New App,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-1.png[Create New App,scaledwidth=50%]
 
 You need to repeat the process for  web, Android & iOS (web is used by the simulator):
 
 .Pick Platform
-image::img/developer-guide/chat-app-tutorial-facebook-login-2.png[Pick Platform,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-2.png[Pick Platform,scaledwidth=50%]
 
 For the first platform you need to enter the app name:
 
 .Pick app name
-image::img/developer-guide/chat-app-tutorial-facebook-login-3.png[Pick Name,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-3.png[Pick Name,scaledwidth=50%]
 
 And provide some basic details:
 
 .Basic details for the app
-image::img/developer-guide/chat-app-tutorial-facebook-login-4.png[Details,scaledwidth=35%]
+image::img/chat-app-tutorial-facebook-login-4.png[Details,scaledwidth=35%]
 
 For iOS we need the bundle ID which is the exact same thing we used in the Google+ login to identify the iOS app
 its effectively your package name:
 
 .iOS specific basic details
-image::img/developer-guide/chat-app-tutorial-facebook-login-5.png[Details,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-5.png[Details,scaledwidth=50%]
 
 You should end up with something that looks like this:
 
 .Finished Facebook app
-image::img/developer-guide/chat-app-tutorial-facebook-login-6.png[Details,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-6.png[Details,scaledwidth=50%]
 
 The Android process is pretty similar but in this case we need the activity name too.
 
 IMPORTANT: The activity name should match the main class name followed by the word `Stub` (uppercase s). E.g. for the main class `SociallChat` we would use `SocialChatStub` as the activity name
 
 .Android Activity definition
-image::img/developer-guide/chat-app-tutorial-facebook-login-7.png[Details,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-7.png[Details,scaledwidth=50%]
 
 To build the native Android app we must make sure that we setup the keystore correctly for our application. If you don't have
 an Android certificate you can use the visual wizard (in the Android section in the project preferences the button labeled #Generate#) or use the command line:
@@ -1012,12 +1012,12 @@ keytool -exportcert -alias androiddebugkey -keystore %HOMEPATH%\.android\debug.k
 You can read more about it on the https://developers.facebook.com/docs/android/getting-started[Facebook guide here].
 
 .Hash generation process, notice the command lines are listed as part of the web wizard
-image::img/developer-guide/chat-app-tutorial-facebook-login-8.png[Hash,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-8.png[Hash,scaledwidth=50%]
 
 Lastly you need to publish the Facebook app by flipping the switch in the apps "Status & Review" page as such:
 
 .Without flipping the switch the app won't "appear"
-image::img/developer-guide/chat-app-tutorial-facebook-login-9.png[Enable The App,scaledwidth=50%]
+image::img/chat-app-tutorial-facebook-login-9.png[Enable The App,scaledwidth=50%]
 
 ==== IDE Setup
 
@@ -1116,54 +1116,54 @@ Go to https://developers.google.com/mobile/add[the Google Developer Portal], fol
 Point your browser to https://developers.google.com/mobile/add[this page].
 
 .Set up mobile app form on Google
-image::img/developer-guide/google-signin-ios-setup.png[Google Setup Mobile App Form,scaledwidth=50%]
+image::img/google-signin-ios-setup.png[Google Setup Mobile App Form,scaledwidth=50%]
 
 Click on the "Getting Started" button.
 
 .Getting started button
-image::img/developer-guide/google-signin-ios-getting-started-button.png[Getting started button,scaledwidth=15%]
+image::img/google-signin-ios-getting-started-button.png[Getting started button,scaledwidth=15%]
 
 Then click "iOS App"
 
 .Pick a platform
-image::img/developer-guide/google-signin-ios-pick-a-platform.png[Pick a platform,scaledwidth=50%]
+image::img/google-signin-ios-pick-a-platform.png[Pick a platform,scaledwidth=50%]
 
 Now enter an app name and the bundle ID for your app on the form below.  The app name doesn't necessary need to match your app's name, but the bundle ID should match the package name of your app.
 
 .Create or Choose App
-image::img/developer-guide/google-signin-ios-create-or-choose-app.png[Create or Choose App,scaledwidth=50%]
+image::img/google-signin-ios-create-or-choose-app.png[Create or Choose App,scaledwidth=50%]
 
 Select your country, and then click the "Choose and Configure Services" button.
 
 .Choose and Configure Services
-image::img/developer-guide/google-signin-ios-choose-and-configure-services-btn.png[Choose and Configure Services,scaledwidth=20%]
+image::img/google-signin-ios-choose-and-configure-services-btn.png[Choose and Configure Services,scaledwidth=20%]
 
 You'll be presented with the following screen
 
 .Choose and Configure Services form
-image::img/developer-guide/google-signin-ios-choose-and-configure-services-form.png[Choose and Configure Services form,scaledwidth=50%]
+image::img/google-signin-ios-choose-and-configure-services-form.png[Choose and Configure Services form,scaledwidth=50%]
 
 Click on "Google Sign-In".
 
 Then press the "Enable Google Sign-In" button that appears.
 
 .Enable Google Sign-In
-image::img/developer-guide/google-signin-ios-enable-google-signin-btn.png[Enable Google Sign-In,scaledwidth=50%]
+image::img/google-signin-ios-enable-google-signin-btn.png[Enable Google Sign-In,scaledwidth=50%]
 
 You should then be presented with another button to "Generate Configuration Files" as shown below
 
 .Generate Configuration Files
-image::img/developer-guide/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
+image::img/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
 
 Finally you will be presented with a button to "Download GoogleServices-Info.plist".
 
 .Download GoogleService-Info.plist file
-image::img/developer-guide/google-signin-ios-download-googleservice-infoplist-btn.png[Download GoogleService-Info plist file,scaledwidth=20%]
+image::img/google-signin-ios-download-googleservice-infoplist-btn.png[Download GoogleService-Info plist file,scaledwidth=20%]
 
 Press this button to download the GoogleService-Info.plist file.  Then copy this into the "native/ios" directory of your Codename One project.
 
 .Project file structure after placing the GoogleService-Info.plist into the native/ios directory
-image::img/developer-guide/google-signin-ios-google-service-info-plist-file-structure.png[Project structure,scaledwidth=15%]
+image::img/google-signin-ios-google-service-info-plist-file-structure.png[Project structure,scaledwidth=15%]
 
 At this point, your app should be able to use Google Sign-In.  Notice that we don't require any build hints.  Only that the GoogleService-Info.plist file is added to the project's native/ios directory.
 
@@ -1179,32 +1179,32 @@ Go to https://developers.google.com/mobile/add[the Google Developer Portal], fol
 Point your browser to https://developers.google.com/mobile/add[this page].
 
 .Set up mobile app form on Google
-image::img/developer-guide/google-signin-ios-setup.png[Google Setup Mobile App Form,scaledwidth=30%]
+image::img/google-signin-ios-setup.png[Google Setup Mobile App Form,scaledwidth=30%]
 
 Click on the "Getting Started" button.
 
-image::img/developer-guide/google-signin-ios-getting-started-button.png[Getting started button,scaledwidth=15%]
+image::img/google-signin-ios-getting-started-button.png[Getting started button,scaledwidth=15%]
 
 Then click "Android App"
 
-image::img/developer-guide/google-signin-ios-pick-a-platform.png[Pick a platform,scaledwidth=30%]
+image::img/google-signin-ios-pick-a-platform.png[Pick a platform,scaledwidth=30%]
 
 Now enter an app name and the platform for your app on the form below.  The app name doesn't necessary need to match your app's name, but the package name should match the package name of your app.
 
 .Create or Choose App
-image::img/developer-guide/google-signin-android-create-or-choose-app.png[Create or Choose App,scaledwidth=40%]
+image::img/google-signin-android-create-or-choose-app.png[Create or Choose App,scaledwidth=40%]
 
 Select your country, and then click the "Choose and Configure Services" button.
 
 .Choose and Configure Services
-image::img/developer-guide/google-signin-android-choose-and-configure-services-btn.png[Choose and Configure Services,scaledwidth=40%]
+image::img/google-signin-android-choose-and-configure-services-btn.png[Choose and Configure Services,scaledwidth=40%]
 
 Click on "Google Sign-In"
 
 Then you'll be presented with a field to enter the Android Signing Certificate SHA-1.
 
 .Android Signing Certifiate SHA-1
-image::img/developer-guide/google-signin-android-signing-sha1.png[Android Signing Certifiate SHA-1,scaledwidth=40%]
+image::img/google-signin-android-signing-sha1.png[Android Signing Certifiate SHA-1,scaledwidth=40%]
 
 The value that you enter here should be obtained from the certificate that you are using to build your app.  You an use the *keytool* app that is distributed with the JDK to extract this value
 
@@ -1254,22 +1254,22 @@ You would paste this value into the "Android Signing Certificate SHA-1" field in
 After pasting that in, you'll see a new button with label "Enable Google Sign-in"
 
 .Enable Google Sign-In
-image::img/developer-guide/google-signin-ios-enable-google-signin-btn.png[Enable Google Sign-In,scaledwidth=40%]
+image::img/google-signin-ios-enable-google-signin-btn.png[Enable Google Sign-In,scaledwidth=40%]
 
 Press this button and you'll be presented with another button to "Generate Configuration Files" as shown below
 
 .Generate Configuration Files
-image::img/developer-guide/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
+image::img/google-signin-ios-generate-configuration-files-button.png[Generate Configuration Files,scaledwidth=20%]
 
 Finally you will be presented with a button to "Download google-services.json".
 
 .Download google-services.json file
-image::img/developer-guide/google-signin-android-download-googleservices-json-btn.png[Download google-services json file,scaledwidth=20%]
+image::img/google-signin-android-download-googleservices-json-btn.png[Download google-services json file,scaledwidth=20%]
 
 Press this button to download the google-services.json file.  Then copy this into the "native/android" directory of your Codename One project.
 
 .Project file structure after placing the GoogleService-Info.plist into the native/android directory
-image::img/developer-guide/google-signin-android-google-services-json-file-structure.png[Project structure,scaledwidth=15%]
+image::img/google-signin-android-google-services-json-file-structure.png[Project structure,scaledwidth=15%]
 
 At this point, your app should be able to use Google Sign-In.  Notice that we don't require any build hints.  Only that the google-services.json file is added to the project's native/android directory.
 
@@ -1288,13 +1288,13 @@ If you've set up the Google Sign-In API for either Android or iOS, then Google w
 . Select your app from the drop-down-menu in the top bar
 . Click on "Credentials" in the left menu.  You'll see a screen like this
 +
-image::img/developer-guide/google-sign-in-google-cloud-platform-credentials.png[Credentials,scaledwidth=20%]
+image::img/google-sign-in-google-cloud-platform-credentials.png[Credentials,scaledwidth=20%]
 . Under the "OAuth2.0 Client IDs", find the row with "Web application" listed in the type column
 . Click the "Edit icon for that row.
 . Make note of the "Client ID" and "Client Secret" on this page, as you'll need to add them to your Java source in the next step.
 . In the "Authorized redirect URIs" section, you will need to enter the URL to the page that the user will be sent to after a successful login.  This page will only appear in the simulator for a split second, as Codename One's BrowserComponent will intercept this request to obtain the access token upon successful login.  You can use any URL you like here, but it must match the value you give to `GoogleConnect.setRedirectURL()` in <<the-code>>.
 +
-image::img/developer-guide/google-sign-in-oauth-setup-redirect-url.png[Redirect URL,scaledwidth=30%]
+image::img/google-sign-in-oauth-setup-redirect-url.png[Redirect URL,scaledwidth=30%]
 
 [[javascript-setup]]
 ==== Javascript Setup Instructions
@@ -1470,7 +1470,7 @@ void addEntry(Accordion accr) {
 This allows us to add/edit entries but it also allows the delete button above to actually work separately. Without a call to `setBlockLead(true)` the delete button would cat as the rest of the accordion title.
 
 .Accordion with delete button entries that work despite the surrounding lead
-image::img/developer-guide/lead-component-blocking.png[Accordion with delete button entries that work despite the surrounding lead,scaledwidth=20%]
+image::img/lead-component-blocking.png[Accordion with delete button entries that work despite the surrounding lead,scaledwidth=20%]
 
 === Pull To Refresh
 
@@ -1490,7 +1490,7 @@ hi.show();
 ----
 
 .Pull to refresh demo
-image::img/developer-guide/pull-to-refresh.png[Simple pull to refresh demo,scaledwidth=20%]
+image::img/pull-to-refresh.png[Simple pull to refresh demo,scaledwidth=20%]
 
 === Running 3rd Party Apps Using Display's execute
 
