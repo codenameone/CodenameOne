@@ -8,12 +8,15 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Hashtable;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -87,6 +90,7 @@ public abstract class UITestBase {
 
     @AfterEach
     protected void tearDownDisplay() throws Exception {
+        flushSerialCalls();
         resetUIManager();
         setDisplayField("codenameOneGraphics", null);
         setDisplayField("impl", null);
@@ -94,6 +98,13 @@ public abstract class UITestBase {
         setDisplayField("codenameOneRunning", false);
         setDisplayField("edt", null);
         Util.setImplementation(null);
+        if (implementation != null) {
+            Mockito.reset(implementation);
+        }
+        implementation = null;
+        pluginSupport = null;
+        codenameOneGraphics = null;
+        display = null;
     }
 
     private void setDisplayField(String fieldName, Object value) throws Exception {
@@ -109,7 +120,58 @@ public abstract class UITestBase {
     private void resetUIManager() throws Exception {
         Field instanceField = UIManager.class.getDeclaredField("instance");
         instanceField.setAccessible(true);
+        UIManager instance = (UIManager) instanceField.get(null);
+        if (instance != null) {
+            clearMap(instance, "styles");
+            clearMap(instance, "selectedStyles");
+            clearMap(instance, "themeConstants");
+            clearMap(instance, "imageCache");
+            clearMap(instance, "parseCache");
+
+            Field themePropsField = UIManager.class.getDeclaredField("themeProps");
+            themePropsField.setAccessible(true);
+            Object themeProps = themePropsField.get(instance);
+            if (themeProps instanceof Map) {
+                ((Map) themeProps).clear();
+            }
+            themePropsField.set(instance, null);
+
+            Field resourceBundleField = UIManager.class.getDeclaredField("resourceBundle");
+            resourceBundleField.setAccessible(true);
+            Object resourceBundle = resourceBundleField.get(instance);
+            if (resourceBundle instanceof Hashtable) {
+                ((Hashtable) resourceBundle).clear();
+            }
+            resourceBundleField.set(instance, null);
+
+            Field bundleField = UIManager.class.getDeclaredField("bundle");
+            bundleField.setAccessible(true);
+            Object bundle = bundleField.get(instance);
+            if (bundle instanceof Map) {
+                ((Map) bundle).clear();
+            }
+            bundleField.set(instance, null);
+        }
         instanceField.set(null, null);
+
+        Field accessibleField = UIManager.class.getDeclaredField("accessible");
+        accessibleField.setAccessible(true);
+        accessibleField.setBoolean(null, true);
+
+        Field localeAccessibleField = UIManager.class.getDeclaredField("localeAccessible");
+        localeAccessibleField.setAccessible(true);
+        localeAccessibleField.setBoolean(null, true);
+    }
+
+    private void clearMap(UIManager manager, String fieldName) throws Exception {
+        Field field = UIManager.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        Object value = field.get(manager);
+        if (value instanceof Map) {
+            ((Map) value).clear();
+        } else if (value instanceof Hashtable) {
+            ((Hashtable) value).clear();
+        }
     }
 
     private Graphics createGraphics() throws Exception {
