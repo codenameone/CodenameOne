@@ -233,6 +233,10 @@ public class Storage {
      * @return true for success, false for failure
      */
     public boolean writeObject(String name, Object o) {
+        return writeObject(name, o, true);
+    }
+
+    boolean writeObject(String name, Object o, boolean sendLog) {
         name = fixFileName(name);
         cache.put(name, o);
         DataOutputStream d = null;
@@ -243,7 +247,7 @@ public class Storage {
             return true;
         } catch (Exception err) {
             Log.e(err);
-            if (Log.isCrashBound()) {
+            if (sendLog && Log.isCrashBound()) {
                 Log.sendLog();
             }
             Util.getImplementation().deleteStorageFile(name);
@@ -263,6 +267,10 @@ public class Storage {
      * @return object stored under that name
      */
     public Object readObject(String name) {
+        return readObject(name, true);
+    }
+
+    Object readObject(String name, boolean sendLog) {
         name = fixFileName(name);
         Object o = cache.get(name);
         if (o != null) {
@@ -281,7 +289,7 @@ public class Storage {
         } catch (Throwable err) {
             Log.p("Error while reading: " + name);
             Log.e(err);
-            if (Log.isCrashBound()) {
+            if (sendLog && Log.isCrashBound()) {
                 Log.sendLog();
             }
             Util.getImplementation().cleanup(d);
