@@ -130,7 +130,7 @@ class GraphicsTest extends UITestBase {
         graphics.setColor(paint);
         Rectangle shape = new Rectangle(0, 0, 10, 10);
         graphics.fillShape(shape);
-        verify(paint).paint(same(graphics), eq(0), eq(0), eq(10), eq(10));
+        verify(paint).paint(same(graphics), eq(0.0), eq(0.0), eq(10.0), eq(10.0));
         verify(implementation).setClip(eq(nativeGraphics), any(Shape.class));
         verify(implementation).clipRect(nativeGraphics, 0, 0, 100, 100);
         verify(implementation).setClip(nativeGraphics, 0, 0, 100, 100);
