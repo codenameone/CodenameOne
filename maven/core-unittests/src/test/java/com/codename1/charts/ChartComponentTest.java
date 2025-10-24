@@ -59,26 +59,22 @@ class ChartComponentTest extends UITestBase {
         ChartComponent component = new PositionedChartComponent(chart, 10, 15);
 
         Rectangle screenRect = new Rectangle(component.getAbsoluteX(), component.getAbsoluteY(), 40, 50);
-        Rectangle chartBounds = component.screenToChartShape(screenRect).getBounds();
+        Shape chartShape = component.screenToChartShape(screenRect);
+        Rectangle screenRoundTripBounds = component.chartToScreenShape(chartShape).getBounds();
 
-        Point chartTopLeft = component.screenToChartCoord(screenRect.getX(), screenRect.getY());
-        Point chartBottomRight = component.screenToChartCoord(screenRect.getX() + screenRect.getSize().getWidth(),
-                screenRect.getY() + screenRect.getSize().getHeight());
-        assertEquals(chartTopLeft.getX(), chartBounds.getX());
-        assertEquals(chartTopLeft.getY(), chartBounds.getY());
-        assertEquals(chartBottomRight.getX() - chartTopLeft.getX(), chartBounds.getSize().getWidth());
-        assertEquals(chartBottomRight.getY() - chartTopLeft.getY(), chartBounds.getSize().getHeight());
+        assertEquals(screenRect.getX(), screenRoundTripBounds.getX());
+        assertEquals(screenRect.getY(), screenRoundTripBounds.getY());
+        assertEquals(screenRect.getSize().getWidth(), screenRoundTripBounds.getSize().getWidth());
+        assertEquals(screenRect.getSize().getHeight(), screenRoundTripBounds.getSize().getHeight());
 
         Rectangle chartRect = new Rectangle(0, 0, 40, 50);
-        Rectangle screenBounds = component.chartToScreenShape(chartRect).getBounds();
+        Shape screenShape = component.chartToScreenShape(chartRect);
+        Rectangle chartRoundTripBounds = component.screenToChartShape(screenShape).getBounds();
 
-        Point screenTopLeft = component.chartToScreenCoord(chartRect.getX(), chartRect.getY());
-        Point screenBottomRight = component.chartToScreenCoord(chartRect.getX() + chartRect.getSize().getWidth(),
-                chartRect.getY() + chartRect.getSize().getHeight());
-        assertEquals(screenTopLeft.getX(), screenBounds.getX());
-        assertEquals(screenTopLeft.getY(), screenBounds.getY());
-        assertEquals(screenBottomRight.getX() - screenTopLeft.getX(), screenBounds.getSize().getWidth());
-        assertEquals(screenBottomRight.getY() - screenTopLeft.getY(), screenBounds.getSize().getHeight());
+        assertEquals(chartRect.getX(), chartRoundTripBounds.getX());
+        assertEquals(chartRect.getY(), chartRoundTripBounds.getY());
+        assertEquals(chartRect.getSize().getWidth(), chartRoundTripBounds.getSize().getWidth());
+        assertEquals(chartRect.getSize().getHeight(), chartRoundTripBounds.getSize().getHeight());
     }
 
     @Test
