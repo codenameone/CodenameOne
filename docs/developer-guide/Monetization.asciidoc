@@ -65,21 +65,6 @@ public class HelloWorldIAP implements PurchaseCallback {
     }
 
     @Override
-    public void itemRefunded(String sku) {
-        ...
-    }
-
-    @Override
-    public void subscriptionStarted(String sku) {
-        ...
-    }
-
-    @Override
-    public void subscriptionCanceled(String sku) {
-        ...
-    }
-
-    @Override
     public void paymentFailed(String paymentCode, String failureReason) {
        ...
     }
@@ -92,7 +77,7 @@ public class HelloWorldIAP implements PurchaseCallback {
 }
 ----
 
-Using these callbacks, we'll be notified whenever something changes in our purchases.  For our simple app we're only interested in `itemPurchased()` and `itemPurchaseError()`.
+Using these callbacks, we'll be notified whenever something changes in our purchases.  For our simple app we're only interested in `itemPurchased()` and `itemPurchaseError()`.  The legacy `itemRefunded()`, `subscriptionStarted()`, and `subscriptionCanceled()` hooks have been deprecated in the core API and are no longer dispatched by the stores.  Instead of relying on callbacks for long-term entitlement state, query the current receipts at runtime using helpers such as `Purchase.wasPurchased(...)`, `Purchase.isSubscribed(...)`, or by iterating through `Purchase.getReceipts()` so that your UI always reflects the latest data provided by the underlying store.
 
 Now in the start method, we'll add a button that allows the user to buy the world:
 
@@ -221,6 +206,36 @@ Non-renewable subscriptions are the same as consumable products, except that the
 NOTE:  The concept of an "Non-renewable" subscription is unique to iTunes. Google Play has no formal similar option.  In order to create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a *regular product* in Google play, and a Non-renewable subscription in the iTunes store.  We'll learn more about that in a later post when we go into the specifics of app store setup.
 
 IMPORTANT:  The `Purchase` class includes both a `purchase()` method and a `subscribe()` method.  On some platforms it makes no difference which one you use, but on Android it matters.  If the product is set up as a subscription in Google Play, then you *must* use `subscribe()` to purchase the product.  If it is set up as a regular product, then you *must* use `purchase()`.  Since we enter "Non-renewable" subscriptions as regular products in the play store, we would use the `purchase()` method.
+
+==== Promotional offers (iOS)
+
+Apple allows you to present discounted introductory pricing to existing subscribers via https://developer.apple.com/documentation/storekit/skpaymentdiscount[promotional offers].  Codename One surfaces this capability through overloads of both `Purchase.purchase(String, PromotionalOffer)` and `Purchase.subscribe(String, PromotionalOffer)`, which forward the promotional context to StoreKit when you initiate the transaction.  Promotional offers are only honoured by iOS, so the overloads simply fall back to the regular purchase flow on other platforms.
+
+To build the signed discount payload required by Apple you can use the `ApplePromotionalOffer` helper:
+
+[source,java]
+----
+ApplePromotionalOffer offer = new ApplePromotionalOffer();
+offer.setOfferIdentifier("my-intro-offer");
+offer.setKeyIdentifier("A1B2C3D4");
+offer.setNonce(UUID.randomUUID().toString());
+offer.setSignature(signatureFromYourServer);
+offer.setTimestamp(timestampFromYourServer);
+
+Purchase purchase = Purchase.getInAppPurchase();
+purchase.subscribe(SKU_WORLD_MONTHLY, offer);
+----
+
+Apple generates the signature and timestamp from your App Store Connect server notifications endpoint; Codename One simply passes them to the native StoreKit APIs.  For one-time products you can call `purchase(sku, offer)` instead of `subscribe(...)`.
+
+==== Restoring purchases and managing subscriptions
+
+Both Apple and Google provide built-in user interfaces for restoring past purchases and managing subscription billing preferences.  Codename One exposes these entry points so you can surface the native flows without reimplementing them yourself.
+
+* Restores: Call `Purchase.isRestoreSupported()` before presenting a "Restore purchases" button.  When supported (iOS currently implements this natively), invoke `Purchase.restore()` to prompt the operating system to re-deliver past transactions.  Your app should implement `RestoreCallback` (similar to how you implement `PurchaseCallback`) so you can respond to individual `itemRestored(...)` events and to the completion or failure of the restore request.
+* Subscription management: Use `Purchase.isManageSubscriptionsSupported()` to detect whether the platform can show the subscription management UI.  When it returns `true`, calling `Purchase.manageSubscriptions(null)` opens the store-specific settings screen (Apple's subscription center on iOS and Google Play's subscription management activity on Android).  On Android you can optionally pass a SKU to deep-link directly to the plan the user should manage.
+
+Because these flows are handled by the underlying store your UI doesn't need to rebuild any billing screens.  Simply gate the buttons on the capability checks above so that iOS and Android users get the familiar restore/manage dialogs while other platforms can fall back to your own help copy.
 
 ==== The Server-Side
 
