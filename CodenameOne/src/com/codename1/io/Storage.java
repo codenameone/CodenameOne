@@ -233,6 +233,24 @@ public class Storage {
      * @return true for success, false for failure
      */
     public boolean writeObject(String name, Object o) {
+        return writeObject(name, o, true);
+    }
+
+    /**
+     * <p>Writes the given object to storage assuming it is an externalizable type
+     * or one of the supported types.</p>
+     *
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
+     *
+     * @param name store name
+     * @param o    object to store
+     * @param includeLogging During app initialization, the logging on error might impact the apps stability
+     * @return true for success, false for failure
+     */
+    public boolean writeObject(String name, Object o, boolean includeLogging) {
         name = fixFileName(name);
         cache.put(name, o);
         DataOutputStream d = null;
@@ -242,9 +260,11 @@ public class Storage {
             d.close();
             return true;
         } catch (Exception err) {
-            Log.e(err);
-            if (Log.isCrashBound()) {
-                Log.sendLog();
+            if(includeLogging) {
+                Log.e(err);
+                if (Log.isCrashBound()) {
+                    Log.sendLog();
+                }
             }
             Util.getImplementation().deleteStorageFile(name);
             Util.getImplementation().cleanup(d);
@@ -263,6 +283,21 @@ public class Storage {
      * @return object stored under that name
      */
     public Object readObject(String name) {
+        return readObject(name, true);
+    }
+
+    /**
+     * <p>Reads the object from the storage, returns null if the object isn't there</p>
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
+     *
+     * @param name name of the store
+     * @param includeLogging During app initialization, the logging on error might impact the apps stability
+     * @return object stored under that name
+     */
+    public Object readObject(String name, boolean includeLogging) {
         name = fixFileName(name);
         Object o = cache.get(name);
         if (o != null) {
@@ -279,10 +314,12 @@ public class Storage {
             cache.put(name, o);
             return o;
         } catch (Throwable err) {
-            Log.p("Error while reading: " + name);
-            Log.e(err);
-            if (Log.isCrashBound()) {
-                Log.sendLog();
+            if(includeLogging) {
+                Log.p("Error while reading: " + name);
+                Log.e(err);
+                if (Log.isCrashBound()) {
+                    Log.sendLog();
+                }
             }
             Util.getImplementation().cleanup(d);
             return null;
