@@ -367,7 +367,9 @@ bia_log "Found xcworkspace: $WORKSPACE"
 
 SCHEME="${MAIN_NAME}-CI"
 
-# Make these visible to the next GH Actions step
+# Best-effort: locate a simulator .app under the generated project (may be empty here,
+# because the runner does the actual build-for-testing).
+APP_BUNDLE_PATH="$(/bin/ls -1d "$PROJECT_DIR"/**/Build/Products/Debug-iphonesimulator/*.app 2>/dev/null | head -n1 || true)"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "workspace=$WORKSPACE"

@@ -107,7 +107,7 @@ jobs:
           
           ./scripts/run-ios-ui-tests.sh \
             "${{ steps.build-ios-app.outputs.workspace }}" \
-            "" \
+            "${{ steps.build-ios-app.outputs.app_bundle }}" \
             "${{ steps.build-ios-app.outputs.scheme }}"
         timeout-minutes: 30
 

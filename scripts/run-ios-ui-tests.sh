@@ -182,7 +182,7 @@ if [ -z "$SIM_DESTINATION" ]; then
   fi
 fi
 if [ -z "$SIM_DESTINATION" ]; then
-  SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16"
+  SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16,OS=latest"
   ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
 fi
 
@@ -190,6 +190,58 @@ ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
+
+ri_log "STAGE:BUILD_FOR_TESTING -> xcodebuild build-for-testing"
+set -o pipefail
+if ! xcodebuild \
+  -workspace "$WORKSPACE_PATH" \
+  -scheme "$SCHEME" \
+  -sdk iphonesimulator \
+  -configuration Debug \
+  -destination "$SIM_DESTINATION" \
+  -derivedDataPath "$DERIVED_DATA_DIR" \
+  build-for-testing | tee "$ARTIFACTS_DIR/xcodebuild-build.log"; then
+  ri_log "STAGE:BUILD_FAILED -> See $ARTIFACTS_DIR/xcodebuild-build.log"
+  exit 1
+fi
+
+# Prefer the product we just built; fall back to the optional arg2 if provided
+AUT_APP="$(/bin/ls -1d "$DERIVED_DATA_DIR"/Build/Products/Debug-iphonesimulator/*.app 2>/dev/null | head -n1 || true)"
+if [ -z "$AUT_APP" ] && [ -n "$APP_BUNDLE_PATH" ] && [ -d "$APP_BUNDLE_PATH" ]; then
+  AUT_APP="$APP_BUNDLE_PATH"
+fi
+if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
+  ri_log "Using simulator app bundle at $AUT_APP"
+  AUT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$AUT_APP/Info.plist" 2>/dev/null || true)
+  if [ -n "$AUT_BUNDLE_ID" ]; then
+    export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"
+    ri_log "Exported CN1_AUT_BUNDLE_ID=$AUT_BUNDLE_ID"
+  fi
+
+  # Resolve a UDID for the chosen destination name
+  SIM_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
+  SIM_UDID="$(xcrun simctl list devices available -j | python3 - "$SIM_NAME" <<'PY'
+import json,sys
+name=sys.argv[1]
+j=json.load(sys.stdin)
+for _,devs in j.get("devices",{}).items():
+  for d in devs:
+    if d.get("isAvailable") and d.get("name")==name:
+      print(d["udid"]); sys.exit(0)
+print("")
+PY
+)"
+  if [ -n "$SIM_UDID" ]; then
+    xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
+    xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
+    if [ -n "$AUT_BUNDLE_ID" ]; then
+      # Warm launch so the GL surface is alive before XCTest attaches;
+      # UITest still calls [self.app launch] with locale args afterwards.
+      xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
+      sleep 1
+    fi
+  fi
+fi
 
 # Run only the UI test bundle
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
@@ -210,7 +262,7 @@ if ! xcodebuild \
   "${XCODE_TEST_FILTERS[@]}" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   GENERATE_INFOPLIST_FILE=YES \
-  test | tee "$TEST_LOG"; then
+  test-without-building | tee "$TEST_LOG"; then
   ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
   exit 10
 fi
