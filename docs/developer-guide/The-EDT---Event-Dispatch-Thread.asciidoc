@@ -34,8 +34,7 @@ Codename One’s networking code automatically spawns its own network thread (se
 Codename One assumes all modifications to the UI
 are performed on the EDT but if we spawned a separate thread. How do we force our modifications back into the EDT?
 
-Codename One includes 3 methods in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class to help in these situations: `isEDT()`, `callSerially(Runnable`) &
-`callSeriallyAndWait(Runnable)`.
+Codename One includes helper methods in the https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] class to help in these situations: `isEDT()`, `callSerially(Runnable)`, `callSeriallyOnIdle(Runnable)`, and `callSeriallyAndWait(Runnable)` (with an optional timeout overload).
 
 `isEDT()` is useful for generic code that needs to test whether the current code is executing on the EDT.
 
@@ -86,7 +85,9 @@ if(!globalFlag) {
 otherMethod();
 ----
 
-TIP: If you are unsure use `callSerially`. The use cases for `callSeriallyAndWait` are very rare.
+TIP: If you are unsure use `callSerially`. The use cases for `callSeriallyAndWait` are very rare. When you do need to wait, the overload that accepts a timeout lets background threads marshal results back to the EDT without risking an indefinite stall if the EDT is busy.
+
+If the work you are posting back to the EDT is expensive and can wait until the UI finishes its current pass, use `callSeriallyOnIdle()`. This queues the runnable for execution only after the EDT completes painting, animations, and any other queued tasks. Deferring longer tasks to the idle queue helps avoid starving animations and transitions when bursts of background callbacks arrive together.
 
 ==== callSerially On The EDT
 
@@ -110,6 +111,8 @@ you run into issues in event processing we suggest trying this to see if its the
 
 IMPORTANT: You should never invoke callSeriallyAndWait on the EDT since this would effectively mean sleeping on the
 EDT. We made that method throw an exception if its invoked from the EDT.
+
+If you need to run logic on the EDT but must ensure nothing inside it blocks, the `Display` class also provides `invokeWithoutBlocking()` and `invokeWithoutBlockingWithResultSync()`. These helpers temporarily disable `invokeAndBlock()` for the duration of the runnable. Any nested call to `invokeAndBlock()` while blocking is disabled results in a `BlockingDisallowedException`. Framework code that wraps user callbacks can use these methods to guard against accidental nested blocking that would otherwise deadlock or stall the UI, yet still safely obtain a return value when needed via `invokeWithoutBlockingWithResultSync()`.
 
 === Debugging EDT Violations
 
