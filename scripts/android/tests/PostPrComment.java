@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -324,7 +325,12 @@ public class PostPrComment {
         try (var stream = Files.list(dest)) {
             stream.filter(Files::isRegularFile)
                     .sorted()
-                    .forEach(path -> urls.put(path.getFileName().toString(), rawBase + "/" + path.getFileName()));
+                    .forEach(path -> {
+                        String fileName = path.getFileName().toString();
+                        String url = rawBase + "/" + fileName;
+                        urls.put(fileName, url);
+                        urls.put(fileName.toLowerCase(Locale.ROOT), url);
+                    });
         }
         deleteRecursively(worktree);
         return urls;
