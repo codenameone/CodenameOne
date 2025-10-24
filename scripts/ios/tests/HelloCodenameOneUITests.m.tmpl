@@ -1,7 +1,6 @@
 #import <XCTest/XCTest.h>
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
-#import <objc/message.h>
 #import <math.h>
 #import <float.h>
 
@@ -47,17 +46,6 @@
     [[NSFileManager defaultManager] createDirectoryAtURL:self.outputDirectory withIntermediateDirectories:YES attributes:nil error:nil];
 
     [self.app launch];
-    [self.app activate];
-
-    NSString *resolvedBundleIdentifier = [self resolvedBundleIdentifier];
-    if (resolvedBundleIdentifier.length > 0) {
-        printf("CN1SS:INFO:ui_test_resolved_bundle_id=%s\n", resolvedBundleIdentifier.UTF8String);
-    }
-    NSURL *resolvedBundleURL = [self resolvedBundleURL];
-    if (resolvedBundleURL != nil) {
-        printf("CN1SS:INFO:ui_test_resolved_bundle_url=%s\n", resolvedBundleURL.path.UTF8String);
-    }
-
     [self waitForAppToEnterForegroundWithTimeout:40.0];
     [self waitForRenderedContentInContext:@"launch" timeout:45.0 settle:1.2];
 }
@@ -188,37 +176,6 @@
     [self addAttachment:attachment];
 
     [self emitScreenshotPayloadsForShot:shot name:name pngData:pngData];
-}
-
-- (NSString *)resolvedBundleIdentifier {
-    if (self.app == nil) {
-        return @"";
-    }
-    SEL selectors[] = { NSSelectorFromString(@"bundleIdentifier"), NSSelectorFromString(@"bundleID") };
-    for (NSUInteger i = 0; i < sizeof(selectors) / sizeof(selectors[0]); i++) {
-        SEL selector = selectors[i];
-        if ([self.app respondsToSelector:selector]) {
-            id result = ((id (*)(id, SEL))objc_msgSend)(self.app, selector);
-            if ([result isKindOfClass:[NSString class]]) {
-                return (NSString *)result;
-            }
-        }
-    }
-    return @"";
-}
-
-- (NSURL *)resolvedBundleURL {
-    if (self.app == nil) {
-        return nil;
-    }
-    SEL selector = NSSelectorFromString(@"bundleURL");
-    if ([self.app respondsToSelector:selector]) {
-        id result = ((id (*)(id, SEL))objc_msgSend)(self.app, selector);
-        if ([result isKindOfClass:[NSURL class]]) {
-            return (NSURL *)result;
-        }
-    }
-    return nil;
 }
 
 - (NSString *)sanitizeTestName:(NSString *)name {
