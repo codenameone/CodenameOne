@@ -222,14 +222,17 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
     ri_log "Exported CN1_AUT_BUNDLE_ID=$AUT_BUNDLE_ID"
   fi
 
-  # Resolve a UDID for the chosen destination name (no Python/heredocs)
+  # Resolve a UDID for the chosen destination name (no regex groups to keep BSD awk happy)
   SIM_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
   SIM_UDID="$(
     xcrun simctl list devices available 2>/dev/null | \
     awk -v name="$SIM_NAME" '
-      $0 ~ name" \\(" && /\[/ {
-        # Example: "iPhone 16 (18.0) [UDID] (Available)"
-        if (match($0, /\[([0-9A-F-]+)\]/, a)) { print a[1]; exit }
+      # Match a line that contains the selected device name followed by " ("
+      index($0, name" (") && index($0, "[") {
+        ud=$0
+        sub(/^.*\[/,"",ud)     # drop everything up to and including the first '['
+        sub(/\].*$/,"",ud)     # drop everything after the closing ']'
+        if (length(ud)>0) { print ud; exit }
       }'
   )"
 
