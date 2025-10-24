@@ -2,7 +2,9 @@ package com.codenameone.developerguide;
 
 import com.codename1.testing.AbstractTest;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Verifies the demo registry exposes the expected demos and is immutable.
@@ -15,15 +17,18 @@ public class DemoRegistryTest extends AbstractTest {
 
         assertNotNull(demos, "Demo registry should never return null.");
         assertFalse(demos.isEmpty(), "Demo registry should contain at least one demo.");
-        assertEqual(2, demos.size(), "Demo registry should contain the sample demos.");
 
-        Demo hello = demos.get(0);
-        assertEqual("Hello World", hello.getTitle());
-        assertEqual("Shows a button that pops up a welcome dialog.", hello.getDescription());
+        Set<String> titles = new HashSet<>();
+        for (Demo demo : demos) {
+            assertNotNull(demo.getTitle(), "Demo titles must not be null.");
+            assertFalse(demo.getTitle().trim().isEmpty(), "Demo titles must not be empty.");
+            assertNotNull(demo.getDescription(), "Demo descriptions must not be null.");
+            titles.add(demo.getTitle());
+        }
 
-        Demo counter = demos.get(1);
-        assertEqual("Counter", counter.getTitle());
-        assertEqual("Interactive counter with increment/decrement controls and a slider.", counter.getDescription());
+        assertTrue(titles.contains("Layout Animations"), "Layout Animations demo should be registered.");
+        assertTrue(titles.contains("Slide Transitions"), "Slide Transitions demo should be registered.");
+        assertTrue(titles.contains("Bubble Transition"), "Bubble Transition demo should be registered.");
 
         boolean immutable = false;
         try {

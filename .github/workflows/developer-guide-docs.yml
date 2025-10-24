@@ -49,6 +49,37 @@ jobs:
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
           xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml test
 
+      - name: Install ImageMagick for screenshot comparison
+        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick
+
+      - name: Compare animation screenshots
+        id: compare_animation_screenshots
+        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          ARTIFACT_DIR="build/developer-guide/animation-screenshots"
+          mkdir -p "${ARTIFACT_DIR}"
+          .github/scripts/compare-animation-screenshots.sh "${ARTIFACT_DIR}"
+
+      - name: Upload animation screenshot mismatches
+        if: steps.compare_animation_screenshots.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-guide-animation-screenshots
+          path: build/developer-guide/animation-screenshots
+          if-no-files-found: warn
+
+      - name: Fail when animation screenshots differ
+        if: steps.compare_animation_screenshots.outcome == 'failure'
+        run: |
+          echo "Animation demo screenshots differ from developer guide assets." >&2
+          exit 1
+
       - name: Determine publication metadata
         run: |
           set -euo pipefail
