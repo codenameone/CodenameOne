@@ -74,17 +74,8 @@ class TestRunnerComponentTest extends UITestBase {
         Form form = component.showForm();
         assertNotNull(form);
 
-        RuntimeException thrown = null;
-        try {
-            component.runTests();
-        } catch (RuntimeException ex) {
-            thrown = ex;
-        }
+        assertDoesNotThrow(component::runTests);
         flushSerialCalls();
-
-        if (thrown != null) {
-            assertSame(failure, thrown, "runTests should not propagate unexpected exceptions");
-        }
 
         Container resultsPane = getResultsPane(component);
         assertEquals(2, resultsPane.getComponentCount());
