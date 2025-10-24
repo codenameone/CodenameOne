@@ -66,6 +66,7 @@ class TestRunnerComponentTest extends UITestBase {
     }
 
     @Test
+    @AllowConsoleOutput
     void runTestsAddsFailureActionListenerOnException() throws Exception {
         RuntimeException failure = new RuntimeException("explode");
         TestRunnerComponent component = new TestRunnerComponent();
