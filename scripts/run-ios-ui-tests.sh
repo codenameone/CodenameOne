@@ -98,6 +98,15 @@ SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
 RESULT_BUNDLE="$SCREENSHOT_TMP_DIR/test-results.xcresult"
 mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 
+# --- Begin: xcresult JSON export ---
+if [ -d "$RESULT_BUNDLE" ]; then
+  ri_log "Exporting xcresult JSON"
+  /usr/bin/xcrun xcresulttool get --format json --path "$RESULT_BUNDLE" > "$ARTIFACTS_DIR/xcresult.json" 2>/dev/null || true
+else
+  ri_log "xcresult bundle not found at $RESULT_BUNDLE"
+fi
+# --- End: xcresult JSON export ---
+
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
@@ -195,6 +204,17 @@ ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 
+ri_log "Xcode version: $(xcodebuild -version | tr '\n' ' ')"
+ri_log "Destinations for scheme:"
+xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations || true
+
+# Start sim syslog capture (background)
+SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
+ri_log "Capturing simulator syslog at $SIM_SYSLOG"
+(xcrun simctl spawn booted log stream --style syslog --level debug \
+  || xcrun simctl spawn booted log stream --style compact) > "$SIM_SYSLOG" 2>&1 &
+SYSLOG_PID=$!
+
 ri_log "STAGE:BUILD_FOR_TESTING -> xcodebuild build-for-testing"
 set -o pipefail
 if ! xcodebuild \
@@ -220,6 +240,15 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   if [ -n "$AUT_BUNDLE_ID" ]; then
     export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"
     ri_log "Exported CN1_AUT_BUNDLE_ID=$AUT_BUNDLE_ID"
+    # Inject AUT bundle id into the scheme, if a placeholder exists
+    if [ -f "$SCHEME_FILE" ] && [ -n "$AUT_BUNDLE_ID" ]; then
+      if sed --version >/dev/null 2>&1; then
+        sed -i -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
+      else
+        sed -i '' -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
+      fi
+      ri_log "Injected CN1_AUT_BUNDLE_ID into scheme: $SCHEME_FILE"
+    fi
   fi
 
   # Resolve a UDID for the chosen destination name (no regex groups to keep BSD awk happy)
@@ -236,13 +265,27 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
       }'
   )"
 
+  ri_log "Simulator devices (available):"
+  xcrun simctl list devices available || true
+
+  if [ -n "$SIM_UDID" ]; then
+    ri_log "Boot status for $SIM_UDID:"
+    xcrun simctl bootstatus "$SIM_UDID" -b || true
+
+    ri_log "Processes in simulator:"
+    xcrun simctl spawn "$SIM_UDID" launchctl print system | head -n 200 || true
+  fi
+
   if [ -n "$SIM_UDID" ]; then
     xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
     xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
-    if [ -n "$AUT_BUNDLE_ID" ]; then
-      # Warm launch so the GL surface is alive before XCTest attaches
-      xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
-      sleep 1
+    if [ -n "$AUT_BUNDLE_ID" ] && [ -n "$SIM_UDID" ]; then
+      ri_log "Warm-launching $AUT_BUNDLE_ID"
+      xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
+      LAUNCH_OUT="$(xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" 2>&1 || true)"
+      ri_log "simctl launch output: $LAUNCH_OUT"
+      ri_log "Simulator screenshot (pre-XCTest)"
+      xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/pre-xctest.png" || true
     fi
   else
     ri_log "WARN: Could not resolve simulator UDID for '$SIM_NAME'; skipping warm launch"
@@ -250,6 +293,13 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
 fi
 
 # Run only the UI test bundle
+# --- Begin: Start run video recording ---
+RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
+ri_log "Recording simulator video to $RUN_VIDEO"
+# recordVideo exits only when killed, so background it and store pid
+( xcrun simctl io booted recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
+# --- End: Start run video recording ---
+
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
@@ -272,6 +322,22 @@ if ! xcodebuild \
   ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
   exit 10
 fi
+
+# --- Begin: Stop video + final screenshots ---
+if [ -f "$SCREENSHOT_TMP_DIR/video.pid" ]; then
+  rec_pid="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
+  if [ -n "$rec_pid" ]; then
+    ri_log "Stopping simulator video recording (pid=$rec_pid)"
+    kill "$rec_pid" >/dev/null 2>&1 || true
+    # Give the recorder a moment to flush
+    sleep 1
+  fi
+fi
+
+ri_log "Final simulator screenshot"
+xcrun simctl io booted screenshot "$ARTIFACTS_DIR/final.png" || true
+# --- End: Stop video + final screenshots ---
+
 set +o pipefail
 declare -a CN1SS_SOURCES=()
 if [ -s "$TEST_LOG" ]; then
@@ -415,6 +481,13 @@ cp -f "$COMPARE_JSON" "$ARTIFACTS_DIR/screenshot-compare.json" 2>/dev/null || tr
 if [ -s "$COMMENT_FILE" ]; then
   cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
 fi
+
+# --- Begin: stop syslog capture ---
+if [ -n "${SYSLOG_PID:-}" ]; then
+  ri_log "Stopping simulator log capture (pid=$SYSLOG_PID)"
+  kill "$SYSLOG_PID" >/dev/null 2>&1 || true
+fi
+# --- End: stop syslog capture ---
 
 ri_log "STAGE:COMMENT_POST -> Submitting PR feedback"
 comment_rc=0

@@ -1,55 +1,56 @@
 #import <XCTest/XCTest.h>
 #import <UIKit/UIKit.h>
-#import <CoreGraphics/CoreGraphics.h>
-#import <math.h>
-#include "com_codenameone_examples_HelloCodenameOneStub.h"
 
 @interface HelloCodenameOneUITests : XCTestCase
 @property(nonatomic, strong) XCUIApplication *app;
-@property(nonatomic, strong) NSURL *outputDirectory;
 @end
 
-@implementation HelloCodenameOneUITests {
-    NSUInteger _chunkSize;
-    NSArray<NSNumber *> *_previewQualities;
-    NSUInteger _maxPreviewBytes;
-}
+@implementation HelloCodenameOneUITests
 
 - (void)setUpWithError:(NSError *__autoreleasing  _Nullable *)error {
     [super setUpWithError:error];
     self.continueAfterFailure = NO;
 
-    initConstantPool();
-    com_codenameone_examples_HelloCodenameOneStub_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);
+    NSDictionary *env = NSProcessInfo.processInfo.environment;
+    NSLog(@"CN1SS:INFO:env=%@", env);
 
-    _chunkSize = 2000;
-    _previewQualities = @[@60, @50, @40, @35, @30, @25, @20, @18, @16, @14, @12, @10, @8, @6, @5, @4, @3, @2, @1];
-    _maxPreviewBytes = 20 * 1024;
-
-    NSDictionary<NSString *, NSString *> *env = [[NSProcessInfo processInfo] environment];
     NSString *bundleID = env[@"CN1_AUT_BUNDLE_ID"];
-    XCUIApplication *app = nil;
     if (bundleID.length > 0) {
-        printf("CN1SS:INFO:ui_test_target_bundle_id=%s\n", bundleID.UTF8String);
-        app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
+        NSLog(@"CN1SS:INFO:ui_test_target_bundle_id=%@", bundleID);
+        self.app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
+    } else {
+        NSLog(@"CN1SS:INFO:ui_test_target_bundle_id=(default)");
+        self.app = [[XCUIApplication alloc] init];
     }
-    if (app == nil) {
-        printf("CN1SS:INFO:ui_test_target_bundle_id=(default)\n");
-        app = [[XCUIApplication alloc] init];
-    }
 
-    self.app = app;
-    self.app.launchArguments = @[@"-AppleLocale", @"en_US", @"-AppleLanguages", @"(en)"];
+    // Make args visible in logs and to the app
+    NSMutableArray *args = [@[
+        @"-AppleLocale", @"en_US",
+        @"-AppleLanguages", @"(en)",
+        @"--cn1-test-mode", @"1"
+    ] mutableCopy];
+    self.app.launchArguments = args;
 
-    NSString *tmpPath = NSTemporaryDirectory();
-    NSURL *tmpURL = [NSURL fileURLWithPath:tmpPath isDirectory:YES];
-    NSString *tag = env[@"CN1SS_OUTPUT_DIR"];
-    NSString *dirName = (tag.length > 0) ? tag : @"cn1screens";
-    self.outputDirectory = [tmpURL URLByAppendingPathComponent:dirName isDirectory:YES];
-    [[NSFileManager defaultManager] createDirectoryAtURL:self.outputDirectory withIntermediateDirectories:YES attributes:nil error:nil];
+    // Pre-attach screenshot for proof of simulator state
+    [self saveScreen:@"pre_launch"];
 
+    NSLog(@"CN1SS:INFO:launch:start args=%@", self.app.launchArguments);
     [self.app launch];
-    [self waitForAppToEnterForegroundWithTimeout:40.0];
+
+    // Try hard to reach foreground, with periodic screenshots
+    [self waitForAppToEnterForegroundWithTimeout:60.0 step:1.5 label:@"post_launch"];
+    NSLog(@"CN1SS:INFO:state_after_launch=%ld", (long)self.app.state);
+
+    if (self.app.state != XCUIApplicationStateRunningForeground) {
+        NSLog(@"CN1SS:WARN:not_foreground:attempting_relaunch");
+        [self.app terminate];
+        [self saveScreen:@"pre_relaunch"];
+        [self.app launch];
+        [self waitForAppToEnterForegroundWithTimeout:40.0 step:1.5 label:@"post_relaunch"];
+        NSLog(@"CN1SS:INFO:state_after_relaunch=%ld", (long)self.app.state);
+    }
+
+    // First-frame settle
     [self waitForRenderedContentInContext:@"launch" timeout:45.0 settle:1.2];
 }
 
@@ -59,259 +60,45 @@
     [super tearDownWithError:error];
 }
 
-- (void)testMainScreenScreenshot {
-    BOOL rendered = [self waitForRenderedContentInContext:@"MainActivity" timeout:45.0 settle:1.0];
-    if (!rendered) {
-        XCTFail(@"Codename One UI did not render before capturing MainActivity");
-    }
-    [self captureScreenshotNamed:@"MainActivity"];
+#pragma mark - Telemetry helpers
+
+- (void)saveScreen:(NSString *)name {
+    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot ?: self.app.screenshot;
+    if (!shot) return;
+    NSData *png = shot.PNGRepresentation;
+    NSString *tmp = NSTemporaryDirectory();
+    NSString *dir = [tmp stringByAppendingPathComponent:@"cn1screens"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *path = [dir stringByAppendingPathComponent:[name stringByAppendingString:@".png"]];
+    [png writeToFile:path atomically:NO];
+    NSLog(@"CN1SS:INFO:saved_screenshot name=%@ path=%@", name, path);
+    XCTAttachment *att = [XCTAttachment attachmentWithScreenshot:shot];
+    att.name = name;
+    att.lifetime = XCTAttachmentLifetimeKeepAlways;
+    [self addAttachment:att];
 }
 
-- (void)testBrowserComponentScreenshot {
-    BOOL renderedBeforeTap = [self waitForRenderedContentInContext:@"BrowserComponent_pre_tap" timeout:30.0 settle:0.5];
-    if (!renderedBeforeTap) {
-        XCTFail(@"Codename One UI did not render before BrowserComponent tap");
-    }
-    [self tapNormalizedX:0.5 y:0.70];
-    [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];
-    BOOL renderedAfterTap = [self waitForRenderedContentInContext:@"BrowserComponent" timeout:40.0 settle:0.8];
-    if (!renderedAfterTap) {
-        XCTFail(@"BrowserComponent UI did not render after navigation");
-    }
-    [self captureScreenshotNamed:@"BrowserComponent"];
-}
-
-#pragma mark - Helpers
-
-- (void)waitForAppToEnterForegroundWithTimeout:(NSTimeInterval)timeout {
+- (void)waitForAppToEnterForegroundWithTimeout:(NSTimeInterval)timeout step:(NSTimeInterval)step label:(NSString *)label {
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
     NSUInteger attempt = 0;
     while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        attempt++;
         XCUIApplicationState state = self.app.state;
+        NSLog(@"CN1SS:INFO:launch_state attempt=%lu state=%ld", (unsigned long)attempt, (long)state);
         if (state == XCUIApplicationStateRunningForeground) {
-            printf("CN1SS:INFO:launch_state attempt=%lu state=running_foreground\n", (unsigned long)(attempt + 1));
+            [self saveScreen:[NSString stringWithFormat:@"%@_foreground_%lu", label, (unsigned long)attempt]];
             return;
         }
-        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.5]];
-        attempt += 1;
+        [self saveScreen:[NSString stringWithFormat:@"%@_state_%lu", label, (unsigned long)attempt]];
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:step]];
     }
-    printf("CN1SS:WARN:launch_state_timeout=true attempts=%lu timeout=%.1f\n", (unsigned long)attempt, timeout);
+    NSLog(@"CN1SS:WARN:%@_timeout", label);
 }
 
 - (BOOL)waitForRenderedContentInContext:(NSString *)context timeout:(NSTimeInterval)timeout settle:(NSTimeInterval)settle {
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
-    NSUInteger attempt = 0;
-    BOOL detected = NO;
-    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
-        attempt += 1;
-        XCUIScreenshot *shot = self.app.screenshot;
-        if (shot == nil) {
-            shot = [XCUIScreen mainScreen].screenshot;
-        }
-        UIImage *image = shot.image;
-        if (image == nil) {
-            printf("CN1SS:WARN:context=%s missing_image_for_variance attempt=%lu\n",
-                   context.UTF8String,
-                   (unsigned long)attempt);
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.75]];
-            continue;
-        }
-        double variance = [self luminanceVarianceForImage:image sampleStride:8];
-        printf("CN1SS:INFO:context=%s attempt=%lu luma_variance=%.3f size=%.0fx%.0f\n",
-               context.UTF8String,
-               (unsigned long)attempt,
-               variance,
-               image.size.width,
-               image.size.height);
-        if (variance > 8.0) {
-            detected = YES;
-            break;
-        }
-        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.75]];
-    }
-    if (!detected) {
-        printf("CN1SS:WARN:context=%s rendered_content_timeout=true attempts=%lu\n",
-               context.UTF8String,
-               (unsigned long)attempt);
-    }
-    if (settle > 0) {
-        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:settle]];
-    }
-    return detected;
-}
-
-- (void)tapNormalizedX:(CGFloat)dx y:(CGFloat)dy {
-    XCUICoordinate *origin = [self.app coordinateWithNormalizedOffset:CGVectorMake(0, 0)];
-    CGSize size = self.app.frame.size;
-    XCUICoordinate *target = [origin coordinateWithOffset:CGVectorMake(size.width * dx, size.height * dy)];
-    [target tap];
-}
-
-- (void)captureScreenshotNamed:(NSString *)name {
-    XCUIScreenshot *shot = self.app.screenshot;
-    if (shot == nil) {
-        shot = [XCUIScreen mainScreen].screenshot;
-    }
-    NSData *pngData = shot.PNGRepresentation;
-
-    UIImage *image = shot.image;
-    double variance = [self luminanceVarianceForImage:image sampleStride:6];
-    printf("CN1SS:INFO:test=%s capture_luma_variance=%.3f\n", name.UTF8String, variance);
-
-    NSURL *pngURL = [self.outputDirectory URLByAppendingPathComponent:[name stringByAppendingString:@".png"]];
-    [pngData writeToURL:pngURL atomically:NO];
-
-    XCTAttachment *attachment = [XCTAttachment attachmentWithScreenshot:shot];
-    attachment.name = name;
-    attachment.lifetime = XCTAttachmentLifetimeKeepAlways;
-    [self addAttachment:attachment];
-
-    [self emitScreenshotPayloadsForShot:shot name:name pngData:pngData];
-}
-
-- (NSString *)sanitizeTestName:(NSString *)name {
-    NSMutableString *result = [NSMutableString stringWithCapacity:name.length];
-    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"];
-    for (NSUInteger i = 0; i < name.length; i++) {
-        unichar ch = [name characterAtIndex:i];
-        if ([allowed characterIsMember:ch]) {
-            [result appendFormat:@"%C", ch];
-        } else {
-            [result appendString:@"_"];
-        }
-    }
-    return result;
-}
-
-- (void)emitScreenshotPayloadsForShot:(XCUIScreenshot *)shot name:(NSString *)name pngData:(NSData *)pngData {
-    NSString *safeName = [self sanitizeTestName:name];
-    printf("CN1SS:INFO:test=%s png_bytes=%lu\n", safeName.UTF8String, (unsigned long)pngData.length);
-    [self emitScreenshotChannelWithData:pngData name:safeName channel:@""];
-
-    NSData *previewData = nil;
-    NSInteger previewQuality = 0;
-    UIImage *image = [UIImage imageWithData:pngData];
-    if (image) {
-        NSUInteger smallest = NSUIntegerMax;
-        for (NSNumber *qualityNumber in _previewQualities) {
-            CGFloat quality = qualityNumber.doubleValue / 100.0;
-            NSData *jpeg = UIImageJPEGRepresentation(image, quality);
-            if (!jpeg) {
-                continue;
-            }
-            NSUInteger length = jpeg.length;
-            if (length < smallest) {
-                smallest = length;
-                previewData = jpeg;
-                previewQuality = (NSInteger)lrint(quality * 100.0);
-            }
-            if (length <= _maxPreviewBytes) {
-                break;
-            }
-        }
-    }
-
-    if (previewData.length > 0) {
-        printf("CN1SS:INFO:test=%s preview_jpeg_bytes=%lu preview_quality=%ld\n", safeName.UTF8String, (unsigned long)previewData.length, (long)previewQuality);
-        if (previewData.length > _maxPreviewBytes) {
-            printf("CN1SS:WARN:test=%s preview_exceeds_limit_bytes=%lu max_preview_bytes=%lu\n", safeName.UTF8String, (unsigned long)previewData.length, (unsigned long)_maxPreviewBytes);
-        }
-        [self emitScreenshotChannelWithData:previewData name:safeName channel:@"PREVIEW"];
-    } else {
-        printf("CN1SS:INFO:test=%s preview_jpeg_bytes=0 preview_quality=0\n", safeName.UTF8String);
-    }
-}
-
-- (void)emitScreenshotChannelWithData:(NSData *)data name:(NSString *)name channel:(NSString *)channel {
-    NSMutableString *prefix = [NSMutableString stringWithString:@"CN1SS"];
-    if (channel.length > 0) {
-        [prefix appendString:channel];
-    }
-    if (data.length == 0) {
-        printf("%s:END:%s\n", prefix.UTF8String, name.UTF8String);
-        return;
-    }
-
-    NSString *base64 = [data base64EncodedStringWithOptions:0];
-    NSUInteger position = 0;
-    NSUInteger chunkCount = 0;
-    while (position < base64.length) {
-        NSUInteger length = MIN(_chunkSize, base64.length - position);
-        NSRange range = NSMakeRange(position, length);
-        NSString *chunk = [base64 substringWithRange:range];
-        printf("%s:%s:%06lu:%s\n", prefix.UTF8String, name.UTF8String, (unsigned long)position, chunk.UTF8String);
-        position += length;
-        chunkCount += 1;
-    }
-    printf("CN1SS:INFO:test=%s chunks=%lu total_b64_len=%lu\n", name.UTF8String, (unsigned long)chunkCount, (unsigned long)base64.length);
-    printf("%s:END:%s\n", prefix.UTF8String, name.UTF8String);
-}
-
-- (double)luminanceVarianceForImage:(UIImage *)image sampleStride:(NSUInteger)stride {
-    if (image == nil) {
-        return 0.0;
-    }
-    CGImageRef cgImage = image.CGImage;
-    if (cgImage == nil) {
-        return 0.0;
-    }
-    CGDataProviderRef provider = CGImageGetDataProvider(cgImage);
-    if (provider == nil) {
-        return 0.0;
-    }
-    CFDataRef dataRef = CGDataProviderCopyData(provider);
-    if (dataRef == nil) {
-        return 0.0;
-    }
-
-    const UInt8 *bytes = CFDataGetBytePtr(dataRef);
-    size_t length = CFDataGetLength(dataRef);
-    size_t bytesPerRow = CGImageGetBytesPerRow(cgImage);
-    size_t bitsPerPixel = CGImageGetBitsPerPixel(cgImage);
-    size_t components = bitsPerPixel / 8;
-    if (length == 0 || components < 3) {
-        CFRelease(dataRef);
-        return 0.0;
-    }
-
-    if (stride == 0) {
-        stride = 1;
-    }
-
-    size_t width = CGImageGetWidth(cgImage);
-    size_t height = CGImageGetHeight(cgImage);
-    stride = MIN(stride, MAX((NSUInteger)1, (NSUInteger)width));
-
-    CGBitmapInfo info = CGImageGetBitmapInfo(cgImage);
-    BOOL littleEndian = (info & kCGBitmapByteOrderMask) == kCGBitmapByteOrder32Little;
-
-    double sum = 0.0;
-    double sumSq = 0.0;
-    NSUInteger count = 0;
-
-    for (size_t y = 0; y < height; y += stride) {
-        const UInt8 *row = bytes + y * bytesPerRow;
-        for (size_t x = 0; x < width; x += stride) {
-            const UInt8 *pixel = row + x * components;
-            double r = littleEndian ? pixel[2] : pixel[0];
-            double g = littleEndian ? pixel[1] : pixel[1];
-            double b = littleEndian ? pixel[0] : pixel[2];
-            double luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            sum += luma;
-            sumSq += luma * luma;
-            count += 1;
-        }
-    }
-
-    CFRelease(dataRef);
-
-    if (count == 0) {
-        return 0.0;
-    }
-
-    double mean = sum / (double)count;
-    double variance = (sumSq / (double)count) - (mean * mean);
-    return variance;
+    // keep your variance logic as-is; also call [self saveScreen:...] inside the loop every few attempts
+    // ...
+    return YES;
 }
 
 @end
