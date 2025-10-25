@@ -98,15 +98,6 @@ SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
 RESULT_BUNDLE="$SCREENSHOT_TMP_DIR/test-results.xcresult"
 mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 
-# --- Begin: xcresult JSON export ---
-if [ -d "$RESULT_BUNDLE" ]; then
-  ri_log "Exporting xcresult JSON"
-  /usr/bin/xcrun xcresulttool get --format json --path "$RESULT_BUNDLE" > "$ARTIFACTS_DIR/xcresult.json" 2>/dev/null || true
-else
-  ri_log "xcresult bundle not found at $RESULT_BUNDLE"
-fi
-# --- End: xcresult JSON export ---
-
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
@@ -208,13 +199,6 @@ ri_log "Xcode version: $(xcodebuild -version | tr '\n' ' ')"
 ri_log "Destinations for scheme:"
 xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations || true
 
-# Start sim syslog capture (background)
-SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
-ri_log "Capturing simulator syslog at $SIM_SYSLOG"
-(xcrun simctl spawn booted log stream --style syslog --level debug \
-  || xcrun simctl spawn booted log stream --style compact) > "$SIM_SYSLOG" 2>&1 &
-SYSLOG_PID=$!
-
 ri_log "STAGE:BUILD_FOR_TESTING -> xcodebuild build-for-testing"
 set -o pipefail
 if ! xcodebuild \
@@ -279,6 +263,18 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   if [ -n "$SIM_UDID" ]; then
     xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
     xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
+
+    # Now that a device is definitely booted, start syslog and video
+    SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
+    ri_log "Capturing simulator syslog at $SIM_SYSLOG"
+    (xcrun simctl spawn "$SIM_UDID" log stream --style syslog --level debug \
+      || xcrun simctl spawn "$SIM_UDID" log stream --style compact) > "$SIM_SYSLOG" 2>&1 &
+    SYSLOG_PID=$!
+
+    RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
+    ri_log "Recording simulator video to $RUN_VIDEO"
+    ( xcrun simctl io "$SIM_UDID" recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
+
     if [ -n "$AUT_BUNDLE_ID" ] && [ -n "$SIM_UDID" ]; then
       ri_log "Warm-launching $AUT_BUNDLE_ID"
       xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
@@ -333,6 +329,17 @@ if [ -f "$SCREENSHOT_TMP_DIR/video.pid" ]; then
     sleep 1
   fi
 fi
+
+# --- Begin: xcresult JSON export ---
+if [ -d "$RESULT_BUNDLE" ]; then
+  ri_log "Exporting xcresult JSON"
+  /usr/bin/xcrun xcresulttool get --format json --path "$RESULT_BUNDLE" > "$ARTIFACTS_DIR/xcresult.json" 2>/dev/null || true
+else
+  ri_log "xcresult bundle not found at $RESULT_BUNDLE"
+fi
+# --- End: xcresult JSON export ---
+
+
 
 ri_log "Final simulator screenshot"
 xcrun simctl io booted screenshot "$ARTIFACTS_DIR/final.png" || true

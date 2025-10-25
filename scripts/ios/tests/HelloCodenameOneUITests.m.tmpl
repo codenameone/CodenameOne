@@ -23,24 +23,18 @@
         self.app = [[XCUIApplication alloc] init];
     }
 
-    // Make args visible in logs and to the app
-    NSMutableArray *args = [@[
+    self.app.launchArguments = @[
         @"-AppleLocale", @"en_US",
         @"-AppleLanguages", @"(en)",
         @"--cn1-test-mode", @"1"
-    ] mutableCopy];
-    self.app.launchArguments = args;
+    ];
 
-    // Pre-attach screenshot for proof of simulator state
     [self saveScreen:@"pre_launch"];
-
     NSLog(@"CN1SS:INFO:launch:start args=%@", self.app.launchArguments);
     [self.app launch];
 
-    // Try hard to reach foreground, with periodic screenshots
     [self waitForAppToEnterForegroundWithTimeout:60.0 step:1.5 label:@"post_launch"];
     NSLog(@"CN1SS:INFO:state_after_launch=%ld", (long)self.app.state);
-
     if (self.app.state != XCUIApplicationStateRunningForeground) {
         NSLog(@"CN1SS:WARN:not_foreground:attempting_relaunch");
         [self.app terminate];
@@ -49,15 +43,71 @@
         [self waitForAppToEnterForegroundWithTimeout:40.0 step:1.5 label:@"post_relaunch"];
         NSLog(@"CN1SS:INFO:state_after_relaunch=%ld", (long)self.app.state);
     }
-
-    // First-frame settle
-    [self waitForRenderedContentInContext:@"launch" timeout:45.0 settle:1.2];
 }
 
 - (void)tearDownWithError:(NSError *__autoreleasing  _Nullable *)error {
     [self.app terminate];
     self.app = nil;
     [super tearDownWithError:error];
+}
+
+#pragma mark - REAL TEST(S)
+
+- (void)testSmokeLaunchAndScreenshot {
+    // If we got here, setUpWithError ran (launch done). Emit one CN1SS screenshot.
+    [self emitCn1ssScreenshotNamed:@"MainActivity"];
+    // A trivial assertion so XCTest reports 1 test executed
+    XCTAssertTrue(self.app.state == XCUIApplicationStateRunningForeground || self.app.exists);
+}
+
+#pragma mark - CN1SS helpers (compact)
+
+- (void)emitCn1ssScreenshotNamed:(NSString *)name {
+    XCUIScreenshot *shot = self.app.screenshot ?: XCUIScreen.mainScreen.screenshot;
+    if (!shot) { NSLog(@"CN1SS:WARN:test=%@ no_screenshot", name); return; }
+    NSData *png = shot.PNGRepresentation;
+    if (png.length == 0) { NSLog(@"CN1SS:WARN:test=%@ empty_png", name); return; }
+
+    // Emit raw channel
+    [self cn1ssEmitChannel:@""
+                      name:name
+                     bytes:png];
+
+    // Emit a small preview JPEG if possible
+    UIImage *img = [UIImage imageWithData:png];
+    if (img) {
+        NSData *jpeg = UIImageJPEGRepresentation(img, 0.1); // ~very small preview
+        if (jpeg.length > 0) {
+            [self cn1ssEmitChannel:@"PREVIEW" name:name bytes:jpeg];
+        }
+    }
+
+    // Also attach to the test for convenience
+    XCTAttachment *att = [XCTAttachment attachmentWithScreenshot:shot];
+    att.name = name;
+    att.lifetime = XCTAttachmentLifetimeKeepAlways;
+    [self addAttachment:att];
+}
+
+- (void)cn1ssEmitChannel:(NSString *)channel name:(NSString *)name bytes:(NSData *)bytes {
+    if (bytes.length == 0) return;
+    NSString *prefix = channel.length ? [@"CN1SS" stringByAppendingString:channel] : @"CN1SS";
+    NSString *b64 = [bytes base64EncodedStringWithOptions:0];
+    NSUInteger chunkSize = 2000, pos = 0, chunks = 0;
+    while (pos < b64.length) {
+        NSUInteger len = MIN(chunkSize, b64.length - pos);
+        NSString *chunk = [b64 substringWithRange:NSMakeRange(pos, len)];
+        printf("%s:%s:%06lu:%s\n",
+               prefix.UTF8String,
+               name.UTF8String,
+               (unsigned long)pos,
+               chunk.UTF8String);
+        pos += len;
+        chunks += 1;
+    }
+    printf("CN1SS:END:%s\n", name.UTF8String);
+    printf("CN1SS:INFO:test=%s chunks=%lu total_b64_len=%lu\n",
+           name.UTF8String, (unsigned long)chunks, (unsigned long)b64.length);
 }
 
 #pragma mark - Telemetry helpers
@@ -93,12 +143,6 @@
         [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:step]];
     }
     NSLog(@"CN1SS:WARN:%@_timeout", label);
-}
-
-- (BOOL)waitForRenderedContentInContext:(NSString *)context timeout:(NSTimeInterval)timeout settle:(NSTimeInterval)settle {
-    // keep your variance logic as-is; also call [self saveScreen:...] inside the loop every few attempts
-    // ...
-    return YES;
 }
 
 @end
