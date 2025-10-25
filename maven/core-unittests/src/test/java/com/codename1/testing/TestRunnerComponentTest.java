@@ -11,6 +11,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,6 +83,8 @@ class TestRunnerComponentTest extends UITestBase {
 
         try {
             assertDoesNotThrow(component::runTests);
+            assertEquals(1, recordingLog.loggedThrowables.size(), "failure should be logged immediately");
+            assertSame(failure, recordingLog.loggedThrowables.get(0));
             flushSerialCalls();
 
             Container resultsPane = getResultsPane(component);
@@ -89,18 +93,20 @@ class TestRunnerComponentTest extends UITestBase {
             assertEquals("Explosive: Failed", status.getText());
 
             ActionListener failureListener = null;
+            int loggedBeforeAction = recordingLog.loggedThrowables.size();
             for (Object listener : status.getListeners()) {
                 if (listener instanceof ActionListener) {
                     ActionListener candidate = (ActionListener) listener;
                     candidate.actionPerformed(new ActionEvent(status));
-                    if (recordingLog.loggedThrowable != null) {
+                    if (recordingLog.loggedThrowables.size() > loggedBeforeAction) {
                         failureListener = candidate;
                         break;
                     }
                 }
             }
             assertNotNull(failureListener, "failure action listener should be installed");
-            assertSame(failure, recordingLog.loggedThrowable, "failure should be forwarded to Log.e");
+            assertEquals(loggedBeforeAction + 1, recordingLog.loggedThrowables.size(), "tapping failure should log again");
+            assertSame(failure, recordingLog.loggedThrowables.get(loggedBeforeAction));
         } finally {
             restoreLog(originalLog);
         }
@@ -158,11 +164,11 @@ class TestRunnerComponentTest extends UITestBase {
     }
 
     private static class RecordingLog extends Log {
-        private Throwable loggedThrowable;
+        private final List<Throwable> loggedThrowables = new ArrayList<>();
 
         @Override
         protected void logThrowable(Throwable t) {
-            loggedThrowable = t;
+            loggedThrowables.add(t);
         }
     }
 }
