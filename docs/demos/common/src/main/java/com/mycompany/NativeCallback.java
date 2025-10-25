@@ -19,7 +19,7 @@ public class NativeCallback {
     // end::nativeCallbackString[]
 
     // tag::nativeCallbackReturn[]
-    public static int callback(int arg) {
+    public static int callbackR(int arg) {
         // do stuff
         return arg;
     }

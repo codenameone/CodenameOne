@@ -4,7 +4,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.list.MultiButton;
+import com.codename1.components.MultiButton;
 import java.util.Arrays;
 import java.util.Collections;
 

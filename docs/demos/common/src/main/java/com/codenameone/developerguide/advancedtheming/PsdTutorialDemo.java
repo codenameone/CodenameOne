@@ -1,21 +1,21 @@
 package com.codenameone.developerguide.advancedtheming;
 
 import com.codename1.io.Log;
-import com.codename1.ui.BorderLayout;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.TableLayout;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.table.TableLayout;
 
 /**
  * Code sample from the PSD to theme conversion tutorial.

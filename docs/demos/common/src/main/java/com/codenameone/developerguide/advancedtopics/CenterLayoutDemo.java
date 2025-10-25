@@ -2,12 +2,11 @@ package com.codenameone.developerguide.advancedtopics;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dimension;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.geom.Dimension;
 
 // tag::centerLayout[]
 class CenterLayout extends Layout {
