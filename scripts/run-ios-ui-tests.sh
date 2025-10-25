@@ -47,6 +47,7 @@ run_with_timeout() {
 # --- end: global cleanup/watchdog helpers ---
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
+require_cmd() { command -v "$1" >/dev/null 2>&1 || { ri_log "FATAL: '$1' not found"; exit 3; }; }
 
 if [ $# -lt 1 ]; then
   ri_log "Usage: $0 <workspace_path> [app_bundle] [scheme]" >&2
@@ -102,21 +103,14 @@ source "$ENV_FILE"
 export DEVELOPER_DIR="/Applications/Xcode_16.4.app/Contents/Developer"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 
+require_cmd xcodebuild
+require_cmd xcrun
+
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
   ri_log "JAVA17_HOME not set correctly" >&2
   exit 3
 fi
-if ! command -v xcodebuild >/dev/null 2>&1; then
-  ri_log "xcodebuild not found" >&2
-  exit 3
-fi
-if ! command -v xcrun >/dev/null 2>&1; then
-  ri_log "xcrun not found" >&2
-  exit 3
-fi
-
 JAVA17_BIN="$JAVA17_HOME/bin/java"
-
 cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
@@ -147,11 +141,9 @@ export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
 if [ -f "$SCHEME_FILE" ]; then
   if sed --version >/dev/null 2>&1; then
-    # GNU sed
     sed -i -e "s|__CN1SS_OUTPUT_DIR__|$SCREENSHOT_RAW_DIR|g" \
            -e "s|__CN1SS_PREVIEW_DIR__|$SCREENSHOT_PREVIEW_DIR|g" "$SCHEME_FILE"
   else
-    # BSD sed (macOS)
     sed -i '' -e "s|__CN1SS_OUTPUT_DIR__|$SCREENSHOT_RAW_DIR|g" \
               -e "s|__CN1SS_PREVIEW_DIR__|$SCREENSHOT_PREVIEW_DIR|g" "$SCHEME_FILE"
   fi
@@ -160,108 +152,121 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-# --- begin: pick latest available iOS runtime + an iPhone device type (robust, non-fatal probing) ---
-require_cmd() { command -v "$1" >/dev/null 2>&1 || { ri_log "FATAL: '$1' not found"; exit 3; }; }
-require_cmd xcrun
+# --- begin: robust destination selection (no Python, no JSON) ---
+dump_sim_info() {
+  xcrun simctl list          > "$ARTIFACTS_DIR/simctl-list.txt"           2>&1 || true
+  xcrun simctl list runtimes > "$ARTIFACTS_DIR/sim-runtimes.txt"          2>&1 || true
+  xcrun simctl list devicetypes > "$ARTIFACTS_DIR/sim-devicetypes.txt"    2>&1 || true
+  xcodebuild -showsdks       > "$ARTIFACTS_DIR/xcodebuild-showsdks.txt"   2>&1 || true
+  xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations > "$ARTIFACTS_DIR/xcodebuild-showdestinations.txt" 2>&1 || true
+}
 
-RUNTIME_ID="${IOS_RUNTIME_ID:-}"
-DEVICE_TYPE="${IOS_DEVICE_TYPE:-}"
-RUNTIMES_JSON=""; DEVICETYPES_JSON=""
+pick_destination_from_showdestinations() {
+  # Prefer xcodebuild-proposed, real UUID (id: <uuid>), platform:iOS Simulator, prefer iPhone
+  xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null | \
+  awk '
+    BEGIN{ FS="[, ]+"; best=""; }
+    /platform:iOS Simulator/ && /id:/ {
+      # Extract fields like name:<...> id:<UUID>
+      name=""; id="";
+      for (i=1;i<=NF;i++) {
+        if ($i ~ /^name:/) name=substr($i,6);
+        if ($i ~ /^id:/)   id=substr($i,4);
+      }
+      if (id ~ /^[0-9A-Fa-f-]{36}$/) {
+        score = (name ~ /iPhone/) ? 2 : ((name ~ /iPad/) ? 1 : 0);
+        printf("%d|%s\n", score, id);
+      }
+    }
+  ' | sort -t'|' -k1,1nr | head -n1 | cut -d'|' -f2
+}
 
-# Don’t let set -e kill us while probing/parsing
-set +e
+pick_available_device_udid() {
+  # From simctl list devices available (text), pick first iPhone
+  xcrun simctl list devices available 2>/dev/null | \
+  awk '
+    # Example: "iPhone 16 (18.5) [UDID] (Available)"
+    /[([]Available[])]/ && /iPhone/ && /\[/ {
+      gsub(/^.*\[/,""); gsub(/\].*$/,""); print; exit
+    }'
+}
 
-# Try JSON first (if python3 exists)
-if command -v python3 >/dev/null 2>&1; then
-  RUNTIMES_JSON="$(xcrun simctl list runtimes --json 2>/dev/null || true)"
-  DEVICETYPES_JSON="$(xcrun simctl list devicetypes --json 2>/dev/null || true)"
-  if [ -z "$RUNTIME_ID" ] && [ -n "$RUNTIMES_JSON" ]; then
-    RUNTIME_ID="$(printf '%s' "$RUNTIMES_JSON" | python3 - <<'PY' || true
-import json, sys
-try: data=json.load(sys.stdin)
-except: sys.exit(0)
-c=[]
-for r in data.get("runtimes", []):
-    plat = r.get("platform") or r.get("name","")
-    if "iOS" not in str(plat): continue
-    if not r.get("isAvailable", False): continue
-    ident = r.get("identifier") or ""
-    ver   = r.get("version") or ""
-    parts=[]
-    for p in str(ver).split("."):
-        try: parts.append(int(p))
-        except: parts.append(0)
-    c.append((parts, ident))
-if c:
-    c.sort()
-    print(c[-1][1])
-PY
-    )"
+create_temp_device_on_latest_runtime() {
+  # Find latest available iOS runtime identifier (text)
+  local rt
+  rt="$(xcrun simctl list runtimes 2>/dev/null | \
+    awk '
+      /iOS/ && /(Available|installed)/ {
+        # last field often looks like (com.apple.CoreSimulator.SimRuntime.iOS-18-5)
+        id=$NF; gsub(/[()]/,"",id);
+        # extract version parts to sort, keep id
+        if (match($0,/iOS[[:space:]]+([0-9]+)\.([0-9]+)/,m)) {
+          printf("%03d.%03d|%s\n", m[1], m[2], id);
+        } else if (match($0,/iOS[[:space:]]+([0-9]+)/,m2)) {
+          printf("%03d.%03d|%s\n", m2[1], 0, id);
+        }
+      }
+    ' | sort | tail -n1 | cut -d"|" -f2)"
+  if [ -z "$rt" ]; then
+    echo ""
+    return 0
   fi
-  if [ -z "$DEVICE_TYPE" ] && [ -n "$DEVICETYPES_JSON" ]; then
-    DEVICE_TYPE="$(printf '%s' "$DEVICETYPES_JSON" | python3 - <<'PY' || true
-import json, sys
-try: d=json.load(sys.stdin)
-except: sys.exit(0)
-prefs = ["iPhone 16 Pro Max","iPhone 16 Pro","iPhone 16",
-         "iPhone 15 Pro Max","iPhone 15 Pro","iPhone 15","iPhone"]
-dts = d.get("devicetypes", [])
-for pref in prefs:
-    for dt in dts:
-        if pref in (dt.get("name") or ""):
-            print(dt.get("identifier","")); sys.exit(0)
-for dt in dts:
-    if "iPhone" in (dt.get("name") or ""):
-        print(dt.get("identifier","")); sys.exit(0)
-if dts: print(dts[0].get("identifier",""))
-PY
-    )"
+  # Prefer a modern iPhone device type if present
+  local dt
+  dt="$(xcrun simctl list devicetypes 2>/dev/null | \
+    awk -F '[()]' '
+      /iPhone 16 Pro Max/ {print $2; exit}
+      /iPhone 16 Pro/     {print $2; exit}
+      /iPhone 16/         {print $2; exit}
+      /iPhone 15 Pro Max/ {print $2; exit}
+      /iPhone 15 Pro/     {print $2; exit}
+      /iPhone 15/         {print $2; exit}
+      /iPhone/            {print $2; exit}
+    ' )"
+  [ -z "$dt" ] && dt="com.apple.CoreSimulator.SimDeviceType.iPhone-16"
+
+  local name="CN1 UI Test iPhone"
+  local udid
+  udid="$(xcrun simctl create "$name" "$dt" "$rt" 2>/dev/null || true)"
+  if [ -n "$udid" ]; then
+    SIM_UDID_CREATED="$udid"
+    echo "$udid"
+  else
+    echo ""
   fi
+}
+
+dump_sim_info
+
+SIM_UDID=""
+# 1) Best: take what xcodebuild wants
+SIM_UDID="$(pick_destination_from_showdestinations || true)"
+if [ -n "$SIM_UDID" ]; then
+  ri_log "Chose simulator from xcodebuild -showdestinations: $SIM_UDID"
 fi
 
-# Fallback to text parsing if needed
-if [ -z "$RUNTIME_ID" ]; then
-  RUNTIME_ID="$(xcrun simctl list runtimes 2>/dev/null | awk '
-    $0 ~ /iOS/ && $0 ~ /(Available|installed)/ {
-      id=$NF; gsub(/[()]/,"",id); last=id
-    } END { if (last!="") print last }
-  ' || true)"
-fi
-if [ -z "$DEVICE_TYPE" ]; then
-  DEVICE_TYPE="$(xcrun simctl list devicetypes 2>/dev/null | awk -F '[()]' '
-    /iPhone/ && /identifier/ { print $2; found=1; exit }
-    END { if (!found) print "" }
-  ' || true)"
-fi
-
-set -e
-
-# Emit debug to artifacts
-if [ -n "${ARTIFACTS_DIR:-}" ]; then
-  printf '%s\n' "${RUNTIMES_JSON:-}"      > "$ARTIFACTS_DIR/sim-runtimes.json"      2>/dev/null || true
-  printf '%s\n' "${DEVICETYPES_JSON:-}"   > "$ARTIFACTS_DIR/sim-devicetypes.json"   2>/dev/null || true
-  xcrun simctl list runtimes            > "$ARTIFACTS_DIR/sim-runtimes.txt"        2>&1 || true
-  xcrun simctl list devicetypes         > "$ARTIFACTS_DIR/sim-devicetypes.txt"     2>&1 || true
-fi
-
-if [ -z "$RUNTIME_ID" ]; then
-  ri_log "FATAL: No *available* iOS simulator runtime found on this runner"
-  exit 3
-fi
-if [ -z "$DEVICE_TYPE" ]; then
-  ri_log "FATAL: Could not determine an iPhone device type"
-  exit 3
-fi
-
-SIM_NAME="CN1 UI Test iPhone"
-SIM_UDID="$(xcrun simctl create "$SIM_NAME" "$DEVICE_TYPE" "$RUNTIME_ID" 2>/dev/null || true)"
+# 2) Otherwise: any available iPhone device
 if [ -z "$SIM_UDID" ]; then
-  ri_log "FATAL: Failed to create simulator (deviceType=$DEVICE_TYPE, runtime=$RUNTIME_ID)"
+  SIM_UDID="$(pick_available_device_udid || true)"
+  if [ -n "$SIM_UDID" ]; then
+    ri_log "Chose available simulator from simctl list: $SIM_UDID"
+  fi
+fi
+
+# 3) Last resort: create a temp device on the newest runtime
+if [ -z "$SIM_UDID" ]; then
+  SIM_UDID="$(create_temp_device_on_latest_runtime || true)"
+  if [ -n "$SIM_UDID" ]; then
+    ri_log "Created simulator for tests: $SIM_UDID"
+  fi
+fi
+
+if [ -z "$SIM_UDID" ]; then
+  ri_log "FATAL: No *available* iOS simulator runtime or device found on this runner"
   exit 3
 fi
-SIM_UDID_CREATED="$SIM_UDID"
-ri_log "Created simulator $SIM_NAME ($SIM_UDID) deviceType=$DEVICE_TYPE runtime=$RUNTIME_ID"
 
+# Boot and wait
 xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
 if ! xcrun simctl bootstatus "$SIM_UDID" -b -t 180; then
   ri_log "FATAL: Simulator never reached booted state"
@@ -269,7 +274,7 @@ if ! xcrun simctl bootstatus "$SIM_UDID" -b -t 180; then
 fi
 ri_log "Simulator booted: $SIM_UDID"
 SIM_DESTINATION="id=$SIM_UDID"
-# --- end: pick latest available iOS runtime + an iPhone device type (robust, non-fatal probing) ---
+# --- end: robust destination selection ---
 
 ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 
@@ -378,7 +383,6 @@ if [ -f "$SCREENSHOT_TMP_DIR/video.pid" ]; then
   if [ -n "$rec_pid" ]; then
     ri_log "Stopping simulator video recording (pid=$rec_pid)"
     kill "$rec_pid" >/dev/null 2>&1 || true
-    # Give the recorder a moment to flush
     sleep 1
   fi
 fi
@@ -538,6 +542,7 @@ fi
 cp -f "$COMPARE_JSON" "$ARTIFACTS_DIR/screenshot-compare.json" 2>/dev/null || true
 if [ -s "$COMMENT_FILE" ]; then
   cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
+
 fi
 
 # --- Begin: stop syslog capture ---
