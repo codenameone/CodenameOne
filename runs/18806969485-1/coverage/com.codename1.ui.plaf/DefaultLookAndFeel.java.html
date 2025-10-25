@@ -1,0 +1,2602 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultLookAndFeel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">DefaultLookAndFeel.java</span></div><h1>DefaultLookAndFeel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.plaf;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.io.Util;
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.ComboBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.ComponentSelector.ComponentClosure;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextSelection;
+import com.codename1.ui.TextSelection.Char;
+import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.Spans;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.list.ListModel;
+
+/**
+ * Used to render the default look of Codename One
+ *
+ * @author Chen Fishbein
+ * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate
+ * our desire to reduce usage/reliance on this class.
+ */
+public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
+<span class="fc" id="L67">    private static final Image[] threeImageCache = new Image[3];</span>
+<span class="fc" id="L68">    private static final Image[] oneImageCache = new Image[1];</span>
+<span class="fc" id="L69">    private Image[] chkBoxImages = null;</span>
+<span class="fc" id="L70">    private Image comboImage = null;</span>
+<span class="fc" id="L71">    private Image[] rButtonImages = null;</span>
+<span class="fc" id="L72">    private Image[] chkBoxImagesFocus = null;</span>
+<span class="fc" id="L73">    private Image[] rButtonImagesFocus = null;</span>
+<span class="fc" id="L74">    private boolean tickWhenFocused = true;</span>
+<span class="fc" id="L75">    private char passwordChar = '\u25CF';</span>
+    //used for the pull to refresh feature
+    private Container pull;
+    private Component updating;
+    private Component pullDown;
+    private Component releaseToRefresh;
+
+    /**
+     * Creates a new instance of DefaultLookAndFeel
+     */
+    public DefaultLookAndFeel(UIManager manager) {
+<span class="fc" id="L86">        super(manager);</span>
+<span class="fc" id="L87">    }</span>
+
+    private static void fillCheckbox(Graphics g, int width, int height) {
+<span class="nc" id="L90">        int x1 = scaleCoordinate(2.0450495f, 16, width);</span>
+<span class="nc" id="L91">        int y1 = scaleCoordinate(9.4227722f, 16, height);</span>
+<span class="nc" id="L92">        int x2 = scaleCoordinate(5.8675725f, 16, width);</span>
+<span class="nc" id="L93">        int y2 = scaleCoordinate(13.921746f, 16, height);</span>
+<span class="nc" id="L94">        int x3 = scaleCoordinate(5.8675725f, 16, width);</span>
+<span class="nc" id="L95">        int y3 = scaleCoordinate(11f, 16, height);</span>
+<span class="nc" id="L96">        g.fillTriangle(x1, y1, x2, y2, x3, y3);</span>
+
+<span class="nc" id="L98">        x1 = scaleCoordinate(14.38995f, 16, width);</span>
+<span class="nc" id="L99">        y1 = scaleCoordinate(0, 16, height);</span>
+<span class="nc" id="L100">        g.fillTriangle(x1, y1, x2, y2, x3, y3);</span>
+<span class="nc" id="L101">    }</span>
+
+    private static int round(float x) {
+<span class="nc" id="L104">        int rounded = (int) x;</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (x - rounded &gt; 0.5f) {</span>
+<span class="nc" id="L106">            return rounded + 1;</span>
+        }
+<span class="nc" id="L108">        return rounded;</span>
+    }
+
+    /**
+     * Takes a floating point coordinate on a virtual axis and rusterizes it to
+     * a coordinate in the pixel surface. This is a very simple algorithm since
+     * anti-aliasing isn't supported.
+     *
+     * @param coordinate a position in a theoretical plain
+     * @param plain      the amount of space in the theoretical plain
+     * @param pixelSize  the amount of pixels available on the screen
+     * @return the pixel which we should color
+     */
+    private static int scaleCoordinate(float coordinate, float plain, int pixelSize) {
+<span class="nc" id="L122">        return round(coordinate / plain * pixelSize);</span>
+    }
+
+    /**
+     * Reverses alignment in the case of bidi
+     */
+    public static int reverseAlignForBidi(Component c, int align) {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (c.isRTL()) {</span>
+<span class="nc bnc" id="L130" title="All 3 branches missed.">            switch (align) {</span>
+                case Component.RIGHT:
+<span class="nc" id="L132">                    return Component.LEFT;</span>
+                case Component.LEFT:
+<span class="nc" id="L134">                    return Component.RIGHT;</span>
+            }
+        }
+<span class="nc" id="L137">        return align;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void bind(Component cmp) {
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">        if (tickWhenFocused &amp;&amp; cmp instanceof Label) {</span>
+<span class="fc" id="L145">            cmp.addFocusListener(this);</span>
+        }
+<span class="fc" id="L147">    }</span>
+
+    /**
+     * This method allows to set all Labels, Buttons, CheckBoxes, RadioButtons
+     * to start ticking when the text is too long.
+     *
+     * @return tickWhenFocused
+     */
+    public boolean isTickWhenFocused() {
+<span class="nc" id="L156">        return tickWhenFocused;</span>
+    }
+
+    /**
+     * This method allows to set all Labels, Buttons, CheckBoxes, RadioButtons
+     * to start ticking when the text is too long.
+     *
+     * @param tickWhenFocused
+     */
+    public void setTickWhenFocused(boolean tickWhenFocused) {
+<span class="nc" id="L166">        this.tickWhenFocused = tickWhenFocused;</span>
+<span class="nc" id="L167">    }</span>
+
+    /**
+     * Sets images for checkbox checked/unchecked modes
+     *
+     * @param checkedX   the image to draw in order to represent a checked checkbox
+     * @param uncheckedX the image to draw in order to represent an uncheck checkbox
+     */
+    public void setCheckBoxImages(Image checkedX, Image uncheckedX) {
+<span class="nc" id="L176">        setCheckBoxImages(checkedX, uncheckedX, checkedX, uncheckedX);</span>
+<span class="nc" id="L177">    }</span>
+
+    /**
+     * Sets images for checkbox checked/unchecked modes
+     *
+     * @param checkedX          the image to draw in order to represent a checked checkbox
+     * @param uncheckedX        the image to draw in order to represent an uncheck checkbox
+     * @param disabledChecked   same as checked for the disabled state
+     * @param disabledUnchecked same as unchecked for the disabled state
+     */
+    public void setCheckBoxImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">        if (checkedX == null || uncheckedX == null) {</span>
+<span class="nc" id="L189">            chkBoxImages = null;</span>
+        } else {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (disabledUnchecked == null) {</span>
+<span class="nc" id="L192">                disabledUnchecked = uncheckedX;</span>
+            }
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (disabledChecked == null) {</span>
+<span class="nc" id="L195">                disabledChecked = checkedX;</span>
+            }
+<span class="fc" id="L197">            chkBoxImages = new Image[]{uncheckedX, checkedX, disabledUnchecked, disabledChecked};</span>
+        }
+<span class="fc" id="L199">    }</span>
+
+    /**
+     * Sets images for checkbox when in focused mode
+     *
+     * @param checkedX          the image to draw in order to represent a checked checkbox
+     * @param uncheckedX        the image to draw in order to represent an uncheck checkbox
+     * @param disabledChecked   same as checked for the disabled state
+     * @param disabledUnchecked same as unchecked for the disabled state
+     */
+    public void setCheckBoxFocusImages(Image checkedX, Image uncheckedX, Image disabledChecked, Image disabledUnchecked) {
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (checkedX == null || uncheckedX == null) {</span>
+<span class="nc" id="L211">            chkBoxImagesFocus = null;</span>
+        } else {
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            if (disabledUnchecked == null) {</span>
+<span class="nc" id="L214">                disabledUnchecked = uncheckedX;</span>
+            }
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            if (disabledChecked == null) {</span>
+<span class="nc" id="L217">                disabledChecked = checkedX;</span>
+            }
+<span class="fc" id="L219">            chkBoxImagesFocus = new Image[]{uncheckedX, checkedX, disabledUnchecked, disabledChecked};</span>
+        }
+<span class="fc" id="L221">    }</span>
+
+    /**
+     * Sets image for the combo box dropdown drawing
+     *
+     * @param picker picker image
+     */
+    public void setComboBoxImage(Image picker) {
+<span class="fc" id="L229">        comboImage = picker;</span>
+<span class="fc" id="L230">    }</span>
+
+    /**
+     * Sets images for radio button selected/unselected modes
+     *
+     * @param selected   the image to draw in order to represent a selected radio button
+     * @param unselected the image to draw in order to represent an unselected radio button
+     */
+    public void setRadioButtonImages(Image selected, Image unselected) {
+<span class="nc bnc" id="L239" title="All 4 branches missed.">        if (selected == null || unselected == null) {</span>
+<span class="nc" id="L240">            rButtonImages = null;</span>
+        } else {
+<span class="nc" id="L242">            rButtonImages = new Image[]{unselected, selected};</span>
+        }
+<span class="nc" id="L244">    }</span>
+
+    /**
+     * Sets images for radio button selected/unselected modes
+     *
+     * @param selected           the image to draw in order to represent a selected radio button
+     * @param unselected         the image to draw in order to represent an unselected radio button
+     * @param disabledSelected   same as selected for the disabled state
+     * @param disabledUnselected same as unselected for the disabled state
+     */
+    public void setRadioButtonImages(Image selected, Image unselected, Image disabledSelected, Image disabledUnselected) {
+<span class="pc bpc" id="L255" title="2 of 4 branches missed.">        if (selected == null || unselected == null) {</span>
+<span class="nc" id="L256">            rButtonImages = null;</span>
+        } else {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (disabledUnselected == null) {</span>
+<span class="nc" id="L259">                disabledUnselected = unselected;</span>
+            }
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            if (disabledSelected == null) {</span>
+<span class="nc" id="L262">                disabledSelected = selected;</span>
+            }
+<span class="fc" id="L264">            rButtonImages = new Image[]{unselected, selected, disabledUnselected, disabledSelected};</span>
+        }
+<span class="fc" id="L266">    }</span>
+
+    /**
+     * Sets images for radio button selected/unselected and disabled modes, when the radio button has focus, these are entirely optional
+     *
+     * @param selected           the image to draw in order to represent a selected radio button
+     * @param unselected         the image to draw in order to represent an unselected radio button
+     * @param disabledSelected   same as selected for the disabled state
+     * @param disabledUnselected same as unselected for the disabled state
+     */
+    public void setRadioButtonFocusImages(Image selected, Image unselected, Image disabledSelected, Image disabledUnselected) {
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">        if (selected == null || unselected == null) {</span>
+<span class="nc" id="L278">            rButtonImagesFocus = null;</span>
+        } else {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            if (disabledUnselected == null) {</span>
+<span class="nc" id="L281">                disabledUnselected = unselected;</span>
+            }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">            if (disabledSelected == null) {</span>
+<span class="nc" id="L284">                disabledSelected = selected;</span>
+            }
+<span class="fc" id="L286">            rButtonImagesFocus = new Image[]{unselected, selected, disabledUnselected, disabledSelected};</span>
+        }
+<span class="fc" id="L288">    }</span>
+
+    /**
+     * Sets the password character to display in the TextArea and the TextField
+     *
+     * @param the char to display
+     */
+    public void setPasswordChar(char c) {
+<span class="nc" id="L296">        passwordChar = c;</span>
+<span class="nc" id="L297">    }</span>
+
+    /**
+     * Returns the images used to represent the radio button (selected followed by unselected).
+     *
+     * @return images representing the radio button or null for using the default drawing
+     */
+    public Image[] getRadioButtonImages() {
+<span class="nc" id="L305">        return rButtonImages;</span>
+    }
+
+    /**
+     * Returns the images used to represent the radio button when in focused mode
+     *
+     * @return images representing the radio button or null for using the default drawing
+     */
+    public Image[] getRadioButtonFocusImages() {
+<span class="nc" id="L314">        return rButtonImagesFocus;</span>
+    }
+
+    /**
+     * Returns the images used to represent the checkbox (selected followed by unselected).
+     *
+     * @return images representing the check box or null for using the default drawing
+     */
+    public Image[] getCheckBoxImages() {
+<span class="nc" id="L323">        return chkBoxImages;</span>
+    }
+
+    /**
+     * Returns the images used to represent the checkbox when focused
+     *
+     * @return images representing the check box or null for using the default drawing
+     */
+    public Image[] getCheckBoxFocusImages() {
+<span class="nc" id="L332">        return chkBoxImagesFocus;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
+     */
+    public void drawButton(Graphics g, Button b) {
+<span class="nc" id="L341">        drawComponent(g, b, b.getIconFromState(), null, 0);</span>
+<span class="nc" id="L342">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawCheckBox(Graphics g, Button cb) {
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (chkBoxImages != null) {</span>
+            Image x;
+<span class="nc bnc" id="L350" title="All 8 branches missed.">            if (chkBoxImagesFocus != null &amp;&amp; chkBoxImagesFocus[0] != null &amp;&amp; cb.hasFocus() &amp;&amp; Display.getInstance().shouldRenderSelection(cb)) {</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                if (cb.isEnabled()) {</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                    x = chkBoxImagesFocus[cb.isSelected() ? 1 : 0];</span>
+                } else {
+<span class="nc bnc" id="L354" title="All 2 branches missed.">                    x = chkBoxImagesFocus[cb.isSelected() ? 3 : 2];</span>
+                }
+            } else {
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                if (cb.isEnabled()) {</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                    x = chkBoxImages[cb.isSelected() ? 1 : 0];</span>
+                } else {
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                    x = chkBoxImages[cb.isSelected() ? 3 : 2];</span>
+                }
+            }
+<span class="nc" id="L363">            drawComponent(g, cb, cb.getIconFromState(), x, 0);</span>
+<span class="nc" id="L364">        } else {</span>
+<span class="nc" id="L365">            Style style = cb.getStyle();</span>
+
+            // checkbox square needs to be the height and width of the font height even
+            // when no text is in the check box this is a good indication of phone DPI
+<span class="nc" id="L369">            int height = cb.getStyle().getFont().getHeight();</span>
+
+<span class="nc" id="L371">            drawComponent(g, cb, cb.getIconFromState(), null, height);</span>
+
+            int gradientColor;
+<span class="nc" id="L374">            g.setColor(style.getFgColor());</span>
+
+<span class="nc" id="L376">            gradientColor = style.getBgColor();</span>
+
+<span class="nc" id="L378">            int width = height;</span>
+
+<span class="nc" id="L380">            int rectWidth = scaleCoordinate(12f, 16, width);</span>
+<span class="nc" id="L381">            int tX = cb.getX();</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">            if (cb.isRTL()) {</span>
+<span class="nc" id="L383">                tX = tX + cb.getWidth() - style.getPaddingLeft(cb.isRTL()) - rectWidth;</span>
+            } else {
+<span class="nc" id="L385">                tX += style.getPaddingLeft(cb.isRTL());</span>
+            }
+
+<span class="nc" id="L388">            int tY = cb.getY() + style.getPaddingTop() + (cb.getHeight() - style.getPaddingTop() - style.getPaddingBottom()) / 2 - height / 2;</span>
+<span class="nc" id="L389">            g.translate(tX, tY);</span>
+<span class="nc" id="L390">            int x = scaleCoordinate(1.04f, 16, width);</span>
+<span class="nc" id="L391">            int y = scaleCoordinate(4.0f, 16, height);</span>
+<span class="nc" id="L392">            int rectHeight = scaleCoordinate(12f, 16, height);</span>
+
+            // brighten or darken the color slightly
+<span class="nc" id="L395">            int destColor = findDestColor(gradientColor);</span>
+
+<span class="nc" id="L397">            g.fillLinearGradient(gradientColor, destColor, x + 1, y + 1, rectWidth - 2, rectHeight - 1, false);</span>
+<span class="nc" id="L398">            int alpha = g.concatenateAlpha(style.getFgAlpha());</span>
+<span class="nc" id="L399">            g.drawRoundRect(x, y, rectWidth, rectHeight, 5, 5);</span>
+<span class="nc" id="L400">            g.setAlpha(alpha);</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">            if (cb.isSelected()) {</span>
+<span class="nc" id="L402">                int color = g.getColor();</span>
+<span class="nc" id="L403">                g.setColor(0x111111);</span>
+<span class="nc" id="L404">                g.translate(0, 1);</span>
+<span class="nc" id="L405">                fillCheckbox(g, width, height);</span>
+<span class="nc" id="L406">                g.setColor(color);</span>
+<span class="nc" id="L407">                g.translate(0, -1);</span>
+<span class="nc" id="L408">                fillCheckbox(g, width, height);</span>
+            }
+<span class="nc" id="L410">            g.translate(-tX, -tY);</span>
+        }
+<span class="nc" id="L412">    }</span>
+
+    /**
+     * {@inheritDoc}
+     *
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
+     */
+    public void drawLabel(Graphics g, Label l) {
+<span class="nc" id="L420">        drawComponent(g, l, l.getMaskedIcon(), null, 0);</span>
+<span class="nc" id="L421">    }</span>
+
+    public Span calculateLabelSpan(TextSelection sel, Label l) {
+<span class="nc" id="L424">        Image icon = l.getMaskedIcon();</span>
+<span class="nc" id="L425">        Image stateIcon = null;</span>
+<span class="nc" id="L426">        int preserveSpaceForState = 0;</span>
+        //setFG(g, l);
+
+<span class="nc" id="L429">        int gap = l.getGap();</span>
+<span class="nc" id="L430">        int stateIconSize = 0;</span>
+<span class="nc" id="L431">        String text = l.getText();</span>
+<span class="nc" id="L432">        Style style = l.getStyle();</span>
+<span class="nc" id="L433">        int cmpX = l.getX();</span>
+<span class="nc" id="L434">        int cmpY = l.getY();</span>
+<span class="nc" id="L435">        int cmpHeight = l.getHeight();</span>
+<span class="nc" id="L436">        int cmpWidth = l.getWidth();</span>
+
+<span class="nc" id="L438">        boolean rtl = l.isRTL();</span>
+<span class="nc" id="L439">        int leftPadding = style.getPaddingLeft(rtl);</span>
+<span class="nc" id="L440">        int rightPadding = style.getPaddingRight(rtl);</span>
+<span class="nc" id="L441">        int topPadding = style.getPaddingTop();</span>
+<span class="nc" id="L442">        int bottomPadding = style.getPaddingBottom();</span>
+
+<span class="nc" id="L444">        Font font = style.getFont();</span>
+<span class="nc" id="L445">        int fontHeight = 0;</span>
+<span class="nc bnc" id="L446" title="All 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L447">            text = &quot;&quot;;</span>
+        }
+<span class="nc bnc" id="L449" title="All 2 branches missed.">        if (text.length() &gt; 0) {</span>
+<span class="nc" id="L450">            fontHeight = font.getHeight();</span>
+        }
+
+<span class="nc" id="L453">        int x = cmpX + leftPadding;</span>
+<span class="nc" id="L454">        int y = cmpY + topPadding;</span>
+<span class="nc" id="L455">        boolean opposite = false;</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        if (stateIcon != null) {</span>
+<span class="nc" id="L457">            stateIconSize = stateIcon.getWidth(); //square image width == height</span>
+<span class="nc" id="L458">            preserveSpaceForState = stateIconSize + gap;</span>
+<span class="nc" id="L459">            int tX = cmpX;</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            if (((Button) l).isOppositeSide()) {</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L462">                    tX += leftPadding;</span>
+                } else {
+<span class="nc" id="L464">                    tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                }
+<span class="nc" id="L466">                cmpWidth -= leftPadding - stateIconSize;</span>
+<span class="nc" id="L467">                preserveSpaceForState = 0;</span>
+<span class="nc" id="L468">                opposite = true;</span>
+            } else {
+<span class="nc" id="L470">                x = cmpX + leftPadding + preserveSpaceForState;</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L472">                    tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                } else {
+<span class="nc" id="L474">                    tX += leftPadding;</span>
+                }
+            }
+
+        }
+
+        //default for bottom left alignment
+<span class="nc" id="L481">        int align = reverseAlignForBidi(l, style.getAlignment());</span>
+
+<span class="nc" id="L483">        int textPos = reverseAlignForBidi(l, l.getTextPosition());</span>
+
+        //set initial x,y position according to the alignment and textPosition
+<span class="nc bnc" id="L486" title="All 2 branches missed.">        if (align == Component.LEFT) {</span>
+<span class="nc bnc" id="L487" title="All 3 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="nc bnc" id="L490" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? icon.getHeight() : 0), fontHeight))) / 2;</span>
+<span class="nc" id="L491">                    break;</span>
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="nc bnc" id="L494" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;</span>
+<span class="nc" id="L495">                    break;</span>
+            }
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        } else if (align == Component.CENTER) {</span>
+<span class="nc bnc" id="L498" title="All 3 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                    x = x + (cmpWidth - (preserveSpaceForState +</span>
+                            leftPadding +
+                            rightPadding +
+<span class="nc" id="L504">                            ((icon != null) ? icon.getWidth() + l.getGap() : 0) +</span>
+<span class="nc" id="L505">                            l.getStringWidth(font))) / 2;</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">                    if (!opposite) {</span>
+<span class="nc" id="L507">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    } else {
+<span class="nc" id="L509">                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    }
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L513">                            Math.max(((icon != null) ? icon.getHeight() : 0),</span>
+                                    fontHeight))) / 2;
+<span class="nc" id="L515">                    break;</span>
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                    x = x + (cmpWidth - (preserveSpaceForState + leftPadding +</span>
+                            rightPadding +
+<span class="nc" id="L520">                            Math.max(((icon != null) ? icon.getWidth() : 0),</span>
+<span class="nc" id="L521">                                    l.getStringWidth(font)))) / 2;</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">                    if (!opposite) {</span>
+<span class="nc" id="L523">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    } else {
+<span class="nc" id="L525">                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    }
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L529">                            ((icon != null) ? icon.getHeight() + gap : 0) +</span>
+                            fontHeight)) / 2;
+<span class="nc" id="L531">                    break;</span>
+            }
+<span class="nc bnc" id="L533" title="All 2 branches missed.">        } else if (align == Component.RIGHT) {</span>
+<span class="nc bnc" id="L534" title="All 3 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="nc bnc" id="L537" title="All 2 branches missed.">                    x = cmpX + cmpWidth - rightPadding -</span>
+<span class="nc" id="L538">                            (((icon != null) ? (icon.getWidth() + gap) : 0) +</span>
+<span class="nc" id="L539">                                    l.getStringWidth(font));</span>
+<span class="nc bnc" id="L540" title="All 2 branches missed.">                    if (l.isRTL()) {</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">                        if (!opposite) {</span>
+<span class="nc" id="L542">                            x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);</span>
+                        } else {
+<span class="nc" id="L544">                            x = Math.min(x - preserveSpaceForState, cmpX + leftPadding);</span>
+                        }
+                    } else {
+<span class="nc bnc" id="L547" title="All 2 branches missed.">                        if (!opposite) {</span>
+<span class="nc" id="L548">                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                        } else {
+<span class="nc" id="L550">                            x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                        }
+                    }
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L555">                            Math.max(((icon != null) ? icon.getHeight() : 0),</span>
+                                    fontHeight))) / 2;
+<span class="nc" id="L557">                    break;</span>
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                    x = cmpX + cmpWidth - rightPadding -</span>
+<span class="nc" id="L561">                            (Math.max(((icon != null) ? (icon.getWidth()) : 0),</span>
+<span class="nc" id="L562">                                    l.getStringWidth(font)));</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                    if (!opposite) {</span>
+<span class="nc" id="L564">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    } else {
+<span class="nc" id="L566">                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    }
+
+<span class="nc bnc" id="L569" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L571">                            ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;</span>
+                    break;
+            }
+        }
+
+
+<span class="nc" id="L577">        int textSpaceW = cmpWidth - rightPadding - leftPadding;</span>
+
+<span class="nc bnc" id="L579" title="All 6 branches missed.">        if (icon != null &amp;&amp; (textPos == Label.RIGHT || textPos == Label.LEFT)) {</span>
+<span class="nc" id="L580">            textSpaceW = textSpaceW - icon.getWidth();</span>
+        }
+
+<span class="nc bnc" id="L583" title="All 2 branches missed.">        if (stateIcon != null) {</span>
+<span class="nc" id="L584">            textSpaceW = textSpaceW - stateIconSize;</span>
+        } else {
+<span class="nc" id="L586">            textSpaceW = textSpaceW - preserveSpaceForState;</span>
+        }
+
+<span class="nc bnc" id="L589" title="All 2 branches missed.">        if (icon == null) { // no icon only string</span>
+<span class="nc" id="L590">            return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);</span>
+        } else {
+<span class="nc" id="L592">            int strWidth = l.getStringWidth(font);</span>
+<span class="nc" id="L593">            int iconWidth = icon.getWidth();</span>
+<span class="nc" id="L594">            int iconHeight = icon.getHeight();</span>
+            int iconStringWGap;
+            int iconStringHGap;
+
+<span class="nc bnc" id="L598" title="All 5 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+<span class="nc bnc" id="L600" title="All 2 branches missed.">                    if (iconHeight &gt; fontHeight) {</span>
+<span class="nc" id="L601">                        iconStringHGap = (iconHeight - fontHeight) / 2;</span>
+<span class="nc" id="L602">                        return calculateSpanForLabelStringValign(sel, l, text, x, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);</span>
+                    } else {
+<span class="nc" id="L604">                        iconStringHGap = (fontHeight - iconHeight) / 2;</span>
+                        //strWidth = drawLabelString(l, text, x, y, textSpaceW);
+<span class="nc" id="L606">                        return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);</span>
+                        //g.drawImage(icon, x + strWidth + gap, y + iconStringHGap);
+                    }
+
+                case Label.RIGHT:
+<span class="nc bnc" id="L611" title="All 2 branches missed.">                    if (iconHeight &gt; fontHeight) {</span>
+<span class="nc" id="L612">                        iconStringHGap = (iconHeight - fontHeight) / 2;</span>
+                        //g.drawImage(icon, x, y);
+<span class="nc" id="L614">                        return calculateSpanForLabelStringValign(sel, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);</span>
+                    } else {
+<span class="nc" id="L616">                        iconStringHGap = (fontHeight - iconHeight) / 2;</span>
+                        //g.drawImage(icon, x, y + iconStringHGap);
+<span class="nc" id="L618">                        return calculateSpanForLabelString(sel, l, text, x + iconWidth + gap, y, textSpaceW);</span>
+                    }
+
+                case Label.BOTTOM:
+<span class="nc bnc" id="L622" title="All 2 branches missed.">                    if (iconWidth &gt; strWidth) { //center align the smaller</span>
+
+<span class="nc" id="L624">                        iconStringWGap = (iconWidth - strWidth) / 2;</span>
+                        //g.drawImage(icon, x, y);
+<span class="nc" id="L626">                        return calculateSpanForLabelString(sel, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW);</span>
+                    } else {
+<span class="nc" id="L628">                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;</span>
+                        //g.drawImage(icon, x + iconStringWGap, y);
+
+<span class="nc" id="L631">                        return calculateSpanForLabelString(sel, l, text, x, y + iconHeight + gap, textSpaceW);</span>
+                    }
+
+                case Label.TOP:
+<span class="nc bnc" id="L635" title="All 2 branches missed.">                    if (iconWidth &gt; strWidth) { //center align the smaller</span>
+
+<span class="nc" id="L637">                        iconStringWGap = (iconWidth - strWidth) / 2;</span>
+<span class="nc" id="L638">                        return calculateSpanForLabelString(sel, l, text, x + iconStringWGap, y, textSpaceW);</span>
+                        //g.drawImage(icon, x, y + fontHeight + gap);
+                    } else {
+<span class="nc" id="L641">                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;</span>
+<span class="nc" id="L642">                        return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);</span>
+                        //g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
+                    }
+
+            }
+        }
+<span class="nc" id="L648">        return sel.newSpan(l);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawRadioButton(Graphics g, Button rb) {
+<span class="nc bnc" id="L655" title="All 2 branches missed.">        if (rButtonImages != null) {</span>
+            Image x;
+<span class="nc bnc" id="L657" title="All 8 branches missed.">            if (rButtonImagesFocus != null &amp;&amp; rButtonImagesFocus[0] != null &amp;&amp; rb.hasFocus() &amp;&amp; Display.getInstance().shouldRenderSelection(rb)) {</span>
+<span class="nc bnc" id="L658" title="All 2 branches missed.">                if (rb.isEnabled()) {</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">                    x = rButtonImagesFocus[rb.isSelected() ? 1 : 0];</span>
+                } else {
+<span class="nc bnc" id="L661" title="All 2 branches missed.">                    x = rButtonImagesFocus[rb.isSelected() ? 3 : 2];</span>
+                }
+            } else {
+<span class="nc bnc" id="L664" title="All 2 branches missed.">                if (rb.isEnabled()) {</span>
+<span class="nc bnc" id="L665" title="All 2 branches missed.">                    x = rButtonImages[rb.isSelected() ? 1 : 0];</span>
+                } else {
+<span class="nc bnc" id="L667" title="All 2 branches missed.">                    x = rButtonImages[rb.isSelected() ? 3 : 2];</span>
+                }
+            }
+<span class="nc" id="L670">            drawComponent(g, rb, rb.getIconFromState(), x, 0);</span>
+<span class="nc" id="L671">        } else {</span>
+<span class="nc" id="L672">            Style style = rb.getStyle();</span>
+
+            // radio button radius needs to be of the size of the font height even
+            // when no text is in the radio button this is a good indication of phone DPI
+<span class="nc" id="L676">            int height = rb.getStyle().getFont().getHeight();</span>
+
+<span class="nc" id="L678">            drawComponent(g, rb, rb.getIconFromState(), null, height + rb.getGap());</span>
+<span class="nc" id="L679">            g.setColor(style.getFgColor());</span>
+<span class="nc" id="L680">            int x = rb.getX();</span>
+<span class="nc bnc" id="L681" title="All 2 branches missed.">            if (rb.isRTL()) {</span>
+<span class="nc" id="L682">                x = x + rb.getWidth() - style.getPaddingLeft(rb.isRTL()) - height;</span>
+            } else {
+<span class="nc" id="L684">                x += style.getPaddingLeft(rb.isRTL());</span>
+            }
+
+<span class="nc" id="L687">            int y = rb.getY();</span>
+
+            // center the RadioButton
+<span class="nc" id="L690">            y += Math.max(0, rb.getHeight() / 2 - height / 2);</span>
+<span class="nc" id="L691">            int alpha = g.concatenateAlpha(style.getFgAlpha());</span>
+<span class="nc" id="L692">            g.drawArc(x, y, height, height, 0, 360);</span>
+<span class="nc" id="L693">            g.setAlpha(alpha);</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">            if (rb.isSelected()) {</span>
+<span class="nc" id="L695">                int color = g.getColor();</span>
+<span class="nc" id="L696">                int destColor = findDestColor(color);</span>
+<span class="nc" id="L697">                g.fillRadialGradient(color, destColor, x + 3, y + 3, height - 5, height - 5);</span>
+            }
+        }
+<span class="nc" id="L700">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawComboBox(Graphics g, List cb) {
+<span class="nc" id="L706">        int border = 2;</span>
+<span class="nc" id="L707">        Style style = cb.getStyle();</span>
+<span class="nc" id="L708">        int leftPadding = style.getPaddingLeft(cb.isRTL());</span>
+<span class="nc" id="L709">        int rightPadding = style.getPaddingRight(cb.isRTL());</span>
+
+<span class="nc" id="L711">        setFG(g, cb);</span>
+
+<span class="nc" id="L713">        ListModel model = cb.getModel();</span>
+<span class="nc" id="L714">        ListCellRenderer renderer = cb.getRenderer();</span>
+<span class="nc" id="L715">        Object value = model.getItemAt(model.getSelectedIndex());</span>
+<span class="nc bnc" id="L716" title="All 2 branches missed.">        Image comboBoxImage = ((ComboBox) cb).getComboBoxImage() != null ? ((ComboBox) cb).getComboBoxImage() : comboImage;</span>
+        int comboImageWidth;
+<span class="nc bnc" id="L718" title="All 2 branches missed.">        if (comboBoxImage != null) {</span>
+<span class="nc" id="L719">            comboImageWidth = comboBoxImage.getWidth();</span>
+        } else {
+<span class="nc" id="L721">            comboImageWidth = style.getFont().getHeight();</span>
+        }
+
+<span class="nc" id="L724">        int cellX = cb.getX() + style.getPaddingTop();</span>
+<span class="nc bnc" id="L725" title="All 2 branches missed.">        if (cb.isRTL()) {</span>
+<span class="nc" id="L726">            cellX += comboImageWidth;</span>
+        }
+
+<span class="nc bnc" id="L729" title="All 2 branches missed.">        if (model.getSize() &gt; 0) {</span>
+<span class="nc" id="L730">            Component cmp = renderer.getListCellRendererComponent(cb, value, model.getSelectedIndex(), cb.hasFocus());</span>
+<span class="nc" id="L731">            cmp.setX(cellX);</span>
+<span class="nc" id="L732">            cmp.setY(cb.getY() + style.getPaddingTop());</span>
+<span class="nc" id="L733">            cmp.setWidth(cb.getWidth() - comboImageWidth - rightPadding - leftPadding);</span>
+<span class="nc" id="L734">            cmp.setHeight(cb.getHeight() - style.getPaddingTop() - style.getPaddingBottom());</span>
+<span class="nc" id="L735">            cmp.paint(g);</span>
+        }
+
+<span class="nc" id="L738">        g.setColor(style.getBgColor());</span>
+<span class="nc" id="L739">        int y = cb.getY();</span>
+<span class="nc" id="L740">        int height = cb.getHeight();</span>
+<span class="nc" id="L741">        int width = comboImageWidth + border;</span>
+<span class="nc" id="L742">        int x = cb.getX();</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">        if (cb.isRTL()) {</span>
+<span class="nc" id="L744">            x += leftPadding;</span>
+        } else {
+<span class="nc" id="L746">            x += cb.getWidth() - comboImageWidth - rightPadding;</span>
+        }
+
+<span class="nc bnc" id="L749" title="All 2 branches missed.">        if (comboBoxImage != null) {</span>
+<span class="nc" id="L750">            g.drawImage(comboBoxImage, x, y + height / 2 - comboBoxImage.getHeight() / 2);</span>
+        } else {
+<span class="nc" id="L752">            int color = g.getColor();</span>
+
+            // brighten or darken the color slightly
+<span class="nc" id="L755">            int destColor = findDestColor(color);</span>
+
+<span class="nc bnc" id="L757" title="All 2 branches missed.">            if (style.getBgTransparency() &gt; 0) {</span>
+<span class="nc" id="L758">                g.fillLinearGradient(g.getColor(), destColor, x, y, width, height, false);</span>
+            }
+<span class="nc" id="L760">            g.setColor(color);</span>
+<span class="nc" id="L761">            int alpha = g.concatenateAlpha(style.getFgAlpha());</span>
+<span class="nc" id="L762">            g.drawRect(x, y, width, height - 1);</span>
+<span class="nc" id="L763">            g.setAlpha(alpha);</span>
+<span class="nc" id="L764">            width--;</span>
+<span class="nc" id="L765">            height--;</span>
+
+            //g.drawRect(x, y, width, height);
+<span class="nc" id="L768">            g.translate(x + 1, y + 1);</span>
+<span class="nc" id="L769">            g.setColor(0x111111);</span>
+<span class="nc" id="L770">            int x1 = scaleCoordinate(2.5652081f, 16, width);</span>
+<span class="nc" id="L771">            int y1 = scaleCoordinate(4.4753664f, 16, height);</span>
+<span class="nc" id="L772">            int x2 = scaleCoordinate(8.2872691f, 16, width);</span>
+<span class="nc" id="L773">            int y2 = scaleCoordinate(10f, 16, height);</span>
+<span class="nc" id="L774">            int x3 = scaleCoordinate(13.516078f, 16, width);</span>
+<span class="nc" id="L775">            int y3 = y1;</span>
+<span class="nc" id="L776">            g.fillTriangle(x1, y1, x2, y2, x3, y3);</span>
+<span class="nc" id="L777">            g.translate(-1, -1);</span>
+<span class="nc" id="L778">            g.setColor(style.getFgColor());</span>
+<span class="nc" id="L779">            alpha = g.concatenateAlpha(style.getFgAlpha());</span>
+<span class="nc" id="L780">            g.fillTriangle(x1, y1, x2, y2, x3, y3);</span>
+<span class="nc" id="L781">            g.setAlpha(alpha);</span>
+<span class="nc" id="L782">            g.translate(-x, -y);</span>
+        }
+
+<span class="nc" id="L785">    }</span>
+
+    /**
+     * Finds a suitable destination color for gradient values
+     */
+    private int findDestColor(int color) {
+        // brighten or darken the color slightly
+<span class="nc" id="L792">        int sourceR = color &gt;&gt; 16 &amp; 0xff;</span>
+<span class="nc" id="L793">        int sourceG = color &gt;&gt; 8 &amp; 0xff;</span>
+<span class="nc" id="L794">        int sourceB = color &amp; 0xff;</span>
+<span class="nc bnc" id="L795" title="All 6 branches missed.">        if (sourceR &gt; 128 &amp;&amp; sourceG &gt; 128 &amp;&amp; sourceB &gt; 128) {</span>
+            // darken
+<span class="nc" id="L797">            sourceR = Math.max(sourceR &gt;&gt; 1, 0);</span>
+<span class="nc" id="L798">            sourceG = Math.max(sourceG &gt;&gt; 1, 0);</span>
+<span class="nc" id="L799">            sourceB = Math.max(sourceB &gt;&gt; 1, 0);</span>
+        } else {
+            // special case for black, since all channels are 0 it can't be brightened properly...
+<span class="nc bnc" id="L802" title="All 2 branches missed.">            if (color == 0) {</span>
+<span class="nc" id="L803">                return 0x222222;</span>
+            }
+
+            // brighten
+<span class="nc" id="L807">            sourceR = Math.min(sourceR &lt;&lt; 1, 0xff);</span>
+<span class="nc" id="L808">            sourceG = Math.min(sourceG &lt;&lt; 1, 0xff);</span>
+<span class="nc" id="L809">            sourceB = Math.min(sourceB &lt;&lt; 1, 0xff);</span>
+        }
+<span class="nc" id="L811">        return ((sourceR &lt;&lt; 16) &amp; 0xff0000) | ((sourceG &lt;&lt; 8) &amp; 0xff00) | (sourceB &amp; 0xff);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawList(Graphics g, List l) {
+<span class="nc" id="L818">    }</span>
+
+    private int getSelectionHeight(Font f) {
+<span class="nc" id="L821">        return f.getHeight() + (int) (f.getHeight() * 0.2);</span>
+        //return f.getHeight() + f.getDescent();
+    }
+
+    private void append(TextSelection sel, Component l, Span span, String text, Font f, int posOffset, int x, int y, int h) {
+<span class="nc" id="L826">        int len = text.length();</span>
+<span class="nc" id="L827">        int xPos = 0;</span>
+<span class="nc" id="L828">        int curPos = 1;</span>
+        //int h = f.getHeight() + (int)(f.getHeight() * 0.25);
+        //y -= (int)(f.getHeight() * 0.25);
+        //int tx = l.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - l.getX();
+        //int ty = l.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - l.getY();
+<span class="nc bnc" id="L833" title="All 2 branches missed.">        while (curPos &lt;= len) {</span>
+<span class="nc" id="L834">            int newXpos = f.stringWidth(text.substring(0, curPos));</span>
+<span class="nc" id="L835">            Char next = sel.newChar(posOffset + curPos - 1, x + xPos, y, newXpos - xPos, h);</span>
+<span class="nc" id="L836">            span.add(next);</span>
+<span class="nc" id="L837">            xPos = newXpos;</span>
+<span class="nc" id="L838">            curPos++;</span>
+<span class="nc" id="L839">        }</span>
+<span class="nc" id="L840">    }</span>
+
+    @Override
+    public Spans calculateTextAreaSpan(TextSelection sel, TextArea ta) {
+<span class="nc" id="L844">        Spans out = sel.newSpans();</span>
+        //setFG(g, ta);
+        //Span out = sel.newSpan(ta);
+<span class="nc" id="L847">        int line = ta.getLines();</span>
+        //int oX = g.getClipX();
+        //int oY = g.getClipY();
+        //int oWidth = g.getClipWidth();
+        //int oHeight = g.getClipHeight();
+<span class="nc" id="L852">        Font f = ta.getStyle().getFont();</span>
+<span class="nc" id="L853">        int fontHeight = f.getHeight();</span>
+
+<span class="nc" id="L855">        int align = reverseAlignForBidi(ta);</span>
+
+<span class="nc" id="L857">        int leftPadding = ta.getStyle().getPaddingLeft(ta.isRTL());</span>
+<span class="nc" id="L858">        int rightPadding = ta.getStyle().getPaddingRight(ta.isRTL());</span>
+<span class="nc" id="L859">        int topPadding = ta.getStyle().getPaddingTop();</span>
+<span class="nc bnc" id="L860" title="All 3 branches missed.">        switch (ta.getVerticalAlignment()) {</span>
+            case Component.CENTER:
+<span class="nc" id="L862">                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line) / 2);</span>
+<span class="nc" id="L863">                break;</span>
+            case Component.BOTTOM:
+<span class="nc" id="L865">                topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line));</span>
+        }
+        //boolean shouldBreak = false;
+<span class="nc" id="L868">        int posOffset = 0;</span>
+<span class="nc" id="L869">        int lastRowBottom = 0;</span>
+<span class="nc bnc" id="L870" title="All 2 branches missed.">        for (int i = 0; i &lt; line; i++) {</span>
+<span class="nc" id="L871">            Span rowSpan = sel.newSpan(ta);</span>
+<span class="nc" id="L872">            int x = ta.getX() + leftPadding;</span>
+<span class="nc" id="L873">            int y = ta.getY() + topPadding +</span>
+<span class="nc" id="L874">                    (ta.getRowsGap() + fontHeight) * i;</span>
+<span class="nc" id="L875">            int adjustedY = Math.max(y, lastRowBottom);</span>
+<span class="nc" id="L876">            int yDiff = adjustedY - y;</span>
+<span class="nc" id="L877">            y = adjustedY;</span>
+
+            //if(Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
+
+<span class="nc" id="L881">            String rowText = ta.getTextAt(i);</span>
+            //display ******** if it is a password field
+<span class="nc" id="L883">            String displayText = &quot;&quot;;</span>
+<span class="nc bnc" id="L884" title="All 2 branches missed.">            if ((ta.getConstraint() &amp; TextArea.PASSWORD) != 0) {</span>
+<span class="nc" id="L885">                int rlen = rowText.length();</span>
+<span class="nc bnc" id="L886" title="All 2 branches missed.">                for (int j = 0; j &lt; rlen; j++) {</span>
+<span class="nc" id="L887">                    displayText += passwordChar;</span>
+                }
+<span class="nc" id="L889">            } else {</span>
+<span class="nc" id="L890">                displayText = rowText;</span>
+            }
+<span class="nc" id="L892">            posOffset = ta.getText().indexOf(rowText, posOffset);</span>
+<span class="nc bnc" id="L893" title="All 3 branches missed.">            switch (align) {</span>
+                case Component.RIGHT:
+<span class="nc" id="L895">                    x = ta.getX() + ta.getWidth() - rightPadding - f.stringWidth(displayText);</span>
+<span class="nc" id="L896">                    break;</span>
+                case Component.CENTER:
+<span class="nc" id="L898">                    x += (ta.getWidth() - leftPadding - rightPadding - f.stringWidth(displayText)) / 2;</span>
+                    break;
+            }
+            //int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
+            //if this is the last line to display and there is more content and isEndsWith3Points() is true
+            //add &quot;...&quot; at the last row
+<span class="nc bnc" id="L904" title="All 6 branches missed.">            if (ta.isEndsWith3Points() &amp;&amp; ta.getGrowLimit() == (i + 1) &amp;&amp; ta.getGrowLimit() != line) {</span>
+<span class="nc bnc" id="L905" title="All 2 branches missed.">                if (displayText.length() &gt; 3) {</span>
+<span class="nc" id="L906">                    displayText = displayText.substring(0, displayText.length() - 3);</span>
+                }
+                //g.drawString(displayText + &quot;...&quot;, x, y ,ta.getStyle().getTextDecoration());
+<span class="nc" id="L909">                append(sel, ta, rowSpan, displayText + &quot;...&quot;, f, posOffset, x, y, getSelectionHeight(f) - yDiff);</span>
+<span class="nc" id="L910">                lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();</span>
+<span class="nc" id="L911">                rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());</span>
+<span class="nc" id="L912">                out.add(rowSpan);</span>
+<span class="nc" id="L913">                return out;</span>
+            } else {
+                //g.drawString(displayText, x, y ,ta.getStyle().getTextDecoration());
+<span class="nc" id="L916">                append(sel, ta, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f) - yDiff);</span>
+<span class="nc" id="L917">                lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();</span>
+<span class="nc" id="L918">                rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());</span>
+<span class="nc" id="L919">                out.add(rowSpan);</span>
+            }
+<span class="nc" id="L921">            posOffset += displayText.length();</span>
+            //shouldBreak = true;
+            //}else{
+            //    if(shouldBreak){
+            //        break;
+            //    }
+            //}
+        }
+<span class="nc" id="L929">        return out;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawTextArea(Graphics g, TextArea ta) {
+<span class="nc" id="L936">        setFG(g, ta);</span>
+<span class="nc" id="L937">        int alpha = g.concatenateAlpha(ta.getStyle().getFgAlpha());</span>
+
+<span class="nc" id="L939">        int line = ta.getLines();</span>
+<span class="nc" id="L940">        int oX = g.getClipX();</span>
+<span class="nc" id="L941">        int oY = g.getClipY();</span>
+<span class="nc" id="L942">        int oWidth = g.getClipWidth();</span>
+<span class="nc" id="L943">        int oHeight = g.getClipHeight();</span>
+<span class="nc" id="L944">        Font f = ta.getStyle().getFont();</span>
+<span class="nc" id="L945">        int fontHeight = f.getHeight();</span>
+
+<span class="nc" id="L947">        int align = reverseAlignForBidi(ta);</span>
+
+<span class="nc" id="L949">        int leftPadding = ta.getStyle().getPaddingLeft(ta.isRTL());</span>
+<span class="nc" id="L950">        int rightPadding = ta.getStyle().getPaddingRight(ta.isRTL());</span>
+<span class="nc" id="L951">        int topPadding = ta.getStyle().getPaddingTop();</span>
+<span class="nc bnc" id="L952" title="All 3 branches missed.">        switch (ta.getVerticalAlignment()) {</span>
+            case Component.CENTER:
+<span class="nc" id="L954">                topPadding += Math.max(0, (ta.getInnerHeight() - ta.getRowsGap() * (line - 1) - fontHeight * line) / 2);</span>
+<span class="nc" id="L955">                break;</span>
+            case Component.BOTTOM:
+<span class="nc" id="L957">                topPadding += Math.max(0, (ta.getInnerHeight() - ta.getRowsGap() * (line - 1) - fontHeight * line));</span>
+        }
+<span class="nc" id="L959">        boolean shouldBreak = false;</span>
+
+<span class="nc bnc" id="L961" title="All 2 branches missed.">        for (int i = 0; i &lt; line; i++) {</span>
+<span class="nc" id="L962">            int x = ta.getX() + leftPadding;</span>
+<span class="nc" id="L963">            int y = ta.getY() + topPadding +</span>
+<span class="nc" id="L964">                    (ta.getRowsGap() + fontHeight) * i;</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">            if (Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {</span>
+
+<span class="nc" id="L967">                String rowText = ta.getTextAt(i);</span>
+                //display ******** if it is a password field
+<span class="nc" id="L969">                String displayText = &quot;&quot;;</span>
+<span class="nc bnc" id="L970" title="All 2 branches missed.">                if ((ta.getConstraint() &amp; TextArea.PASSWORD) != 0) {</span>
+<span class="nc" id="L971">                    int rlen = rowText.length();</span>
+<span class="nc bnc" id="L972" title="All 2 branches missed.">                    for (int j = 0; j &lt; rlen; j++) {</span>
+<span class="nc" id="L973">                        displayText += passwordChar;</span>
+                    }
+<span class="nc" id="L975">                } else {</span>
+<span class="nc" id="L976">                    displayText = rowText;</span>
+                }
+
+<span class="nc bnc" id="L979" title="All 3 branches missed.">                switch (align) {</span>
+                    case Component.RIGHT:
+<span class="nc" id="L981">                        x = ta.getX() + ta.getWidth() - rightPadding - f.stringWidth(displayText);</span>
+<span class="nc" id="L982">                        break;</span>
+                    case Component.CENTER:
+<span class="nc" id="L984">                        x += (ta.getWidth() - leftPadding - rightPadding - f.stringWidth(displayText)) / 2;</span>
+                        break;
+                }
+<span class="nc" id="L987">                int nextY = ta.getY() + topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);</span>
+                //if this is the last line to display and there is more content and isEndsWith3Points() is true
+                //add &quot;...&quot; at the last row
+<span class="nc bnc" id="L990" title="All 6 branches missed.">                if (ta.isEndsWith3Points() &amp;&amp; ta.getGrowLimit() == (i + 1) &amp;&amp; ta.getGrowLimit() != line) {</span>
+<span class="nc bnc" id="L991" title="All 2 branches missed.">                    if (displayText.length() &gt; 3) {</span>
+<span class="nc" id="L992">                        displayText = displayText.substring(0, displayText.length() - 3);</span>
+                    }
+<span class="nc" id="L994">                    g.drawString(displayText + &quot;...&quot;, x, y, ta.getStyle().getTextDecoration());</span>
+<span class="nc" id="L995">                    return;</span>
+                } else {
+<span class="nc" id="L997">                    g.drawString(displayText, x, y, ta.getStyle().getTextDecoration());</span>
+                }
+<span class="nc" id="L999">                shouldBreak = true;</span>
+<span class="nc" id="L1000">            } else {</span>
+<span class="nc bnc" id="L1001" title="All 2 branches missed.">                if (shouldBreak) {</span>
+<span class="nc" id="L1002">                    break;</span>
+                }
+            }
+        }
+<span class="nc" id="L1006">        g.setAlpha(alpha);</span>
+<span class="nc" id="L1007">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getButtonPreferredSize(Button b) {
+<span class="fc" id="L1013">        threeImageCache[0] = b.getMaskedIcon();</span>
+<span class="fc" id="L1014">        threeImageCache[1] = b.getRolloverIcon();</span>
+<span class="fc" id="L1015">        threeImageCache[2] = b.getPressedIcon();</span>
+<span class="fc" id="L1016">        return getPreferredSize(b, threeImageCache, null);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getCheckBoxPreferredSize(Button cb) {
+<span class="nc bnc" id="L1023" title="All 2 branches missed.">        if (cb.isToggle()) {</span>
+<span class="nc" id="L1024">            return getButtonPreferredSize(cb);</span>
+        }
+<span class="nc" id="L1026">        threeImageCache[0] = cb.getMaskedIcon();</span>
+<span class="nc" id="L1027">        threeImageCache[1] = cb.getRolloverIcon();</span>
+<span class="nc" id="L1028">        threeImageCache[2] = cb.getPressedIcon();</span>
+<span class="nc bnc" id="L1029" title="All 2 branches missed.">        if (chkBoxImages != null) {</span>
+<span class="nc" id="L1030">            return getPreferredSize(cb, threeImageCache, chkBoxImages[0]);</span>
+        }
+<span class="nc" id="L1032">        Dimension d = getPreferredSize(cb, threeImageCache, null);</span>
+
+        // checkbox square needs to be the height and width of the font height even
+        // when no text is in the check box this is a good indication of phone DPI
+<span class="nc" id="L1036">        int checkBoxSquareSize = cb.getStyle().getFont().getHeight();</span>
+
+        // allow for checkboxes without a string within them
+<span class="nc" id="L1039">        d.setHeight(Math.max(checkBoxSquareSize, d.getHeight()));</span>
+
+<span class="nc" id="L1041">        d.setWidth(d.getWidth() + checkBoxSquareSize + cb.getGap());</span>
+<span class="nc" id="L1042">        return d;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getLabelPreferredSize(Label l) {
+<span class="fc" id="L1049">        oneImageCache[0] = l.getMaskedIcon();</span>
+<span class="fc" id="L1050">        return getPreferredSize(l, oneImageCache, null);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    private Dimension getPreferredSize(Label l, Image[] icons, Image stateImage) {
+<span class="fc" id="L1057">        int prefW = 0;</span>
+<span class="fc" id="L1058">        int prefH = 0;</span>
+
+<span class="fc" id="L1060">        Style style = l.getStyle();</span>
+<span class="fc" id="L1061">        int gap = l.getGap();</span>
+<span class="fc" id="L1062">        int ilen = icons.length;</span>
+<span class="fc bfc" id="L1063" title="All 2 branches covered.">        for (int i = 0; i &lt; ilen; i++) {</span>
+<span class="fc" id="L1064">            Image icon = icons[i];</span>
+<span class="fc bfc" id="L1065" title="All 2 branches covered.">            if (icon != null) {</span>
+<span class="fc" id="L1066">                prefW = Math.max(prefW, icon.getWidth());</span>
+<span class="fc" id="L1067">                prefH = Math.max(prefH, icon.getHeight());</span>
+            }
+        }
+<span class="fc" id="L1070">        String text = l.getText();</span>
+<span class="fc" id="L1071">        Font font = style.getFont();</span>
+<span class="pc bpc" id="L1072" title="1 of 2 branches missed.">        if (font == null) {</span>
+<span class="nc" id="L1073">            System.out.println(&quot;Missing font for &quot; + l);</span>
+<span class="nc" id="L1074">            font = Font.getDefaultFont();</span>
+        }
+<span class="fc bfc" id="L1076" title="All 4 branches covered.">        if (text != null &amp;&amp; text.length() &gt; 0) {</span>
+            //add the text size
+<span class="pc bpc" id="L1078" title="1 of 3 branches missed.">            switch (l.getTextPosition()) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="fc" id="L1081">                    prefW += font.stringWidth(text);</span>
+<span class="fc" id="L1082">                    prefH = Math.max(prefH, font.getHeight());</span>
+<span class="fc" id="L1083">                    break;</span>
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="fc" id="L1086">                    prefW = Math.max(prefW, font.stringWidth(text));</span>
+<span class="fc" id="L1087">                    prefH += font.getHeight();</span>
+                    break;
+            }
+        }
+        //add the state image(relevant for CheckBox\RadioButton)
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">        if (stateImage != null) {</span>
+<span class="nc" id="L1093">            prefW += (stateImage.getWidth() + gap);</span>
+<span class="nc" id="L1094">            prefH = Math.max(prefH, stateImage.getHeight());</span>
+        }
+
+
+<span class="pc bpc" id="L1098" title="2 of 6 branches missed.">        if (icons[0] != null &amp;&amp; text != null &amp;&amp; text.length() &gt; 0) {</span>
+<span class="nc bnc" id="L1099" title="All 3 branches missed.">            switch (l.getTextPosition()) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="nc" id="L1102">                    prefW += gap;</span>
+<span class="nc" id="L1103">                    break;</span>
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="nc" id="L1106">                    prefH += gap;</span>
+                    break;
+            }
+        }
+
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">        if (l.isShowEvenIfBlank()) {</span>
+<span class="nc" id="L1112">            prefH += style.getVerticalPadding();</span>
+<span class="nc" id="L1113">            prefW += style.getHorizontalPadding();</span>
+        } else {
+<span class="fc bfc" id="L1115" title="All 2 branches covered.">            if (prefH != 0) {</span>
+<span class="fc" id="L1116">                prefH += style.getVerticalPadding();</span>
+            }
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">            if (prefW != 0) {</span>
+<span class="fc" id="L1119">                prefW += style.getHorizontalPadding();</span>
+            }
+        }
+
+<span class="fc bfc" id="L1123" title="All 2 branches covered.">        if (style.getBorder() != null) {</span>
+<span class="fc" id="L1124">            prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);</span>
+<span class="fc" id="L1125">            prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);</span>
+        }
+<span class="pc bpc" id="L1127" title="3 of 4 branches missed.">        if (isBackgroundImageDetermineSize() &amp;&amp; style.getBgImage() != null) {</span>
+<span class="nc" id="L1128">            prefW = Math.max(style.getBgImage().getWidth(), prefW);</span>
+<span class="nc" id="L1129">            prefH = Math.max(style.getBgImage().getHeight(), prefH);</span>
+        }
+
+<span class="fc" id="L1132">        return new Dimension(prefW, prefH);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getListPreferredSize(List l) {
+<span class="fc" id="L1139">        Dimension d = getListPreferredSizeImpl(l);</span>
+<span class="fc" id="L1140">        Style style = l.getStyle();</span>
+<span class="pc bpc" id="L1141" title="1 of 2 branches missed.">        if (style.getBorder() != null) {</span>
+<span class="nc" id="L1142">            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));</span>
+<span class="nc" id="L1143">            d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));</span>
+        }
+<span class="fc" id="L1145">        return d;</span>
+    }
+
+    private Dimension getListPreferredSizeImpl(List l) {
+<span class="fc" id="L1149">        int width = 0;</span>
+<span class="fc" id="L1150">        int height = 0;</span>
+        int selectedHeight;
+        int selectedWidth;
+<span class="fc" id="L1153">        ListModel model = l.getModel();</span>
+<span class="fc" id="L1154">        int numOfcomponents = Math.max(model.getSize(), l.getMinElementHeight());</span>
+<span class="fc" id="L1155">        numOfcomponents = Math.min(numOfcomponents, l.getMaxElementHeight());</span>
+<span class="fc" id="L1156">        Object prototype = l.getRenderingPrototype();</span>
+
+<span class="fc" id="L1158">        Style unselectedEntryStyle = null;</span>
+        Style selectedEntryStyle;
+<span class="pc bpc" id="L1160" title="1 of 2 branches missed.">        if (prototype != null) {</span>
+<span class="nc" id="L1161">            ListCellRenderer renderer = l.getRenderer();</span>
+<span class="nc" id="L1162">            Component cmp = renderer.getListCellRendererComponent(l, prototype, 0, false);</span>
+<span class="nc" id="L1163">            height = cmp.getPreferredH();</span>
+<span class="nc" id="L1164">            width = cmp.getPreferredW();</span>
+<span class="nc" id="L1165">            unselectedEntryStyle = cmp.getStyle();</span>
+<span class="nc" id="L1166">            cmp = renderer.getListCellRendererComponent(l, prototype, 0, true);</span>
+
+<span class="nc" id="L1168">            selectedEntryStyle = cmp.getStyle();</span>
+<span class="nc" id="L1169">            selectedHeight = Math.max(height, cmp.getPreferredH());</span>
+<span class="nc" id="L1170">            selectedWidth = Math.max(width, cmp.getPreferredW());</span>
+<span class="nc" id="L1171">        } else {</span>
+<span class="fc" id="L1172">            int hightCalcComponents = Math.min(l.getListSizeCalculationSampleCount(), numOfcomponents);</span>
+<span class="fc" id="L1173">            Object dummyProto = l.getRenderingPrototype();</span>
+<span class="pc bpc" id="L1174" title="2 of 4 branches missed.">            if (model.getSize() &gt; 0 &amp;&amp; dummyProto == null) {</span>
+<span class="fc" id="L1175">                dummyProto = model.getItemAt(0);</span>
+            }
+<span class="fc" id="L1177">            ListCellRenderer renderer = l.getRenderer();</span>
+<span class="fc bfc" id="L1178" title="All 2 branches covered.">            for (int i = 0; i &lt; hightCalcComponents; i++) {</span>
+                Object value;
+<span class="pc bpc" id="L1180" title="1 of 2 branches missed.">                if (i &lt; model.getSize()) {</span>
+<span class="fc" id="L1181">                    value = model.getItemAt(i);</span>
+                } else {
+<span class="nc" id="L1183">                    value = dummyProto;</span>
+                }
+<span class="fc" id="L1185">                Component cmp = renderer.getListCellRendererComponent(l, value, i, false);</span>
+<span class="pc bpc" id="L1186" title="1 of 2 branches missed.">                if (cmp instanceof Container) {</span>
+<span class="nc" id="L1187">                    cmp.setShouldCalcPreferredSize(true);</span>
+                }
+<span class="fc" id="L1189">                unselectedEntryStyle = cmp.getStyle();</span>
+
+<span class="fc" id="L1191">                height = Math.max(height, cmp.getPreferredH());</span>
+<span class="fc" id="L1192">                width = Math.max(width, cmp.getPreferredW());</span>
+            }
+<span class="fc" id="L1194">            selectedEntryStyle = unselectedEntryStyle;</span>
+<span class="fc" id="L1195">            selectedHeight = height;</span>
+<span class="fc" id="L1196">            selectedWidth = width;</span>
+<span class="pc bpc" id="L1197" title="1 of 2 branches missed.">            if (model.getSize() &gt; 0) {</span>
+<span class="fc" id="L1198">                Object value = model.getItemAt(0);</span>
+<span class="fc" id="L1199">                Component cmp = renderer.getListCellRendererComponent(l, value, 0, true);</span>
+<span class="pc bpc" id="L1200" title="1 of 2 branches missed.">                if (cmp instanceof Container) {</span>
+<span class="nc" id="L1201">                    cmp.setShouldCalcPreferredSize(true);</span>
+                }
+
+<span class="fc" id="L1204">                selectedHeight = Math.max(height, cmp.getPreferredH());</span>
+<span class="fc" id="L1205">                selectedWidth = Math.max(width, cmp.getPreferredW());</span>
+<span class="fc" id="L1206">                selectedEntryStyle = cmp.getStyle();</span>
+            }
+        }
+<span class="pc bpc" id="L1209" title="1 of 2 branches missed.">        if (unselectedEntryStyle != null) {</span>
+<span class="fc" id="L1210">            selectedWidth += selectedEntryStyle.getMarginLeftNoRTL() + selectedEntryStyle.getMarginRightNoRTL();</span>
+<span class="fc" id="L1211">            selectedHeight += selectedEntryStyle.getMarginTop() + selectedEntryStyle.getMarginBottom();</span>
+<span class="fc" id="L1212">            width += unselectedEntryStyle.getMarginLeftNoRTL() + unselectedEntryStyle.getMarginRightNoRTL();</span>
+<span class="fc" id="L1213">            height += unselectedEntryStyle.getMarginTop() + unselectedEntryStyle.getMarginBottom();</span>
+        }
+
+<span class="fc" id="L1216">        Style lStyle = l.getStyle();</span>
+<span class="fc" id="L1217">        int verticalPadding = lStyle.getPaddingTop() + lStyle.getPaddingBottom();</span>
+<span class="fc" id="L1218">        int horizontalPadding = lStyle.getPaddingRightNoRTL() + lStyle.getPaddingLeftNoRTL() + l.getSideGap();</span>
+
+<span class="pc bpc" id="L1220" title="1 of 2 branches missed.">        if (numOfcomponents == 0) {</span>
+<span class="nc" id="L1221">            return new Dimension(horizontalPadding, verticalPadding);</span>
+        }
+
+        // If combobox without ever importing the ComboBox class dependency
+<span class="pc bpc" id="L1225" title="1 of 2 branches missed.">        if (l.getOrientation() &gt; List.HORIZONTAL) {</span>
+<span class="nc" id="L1226">            int boxWidth = l.getStyle().getFont().getHeight() + 2;</span>
+<span class="nc" id="L1227">            return new Dimension(boxWidth + selectedWidth + horizontalPadding, selectedHeight + verticalPadding);</span>
+        } else {
+<span class="pc bpc" id="L1229" title="1 of 2 branches missed.">            if (l.getOrientation() == List.VERTICAL) {</span>
+<span class="fc" id="L1230">                return new Dimension(selectedWidth + horizontalPadding, selectedHeight + (height + l.getItemGap()) * (numOfcomponents - 1) + verticalPadding);</span>
+            } else {
+<span class="nc" id="L1232">                return new Dimension(selectedWidth + (width + l.getItemGap()) * (numOfcomponents - 1) + horizontalPadding, selectedHeight + verticalPadding);</span>
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getRadioButtonPreferredSize(Button rb) {
+<span class="pc bpc" id="L1241" title="1 of 2 branches missed.">        if (rb.isToggle()) {</span>
+<span class="fc" id="L1242">            return getButtonPreferredSize(rb);</span>
+        }
+<span class="nc" id="L1244">        threeImageCache[0] = rb.getMaskedIcon();</span>
+<span class="nc" id="L1245">        threeImageCache[1] = rb.getRolloverIcon();</span>
+<span class="nc" id="L1246">        threeImageCache[2] = rb.getPressedIcon();</span>
+<span class="nc bnc" id="L1247" title="All 2 branches missed.">        if (rButtonImages != null) {</span>
+<span class="nc" id="L1248">            return getPreferredSize(rb, threeImageCache, rButtonImages[0]);</span>
+        }
+<span class="nc" id="L1250">        Dimension d = getPreferredSize(rb, threeImageCache, null);</span>
+
+        // radio button radius needs to be of the size of the font height even
+        // when no text is in the radio button this is a good indication of phone DPI
+<span class="nc" id="L1254">        int height = rb.getStyle().getFont().getHeight();</span>
+
+        // allow for radio buttons without a string within them
+<span class="nc" id="L1257">        d.setHeight(Math.max(height, d.getHeight()));</span>
+
+<span class="nc bnc" id="L1259" title="All 4 branches missed.">        if (rButtonImages != null &amp;&amp; rButtonImages.length &gt; 0) {</span>
+<span class="nc" id="L1260">            d.setWidth(rButtonImages[0].getWidth() + d.getWidth() + rb.getGap());</span>
+        } else {
+<span class="nc" id="L1262">            d.setWidth(d.getWidth() + height + rb.getGap());</span>
+        }
+<span class="nc" id="L1264">        return d;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getTextAreaSize(TextArea ta, boolean pref) {
+<span class="fc" id="L1271">        int prefW = 0;</span>
+<span class="fc" id="L1272">        int prefH = 0;</span>
+<span class="fc" id="L1273">        Style style = ta.getStyle();</span>
+<span class="fc" id="L1274">        Font f = style.getFont();</span>
+
+        //if this is a text field the preferred size should be the text width
+<span class="pc bpc" id="L1277" title="1 of 2 branches missed.">        if (ta.getRows() == 1) {</span>
+<span class="fc" id="L1278">            prefW = f.stringWidth(ta.getText());</span>
+        } else {
+<span class="nc" id="L1280">            prefW = f.charWidth(TextArea.getWidestChar()) * ta.getColumns();</span>
+        }
+        int rows;
+<span class="fc bfc" id="L1283" title="All 2 branches covered.">        if (pref) {</span>
+<span class="fc" id="L1284">            rows = ta.getActualRows();</span>
+        } else {
+<span class="fc" id="L1286">            rows = ta.getLines();</span>
+        }
+<span class="fc" id="L1288">        prefH = (f.getHeight() + ta.getRowsGap()) * rows;</span>
+<span class="pc bpc" id="L1289" title="1 of 2 branches missed.">        if (!ta.isActAsLabel()) {</span>
+<span class="fc" id="L1290">            int columns = ta.getColumns();</span>
+<span class="fc" id="L1291">            String str = &quot;&quot;;</span>
+<span class="fc bfc" id="L1292" title="All 2 branches covered.">            for (int iter = 0; iter &lt; columns; iter++) {</span>
+<span class="fc" id="L1293">                str += TextArea.getWidestChar();</span>
+            }
+<span class="pc bpc" id="L1295" title="1 of 2 branches missed.">            if (columns &gt; 0) {</span>
+<span class="fc" id="L1296">                prefW = Math.max(prefW, f.stringWidth(str));</span>
+            }
+        }
+<span class="fc" id="L1299">        prefH = Math.max(prefH, rows * f.getHeight());</span>
+
+<span class="fc" id="L1301">        prefW += style.getPaddingRightNoRTL() + style.getPaddingLeftNoRTL();</span>
+<span class="fc" id="L1302">        prefH += style.getPaddingTop() + style.getPaddingBottom();</span>
+<span class="pc bpc" id="L1303" title="1 of 2 branches missed.">        if (style.getBorder() != null) {</span>
+<span class="fc" id="L1304">            prefW = Math.max(style.getBorder().getMinimumWidth(), prefW);</span>
+<span class="fc" id="L1305">            prefH = Math.max(style.getBorder().getMinimumHeight(), prefH);</span>
+        }
+<span class="pc bpc" id="L1307" title="3 of 4 branches missed.">        if (isBackgroundImageDetermineSize() &amp;&amp; style.getBgImage() != null) {</span>
+<span class="nc" id="L1308">            prefW = Math.max(style.getBgImage().getWidth(), prefW);</span>
+<span class="nc" id="L1309">            prefH = Math.max(style.getBgImage().getHeight(), prefH);</span>
+        }
+
+<span class="fc" id="L1312">        return new Dimension(prefW, prefH);</span>
+    }
+
+    /**
+     * Reverses alignment in the case of bidi
+     */
+    private int reverseAlignForBidi(Component c) {
+<span class="nc" id="L1319">        return reverseAlignForBidi(c, c.getStyle().getAlignment());</span>
+    }
+
+    private void drawComponent(Graphics g, Label l, Image icon, Image stateIcon, int preserveSpaceForState) {
+<span class="nc" id="L1323">        setFG(g, l);</span>
+<span class="nc" id="L1324">        int alpha = g.concatenateAlpha(l.getStyle().getFgAlpha());</span>
+<span class="nc" id="L1325">        int gap = l.getGap();</span>
+<span class="nc" id="L1326">        int stateIconSize = 0;</span>
+<span class="nc" id="L1327">        int stateIconYPosition = 0;</span>
+<span class="nc" id="L1328">        String text = l.getText();</span>
+<span class="nc" id="L1329">        Style style = l.getStyle();</span>
+<span class="nc" id="L1330">        int cmpX = l.getX();</span>
+<span class="nc" id="L1331">        int cmpY = l.getY();</span>
+<span class="nc" id="L1332">        int cmpHeight = l.getHeight();</span>
+<span class="nc" id="L1333">        int cmpWidth = l.getWidth();</span>
+
+<span class="nc" id="L1335">        boolean rtl = l.isRTL();</span>
+<span class="nc" id="L1336">        int leftPadding = style.getPaddingLeft(rtl);</span>
+<span class="nc" id="L1337">        int rightPadding = style.getPaddingRight(rtl);</span>
+<span class="nc" id="L1338">        int topPadding = style.getPaddingTop();</span>
+<span class="nc" id="L1339">        int bottomPadding = style.getPaddingBottom();</span>
+
+<span class="nc" id="L1341">        Font font = style.getFont();</span>
+<span class="nc" id="L1342">        int fontHeight = 0;</span>
+<span class="nc bnc" id="L1343" title="All 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L1344">            text = &quot;&quot;;</span>
+        }
+<span class="nc bnc" id="L1346" title="All 2 branches missed.">        if (text.length() &gt; 0) {</span>
+<span class="nc" id="L1347">            fontHeight = font.getHeight();</span>
+        }
+
+<span class="nc" id="L1350">        int x = cmpX + leftPadding;</span>
+<span class="nc" id="L1351">        int y = cmpY + topPadding;</span>
+<span class="nc" id="L1352">        boolean opposite = false;</span>
+<span class="nc" id="L1353">        boolean stateButtonOnLeft = false;</span>
+<span class="nc bnc" id="L1354" title="All 2 branches missed.">        if (stateIcon != null) {</span>
+<span class="nc" id="L1355">            stateIconSize = stateIcon.getWidth(); //square image width == height</span>
+<span class="nc" id="L1356">            preserveSpaceForState = stateIconSize + gap;</span>
+<span class="nc" id="L1357">            stateIconYPosition = cmpY + topPadding</span>
+                    + (cmpHeight - topPadding
+                    - bottomPadding) / 2 - stateIconSize / 2;
+<span class="nc" id="L1360">            int tX = cmpX;</span>
+<span class="nc bnc" id="L1361" title="All 2 branches missed.">            if (((Button) l).isOppositeSide()) {</span>
+<span class="nc bnc" id="L1362" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L1363">                    tX += leftPadding;</span>
+<span class="nc" id="L1364">                    stateButtonOnLeft = true;</span>
+<span class="nc" id="L1365">                    x = cmpX + leftPadding + preserveSpaceForState;</span>
+                } else {
+<span class="nc" id="L1367">                    tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                }
+                //cmpWidth -= leftPadding - stateIconSize;
+                //preserveSpaceForState = 0;
+<span class="nc" id="L1371">                opposite = true;</span>
+            } else {
+
+<span class="nc bnc" id="L1374" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L1375">                    tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                } else {
+<span class="nc" id="L1377">                    x = cmpX + leftPadding + preserveSpaceForState;</span>
+<span class="nc" id="L1378">                    tX += leftPadding;</span>
+<span class="nc" id="L1379">                    stateButtonOnLeft = true;</span>
+                }
+            }
+
+<span class="nc" id="L1383">            g.drawImage(stateIcon, tX, stateIconYPosition);</span>
+        }
+
+        //default for bottom left alignment
+<span class="nc" id="L1387">        int align = reverseAlignForBidi(l, style.getAlignment());</span>
+
+<span class="nc" id="L1389">        int textPos = reverseAlignForBidi(l, l.getTextPosition());</span>
+
+        //set initial x,y position according to the alignment and textPosition
+<span class="nc bnc" id="L1392" title="All 2 branches missed.">        if (align == Component.LEFT) {</span>
+<span class="nc bnc" id="L1393" title="All 3 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="nc bnc" id="L1396" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? icon.getHeight() : 0), fontHeight))) / 2;</span>
+<span class="nc bnc" id="L1397" title="All 4 branches missed.">                    if (textPos == Label.RIGHT &amp;&amp; stateIcon == null) {</span>
+<span class="nc" id="L1398">                        x += preserveSpaceForState;</span>
+                    }
+                    break;
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="nc bnc" id="L1403" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;</span>
+<span class="nc" id="L1404">                    break;</span>
+            }
+<span class="nc bnc" id="L1406" title="All 2 branches missed.">        } else if (align == Component.CENTER) {</span>
+<span class="nc bnc" id="L1407" title="All 3 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="nc bnc" id="L1410" title="All 2 branches missed.">                    x = x + (cmpWidth - (preserveSpaceForState +</span>
+                            leftPadding +
+                            rightPadding +
+<span class="nc" id="L1413">                            ((icon != null) ? icon.getWidth() + l.getGap() : 0) +</span>
+<span class="nc" id="L1414">                            l.getStringWidth(font))) / 2;</span>
+<span class="nc bnc" id="L1415" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L1417">                            Math.max(((icon != null) ? icon.getHeight() : 0),</span>
+                                    fontHeight))) / 2;
+<span class="nc" id="L1419">                    break;</span>
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="nc bnc" id="L1422" title="All 2 branches missed.">                    x = x + (cmpWidth - (preserveSpaceForState + leftPadding +</span>
+                            rightPadding +
+<span class="nc" id="L1424">                            Math.max(((icon != null) ? icon.getWidth() + l.getGap() : 0),</span>
+<span class="nc" id="L1425">                                    l.getStringWidth(font)))) / 2;</span>
+<span class="nc bnc" id="L1426" title="All 2 branches missed.">                    if (!opposite) {</span>
+<span class="nc" id="L1427">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    } else {
+<span class="nc" id="L1429">                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    }
+<span class="nc bnc" id="L1431" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L1433">                            ((icon != null) ? icon.getHeight() + gap : 0) +</span>
+                            fontHeight)) / 2;
+<span class="nc" id="L1435">                    break;</span>
+            }
+<span class="nc bnc" id="L1437" title="All 2 branches missed.">        } else if (align == Component.RIGHT) {</span>
+<span class="nc bnc" id="L1438" title="All 3 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+                case Label.RIGHT:
+<span class="nc bnc" id="L1441" title="All 2 branches missed.">                    x = cmpX + cmpWidth - rightPadding -</span>
+<span class="nc" id="L1442">                            (((icon != null) ? (icon.getWidth() + gap) : 0) +</span>
+<span class="nc" id="L1443">                                    l.getStringWidth(font));</span>
+<span class="nc bnc" id="L1444" title="All 2 branches missed.">                    x = stateButtonOnLeft ? x : x - preserveSpaceForState;</span>
+
+<span class="nc bnc" id="L1446" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L1448">                            Math.max(((icon != null) ? icon.getHeight() : 0),</span>
+                                    fontHeight))) / 2;
+<span class="nc" id="L1450">                    break;</span>
+                case Label.BOTTOM:
+                case Label.TOP:
+<span class="nc bnc" id="L1453" title="All 2 branches missed.">                    x = cmpX + cmpWidth - rightPadding -</span>
+<span class="nc" id="L1454">                            (Math.max(((icon != null) ? (icon.getWidth()) : 0),</span>
+<span class="nc" id="L1455">                                    l.getStringWidth(font)));</span>
+<span class="nc bnc" id="L1456" title="All 2 branches missed.">                    if (!opposite) {</span>
+<span class="nc" id="L1457">                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    } else {
+<span class="nc" id="L1459">                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                    }
+
+<span class="nc bnc" id="L1462" title="All 2 branches missed.">                    y = y + (cmpHeight - (topPadding +</span>
+                            bottomPadding +
+<span class="nc" id="L1464">                            ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;</span>
+                    break;
+            }
+        }
+
+
+<span class="nc" id="L1470">        int textSpaceW = cmpWidth - rightPadding - leftPadding;</span>
+<span class="nc" id="L1471">        int textSpaceX = cmpX + leftPadding;</span>
+
+
+<span class="nc bnc" id="L1474" title="All 6 branches missed.">        if (icon != null &amp;&amp; (textPos == Label.RIGHT || textPos == Label.LEFT)) {</span>
+<span class="nc" id="L1475">            textSpaceW = textSpaceW - icon.getWidth();</span>
+<span class="nc bnc" id="L1476" title="All 2 branches missed.">            textSpaceX = (textPos == Label.RIGHT) ? textSpaceX + icon.getWidth() :</span>
+                    textSpaceX;
+        }
+
+<span class="nc" id="L1480">        textSpaceW = textSpaceW - preserveSpaceForState;</span>
+<span class="nc bnc" id="L1481" title="All 2 branches missed.">        textSpaceX = stateButtonOnLeft ? textSpaceX + preserveSpaceForState : textSpaceX;</span>
+
+<span class="nc bnc" id="L1483" title="All 2 branches missed.">        if (icon == null) { // no icon only string </span>
+<span class="nc" id="L1484">            drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);</span>
+        } else {
+<span class="nc" id="L1486">            int strWidth = l.getStringWidth(font);</span>
+<span class="nc" id="L1487">            int iconWidth = icon.getWidth();</span>
+<span class="nc" id="L1488">            int iconHeight = icon.getHeight();</span>
+            int iconStringWGap;
+            int iconStringHGap;
+
+<span class="nc bnc" id="L1492" title="All 5 branches missed.">            switch (textPos) {</span>
+                case Label.LEFT:
+<span class="nc bnc" id="L1494" title="All 2 branches missed.">                    if (iconHeight &gt; fontHeight) {</span>
+<span class="nc" id="L1495">                        iconStringHGap = (iconHeight - fontHeight) / 2;</span>
+<span class="nc" id="L1496">                        strWidth = drawLabelStringValign(g, l, text, x, y, iconStringHGap, iconHeight, textSpaceX, textSpaceW, fontHeight);</span>
+
+<span class="nc" id="L1498">                        g.drawImage(icon, x + strWidth + gap, y);</span>
+                    } else {
+<span class="nc" id="L1500">                        strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);</span>
+<span class="nc" id="L1501">                        drawLabelImageValign(g, l, icon, x + strWidth + gap, y, fontHeight, iconHeight);</span>
+                    }
+<span class="nc" id="L1503">                    break;</span>
+                case Label.RIGHT:
+<span class="nc bnc" id="L1505" title="All 2 branches missed.">                    if (iconHeight &gt; fontHeight) {</span>
+<span class="nc" id="L1506">                        iconStringHGap = (iconHeight - fontHeight) / 2;</span>
+<span class="nc" id="L1507">                        g.drawImage(icon, x, y);</span>
+<span class="nc" id="L1508">                        drawLabelStringValign(g, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceX, textSpaceW, fontHeight);</span>
+                    } else {
+<span class="nc" id="L1510">                        drawLabelImageValign(g, l, icon, x, y, fontHeight, iconHeight);</span>
+<span class="nc" id="L1511">                        drawLabelString(g, l, text, x + iconWidth + gap, y, textSpaceX, textSpaceW);</span>
+                    }
+<span class="nc" id="L1513">                    break;</span>
+                case Label.BOTTOM:
+<span class="nc bnc" id="L1515" title="All 2 branches missed.">                    if (iconWidth &gt; strWidth) { //center align the smaller</span>
+
+<span class="nc" id="L1517">                        iconStringWGap = (iconWidth - strWidth) / 2;</span>
+<span class="nc" id="L1518">                        g.drawImage(icon, x, y);</span>
+<span class="nc" id="L1519">                        drawLabelString(g, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceX, textSpaceW);</span>
+                    } else {
+<span class="nc" id="L1521">                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;</span>
+<span class="nc" id="L1522">                        g.drawImage(icon, x + iconStringWGap, y);</span>
+
+<span class="nc" id="L1524">                        drawLabelString(g, l, text, x, y + iconHeight + gap, textSpaceX, textSpaceW);</span>
+                    }
+<span class="nc" id="L1526">                    break;</span>
+                case Label.TOP:
+<span class="nc bnc" id="L1528" title="All 2 branches missed.">                    if (iconWidth &gt; strWidth) { //center align the smaller</span>
+
+<span class="nc" id="L1530">                        iconStringWGap = (iconWidth - strWidth) / 2;</span>
+<span class="nc" id="L1531">                        drawLabelString(g, l, text, x + iconStringWGap, y, textSpaceX, textSpaceW);</span>
+<span class="nc" id="L1532">                        g.drawImage(icon, x, y + fontHeight + gap);</span>
+                    } else {
+<span class="nc" id="L1534">                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;</span>
+<span class="nc" id="L1535">                        drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);</span>
+<span class="nc" id="L1536">                        g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);</span>
+                    }
+                    break;
+            }
+        }
+
+<span class="nc" id="L1542">        String badgeText = l.getBadgeText();</span>
+<span class="nc bnc" id="L1543" title="All 4 branches missed.">        if (badgeText != null &amp;&amp; badgeText.length() &gt; 0) {</span>
+
+<span class="nc" id="L1545">            Component badgeCmp = l.getBadgeStyleComponent();</span>
+<span class="nc" id="L1546">            int badgePaddingTop = CN.convertToPixels(1);</span>
+<span class="nc" id="L1547">            int badgePaddingBottom = badgePaddingTop;</span>
+<span class="nc" id="L1548">            int badgePaddingLeft = badgePaddingTop;</span>
+<span class="nc" id="L1549">            int badgePaddingRight = badgePaddingTop;</span>
+<span class="nc" id="L1550">            int fgColor = 0xffffff;</span>
+<span class="nc" id="L1551">            int bgColor = 0x666666;</span>
+<span class="nc" id="L1552">            int strokeColor = bgColor;</span>
+<span class="nc" id="L1553">            Font badgeFont = null;</span>
+            Style badgeStyle;
+<span class="nc bnc" id="L1555" title="All 2 branches missed.">            if (badgeCmp == null) {</span>
+<span class="nc" id="L1556">                badgeStyle = l.getUIManager().getComponentStyle(&quot;Badge&quot;);</span>
+
+            } else {
+<span class="nc" id="L1559">                badgeStyle = badgeCmp.getStyle();</span>
+            }
+<span class="nc bnc" id="L1561" title="All 2 branches missed.">            if (badgeStyle != null) {</span>
+<span class="nc" id="L1562">                fgColor = badgeStyle.getFgColor();</span>
+<span class="nc" id="L1563">                bgColor = badgeStyle.getBgColor();</span>
+<span class="nc bnc" id="L1564" title="All 2 branches missed.">                if (badgeStyle.getBorder() instanceof RoundBorder) {</span>
+<span class="nc" id="L1565">                    strokeColor = ((RoundBorder) badgeStyle.getBorder()).getStrokeColor();</span>
+                } else {
+<span class="nc" id="L1567">                    strokeColor = bgColor;</span>
+                }
+<span class="nc" id="L1569">                badgeFont = badgeStyle.getFont();</span>
+<span class="nc" id="L1570">                badgePaddingTop = badgeStyle.getPaddingTop();</span>
+<span class="nc" id="L1571">                badgePaddingBottom = badgeStyle.getPaddingBottom();</span>
+<span class="nc" id="L1572">                badgePaddingLeft = badgeStyle.getPaddingLeftNoRTL();</span>
+<span class="nc" id="L1573">                badgePaddingRight = badgeStyle.getPaddingRightNoRTL();</span>
+            }
+<span class="nc bnc" id="L1575" title="All 2 branches missed.">            if (badgeFont == null) {</span>
+<span class="nc bnc" id="L1576" title="All 2 branches missed.">                if (Font.isNativeFontSchemeSupported()) {</span>
+<span class="nc" id="L1577">                    badgeFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT).derive(fontHeight / 2, 0);</span>
+                } else {
+<span class="nc" id="L1579">                    badgeFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);</span>
+                }
+            }
+
+<span class="nc" id="L1583">            int badgeFontHeight = badgeFont.getHeight();</span>
+<span class="nc" id="L1584">            int badgeTextWidth = badgeFont.stringWidth(badgeText);</span>
+<span class="nc" id="L1585">            GeneralPath path = new GeneralPath();</span>
+
+<span class="nc" id="L1587">            Rectangle rect = new Rectangle(</span>
+                    cmpX + cmpWidth - badgeTextWidth - badgePaddingLeft - badgePaddingRight,
+                    cmpY,
+                    badgePaddingLeft + badgePaddingRight + badgeTextWidth,
+                    badgePaddingTop + badgePaddingBottom + badgeFontHeight
+            );
+<span class="nc bnc" id="L1593" title="All 2 branches missed.">            if (rect.getWidth() &lt; rect.getHeight()) {</span>
+<span class="nc" id="L1594">                rect.setX(cmpX + cmpWidth - rect.getHeight());</span>
+<span class="nc" id="L1595">                rect.setWidth(rect.getHeight());</span>
+            }
+
+<span class="nc" id="L1598">            path.moveTo(rect.getX() + rect.getHeight() / 2, rect.getY());</span>
+<span class="nc" id="L1599">            path.lineTo(rect.getX() + rect.getWidth() - rect.getHeight() / 2, rect.getY());</span>
+<span class="nc" id="L1600">            path.arcTo(rect.getX() + rect.getWidth() - rect.getHeight() / 2, rect.getY() + rect.getHeight() / 2, rect.getX() + rect.getWidth() - rect.getHeight() / 2, rect.getY() + rect.getHeight(), true);</span>
+<span class="nc" id="L1601">            path.lineTo(rect.getX() + rect.getHeight() / 2, rect.getY() + rect.getHeight());</span>
+<span class="nc" id="L1602">            path.arcTo(rect.getX() + rect.getHeight() / 2, rect.getY() + rect.getHeight() / 2, rect.getX() + rect.getHeight() / 2, rect.getY(), true);</span>
+<span class="nc" id="L1603">            path.closePath();</span>
+
+<span class="nc" id="L1605">            int col = g.getColor();</span>
+<span class="nc" id="L1606">            boolean antialias = g.isAntiAliased();</span>
+<span class="nc" id="L1607">            g.setAntiAliased(true);</span>
+<span class="nc" id="L1608">            g.setColor(bgColor);</span>
+
+
+<span class="nc" id="L1611">            g.fillShape(path);</span>
+<span class="nc bnc" id="L1612" title="All 2 branches missed.">            if (bgColor != strokeColor) {</span>
+<span class="nc" id="L1613">                g.setColor(strokeColor);</span>
+<span class="nc" id="L1614">                int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());</span>
+<span class="nc" id="L1615">                g.drawShape(path, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));</span>
+<span class="nc" id="L1616">                g.setAlpha(alpha2);</span>
+            }
+
+
+<span class="nc" id="L1620">            g.setColor(fgColor);</span>
+<span class="nc" id="L1621">            g.setFont(badgeFont);</span>
+<span class="nc" id="L1622">            int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());</span>
+<span class="nc" id="L1623">            g.drawString(badgeText, rect.getX() + rect.getWidth() / 2 - badgeTextWidth / 2, rect.getY() + badgePaddingTop);</span>
+<span class="nc" id="L1624">            g.setAlpha(alpha2);</span>
+
+
+<span class="nc" id="L1627">            g.setColor(col);</span>
+<span class="nc" id="L1628">            g.setAntiAliased(antialias);</span>
+
+
+        }
+<span class="nc" id="L1632">        g.setAlpha(alpha);</span>
+<span class="nc" id="L1633">    }</span>
+
+    private void drawLabelImageValign(Graphics g, Label l, Image icon, int x, int y, int fontHeight, int iconHeight) {
+<span class="nc" id="L1636">        int iconStringHGap = (fontHeight - iconHeight) / 2;</span>
+        //int strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
+<span class="nc bnc" id="L1638" title="All 4 branches missed.">        switch (l.getVerticalAlignment()) {</span>
+            case Component.TOP:
+<span class="nc" id="L1640">                g.drawImage(icon, x, y + iconStringHGap);</span>
+<span class="nc" id="L1641">                break;</span>
+            case Component.BOTTOM:
+<span class="nc" id="L1643">                g.drawImage(icon, x, y + fontHeight - iconHeight);</span>
+<span class="nc" id="L1644">                break;</span>
+            case Component.BASELINE:
+<span class="nc" id="L1646">                Font iconFont = l.getIconStyleComponent().getStyle().getFont();</span>
+<span class="nc" id="L1647">                Font textFont = l.getStyle().getFont();</span>
+<span class="nc bnc" id="L1648" title="All 2 branches missed.">                if (iconFont == null) {</span>
+<span class="nc" id="L1649">                    iconFont = Font.getDefaultFont();</span>
+                }
+<span class="nc bnc" id="L1651" title="All 2 branches missed.">                if (textFont == null) {</span>
+<span class="nc" id="L1652">                    textFont = Font.getDefaultFont();</span>
+                }
+<span class="nc" id="L1654">                iconStringHGap = textFont.getAscent() - iconFont.getAscent();</span>
+<span class="nc" id="L1655">                g.drawImage(icon, x, y + iconStringHGap);</span>
+<span class="nc" id="L1656">                break;</span>
+            default:
+<span class="nc" id="L1658">                g.drawImage(icon, x, y + iconStringHGap);</span>
+                break;
+
+        }
+<span class="nc" id="L1662">    }</span>
+
+    /**
+     * Implements the drawString for the text component and adjust the valign
+     * assuming the icon is in one of the sides
+     */
+    private int drawLabelStringValign(Graphics g, Label l, String str, int x, int y,
+                                      int iconStringHGap, int iconHeight, int textSpaceX, int textSpaceW, int fontHeight) {
+<span class="nc bnc" id="L1670" title="All 2 branches missed.">        if (str.length() == 0) {</span>
+<span class="nc" id="L1671">            return 0;</span>
+        }
+<span class="nc bnc" id="L1673" title="All 4 branches missed.">        switch (l.getVerticalAlignment()) {</span>
+            case Component.TOP:
+<span class="nc" id="L1675">                return drawLabelString(g, l, str, x, y, textSpaceX, textSpaceW);</span>
+            case Component.CENTER:
+<span class="nc" id="L1677">                return drawLabelString(g, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceX, textSpaceW);</span>
+            case Component.BASELINE:
+<span class="nc" id="L1679">                Font iconFont = l.getIconStyleComponent().getStyle().getFont();</span>
+<span class="nc" id="L1680">                Font textFont = l.getStyle().getFont();</span>
+<span class="nc bnc" id="L1681" title="All 2 branches missed.">                if (iconFont == null) {</span>
+<span class="nc" id="L1682">                    iconFont = Font.getDefaultFont();</span>
+                }
+<span class="nc bnc" id="L1684" title="All 2 branches missed.">                if (textFont == null) {</span>
+<span class="nc" id="L1685">                    textFont = Font.getDefaultFont();</span>
+                }
+<span class="nc" id="L1687">                int ascentDiff = iconFont.getAscent() - textFont.getAscent();</span>
+<span class="nc" id="L1688">                return drawLabelString(g, l, str, x, y + ascentDiff, textSpaceX, textSpaceW);</span>
+
+            default:
+<span class="nc" id="L1691">                return drawLabelString(g, l, str, x, y + iconStringHGap, textSpaceX, textSpaceW);</span>
+        }
+    }
+
+    private Span calculateSpanForLabelStringValign(TextSelection sel, Label l, String str, int x, int y,
+                                                   int iconStringHGap, int iconHeight, int textSpaceW, int fontHeight) {
+<span class="nc bnc" id="L1697" title="All 4 branches missed.">        switch (l.getVerticalAlignment()) {</span>
+            case Component.TOP:
+<span class="nc" id="L1699">                return calculateSpanForLabelString(sel, l, str, x, y, textSpaceW);</span>
+            case Component.CENTER:
+<span class="nc" id="L1701">                return calculateSpanForLabelString(sel, l, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW);</span>
+            case Component.BASELINE:
+<span class="nc" id="L1703">                Font iconFont = l.getIconStyleComponent().getStyle().getFont();</span>
+<span class="nc" id="L1704">                Font textFont = l.getStyle().getFont();</span>
+<span class="nc bnc" id="L1705" title="All 2 branches missed.">                if (iconFont == null) {</span>
+<span class="nc" id="L1706">                    iconFont = Font.getDefaultFont();</span>
+                }
+<span class="nc bnc" id="L1708" title="All 2 branches missed.">                if (textFont == null) {</span>
+<span class="nc" id="L1709">                    textFont = Font.getDefaultFont();</span>
+                }
+<span class="nc" id="L1711">                int ascentDiff = iconFont.getAscent() - textFont.getAscent();</span>
+<span class="nc" id="L1712">                return calculateSpanForLabelString(sel, l, str, x, y + ascentDiff, textSpaceW);</span>
+            default:
+<span class="nc" id="L1714">                return calculateSpanForLabelString(sel, l, str, x, y + iconStringHGap, textSpaceW);</span>
+        }
+    }
+
+    /**
+     * Implements the drawString for the text component and adjust the valign
+     * assuming the icon is in one of the sides
+     */
+    private int drawLabelString(Graphics g, Label l, String text, int x, int y, int textSpaceX, int textSpaceW) {
+<span class="nc bnc" id="L1723" title="All 2 branches missed.">        if (text.length() == 0) {</span>
+<span class="nc" id="L1724">            return 0;</span>
+        }
+<span class="nc" id="L1726">        Style style = l.getStyle();</span>
+
+<span class="nc" id="L1728">        int cx = g.getClipX();</span>
+<span class="nc" id="L1729">        int cy = g.getClipY();</span>
+<span class="nc" id="L1730">        int cw = g.getClipWidth();</span>
+<span class="nc" id="L1731">        int ch = g.getClipHeight();</span>
+        //g.pushClip();
+<span class="nc" id="L1733">        g.clipRect(textSpaceX, cy, textSpaceW, ch);</span>
+
+<span class="nc bnc" id="L1735" title="All 2 branches missed.">        if (l.isTickerRunning()) {</span>
+<span class="nc" id="L1736">            Font font = style.getFont();</span>
+<span class="nc bnc" id="L1737" title="All 2 branches missed.">            if (l.getShiftText() &gt; 0) {</span>
+<span class="nc bnc" id="L1738" title="All 2 branches missed.">                if (l.getShiftText() &gt; textSpaceW) {</span>
+<span class="nc" id="L1739">                    l.setShiftText(x - l.getX() - l.getStringWidth(font));</span>
+                }
+<span class="nc bnc" id="L1741" title="All 2 branches missed.">            } else if (l.getShiftText() + l.getStringWidth(font) &lt; 0) {</span>
+<span class="nc" id="L1742">                l.setShiftText(textSpaceW);</span>
+            }
+        }
+<span class="nc" id="L1745">        int drawnW = drawLabelText(g, l, text, x, y, textSpaceW);</span>
+
+<span class="nc" id="L1747">        g.setClip(cx, cy, cw, ch);</span>
+        //g.popClip();
+
+<span class="nc" id="L1750">        return drawnW;</span>
+    }
+
+    private Span calculateSpanForLabelString(TextSelection sel, Label l, String text, int x, int y, int textSpaceW) {
+<span class="nc" id="L1754">        Style style = l.getStyle();</span>
+
+
+<span class="nc bnc" id="L1757" title="All 2 branches missed.">        if (l.isTickerRunning()) {</span>
+<span class="nc" id="L1758">            Font font = style.getFont();</span>
+<span class="nc bnc" id="L1759" title="All 2 branches missed.">            if (l.getShiftText() &gt; 0) {</span>
+<span class="nc bnc" id="L1760" title="All 2 branches missed.">                if (l.getShiftText() &gt; textSpaceW) {</span>
+<span class="nc" id="L1761">                    l.setShiftText(x - l.getX() - l.getStringWidth(font));</span>
+                }
+<span class="nc bnc" id="L1763" title="All 2 branches missed.">            } else if (l.getShiftText() + l.getStringWidth(font) &lt; 0) {</span>
+<span class="nc" id="L1764">                l.setShiftText(textSpaceW);</span>
+            }
+        }
+<span class="nc" id="L1767">        return calculateSpanForLabelText(sel, l, text, x, y, textSpaceW);</span>
+
+    }
+
+    /**
+     * Draws the text of a label
+     *
+     * @param g          graphics context
+     * @param l          label component
+     * @param text       the text for the label
+     * @param x          position for the label
+     * @param y          position for the label
+     * @param textSpaceW the width available for the component
+     * @return the space used by the drawing
+     */
+    protected int drawLabelText(Graphics g, Label l, String text, int x, int y, int textSpaceW) {
+<span class="nc" id="L1783">        Style style = l.getStyle();</span>
+<span class="nc" id="L1784">        Font f = style.getFont();</span>
+<span class="nc" id="L1785">        boolean rtl = l.isRTL();</span>
+<span class="nc" id="L1786">        boolean isTickerRunning = l.isTickerRunning();</span>
+<span class="nc" id="L1787">        int txtW = l.getStringWidth(f);</span>
+<span class="nc bnc" id="L1788" title="All 4 branches missed.">        if ((!isTickerRunning) || rtl) {</span>
+            //if there is no space to draw the text add ... at the end
+<span class="nc bnc" id="L1790" title="All 4 branches missed.">            if (txtW &gt; textSpaceW &amp;&amp; textSpaceW &gt; 0) {</span>
+                // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+                // the allowed space is handled differently in RTL, this is due to the reverse algorithm
+                // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+                // trimming characters from the end of the text (as done with LTR) won't do.
+                // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+                // the downside is that a part of a letter may be shown here as well.
+
+<span class="nc bnc" id="L1798" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc bnc" id="L1799" title="All 4 branches missed.">                    if ((!isTickerRunning) &amp;&amp; (l.isEndsWith3Points())) {</span>
+<span class="nc" id="L1800">                        String points = &quot;...&quot;;</span>
+<span class="nc" id="L1801">                        int pointsW = f.stringWidth(points);</span>
+<span class="nc" id="L1802">                        g.drawString(points, l.getShiftText() + x, y, l.getStyle().getTextDecoration());</span>
+<span class="nc" id="L1803">                        g.clipRect(pointsW + l.getShiftText() + x, y, textSpaceW - pointsW, f.getHeight());</span>
+<span class="nc" id="L1804">                    }</span>
+                    //x = x - txtW + textSpaceW;
+                } else {
+<span class="nc bnc" id="L1807" title="All 2 branches missed.">                    if (l.isEndsWith3Points()) {</span>
+<span class="nc" id="L1808">                        String points = &quot;...&quot;;</span>
+<span class="nc" id="L1809">                        int index = 1;</span>
+<span class="nc" id="L1810">                        int widest = f.charWidth('W');</span>
+<span class="nc" id="L1811">                        int pointsW = f.stringWidth(points);</span>
+<span class="nc" id="L1812">                        int tlen = text.length();</span>
+<span class="nc bnc" id="L1813" title="All 4 branches missed.">                        while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, f) &amp;&amp; index &lt; tlen) {</span>
+<span class="nc" id="L1814">                            index++;</span>
+                        }
+<span class="nc" id="L1816">                        text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;</span>
+<span class="nc" id="L1817">                        txtW = f.stringWidth(text);</span>
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L1823">        g.drawString(text, l.getShiftText() + x, y, style.getTextDecoration());</span>
+<span class="nc" id="L1824">        return Math.min(txtW, textSpaceW);</span>
+    }
+
+    private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Font f) {
+<span class="nc bnc" id="L1828" title="All 2 branches missed.">        if (length * charWidth &lt; width) {</span>
+<span class="nc" id="L1829">            return true;</span>
+        }
+<span class="nc" id="L1831">        length = Math.min(s.length(), length);</span>
+<span class="nc bnc" id="L1832" title="All 2 branches missed.">        return f.substringWidth(s, 0, length) &lt; width;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getComboBoxPreferredSize(List cb) {
+<span class="nc" id="L1839">        Dimension d = getListPreferredSize(cb);</span>
+<span class="nc bnc" id="L1840" title="All 2 branches missed.">        Image comboBoxImage = ((ComboBox) cb).getComboBoxImage() != null ? ((ComboBox) cb).getComboBoxImage() : comboImage;</span>
+<span class="nc bnc" id="L1841" title="All 2 branches missed.">        if (comboBoxImage != null) {</span>
+<span class="nc" id="L1842">            d.setWidth(d.getWidth() + comboBoxImage.getWidth());</span>
+<span class="nc" id="L1843">            d.setHeight(Math.max(d.getHeight(), comboBoxImage.getHeight()));</span>
+        }
+<span class="nc" id="L1845">        return d;</span>
+    }
+
+
+    /**
+     * Similar to getText() but works properly with password fields
+     */
+    protected String getTextFieldString(TextArea ta) {
+<span class="nc" id="L1853">        String txt = ta.getText();</span>
+        String text;
+<span class="nc bnc" id="L1855" title="All 2 branches missed.">        if (ta.isSingleLineTextArea()) {</span>
+<span class="nc" id="L1856">            text = txt;</span>
+        } else {
+<span class="nc" id="L1858">            text = ta.getTextAt(ta.getCursorY());</span>
+<span class="nc bnc" id="L1859" title="All 2 branches missed.">            if (ta.getCursorPosition() + text.length() &lt; txt.length()) {</span>
+<span class="nc" id="L1860">                char c = txt.charAt(ta.getCursorPosition() + text.length());</span>
+<span class="nc bnc" id="L1861" title="All 2 branches missed.">                if (c == '\n') {</span>
+<span class="nc" id="L1862">                    text += &quot;\n&quot;;</span>
+<span class="nc bnc" id="L1863" title="All 2 branches missed.">                } else if (c == ' ') {</span>
+<span class="nc" id="L1864">                    text += &quot; &quot;;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L1869">        String displayText = &quot;&quot;;</span>
+<span class="nc bnc" id="L1870" title="All 2 branches missed.">        if ((ta.getConstraint() &amp; TextArea.PASSWORD) != 0) {</span>
+            // show the last character in a password field
+<span class="nc bnc" id="L1872" title="All 2 branches missed.">            if (ta.isPendingCommit()) {</span>
+<span class="nc bnc" id="L1873" title="All 2 branches missed.">                if (text.length() &gt; 0) {</span>
+<span class="nc" id="L1874">                    int tlen = text.length();</span>
+<span class="nc bnc" id="L1875" title="All 2 branches missed.">                    for (int j = 0; j &lt; tlen - 1; j++) {</span>
+<span class="nc" id="L1876">                        displayText += passwordChar;</span>
+                    }
+<span class="nc" id="L1878">                    displayText += text.charAt(text.length() - 1);</span>
+<span class="nc" id="L1879">                }</span>
+            } else {
+<span class="nc bnc" id="L1881" title="All 2 branches missed.">                for (int j = 0; j &lt; text.length(); j++) {</span>
+<span class="nc" id="L1882">                    displayText += passwordChar;</span>
+                }
+            }
+        } else {
+<span class="nc" id="L1886">            displayText = text;</span>
+        }
+<span class="nc" id="L1888">        return displayText;</span>
+    }
+
+    public Spans calculateTextFieldSpan(TextSelection sel, TextArea ta) {
+        //setFG(g, ta);
+<span class="nc" id="L1893">        Span out = sel.newSpan(ta);</span>
+        // display ******** if it is a password field
+<span class="nc" id="L1895">        String displayText = getTextFieldString(ta);</span>
+
+<span class="nc" id="L1897">        Style style = ta.getStyle();</span>
+<span class="nc" id="L1898">        int x = 0;</span>
+<span class="nc bnc" id="L1899" title="All 2 branches missed.">        int cursorCharPosition = ta.hasFocus() ? ta.getCursorPosition() : 0;//ta.getCursorX();        </span>
+<span class="nc" id="L1900">        Font f = style.getFont();</span>
+<span class="nc" id="L1901">        int cursorX = 0;</span>
+<span class="nc" id="L1902">        int xPos = 0;</span>
+
+<span class="nc" id="L1904">        int align = reverseAlignForBidi(ta);</span>
+<span class="nc" id="L1905">        int displayX = 0;</span>
+
+<span class="nc" id="L1907">        String inputMode = ta.getInputMode();</span>
+<span class="nc" id="L1908">        int inputModeWidth = f.stringWidth(inputMode);</span>
+
+        // QWERTY devices don't quite have an input mode hide it also when we have a VK
+<span class="nc bnc" id="L1911" title="All 6 branches missed.">        if (!Display.getInstance().platformUsesInputMode() || ta.isQwertyInput() || Display.getInstance().isVirtualKeyboardShowing()) {</span>
+<span class="nc" id="L1912">            inputMode = &quot;&quot;;</span>
+<span class="nc" id="L1913">            inputModeWidth = 0;</span>
+        }
+<span class="nc bnc" id="L1915" title="All 2 branches missed.">        if (ta.isSingleLineTextArea()) {</span>
+            // there is currently no support for CENTER aligned text fields
+<span class="nc bnc" id="L1917" title="All 2 branches missed.">            if (align == Component.LEFT) {</span>
+<span class="nc bnc" id="L1918" title="All 2 branches missed.">                if (cursorCharPosition &gt; 0) {</span>
+<span class="nc" id="L1919">                    cursorCharPosition = Math.min(displayText.length(),</span>
+                            cursorCharPosition);
+<span class="nc" id="L1921">                    xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));</span>
+<span class="nc" id="L1922">                    cursorX = ta.getX() + style.getPaddingLeft(ta.isRTL()) + xPos;</span>
+
+                    // no point in showing the input mode when there is only one input mode...
+<span class="nc bnc" id="L1925" title="All 6 branches missed.">                    if (inputModeWidth &gt; 0 &amp;&amp; ta.getInputModeOrder() != null &amp;&amp; ta.getInputModeOrder().length == 1) {</span>
+<span class="nc" id="L1926">                        inputModeWidth = 0;</span>
+                    }
+<span class="nc bnc" id="L1928" title="All 2 branches missed.">                    if (ta.isEnableInputScroll()) {</span>
+<span class="nc bnc" id="L1929" title="All 4 branches missed.">                        if (ta.getWidth() &gt; (f.getHeight() * 2) &amp;&amp; cursorX &gt;= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL())) {</span>
+<span class="nc bnc" id="L1930" title="All 2 branches missed.">                            if (x + xPos &gt;= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2) {</span>
+<span class="nc" id="L1931">                                x = ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2 - xPos - 1;</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L1936">                displayX = ta.getX() + x + style.getPaddingLeft(ta.isRTL());</span>
+            } else {
+<span class="nc" id="L1938">                x = 0;</span>
+<span class="nc" id="L1939">                cursorX = getTextFieldCursorX(ta);</span>
+<span class="nc" id="L1940">                int baseX = ta.getX() + style.getPaddingLeftNoRTL() + inputModeWidth;</span>
+<span class="nc" id="L1941">                int endX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL();</span>
+
+<span class="nc bnc" id="L1943" title="All 2 branches missed.">                if (cursorX &lt; baseX) {</span>
+<span class="nc" id="L1944">                    x = baseX - cursorX;</span>
+                } else {
+<span class="nc bnc" id="L1946" title="All 2 branches missed.">                    if (cursorX &gt; endX) {</span>
+<span class="nc" id="L1947">                        x = endX - cursorX;</span>
+                    }
+                }
+
+<span class="nc" id="L1951">                displayX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL() - style.getPaddingLeftNoRTL() - f.stringWidth(displayText) + x;</span>
+            }
+
+            //int cx = g.getClipX();
+            //int cy = g.getClipY();
+            //int cw = g.getClipWidth();
+            //int ch = g.getClipHeight();
+            //int clipx = ta.getX() + style.getPaddingLeft(ta.isRTL());
+            //int clipw = ta.getWidth() - style.getPaddingLeft(ta.isRTL()) - style.getPaddingRight(ta.isRTL());
+            //g.pushClip();
+            //g.clipRect(clipx, cy, clipw, ch);
+
+            //int xOffset = 0;
+            //int len = displayText.length();
+            //int charH = f.getHeight();
+<span class="nc" id="L1966">            int h = getSelectionHeight(f);</span>
+<span class="nc bnc" id="L1967" title="All 3 branches missed.">            switch (ta.getVerticalAlignment()) {</span>
+                case Component.BOTTOM:
+                    //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), style.getTextDecoration());
+<span class="nc" id="L1970">                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - h, h);</span>
+                    // c = sel.newChar(i, charX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), charW , charH);
+<span class="nc" id="L1972">                    break;</span>
+                case Component.CENTER:
+                    //g.drawString(displayText, displayX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, style.getTextDecoration());
+                    //c = sel.newChar(i, charX, ta.getY() + ta.getHeight() / 2  - f.getHeight() / 2, charW, charH);
+<span class="nc" id="L1976">                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + ta.getHeight() / 2 - h / 2, h);</span>
+<span class="nc" id="L1977">                    break;</span>
+                default:
+                    //g.drawString(displayText, displayX, ta.getY() + style.getPaddingTop(), style.getTextDecoration());
+                    //c = sel.newChar(i, charX, ta.getY() + style.getPaddingTop(), charW, charH);
+<span class="nc" id="L1981">                    append(sel, ta, out, displayText, f, 0, displayX, ta.getY() + style.getPaddingTop(), h);</span>
+                    break;
+            }
+
+
+            //g.setClip(cx, cy, cw, ch);
+            //g.popClip();
+<span class="nc" id="L1988">            out = out.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());</span>
+<span class="nc" id="L1989">            Spans spansOut = sel.newSpans();</span>
+<span class="nc" id="L1990">            spansOut.add(out);</span>
+<span class="nc" id="L1991">            return spansOut;</span>
+
+        } else {
+            //drawTextArea(g, ta);
+<span class="nc" id="L1995">            return calculateTextAreaSpan(sel, ta);</span>
+        }
+
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawTextField(Graphics g, TextArea ta) {
+<span class="nc" id="L2005">        setFG(g, ta);</span>
+<span class="nc" id="L2006">        int alpha = g.concatenateAlpha(ta.getStyle().getFgAlpha());</span>
+        // display ******** if it is a password field
+<span class="nc" id="L2008">        String displayText = getTextFieldString(ta);</span>
+
+<span class="nc" id="L2010">        Style style = ta.getStyle();</span>
+<span class="nc" id="L2011">        int x = 0;</span>
+<span class="nc bnc" id="L2012" title="All 2 branches missed.">        int cursorCharPosition = ta.hasFocus() ? ta.getCursorPosition() : 0;//ta.getCursorX();        </span>
+<span class="nc" id="L2013">        Font f = style.getFont();</span>
+<span class="nc" id="L2014">        int cursorX = 0;</span>
+<span class="nc" id="L2015">        int xPos = 0;</span>
+
+<span class="nc" id="L2017">        int align = reverseAlignForBidi(ta);</span>
+<span class="nc" id="L2018">        int displayX = 0;</span>
+
+<span class="nc" id="L2020">        String inputMode = ta.getInputMode();</span>
+<span class="nc" id="L2021">        int inputModeWidth = f.stringWidth(inputMode);</span>
+
+        // QWERTY devices don't quite have an input mode hide it also when we have a VK
+<span class="nc bnc" id="L2024" title="All 6 branches missed.">        if (!Display.getInstance().platformUsesInputMode() || ta.isQwertyInput() || Display.getInstance().isVirtualKeyboardShowing()) {</span>
+<span class="nc" id="L2025">            inputMode = &quot;&quot;;</span>
+<span class="nc" id="L2026">            inputModeWidth = 0;</span>
+        }
+<span class="nc bnc" id="L2028" title="All 2 branches missed.">        if (ta.isSingleLineTextArea()) {</span>
+            // there is currently no support for CENTER aligned text fields
+<span class="nc bnc" id="L2030" title="All 2 branches missed.">            if (align == Component.LEFT) {</span>
+<span class="nc bnc" id="L2031" title="All 2 branches missed.">                if (cursorCharPosition &gt; 0) {</span>
+<span class="nc" id="L2032">                    cursorCharPosition = Math.min(displayText.length(),</span>
+                            cursorCharPosition);
+<span class="nc" id="L2034">                    xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));</span>
+<span class="nc" id="L2035">                    cursorX = ta.getX() + style.getPaddingLeft(ta.isRTL()) + xPos;</span>
+
+                    // no point in showing the input mode when there is only one input mode...
+<span class="nc bnc" id="L2038" title="All 6 branches missed.">                    if (inputModeWidth &gt; 0 &amp;&amp; ta.getInputModeOrder() != null &amp;&amp; ta.getInputModeOrder().length == 1) {</span>
+<span class="nc" id="L2039">                        inputModeWidth = 0;</span>
+                    }
+<span class="nc bnc" id="L2041" title="All 2 branches missed.">                    if (ta.isEnableInputScroll()) {</span>
+<span class="nc bnc" id="L2042" title="All 4 branches missed.">                        if (ta.getWidth() &gt; (f.getHeight() * 2) &amp;&amp; cursorX &gt;= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL())) {</span>
+<span class="nc bnc" id="L2043" title="All 2 branches missed.">                            if (x + xPos &gt;= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2) {</span>
+<span class="nc" id="L2044">                                x = ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL()) * 2 - xPos - 1;</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L2049">                displayX = ta.getX() + x + style.getPaddingLeft(ta.isRTL());</span>
+            } else {
+<span class="nc" id="L2051">                x = 0;</span>
+<span class="nc" id="L2052">                cursorX = getTextFieldCursorX(ta);</span>
+<span class="nc" id="L2053">                int baseX = ta.getX() + style.getPaddingLeftNoRTL() + inputModeWidth;</span>
+<span class="nc" id="L2054">                int endX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL();</span>
+
+<span class="nc bnc" id="L2056" title="All 2 branches missed.">                if (cursorX &lt; baseX) {</span>
+<span class="nc" id="L2057">                    x = baseX - cursorX;</span>
+                } else {
+<span class="nc bnc" id="L2059" title="All 2 branches missed.">                    if (cursorX &gt; endX) {</span>
+<span class="nc" id="L2060">                        x = endX - cursorX;</span>
+                    }
+                }
+
+<span class="nc" id="L2064">                displayX = ta.getX() + ta.getWidth() - style.getPaddingRightNoRTL() - style.getPaddingLeftNoRTL() - f.stringWidth(displayText) + x;</span>
+            }
+
+<span class="nc" id="L2067">            int cx = g.getClipX();</span>
+<span class="nc" id="L2068">            int cy = g.getClipY();</span>
+<span class="nc" id="L2069">            int cw = g.getClipWidth();</span>
+<span class="nc" id="L2070">            int ch = g.getClipHeight();</span>
+<span class="nc" id="L2071">            int clipx = ta.getX() + style.getPaddingLeft(ta.isRTL());</span>
+<span class="nc" id="L2072">            int clipw = ta.getWidth() - style.getPaddingLeft(ta.isRTL()) - style.getPaddingRight(ta.isRTL());</span>
+            //g.pushClip();
+<span class="nc" id="L2074">            g.clipRect(clipx, cy, clipw, ch);</span>
+
+<span class="nc bnc" id="L2076" title="All 3 branches missed.">            switch (ta.getVerticalAlignment()) {</span>
+                case Component.BOTTOM:
+<span class="nc" id="L2078">                    g.drawString(displayText, displayX, ta.getY() + ta.getHeight() - style.getPaddingBottom() - f.getHeight(), style.getTextDecoration());</span>
+<span class="nc" id="L2079">                    break;</span>
+                case Component.CENTER:
+<span class="nc" id="L2081">                    g.drawString(displayText, displayX, ta.getY() + ta.getHeight() / 2 - f.getHeight() / 2, style.getTextDecoration());</span>
+<span class="nc" id="L2082">                    break;</span>
+                default:
+<span class="nc" id="L2084">                    g.drawString(displayText, displayX, ta.getY() + style.getPaddingTop(), style.getTextDecoration());</span>
+                    break;
+            }
+<span class="nc" id="L2087">            g.setClip(cx, cy, cw, ch);</span>
+            //g.popClip();
+
+<span class="nc" id="L2090">        } else {</span>
+<span class="nc" id="L2091">            drawTextArea(g, ta);</span>
+        }
+        // no point in showing the input mode when there is only one input mode...
+<span class="nc bnc" id="L2094" title="All 6 branches missed.">        if (inputModeWidth &gt; 0 &amp;&amp; ta.getInputModeOrder() != null &amp;&amp; ta.getInputModeOrder().length &gt; 1) {</span>
+
+<span class="nc bnc" id="L2096" title="All 4 branches missed.">            if (ta.handlesInput() &amp;&amp; ta.getWidth() / 2 &gt; inputModeWidth) {</span>
+
+<span class="nc" id="L2098">                int drawXPos = ta.getX() + style.getPaddingLeft(ta.isRTL());</span>
+<span class="nc bnc" id="L2099" title="All 4 branches missed.">                if ((!ta.isRTL() &amp;&amp; style.getAlignment() == Component.LEFT) ||</span>
+<span class="nc bnc" id="L2100" title="All 4 branches missed.">                        (ta.isRTL() &amp;&amp; style.getAlignment() == Component.RIGHT)) {</span>
+<span class="nc" id="L2101">                    drawXPos = drawXPos + ta.getWidth() - inputModeWidth - style.getPaddingRightNoRTL() - style.getPaddingLeftNoRTL();</span>
+                }
+<span class="nc" id="L2103">                g.setColor(style.getFgColor());</span>
+<span class="nc" id="L2104">                int inputIndicatorY = ta.getY() + ta.getScrollY() + ta.getHeight() -</span>
+<span class="nc" id="L2105">                        style.getPaddingBottom() -</span>
+<span class="nc" id="L2106">                        f.getHeight();</span>
+<span class="nc" id="L2107">                g.fillRect(drawXPos, inputIndicatorY, inputModeWidth,</span>
+<span class="nc" id="L2108">                        f.getHeight(), (byte) 140);</span>
+<span class="nc" id="L2109">                g.setColor(style.getBgColor());</span>
+<span class="nc" id="L2110">                g.drawString(inputMode, drawXPos, inputIndicatorY);</span>
+            }
+        }
+<span class="nc" id="L2113">        g.setAlpha(alpha);</span>
+<span class="nc" id="L2114">    }</span>
+
+
+    /**
+     * Returns true if the given character is an RTL character or a space
+     * character
+     *
+     * @param c character to test
+     * @return true if bidi is active and this is a
+     */
+    private boolean isRTLOrWhitespace(char c) {
+<span class="nc bnc" id="L2125" title="All 4 branches missed.">        return (Display.getInstance().isRTL(c)) || c == ' ';</span>
+    }
+
+    /**
+     * Calculates the position of the text field cursor within the string
+     */
+    private int getTextFieldCursorX(TextArea ta) {
+<span class="nc" id="L2132">        Style style = ta.getStyle();</span>
+<span class="nc" id="L2133">        Font f = style.getFont();</span>
+
+        // display ******** if it is a password field
+<span class="nc" id="L2136">        String displayText = getTextFieldString(ta);</span>
+<span class="nc" id="L2137">        String inputMode = ta.getInputMode();</span>
+<span class="nc" id="L2138">        int inputModeWidth = f.stringWidth(inputMode);</span>
+        // QWERTY devices don't quite have an input mode hide it also when we have a VK
+<span class="nc bnc" id="L2140" title="All 4 branches missed.">        if (ta.isQwertyInput() || Display.getInstance().isVirtualKeyboardShowing()) {</span>
+<span class="nc" id="L2141">            inputMode = &quot;&quot;;</span>
+<span class="nc" id="L2142">            inputModeWidth = 0;</span>
+        }
+
+<span class="nc" id="L2145">        int xPos = 0;</span>
+<span class="nc" id="L2146">        int cursorCharPosition = ta.getCursorX();</span>
+<span class="nc" id="L2147">        int cursorX = 0;</span>
+<span class="nc" id="L2148">        int x = 0;</span>
+
+<span class="nc bnc" id="L2150" title="All 2 branches missed.">        if (reverseAlignForBidi(ta) == Component.RIGHT) {</span>
+<span class="nc bnc" id="L2151" title="All 2 branches missed.">            if (Display.getInstance().isBidiAlgorithm()) {</span>
+                //char[] dest = displayText.toCharArray();
+<span class="nc" id="L2153">                cursorCharPosition = Display.getInstance().getCharLocation(displayText, cursorCharPosition - 1);</span>
+
+<span class="nc bnc" id="L2155" title="All 2 branches missed.">                if (cursorCharPosition == -1) {</span>
+<span class="nc" id="L2156">                    xPos = f.stringWidth(displayText);</span>
+                } else {
+<span class="nc" id="L2158">                    displayText = Display.getInstance().convertBidiLogicalToVisual(displayText);</span>
+<span class="nc bnc" id="L2159" title="All 2 branches missed.">                    if (!isRTLOrWhitespace((displayText.charAt(cursorCharPosition)))) {</span>
+<span class="nc" id="L2160">                        cursorCharPosition++;</span>
+                    }
+<span class="nc" id="L2162">                    xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));</span>
+                }
+            }
+<span class="nc" id="L2165">            int displayX = ta.getX() + ta.getWidth() - style.getPaddingLeft(ta.isRTL()) - f.stringWidth(displayText);</span>
+<span class="nc" id="L2166">            cursorX = displayX + xPos;</span>
+<span class="nc" id="L2167">            x = 0;</span>
+<span class="nc" id="L2168">        } else {</span>
+<span class="nc bnc" id="L2169" title="All 2 branches missed.">            if (cursorCharPosition &gt; 0) {</span>
+<span class="nc" id="L2170">                cursorCharPosition = Math.min(displayText.length(),</span>
+                        cursorCharPosition);
+<span class="nc" id="L2172">                xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));</span>
+            }
+<span class="nc" id="L2174">            cursorX = ta.getX() + style.getPaddingLeft(ta.isRTL()) + xPos;</span>
+
+<span class="nc bnc" id="L2176" title="All 6 branches missed.">            if (ta.isSingleLineTextArea() &amp;&amp; ta.getWidth() &gt; (f.getHeight() * 2) &amp;&amp; cursorX &gt;= ta.getWidth() - inputModeWidth - style.getPaddingLeft(ta.isRTL())) {</span>
+<span class="nc bnc" id="L2177" title="All 2 branches missed.">                if (x + xPos &gt;= ta.getWidth() - inputModeWidth - style.getPaddingLeftNoRTL() - style.getPaddingRightNoRTL()) {</span>
+<span class="nc" id="L2178">                    x = ta.getWidth() - inputModeWidth - style.getPaddingLeftNoRTL() - style.getPaddingRightNoRTL() - xPos - 1;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L2183">        return cursorX + x;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getTextFieldPreferredSize(TextArea ta) {
+<span class="nc" id="L2190">        return getTextAreaSize(ta, true);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawTextFieldCursor(Graphics g, TextArea ta) {
+<span class="nc" id="L2197">        Style style = ta.getStyle();</span>
+<span class="nc" id="L2198">        Font f = style.getFont();</span>
+
+
+        int cursorY;
+<span class="nc bnc" id="L2202" title="All 2 branches missed.">        if (ta.isSingleLineTextArea()) {</span>
+<span class="nc bnc" id="L2203" title="All 3 branches missed.">            switch (ta.getVerticalAlignment()) {</span>
+                case Component.BOTTOM:
+<span class="nc" id="L2205">                    cursorY = ta.getY() + ta.getHeight() - f.getHeight();</span>
+<span class="nc" id="L2206">                    break;</span>
+                case Component.CENTER:
+<span class="nc" id="L2208">                    cursorY = ta.getY() + ta.getHeight() / 2 - f.getHeight() / 2;</span>
+<span class="nc" id="L2209">                    break;</span>
+                default:
+<span class="nc" id="L2211">                    cursorY = ta.getY() + style.getPaddingTop();</span>
+<span class="nc" id="L2212">                    break;</span>
+            }
+        } else {
+<span class="nc" id="L2215">            cursorY = ta.getY() + style.getPaddingTop() + ta.getCursorY() * (ta.getRowsGap() + f.getHeight());</span>
+        }
+<span class="nc" id="L2217">        int cursorX = getTextFieldCursorX(ta);</span>
+
+<span class="nc" id="L2219">        int align = reverseAlignForBidi(ta);</span>
+<span class="nc" id="L2220">        int x = 0;</span>
+<span class="nc bnc" id="L2221" title="All 2 branches missed.">        if (align == Component.RIGHT) {</span>
+<span class="nc" id="L2222">            String inputMode = ta.getInputMode();</span>
+<span class="nc" id="L2223">            int inputModeWidth = f.stringWidth(inputMode);</span>
+
+<span class="nc" id="L2225">            int baseX = ta.getX() + style.getPaddingLeftNoRTL() + inputModeWidth;</span>
+<span class="nc bnc" id="L2226" title="All 2 branches missed.">            if (cursorX &lt; baseX) {</span>
+<span class="nc" id="L2227">                x = baseX - cursorX;</span>
+            }
+        }
+
+<span class="nc" id="L2231">        int oldColor = g.getColor();</span>
+<span class="nc" id="L2232">        int alpha = g.concatenateAlpha(style.getFgAlpha());</span>
+<span class="nc bnc" id="L2233" title="All 2 branches missed.">        if (getTextFieldCursorColor() == 0) {</span>
+<span class="nc" id="L2234">            g.setColor(style.getFgColor());</span>
+        } else {
+<span class="nc" id="L2236">            g.setColor(getTextFieldCursorColor());</span>
+        }
+<span class="nc" id="L2238">        g.drawLine(cursorX + x, cursorY, cursorX + x, cursorY + f.getHeight());</span>
+<span class="nc" id="L2239">        g.setColor(oldColor);</span>
+<span class="nc" id="L2240">        g.setAlpha(alpha);</span>
+<span class="nc" id="L2241">    }</span>
+
+    private FontImage getDefaultRefreshIcon() {
+<span class="nc" id="L2244">        Style s = new Style(UIManager.getInstance().getComponentStyle(&quot;Label&quot;));</span>
+<span class="nc" id="L2245">        s.setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE));</span>
+<span class="nc" id="L2246">        return FontImage.createMaterial(FontImage.MATERIAL_ARROW_UPWARD, s);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void drawPullToRefresh(Graphics g, final Component cmp, boolean taskExecuted) {
+<span class="nc" id="L2253">        final Form parentForm = cmp.getComponentForm();</span>
+<span class="nc" id="L2254">        final int scrollY = cmp.getScrollY();</span>
+        Component cmpToDraw;
+<span class="nc bnc" id="L2256" title="All 2 branches missed.">        if (taskExecuted) {</span>
+<span class="nc" id="L2257">            cmpToDraw = updating;</span>
+        } else {
+<span class="nc bnc" id="L2259" title="All 2 branches missed.">            if (-scrollY &gt; getPullToRefreshHeight()) {</span>
+<span class="nc" id="L2260">                cmpToDraw = releaseToRefresh;</span>
+            } else {
+<span class="nc" id="L2262">                cmpToDraw = pullDown;</span>
+            }
+        }
+
+<span class="nc bnc" id="L2266" title="All 4 branches missed.">        if (pull.getComponentAt(0) != updating &amp;&amp; cmpToDraw != pull.getComponentAt(0)) {</span>
+
+<span class="nc" id="L2268">            parentForm.registerAnimated(new Animation() {</span>
+
+<span class="nc" id="L2270">                int counter = 0;</span>
+                Image i;
+
+                {
+<span class="nc" id="L2274">                    i = UIManager.getInstance().getThemeImageConstant(&quot;pullToRefreshImage&quot;);</span>
+<span class="nc bnc" id="L2275" title="All 2 branches missed.">                    if (i == null) {</span>
+<span class="nc" id="L2276">                        i = getDefaultRefreshIcon();</span>
+                    }
+<span class="nc" id="L2278">                }</span>
+
+                public boolean animate() {
+<span class="nc" id="L2281">                    counter++;</span>
+
+<span class="nc bnc" id="L2283" title="All 2 branches missed.">                    if (pull.getComponentAt(0) == releaseToRefresh) {</span>
+<span class="nc" id="L2284">                        ((Label) releaseToRefresh).setIcon(i.rotate(180 - (180 / 6) * counter));</span>
+                    } else {
+<span class="nc" id="L2286">                        ((Label) pullDown).setIcon(i.rotate(180 * counter / 6));</span>
+                    }
+<span class="nc bnc" id="L2288" title="All 2 branches missed.">                    if (counter == 6) {</span>
+<span class="nc" id="L2289">                        ((Label) releaseToRefresh).setIcon(i);</span>
+<span class="nc" id="L2290">                        ((Label) pullDown).setIcon(i.rotate(180));</span>
+<span class="nc" id="L2291">                        parentForm.deregisterAnimated(this);</span>
+                    }
+
+                    // Placing the repaint inside a callSerially() because repaint directly
+                    // inside animate causes painting artifacts in many instances
+<span class="nc" id="L2296">                    CN.callSerially(new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L2298">                            cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(), cmp.getWidth(),</span>
+<span class="nc" id="L2299">                                    getPullToRefreshHeight());</span>
+<span class="nc" id="L2300">                        }</span>
+                    });
+
+
+<span class="nc" id="L2304">                    return false;</span>
+                }
+
+                public void paint(Graphics g) {
+<span class="nc" id="L2308">                }</span>
+            });
+
+        }
+<span class="nc bnc" id="L2312" title="All 4 branches missed.">        if (pull.getComponentAt(0) != cmpToDraw</span>
+                &amp;&amp; cmpToDraw instanceof Label
+<span class="nc bnc" id="L2314" title="All 2 branches missed.">                &amp;&amp; (pull.getComponentAt(0) instanceof Label)) {</span>
+<span class="nc" id="L2315">            ((Label) cmpToDraw).setIcon(((Label) pull.getComponentAt(0)).getIcon());</span>
+        }
+<span class="nc" id="L2317">        Component current = pull.getComponentAt(0);</span>
+<span class="nc bnc" id="L2318" title="All 2 branches missed.">        if (current != cmpToDraw) {</span>
+<span class="nc" id="L2319">            pull.replace(current, cmpToDraw, null);</span>
+        }
+
+<span class="nc" id="L2322">        pull.setWidth(cmp.getWidth());</span>
+<span class="nc" id="L2323">        pull.setX(cmp.getAbsoluteX());</span>
+<span class="nc" id="L2324">        pull.setY(cmp.getY() - scrollY - getPullToRefreshHeight());</span>
+<span class="nc" id="L2325">        pull.layoutContainer();</span>
+
+        // We need to make the InfiniteProgress to animate, otherwise the progress
+        // just stays static.
+<span class="nc" id="L2329">        ComponentSelector.select(&quot;*&quot;, pull).each(new ComponentClosure() {</span>
+
+
+            @Override
+            public void call(Component c) {
+<span class="nc bnc" id="L2334" title="All 2 branches missed.">                if (c instanceof InfiniteProgress) {</span>
+<span class="nc" id="L2335">                    ((InfiniteProgress) c).animate(true);</span>
+                } else {
+<span class="nc" id="L2337">                    c.animate();</span>
+                }
+<span class="nc" id="L2339">            }</span>
+        });
+<span class="nc" id="L2341">        pull.paintComponent(g);</span>
+
+<span class="nc" id="L2343">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getPullToRefreshHeight() {
+<span class="nc bnc" id="L2349" title="All 2 branches missed.">        if (pull == null) {</span>
+<span class="nc" id="L2350">            BorderLayout bl = new BorderLayout();</span>
+<span class="nc" id="L2351">            bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+<span class="nc" id="L2352">            pull = new Container(bl);</span>
+        }
+<span class="nc bnc" id="L2354" title="All 2 branches missed.">        if (pullDown == null) {</span>
+<span class="nc" id="L2355">            pullDown = new Label(getUIManager().localize(&quot;pull.down&quot;, &quot;Pull down to refresh...&quot;));</span>
+<span class="nc" id="L2356">            pullDown.setUIID(&quot;PullToRefresh&quot;);</span>
+
+<span class="nc" id="L2358">            Image i = UIManager.getInstance().getThemeImageConstant(&quot;pullToRefreshImage&quot;);</span>
+<span class="nc bnc" id="L2359" title="All 2 branches missed.">            if (i == null) {</span>
+<span class="nc" id="L2360">                i = getDefaultRefreshIcon();</span>
+            }
+<span class="nc" id="L2362">            i = i.rotate(180);</span>
+<span class="nc" id="L2363">            ((Label) pullDown).setIcon(i);</span>
+        }
+<span class="nc bnc" id="L2365" title="All 2 branches missed.">        if (releaseToRefresh == null) {</span>
+<span class="nc" id="L2366">            releaseToRefresh = new Label(getUIManager().localize(&quot;pull.release&quot;, &quot;Release to refresh...&quot;));</span>
+<span class="nc" id="L2367">            releaseToRefresh.setUIID(&quot;PullToRefresh&quot;);</span>
+<span class="nc" id="L2368">            Image i = UIManager.getInstance().getThemeImageConstant(&quot;pullToRefreshImage&quot;);</span>
+<span class="nc bnc" id="L2369" title="All 2 branches missed.">            if (i == null) {</span>
+<span class="nc" id="L2370">                i = getDefaultRefreshIcon();</span>
+            }
+<span class="nc" id="L2372">            ((Label) releaseToRefresh).setIcon(i);</span>
+        }
+<span class="nc bnc" id="L2374" title="All 2 branches missed.">        if (updating == null) {</span>
+<span class="nc" id="L2375">            updating = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="nc" id="L2376">            ((Container) updating).addComponent(new InfiniteProgress());</span>
+<span class="nc" id="L2377">            Label l = new Label(getUIManager().localize(&quot;pull.refresh&quot;, &quot;Updating...&quot;));</span>
+<span class="nc" id="L2378">            l.setUIID(&quot;PullToRefresh&quot;);</span>
+<span class="nc" id="L2379">            ((Container) updating).addComponent(l);</span>
+
+<span class="nc" id="L2381">            pull.getUnselectedStyle().setPadding(0, 0, 0, 0);</span>
+<span class="nc" id="L2382">            pull.getUnselectedStyle().setMargin(0, 0, 0, 0);</span>
+<span class="nc" id="L2383">            pull.addComponent(BorderLayout.CENTER, updating);</span>
+<span class="nc" id="L2384">            pull.layoutContainer();</span>
+<span class="nc" id="L2385">            pull.setHeight(Math.max(pullDown.getPreferredH(), pull.getPreferredH()));</span>
+        }
+<span class="nc" id="L2387">        String s = UIManager.getInstance().getThemeConstant(&quot;pullToRefreshHeight&quot;, null);</span>
+<span class="nc bnc" id="L2388" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L2389">            float f = Util.toFloatValue(s);</span>
+<span class="nc bnc" id="L2390" title="All 2 branches missed.">            if (f &gt; 0) {</span>
+<span class="nc" id="L2391">                return Display.getInstance().convertToPixels(f);</span>
+            }
+        }
+<span class="nc" id="L2394">        return pull.getHeight();</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public void focusGained(Component cmp) {
+<span class="pc bpc" id="L2402" title="1 of 2 branches missed.">        if (cmp instanceof Label) {</span>
+<span class="fc" id="L2403">            Label l = (Label) cmp;</span>
+<span class="pc bpc" id="L2404" title="4 of 6 branches missed.">            if (l.isTickerEnabled() &amp;&amp; l.shouldTickerStart() &amp;&amp; Display.getInstance().shouldRenderSelection(cmp)) {</span>
+<span class="nc" id="L2405">                ((Label) cmp).startTicker(getTickerSpeed(), true);</span>
+            }
+        }
+<span class="fc" id="L2408">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void focusLost(Component cmp) {
+<span class="nc bnc" id="L2414" title="All 2 branches missed.">        if (cmp instanceof Label) {</span>
+<span class="nc" id="L2415">            Label l = (Label) cmp;</span>
+<span class="nc bnc" id="L2416" title="All 2 branches missed.">            if (l.isTickerRunning()) {</span>
+<span class="nc" id="L2417">                l.stopTicker();</span>
+            }
+        }
+<span class="nc" id="L2420">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void refreshTheme(boolean b) {
+<span class="fc" id="L2426">        chkBoxImages = null;</span>
+<span class="fc" id="L2427">        comboImage = null;</span>
+<span class="fc" id="L2428">        rButtonImages = null;</span>
+<span class="fc" id="L2429">        chkBoxImagesFocus = null;</span>
+<span class="fc" id="L2430">        rButtonImagesFocus = null;</span>
+<span class="fc" id="L2431">        super.refreshTheme(b);</span>
+<span class="fc" id="L2432">        UIManager m = getUIManager();</span>
+<span class="fc" id="L2433">        Image combo = m.getThemeImageConstant(&quot;comboImage&quot;);</span>
+<span class="pc bpc" id="L2434" title="1 of 2 branches missed.">        if (combo != null) {</span>
+<span class="nc" id="L2435">            setComboBoxImage(combo);</span>
+        } else {
+<span class="pc bpc" id="L2437" title="1 of 2 branches missed.">            if (Font.isNativeFontSchemeSupported()) {</span>
+<span class="fc" id="L2438">                Style c = UIManager.getInstance().createStyle(&quot;ComboBox.&quot;, &quot;&quot;, false);</span>
+<span class="fc" id="L2439">                combo = FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, c);</span>
+<span class="fc" id="L2440">                setComboBoxImage(combo);</span>
+            }
+        }
+<span class="fc" id="L2443">        updateCheckBoxConstants(m, false, &quot;&quot;);</span>
+<span class="fc" id="L2444">        updateCheckBoxConstants(m, true, &quot;Focus&quot;);</span>
+<span class="fc" id="L2445">        updateRadioButtonConstants(m, false, &quot;&quot;);</span>
+<span class="fc" id="L2446">        updateRadioButtonConstants(m, true, &quot;Focus&quot;);</span>
+<span class="fc" id="L2447">    }</span>
+
+    private void updateCheckBoxConstants(UIManager m, boolean focus, String append) {
+<span class="fc" id="L2450">        Image checkSel = m.getThemeImageConstant(&quot;checkBoxChecked&quot; + append + &quot;Image&quot;);</span>
+<span class="pc bpc" id="L2451" title="1 of 2 branches missed.">        if (checkSel != null) {</span>
+<span class="nc" id="L2452">            Image checkUnsel = m.getThemeImageConstant(&quot;checkBoxUnchecked&quot; + append + &quot;Image&quot;);</span>
+<span class="nc bnc" id="L2453" title="All 2 branches missed.">            if (checkUnsel != null) {</span>
+<span class="nc" id="L2454">                Image disUnsel = m.getThemeImageConstant(&quot;checkBoxUncheckDis&quot; + append + &quot;Image&quot;);</span>
+<span class="nc" id="L2455">                Image disSel = m.getThemeImageConstant(&quot;checkBoxCheckDis&quot; + append + &quot;Image&quot;);</span>
+<span class="nc bnc" id="L2456" title="All 2 branches missed.">                if (disSel == null) {</span>
+<span class="nc" id="L2457">                    disSel = checkSel;</span>
+                }
+<span class="nc bnc" id="L2459" title="All 2 branches missed.">                if (disUnsel == null) {</span>
+<span class="nc" id="L2460">                    disUnsel = checkUnsel;</span>
+                }
+<span class="nc bnc" id="L2462" title="All 2 branches missed.">                if (focus) {</span>
+<span class="nc" id="L2463">                    setCheckBoxFocusImages(checkSel, checkUnsel, disSel, disUnsel);</span>
+                } else {
+<span class="nc" id="L2465">                    setCheckBoxImages(checkSel, checkUnsel, disSel, disUnsel);</span>
+                }
+            }
+<span class="nc bnc" id="L2468" title="All 2 branches missed.">            if (checkUnsel != null) {</span>
+<span class="nc bnc" id="L2469" title="All 2 branches missed.">                if (focus) {</span>
+<span class="nc" id="L2470">                    setCheckBoxFocusImages(checkSel, checkUnsel, checkSel, checkUnsel);</span>
+                } else {
+<span class="nc" id="L2472">                    setCheckBoxImages(checkSel, checkUnsel);</span>
+                }
+            }
+<span class="nc" id="L2475">        } else {</span>
+<span class="pc bpc" id="L2476" title="1 of 2 branches missed.">            if (!Font.isTrueTypeFileSupported()) {</span>
+<span class="nc" id="L2477">                return;</span>
+            }
+<span class="fc" id="L2479">            UIManager uim = UIManager.getInstance();</span>
+<span class="fc" id="L2480">            Style unsel = uim.createStyle(&quot;CheckBox.&quot;, &quot;&quot;, false);</span>
+<span class="fc" id="L2481">            Style sel = uim.createStyle(&quot;CheckBox.&quot;, &quot;sel#&quot;, true);</span>
+<span class="fc" id="L2482">            Style dis = uim.createStyle(&quot;CheckBox.&quot;, &quot;dis#&quot;, false);</span>
+<span class="fc" id="L2483">            FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, dis);</span>
+<span class="fc" id="L2484">            FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);</span>
+<span class="fc bfc" id="L2485" title="All 2 branches covered.">            if (focus) {</span>
+<span class="fc" id="L2486">                FontImage checkedSelected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, sel);</span>
+<span class="fc" id="L2487">                FontImage uncheckedSelected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);</span>
+<span class="fc" id="L2488">                setCheckBoxFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);</span>
+<span class="fc" id="L2489">            } else {</span>
+<span class="fc" id="L2490">                FontImage checkedUnselected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, unsel);</span>
+<span class="fc" id="L2491">                FontImage uncheckedUnselected = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, unsel);</span>
+<span class="fc" id="L2492">                setCheckBoxImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);</span>
+            }
+        }
+<span class="fc" id="L2495">    }</span>
+
+    private void updateRadioButtonConstants(UIManager m, boolean focus, String append) {
+<span class="fc" id="L2498">        Image radioSel = m.getThemeImageConstant(&quot;radioSelected&quot; + append + &quot;Image&quot;);</span>
+<span class="pc bpc" id="L2499" title="1 of 2 branches missed.">        if (radioSel != null) {</span>
+<span class="nc" id="L2500">            Image radioUnsel = m.getThemeImageConstant(&quot;radioUnselected&quot; + append + &quot;Image&quot;);</span>
+<span class="nc bnc" id="L2501" title="All 2 branches missed.">            if (radioUnsel != null) {</span>
+<span class="nc" id="L2502">                Image disUnsel = m.getThemeImageConstant(&quot;radioUnselectedDis&quot; + append + &quot;Image&quot;);</span>
+<span class="nc" id="L2503">                Image disSel = m.getThemeImageConstant(&quot;radioSelectedDis&quot; + append + &quot;Image&quot;);</span>
+<span class="nc bnc" id="L2504" title="All 2 branches missed.">                if (disUnsel == null) {</span>
+<span class="nc" id="L2505">                    disUnsel = radioUnsel;</span>
+                }
+<span class="nc bnc" id="L2507" title="All 2 branches missed.">                if (disSel == null) {</span>
+<span class="nc" id="L2508">                    disSel = radioSel;</span>
+                }
+<span class="nc bnc" id="L2510" title="All 2 branches missed.">                if (focus) {</span>
+<span class="nc" id="L2511">                    setRadioButtonFocusImages(radioSel, radioUnsel, disSel, disUnsel);</span>
+                } else {
+<span class="nc" id="L2513">                    setRadioButtonImages(radioSel, radioUnsel, disSel, disUnsel);</span>
+                }
+            }
+<span class="nc" id="L2516">        } else {</span>
+<span class="pc bpc" id="L2517" title="1 of 2 branches missed.">            if (!Font.isTrueTypeFileSupported()) {</span>
+<span class="nc" id="L2518">                return;</span>
+            }
+<span class="fc" id="L2520">            UIManager uim = UIManager.getInstance();</span>
+<span class="fc" id="L2521">            Style unsel = uim.createStyle(&quot;RadioButton.&quot;, &quot;&quot;, false);</span>
+<span class="fc" id="L2522">            Style sel = uim.createStyle(&quot;RadioButton.&quot;, &quot;sel#&quot;, true);</span>
+<span class="fc" id="L2523">            Style dis = uim.createStyle(&quot;RadioButton.&quot;, &quot;dis#&quot;, false);</span>
+<span class="fc" id="L2524">            FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, dis);</span>
+<span class="fc" id="L2525">            FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);</span>
+<span class="fc bfc" id="L2526" title="All 2 branches covered.">            if (focus) {</span>
+<span class="fc" id="L2527">                FontImage checkedSelected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, sel);</span>
+<span class="fc" id="L2528">                FontImage uncheckedSelected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);</span>
+<span class="fc" id="L2529">                setRadioButtonFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);</span>
+<span class="fc" id="L2530">            } else {</span>
+<span class="fc" id="L2531">                FontImage checkedUnselected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, unsel);</span>
+<span class="fc" id="L2532">                FontImage uncheckedUnselected = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, unsel);</span>
+<span class="fc" id="L2533">                setRadioButtonImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);</span>
+            }
+        }
+<span class="fc" id="L2536">    }</span>
+
+
+    public Span calculateSpanForLabelText(TextSelection sel, Label l, String text, int x, int y, int textSpaceW) {
+
+<span class="nc" id="L2541">        Span span = sel.newSpan(l);</span>
+<span class="nc" id="L2542">        Style style = l.getStyle();</span>
+<span class="nc" id="L2543">        Font f = style.getFont();</span>
+<span class="nc" id="L2544">        int h = f.getHeight() + (int) (f.getHeight() * 0.25);</span>
+<span class="nc" id="L2545">        y -= (int) (f.getHeight() * 0.25);</span>
+<span class="nc" id="L2546">        boolean rtl = l.isRTL();</span>
+<span class="nc" id="L2547">        boolean isTickerRunning = l.isTickerRunning();</span>
+<span class="nc" id="L2548">        int txtW = l.getStringWidth(f);</span>
+<span class="nc" id="L2549">        int curPos = text.length();</span>
+<span class="nc bnc" id="L2550" title="All 4 branches missed.">        if ((!isTickerRunning) || rtl) {</span>
+            //if there is no space to draw the text add ... at the end
+<span class="nc bnc" id="L2552" title="All 4 branches missed.">            if (txtW &gt; textSpaceW &amp;&amp; textSpaceW &gt; 0) {</span>
+                // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+                // the allowed space is handled differently in RTL, this is due to the reverse algorithm
+                // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+                // trimming characters from the end of the text (as done with LTR) won't do.
+                // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+                // the downside is that a part of a letter may be shown here as well.
+
+<span class="nc bnc" id="L2560" title="All 2 branches missed.">                if (rtl) {</span>
+<span class="nc bnc" id="L2561" title="All 4 branches missed.">                    if ((!isTickerRunning) &amp;&amp; (l.isEndsWith3Points())) {</span>
+<span class="nc" id="L2562">                        String points = &quot;...&quot;;</span>
+<span class="nc" id="L2563">                        int pointsW = f.stringWidth(points);</span>
+                        //xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));
+                        //g.drawString(points, l.getShiftText() + x, y,l.getStyle().getTextDecoration());
+                        //g.clipRect(pointsW+l.getShiftText() + x, y, textSpaceW - pointsW, f.getHeight());
+<span class="nc" id="L2567">                        Char nextChar = sel.newChar(curPos, pointsW + l.getShiftText() + x, y, textSpaceW - pointsW, h);</span>
+<span class="nc" id="L2568">                        span.add(nextChar);</span>
+                    }
+<span class="nc" id="L2570">                    x = x - txtW + textSpaceW;</span>
+                } else {
+<span class="nc bnc" id="L2572" title="All 2 branches missed.">                    if (l.isEndsWith3Points()) {</span>
+<span class="nc" id="L2573">                        String points = &quot;...&quot;;</span>
+<span class="nc" id="L2574">                        int index = 1;</span>
+<span class="nc" id="L2575">                        int widest = f.charWidth('W');</span>
+<span class="nc" id="L2576">                        int pointsW = f.stringWidth(points);</span>
+<span class="nc" id="L2577">                        int tlen = text.length();</span>
+<span class="nc bnc" id="L2578" title="All 4 branches missed.">                        while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, f) &amp;&amp; index &lt; tlen) {</span>
+<span class="nc" id="L2579">                            index++;</span>
+                        }
+<span class="nc" id="L2581">                        text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;</span>
+<span class="nc" id="L2582">                        txtW = f.stringWidth(text);</span>
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L2588">        int len = text.length();</span>
+<span class="nc" id="L2589">        int xPos = 0;</span>
+<span class="nc" id="L2590">        curPos = 1;</span>
+<span class="nc bnc" id="L2591" title="All 2 branches missed.">        while (curPos &lt;= len) {</span>
+<span class="nc" id="L2592">            int newXpos = f.stringWidth(text.substring(0, curPos));</span>
+<span class="nc" id="L2593">            Char next = sel.newChar(curPos - 1, l.getShiftText() + x + xPos, y, newXpos - xPos, h);</span>
+<span class="nc" id="L2594">            span.add(next);</span>
+<span class="nc" id="L2595">            xPos = newXpos;</span>
+<span class="nc" id="L2596">            curPos++;</span>
+<span class="nc" id="L2597">        }</span>
+        //System.out.println(&quot;Span: &quot;+span);
+<span class="nc" id="L2599">        return span.translate(l.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - l.getX(), l.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - l.getY());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

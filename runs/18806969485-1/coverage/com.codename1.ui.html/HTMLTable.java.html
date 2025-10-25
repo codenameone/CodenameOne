@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTMLTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">HTMLTable.java</span></div><h1>HTMLTable.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.table.Table;
+import com.codename1.ui.table.TableLayout.Constraint;
+
+/**
+ * HTMLTable extends Codename One's Table and overrides some it's rendering and constaints methods do adapt to HTMLTableModel
+ *
+ * @author Ofir Leitner
+ */
+class HTMLTable extends Table {
+
+    /**
+     * Constant denoting that only inner borders rows should be drawn, only when seperating between table segments
+     * The groups/segments feature is not available to Table, but is available internally to HTMLTable
+     */
+    static final int INNER_BORDERS_GROUPS = 4;
+    boolean innerBorderGroups; // Denotes that the inner border mode is groups
+
+    /**
+     * Constructs an HTMLTAble with the given model, which has to be HTMLTableModel
+     *
+     * @param model The HTMLTableModel for this Table
+     */
+    HTMLTable(HTMLTableModel model) {
+<span class="nc" id="L50">        super(model, false);</span>
+<span class="nc" id="L51">        setCollapseBorder(false); //default for HTML tables</span>
+<span class="nc" id="L52">    }</span>
+
+    public String getUIID() {
+<span class="nc" id="L55">        return &quot;HTMLTable&quot;;</span>
+    }
+
+    /**
+     * This method is overriden to return the component that is contained in the HTMLTableModel
+     * (Since our model contains the actual component and does not store data that can be rendered using toString we can't use the original createCell method)
+     *
+     * @param value    the new value object
+     * @param row      row number, -1 for the header rows
+     * @param column   column number
+     * @param editable true if the cell is editable
+     * @return cell component instance
+     */
+    protected Component createCell(Object value, int row, int column, boolean editable) {
+<span class="nc" id="L69">        Component cmp = null;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (value instanceof Component) {</span>
+<span class="nc" id="L71">            cmp = (Component) value;</span>
+            // TODO - table cells styling - needs to propogate downwards since the cell is usually a container, on the other hand can't wipe out the style of the container's components - TBD
+//            boolean isHeader=((HTMLTableModel)getModel()).isHeader(value);
+//            if (isHeader) {
+//                cmp.setUIID(&quot;TableHeader&quot;);
+//            } else {
+//                cmp.setUIID(&quot;TableCell&quot;);
+//            }
+        } else {
+<span class="nc" id="L80">            cmp = super.createCell(value, row, column, editable);</span>
+        }
+<span class="nc" id="L82">        cmp.setFocusable(false);</span>
+<span class="nc" id="L83">        return cmp;</span>
+    }
+
+    /**
+     * This method is overriden to fetch the constraints from the associated HTMLTableModel and converts it to TableLayout.Constraint
+     *
+     * @param value  the value of the cell
+     * @param row    the table row
+     * @param column the table column
+     * @return the table constraint
+     */
+    protected Constraint createCellConstraint(Object value, int row, int column) {
+<span class="nc" id="L95">        CellConstraint cConstraint = ((HTMLTableModel) getModel()).getConstraint(value);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (cConstraint == null) { // Can be null for cells that were &quot;spanned over&quot;</span>
+<span class="nc" id="L97">            return super.createCellConstraint(value, row, column);</span>
+        }
+<span class="nc" id="L99">        Constraint constraint = new Constraint();</span>
+<span class="nc" id="L100">        constraint.setHorizontalAlign(cConstraint.align);</span>
+<span class="nc" id="L101">        constraint.setVerticalAlign(cConstraint.valign);</span>
+<span class="nc" id="L102">        constraint.setHorizontalSpan(cConstraint.spanHorizontal);</span>
+<span class="nc" id="L103">        constraint.setVerticalSpan(cConstraint.spanVertical);</span>
+<span class="nc" id="L104">        constraint.setWidthPercentage(cConstraint.width);</span>
+<span class="nc" id="L105">        constraint.setHeightPercentage(cConstraint.height);</span>
+
+<span class="nc" id="L107">        return constraint;</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    protected boolean shouldDrawInnerBorderAfterRow(int row) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (innerBorderGroups) {</span>
+<span class="nc" id="L115">            return ((HTMLTableModel) getModel()).isSegmentEnd(row);</span>
+        } else {
+<span class="nc" id="L117">            return true;</span>
+        }
+    }
+
+    /**
+     * Overrides Table.setInnerBorderMode to accept also the INNER_BORDER_GROUPS constant that implement the 'groups' value for the 'rules' attribute on the 'table' tag.
+     *
+     * @param innerBorder The inner border mode, one of the INNER_BORDER_* constants
+     */
+    public void setInnerBorderMode(int innerBorder) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (innerBorder == INNER_BORDERS_GROUPS) {</span>
+<span class="nc" id="L128">            innerBorderGroups = true;</span>
+<span class="nc" id="L129">            innerBorder = INNER_BORDERS_ROWS;</span>
+        } else {
+<span class="nc" id="L131">            innerBorderGroups = false;</span>
+        }
+<span class="nc" id="L133">        super.setInnerBorderMode(innerBorder);</span>
+<span class="nc" id="L134">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

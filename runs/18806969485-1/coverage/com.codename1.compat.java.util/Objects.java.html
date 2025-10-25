@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Objects.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.compat.java.util</a> &gt; <span class="el_source">Objects.java</span></div><h1>Objects.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ *
+ * This code was adapted from TeaVM's class library.
+ */
+
+package com.codename1.compat.java.util;
+
+import java.util.Arrays;
+import java.util.Comparator;
+
+/**
+ * This is a compatibility class which supports the java.util.Objects API.  On platforms that don't support this class (e.g. Android)
+ * the build server will automatically remap all uses of java.util.Objects to use this implementation instead.
+ * &lt;p&gt;
+ * This class consists of static utility methods for operating on objects. These utilities include null-safe or null-tolerant methods for computing the hash code of an object, returning a string for an object, and comparing two objects.
+ *
+ * @author shannah
+ */
+<span class="nc" id="L39">public final class Objects {</span>
+    /**
+     * Returns true if the arguments are equal to each other and false otherwise. Consequently, if both arguments are null, true is returned and if exactly one argument is null, false is returned. Otherwise, equality is determined by using the equals method of the first argument.
+     *
+     * @param a
+     * @param b
+     * @return
+     */
+    public static boolean equals(Object a, Object b) {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (a == b) {</span>
+<span class="fc" id="L49">            return true;</span>
+        }
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    /**
+     * Returns the hash code of a non-null argument and 0 for a null argument.
+     *
+     * @param o
+     * @return
+     */
+    public static int hashCode(Object o) {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        return o == null ? 0 : o.hashCode();</span>
+    }
+
+    public static String toString(Object o) {
+<span class="fc" id="L65">        return toString(o, &quot;null&quot;);</span>
+    }
+
+    public static String toString(Object o, String nullDefault) {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        return o != null ? o.toString() : nullDefault;</span>
+    }
+
+    public static &lt;T&gt; int compare(T a, T b, Comparator&lt;? super T&gt; c) {
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">        return a == null &amp;&amp; b == null ? 0 : c.compare(a, b);</span>
+    }
+
+    public static &lt;T&gt; T requireNonNull(T obj) {
+<span class="nc" id="L77">        return requireNonNull(obj, &quot;&quot;);</span>
+    }
+
+    public static &lt;T&gt; T requireNonNull(T obj, String message) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (obj == null) {</span>
+<span class="fc" id="L82">            throw new NullPointerException(message);</span>
+        }
+<span class="fc" id="L84">        return obj;</span>
+    }
+
+    public static boolean nonNull(Object obj) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        return obj != null;</span>
+    }
+
+    public static boolean deepEquals(Object a, Object b) {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (a == b) {</span>
+<span class="nc" id="L93">            return true;</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (a == null) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            return b == null;</span>
+        }
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (a instanceof boolean[]) {</span>
+<span class="nc bnc" id="L99" title="All 4 branches missed.">            return b instanceof boolean[] &amp;&amp; Arrays.equals((boolean[]) a, (boolean[]) b);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        } else if (b instanceof boolean[]) {</span>
+<span class="nc" id="L101">            return false;</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        } else if (a instanceof byte[]) {</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">            return b instanceof byte[] &amp;&amp; Arrays.equals((byte[]) a, (byte[]) b);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        } else if (b instanceof byte[]) {</span>
+<span class="nc" id="L105">            return false;</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        } else if (a instanceof short[]) {</span>
+<span class="nc bnc" id="L107" title="All 4 branches missed.">            return b instanceof short[] &amp;&amp; Arrays.equals((short[]) a, (short[]) b);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        } else if (b instanceof short[]) {</span>
+<span class="nc" id="L109">            return false;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        } else if (a instanceof int[]) {</span>
+<span class="fc bfc" id="L111" title="All 4 branches covered.">            return b instanceof int[] &amp;&amp; Arrays.equals((int[]) a, (int[]) b);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        } else if (b instanceof int[]) {</span>
+<span class="nc" id="L113">            return false;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        } else if (a instanceof char[]) {</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">            return b instanceof char[] &amp;&amp; Arrays.equals((char[]) a, (char[]) b);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        } else if (b instanceof char[]) {</span>
+<span class="nc" id="L117">            return false;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        } else if (a instanceof float[]) {</span>
+<span class="nc bnc" id="L119" title="All 4 branches missed.">            return b instanceof float[] &amp;&amp; Arrays.equals((float[]) a, (float[]) b);</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        } else if (b instanceof float[]) {</span>
+<span class="nc" id="L121">            return false;</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        } else if (a instanceof double[]) {</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            return b instanceof double[] &amp;&amp; Arrays.equals((double[]) a, (double[]) b);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        } else if (b instanceof double[]) {</span>
+<span class="nc" id="L125">            return false;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        } else if (a instanceof Object[]) {</span>
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">            return b instanceof Object[] &amp;&amp; Arrays.deepEquals((Object[]) a, (Object[]) b);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        } else if (b instanceof Object[]) {</span>
+<span class="nc" id="L129">            return false;</span>
+        } else {
+<span class="nc" id="L131">            return a.equals(b);</span>
+        }
+    }
+
+    public static int hash(Object... values) {
+<span class="fc" id="L136">        return Arrays.hashCode(values);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

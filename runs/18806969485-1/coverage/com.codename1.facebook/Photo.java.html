@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Photo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.facebook</a> &gt; <span class="el_source">Photo.java</span></div><h1>Photo.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.facebook;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * This class represents a Facebook Photo Object
+ * http://developers.facebook.com/docs/reference/api/photo/
+ *
+ * @author Chen Fishbein
+ */
+public class Photo extends FBObject {
+
+<span class="nc" id="L37">    private final User from = new User();</span>
+    private String iconUrl;
+    private String pictureUrl;
+    private String sourceUrl;
+    private int height;
+    private int width;
+    private String link;
+    private String created_time;
+    private String updated_time;
+    private int position;
+    private Vector images;
+    private Vector comments;
+
+    /**
+     * Empty Contructor
+     */
+<span class="nc" id="L53">    public Photo() {</span>
+<span class="nc" id="L54">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Photo(Hashtable props) {
+<span class="nc" id="L60">        super(props);</span>
+<span class="nc" id="L61">        init(props);</span>
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * Get created_time
+     *
+     * @return created_time
+     */
+    public String getCreated_time() {
+<span class="nc" id="L70">        return created_time;</span>
+    }
+
+    /**
+     * Get from
+     *
+     * @return from
+     */
+    public User getFrom() {
+<span class="nc" id="L79">        return from;</span>
+    }
+
+    /**
+     * Get height
+     *
+     * @return height
+     */
+    public int getHeight() {
+<span class="nc" id="L88">        return height;</span>
+    }
+
+    /**
+     * Get iconUrl
+     *
+     * @return iconUrl
+     */
+    public String getIconUrl() {
+<span class="nc" id="L97">        return iconUrl;</span>
+    }
+
+    /**
+     * Get link
+     *
+     * @return link
+     */
+    public String getLink() {
+<span class="nc" id="L106">        return link;</span>
+    }
+
+    /**
+     * Get pictureUrl
+     *
+     * @return pictureUrl
+     */
+    public String getPictureUrl() {
+<span class="nc" id="L115">        return pictureUrl;</span>
+    }
+
+    /**
+     * Get position
+     *
+     * @return position
+     */
+    public int getPosition() {
+<span class="nc" id="L124">        return position;</span>
+    }
+
+    /**
+     * Get sourceUrl
+     *
+     * @return sourceUrl
+     */
+    public String getSourceUrl() {
+<span class="nc" id="L133">        return sourceUrl;</span>
+    }
+
+    /**
+     * Get updated_time
+     *
+     * @return updated_time
+     */
+    public String getUpdated_time() {
+<span class="nc" id="L142">        return updated_time;</span>
+    }
+
+    /**
+     * Get width
+     *
+     * @return width
+     */
+    public int getWidth() {
+<span class="nc" id="L151">        return width;</span>
+    }
+
+    /**
+     * Get images vector where each entry is a String of a url
+     *
+     * @return images
+     */
+    public Vector getImages() {
+<span class="nc" id="L160">        return images;</span>
+    }
+
+    /**
+     * Gets the comments on this Photos, where each
+     * entry is a Post Object
+     *
+     * @return a Vector of Post Objects
+     */
+    public Vector getComments() {
+<span class="nc" id="L170">        return comments;</span>
+    }
+
+    /**
+     * copies the relevant values from the given hashtable
+     *
+     * @param props an hashtable to copy from
+     */
+    public void copy(Hashtable props) {
+<span class="nc" id="L179">        super.copy(props);</span>
+<span class="nc" id="L180">        init(props);</span>
+<span class="nc" id="L181">    }</span>
+
+    private void init(Hashtable toCopy) {
+<span class="nc" id="L184">        super.copy(toCopy);</span>
+<span class="nc" id="L185">        Hashtable f = (Hashtable) toCopy.get(&quot;from&quot;);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L187">            from.copy(f);</span>
+        }
+<span class="nc" id="L189">        iconUrl = (String) toCopy.get(&quot;icon&quot;);</span>
+<span class="nc" id="L190">        pictureUrl = (String) toCopy.get(&quot;picture&quot;);</span>
+<span class="nc" id="L191">        sourceUrl = (String) toCopy.get(&quot;source&quot;);</span>
+<span class="nc" id="L192">        String heightStr = (String) toCopy.get(&quot;height&quot;);</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (heightStr != null) {</span>
+<span class="nc" id="L194">            height = Integer.parseInt(heightStr);</span>
+        }
+<span class="nc" id="L196">        String widthStr = (String) toCopy.get(&quot;width&quot;);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (widthStr != null) {</span>
+<span class="nc" id="L198">            width = Integer.parseInt(widthStr);</span>
+        }
+<span class="nc" id="L200">        link = (String) toCopy.get(&quot;link&quot;);</span>
+<span class="nc" id="L201">        created_time = (String) toCopy.get(&quot;created_time&quot;);</span>
+<span class="nc" id="L202">        updated_time = (String) toCopy.get(&quot;updated_time&quot;);</span>
+<span class="nc" id="L203">        String positionStr = (String) toCopy.get(&quot;position&quot;);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (positionStr != null) {</span>
+<span class="nc" id="L205">            position = Integer.parseInt(positionStr);</span>
+        }
+
+<span class="nc" id="L208">        images = (Vector) toCopy.get(&quot;images&quot;);</span>
+
+<span class="nc" id="L210">        Hashtable data = (Hashtable) toCopy.get(&quot;comments&quot;);</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (data != null) {</span>
+<span class="nc" id="L212">            comments = new Vector();</span>
+<span class="nc" id="L213">            Vector commentsArray = (Vector) data.get(&quot;data&quot;);</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            for (int i = 0; i &lt; commentsArray.size(); i++) {</span>
+<span class="nc" id="L215">                Hashtable comment = (Hashtable) commentsArray.elementAt(i);</span>
+<span class="nc" id="L216">                Post p = new Post();</span>
+<span class="nc" id="L217">                p.copy(comment);</span>
+<span class="nc" id="L218">                comments.addElement(p);</span>
+            }
+        }
+
+<span class="nc" id="L222">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

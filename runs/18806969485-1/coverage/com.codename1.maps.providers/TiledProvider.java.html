@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TiledProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps.providers</a> &gt; <span class="el_source">TiledProvider.java</span></div><h1>TiledProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2010, 2011 Itiner.pl. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Itiner designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Itiner in the LICENSE.txt file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+package com.codename1.maps.providers;
+
+import com.codename1.maps.BoundingBox;
+import com.codename1.maps.Coord;
+import com.codename1.maps.Projection;
+import com.codename1.maps.ProxyHttpTile;
+import com.codename1.maps.Tile;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Point;
+
+/**
+ * This is a tiled map provider
+ *
+ * @author Roman Kamyk &lt;roman.kamyk@itiner.pl&gt;
+ */
+public abstract class TiledProvider extends MapProvider {
+
+    protected final String _url;
+    protected int _zoomLevel;
+    // Very ugly cacheing
+    private Point _tileNo;
+
+    /**
+     * Creates a new Tiled provider
+     *
+     * @param url        the url of the provider
+     * @param projection the Projection system of the Provider
+     * @param tileSize   the tiles size(usually 256x256)
+     */
+    public TiledProvider(String url, Projection projection, Dimension tileSize) {
+<span class="nc" id="L50">        super(projection, tileSize);</span>
+<span class="nc" id="L51">        _url = url;</span>
+<span class="nc" id="L52">    }</span>
+
+    /**
+     * build a url request for a tile
+     *
+     * @param zoomLevel the zoom level
+     * @param xTile     x position of the tile
+     * @param yTile     y position of the tile
+     * @return the image url of the tile
+     */
+    protected String url(int zoomLevel, int xTile, int yTile) {
+<span class="nc" id="L63">        String sb = _url + &quot;/&quot; +</span>
+                zoomLevel +
+                &quot;/&quot; +
+                xTile +
+                &quot;/&quot; +
+                yTile +
+                &quot;.png&quot;;
+<span class="nc" id="L70">        return sb;</span>
+    }
+
+    private int tileNo(double pos, double pos0, double scale) {
+<span class="nc" id="L74">        return (int) ((pos - pos0) / scale);</span>
+    }
+
+    private double tileCoord(int tileNo, double pos0, double scale) {
+<span class="nc" id="L78">        return tileNo * scale + pos0;</span>
+    }
+
+    /**
+     * Scale to the zoom level
+     *
+     * @param zoomLevel to scale to
+     * @return a scaled coordinate.
+     */
+    public Coord scale(int zoomLevel) {
+<span class="nc" id="L88">        int divider = (1 &lt;&lt; zoomLevel);</span>
+<span class="nc" id="L89">        double longitude = (projection().extent().longitudeDifference()) / divider / tileSize().getWidth();</span>
+<span class="nc" id="L90">        double latitude = (projection().extent().latitudeDifference()) / divider / tileSize().getHeight();</span>
+<span class="nc" id="L91">        return new Coord(latitude, longitude, false);</span>
+    }
+
+    private Point tileNo(Coord position, Coord boundary, Coord scale) {
+<span class="nc" id="L95">        return new Point(tileNo(position.getLongitude(), boundary.getLongitude(), scale.getLongitude()), tileNo(position.getLatitude(), boundary.getLatitude(), scale.getLatitude()));</span>
+    }
+
+    private Coord tileCoord(Point tileNo, Coord boundary, Coord scale) {
+<span class="nc" id="L99">        return new Coord(tileCoord(tileNo.getY(), boundary.getLatitude(), scale.getLatitude()),</span>
+<span class="nc" id="L100">                tileCoord(tileNo.getX(), boundary.getLongitude(), scale.getLongitude()), true);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public BoundingBox bboxFor(Coord position, int zoomLevel) {
+<span class="nc" id="L107">        _zoomLevel = zoomLevel;</span>
+<span class="nc" id="L108">        Coord scale = scale(zoomLevel);</span>
+
+<span class="nc" id="L110">        Dimension tileSize = tileSize();</span>
+<span class="nc" id="L111">        double x = scale.getLongitude() * tileSize.getWidth();</span>
+<span class="nc" id="L112">        double y = scale.getLatitude() * tileSize.getHeight();</span>
+<span class="nc" id="L113">        Coord tileScale = new Coord(y, x, false);</span>
+
+<span class="nc" id="L115">        _tileNo = tileNo(position, projection().extent().getSouthWest(), tileScale);</span>
+<span class="nc" id="L116">        Coord start = tileCoord(_tileNo, projection().extent().getSouthWest(), tileScale);</span>
+<span class="nc" id="L117">        Coord end = start.translate(tileScale.getLatitude(), tileScale.getLongitude());</span>
+<span class="nc" id="L118">        return new BoundingBox(start, end);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Tile tileFor(BoundingBox bbox) {
+<span class="nc" id="L125">        String url = url(_zoomLevel, _tileNo.getX(), (1 &lt;&lt; _zoomLevel) - _tileNo.getY() - 1);</span>
+<span class="nc" id="L126">        return new ProxyHttpTile(tileSize(), bbox, url);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

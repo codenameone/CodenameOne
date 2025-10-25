@@ -1,0 +1,776 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSSParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">CSSParser.java</span></div><h1>CSSParser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.xml.ParserCallback;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.util.Enumeration;
+import java.util.Vector;
+
+/**
+ * A parser for CSS segments or files.
+ * Note that this class is not derived from XMLParser or HTMLParser as CSS format is significantly different than XML/HTML
+ *
+ * @author Ofir Leitner
+ */
+<span class="nc" id="L43">class CSSParser {</span>
+
+    /**
+     * The supported CSS media types, this is relevant for CSS at-rules (i.e. @import and @media)
+     * The default values according to the WCSS specs the default one is &quot;handheld&quot; and &quot;all&quot; (Which is always accepted)
+     */
+<span class="nc" id="L49">    private static String[] SUPPORTED_MEDIA_TYPES = {&quot;all&quot;, &quot;handheld&quot;};</span>
+
+    private static CSSParser instance;
+
+    private CSSParserCallback parserCallback;
+
+    /**
+     * Returns or creates the Parser's single instance
+     *
+     * @return the Parser's instance
+     */
+    static CSSParser getInstance() {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc" id="L62">            instance = new CSSParser();</span>
+        }
+<span class="nc" id="L64">        return instance;</span>
+    }
+
+    /**
+     * Sets the supported CSS media types to the given strings.
+     * Usually the default media types (&quot;all&quot;,&quot;handheld&quot;) should be suitable, but in case this runs on a device that matches another profile, the developer can specify it here.
+     *
+     * @param supportedMediaTypes A string array containing the media types that should be supported
+     */
+    static void setCSSSupportedMediaTypes(String[] supportedMediaTypes) {
+<span class="nc" id="L74">        SUPPORTED_MEDIA_TYPES = supportedMediaTypes;</span>
+<span class="nc" id="L75">    }</span>
+
+
+    // ***********
+    // CSS Parsing methods from here onward
+    // ***********
+
+    /**
+     * Checks if the specified character is a white space or not.
+     * Exposed to packaage since used by HTMLComponent as well
+     *
+     * @param ch The character to check
+     * @return true if the character is a white space, false otherwise
+     */
+    static boolean isWhiteSpace(char ch) {
+<span class="nc bnc" id="L90" title="All 10 branches missed.">        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == 10) || (ch == 13));</span>
+    }
+
+
+    /**
+     * Handles a CSS comment segment
+     *
+     * @param r The stream reader
+     * @return The next char after the comment
+     * @throws IOException
+     */
+    private char handleCSSComment(ExtInputStreamReader r) throws IOException {
+<span class="nc" id="L102">        char c = r.readCharFromReader();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (c == '*') {</span>
+<span class="nc" id="L104">            char lastC = '\0';</span>
+<span class="nc bnc" id="L105" title="All 4 branches missed.">            while ((c != '/') || (lastC != '*')) {</span>
+<span class="nc" id="L106">                lastC = c;</span>
+<span class="nc" id="L107">                c = r.readCharFromReader();</span>
+            }
+<span class="nc" id="L109">            c = r.readCharFromReader();</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">            while (((byte) c) != -1 &amp;&amp; isWhiteSpace(c)) { //skip white spaces</span>
+<span class="nc" id="L111">                c = r.readCharFromReader();</span>
+            }
+<span class="nc" id="L113">        } else {</span>
+<span class="nc" id="L114">            r.unreadChar(c);</span>
+<span class="nc" id="L115">            return '/';</span>
+        }
+<span class="nc" id="L117">        return c;</span>
+    }
+
+    /**
+     * Reads the next CSS token from the reader
+     *
+     * @param r                 The stream reader
+     * @param readNewline       true to read new lines and not break when they're found, false otherwise
+     * @param ignoreCommas      true to ignore commas and not break when they're found, false otherwise
+     * @param ignoreColons      true to ignore colons and not break when they're found, false otherwise
+     * @param ignoreWhiteSpaces true to ignore white spaces and not break when they're found, false otherwise
+     * @return The next CSS token
+     * @throws IOException
+     */
+    private String nextToken(ExtInputStreamReader r, boolean readNewline, boolean ignoreCommas, boolean ignoreColons, boolean ignoreWhiteSpaces) throws IOException {
+<span class="nc" id="L132">        boolean newline = false;</span>
+<span class="nc" id="L133">        StringBuilder currentToken = new StringBuilder();</span>
+<span class="nc" id="L134">        char c = r.readCharFromReader();</span>
+
+        // read the next token from the CSS stream
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        while (((byte) c) != -1 &amp;&amp; isWhiteSpace(c)) {</span>
+<span class="nc bnc" id="L138" title="All 16 branches missed.">            newline = newline || (c == 10 || c == 13 || c == ';' || ((c == ',') &amp;&amp; (!ignoreCommas)) || (c == '&gt;') || (c == '+'));</span>
+<span class="nc bnc" id="L139" title="All 4 branches missed.">            if (!readNewline &amp;&amp; newline) {</span>
+<span class="nc" id="L140">                return null;</span>
+            }
+<span class="nc" id="L142">            c = r.readCharFromReader();</span>
+        }
+<span class="nc bnc" id="L144" title="All 4 branches missed.">        if (c == ';' &amp;&amp; readNewline) { //leftover from compound operation</span>
+<span class="nc" id="L145">            c = r.readCharFromReader();</span>
+<span class="nc bnc" id="L146" title="All 4 branches missed.">            while (((byte) c) != -1 &amp;&amp; isWhiteSpace(c)) { // This was added since after reading ; there might be some more white spaces. However there needs to be a way to combine this with the previous white spaces code or with the revised newline detection and unreading char below</span>
+<span class="nc bnc" id="L147" title="All 16 branches missed.">                newline = newline || (c == 10 || c == 13 || c == ';' || ((c == ',') &amp;&amp; (!ignoreCommas)) || (c == '&gt;') || (c == '+'));</span>
+<span class="nc" id="L148">                c = r.readCharFromReader();</span>
+            }
+
+
+        }
+<span class="nc" id="L153">        char segment = '\0'; // segment of (...) or &quot;...&quot; or '...'</span>
+<span class="nc bnc" id="L154" title="All 28 branches missed.">        while (((byte) c) != -1 &amp;&amp; ((!isWhiteSpace(c)) || (segment != '\0') || (ignoreWhiteSpaces)) &amp;&amp; c != ';' &amp;&amp; ((c != ':') ||</span>
+                (segment != '\0') || (ignoreColons)) &amp;&amp; ((c != ',') || (segment != '\0') ||
+                (ignoreCommas)) &amp;&amp; (((c != '&gt;') &amp;&amp; (c != '+')) || (segment != '\0'))) { //- : denotes pseudo-classes, would like to keep them as one token
+
+<span class="nc bnc" id="L158" title="All 4 branches missed.">            if ((segment == '\0') &amp;&amp; (c == '/')) { //comment start perhaps, if inside brackets - ignore</span>
+<span class="nc" id="L159">                c = handleCSSComment(r);</span>
+            }
+
+<span class="nc bnc" id="L162" title="All 8 branches missed.">            if ((c == '}' || c == '{' || c == '*') &amp;&amp; (segment == '\0')) { //enter only if not in the middle of a segment. i.e. '*N'</span>
+<span class="nc" id="L163">                newline = true;</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                if (currentToken.length() == 0) {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                    if (!readNewline) {</span>
+<span class="nc" id="L166">                        r.unreadChar(c);</span>
+<span class="nc" id="L167">                        return null;</span>
+                    }
+<span class="nc" id="L169">                    return &quot;&quot; + c;</span>
+                }
+<span class="nc" id="L171">                r.unreadChar(c);</span>
+<span class="nc" id="L172">                break;</span>
+            }
+<span class="nc" id="L174">            currentToken.append(c);</span>
+
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (c == '(') {</span>
+<span class="nc" id="L177">                segment = ')';</span>
+<span class="nc bnc" id="L178" title="All 6 branches missed.">            } else if ((segment == '\0') &amp;&amp; ((c == '\&quot;') || (c == '\''))) { //Note - This keeps track of one segment only, while in fact there can be &quot;nested&quot; segments - i.e. (&quot;...&quot;) which is common in URLs, though not sure it is critical as such pattern works correctly even now</span>
+<span class="nc" id="L179">                segment = c;</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            } else if (c == segment) {</span>
+<span class="nc" id="L181">                segment = '\0';</span>
+            }
+<span class="nc" id="L183">            c = r.readCharFromReader();</span>
+        }
+<span class="nc bnc" id="L185" title="All 8 branches missed.">        if (((c == ',') &amp;&amp; (!ignoreCommas)) || (c == '&gt;') || (c == '+')) {</span>
+<span class="nc" id="L186">            currentToken.append(c);</span>
+        }
+
+<span class="nc bnc" id="L189" title="All 6 branches missed.">        if ((!readNewline) &amp;&amp; (c == ';') &amp;&amp; (currentToken.length() != 0)) {</span>
+<span class="nc" id="L190">            r.unreadChar(c);</span>
+        }
+
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (currentToken.length() == 0) {</span>
+<span class="nc" id="L194">            return null;</span>
+        }
+<span class="nc" id="L196">        return currentToken.toString();</span>
+    }
+
+    /**
+     * Copies all attributes from
+     *
+     * @param element   The element to copy from
+     * @param selectors A vector containing grouped selectors to copy the attributes to
+     * @param addTo     The main element to add the grouped selectors to
+     */
+    private void copyAttributes(CSSElement element, Vector selectors, HTMLElement addTo) {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (selectors == null) {</span>
+<span class="nc" id="L208">            return;</span>
+        }
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        for (Enumeration e = selectors.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L211">            CSSElement selector = (CSSElement) e.nextElement();</span>
+<span class="nc" id="L212">            addTo.addChild(selector);</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            while (selector.getNumChildren() &gt; 0) { // This makes sure we get the last nested selector</span>
+<span class="nc" id="L214">                selector = selector.getCSSChildAt(0);</span>
+            }
+<span class="nc" id="L216">            element.copyAttributesTo(selector);</span>
+<span class="nc" id="L217">        }</span>
+<span class="nc" id="L218">    }</span>
+
+    /**
+     * Returns true if the specified CSS media type is unsupported, false otherwise
+     *
+     * @param media A string identifying the media type (i.e. &quot;handheld&quot;)
+     * @return true if the specified CSS media type is uspported, false otherwise
+     */
+    private boolean isMediaTypeSupported(String media) {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        for (int i = 0; i &lt; SUPPORTED_MEDIA_TYPES.length; i++) {</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">            if (media.equalsIgnoreCase(SUPPORTED_MEDIA_TYPES[i])) {</span>
+<span class="nc" id="L229">                return true;</span>
+            }
+        }
+<span class="nc" id="L232">        return false;</span>
+    }
+
+    /**
+     * Checks if an at-media rule applies to the supported media types
+     *
+     * @param mediaTypes A string containing all media types the at-media rule allows
+     * @return true if one of the supported media types is denoted, false otherwise
+     */
+    boolean mediaTypeMatches(String mediaTypes) {
+<span class="nc bnc" id="L242" title="All 4 branches missed.">        if ((mediaTypes == null) || (mediaTypes.equals(&quot;&quot;))) {</span>
+<span class="nc" id="L243">            return true;</span>
+        }
+<span class="nc" id="L245">        int comma = mediaTypes.indexOf(',');</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        while (comma != -1) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (isMediaTypeSupported(mediaTypes.substring(0, comma).trim())) {</span>
+<span class="nc" id="L248">                return true;</span>
+            }
+<span class="nc" id="L250">            mediaTypes = mediaTypes.substring(comma + 1);</span>
+<span class="nc" id="L251">            comma = mediaTypes.indexOf(',');</span>
+        }
+<span class="nc" id="L253">        return isMediaTypeSupported(mediaTypes.trim());</span>
+    }
+
+    /**
+     * Returns the import URL if the specified media matches, or null otherwise
+     *
+     * @param token The string including the url and media of the import at-rule (example: url(&quot;mycss.css&quot;) handheld,tv;
+     * @return the import URL if the specified media matches, or null otherwise
+     */
+    private String getImportURLByMediaType(String token) {
+<span class="nc" id="L263">        String url = token;</span>
+<span class="nc" id="L264">        boolean mediaMatches = true;</span>
+<span class="nc" id="L265">        int space = token.indexOf(' ');</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (space != -1) {</span>
+<span class="nc" id="L267">            url = token.substring(0, space);</span>
+<span class="nc" id="L268">            token = token.substring(space + 1);</span>
+<span class="nc" id="L269">            mediaMatches = mediaTypeMatches(token);</span>
+        }
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (mediaMatches) {</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (url.startsWith(&quot;url(&quot;)) {</span>
+<span class="nc" id="L273">                url = CSSEngine.getCSSUrl(url);</span>
+            }
+<span class="nc" id="L275">            return url;</span>
+        } else {
+<span class="nc" id="L277">            return null;</span>
+        }
+
+    }
+
+    /**
+     * Handles a media at-rule segment.
+     * This method checks if the media type specified in the media at-rule is supported, if it does
+     * it returns only the media segment as a separate stream, otherwsie it returns null
+     *
+     * @param isr      The stream representing the CSS
+     * @param encoding The encoding string
+     * @param htmlC    The HTMLComponent
+     * @return An input stream with the relevant media segment or null if the media is not supported
+     * @throws IOException on input stream failure
+     */
+    private ExtInputStreamReader getMediaSegment(ExtInputStreamReader r, String encoding, HTMLComponent htmlC) throws IOException {
+<span class="nc" id="L294">        String token = nextToken(r, true, true, true, true);</span>
+<span class="nc" id="L295">        char c = r.readCharFromReader();</span>
+
+<span class="nc bnc" id="L297" title="All 4 branches missed.">        while ((((byte) c) != -1) &amp;&amp; (c != '{')) { // Find the first { that marks the start of the media segment</span>
+<span class="nc" id="L298">            c = r.readCharFromReader();</span>
+        }
+
+<span class="nc" id="L301">        StringBuilder segment = new StringBuilder();</span>
+<span class="nc" id="L302">        boolean match = mediaTypeMatches(token);</span>
+
+<span class="nc" id="L304">        int count = 1; // counts the number of opened curly brackets</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        while (count &gt; 0) {</span>
+<span class="nc" id="L306">            c = r.readCharFromReader();</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            if ((((byte) c) == -1)) {</span>
+<span class="nc" id="L308">                break; //end of file</span>
+            }
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            if (match) {</span>
+<span class="nc" id="L311">                segment.append(c);</span>
+            }
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            if (c == '{') {</span>
+<span class="nc" id="L314">                count++;</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            } else if (c == '}') {</span>
+<span class="nc" id="L316">                count--;</span>
+            }
+        }
+
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (match) {</span>
+<span class="nc" id="L321">            ExtInputStreamReader segmentReader = null;</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            if (encoding != null) {</span>
+                try {
+<span class="nc" id="L324">                    segmentReader = new ExtInputStreamReader(new InputStreamReader(new ByteArrayInputStream(segment.toString().getBytes()), encoding));</span>
+<span class="nc" id="L325">                } catch (UnsupportedEncodingException uee) {</span>
+<span class="nc" id="L326">                    notifyError(ParserCallback.ERROR_ENCODING, &quot;@media&quot;, null, encoding, &quot;Encoding '&quot; + encoding + &quot;' failed for media segment. &quot; + uee.getMessage());</span>
+<span class="nc" id="L327">                }</span>
+            }
+<span class="nc bnc" id="L329" title="All 2 branches missed.">            if (segmentReader == null) { //either no encoding, or encoding failed</span>
+<span class="nc" id="L330">                segmentReader = new ExtInputStreamReader(new InputStreamReader(new ByteArrayInputStream(segment.toString().getBytes())));</span>
+            }
+<span class="nc" id="L332">            return segmentReader;</span>
+        } else {
+<span class="nc" id="L334">            return null;</span>
+        }
+
+    }
+
+    /**
+     * Reads a CSS file/stream and returns the tokenized CSS as a single level element tree with the
+     * root appearing as a &quot;style&quot;.
+     * This method is called upon finding linked/external CSS and embedded CSS segments.
+     * It handles at-rules such as import/charset/media and forwards relevant segments to the parseCSS method
+     *
+     * @param isr     The Reader representing the stream
+     * @param is      The InputStream representing the stream (We need it too, in case encoding changes and we need to create another InputStreamReader)
+     * @param htmlC   The HTMLComponent
+     * @param pageURL For external CSS the URL of the CSS, for embedded - null
+     * @return A CSSElement containing all selectors found in the stream as its children
+     * @throws IOException on input stream failure
+     */
+    CSSElement parseCSSSegment(Reader isr, InputStream is, HTMLComponent htmlC, String pageURL) throws IOException {
+<span class="nc" id="L353">        CSSElement addTo = new CSSElement(&quot;style&quot;);</span>
+<span class="nc" id="L354">        ExtInputStreamReader r = new ExtInputStreamReader(isr);</span>
+<span class="nc" id="L355">        DocumentInfo docInfo = null;</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        String encoding = htmlC.getDocumentInfo() != null ? htmlC.getDocumentInfo().getEncoding() : null;</span>
+<span class="nc" id="L357">        String token = nextToken(r, true, false, true, false);</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        while (token.startsWith(&quot;@&quot;)) {</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">            if (token.equals(&quot;@import&quot;)) {</span>
+<span class="nc" id="L360">                token = nextToken(r, true, true, true, true);</span>
+<span class="nc" id="L361">                String url = getImportURLByMediaType(token);</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                if (url != null) {</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">                    if (docInfo == null) {</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">                        docInfo = pageURL == null ? htmlC.getDocumentInfo() : new DocumentInfo(pageURL);</span>
+                    }
+<span class="nc bnc" id="L366" title="All 2 branches missed.">                    if (docInfo != null) {</span>
+<span class="nc" id="L367">                        htmlC.getThreadQueue().addCSS(docInfo.convertURL(url), encoding); // Referred CSS &quot;inherit&quot; charset from the referring document</span>
+                    } else {
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                        if (DocumentInfo.isAbsoluteURL(url)) {</span>
+<span class="nc" id="L370">                            htmlC.getThreadQueue().addCSS(url, encoding); // Referred CSS &quot;inherit&quot; charset from the referring document</span>
+                        } else {
+<span class="nc" id="L372">                            notifyError(CSSParserCallback.ERROR_CSS_NO_BASE_URL, &quot;@import&quot;, null, url, &quot;Ignoring CSS file referred in an @import rule (&quot; + url + &quot;), since page was set by setBody/setHTML/setDOM so there's no way to access relative URLs&quot;);</span>
+                        }
+                    }
+                }
+<span class="nc bnc" id="L376" title="All 2 branches missed.">            } else if (token.equals(&quot;@media&quot;)) {</span>
+<span class="nc" id="L377">                ExtInputStreamReader mediaReader = getMediaSegment(r, encoding, htmlC);</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">                if (mediaReader != null) {</span>
+<span class="nc" id="L379">                    parseCSS(mediaReader, htmlC, addTo, null);</span>
+                }
+<span class="nc bnc" id="L381" title="All 2 branches missed.">            } else if (token.equals(&quot;@charset&quot;)) {</span>
+<span class="nc" id="L382">                token = CSSEngine.omitQuotesIfExist(nextToken(r, true, false, true, false));</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">                if (is != null) { // @charset applies only to external style sheet, and the inputstream is null for embedded CSS segments</span>
+                    try {
+<span class="nc" id="L385">                        ExtInputStreamReader encodedReader = new ExtInputStreamReader(new InputStreamReader(is, token));</span>
+<span class="nc" id="L386">                        r = encodedReader;</span>
+<span class="nc" id="L387">                        encoding = token;</span>
+<span class="nc" id="L388">                    } catch (UnsupportedEncodingException uee) {</span>
+<span class="nc" id="L389">                        notifyError(ParserCallback.ERROR_ENCODING, &quot;@charset&quot;, null, token, &quot;External CSS encoding @charset &quot; + token + &quot; directive failed: &quot; + uee.getMessage());</span>
+<span class="nc" id="L390">                    }</span>
+                }
+            }
+<span class="nc" id="L393">            token = nextToken(r, true, false, true, false);</span>
+        }
+
+<span class="nc" id="L396">        return parseCSS(r, htmlC, addTo, token);</span>
+    }
+
+    /**
+     * Reads a CSS file/stream and returns the tokenized CSS as a single level element tree with the
+     * root appearing as a &quot;style&quot;.
+     * This method is called either directly on style attributes.
+     *
+     * @param r     The stream reader containing the CSS segment
+     * @param htmlC The HTMLComponent
+     * @return A CSSElement containing all selectors found in the stream as its children
+     * @throws IOException on input stream failure
+     */
+    CSSElement parseCSS(InputStreamReader r, HTMLComponent htmlC) throws IOException {
+<span class="nc" id="L410">        ExtInputStreamReader er = new ExtInputStreamReader(r);</span>
+<span class="nc" id="L411">        return parseCSS(er, htmlC, null, null);</span>
+    }
+
+    /**
+     * Reads a CSS file/stream and returns the tokenized CSS as a single level element tree with the
+     * root appearing as a &quot;style&quot;.
+     *
+     * @param r          The stream reader containing the CSS segment
+     * @param htmlC      The HTMLComponent
+     * @param addTo      the master CSSElement to add the selectors to (or null to open a new one_
+     * @param firstToken A first toekn to process, or null if none
+     * @return A CSSElement containing all selectors found in the stream as its children
+     * @throws IOException on input stream failure
+     */
+    CSSElement parseCSS(ExtInputStreamReader r, HTMLComponent htmlC, CSSElement addTo, String firstToken) throws IOException {
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if (addTo == null) {</span>
+<span class="nc" id="L427">            addTo = new CSSElement(&quot;style&quot;);</span>
+        }
+<span class="nc" id="L429">        CSSElement parent = addTo;</span>
+<span class="nc" id="L430">        Vector selectors = new Vector();</span>
+<span class="nc" id="L431">        CSSElement lastGroupedParent = null;</span>
+
+<span class="nc" id="L433">        boolean selectorMode = true;</span>
+<span class="nc" id="L434">        boolean grouping = false; // Grouping is when selector are grouped, i.e. h1,h2,h3 { ... }</span>
+<span class="nc" id="L435">        boolean childSelector = false; // when 'a &gt; b' appears it is a child seelctor, meaning only 'b' that is a direct child of 'a' (unlike 'a b' which is a descendant selector)</span>
+<span class="nc" id="L436">        boolean siblingSelector = false; // when 'a + b' appears it is a sibling seelctor, meaning only 'b' that is adjacent to 'a'</span>
+
+<span class="nc" id="L438">        String token = &quot;&quot;;</span>
+
+        //TODO - detect BOM for UTF8 etc.
+        while (true) {
+
+<span class="nc bnc" id="L443" title="All 2 branches missed.">            if (firstToken != null) {</span>
+<span class="nc" id="L444">                token = firstToken;</span>
+<span class="nc" id="L445">                firstToken = null;</span>
+            } else {
+<span class="nc" id="L447">                token = nextToken(r, true, false, selectorMode, false);</span>
+            }
+<span class="nc bnc" id="L449" title="All 4 branches missed.">            if (token == null || token.indexOf(&quot;&lt;/style&quot;) &gt; -1) {</span>
+<span class="nc" id="L450">                break;</span>
+            }
+
+<span class="nc bnc" id="L453" title="All 2 branches missed.">            if (&quot;{&quot;.equals(token)) {</span>
+<span class="nc" id="L454">                selectorMode = false;</span>
+<span class="nc" id="L455">                grouping = false;</span>
+<span class="nc" id="L456">                continue;</span>
+            }
+<span class="nc bnc" id="L458" title="All 2 branches missed.">            if (&quot;}&quot;.equals(token)) {</span>
+<span class="nc" id="L459">                selectorMode = true;</span>
+<span class="nc" id="L460">                copyAttributes(parent, selectors, addTo);</span>
+<span class="nc" id="L461">                parent = addTo;</span>
+<span class="nc" id="L462">                selectors = new Vector();</span>
+<span class="nc" id="L463">                lastGroupedParent = null;</span>
+<span class="nc" id="L464">                continue;</span>
+            }
+
+<span class="nc bnc" id="L467" title="All 2 branches missed.">            if (selectorMode) {</span>
+                // Checks for grouped selectors, note that due to spacing the comma can either appear as a separate token, or at the start of a token or at its end
+                // All these scenarios are checked in the following lines of code.
+<span class="nc bnc" id="L470" title="All 2 branches missed.">                if (&quot;,&quot;.equals(token)) {</span>
+<span class="nc" id="L471">                    grouping = true;</span>
+<span class="nc" id="L472">                    continue;</span>
+                }
+
+<span class="nc bnc" id="L475" title="All 2 branches missed.">                if (&quot;&gt;&quot;.equals(token)) {</span>
+<span class="nc" id="L476">                    childSelector = true;</span>
+<span class="nc" id="L477">                    continue;</span>
+                }
+
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                if (&quot;+&quot;.equals(token)) {</span>
+<span class="nc" id="L481">                    siblingSelector = true;</span>
+<span class="nc" id="L482">                    continue;</span>
+                }
+
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                if (token.startsWith(&quot;,&quot;)) {</span>
+<span class="nc" id="L486">                    token = token.substring(1);</span>
+<span class="nc" id="L487">                    grouping = true;</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                } else if (token.startsWith(&quot;&gt;&quot;)) {</span>
+<span class="nc" id="L489">                    token = token.substring(1);</span>
+<span class="nc" id="L490">                    childSelector = true;</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">                } else if (token.startsWith(&quot;+&quot;)) {</span>
+<span class="nc" id="L492">                    token = token.substring(1);</span>
+<span class="nc" id="L493">                    siblingSelector = true;</span>
+                }
+
+<span class="nc" id="L496">                boolean nextIsChildSelector = false;</span>
+<span class="nc" id="L497">                boolean nextIsSiblingSelector = false;</span>
+
+<span class="nc bnc" id="L499" title="All 2 branches missed.">                if (token.endsWith(&quot;&gt;&quot;)) {</span>
+<span class="nc" id="L500">                    nextIsChildSelector = true;</span>
+<span class="nc" id="L501">                    token = token.substring(0, token.length() - 1);</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">                } else if (token.endsWith(&quot;+&quot;)) {</span>
+<span class="nc" id="L503">                    nextIsSiblingSelector = true;</span>
+<span class="nc" id="L504">                    token = token.substring(0, token.length() - 1);</span>
+                }
+
+
+<span class="nc bnc" id="L508" title="All 2 branches missed.">                if (grouping) {</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">                    if (token.endsWith(&quot;,&quot;)) {</span>
+<span class="nc" id="L510">                        token = token.substring(0, token.length() - 1);</span>
+                    } else {
+<span class="nc" id="L512">                        grouping = false; //  there was no comma at the end, so next time it is not a grouped element (unless a comma will be detected as the next token or the start of the next token)</span>
+                    }
+<span class="nc" id="L514">                    CSSElement entry = new CSSElement(token);</span>
+<span class="nc" id="L515">                    selectors.addElement(entry);</span>
+<span class="nc" id="L516">                    lastGroupedParent = entry;</span>
+
+<span class="nc" id="L518">                } else {</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">                    if (token.endsWith(&quot;,&quot;)) {</span>
+<span class="nc" id="L520">                        grouping = true;</span>
+<span class="nc" id="L521">                        token = token.substring(0, token.length() - 1);</span>
+                    }
+<span class="nc" id="L523">                    CSSElement entry = new CSSElement(token);</span>
+
+
+<span class="nc bnc" id="L526" title="All 2 branches missed.">                    entry.descendantSelector = !childSelector;</span>
+<span class="nc" id="L527">                    entry.siblingSelector = siblingSelector;</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">                    if (lastGroupedParent == null) {</span>
+<span class="nc" id="L529">                        parent.addChild(entry);</span>
+<span class="nc" id="L530">                        parent = entry;</span>
+                    } else {
+<span class="nc" id="L532">                        lastGroupedParent.addChild(entry);</span>
+<span class="nc" id="L533">                        lastGroupedParent = entry;</span>
+                    }
+
+                }
+<span class="nc" id="L537">                childSelector = nextIsChildSelector;</span>
+<span class="nc" id="L538">                siblingSelector = nextIsSiblingSelector;</span>
+
+<span class="nc" id="L540">            } else {</span>
+<span class="nc" id="L541">                boolean compoundToken = false;</span>
+
+<span class="nc bnc" id="L543" title="All 2 branches missed.">                for (int iter = 0; iter &lt; CSSElement.CSS_SHORTHAND_ATTRIBUTE_LIST.length; iter++) {</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">                    if (CSSElement.CSS_SHORTHAND_ATTRIBUTE_LIST[iter].equals(token)) {</span>
+<span class="nc" id="L545">                        compoundToken = true;</span>
+<span class="nc" id="L546">                        boolean collattable = CSSElement.CSS_IS_SHORTHAND_ATTRIBUTE_COLLATABLE[iter];</span>
+<span class="nc" id="L547">                        int valsAdded = 0;</span>
+<span class="nc" id="L548">                        token = nextToken(r, false, false, false, false);</span>
+
+                        // This array is used for collatable attributes - the values can't be set as they are read, first we need to see how many values appear and set accordingly
+<span class="nc" id="L551">                        String[] tokens = new String[4];</span>
+<span class="nc bnc" id="L552" title="All 2 branches missed.">                        while (token != null) {</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                            if (collattable) {</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">                                if (valsAdded &lt; tokens.length) {</span>
+<span class="nc" id="L555">                                    tokens[valsAdded] = token;</span>
+<span class="nc" id="L556">                                    valsAdded++;</span>
+                                }
+                            } else {
+<span class="nc" id="L559">                                addShorthandAttribute(token, iter, parent);</span>
+                            }
+
+<span class="nc" id="L562">                            token = nextToken(r, false, false, false, false);</span>
+                        }
+
+                        // The following assigns the collatable attributes according to CSSElement.CSS_COLLATABLE_ORDER
+<span class="nc bnc" id="L566" title="All 4 branches missed.">                        if ((collattable) &amp;&amp; (valsAdded &gt; 0)) {</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">                            for (int i = 0; i &lt; CSSElement.CSS_COLLATABLE_ORDER[valsAdded - 1].length; i++) {</span>
+<span class="nc bnc" id="L568" title="All 2 branches missed.">                                for (int j = 0; j &lt; CSSElement.CSS_COLLATABLE_ORDER[valsAdded - 1][i].length; j++) {</span>
+<span class="nc" id="L569">                                    int side = CSSElement.CSS_COLLATABLE_ORDER[valsAdded - 1][i][j];</span>
+<span class="nc" id="L570">                                    addAttributeTo(parent, CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[iter][side], tokens[i], htmlC);</span>
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                // if this is a &quot;regular&quot; css attribute is it one of the supported attributes
+<span class="nc bnc" id="L579" title="All 2 branches missed.">                if (!compoundToken) {</span>
+                    // We ignore commas when collecting a value, since it can be for example: font-family:arial,tahoma,sans-serif etc.
+                    // We also ignore spaces in font-family / access key since the value can be: arial, tahoma / send * , #
+<span class="nc" id="L582">                    int result = addAttributeTo(parent, token, nextToken(r, false, true, false,</span>
+<span class="nc bnc" id="L583" title="All 4 branches missed.">                            (token.equalsIgnoreCase(&quot;-wap-access-key&quot;) || (token.equalsIgnoreCase(&quot;font-family&quot;)) ||</span>
+<span class="nc bnc" id="L584" title="All 4 branches missed.">                                    (token.equalsIgnoreCase(&quot;quotes&quot;)) || (token.equalsIgnoreCase(&quot;border-spacing&quot;)) ||</span>
+<span class="nc bnc" id="L585" title="All 6 branches missed.">                                    (token.equalsIgnoreCase(&quot;content&quot;)) || (token.equalsIgnoreCase(&quot;counter-reset&quot;)) || (token.equalsIgnoreCase(&quot;counter-increment&quot;)))), htmlC);</span>
+<span class="nc bnc" id="L586" title="All 2 branches missed.">                    if (result != -1) {</span>
+                        // unsupported token we need to read until the newline
+                        //while(nextToken(r, false, false,false) != null &amp;&amp; !newline) {}
+<span class="nc bnc" id="L589" title="All 2 branches missed.">                        while (nextToken(r, false, false, false, false) != null) {</span>
+                        } //TODO - is newline truly unnecessary ? + what if that happens in the end of the file - do we get into an infinite loop?
+                    }
+                }
+<span class="nc" id="L593">            }</span>
+        }
+<span class="nc" id="L595">        return addTo;</span>
+    }
+
+    /**
+     * Adds the specified value to the specified selector as a value to the shorthand attribute whose index is specified
+     * This methods deals with the complexity of adding values for shorthand attributes, since they can be specified in any order
+     * It also handles multiple-shorthand levels such as the 'border' attribute
+     *
+     * @param value         The attribute's value
+     * @param shorthandAttr The attribute's index
+     * @param selector      The selector to add the attribuet to
+     * @return true if succeeded to add, false otherwise (for example invalid value)
+     */
+    private boolean addShorthandAttribute(String value, int shorthandAttr, CSSElement selector) {
+<span class="nc bnc" id="L609" title="All 2 branches missed.">        if (CSSElement.CSS_IS_SHORTHAND_ATTRIBUTE_COLLATABLE[shorthandAttr]) {</span>
+<span class="nc" id="L610">            return addCollatableAttribute(value, shorthandAttr, selector);</span>
+        }
+<span class="nc bnc" id="L612" title="All 2 branches missed.">        for (int i = 0; i &lt; CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[shorthandAttr].length; i++) {</span>
+<span class="nc" id="L613">            int attrIndex = CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[shorthandAttr][i];</span>
+
+<span class="nc bnc" id="L615" title="All 2 branches missed.">            if (attrIndex &gt;= CSSElement.CSS_STYLE_ID_OFFSET) {</span>
+
+<span class="nc bnc" id="L617" title="All 2 branches missed.">                if (!selector.isAttributeAssigned(attrIndex)) { // Only check if the attribute wasn't set yet</span>
+<span class="nc" id="L618">                    int result = selector.addAttribute(attrIndex, value);</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                    if (result == -1) { //no error code return - success</span>
+<span class="nc" id="L620">                        return true;</span>
+                    }
+<span class="nc" id="L622">                }</span>
+            } else {
+<span class="nc" id="L624">                boolean success = addShorthandAttribute(value, attrIndex, selector);</span>
+<span class="nc bnc" id="L625" title="All 2 branches missed.">                if (success) {</span>
+<span class="nc" id="L626">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L630">        return false;</span>
+    }
+
+    /**
+     * Adds the specified value to the specified selector as a value to the shorthand and collatable attribute whose index is specified
+     * This is called from addShorthandAttribute when a shorthand attribute maps to a collatable attribute
+     * Note that while usually collatable attributes can have 1-4 values, and are mapped according to CSSElement.CSS_COLLATABLE_ORDER
+     * When they are specified as part of a top shorthand attribute, only one value can be specified and it is copied to all base attributes.
+     * For example, While the definition 'border-width: 5px 10px' will set the vertical border width to 5 and the horizontal to 10,
+     * One cannot specify: 'border: 5px 10px solid red' - but rather has to specify only one value that will be set as the width for all sides.
+     *
+     * @param value         The attribute's value
+     * @param shorthandAttr The attribute's index
+     * @param selector      The selector to add the attribuet to
+     * @return true if succeeded to add, false otherwise (for example invalid value)
+     */
+    private boolean addCollatableAttribute(String value, int shorthandAttr, CSSElement selector) {
+<span class="nc" id="L647">        int attrIndex = CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[shorthandAttr][0];</span>
+<span class="nc" id="L648">        int result = selector.addAttribute(attrIndex, value);</span>
+<span class="nc bnc" id="L649" title="All 2 branches missed.">        if (result == -1) {</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">            for (int i = 1; i &lt; CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[shorthandAttr].length; i++) {</span>
+<span class="nc" id="L651">                attrIndex = CSSElement.CSS_SHORTHAND_ATTRIBUTE_INDEX[shorthandAttr][i];</span>
+<span class="nc" id="L652">                selector.addAttribute(attrIndex, value);</span>
+            }
+<span class="nc" id="L654">            return true;</span>
+        }
+<span class="nc" id="L656">        return false;</span>
+    }
+
+    /**
+     * Adds the specified attribute and value pair to the specified selector
+     *
+     * @param selector The selector we're working on
+     * @param attrId   The attribute's id
+     * @param value    The attribute value
+     * @param htmlC    The HTMLComponent (To obtain the ParserCallback)
+     * @return a positive value if an error occured, or -1 otherwise
+     */
+    private int addAttributeTo(CSSElement selector, int attrId, String value, HTMLComponent htmlC) {
+<span class="nc" id="L669">        int error = selector.addAttribute(attrId, value);</span>
+<span class="nc" id="L670">        reportAddAttributeError(error, selector, selector.getAttributeName(Integer.valueOf(attrId)), value, htmlC);</span>
+<span class="nc" id="L671">        return error;</span>
+    }
+
+    /**
+     * Adds the specified attribute and value pair to the specified selector
+     *
+     * @param selector      The selector we're working on
+     * @param attributeName The attribute's name
+     * @param value         The attribute value
+     * @param htmlC         The HTMLComponent (To obtain the ParserCallback)
+     * @return a positive value if an error occured, or -1 otherwise
+     */
+    private int addAttributeTo(CSSElement selector, String attributeName, String value, HTMLComponent htmlC) {
+<span class="nc" id="L684">        int error = selector.setAttribute(attributeName, value);</span>
+<span class="nc" id="L685">        reportAddAttributeError(error, selector, attributeName, value, htmlC);</span>
+<span class="nc" id="L686">        return error;</span>
+    }
+
+
+    /**
+     * A helper method that handles reporting of CSS errors to the ParserCallback (if available)
+     *
+     * @param errorCode     The error code as returned by the CSSElement.addAttribute methods
+     * @param selector      The selector we're working on
+     * @param attributeName The attribute's name
+     * @param value         The attribute value
+     * @param htmlC         The HTMLComponent (To obtain the ParserCallback)
+     */
+    private void reportAddAttributeError(int errorCode, CSSElement selector, String attributeName, String value, HTMLComponent htmlC) {
+<span class="nc bnc" id="L700" title="All 2 branches missed.">        if (errorCode != -1) {</span>
+<span class="nc bnc" id="L701" title="All 2 branches missed.">            if (errorCode == CSSParserCallback.ERROR_CSS_ATTRIBUTE_NOT_SUPPORTED) {</span>
+<span class="nc" id="L702">                notifyError(errorCode, selector.getTagName(), attributeName, value, &quot;CSS Attribute '&quot; + attributeName + &quot;' (Appeared in selector '&quot; + selector.getTagName() + &quot;') is not supported in WCSS.&quot;);</span>
+<span class="nc bnc" id="L703" title="All 2 branches missed.">            } else if (errorCode == CSSParserCallback.ERROR_CSS_ATTIBUTE_VALUE_INVALID) {</span>
+<span class="nc" id="L704">                notifyError(errorCode, selector.getTagName(), attributeName, value, &quot;CSS Attribute '&quot; + attributeName + &quot;' (Appeared in selector '&quot; + selector.getTagName() + &quot;') has an invalid value (&quot; + value + &quot;)&quot;);</span>
+            }
+        }
+<span class="nc" id="L707">    }</span>
+
+    /**
+     * A utility method used to notify an error to the ParserCallback and throw an IllegalArgumentException if parsingError returned false
+     *
+     * @param callback    The ParserCallback
+     * @param errorId     The error ID, one of the ERROR_* constants in ParserCallback
+     * @param tag         The tag in which the error occured (Can be null for non-tag related errors)
+     * @param attribute   The attribute in which the error occured (Can be null for non-attribute related errors)
+     * @param value       The value in which the error occured (Can be null for non-value related errors)
+     * @param description A verbal description of the error
+     */
+    void notifyError(int errorId, String tag, String attribute, String value, String description) {
+<span class="nc bnc" id="L720" title="All 2 branches missed.">        if (parserCallback != null) {</span>
+<span class="nc" id="L721">            boolean cont = parserCallback.parsingError(errorId, tag, attribute, value, description);</span>
+<span class="nc bnc" id="L722" title="All 2 branches missed.">            if (!cont) {</span>
+<span class="nc" id="L723">                throw new IllegalArgumentException(description);</span>
+            }
+        }
+<span class="nc" id="L726">    }</span>
+
+    public void setCSSParserCallback(CSSParserCallback parserCallback) {
+<span class="nc" id="L729">        this.parserCallback = parserCallback;</span>
+<span class="nc" id="L730">    }</span>
+
+    /**
+     * A decorator for Reader that adds the ability to &quot;unread&quot; a character
+     * This makes parsing easier, and is used for CSS parsing.
+     *
+     * @author Ofir Leitner
+     */
+    class ExtInputStreamReader {
+
+<span class="nc" id="L740">        char lastCharRead = (char) -1;</span>
+        Reader internalReader;
+
+<span class="nc" id="L743">        ExtInputStreamReader(Reader isr) {</span>
+<span class="nc" id="L744">            internalReader = isr;</span>
+<span class="nc" id="L745">        }</span>
+
+        /**
+         * &quot;Unreads&quot; a character from the stream by placing it in a member variable to be later retreived by readCharFromReader, used by the CSS Parser
+         *
+         * @param c The character to unread
+         */
+        void unreadChar(char c) {
+<span class="nc" id="L753">            lastCharRead = c;</span>
+<span class="nc" id="L754">        }</span>
+
+        /**
+         * Reads the next character from the input stream, used by the CSS Parser
+         * If there's an &quot;unread&quot; character in the buffer it is returned (and no reading is done to the actual stream)
+         *
+         * @param r The stream reader
+         * @return the next character
+         * @throws IOException
+         */
+        char readCharFromReader() throws IOException {
+<span class="nc bnc" id="L765" title="All 2 branches missed.">            if (lastCharRead != (char) -1) {</span>
+<span class="nc" id="L766">                char c = lastCharRead;</span>
+<span class="nc" id="L767">                lastCharRead = (char) -1;</span>
+<span class="nc" id="L768">                return c;</span>
+            }
+<span class="nc" id="L770">            return (char) internalReader.read();</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

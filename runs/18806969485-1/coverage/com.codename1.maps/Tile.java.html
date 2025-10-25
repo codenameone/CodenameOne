@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps</a> &gt; <span class="el_source">Tile.java</span></div><h1>Tile.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2010, 2011 Itiner.pl. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Itiner designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Itiner in the LICENSE.txt file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+package com.codename1.maps;
+
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Point;
+import com.codename1.ui.plaf.UIManager;
+
+/**
+ * This class represents a single tile on a map.
+ * a map is been constructed from a few tiles that are been tiled on next to the
+ * other.
+ *
+ * @author Roman Kamyk &lt;roman.kamyk@itiner.pl&gt;
+ */
+public class Tile {
+
+    private static Image tileLoadingImage;
+<span class="nc" id="L40">    private static String tileLoadingText = &quot;Loading...&quot;;</span>
+<span class="nc" id="L41">    private static final Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);</span>
+<span class="nc" id="L42">    private static boolean paintLoading = false;</span>
+    private final Dimension dimension;
+    private final BoundingBox bbox;
+    private final Image tileImage;
+    private ActionListener listener;
+
+    /**
+     * Creates a new Tile.
+     *
+     * @param dimension      the tile Dimensions (usually 256x256)
+     * @param getBoundingBox the bounding box this tile is showing
+     * @param image          the map image or null.
+     */
+<span class="nc" id="L55">    public Tile(Dimension dimension, BoundingBox boundingBox, Image image) {</span>
+<span class="nc" id="L56">        this.dimension = dimension;</span>
+<span class="nc" id="L57">        bbox = boundingBox;</span>
+<span class="nc" id="L58">        tileImage = image;</span>
+<span class="nc" id="L59">        tileLoadingImage = UIManager.getInstance().getThemeImageConstant(&quot;mapTileLoadingImage&quot;);</span>
+<span class="nc" id="L60">        tileLoadingText = UIManager.getInstance().getThemeConstant(&quot;mapTileLoadingText&quot;, &quot;Loading...&quot;);</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * This flag indicates if the Tile should paint a Loading image or Text or
+     * simply not do any painting if a map image is not ready for painting
+     *
+     * @param if true a Loading rect is displayed when map image is being
+     *           downloaded
+     */
+    public static void setPaintLoading(boolean toPaint) {
+<span class="nc" id="L71">        paintLoading = toPaint;</span>
+<span class="nc" id="L72">    }</span>
+
+    /**
+     * Sets a static image that will be drawn on the map if the tile image is
+     * not available yet.
+     *
+     * @param tileLoadingImage
+     */
+    public static void setTileLoadingImage(Image tileLoadingImage) {
+<span class="nc" id="L81">        Tile.tileLoadingImage = tileLoadingImage;</span>
+<span class="nc" id="L82">    }</span>
+
+    /**
+     * Sets a static text to paint.
+     * This will be used if the map if the tile image is not available yet and
+     * the tileLoadingImage is null
+     *
+     * @param tileLoadingText
+     */
+    public static void setTileLoadingText(String tileLoadingText) {
+<span class="nc" id="L92">        Tile.tileLoadingText = tileLoadingText;</span>
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * Returns the x, y point of the given coordinate relative to this tile
+     *
+     * @param point a coordinate to translate to x, y
+     * @return a Point object relative to this tile
+     */
+    public Point pointPosition(Coord point) {
+<span class="nc" id="L102">        int x = position(dimension.getWidth(), point.getLongitude(),</span>
+<span class="nc" id="L103">                bbox.getSouthWest().getLongitude(), bbox.getNorthEast().getLongitude());</span>
+<span class="nc" id="L104">        int y = position(dimension.getHeight(), point.getLatitude(),</span>
+<span class="nc" id="L105">                bbox.getSouthWest().getLatitude(), bbox.getNorthEast().getLatitude());</span>
+        //
+<span class="nc" id="L107">        return new Point(x, dimension.getHeight() - y);</span>
+    }
+
+    private int position(int dx, double x, double x1, double x2) {
+<span class="nc" id="L111">        return (int) (dx * (x - x1) / (x2 - x1));</span>
+    }
+
+    private double coord(double percent, double x1, double x2) {
+<span class="nc" id="L115">        return x1 + percent * (x2 - x1);</span>
+    }
+
+    /**
+     * Returns the Coordinate of the given x, y position on the tile
+     *
+     * @param posX
+     * @param posY
+     * @return a Coordinate that was created from the given x, y position
+     */
+    public Coord position(int posX, int posY) {
+<span class="nc" id="L126">        double longitude = coord(1.0 * posX / dimension.getWidth(), bbox.getSouthWest().getLongitude(), bbox.getNorthEast().getLongitude());</span>
+<span class="nc" id="L127">        double latitude = coord(1.0 * posY / dimension.getHeight(), bbox.getSouthWest().getLatitude(), bbox.getNorthEast().getLatitude());</span>
+<span class="nc" id="L128">        return new Coord(latitude, longitude, bbox.getSouthWest().isProjected());</span>
+    }
+
+    /**
+     * Gets the tile dimension
+     *
+     * @return the tile dimension
+     */
+    public Dimension dimension() {
+<span class="nc" id="L137">        return dimension;</span>
+    }
+
+    /**
+     * Gets the tile bounding box.
+     *
+     * @return the tile bounding box.
+     */
+    public BoundingBox getBoundingBox() {
+<span class="nc" id="L146">        return bbox;</span>
+    }
+
+    /**
+     * Paints the tile on the Graphics Object
+     *
+     * @param g Graphics object to paint on.
+     * @return true if painting succeeded.
+     */
+    public boolean paint(Graphics g) {
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (tileImage != null) {</span>
+<span class="nc" id="L157">            g.drawImage(tileImage, 0, 0);</span>
+<span class="nc" id="L158">            return true;</span>
+        }
+<span class="nc" id="L160">        return false;</span>
+    }
+
+    /**
+     * Paints the tile on the Graphics Object translated to the given x, y,
+     * This method paints the tile image if available or will call
+     * paintTileLoading
+     *
+     * @param g Graphics object to paint on.
+     * @param x translate to x before painting
+     * @param y translate to y before painting
+     */
+    public void paint(Graphics g, int x, int y) {
+<span class="nc" id="L173">        g.translate(x, y);</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">        if (!paint(g) &amp;&amp; paintLoading) {</span>
+<span class="nc" id="L175">            paintTileLoading(g);</span>
+        }
+<span class="nc" id="L177">        g.translate(-x, -y);</span>
+<span class="nc" id="L178">    }</span>
+
+    /**
+     * This method paints a &quot;tile loading&quot; on the Graphics if
+     * boolean paint(Graphics g) returned false.
+     *
+     * @param g Graphics object to paint on.
+     */
+    public void paintTileLoading(Graphics g) {
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (tileLoadingImage == null) {</span>
+<span class="nc" id="L188">            paintLoadingText(g);</span>
+        } else {
+<span class="nc" id="L190">            paintLoadingImage(g);</span>
+        }
+<span class="nc" id="L192">    }</span>
+
+    private void paintLoadingText(Graphics g) {
+<span class="nc" id="L195">        g.setColor(0x707070);</span>
+<span class="nc" id="L196">        g.fillRect(0, 0, dimension().getWidth(), dimension().getHeight());</span>
+<span class="nc" id="L197">        g.setColor(0xFFFFFF);</span>
+<span class="nc" id="L198">        g.setFont(f);</span>
+<span class="nc" id="L199">        Font f = g.getFont();</span>
+<span class="nc" id="L200">        int strWidth = f.stringWidth(tileLoadingText);</span>
+<span class="nc" id="L201">        g.drawString(tileLoadingText, (dimension().getWidth() - strWidth) / 2, (dimension().getHeight() - f.getHeight()) / 2);</span>
+<span class="nc" id="L202">    }</span>
+
+    private void paintLoadingImage(Graphics g) {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        for (int y = 0; y &lt; dimension().getHeight(); y += tileLoadingImage.getHeight()) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            for (int x = 0; x &lt; dimension().getWidth(); x += tileLoadingImage.getWidth()) {</span>
+<span class="nc" id="L207">                g.drawImage(tileLoadingImage, x, y);</span>
+            }
+        }
+<span class="nc" id="L210">    }</span>
+
+    /**
+     * Sets a Listener to be notified when the tile is fireReady to be painted
+     *
+     * @param listener
+     */
+    public void setsTileReadyListener(ActionListener listener) {
+<span class="nc" id="L218">        this.listener = listener;</span>
+<span class="nc" id="L219">    }</span>
+
+    /**
+     * inform the TileReadyListener that this tile is ready to be painted
+     */
+    protected void fireReady() {
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (listener != null) {</span>
+<span class="nc" id="L226">            listener.actionPerformed(null);</span>
+        }
+<span class="nc" id="L228">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L234">        return getClass().getName() + &quot; dimension: &quot; + dimension + &quot; bbox: &quot; + bbox;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

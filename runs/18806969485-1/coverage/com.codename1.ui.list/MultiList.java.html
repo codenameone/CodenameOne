@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MultiList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.list</a> &gt; <span class="el_source">MultiList.java</span></div><h1>MultiList.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.list;
+
+import com.codename1.components.MultiButton;
+import com.codename1.ui.Image;
+import com.codename1.ui.List;
+
+import java.util.Hashtable;
+
+/**
+ * &lt;p&gt;A list with a {@link com.codename1.components.MultiButton} renderer, &lt;b&gt;notice&lt;/b&gt; that
+ * &lt;a href=&quot;https://www.codenameone.com/blog/avoiding-lists.html&quot;&gt;we strongly
+ * discourage usage of lists&lt;/a&gt;.. This simplifies the process of
+ * working with the list and its model as the renderer comes pre-configured for common use cases.
+ * &lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/b2ab6645db842d7b2750.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/graphics-urlimage-multilist.png&quot; alt=&quot;MultiList and model in action&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class MultiList extends List {
+    private final MultiButton sel;
+    private final MultiButton unsel;
+    private Image placeholder;
+
+    /**
+     * Constructor that accepts a model for the list
+     *
+     * @param model the model object to assign to the list
+     */
+    public MultiList(ListModel model) {
+<span class="nc" id="L54">        super(model);</span>
+<span class="nc" id="L55">        sel = new MultiButton();</span>
+<span class="nc" id="L56">        unsel = new MultiButton();</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Constructor for the GUI builder
+     */
+    public MultiList() {
+<span class="nc" id="L63">        super(new DefaultListModel(h(&quot;Entry 1&quot;, &quot;more...&quot;),</span>
+<span class="nc" id="L64">                h(&quot;Entry 2&quot;, &quot;more...&quot;),</span>
+<span class="nc" id="L65">                h(&quot;Entry 3&quot;, &quot;more...&quot;)));</span>
+<span class="nc" id="L66">        sel = new MultiButton();</span>
+<span class="nc" id="L67">        unsel = new MultiButton();</span>
+<span class="nc" id="L68">    }</span>
+
+    private static Hashtable h(String fline, String sline) {
+<span class="nc" id="L71">        Hashtable h = new Hashtable();</span>
+<span class="nc" id="L72">        h.put(&quot;Line1&quot;, fline);</span>
+<span class="nc" id="L73">        h.put(&quot;Line2&quot;, sline);</span>
+<span class="nc" id="L74">        return h;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initComponent() {
+<span class="nc" id="L81">        super.initComponent();</span>
+<span class="nc" id="L82">        GenericListCellRenderer gn = new GenericListCellRenderer(sel, unsel);</span>
+<span class="nc" id="L83">        setRenderer(gn);</span>
+<span class="nc" id="L84">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="nc" id="L88">        super.deinitialize();</span>
+<span class="nc" id="L89">        ListCellRenderer gn = getRenderer();</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (gn instanceof GenericListCellRenderer) {</span>
+<span class="nc" id="L91">            ((GenericListCellRenderer) gn).deinitialize(this);</span>
+        }
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * Allows developers to customize the properties of the selected multi-button in code
+     *
+     * @return the selected multi button
+     */
+    public MultiButton getSelectedButton() {
+<span class="nc" id="L101">        return sel;</span>
+    }
+
+    /**
+     * Allows developers to customize the properties of the unselected multi-button in code
+     *
+     * @return the unselected multi button
+     */
+    public MultiButton getUnselectedButton() {
+<span class="nc" id="L110">        return unsel;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L117">        return new String[]{</span>
+                &quot;name1&quot;, &quot;name2&quot;, &quot;name3&quot;, &quot;name4&quot;,
+                &quot;uiid1&quot;, &quot;uiid2&quot;, &quot;uiid3&quot;, &quot;uiid4&quot;, &quot;iconName&quot;, &quot;iconUiid&quot;, &quot;iconPosition&quot;,
+                &quot;emblemName&quot;, &quot;emblemUiid&quot;, &quot;emblemPosition&quot;, &quot;horizontalLayout&quot;,
+                &quot;invertFirstTwoEntries&quot;, &quot;checkBox&quot;, &quot;radioButton&quot;,
+                &quot;maskName&quot;, &quot;Placeholder&quot;
+        };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L130">        return new Class[]{</span>
+                String.class,// name1
+                String.class,// name2
+                String.class,// name3
+                String.class,// name4
+                String.class,// uiid1
+                String.class,// uiid2
+                String.class,// uiid3
+                String.class,// uiid4
+                String.class,// iconName
+                String.class,// iconUiid
+                String.class,// iconPosition
+                String.class,// emblemName
+                String.class,// emblemUiid
+                String.class,// emblemPosition
+                Boolean.class,
+                Boolean.class,
+                Boolean.class,
+                Boolean.class,
+                String.class,
+                Image.class // placeholder
+        };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (name.equals(&quot;placeholder&quot;)) {</span>
+<span class="nc" id="L159">            return placeholder;</span>
+        }
+<span class="nc" id="L161">        return unsel.getPropertyValue(name);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (name.equals(&quot;placeholder&quot;)) {</span>
+<span class="nc" id="L169">            this.placeholder = (Image) value;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (unsel != null) {</span>
+<span class="nc" id="L171">                unsel.setIcon(placeholder);</span>
+<span class="nc" id="L172">                sel.setIcon(placeholder);</span>
+            }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            if (getRenderer() instanceof GenericListCellRenderer) {</span>
+<span class="nc" id="L175">                ((GenericListCellRenderer) getRenderer()).updateIconPlaceholders();</span>
+            }
+<span class="nc" id="L177">            return null;</span>
+        }
+<span class="nc" id="L179">        unsel.setPropertyValue(name, value);</span>
+<span class="nc" id="L180">        String v = sel.setPropertyValue(name, value);</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L182">            GenericListCellRenderer gn = new GenericListCellRenderer(sel, unsel);</span>
+<span class="nc" id="L183">            setRenderer(gn);</span>
+        }
+<span class="nc" id="L185">        return v;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

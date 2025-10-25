@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Deflater.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">Deflater.java</span></div><h1>Deflater.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; indent-tabs-mode:nil -*- */
+/*
+Copyright (c) 2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+final public class Deflater extends ZStream {
+
+    static final private int MAX_WBITS = 15;        // 32K LZ77 window
+    static final private int DEF_WBITS = MAX_WBITS;
+
+    static final private int Z_NO_FLUSH = 0;
+    static final private int Z_PARTIAL_FLUSH = 1;
+    static final private int Z_SYNC_FLUSH = 2;
+    static final private int Z_FULL_FLUSH = 3;
+    static final private int Z_FINISH = 4;
+
+    static final private int MAX_MEM_LEVEL = 9;
+
+    static final private int Z_OK = 0;
+    static final private int Z_STREAM_END = 1;
+    static final private int Z_NEED_DICT = 2;
+    static final private int Z_ERRNO = -1;
+    static final private int Z_STREAM_ERROR = -2;
+    static final private int Z_DATA_ERROR = -3;
+    static final private int Z_MEM_ERROR = -4;
+    static final private int Z_BUF_ERROR = -5;
+    static final private int Z_VERSION_ERROR = -6;
+
+<span class="pc" id="L60">    private boolean finished = false;</span>
+
+    public Deflater() {
+<span class="nc" id="L63">        super();</span>
+<span class="nc" id="L64">    }</span>
+
+    public Deflater(int level) throws GZIPException {
+<span class="nc" id="L67">        this(level, MAX_WBITS);</span>
+<span class="nc" id="L68">    }</span>
+
+    public Deflater(int level, boolean nowrap) throws GZIPException {
+<span class="nc" id="L71">        this(level, MAX_WBITS, nowrap);</span>
+<span class="nc" id="L72">    }</span>
+
+    public Deflater(int level, int bits) throws GZIPException {
+<span class="fc" id="L75">        this(level, bits, false);</span>
+<span class="fc" id="L76">    }</span>
+
+    public Deflater(int level, int bits, boolean nowrap) throws GZIPException {
+<span class="fc" id="L79">        super();</span>
+<span class="fc" id="L80">        int ret = init(level, bits, nowrap);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (ret != Z_OK)</span>
+<span class="nc" id="L82">            throw new GZIPException(ret + &quot;: &quot; + msg);</span>
+<span class="fc" id="L83">    }</span>
+
+    public Deflater(int level, int bits, int memlevel, JZlib.WrapperType wrapperType) throws GZIPException {
+<span class="nc" id="L86">        super();</span>
+<span class="nc" id="L87">        int ret = init(level, bits, memlevel, wrapperType);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (ret != Z_OK)</span>
+<span class="nc" id="L89">            throw new GZIPException(ret + &quot;: &quot; + msg);</span>
+<span class="nc" id="L90">    }</span>
+
+    public Deflater(int level, int bits, int memlevel) throws GZIPException {
+<span class="nc" id="L93">        super();</span>
+<span class="nc" id="L94">        int ret = init(level, bits, memlevel);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (ret != Z_OK)</span>
+<span class="nc" id="L96">            throw new GZIPException(ret + &quot;: &quot; + msg);</span>
+<span class="nc" id="L97">    }</span>
+
+    public int init(int level) {
+<span class="nc" id="L100">        return init(level, MAX_WBITS);</span>
+    }
+
+    public int init(int level, boolean nowrap) {
+<span class="nc" id="L104">        return init(level, MAX_WBITS, nowrap);</span>
+    }
+
+    public int init(int level, int bits) {
+<span class="nc" id="L108">        return init(level, bits, false);</span>
+    }
+
+    public int init(int level, int bits, int memlevel, JZlib.WrapperType wrapperType) {
+<span class="nc bnc" id="L112" title="All 4 branches missed.">        if (bits &lt; 9 || bits &gt; 15) {</span>
+<span class="nc" id="L113">            return Z_STREAM_ERROR;</span>
+        }
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (wrapperType == JZlib.W_NONE) {</span>
+<span class="nc" id="L116">            bits *= -1;</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_GZIP) {</span>
+<span class="nc" id="L118">            bits += 16;</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_ANY) {</span>
+<span class="nc" id="L120">            return Z_STREAM_ERROR;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_ZLIB) {</span>
+        }
+<span class="nc" id="L123">        return init(level, bits, memlevel);</span>
+    }
+
+    public int init(int level, int bits, int memlevel) {
+<span class="nc" id="L127">        finished = false;</span>
+<span class="nc" id="L128">        dstate = new Deflate(this);</span>
+<span class="nc" id="L129">        return dstate.deflateInit(level, bits, memlevel);</span>
+    }
+
+    public int init(int level, int bits, boolean nowrap) {
+<span class="fc" id="L133">        finished = false;</span>
+<span class="fc" id="L134">        dstate = new Deflate(this);</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        return dstate.deflateInit(level, nowrap ? -bits : bits);</span>
+    }
+
+    public int deflate(int flush) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (dstate == null) {</span>
+<span class="nc" id="L140">            return Z_STREAM_ERROR;</span>
+        }
+<span class="fc" id="L142">        int ret = dstate.deflate(flush);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (ret == Z_STREAM_END)</span>
+<span class="fc" id="L144">            finished = true;</span>
+<span class="fc" id="L145">        return ret;</span>
+    }
+
+    public int end() {
+<span class="fc" id="L149">        finished = true;</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (dstate == null) return Z_STREAM_ERROR;</span>
+<span class="fc" id="L151">        int ret = dstate.deflateEnd();</span>
+<span class="fc" id="L152">        dstate = null;</span>
+<span class="fc" id="L153">        free();</span>
+<span class="fc" id="L154">        return ret;</span>
+    }
+
+    public int params(int level, int strategy) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (dstate == null) return Z_STREAM_ERROR;</span>
+<span class="nc" id="L159">        return dstate.deflateParams(level, strategy);</span>
+    }
+
+    public int setDictionary(byte[] dictionary, int dictLength) {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (dstate == null)</span>
+<span class="nc" id="L164">            return Z_STREAM_ERROR;</span>
+<span class="nc" id="L165">        return dstate.deflateSetDictionary(dictionary, dictLength);</span>
+    }
+
+    public boolean finished() {
+<span class="fc" id="L169">        return finished;</span>
+    }
+
+    public int copy(Deflater src) {
+<span class="nc" id="L173">        this.finished = src.finished;</span>
+<span class="nc" id="L174">        return Deflate.deflateCopy(this, src);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

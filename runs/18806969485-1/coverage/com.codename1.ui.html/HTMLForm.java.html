@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTMLForm.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">HTMLForm.java</span></div><h1>HTMLForm.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.ComboBox;
+import com.codename1.ui.Command;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.events.ActionEvent;
+
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * HTMLForm is an object that holds all the data related to a form within HTML.
+ * Note that it is not related in any way to Codename One's Form.
+ *
+ * @author Ofir Leitner
+ */
+class HTMLForm {
+
+    /**
+     * The default text on forms' submit button
+     */
+    static final String DEFAULT_SUBMIT_TEXT = &quot;Submit&quot;;
+
+    /**
+     * The default text on forms' reset button
+     */
+    static final String DEFAULT_RESET_TEXT = &quot;Clear&quot;;
+
+<span class="nc" id="L57">    Hashtable comps = new Hashtable();</span>
+<span class="nc" id="L58">    Hashtable defaultValues = new Hashtable();</span>
+<span class="nc" id="L59">    Vector defaultCheckedButtons = new Vector();</span>
+<span class="nc" id="L60">    Vector defaultUncheckedButtons = new Vector();</span>
+<span class="nc" id="L61">    Hashtable inputFormats = new Hashtable();</span>
+<span class="nc" id="L62">    Hashtable buttonGroups = new Hashtable();</span>
+<span class="nc" id="L63">    Vector emptyOk = new Vector();</span>
+<span class="nc" id="L64">    Vector emptyNotOk = new Vector();</span>
+
+    HTMLComponent htmlC;
+    String action;
+    String encType;
+    boolean isPostMethod;
+    boolean hasSubmitButton;
+
+    /**
+     * Constructs the HTMLForm
+     *
+     * @param htmlC  The HTMLComponent containing this form
+     * @param action The action of this form (the URL)
+     * @param method The method of this form (get/post)
+     */
+<span class="nc" id="L79">    HTMLForm(HTMLComponent htmlC, String action, String method, String encType) {</span>
+<span class="nc" id="L80">        this.htmlC = htmlC;</span>
+<span class="nc" id="L81">        this.action = htmlC.convertURL(action);</span>
+<span class="nc" id="L82">        this.encType = encType;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (htmlC.getHTMLCallback() != null) {</span>
+<span class="nc" id="L84">            int linkProps = htmlC.getHTMLCallback().getLinkProperties(htmlC, this.action);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if ((linkProps &amp; HTMLCallback.LINK_FORBIDDEN) != 0) {</span>
+<span class="nc" id="L86">                this.action = null;</span>
+            }
+        }
+
+<span class="nc bnc" id="L90" title="All 4 branches missed.">        this.isPostMethod = ((method != null) &amp;&amp; (method.equalsIgnoreCase(&quot;post&quot;)));</span>
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * Creates a reset command associated with this form
+     *
+     * @param value The reset button display name, if null or empty DEFAULT_RESET_TEXT will be assigned to it
+     * @return The reset command
+     */
+    Command createResetCommand(String value) {
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        if ((value == null) || (value.equals(&quot;&quot;))) {</span>
+<span class="nc" id="L101">            value = htmlC.getUIManager().localize(&quot;html.reset&quot;, HTMLForm.DEFAULT_RESET_TEXT);</span>
+        }
+<span class="nc" id="L103">        return new NamedCommand(null, value, this, false);</span>
+    }
+
+    /**
+     * Creates a submit command associated with this form
+     *
+     * @param name  The submit command name (i.e. it's NAME attribute, or null if none specified)
+     * @param value The submit button display name, if null or empty DEFAULT_SUBMIT_TEXT will be assigned to it
+     * @return The reset command
+     */
+    Command createSubmitCommand(String name, String value) {
+<span class="nc" id="L114">        hasSubmitButton = true;</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">        if ((value == null) || (value.equals(&quot;&quot;))) {</span>
+<span class="nc" id="L116">            value = htmlC.getUIManager().localize(&quot;html.submit&quot;, DEFAULT_SUBMIT_TEXT);</span>
+        }
+<span class="nc" id="L118">        return new NamedCommand(name, value, this, true);</span>
+    }
+
+    /**
+     * Adds an input field to the form, note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
+     *
+     * @param key          The input field's name/id
+     * @param input        The field itself (either the component or the value for a hidden field)
+     * @param defaultValue The default value of the field (or null if none)
+     */
+    void addInput(String key, Object input, String defaultValue) {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (defaultValue != null) { // Default values are added even before the key is checked, since even if the input component is unnamed, the form still needs to be able to reset it</span>
+<span class="nc" id="L130">            defaultValues.put(input, defaultValue);</span>
+        }
+
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (key == null) {</span>
+<span class="nc" id="L134">            return; //no id</span>
+        }
+<span class="nc" id="L136">        comps.put(key, input);</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        if ((htmlC.getHTMLCallback() != null) &amp;&amp; (input instanceof TextArea)) {</span>
+<span class="nc" id="L138">            String autoVal = htmlC.getHTMLCallback().getAutoComplete(htmlC, action, key);</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (autoVal != null) {</span>
+<span class="nc" id="L140">                ((TextArea) input).setText(autoVal);</span>
+            }
+        }
+<span class="nc" id="L143">    }</span>
+
+    /**
+     * @param ta          The textarea/field
+     * @param inputFormat An input format verifier (or null if none)
+     */
+    void setInputFormat(TextArea ta, HTMLInputFormat inputFormat) {
+<span class="nc" id="L150">        inputFormats.put(ta, inputFormat);</span>
+<span class="nc" id="L151">    }</span>
+
+    /**
+     * Sets whether the specified input field can be left empty or not
+     *
+     * @param ta The TextArea
+     * @param ok true if can be left empty, false otherwise
+     */
+    void setEmptyOK(TextArea ta, boolean ok) {
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (ok) {</span>
+<span class="nc" id="L161">            emptyOk.addElement(ta);</span>
+        } else {
+<span class="nc" id="L163">            emptyNotOk.addElement(ta);</span>
+        }
+<span class="nc" id="L165">    }</span>
+
+
+    /**
+     * Sets the default value for the specified input field
+     *
+     * @param input        The input field to set the default value to
+     * @param defaultValue The default value
+     */
+    void setDefaultValue(Object input, Object defaultValue) {
+<span class="nc bnc" id="L175" title="All 4 branches missed.">        if ((input != null) &amp;&amp; (defaultValue != null)) {</span>
+<span class="nc" id="L176">            defaultValues.put(input, defaultValue);</span>
+        }
+<span class="nc" id="L178">    }</span>
+
+    /**
+     * Adds the specified CheckBox to the form.
+     * Note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
+     *
+     * @param key   The CheckBox's name/id
+     * @param cb    The CheckBox
+     * @param value The value of the checkbox
+     */
+    void addCheckBox(String key, CheckBox cb, String value) {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (cb.isSelected()) {</span>
+<span class="nc" id="L190">            defaultCheckedButtons.addElement(cb);</span>
+        } else {
+<span class="nc" id="L192">            defaultUncheckedButtons.addElement(cb);</span>
+        }
+
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (key == null) {</span>
+<span class="nc" id="L196">            return; //no id</span>
+        }
+
+<span class="nc" id="L199">        Hashtable internal = (Hashtable) comps.get(key);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L201">            internal = new Hashtable();</span>
+<span class="nc" id="L202">            comps.put(key, internal);</span>
+        }
+<span class="nc" id="L204">        internal.put(cb, value);</span>
+<span class="nc" id="L205">    }</span>
+
+    /**
+     * Adds the specified RadioButton to the form.
+     * Note that unlike adding to a Codename One form here the components are added logically only to query them for their value on submit.
+     *
+     * @param key   The CheckBox's name/id
+     * @param rb    The RadioButton to add
+     * @param value The value of the checkbox
+     */
+    void addRadioButton(String key, RadioButton rb, String value) {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (rb.isSelected()) {</span>
+<span class="nc" id="L217">            defaultCheckedButtons.addElement(rb);</span>
+        } else {
+<span class="nc" id="L219">            defaultUncheckedButtons.addElement(rb);</span>
+        }
+
+
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (key == null) {</span>
+<span class="nc" id="L224">            return; //no id</span>
+        }
+
+<span class="nc" id="L227">        Hashtable internal = (Hashtable) comps.get(key);</span>
+<span class="nc" id="L228">        ButtonGroup group = null;</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L230">            internal = new Hashtable();</span>
+<span class="nc" id="L231">            comps.put(key, internal);</span>
+<span class="nc" id="L232">            group = new ButtonGroup();</span>
+<span class="nc" id="L233">            buttonGroups.put(key, group);</span>
+
+        } else {
+<span class="nc" id="L236">            group = (ButtonGroup) buttonGroups.get(key);</span>
+        }
+<span class="nc" id="L238">        group.add(rb);</span>
+<span class="nc" id="L239">        internal.put(rb, value);</span>
+
+<span class="nc" id="L241">    }</span>
+
+    /**
+     * Returns the number of fields in the form
+     *
+     * @return the number of fields in the form
+     */
+    int getNumFields() {
+<span class="nc" id="L249">        return comps.size();</span>
+    }
+
+
+    /**
+     * Called when the a form submit is needed.
+     * This querys all form fields, creates a URL accordingly and sets it to the HTMLComponent
+     */
+    void submit(String submitKey, String submitVal) {
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (action == null) {</span>
+<span class="nc" id="L259">            return;</span>
+        }
+<span class="nc" id="L261">        boolean error = false; //If this is turned to true anywhere, the form will not be submitted</span>
+<span class="nc" id="L262">        String url = action;</span>
+<span class="nc" id="L263">        String params = null;</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (comps.size() &gt; 0) {</span>
+<span class="nc" id="L265">            params = &quot;&quot;;</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">            for (Enumeration e = comps.keys(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L267">                String key = (String) e.nextElement();</span>
+<span class="nc" id="L268">                Object input = comps.get(key);</span>
+<span class="nc" id="L269">                key = HTMLUtils.encodeString(key);</span>
+<span class="nc" id="L270">                String value = &quot;&quot;;</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                if (input instanceof String) { //hidden</span>
+<span class="nc" id="L272">                    value = HTMLUtils.encodeString((String) input);</span>
+<span class="nc" id="L273">                    params += key + &quot;=&quot; + value + &quot;&amp;&quot;;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                } else if (input instanceof Hashtable) { //checkbox / radiobutton</span>
+<span class="nc" id="L275">                    Hashtable options = (Hashtable) input;</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                    for (Enumeration e2 = options.keys(); e2.hasMoreElements(); ) {</span>
+<span class="nc" id="L277">                        Button b = (Button) e2.nextElement();</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                        if (b.isSelected()) {</span>
+<span class="nc" id="L279">                            params += key + &quot;=&quot; + HTMLUtils.encodeString((String) options.get(b)) + &quot;&amp;&quot;;</span>
+                        }
+<span class="nc" id="L281">                    }</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                } else if (input instanceof TextArea) { //catches both textareas and text input fields</span>
+<span class="nc" id="L283">                    TextArea tf = ((TextArea) input);</span>
+<span class="nc" id="L284">                    String text = tf.getText();</span>
+
+<span class="nc" id="L286">                    String errorMsg = null;</span>
+                    if (HTMLComponent.SUPPORT_INPUT_FORMAT) {
+<span class="nc" id="L288">                        boolean ok = false;</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                        if (text.equals(&quot;&quot;)) { // check empty - Note that emptyok/-wap-input-required overrides input format</span>
+<span class="nc bnc" id="L290" title="All 2 branches missed.">                            if (emptyNotOk.contains(tf)) {</span>
+<span class="nc" id="L291">                                errorMsg = htmlC.getUIManager().localize(&quot;html.format.emptynotok&quot;, &quot;Field can't be empty&quot;);</span>
+<span class="nc" id="L292">                                error = true;</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">                            } else if (emptyOk.contains(tf)) {</span>
+<span class="nc" id="L294">                                ok = true;</span>
+                            }
+                        }
+
+<span class="nc bnc" id="L298" title="All 4 branches missed.">                        if ((!error) &amp;&amp; (!ok)) { // If there's already an error or it has been cleared by the emptyOK field, no need to check</span>
+<span class="nc" id="L299">                            HTMLInputFormat inputFormat = (HTMLInputFormat) inputFormats.get(tf);</span>
+<span class="nc bnc" id="L300" title="All 4 branches missed.">                            if ((inputFormat != null) &amp;&amp; (!inputFormat.verifyString(text))) {</span>
+<span class="nc" id="L301">                                String emptyStr = &quot;&quot;;</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                                if (emptyOk.contains(tf)) {</span>
+<span class="nc" id="L303">                                    emptyStr = htmlC.getUIManager().localize(&quot;html.format.oremptyok&quot;, &quot; or an empty string&quot;);</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                                } else if (emptyNotOk.contains(tf)) {</span>
+<span class="nc" id="L305">                                    emptyStr = htmlC.getUIManager().localize(&quot;html.format.andemptynotok&quot;, &quot; and cannot be an empty string&quot;);</span>
+                                }
+<span class="nc" id="L307">                                errorMsg = htmlC.getUIManager().localize(&quot;html.format.errordesc&quot;, &quot;Malformed text. Correct value: &quot;) + inputFormat + emptyStr;</span>
+<span class="nc" id="L308">                                error = true;</span>
+                            }
+                        }
+                    }
+
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                    if (htmlC.getHTMLCallback() != null) {</span>
+<span class="nc" id="L314">                        int type = HTMLCallback.FIELD_TEXT;</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                        if ((tf.getConstraint() &amp; TextArea.PASSWORD) != 0) {</span>
+<span class="nc" id="L316">                            type = HTMLCallback.FIELD_PASSWORD;</span>
+                        }
+<span class="nc" id="L318">                        text = htmlC.getHTMLCallback().fieldSubmitted(htmlC, tf, url, key, text, type, errorMsg);</span>
+                    }
+<span class="nc bnc" id="L320" title="All 2 branches missed.">                    if (errorMsg == null) {</span>
+<span class="nc" id="L321">                        params += key + &quot;=&quot; + HTMLUtils.encodeString(text) + &quot;&amp;&quot;;</span>
+                    }
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                } else if (input instanceof ComboBox) { // drop down lists (single selection)</span>
+<span class="nc" id="L324">                    Object item = ((ComboBox) input).getSelectedItem();</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                    if (item instanceof OptionItem) {</span>
+<span class="nc" id="L326">                        value = ((OptionItem) item).getValue();</span>
+<span class="nc" id="L327">                        params += key + &quot;=&quot; + HTMLUtils.encodeString(value) + &quot;&amp;&quot;;</span>
+                    } // if not - value may be an OPTGROUP label in an only optgroup combobox
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                } else if (input instanceof MultiComboBox) { // drop down lists (multiple selection)</span>
+<span class="nc" id="L330">                    Vector selected = ((MultiComboBox) input).getSelected();</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">                    for (int i = 0; i &lt; selected.size(); i++) {</span>
+<span class="nc" id="L332">                        Object item = selected.elementAt(i);</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                        if (item instanceof OptionItem) {</span>
+<span class="nc" id="L334">                            value = ((OptionItem) item).getValue();</span>
+<span class="nc" id="L335">                            params += key + &quot;=&quot; + HTMLUtils.encodeString(value) + &quot;&amp;&quot;;</span>
+                        } // if not - value may be an OPTGROUP label in an only optgroup combobox
+                    }
+                }
+
+<span class="nc" id="L340">            }</span>
+
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            if (params.endsWith(&quot;&amp;&quot;)) { //trim the extra &amp;</span>
+<span class="nc" id="L343">                params = params.substring(0, params.length() - 1);</span>
+            }
+        }
+
+        // Add the submit button param, only if the key is non-null (unnamed submit buttons are not passed as parameters)
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (submitKey != null) {</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">            if (params == null) {</span>
+<span class="nc" id="L350">                params = &quot;&quot;;</span>
+            }
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            if (!params.equals(&quot;&quot;)) {</span>
+<span class="nc" id="L353">                params = params + &quot;&amp;&quot;;</span>
+            }
+<span class="nc" id="L355">            params = params + HTMLUtils.encodeString(submitKey) + &quot;=&quot; + HTMLUtils.encodeString(submitVal);</span>
+        }
+
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (!error) {</span>
+<span class="nc" id="L359">            DocumentInfo docInfo = new DocumentInfo(url, params, isPostMethod);</span>
+<span class="nc bnc" id="L360" title="All 4 branches missed.">            if ((encType != null) &amp;&amp; (!encType.equals(&quot;&quot;))) {</span>
+<span class="nc" id="L361">                docInfo.setEncoding(encType);</span>
+            }
+<span class="nc" id="L363">            htmlC.setPage(docInfo);</span>
+        }
+<span class="nc" id="L365">    }</span>
+
+    /**
+     * Called when a form reset is needed and resets all the form fields to their default values.
+     */
+    void reset() {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        for (Enumeration e = defaultValues.keys(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L372">            Object input = e.nextElement();</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">            if (input instanceof TextArea) { //catches both textareas and text input fields</span>
+<span class="nc" id="L374">                String defVal = (String) defaultValues.get(input);</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                if (defVal == null) {</span>
+<span class="nc" id="L376">                    defVal = &quot;&quot;;</span>
+                }
+<span class="nc" id="L378">                ((TextArea) input).setText(defVal);</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">            } else if (input instanceof ComboBox) {</span>
+<span class="nc" id="L380">                OptionItem defVal = (OptionItem) defaultValues.get(input);</span>
+<span class="nc" id="L381">                ComboBox combo = ((ComboBox) input);</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                if (defVal != null) {</span>
+<span class="nc" id="L383">                    combo.setSelectedItem(defVal);</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                } else if (combo.size() &gt; 0) {</span>
+<span class="nc" id="L385">                    combo.setSelectedIndex(0);</span>
+                }
+            }
+<span class="nc" id="L388">        }</span>
+
+<span class="nc bnc" id="L390" title="All 2 branches missed.">        for (Enumeration e = defaultCheckedButtons.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L391">            Button b = (Button) e.nextElement();</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">            if (!b.isSelected()) {</span>
+<span class="nc" id="L393">                setButton(b, true);</span>
+            }
+<span class="nc" id="L395">        }</span>
+
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        for (Enumeration e = defaultUncheckedButtons.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L398">            Button b = (Button) e.nextElement();</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">            if (b.isSelected()) {</span>
+<span class="nc" id="L400">                setButton(b, false);</span>
+            }
+<span class="nc" id="L402">        }</span>
+
+<span class="nc" id="L404">    }</span>
+
+    /**
+     * A convenience method used in reset()
+     *
+     * @param button   The button to set (CheckBox/RadioButton)
+     * @param checkedX true to check, false to uncheck
+     */
+    private void setButton(Button button, boolean checkedX) {
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        if (button instanceof RadioButton) {</span>
+<span class="nc" id="L414">            ((RadioButton) button).setSelected(checkedX);</span>
+        } else {
+<span class="nc" id="L416">            ((CheckBox) button).setSelected(checkedX);</span>
+        }
+<span class="nc" id="L418">    }</span>
+
+    /**
+     * A simple class adding the option to change the name of a command
+     *
+     * @author Ofir Leitner
+     */
+    class NamedCommand extends Command {
+
+        HTMLForm htmlForm;
+        String key;   // The key is taken from the NAME attribute of the INPUT tag. It is called key to avoid mixup with the command's name (i.e. display name which is in fact 'value')
+        // For reset buttons the name will always be null, as it is not relevant. Submit buttons can be named with the NAME attribute, resulting in their name and value passed as a parameter upon form submission
+        String value; // The value is also the display name of the command
+        boolean isSubmit;
+
+<span class="nc" id="L433">        NamedCommand(String key, String value, HTMLForm htmlForm, boolean isSubmit) {</span>
+<span class="nc" id="L434">            super(value);</span>
+<span class="nc" id="L435">            this.key = key;</span>
+<span class="nc" id="L436">            this.htmlForm = htmlForm;</span>
+<span class="nc" id="L437">            this.value = value;</span>
+<span class="nc" id="L438">            this.isSubmit = isSubmit;</span>
+<span class="nc" id="L439">        }</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L442">            super.actionPerformed(evt);</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">            if (isSubmit) {</span>
+<span class="nc" id="L444">                htmlForm.submit(key, value);</span>
+            } else {
+<span class="nc" id="L446">                htmlForm.reset();</span>
+            }
+<span class="nc" id="L448">        }</span>
+
+        public String getCommandName() {
+<span class="nc" id="L451">            return value;</span>
+        }
+
+        public void setCommandName(String name) {
+<span class="nc" id="L455">            this.value = name;</span>
+<span class="nc" id="L456">        }</span>
+    }
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

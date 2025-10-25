@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RangeBarChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">RangeBarChart.java</span></div><h1>RangeBarChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.models.XYSeries;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYSeriesRenderer;
+
+import java.util.List;
+
+
+/**
+ * Extends {@link BarChart} to support values that represent ranges rather than
+ * single points. Each bar is drawn from the lower value to the upper value in
+ * the dataset.
+ * &lt;p&gt;
+ * Use this chart with an {@link XYMultipleSeriesDataset} containing
+ * {@link XYSeries} instances where consecutive entries form the minimum/maximum
+ * pair for a category.
+ */
+public class RangeBarChart extends BarChart {
+    /** The chart type. */
+    public static final String TYPE = &quot;RangeBar&quot;;
+
+<span class="nc" id="L42">    RangeBarChart() {</span>
+<span class="nc" id="L43">    }</span>
+
+    RangeBarChart(Type type) {
+<span class="nc" id="L46">        super(type);</span>
+<span class="nc" id="L47">    }</span>
+
+    /**
+     * Builds a new range bar chart instance.
+     *
+     * @param dataset the multiple series dataset
+     * @param renderer the multiple series renderer
+     * @param type the range bar chart type
+     */
+    public RangeBarChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer, Type type) {
+<span class="nc" id="L57">        super(dataset, renderer, type);</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * The graphical representation of a series.
+     *
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param points the array of points to be used for drawing the series
+     * @param seriesRenderer the series renderer
+     * @param yAxisValue the minimum value of the y axis
+     * @param seriesIndex the index of the series currently being drawn
+     * @param startIndex the start index of the rendering points
+     */
+    @Override
+    public void drawSeries(Canvas canvas, Paint paint, List&lt;Float&gt; points,
+                           XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
+<span class="nc" id="L74">        int seriesNr = mDataset.getSeriesCount();</span>
+<span class="nc" id="L75">        int length = points.size();</span>
+<span class="nc" id="L76">        paint.setColor(seriesRenderer.getColor());</span>
+<span class="nc" id="L77">        paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L78">        float halfDiffX = getHalfDiffX(points, length, seriesNr);</span>
+<span class="nc" id="L79">        int start = 0;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (startIndex &gt; 0) {</span>
+<span class="nc" id="L81">            start = 2;</span>
+        }
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        for (int i = start; i &lt; length; i += 4) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (points.size() &gt; i + 3) {</span>
+<span class="nc" id="L85">                float xMin = points.get(i);</span>
+<span class="nc" id="L86">                float yMin = points.get(i + 1);</span>
+                // xMin = xMax
+<span class="nc" id="L88">                float xMax = points.get(i + 2);</span>
+<span class="nc" id="L89">                float yMax = points.get(i + 3);</span>
+<span class="nc" id="L90">                drawBar(canvas, xMin, yMin, xMax, yMax, halfDiffX, seriesNr, seriesIndex, paint);</span>
+            }
+        }
+<span class="nc" id="L93">        paint.setColor(seriesRenderer.getColor());</span>
+<span class="nc" id="L94">    }</span>
+
+    /**
+     * The graphical representation of the series values as text.
+     *
+     * @param canvas the canvas to paint to
+     * @param series the series to be painted
+     * @param renderer the series renderer
+     * @param paint the paint to be used for drawing
+     * @param points the array of points to be used for drawing the series
+     * @param seriesIndex the index of the series currently being drawn
+     * @param startIndex the start index of the rendering points
+     */
+    protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
+                                       Paint paint, List&lt;Float&gt; points, int seriesIndex, int startIndex) {
+<span class="nc" id="L109">        int seriesNr = mDataset.getSeriesCount();</span>
+<span class="nc" id="L110">        float halfDiffX = getHalfDiffX(points, points.size(), seriesNr);</span>
+<span class="nc" id="L111">        int start = 0;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (startIndex &gt; 0) {</span>
+<span class="nc" id="L113">            start = 2;</span>
+        }
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        for (int i = start; i &lt; points.size(); i += 4) {</span>
+<span class="nc" id="L116">            int index = startIndex + i / 2;</span>
+<span class="nc" id="L117">            float x = points.get(i);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            if (mType == Type.DEFAULT) {</span>
+<span class="nc" id="L119">                x += seriesIndex * 2 * halfDiffX - (seriesNr - 1.5f) * halfDiffX;</span>
+            }
+
+<span class="nc bnc" id="L122" title="All 4 branches missed.">            if (!isNullValue(series.getY(index + 1)) &amp;&amp; points.size() &gt; i + 3) {</span>
+                // draw the maximum value
+<span class="nc" id="L124">                drawText(canvas, getLabel(renderer.getChartValuesFormat(), series.getY(index + 1)), x,</span>
+<span class="nc" id="L125">                        points.get(i + 3) - renderer.getChartValuesSpacing(), paint, 0);</span>
+            }
+<span class="nc bnc" id="L127" title="All 4 branches missed.">            if (!isNullValue(series.getY(index)) &amp;&amp; points.size() &gt; i + 1) {</span>
+                // draw the minimum value
+<span class="nc" id="L129">                drawText(</span>
+                        canvas,
+<span class="nc" id="L131">                        getLabel(renderer.getChartValuesFormat(), series.getY(index)),</span>
+                        x,
+<span class="nc" id="L133">                        points.get(i + 1) + renderer.getChartValuesTextSize()</span>
+<span class="nc" id="L134">                                + renderer.getChartValuesSpacing() - 3, paint, 0);</span>
+            }
+        }
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Returns the value of a constant used to calculate the half-distance.
+     *
+     * @return the constant value
+     */
+    protected float getCoeficient() {
+<span class="nc" id="L145">        return 0.5f;</span>
+    }
+
+    /**
+     * Returns the chart type identifier.
+     *
+     * @return the chart type
+     */
+    public String getChartType() {
+<span class="nc" id="L154">        return TYPE;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

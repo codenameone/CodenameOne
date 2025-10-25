@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CloudPersona.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.cloud</a> &gt; <span class="el_source">CloudPersona.java</span></div><h1>CloudPersona.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.cloud;
+
+/**
+ * A persona represents a user of the cloud, this is an optional feature that allows
+ * data to be limited to a specific user on the server side.
+ *
+ * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
+ */
+public class CloudPersona {
+    private CloudPersona() {
+    }
+
+    /**
+     * This method returns the currently logged in persona or a blank persona
+     * (token would be null)
+     *
+     * @return the current persona
+     */
+    public static CloudPersona getCurrentPersona() {
+<span class="nc" id="L43">        return null;</span>
+
+    }
+
+    /**
+     * Initializes the persona based on a token, since this method assumes binary transfer of a completed
+     * token the token isn't verified in any way and the user is considered logged in.
+     *
+     * @param token the token
+     */
+    public static void createFromToken(String token) {
+<span class="nc" id="L54">    }</span>
+
+    /**
+     * Creates an anonymous persona that will be unique in the cloud, NEVER logout an anonymous user!
+     *
+     * @return false in case login failed e.g. due to bad network connection
+     */
+    public static boolean createAnonymous() {
+<span class="nc" id="L62">        return false;</span>
+    }
+
+    /**
+     * Creates a new user if a user isn't occupying the given login already,
+     * if the user exists performs a login operation.
+     *
+     * @param login    a user name
+     * @param password a password
+     * @return true if the login is successful false otherwise
+     */
+    public static boolean createOrLogin(String login, String password) {
+<span class="nc" id="L74">        return false;</span>
+    }
+
+    /**
+     * Returns a unique login token that represents the current user and his password, while this login token shouldn't
+     * be user visible (it's a password too!) it can be transfered to a different device to give
+     * them both identical user role and joined access.
+     *
+     * @return a persona UID
+     */
+    public String getToken() {
+<span class="nc" id="L85">        return null;</span>
+    }
+
+    /**
+     * Logs out the current user, notice that with an anonymous user this will effectively KILL all
+     * the data in the cloud!
+     */
+    public void logout() {
+<span class="nc" id="L93">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

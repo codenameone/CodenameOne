@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PieChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">PieChart.java</span></div><h1>PieChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.GradientDrawable;
+import com.codename1.charts.compat.GradientDrawable.Orientation;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.CategorySeries;
+import com.codename1.charts.models.Point;
+import com.codename1.charts.models.SeriesSelection;
+import com.codename1.charts.renderers.DefaultRenderer;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.geom.Shape;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+/**
+ * Shows each value from a {@link CategorySeries} as a slice of a circle.
+ * &lt;p&gt;
+ * Combine this chart with a {@link DefaultRenderer} to control colours, labels
+ * and gradients. The resulting {@code PieChart} can be embedded in a form via a
+ * {@link com.codename1.charts.ChartComponent}.
+ */
+public class PieChart extends RoundChart {
+    /** Handles returning values when tapping on PieChart. */
+    private final PieMapper mPieMapper;
+
+    /**
+     * Builds a new pie chart instance.
+     *
+     * @param dataset the series dataset
+     * @param renderer the series renderer
+     */
+    public PieChart(CategorySeries dataset, DefaultRenderer renderer) {
+<span class="nc" id="L53">        super(dataset, renderer);</span>
+<span class="nc" id="L54">        mPieMapper = new PieMapper();</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * The graphical representation of the pie chart.
+     *
+     * @param canvas the canvas to paint to
+     * @param x the top left x value of the view to draw to
+     * @param y the top left y value of the view to draw to
+     * @param width the width of the view to draw to
+     * @param height the height of the view to draw to
+     * @param paint the paint
+     */
+    @Override
+    public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+<span class="nc" id="L69">        paint.setAntiAlias(mRenderer.isAntialiasing());</span>
+<span class="nc" id="L70">        paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L71">        paint.setTextSize(mRenderer.getLabelsTextSize());</span>
+<span class="nc" id="L72">        int legendSize = getLegendSize(mRenderer, height / 5, 0);</span>
+<span class="nc" id="L73">        int left = x;</span>
+<span class="nc" id="L74">        int top = y;</span>
+<span class="nc" id="L75">        int right = x + width;</span>
+<span class="nc" id="L76">        int sLength = mDataset.getItemCount();</span>
+<span class="nc" id="L77">        double total = 0;</span>
+<span class="nc" id="L78">        String[] titles = new String[sLength];</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="nc" id="L80">            total += mDataset.getValue(i);</span>
+<span class="nc" id="L81">            titles[i] = mDataset.getCategory(i);</span>
+        }
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (mRenderer.isFitLegend()) {</span>
+<span class="nc" id="L84">            legendSize = drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize,</span>
+                    paint, true);
+        }
+<span class="nc" id="L87">        int bottom = y + height - legendSize;</span>
+<span class="nc" id="L88">        drawBackground(mRenderer, canvas, x, y, width, height, paint, false, DefaultRenderer.NO_COLOR);</span>
+
+<span class="nc" id="L90">        float currentAngle = mRenderer.getStartAngle();</span>
+<span class="nc" id="L91">        int mRadius = Math.min(Math.abs(right - left), Math.abs(bottom - top));</span>
+<span class="nc" id="L92">        int radius = (int) (mRadius * 0.35 * mRenderer.getScale());</span>
+
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterX == NO_VALUE) {</span>
+<span class="nc" id="L95">            mCenterX = (left + right) / 2;</span>
+        }
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterY == NO_VALUE) {</span>
+<span class="nc" id="L98">            mCenterY = (bottom + top) / 2;</span>
+        }
+
+        // Hook in clip detection after center has been calculated
+<span class="nc" id="L102">        mPieMapper.setDimensions(radius, mCenterX, mCenterY);</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        boolean loadPieCfg = !mPieMapper.areAllSegmentPresent(sLength);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (loadPieCfg) {</span>
+<span class="nc" id="L105">            mPieMapper.clearPieSegments();</span>
+        }
+
+<span class="nc" id="L108">        float shortRadius = radius * 0.9f;</span>
+<span class="nc" id="L109">        float longRadius = radius * 1.1f;</span>
+<span class="nc" id="L110">        Rectangle2D oval = PkgUtils.makeRect(mCenterX - radius, mCenterY - radius, mCenterX + radius, mCenterY</span>
+                + radius);
+<span class="nc" id="L112">        List&lt;Rectangle2D&gt; prevLabelsBounds = new ArrayList&lt;Rectangle2D&gt;();</span>
+
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="nc" id="L115">            SimpleSeriesRenderer seriesRenderer = mRenderer.getSeriesRendererAt(i);</span>
+<span class="nc" id="L116">            boolean gradient = false;</span>
+<span class="nc" id="L117">            GradientDrawable gradientDrawable = null;</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            if (seriesRenderer.isGradientEnabled()) {</span>
+<span class="nc" id="L119">                gradient = true;</span>
+<span class="nc" id="L120">                gradientDrawable = new GradientDrawable(Orientation.TOP_BOTTOM, new int[]{seriesRenderer.getGradientStartColor(), seriesRenderer.getGradientStopColor()});</span>
+<span class="nc" id="L121">                paint.setColor(seriesRenderer.getGradientStartColor());</span>
+            } else {
+<span class="nc" id="L123">                paint.setColor(seriesRenderer.getColor());</span>
+            }
+
+
+<span class="nc" id="L127">            float value = (float) mDataset.getValue(i);</span>
+<span class="nc" id="L128">            float angle = (float) (value / total * 360);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (seriesRenderer.isHighlighted()) {</span>
+<span class="nc" id="L130">                double rAngle = Math.toRadians(90 - (currentAngle + angle / 2));</span>
+<span class="nc" id="L131">                float translateX = (float) (radius * 0.1 * Math.sin(rAngle));</span>
+<span class="nc" id="L132">                float translateY = (float) (radius * 0.1 * Math.cos(rAngle));</span>
+<span class="nc" id="L133">                oval.translate(translateX, translateY);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                if (gradient) {</span>
+<span class="nc" id="L135">                    canvas.drawArcWithGradient(oval, currentAngle, angle, true, paint, gradientDrawable);</span>
+                } else {
+<span class="nc" id="L137">                    canvas.drawArc(oval, currentAngle, angle, true, paint);</span>
+                }
+<span class="nc" id="L139">                oval.translate(-translateX, -translateY);</span>
+<span class="nc" id="L140">            } else {</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                if (gradient) {</span>
+<span class="nc" id="L142">                    canvas.drawArcWithGradient(oval, currentAngle, angle, true, paint, gradientDrawable);</span>
+                } else {
+<span class="nc" id="L144">                    canvas.drawArc(oval, currentAngle, angle, true, paint);</span>
+                }
+            }
+<span class="nc" id="L147">            paint.setColor(seriesRenderer.getColor());</span>
+            //paint.setShader(null);
+<span class="nc" id="L149">            drawLabel(canvas, mDataset.getCategory(i), mRenderer, prevLabelsBounds, mCenterX, mCenterY,</span>
+<span class="nc" id="L150">                    shortRadius, longRadius, currentAngle, angle, left, right, mRenderer.getLabelsColor(),</span>
+                    paint, true, false);
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (mRenderer.isDisplayValues()) {</span>
+<span class="nc" id="L153">                drawLabel(</span>
+                        canvas,
+<span class="nc" id="L155">                        getLabel(mRenderer.getSeriesRendererAt(i).getChartValuesFormat(), mDataset.getValue(i)),</span>
+                        mRenderer, prevLabelsBounds, mCenterX, mCenterY, shortRadius / 2, longRadius / 2,
+<span class="nc" id="L157">                        currentAngle, angle, left, right, mRenderer.getLabelsColor(), paint, false, true);</span>
+            }
+
+            // Save details for getSeries functionality
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (loadPieCfg) {</span>
+<span class="nc" id="L162">                mPieMapper.addPieSegment(i, value, currentAngle, angle);</span>
+            }
+<span class="nc" id="L164">            currentAngle += angle;</span>
+        }
+<span class="nc" id="L166">        prevLabelsBounds.clear();</span>
+<span class="nc" id="L167">        drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize, paint, false);</span>
+<span class="nc" id="L168">        drawTitle(canvas, x, y, width, paint);</span>
+<span class="nc" id="L169">    }</span>
+
+    public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
+<span class="nc" id="L172">        return mPieMapper.getSeriesAndPointForScreenCoordinate(screenPoint);</span>
+    }
+
+
+    /**
+     * Gets the shape of a pie segment given its point index.
+     * @param pointIndex The point index representing the pie segment.
+     * @return A shape of the outline of the segment.
+     */
+    public Shape getSegmentShape(int pointIndex) {
+<span class="nc" id="L182">        return mPieMapper.getSegmentShape(pointIndex);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

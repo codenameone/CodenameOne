@@ -1,0 +1,1083 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Switch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">Switch.java</span></div><h1>Switch.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
+import com.codename1.ui.ReleasableComponent;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Collection;
+
+/**
+ * &lt;p&gt;
+ * The on/off switch is a checkbox of sort (although it derives container) that
+ * represents its state as a switch When using the Android native theme, this implementation follows the Material
+ * Design Switch guidelines:
+ * https://material.io/guidelines/components/selection-controls.html#selection-controls-radio-button
+ *
+ * &lt;/p&gt;
+ *
+ * &lt;h3&gt;Customizing Look and Feel&lt;/h3&gt;
+ *
+ * &lt;p&gt;You can customize the look and feel of a switch using styles, either directly
+ * in the theme.res file or in CSS.  This component consists of two elements: the &quot;thumb&quot; the &quot;track&quot;.
+ * The &quot;thumb&quot; is the circular handle that can be toggled/dragged between an on and off position.
+ * The &quot;track&quot; is the background track along which the &quot;thumb&quot; appears to slide when it is dragged/toggled.
+ *
+ * &lt;p&gt;The thumb will be rendered using Switch's {@link Style#getFgColor() }.  It will use the
+ * selected style, when in the &quot;on&quot; position, the unselected style when in the &quot;off&quot; position,
+ * and the disabled style, when {@link #isEnabled() } is {@literal false}.&lt;/p&gt;
+ *
+ * &lt;p&gt;The track will be rendered using the Switch's {@link Style#getBgColor() }.  It will
+ * use the selected style, when in the &quot;on&quot; position, and the unselected style when in the &quot;off&quot;
+ * position.&lt;/p&gt;
+ *
+ * &lt;p&gt;You can also adjust the thumb and track sizes using the following theme constants:&lt;/p&gt;
+ *
+ * &lt;table&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchThumbScaleY}&lt;/td&gt;&lt;td&gt;A floating point value used to scale the thumb's diameter, relative to the font size.  In the android native theme, this value is set to 1.5.  On iOS, it is set to 1.4.&lt;/td&gt;&lt;/tr&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchTrackScaleY}&lt;/td&gt;&lt;td&gt;A floating point value used to scale the track's height, relative the the font size.  In the android native theme, this value is set to 0.9.  On iOS, it is set to 1.5&lt;/td&gt;&lt;/tr&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchTrackScaleX}&lt;/td&gt;&lt;td&gt;A floating point value used to scale the track's width relative to the font size.  In the Android native theme, this value is set to 3.0.  On iOS it is 2.5&lt;/td&gt;&lt;/tr&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchTrackOffOutlineWidthMM}&lt;/td&gt;&lt;td&gt;A floating point value used to set the stroke/outline thickness of the track when the switch is in the &quot;off&quot; position.  In the Android native theme, this is set to 0.  On iOS it is 0.25&lt;/td&gt;&lt;/tr&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchTrackOnOutlineWidthMM}&lt;/td&gt;&lt;td&gt;A floating point value used to set the stroke/outline thickness of the track when the switch is in the &quot;on&quot; position.  In both the Android native theme and the iOS native theme, this is set to 0.&lt;/td&gt;&lt;/tr&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchTrackOffOutlineColor}&lt;/td&gt;&lt;td&gt;The color used to stroke the outline for the track when the switch is in the &quot;off&quot; position, expressed as a base-16 int.  In the iOS native theme, this is set to &quot;cccccc&quot;.&lt;/td&gt;&lt;/tr&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchTrackOnOutlineColor}&lt;/td&gt;&lt;td&gt;The color used to stroke the outline for the track when the switch is in the &quot;on&quot; position, expressed as a base-16 int.  This is currently not used in either Android or iOS.&lt;/td&gt;&lt;/tr&gt;
+ * &lt;tr&gt;&lt;td&gt;{@literal switchThumbInsetMM}&lt;/td&gt;&lt;td&gt;An inset to use when rendering the thumb that will cause it to be inset from the edge of the track. In the iOS native theme, this is 0.25&lt;/td&gt;&lt;/tr&gt;
+ * &lt;/table&gt;
+ *
+ * &lt;p&gt;
+ * &lt;strong&gt;IMPORTANT:&lt;/strong&gt; when changing the UIID of the switch the constants
+ * above implicitly change to match the new UIID with the same convetion. So if
+ * your UIID is {@code MySwitch} then a theme constant will become:
+ * {@code myswitchTrackScaleY}. Notice that the whole UIID is lower cased...
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;&lt;strong&gt;CSS used in the Android native theme:&lt;/strong&gt;&lt;/p&gt;
+ * &lt;pre&gt;{@code
+ * #Constants {
+ * ...
+ * switchThumbPaddingInt: 2;
+ * switchThumbScaleY: &quot;1.5&quot;;
+ * switchTrackScaleY: &quot;0.9&quot;;
+ * switchTrackScaleX: &quot;3&quot;;
+ * switchTrackOffOutlineWidthMM: &quot;0&quot;;
+ * switchTrackOnOutlineWidthMM: &quot;0&quot;;
+ * switchTrackOffOutlineColor: &quot;cccccc&quot;;
+ * switchThumbInsetMM: &quot;0&quot;;
+ * }
+ * Switch {
+ * color: rgb(237, 237, 237);
+ * background-color: rgb(159, 158, 158);
+ *
+ * }
+ * Switch.selected {
+ * color: rgb(34,44,50);
+ * background-color: rgb(117, 126, 132);
+ * }
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;&lt;strong&gt;CSS used in the iOS native theme:&lt;/strong&gt;&lt;/p&gt;
+ * &lt;pre&gt;{@code
+ * #Constants {
+ * ...
+ * switchThumbPaddingInt: 2;
+ * switchThumbScaleY: &quot;1.4&quot;;
+ * switchTrackScaleY: &quot;1.5&quot;;
+ * switchTrackScaleX: &quot;2.5&quot;;
+ * switchTrackOffOutlineWidthMM: &quot;0.25&quot;;
+ * switchTrackOnOutlineWidthMM: &quot;0&quot;;
+ * switchTrackOffOutlineColor: &quot;cccccc&quot;;
+ * switchThumbInsetMM: &quot;0.25&quot;;
+ * }
+ * Switch {
+ * color: white;
+ * background-color: white;
+ *
+ * }
+ * Switch.selected {
+ * color: white;
+ * background-color: rgb(61, 216, 76);
+ *
+ * }
+ * }
+ * &lt;/pre&gt;
+ * &lt;h4&gt;Using Custom Thumb and Track Images&lt;/h4&gt;
+ * &lt;p&gt;You can optionally provide custom images for use as the track or thumb via the following
+ * theme constants&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@literal switchThumbOnImage}&lt;/li&gt;
+ *   &lt;li&gt;{@literal switchThumbOffImage}&lt;/li&gt;
+ *   &lt;li&gt;{@literal switchThumbDisabledImage}&lt;/li&gt;
+ *   &lt;li&gt;{@literal switchOnTrackImage}&lt;/li&gt;
+ *   &lt;li&gt;{@literal switchOffTrackImage}&lt;/li&gt;
+ *   &lt;li&gt;{@literal switchDisabledTrackImage}&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+public class Switch extends Component implements ActionSource, ReleasableComponent {
+
+<span class="fc" id="L153">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+<span class="fc" id="L154">    private final EventDispatcher changeDispatcher = new EventDispatcher();</span>
+    private boolean value;
+    private Image thumbOnImage;
+    private Image thumbOffImage;
+    private Image thumbDisabledImage;
+    private Image trackOnImage;
+    private Image trackOffImage;
+    private Image trackDisabledImage;
+    private boolean dragged;
+    private long dragStartTime;
+    private int pressX, pressY;
+    private int deltaX, deltaY; //pressX - currentdragX
+<span class="fc" id="L166">    private final ActionListener pointerPressed = new ActionListener() {</span>
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L168">            Form f = getComponentForm();</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (f != null) {</span>
+<span class="nc" id="L170">                f.addComponentAwaitingRelease(Switch.this);</span>
+            }
+<span class="nc" id="L172">            dragged = false;</span>
+<span class="nc" id="L173">            dragStartTime = System.currentTimeMillis();</span>
+<span class="nc" id="L174">            deltaX = 0;</span>
+<span class="nc" id="L175">            deltaY = 0;</span>
+<span class="nc" id="L176">            pressX = evt.getX();</span>
+<span class="nc" id="L177">            pressY = evt.getY();</span>
+<span class="nc" id="L178">        }</span>
+    };
+<span class="fc" id="L180">    private final ActionListener pointerDragged = new ActionListener() {</span>
+        public void actionPerformed(ActionEvent evt) {
+
+<span class="nc" id="L183">            dragged = true;</span>
+<span class="nc" id="L184">            deltaX = pressX - evt.getX();</span>
+<span class="nc" id="L185">            deltaY = pressY - evt.getY();</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (Math.abs(deltaY) &gt;= Math.abs(deltaX * 0.5)) {</span>
+<span class="nc" id="L187">                dragged = false;</span>
+<span class="nc" id="L188">                deltaX = 0;</span>
+<span class="nc" id="L189">                deltaY = 0;</span>
+            } else {
+<span class="nc" id="L191">                evt.consume();</span>
+            }
+<span class="nc" id="L193">        }</span>
+    };
+    private boolean animationLock;
+<span class="fc" id="L196">    private final ActionListener pointerReleased = new ActionListener() {</span>
+<span class="fc" id="L197">        private final int tapThreshold = CN.convertToPixels(1);</span>
+
+        private boolean dragWasActuallyATap() {
+<span class="nc bnc" id="L200" title="All 4 branches missed.">            return System.currentTimeMillis() - dragStartTime &lt; 60 &amp;&amp; Math.abs(deltaX) &lt; tapThreshold;</span>
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            if (animationLock) {</span>
+<span class="nc" id="L205">                return;</span>
+            }
+<span class="nc" id="L207">            animationLock = true;</span>
+
+<span class="nc bnc" id="L209" title="All 4 branches missed.">            if (!dragWasActuallyATap() &amp;&amp; dragged) {</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">                if (deltaX &gt; 0) { //dragged from RtL</span>
+<span class="nc" id="L211">                    int trackLength = 0;</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                    if (isRTL()) {</span>
+<span class="nc" id="L213">                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    } else {
+<span class="nc" id="L215">                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                    if (deltaX &gt; trackLength / 2) {</span>
+<span class="nc" id="L218">                        animateTo(isRTL(), deltaX, trackLength, trackLength);</span>
+                    } else { //Not moved enaugh, go back to the state where we come from (i.e. ON for LtR switch and OFF for RtL ones)
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                        animateTo(!isRTL(), deltaX, 0, trackLength);</span>
+                    }
+<span class="nc" id="L222">                } else { //dragged from LtR</span>
+<span class="nc" id="L223">                    int trackLength = 0;</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                    if (isRTL()) {</span>
+<span class="nc" id="L225">                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    } else {
+<span class="nc" id="L227">                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    }
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                    if (deltaX * -1 &gt; trackLength / 2) {</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                        animateTo(!isRTL(), deltaX, -trackLength, trackLength);</span>
+                    } else {
+<span class="nc" id="L232">                        animateTo(isRTL(), deltaX, 0, trackLength);</span>
+                    }
+<span class="nc" id="L234">                }</span>
+            } else {
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                if (value) {</span>
+<span class="nc" id="L237">                    int trackLength = 0;</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                    if (isRTL()) {</span>
+<span class="nc" id="L239">                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    } else {
+<span class="nc" id="L241">                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    }
+<span class="nc" id="L243">                    animateTo(false, 0, trackLength, trackLength);</span>
+<span class="nc" id="L244">                } else {</span>
+<span class="nc" id="L245">                    int trackLength = 0;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                    if (isRTL()) {</span>
+<span class="nc" id="L247">                        trackLength = getCurrentTrackOffImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    } else {
+<span class="nc" id="L249">                        trackLength = getCurrentTrackOnImage().getWidth() - getCurrentThumbImage().getWidth();</span>
+                    }
+<span class="nc" id="L251">                    animateTo(true, 0, -trackLength, trackLength);</span>
+                }
+
+            }
+            // PMD Fix (UnnecessaryReturn): Removed redundant return at the end of the method.
+<span class="nc" id="L256">            animationLock = false;</span>
+<span class="nc" id="L257">        }</span>
+    };
+<span class="fc" id="L259">    private final int valign = CENTER;</span>
+
+    /**
+     * Default constructor
+     */
+    public Switch() {
+<span class="fc" id="L265">        this(&quot;Switch&quot;);</span>
+<span class="fc" id="L266">    }</span>
+
+    /**
+     * This constructor should be used when customizing theme constants
+     * for a different UIID
+     *
+     * @param uiid accepts an alternate UIID for switch which might be
+     *             necessary for theme constants
+     */
+<span class="fc" id="L275">    public Switch(String uiid) {</span>
+<span class="fc" id="L276">        setUIID(uiid);</span>
+<span class="fc" id="L277">        setOpaque(false);</span>
+<span class="fc" id="L278">        initialize();</span>
+<span class="fc" id="L279">    }</span>
+
+    private static Image createRoundThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
+<span class="nc" id="L282">        Image img = ImageFactory.createImage(context, pxDim + 2 * shadowSpread, pxDim + 2 * shadowSpread, 0x0);</span>
+<span class="nc" id="L283">        Graphics g = img.getGraphics();</span>
+<span class="nc" id="L284">        g.setAntiAliased(true);</span>
+
+<span class="nc" id="L286">        int shadowOpacity = 200;</span>
+<span class="nc" id="L287">        float shadowBlur = 10;</span>
+
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (shadowSpread &gt; 0) {</span>
+            // draw a gradient of sort for the shadow
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            for (int iter = shadowSpread - 1; iter &gt;= 0; iter--) {</span>
+<span class="nc" id="L292">                g.translate(iter, iter);</span>
+<span class="nc" id="L293">                g.setColor(0);</span>
+<span class="nc" id="L294">                int alpha = g.concatenateAlpha(shadowOpacity / shadowSpread);</span>
+<span class="nc" id="L295">                g.fillArc(</span>
+<span class="nc" id="L296">                        Math.max(1, thumbInset + shadowSpread + shadowSpread / 2 - iter),</span>
+<span class="nc" id="L297">                        Math.max(1, thumbInset + 2 * shadowSpread - iter),</span>
+<span class="nc" id="L298">                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset),</span>
+<span class="nc" id="L299">                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset), 0, 360);</span>
+<span class="nc" id="L300">                g.setAlpha(alpha);</span>
+<span class="nc" id="L301">                g.translate(-iter, -iter);</span>
+            }
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            if (Display.getInstance().isGaussianBlurSupported()) {</span>
+<span class="nc" id="L304">                Image blured = Display.getInstance().gaussianBlurImage(img, shadowBlur / 2);</span>
+                //img = Image.createImage(pxDim+2*shadowSpread, pxDim+2*shadowSpread, 0);
+<span class="nc" id="L306">                img = blured;</span>
+<span class="nc" id="L307">                g = img.getGraphics();</span>
+                //g.drawImage(blured, 0, 0);
+<span class="nc" id="L309">                g.setAntiAliased(true);</span>
+            }
+        }
+
+        //g.translate(shadowSpread, shadowSpread);
+<span class="nc" id="L314">        int alpha = g.concatenateAlpha(255);</span>
+<span class="nc" id="L315">        g.setColor(color);</span>
+<span class="nc" id="L316">        g.fillArc(shadowSpread + thumbInset, shadowSpread + thumbInset, Math.max(1, pxDim - 2 * thumbInset), Math.max(1, pxDim - 2 * thumbInset), 0, 360);</span>
+        //g.setColor(outlinecolor);
+        //g.drawArc(shadowSize, shadowSize, pxDim-1, pxDim-1, 0, 360);
+<span class="nc" id="L319">        g.setAlpha(alpha);</span>
+<span class="nc" id="L320">        return img;</span>
+    }
+
+    private static Image createPlatformThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
+<span class="nc" id="L324">        return createRoundThumbImage(context, pxDim, color, shadowSpread, thumbInset);</span>
+    }
+
+    private static Image createRoundRectTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
+<span class="nc" id="L328">        Image img = ImageFactory.createImage(context, width + 2 * thumbPadding, height, 0x0);</span>
+<span class="nc" id="L329">        Graphics g = img.getGraphics();</span>
+<span class="nc" id="L330">        g.setAntiAliased(true);</span>
+<span class="nc" id="L331">        int oldAlpha = g.concatenateAlpha(alpha);</span>
+<span class="nc" id="L332">        int topPadding = 0;</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        if (outlineWidth &gt; 0) {</span>
+<span class="nc" id="L334">            g.setColor(outlineColor);</span>
+<span class="nc" id="L335">            g.fillRoundRect(thumbPadding, 0, width, height, height, height);</span>
+<span class="nc" id="L336">            thumbPadding += outlineWidth;</span>
+<span class="nc" id="L337">            topPadding += outlineWidth;</span>
+<span class="nc" id="L338">            width -= 2 * outlineWidth;</span>
+<span class="nc" id="L339">            height -= 2 * outlineWidth;</span>
+        }
+<span class="nc" id="L341">        thumbPadding = Math.max(0, thumbPadding);</span>
+<span class="nc" id="L342">        topPadding = Math.max(0, topPadding);</span>
+<span class="nc" id="L343">        width = Math.max(2, width);</span>
+<span class="nc" id="L344">        height = Math.max(2, height);</span>
+<span class="nc" id="L345">        g.setColor(color);</span>
+<span class="nc" id="L346">        g.fillRoundRect(thumbPadding, topPadding, width, height, height, height);</span>
+<span class="nc" id="L347">        g.setAlpha(oldAlpha);</span>
+<span class="nc" id="L348">        return img;</span>
+    }
+
+    private static Image createPlatformTrackImage(Component context, int width, int height, int color, int alpha, int thumbPadding, int outlineColor, int outlineWidth) {
+<span class="nc" id="L352">        return createRoundRectTrackImage(context, width, height, color, alpha, thumbPadding, outlineColor, outlineWidth);</span>
+    }
+
+    private static int getAlignedCoord(int coord, int parentDim, int elemDim, int alignment) {
+<span class="nc bnc" id="L356" title="All 3 branches missed.">        switch (alignment) {</span>
+            case Component.CENTER:
+<span class="nc" id="L358">                return coord + parentDim / 2 - elemDim / 2;</span>
+            case Component.RIGHT:
+            case Component.BOTTOM:
+<span class="nc" id="L361">                return coord + parentDim - elemDim;</span>
+            //case Component.LEFT: case Component.TOP:
+            //	return coord;
+            default:
+<span class="nc" id="L365">                return coord;</span>
+        }
+    }
+
+    private int getFontSize() {
+<span class="nc" id="L370">        Font f = getUnselectedStyle().getFont();</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L372">            f = Font.getDefaultFont();</span>
+        }
+<span class="nc" id="L374">        return f.getHeight();</span>
+    }
+
+    private Image getThumbOnImage() {
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        if (thumbOnImage == null) {</span>
+<span class="nc" id="L379">            thumbOnImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getSelectedStyle().getFgColor(), 2, getThumbInset());</span>
+        }
+<span class="nc" id="L381">        return thumbOnImage;</span>
+    }
+
+    private void setThumbOnImage(Image image) {
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="nc" id="L386">            this.thumbOnImage = image;</span>
+            //also set other thumb images if we don't have images for them yet
+<span class="nc bnc" id="L388" title="All 2 branches missed.">            if (this.thumbOffImage == null) {</span>
+<span class="nc" id="L389">                this.thumbOffImage = image;</span>
+            }
+<span class="nc bnc" id="L391" title="All 2 branches missed.">            if (this.thumbDisabledImage == null) {</span>
+<span class="nc" id="L392">                this.thumbDisabledImage = image;</span>
+            }
+<span class="nc" id="L394">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L396">    }</span>
+
+    private Image getThumbOffImage() {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (thumbOffImage == null) {</span>
+<span class="nc" id="L400">            thumbOffImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getUnselectedStyle().getFgColor(), 2, getThumbInset()); //getUnselectedStyle().getFgColor(), true);</span>
+        }
+<span class="nc" id="L402">        return thumbOffImage;</span>
+    }
+
+    private void setThumbOffImage(Image image) {
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="nc" id="L407">            this.thumbOffImage = image;</span>
+            //also set other thumb images if we don't have images for them yet
+<span class="nc bnc" id="L409" title="All 2 branches missed.">            if (this.thumbOnImage == null) {</span>
+<span class="nc" id="L410">                this.thumbOnImage = image;</span>
+            }
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            if (this.thumbDisabledImage == null) {</span>
+<span class="nc" id="L413">                this.thumbDisabledImage = image;</span>
+            }
+<span class="nc" id="L415">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L417">    }</span>
+
+    private Image getThumbDisabledImage() {
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (thumbDisabledImage == null) {</span>
+<span class="nc" id="L421">            thumbDisabledImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getDisabledStyle().getFgColor(), 2, getThumbInset()); //getDisabledStyle().getFgColor(), true);</span>
+        }
+<span class="nc" id="L423">        return thumbDisabledImage;</span>
+    }
+
+    private void setThumbDisabledImage(Image image) {
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="nc" id="L428">            this.thumbDisabledImage = image;</span>
+            //also set other thumb images if we don't have images for them yet
+<span class="nc bnc" id="L430" title="All 2 branches missed.">            if (this.thumbOnImage == null) {</span>
+<span class="nc" id="L431">                this.thumbOnImage = image;</span>
+            }
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            if (this.thumbDisabledImage == null) {</span>
+<span class="nc" id="L434">                this.thumbDisabledImage = image;</span>
+            }
+<span class="nc" id="L436">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L438">    }</span>
+
+    @Override
+    protected int getDragRegionStatus(int x, int y) {
+<span class="nc" id="L442">        return Component.DRAG_REGION_IMMEDIATELY_DRAG_X;</span>
+    }
+
+    private Image getCurrentThumbImage() {
+<span class="nc bnc" id="L446" title="All 2 branches missed.">        if (isEnabled()) {</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">            if (value) {</span>
+<span class="nc" id="L448">                return getThumbOnImage();</span>
+            } else {
+<span class="nc" id="L450">                return getThumbOffImage();</span>
+            }
+        } else {
+<span class="nc" id="L453">            return getThumbDisabledImage();</span>
+        }
+    }
+
+    private double getTrackScaleY() {
+<span class="nc" id="L458">        return Double.parseDouble(getUIManager().</span>
+<span class="nc" id="L459">                getThemeConstant(getUIID().toLowerCase() + &quot;TrackScaleY&quot;, &quot;0.9&quot;));</span>
+    }
+
+    private double getThumbScaleY() {
+<span class="nc" id="L463">        return Double.parseDouble(getUIManager().</span>
+<span class="nc" id="L464">                getThemeConstant(getUIID().toLowerCase() + &quot;ThumbScaleY&quot;, &quot;1.5&quot;));</span>
+    }
+
+    private double getTrackScaleX() {
+<span class="nc" id="L468">        return Double.parseDouble(getUIManager().</span>
+<span class="nc" id="L469">                getThemeConstant(getUIID().toLowerCase() + &quot;TrackScaleX&quot;, &quot;3&quot;));</span>
+    }
+
+    private int getTrackOnOutlineWidth() {
+<span class="nc" id="L473">        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().</span>
+<span class="nc" id="L474">                getThemeConstant(getUIID().toLowerCase() + &quot;TrackOnOutlineWidthMM&quot;, &quot;0&quot;)));</span>
+    }
+
+    private int getTrackOnOutlineColor() {
+<span class="nc" id="L478">        return Integer.parseInt(getUIManager().</span>
+<span class="nc" id="L479">                getThemeConstant(getUIID().toLowerCase() + &quot;TrackOnOutlineColor&quot;, &quot;0&quot;), 16);</span>
+    }
+
+    private int getTrackOffOutlineWidth() {
+<span class="nc" id="L483">        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().</span>
+<span class="nc" id="L484">                getThemeConstant(getUIID().toLowerCase() + &quot;TrackOffOutlineWidthMM&quot;, &quot;0&quot;)));</span>
+    }
+
+    private int getTrackOffOutlineColor() {
+<span class="nc" id="L488">        return Integer.parseInt(getUIManager().</span>
+<span class="nc" id="L489">                getThemeConstant(getUIID().toLowerCase() + &quot;TrackOffOutlineColor&quot;, &quot;0&quot;), 16);</span>
+    }
+
+    private int getThumbInset() {
+<span class="nc" id="L493">        return Display.getInstance().convertToPixels(Float.parseFloat(getUIManager().</span>
+<span class="nc" id="L494">                getThemeConstant(getUIID().toLowerCase() + &quot;ThumbInsetMM&quot;, &quot;0&quot;)));</span>
+    }
+
+    private Image getTrackOnImage() {
+<span class="nc bnc" id="L498" title="All 2 branches missed.">        if (trackOnImage == null) {</span>
+<span class="nc" id="L499">            trackOnImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getSelectedStyle().getBgColor(), 255, 2, getTrackOnOutlineColor(), getTrackOnOutlineWidth());</span>
+        }
+<span class="nc" id="L501">        return trackOnImage;</span>
+    }
+
+    private void setTrackOnImage(Image image) {
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="nc" id="L506">            this.trackOnImage = image;</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">            if (this.trackOffImage == null) {</span>
+<span class="nc" id="L508">                this.trackOffImage = image;</span>
+            }
+<span class="nc bnc" id="L510" title="All 2 branches missed.">            if (this.trackDisabledImage == null) {</span>
+<span class="nc" id="L511">                this.trackDisabledImage = image;</span>
+            }
+<span class="nc" id="L513">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L515">    }</span>
+
+    private Image getTrackDisabledImage() {
+<span class="nc bnc" id="L518" title="All 2 branches missed.">        if (trackDisabledImage == null) {</span>
+<span class="nc" id="L519">            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());</span>
+        }
+<span class="nc" id="L521">        return trackDisabledImage;</span>
+    }
+
+    /**
+     * Sets the image to be used for track when the component is disabled.
+     * Use the &quot;switchDisabledTrackImage&quot; theme constant as a default value.
+     *
+     * @param image
+     */
+    private void setTrackDisabledImage(Image image) {
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="nc" id="L532">            this.trackDisabledImage = image;</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">            if (this.trackOnImage == null) {</span>
+<span class="nc" id="L534">                this.trackOnImage = image;</span>
+            }
+<span class="nc bnc" id="L536" title="All 2 branches missed.">            if (this.trackOffImage == null) {</span>
+<span class="nc" id="L537">                this.trackOffImage = image;</span>
+            }
+<span class="nc" id="L539">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L541">    }</span>
+
+    private Image getCurrentTrackOnImage() {
+<span class="nc bnc" id="L544" title="All 2 branches missed.">        if (isEnabled()) {</span>
+<span class="nc" id="L545">            return getTrackOnImage();</span>
+        } else {
+<span class="nc" id="L547">            return getTrackDisabledImage();</span>
+        }
+    }
+
+    private Image getTrackOffImage() {
+<span class="nc bnc" id="L552" title="All 2 branches missed.">        if (trackOffImage == null) {</span>
+<span class="nc" id="L553">            trackOffImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getUnselectedStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());</span>
+        }
+<span class="nc" id="L555">        return trackOffImage;</span>
+    }
+
+    /**
+     * Sets the image to use for the track when the switch is set to &quot;off&quot;.
+     * Use the &quot;switchOffTrackImage&quot; theme constant as a default value.
+     *
+     * @param image The image to use.
+     */
+    private void setTrackOffImage(Image image) {
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">        if (image != null) {</span>
+<span class="nc" id="L566">            this.trackOffImage = image;</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            if (this.trackOnImage == null) {</span>
+<span class="nc" id="L568">                this.trackOnImage = image;</span>
+            }
+<span class="nc bnc" id="L570" title="All 2 branches missed.">            if (this.trackDisabledImage == null) {</span>
+<span class="nc" id="L571">                this.trackDisabledImage = image;</span>
+            }
+<span class="nc" id="L573">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L575">    }</span>
+
+    private Image getCurrentTrackOffImage() {
+<span class="nc bnc" id="L578" title="All 2 branches missed.">        if (isEnabled()) {</span>
+<span class="nc" id="L579">            return getTrackOffImage();</span>
+        } else {
+<span class="nc" id="L581">            return getTrackDisabledImage();</span>
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+<span class="nc bnc" id="L590" title="All 6 branches missed.">        if (Style.FG_COLOR.equals(propertyName) || Style.BG_COLOR.equals(propertyName) || Style.FONT.equals(propertyName)) {</span>
+<span class="nc" id="L591">            initTheme();</span>
+        }
+<span class="nc" id="L593">        super.styleChanged(propertyName, source);</span>
+<span class="nc" id="L594">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Dimension calcPreferredSize() {
+<span class="nc" id="L600">        return new Dimension(</span>
+<span class="nc" id="L601">                getStyle().getHorizontalPadding() + Math.max(getCurrentThumbImage().getWidth(), Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),</span>
+<span class="nc" id="L602">                getStyle().getVerticalPadding() + Math.max(getCurrentThumbImage().getHeight(), Math.max(getCurrentTrackOnImage().getHeight(), getCurrentTrackOffImage().getHeight())));</span>
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void resetFocusable() {
+<span class="nc" id="L610">        setFocusable(true);</span>
+<span class="nc" id="L611">    }</span>
+
+    private void initialize() {
+<span class="fc" id="L614">        setFocusable(true);</span>
+<span class="fc" id="L615">        initTheme();</span>
+<span class="fc" id="L616">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void refreshTheme(boolean merge) {
+<span class="nc" id="L623">        super.refreshTheme(merge);</span>
+<span class="nc" id="L624">        initTheme();</span>
+        /*
+        if(sliderFull != null) {
+            deinitializeCustomStyle(sliderFull);
+            deinitializeCustomStyle(sliderFullSelected);
+            initStyles();
+        }
+         */
+<span class="nc" id="L632">    }</span>
+
+    private void initTheme() {
+<span class="fc" id="L635">        thumbOffImage = null;</span>
+<span class="fc" id="L636">        thumbOnImage = null;</span>
+<span class="fc" id="L637">        thumbDisabledImage = null;</span>
+<span class="fc" id="L638">        trackOnImage = null;</span>
+<span class="fc" id="L639">        trackOffImage = null;</span>
+<span class="fc" id="L640">        trackDisabledImage = null;</span>
+<span class="fc" id="L641">        setThumbOnImage(UIManager.getInstance().</span>
+<span class="fc" id="L642">                getThemeImageConstant(getUIID().toLowerCase() + &quot;ThumbOnImage&quot;));</span>
+<span class="fc" id="L643">        setThumbOffImage(UIManager.getInstance().</span>
+<span class="fc" id="L644">                getThemeImageConstant(getUIID().toLowerCase() + &quot;ThumbOffImage&quot;));</span>
+<span class="fc" id="L645">        setThumbDisabledImage(UIManager.getInstance().</span>
+<span class="fc" id="L646">                getThemeImageConstant(getUIID().toLowerCase() + &quot;ThumbDisabledImage&quot;));</span>
+<span class="fc" id="L647">        setTrackOnImage(UIManager.getInstance().</span>
+<span class="fc" id="L648">                getThemeImageConstant(getUIID().toLowerCase() + &quot;OnTrackImage&quot;));</span>
+<span class="fc" id="L649">        setTrackOffImage(UIManager.getInstance().</span>
+<span class="fc" id="L650">                getThemeImageConstant(getUIID().toLowerCase() + &quot;OffTrackImage&quot;));</span>
+<span class="fc" id="L651">        setTrackDisabledImage(UIManager.getInstance().</span>
+<span class="fc" id="L652">                getThemeImageConstant(getUIID().toLowerCase() + &quot;DisabledTrackImage&quot;));</span>
+<span class="fc" id="L653">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected boolean isStickyDrag() {
+<span class="nc" id="L659">        return true;</span>
+    }
+
+    /**
+     * Adds a listener to the switch which will cause an event to dispatch on
+     * click
+     *
+     * @param l implementation of the action listener interface
+     */
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L669">        dispatcher.addListener(l);</span>
+<span class="fc" id="L670">    }</span>
+
+    /**
+     * Removes the given action listener from the switch
+     *
+     * @param l implementation of the action listener interface
+     */
+    public void removeActionListener(ActionListener l) {
+<span class="fc" id="L678">        dispatcher.removeListener(l);</span>
+<span class="fc" id="L679">    }</span>
+
+    /**
+     * Adds a listener to the switch which will cause an event on change
+     *
+     * @param l implementation of the action listener interface
+     */
+    public void addChangeListener(ActionListener l) {
+<span class="fc" id="L687">        changeDispatcher.addListener(l);</span>
+<span class="fc" id="L688">    }</span>
+
+    /**
+     * Removes the given change listener from the switch
+     *
+     * @param l implementation of the action listener interface
+     */
+    public void removeChangeListener(ActionListener l) {
+<span class="fc" id="L696">        changeDispatcher.removeListener(l);</span>
+<span class="fc" id="L697">    }</span>
+
+    /**
+     * Returns a collection containing the action listeners for this button
+     *
+     * @return the action listeners
+     * @deprecated This will be removed in a future version.
+     */
+    public Collection getListeners() {
+<span class="fc" id="L706">        return dispatcher.getListenerCollection();</span>
+    }
+
+    void fireActionEvent() {
+<span class="fc" id="L710">        dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed));</span>
+<span class="fc" id="L711">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">        if (d.isBuiltinSoundsEnabled()) {</span>
+<span class="nc" id="L713">            d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);</span>
+        }
+<span class="fc" id="L715">    }</span>
+
+    void fireChangeEvent() {
+<span class="fc" id="L718">        changeDispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));</span>
+<span class="fc" id="L719">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g) {
+
+<span class="nc" id="L726">        Image cthumbImage = getCurrentThumbImage();</span>
+<span class="nc bnc" id="L727" title="All 2 branches missed.">        Image cTrackImage = value ? getCurrentTrackOnImage() : getCurrentTrackOffImage();</span>
+        //Image ctrackOnImage = getCurrentTrackOnImage();
+        //Image ctrackOffImage = getCurrentTrackOffImage();
+<span class="nc" id="L730">        int strackLength = Math.max(cTrackImage.getWidth(), cTrackImage.getWidth());</span>
+<span class="nc" id="L731">        int sheight = Math.max(cthumbImage.getHeight(), Math.max(cTrackImage.getHeight(), cTrackImage.getHeight()));</span>
+
+<span class="nc" id="L733">        int vdeltaX = -deltaX; //virtual increase in slider &quot;value&quot; where OFF state = 0 and ON state = itrackLength</span>
+<span class="nc bnc" id="L734" title="All 2 branches missed.">        if (isRTL()) {</span>
+<span class="nc" id="L735">            vdeltaX = deltaX;</span>
+        }
+
+<span class="nc" id="L738">        Style s = getStyle();</span>
+<span class="nc" id="L739">        int padLeft = s.getPaddingLeft(isRTL());//s.getPaddingLeftNoRTL();</span>
+<span class="nc" id="L740">        int padRight = s.getPaddingRight(isRTL());</span>
+<span class="nc" id="L741">        int padTop = s.getPaddingTop();</span>
+<span class="nc" id="L742">        int padBot = s.getPaddingBottom();</span>
+<span class="nc" id="L743">        int innerHeight = getHeight() - padTop - padBot; //cache it to avoid calling getPadding multiple times, which costs CPU as it make the unit conversion at each call...</span>
+<span class="nc" id="L744">        int innerWidth = getWidth() - padLeft - padRight;</span>
+<span class="nc" id="L745">        int halign = s.getAlignment(); //TODO: swap left and right if RTL</span>
+
+<span class="nc" id="L747">        int thumbrX = 0; //X position of the thumb relative to the start of the track</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">        if (isRTL()) {</span>
+<span class="nc bnc" id="L749" title="All 2 branches missed.">            if (!value) {</span>
+<span class="nc" id="L750">                thumbrX = cTrackImage.getWidth() - cthumbImage.getWidth();</span>
+            }
+        } else {
+<span class="nc bnc" id="L753" title="All 2 branches missed.">            if (value) {</span>
+<span class="nc" id="L754">                thumbrX = cTrackImage.getWidth() - cthumbImage.getWidth();</span>
+            }
+        }
+
+<span class="nc" id="L758">        Image nextThumbImage = null;</span>
+<span class="nc" id="L759">        Image nextTrackImage = null;</span>
+<span class="nc" id="L760">        double nextImageProgress = 0.0;</span>
+
+<span class="nc bnc" id="L762" title="All 2 branches missed.">        if (value) { //switch is ON so only drag movements going to the OFF position are relevant, meaning a vdelta &lt; 0</span>
+<span class="nc bnc" id="L763" title="All 2 branches missed.">            if (vdeltaX &gt; 0) {</span>
+<span class="nc" id="L764">                dragged = false;</span>
+            } else {
+<span class="nc" id="L766">                nextThumbImage = getThumbOffImage();</span>
+<span class="nc" id="L767">                nextTrackImage = getTrackOffImage();</span>
+<span class="nc" id="L768">                int trackMLength = cTrackImage.getWidth() - cthumbImage.getWidth();</span>
+<span class="nc bnc" id="L769" title="All 2 branches missed.">                if (vdeltaX &lt; -trackMLength) {</span>
+<span class="nc" id="L770">                    vdeltaX = -trackMLength;</span>
+                }
+<span class="nc" id="L772">                nextImageProgress = Math.abs(vdeltaX) / (double) Math.abs(trackMLength);</span>
+
+
+<span class="nc" id="L775">            }</span>
+        } else { //switch is OFF so only consider drag movements toward the ON position, meaning a vdelta &gt; 0
+<span class="nc bnc" id="L777" title="All 2 branches missed.">            if (vdeltaX &lt; 0) {</span>
+<span class="nc" id="L778">                dragged = false;</span>
+            } else {
+<span class="nc" id="L780">                nextThumbImage = getThumbOnImage();</span>
+<span class="nc" id="L781">                nextTrackImage = getTrackOnImage();</span>
+<span class="nc" id="L782">                int trackMLength = cTrackImage.getWidth() - cthumbImage.getWidth();</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">                if (vdeltaX &gt; trackMLength) {</span>
+<span class="nc" id="L784">                    vdeltaX = trackMLength;</span>
+                }
+<span class="nc" id="L786">                nextImageProgress = 1 - Math.abs(trackMLength - vdeltaX) / (double) Math.abs(trackMLength);</span>
+            }
+        }
+<span class="nc bnc" id="L789" title="All 2 branches missed.">        if (dragged) {</span>
+            int thumbCenterrX;
+<span class="nc bnc" id="L791" title="All 2 branches missed.">            if (value) { //vdelta is negative</span>
+<span class="nc bnc" id="L792" title="All 2 branches missed.">                if (isRTL()) {</span>
+<span class="nc" id="L793">                    thumbCenterrX = -vdeltaX + cthumbImage.getWidth() / 2;</span>
+                } else {
+<span class="nc" id="L795">                    thumbCenterrX = cTrackImage.getWidth() + vdeltaX - cthumbImage.getWidth() / 2;</span>
+                }
+            } else { //positive vdelta
+<span class="nc bnc" id="L798" title="All 2 branches missed.">                if (isRTL()) {</span>
+<span class="nc" id="L799">                    thumbCenterrX = cTrackImage.getWidth() - vdeltaX - cthumbImage.getWidth() / 2;</span>
+                } else {
+<span class="nc" id="L801">                    thumbCenterrX = vdeltaX + cthumbImage.getWidth() / 2;</span>
+                }
+            }
+
+<span class="nc" id="L805">            thumbrX = thumbCenterrX - cthumbImage.getWidth() / 2;</span>
+
+
+<span class="nc" id="L808">            int imgY = getY() + padTop + getAlignedCoord((sheight / 2 - cTrackImage.getHeight() / 2), innerHeight, sheight, valign);</span>
+<span class="nc" id="L809">            int imgX = getX() + padLeft + getAlignedCoord(0, innerWidth, strackLength, halign);</span>
+
+<span class="nc" id="L811">            int alph = g.getAlpha();</span>
+<span class="nc bnc" id="L812" title="All 4 branches missed.">            if (nextImageProgress &gt; 0 &amp;&amp; nextTrackImage != null) {</span>
+<span class="nc" id="L813">                g.setAlpha((int) Math.round((1 - nextImageProgress) * 255));</span>
+            }
+<span class="nc" id="L815">            g.drawImage(cTrackImage, imgX, imgY);</span>
+<span class="nc bnc" id="L816" title="All 4 branches missed.">            if (nextImageProgress &gt; 0 &amp;&amp; nextTrackImage != null) {</span>
+<span class="nc" id="L817">                g.setAlpha((int) Math.round(nextImageProgress * 255));</span>
+<span class="nc" id="L818">                g.drawImage(nextTrackImage, imgX, imgY);</span>
+<span class="nc" id="L819">                g.setAlpha(alph);</span>
+            }
+
+<span class="nc" id="L822">        } else {</span>
+<span class="nc" id="L823">            int imgX = getX() + padLeft + getAlignedCoord(0, innerWidth, strackLength, halign);</span>
+<span class="nc" id="L824">            int imgY = getY() + padTop + getAlignedCoord((sheight / 2 - cTrackImage.getHeight() / 2), innerHeight, sheight, valign);</span>
+<span class="nc" id="L825">            g.drawImage(cTrackImage, imgX, imgY);</span>
+
+        }
+
+        //draw the thumb image
+<span class="nc" id="L830">        int alph = g.getAlpha();</span>
+<span class="nc bnc" id="L831" title="All 4 branches missed.">        if (nextImageProgress &gt; 0 &amp;&amp; nextThumbImage != null) {</span>
+<span class="nc" id="L832">            g.setAlpha((int) Math.round((1 - nextImageProgress) * 255));</span>
+        }
+<span class="nc" id="L834">        g.drawImage(cthumbImage,</span>
+<span class="nc" id="L835">                getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),</span>
+<span class="nc" id="L836">                getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));</span>
+<span class="nc bnc" id="L837" title="All 4 branches missed.">        if (nextImageProgress &gt; 0 &amp;&amp; nextThumbImage != null) {</span>
+<span class="nc" id="L838">            g.setAlpha((int) Math.round(nextImageProgress * 255));</span>
+<span class="nc" id="L839">            g.drawImage(nextThumbImage,</span>
+<span class="nc" id="L840">                    getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),</span>
+<span class="nc" id="L841">                    getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));</span>
+<span class="nc" id="L842">            g.setAlpha(alph);</span>
+        }
+
+<span class="nc" id="L845">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initComponent() {
+<span class="nc" id="L851">        super.initComponent();</span>
+<span class="nc" id="L852">        addPointerPressedListener(pointerPressed);</span>
+<span class="nc" id="L853">        addPointerDraggedListener(pointerDragged);</span>
+<span class="nc" id="L854">        addPointerReleasedListener(pointerReleased);</span>
+<span class="nc" id="L855">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void deinitialize() {
+<span class="nc" id="L861">        removePointerPressedListener(pointerPressed);</span>
+<span class="nc" id="L862">        removePointerDraggedListener(pointerDragged);</span>
+<span class="nc" id="L863">        removePointerReleasedListener(pointerReleased);</span>
+<span class="nc" id="L864">        super.deinitialize();</span>
+<span class="nc" id="L865">    }</span>
+
+    private void animateTo(final boolean value, final int deltaStart, final int deltaEnd, final int maxMoveDist) {
+<span class="nc" id="L868">        int anim_duration = (int) Math.abs((deltaEnd - deltaStart) / (double) maxMoveDist * 100.0);</span>
+<span class="nc" id="L869">        final Motion current = Motion.createEaseInOutMotion(deltaStart, deltaEnd, anim_duration);</span>
+<span class="nc bnc" id="L870" title="All 2 branches missed.">        if (anim_duration &gt; 0) {</span>
+<span class="nc" id="L871">            current.start();</span>
+<span class="nc" id="L872">            deltaX = deltaStart;</span>
+<span class="nc" id="L873">            getComponentForm().registerAnimated(new Animation() {</span>
+                public boolean animate() {
+<span class="nc" id="L875">                    deltaX = current.getValue();</span>
+<span class="nc" id="L876">                    dragged = true;</span>
+<span class="nc bnc" id="L877" title="All 2 branches missed.">                    if (current.isFinished()) {</span>
+<span class="nc" id="L878">                        dragged = false;</span>
+<span class="nc" id="L879">                        deltaX = 0;</span>
+<span class="nc" id="L880">                        deltaY = 0;</span>
+<span class="nc" id="L881">                        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L882" title="All 2 branches missed.">                        if (f != null) {</span>
+<span class="nc" id="L883">                            f.deregisterAnimated(this);</span>
+                        }
+<span class="nc" id="L885">                        Switch.this.setValue(value, true);</span>
+                    }
+<span class="nc" id="L887">                    repaint();</span>
+<span class="nc" id="L888">                    return false;</span>
+                }
+
+                public void paint(Graphics g) {
+<span class="nc" id="L892">                }</span>
+            });
+<span class="nc" id="L894">            dragged = true;</span>
+        } else {
+            //deltaX = deltaEnd;
+<span class="nc" id="L897">            deltaX = 0;</span>
+<span class="nc" id="L898">            deltaY = 0;</span>
+<span class="nc" id="L899">            dragged = false;</span>
+<span class="nc" id="L900">            setValue(value, true);</span>
+        }
+
+<span class="nc" id="L903">    }</span>
+
+    /**
+     * The value of the switch
+     *
+     * @return the value
+     */
+    public boolean isValue() {
+<span class="fc" id="L911">        return value;</span>
+    }
+
+    /**
+     * The value of the switch
+     *
+     * @param value the value to set
+     */
+    public void setValue(boolean value) {
+<span class="fc" id="L920">        setValue(value, false);</span>
+<span class="fc" id="L921">    }</span>
+
+    // PMD Fix (UnusedPrivateMethod): Removed the unused flip() helper and retained this setter as the single source of truth.
+    private void setValue(boolean value, boolean fireEvent) {
+<span class="fc" id="L925">        boolean orig = animationLock;</span>
+<span class="fc" id="L926">        animationLock = true;</span>
+<span class="fc" id="L927">        boolean oldValue = this.value;</span>
+
+<span class="fc" id="L929">        this.value = value;</span>
+<span class="fc bfc" id="L930" title="All 2 branches covered.">        if (oldValue != value) {</span>
+<span class="fc" id="L931">            fireChangeEvent();</span>
+        }
+<span class="fc bfc" id="L933" title="All 4 branches covered.">        if (fireEvent &amp;&amp; oldValue != value) {</span>
+<span class="fc" id="L934">            fireActionEvent();</span>
+        }
+<span class="fc" id="L936">        repaint();</span>
+<span class="fc" id="L937">        animationLock = orig;</span>
+<span class="fc" id="L938">    }</span>
+
+    /**
+     * Checks if switch is in the &quot;on&quot; position.
+     *
+     * @return True if switch is on.
+     */
+    public boolean isOn() {
+<span class="fc" id="L946">        return value;</span>
+    }
+
+    /**
+     * Sets the switch to the &quot;on&quot; position.
+     */
+    public void setOn() {
+<span class="fc" id="L953">        setValue(true);</span>
+<span class="fc" id="L954">    }</span>
+
+    /**
+     * Checks if the switch is in the &quot;off&quot; position.
+     *
+     * @return True of switch is currently off.
+     */
+    public boolean isOff() {
+<span class="fc bfc" id="L962" title="All 2 branches covered.">        return !value;</span>
+    }
+
+    /**
+     * Switches the switch to the &quot;off&quot; position.
+     */
+    public void setOff() {
+<span class="fc" id="L969">        setValue(false);</span>
+<span class="fc" id="L970">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="fc" id="L976">        return new String[]{</span>
+                &quot;value&quot;,};
+    }
+
+    /**
+     * Some components may optionally generate a state which can then be
+     * restored using setCompnentState(). This method is used by the UIBuilder.
+     *
+     * @return the component state or null for undefined state.
+     */
+    public Object getComponentState() {
+<span class="nc bnc" id="L987" title="All 2 branches missed.">        if (value) {</span>
+<span class="nc" id="L988">            return Boolean.TRUE;</span>
+        }
+<span class="nc" id="L990">        return Boolean.FALSE;</span>
+    }
+
+    /**
+     * If getComponentState returned a value the setter can update the value and
+     * restore the prior state.
+     *
+     * @param state the non-null state
+     */
+    public void setComponentState(Object state) {
+<span class="nc" id="L1000">        System.out.println(&quot;Setting component state &quot; + state);</span>
+<span class="nc" id="L1001">        value = ((Boolean) state).booleanValue();</span>
+<span class="nc" id="L1002">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L1008">        return new Class[]{</span>
+                Boolean.class,};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L1016" title="1 of 2 branches missed.">        if (name.equals(&quot;value&quot;)) {</span>
+<span class="pc bpc" id="L1017" title="1 of 2 branches missed.">            if (value) {</span>
+<span class="nc" id="L1018">                return Boolean.TRUE;</span>
+            }
+<span class="fc" id="L1020">            return Boolean.FALSE;</span>
+        }
+<span class="nc" id="L1022">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="pc bpc" id="L1029" title="1 of 2 branches missed.">        if (name.equals(&quot;value&quot;)) {</span>
+<span class="fc" id="L1030">            setValue(((Boolean) value).booleanValue());</span>
+<span class="fc" id="L1031">            return null;</span>
+        }
+<span class="nc" id="L1033">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /*
+    The following methods are here to support the ReleasableComponent interface
+    Which is necessary for press/release to work properly.  If the component
+    weren't a ReleasableComponent, some pointerReleased() events may not be called.
+    */
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public boolean isAutoRelease() {
+<span class="fc" id="L1047">        return false;</span>
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void setAutoRelease(boolean arg0) {
+
+<span class="fc" id="L1056">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public int getReleaseRadius() {
+<span class="fc" id="L1063">        return 0;</span>
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void setReleaseRadius(int arg0) {
+
+<span class="fc" id="L1072">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void setReleased() {
+
+<span class="fc" id="L1080">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

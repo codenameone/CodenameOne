@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultDocumentRequestHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">DefaultDocumentRequestHandler.java</span></div><h1>DefaultDocumentRequestHandler.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.Resources;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Vector;
+
+/**
+ * Default implementation of the HTML components document request handler to allow simple
+ * HTML support in Codename One. This version includes only the basics supported by MIDP
+ * e.g. resources and jar file URL's such as jar:// and res://
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L43">public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandler {</span>
+    private static Resources resFile;
+    private boolean trackVisitedURLs;
+    private Vector visitedURLs;
+
+    /**
+     * Allows URL's referring to a res:// local resource to default to this file
+     *
+     * @return the resFile
+     */
+    public static Resources getResFile() {
+<span class="nc" id="L54">        return resFile;</span>
+    }
+
+    /**
+     * Allows URL's referring to a local:// local resource to default to this file
+     *
+     * @param res the resource
+     */
+    public static void setResFile(Resources res) {
+<span class="nc" id="L63">        resFile = res;</span>
+<span class="nc" id="L64">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
+<span class="nc" id="L70">        resourceRequested(docInfo, callback);</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public InputStream resourceRequested(DocumentInfo docInfo) {
+<span class="nc" id="L77">        return null;</span>
+    }
+
+    /**
+     * This method can be invoked to indicate a URL was visited fro tracking
+     *
+     * @param url the url
+     */
+    protected void visitingURL(String url) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (trackVisitedURLs) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (visitedURLs == null) {</span>
+<span class="nc" id="L88">                visitedURLs = new Vector();</span>
+            }
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (!visitedURLs.contains(url)) {</span>
+<span class="nc" id="L91">                visitedURLs.addElement(url);</span>
+            }
+        }
+<span class="nc" id="L94">    }</span>
+
+    /**
+     * Returns true if the URL was visited, requires trackVisitedURLs to be true
+     *
+     * @param url the url
+     * @return true if it was visited
+     */
+    public boolean wasURLVisited(String url) {
+<span class="nc bnc" id="L103" title="All 4 branches missed.">        return visitedURLs != null &amp;&amp; visitedURLs.contains(url);</span>
+    }
+
+    private InputStream resourceRequested(final DocumentInfo docInfo, final IOCallback callback) {
+<span class="nc" id="L107">        String url = docInfo.getUrl();</span>
+
+<span class="nc" id="L109">        visitingURL(url);</span>
+
+        // trim anchors
+<span class="nc" id="L112">        int hash = url.indexOf('#');</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (hash != -1) {</span>
+<span class="nc" id="L114">            url = url.substring(0, hash);</span>
+        }
+
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (url.startsWith(&quot;jar://&quot;)) {</span>
+<span class="nc" id="L118">            callback.streamReady(Display.getInstance().getResourceAsStream(getClass(), docInfo.getUrl().substring(6)), docInfo);</span>
+<span class="nc" id="L119">            return null;</span>
+        } else {
+            try {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                if (url.startsWith(&quot;local://&quot;)) {</span>
+<span class="nc" id="L123">                    Image img = resFile.getImage(url.substring(8));</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                    if (img instanceof EncodedImage) {</span>
+<span class="nc" id="L125">                        callback.streamReady(new ByteArrayInputStream(((EncodedImage) img).getImageData()),</span>
+                                docInfo);
+                    }
+                }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                if (url.startsWith(&quot;res://&quot;)) {</span>
+<span class="nc" id="L130">                    InputStream i = Display.getInstance().getResourceAsStream(getClass(), docInfo.getUrl().substring(6));</span>
+<span class="nc" id="L131">                    Resources r = Resources.open(i);</span>
+<span class="nc" id="L132">                    i.close();</span>
+<span class="nc" id="L133">                    i = r.getData(docInfo.getParams());</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                    if (i != null) {</span>
+<span class="nc" id="L135">                        callback.streamReady(i, docInfo);</span>
+                    } else {
+<span class="nc" id="L137">                        Image img = r.getImage(docInfo.getParams());</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                        if (img instanceof EncodedImage) {</span>
+<span class="nc" id="L139">                            callback.streamReady(new ByteArrayInputStream(((EncodedImage) img).getImageData()),</span>
+                                    docInfo);
+                        }
+                    }
+<span class="nc" id="L143">                    return null;</span>
+                }
+<span class="nc" id="L145">            } catch (IOException ex) {</span>
+<span class="nc" id="L146">                ex.printStackTrace();</span>
+<span class="nc" id="L147">            }</span>
+        }
+
+<span class="nc" id="L150">        return null;</span>
+    }
+
+    /**
+     * Allows tracking whether a URL was visited or not
+     *
+     * @return the trackVisitedURLs
+     */
+    public boolean isTrackVisitedURLs() {
+<span class="nc" id="L159">        return trackVisitedURLs;</span>
+    }
+
+    /**
+     * Allows tracking whether a URL was visited or not
+     *
+     * @param trackVisitedURLs the trackVisitedURLs to set
+     */
+    public void setTrackVisitedURLs(boolean trackVisitedURLs) {
+<span class="nc" id="L168">        this.trackVisitedURLs = trackVisitedURLs;</span>
+<span class="nc" id="L169">        visitedURLs = null;</span>
+<span class="nc" id="L170">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

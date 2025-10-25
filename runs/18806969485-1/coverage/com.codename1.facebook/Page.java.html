@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Page.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.facebook</a> &gt; <span class="el_source">Page.java</span></div><h1>Page.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.facebook;
+
+import java.util.Hashtable;
+
+/**
+ * This class represents a Facebook Page object
+ * https://developers.facebook.com/docs/reference/api/page/
+ *
+ * @author Chen Fishbein
+ */
+public class Page extends FBObject {
+
+    private String about;
+    private String category;
+    private String founded;
+    private int likesCount;
+    private String link;
+    private String username;
+    private String website;
+    private String coverId;
+    private String coverLink;
+
+    /**
+     * Empty Contructor
+     */
+<span class="nc" id="L48">    public Page() {</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Page(Hashtable props) {
+<span class="nc" id="L55">        super(props);</span>
+<span class="nc" id="L56">        init(props);</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Simple Getter
+     */
+    public String getAbout() {
+<span class="nc" id="L63">        return about;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public String getCategory() {
+<span class="nc" id="L70">        return category;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public String getCoverId() {
+<span class="nc" id="L77">        return coverId;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public String getCoverLink() {
+<span class="nc" id="L84">        return coverLink;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public String getFounded() {
+<span class="nc" id="L91">        return founded;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public int getLikesCount() {
+<span class="nc" id="L98">        return likesCount;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public String getLink() {
+<span class="nc" id="L105">        return link;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public String getUsername() {
+<span class="nc" id="L112">        return username;</span>
+    }
+
+    /**
+     * Simple Getter
+     */
+    public String getWebsite() {
+<span class="nc" id="L119">        return website;</span>
+    }
+
+    /**
+     * copies the relevant values from the given hashtable
+     *
+     * @param props an hashtable to copy from
+     */
+    public void copy(Hashtable props) {
+<span class="nc" id="L128">        super.copy(props);</span>
+<span class="nc" id="L129">        init(props);</span>
+<span class="nc" id="L130">    }</span>
+
+    private void init(Hashtable toCopy) {
+<span class="nc" id="L133">        super.copy(toCopy);</span>
+<span class="nc" id="L134">        about = (String) toCopy.get(&quot;about&quot;);</span>
+<span class="nc" id="L135">        category = (String) toCopy.get(&quot;category&quot;);</span>
+<span class="nc" id="L136">        link = (String) toCopy.get(&quot;link&quot;);</span>
+<span class="nc" id="L137">        about = (String) toCopy.get(&quot;about&quot;);</span>
+<span class="nc" id="L138">        founded = (String) toCopy.get(&quot;founded&quot;);</span>
+<span class="nc" id="L139">        website = (String) toCopy.get(&quot;website&quot;);</span>
+<span class="nc" id="L140">        String l = (String) toCopy.get(&quot;likes&quot;);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (l != null) {</span>
+<span class="nc" id="L142">            likesCount = Integer.parseInt(l);</span>
+        } else {
+<span class="nc" id="L144">            likesCount = -1;</span>
+        }
+<span class="nc" id="L146">        username = (String) toCopy.get(&quot;username&quot;);</span>
+
+<span class="nc" id="L148">        Hashtable cover = (Hashtable) toCopy.get(&quot;cover&quot;);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (cover != null) {</span>
+<span class="nc" id="L150">            coverId = (String) cover.get(&quot;cover_id&quot;);</span>
+<span class="nc" id="L151">            coverLink = (String) cover.get(&quot;source&quot;);</span>
+        }
+<span class="nc" id="L153">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PieMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">PieMapper.java</span></div><h1>PieMapper.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.models.Point;
+import com.codename1.charts.models.SeriesSelection;
+import com.codename1.ui.geom.Shape;
+import com.codename1.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * PieChart Segment Selection Management.
+ */
+<span class="nc" id="L29">public class PieMapper {</span>
+
+<span class="nc" id="L31">    private final List&lt;PieSegment&gt; mPieSegmentList = new ArrayList&lt;PieSegment&gt;();</span>
+
+    private int mPieChartRadius;
+
+    private int mCenterX, mCenterY;
+
+    /**
+     * Set PieChart location on screen.
+     *
+     * @param pieRadius
+     * @param centerX
+     * @param centerY
+     */
+    public void setDimensions(int pieRadius, int centerX, int centerY) {
+<span class="nc" id="L45">        mPieChartRadius = pieRadius;</span>
+<span class="nc" id="L46">        mCenterX = centerX;</span>
+<span class="nc" id="L47">        mCenterY = centerY;</span>
+<span class="nc" id="L48">    }</span>
+
+    /**
+     * If we have all PieChart Config then there is no point in reloading it
+     *
+     * @param datasetSize
+     * @return true if cfg for each segment is present
+     */
+    public boolean areAllSegmentPresent(int datasetSize) {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        return mPieSegmentList.size() == datasetSize;</span>
+    }
+
+    /**
+     * Add configuration for a PieChart Segment
+     *
+     * @param dataIndex
+     * @param value
+     * @param startAngle
+     * @param angle
+     */
+    public void addPieSegment(int dataIndex, float value, float startAngle, float angle) {
+<span class="nc" id="L69">        mPieSegmentList.add(new PieSegment(dataIndex, value, startAngle, angle));</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Clears the pie segments list.
+     */
+    public void clearPieSegments() {
+<span class="nc" id="L76">        mPieSegmentList.clear();</span>
+<span class="nc" id="L77">    }</span>
+
+    /**
+     * Fetches angle relative to pie chart center point where 3 O'Clock is 0 and
+     * 12 O'Clock is 270degrees
+     *
+     * @param screenPoint
+     * @return angle in degress from 0-360.
+     */
+    public double getAngle(Point screenPoint) {
+<span class="nc" id="L87">        double dx = screenPoint.getX() - mCenterX;</span>
+        // Minus to correct for coord re-mapping
+<span class="nc" id="L89">        double dy = -(screenPoint.getY() - mCenterY);</span>
+
+<span class="nc" id="L91">        double inRads = com.codename1.util.MathUtil.atan2(dy, dx);</span>
+
+        // We need to map to coord system when 0 degree is at 3 O'clock, 270 at 12
+        // O'clock
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (inRads &lt; 0)</span>
+<span class="nc" id="L96">            inRads = Math.abs(inRads);</span>
+        else
+<span class="nc" id="L98">            inRads = 2 * Math.PI - inRads;</span>
+
+<span class="nc" id="L100">        return Math.toDegrees(inRads);</span>
+    }
+
+    /**
+     * Checks if Point falls within PieChart
+     *
+     * @param screenPoint
+     * @return true if in PieChart
+     */
+    public boolean isOnPieChart(Point screenPoint) {
+        // Using a bit of Pythagoras
+        // inside circle if (x-center_x)**2 + (y-center_y)**2 &lt;= radius**2:
+
+<span class="nc" id="L113">        double sqValue = (MathUtil.pow(mCenterX - screenPoint.getX(), 2) + MathUtil.pow(</span>
+<span class="nc" id="L114">                mCenterY - screenPoint.getY(), 2));</span>
+
+<span class="nc" id="L116">        double radiusSquared = mPieChartRadius * mPieChartRadius;</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        boolean isOnPieChart = sqValue &lt;= radiusSquared;</span>
+<span class="nc" id="L118">        return isOnPieChart;</span>
+    }
+
+    /**
+     * Fetches the SeriesSelection for the PieSegment selected.
+     *
+     * @param screenPoint - the user tap location
+     * @return null if screen point is not in PieChart or its config if it is
+     */
+    public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (isOnPieChart(screenPoint)) {</span>
+<span class="nc" id="L129">            double angleFromPieCenter = getAngle(screenPoint);</span>
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            for (PieSegment pieSeg : mPieSegmentList) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                if (pieSeg.isInSegment(angleFromPieCenter)) {</span>
+<span class="nc" id="L133">                    return new SeriesSelection(0, pieSeg.getDataIndex(), pieSeg.getValue(),</span>
+<span class="nc" id="L134">                            pieSeg.getValue());</span>
+                }
+<span class="nc" id="L136">            }</span>
+        }
+<span class="nc" id="L138">        return null;</span>
+    }
+
+    private Shape getSegmentShape(PieSegment segment) {
+<span class="nc" id="L142">        return segment.getShape(mCenterX, mCenterY, mPieChartRadius);</span>
+    }
+
+    private PieSegment getSegment(int dataIndex) {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        for (PieSegment s : mPieSegmentList) {</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            if (dataIndex == s.getDataIndex()) {</span>
+<span class="nc" id="L148">                return s;</span>
+            }
+<span class="nc" id="L150">        }</span>
+<span class="nc" id="L151">        return null;</span>
+    }
+
+    public Shape getSegmentShape(int dataIndex) {
+<span class="nc" id="L155">        PieSegment seg = getSegment(dataIndex);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (seg != null) {</span>
+<span class="nc" id="L157">            return getSegmentShape(seg);</span>
+        }
+<span class="nc" id="L159">        return null;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TestReporting.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.testing</a> &gt; <span class="el_source">TestReporting.java</span></div><h1>TestReporting.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.testing;
+
+import com.codename1.io.Log;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Enumeration;
+import java.util.Hashtable;
+
+/**
+ * Test reports can be overriden to provide custom test reporting options
+ * you can replace the test reporter on the device by sending the build
+ * argument build.testReporter='com.x.MyTestReporterClass'.
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L39">public class TestReporting {</span>
+    private static TestReporting instance;
+<span class="fc" id="L41">    private final Hashtable&lt;String, Boolean&gt; testsExecuted = new Hashtable&lt;String, Boolean&gt;();</span>
+
+
+    /**
+     * Gets the test reporting instance
+     */
+    public static TestReporting getInstance() {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (instance == null) {</span>
+<span class="fc" id="L49">            instance = new TestReporting();</span>
+        }
+<span class="fc" id="L51">        return instance;</span>
+    }
+
+    /**
+     * Sets the test reporting instance to a subclass of this class.
+     *
+     * @param i the new instance
+     */
+    public static void setInstance(TestReporting i) {
+<span class="fc" id="L60">        instance = i;</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Invoked when a unit test is started
+     */
+    public void startingTestCase(String testName) {
+<span class="fc" id="L67">        Log.p(&quot;Starting test case &quot; + testName);</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #startingTestCase(String)}
+     */
+    public void startingTestCase(UnitTest test) {
+<span class="fc" id="L74">        startingTestCase(test.getClass().getName());</span>
+<span class="fc" id="L75">    }</span>
+
+    /**
+     * Indicates a message from the current test case
+     *
+     * @param message the message
+     */
+    public void logMessage(String message) {
+<span class="fc" id="L83">        Log.p(message);</span>
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * Indicates an error from the current test case
+     *
+     * @param err the error message
+     */
+    public void logException(Throwable err) {
+<span class="nc" id="L92">        Log.e(err);</span>
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * Invoked when a unit test has completed
+     *
+     * @param testName the name of the test case
+     * @param passed   true if the test passed and false otherwise
+     */
+    public void finishedTestCase(String testName, boolean passed) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (passed) {</span>
+<span class="fc" id="L103">            Log.p(testName + &quot; passed&quot;);</span>
+<span class="fc" id="L104">            testsExecuted.put(testName, Boolean.TRUE);</span>
+        } else {
+<span class="fc" id="L106">            Log.p(testName + &quot; failed&quot;);</span>
+<span class="fc" id="L107">            testsExecuted.put(testName, Boolean.FALSE);</span>
+        }
+<span class="fc" id="L109">    }</span>
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #finishedTestCase(String, boolean)}
+     */
+    public void finishedTestCase(UnitTest test, boolean passed) {
+<span class="fc" id="L115">        finishedTestCase(test.getClass().getName(), passed);</span>
+<span class="fc" id="L116">    }</span>
+
+    /**
+     * Writes a test report to the given stream
+     *
+     * @param testSuiteName the name of the test suite
+     * @param os            the destination stream
+     */
+    public void writeReport(String testSuiteName, OutputStream os) throws IOException {
+<span class="fc" id="L125">        Enumeration&lt;String&gt; e = testsExecuted.keys();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        while (e.hasMoreElements()) {</span>
+<span class="fc" id="L127">            String key = e.nextElement();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (testsExecuted.get(key)) {</span>
+<span class="fc" id="L129">                os.write((key + &quot; passed\n&quot;).getBytes());</span>
+            } else {
+<span class="fc" id="L131">                os.write((key + &quot; failed\n&quot;).getBytes());</span>
+            }
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">    }</span>
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #writeReport(String, OutputStream)}
+     */
+    public void writeReport(OutputStream os) throws IOException {
+<span class="nc" id="L140">    }</span>
+
+    /**
+     * Callback to indicate the test execution has finished allowing
+     * for a report to be generated if appropriate
+     */
+    public void testExecutionFinished(String testSuiteName) {
+        // Call the legacy method in case it has been overridden by a subclass
+<span class="fc" id="L148">        testExecutionFinished();</span>
+<span class="fc" id="L149">    }</span>
+
+    /**
+     * @deprecated this method is no longer invoked by the testing framework; please use {@link #testExecutionFinished(String)}
+     */
+    @SuppressWarnings(&quot;DeprecatedIsStillUsed&quot;)
+    public void testExecutionFinished() {
+<span class="nc" id="L156">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

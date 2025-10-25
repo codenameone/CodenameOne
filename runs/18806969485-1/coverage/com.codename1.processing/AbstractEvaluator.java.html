@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">AbstractEvaluator.java</span></div><h1>AbstractEvaluator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+import com.codename1.util.StringUtil;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * Private class, do not use.
+ * &lt;p&gt;
+ * An abstract predicate evaluator handles common tasks of breaking the
+ * expression down to lvalue, rvalue, and comparator, then calling the
+ * appropriate abstracted method with the result.
+ * &lt;p&gt;
+ * Example predicates:
+ *
+ * &lt;code&gt;
+ * Test price attribute:
+ * &lt;p&gt;
+ * [@price &gt; 45]
+ * &lt;p&gt;
+ * Test Child node:
+ * &lt;p&gt;
+ * [town='Exeter']
+ * &lt;p&gt;
+ * Test attribute exists
+ * &lt;p&gt;
+ * [@price]
+ * &lt;p&gt;
+ * Test attribute doesn't exist:
+ * &lt;p&gt;
+ * [@price = null]
+ * &lt;p&gt;
+ * Select by index:
+ * &lt;p&gt;
+ * [3]
+ * &lt;p&gt;
+ * Select by position:
+ * &lt;p&gt;
+ * [position() &lt; 5]
+ * &lt;p&gt;
+ * Select by position:
+ * &lt;p&gt;
+ * [last() - 5]
+ * &lt;/code&gt;
+ *
+ * @author Eric Coolman
+ */
+abstract class AbstractEvaluator implements Evaluator {
+
+    private final String expr;
+
+    /**
+     * Construct with the full predicate expression.
+     *
+     * @param expr The full predicate expression
+     */
+<span class="fc" id="L81">    protected AbstractEvaluator(String expr) {</span>
+<span class="fc" id="L82">        this.expr = expr;</span>
+<span class="fc" id="L83">    }</span>
+
+    /**
+     * Evaluate the predicate expression against a given element.
+     *
+     * @param element the element to apply predicate against.
+     */
+    public Object evaluate(StructuredContent element) {
+<span class="nc" id="L91">        return _evaluate(element);</span>
+    }
+
+    /**
+     * Evaluate the predicate expression against an array of elements.
+     *
+     * @param elements an array of elements to apply predicate against.
+     */
+    public Object evaluate(List elements) {
+<span class="fc" id="L100">        return _evaluate(elements);</span>
+    }
+
+    /**
+     * This internal method takes care of determining the style of expression
+     * (less-than, greater-than, equals, etc), and passing on the to next
+     * internal processor.
+     *
+     * @param element source element, either a List or StructuredContent
+     * @return either a List or StructuredContent
+     * @throws ResultException
+     * @see {@link #_evaluate(Object, int)}
+     * @see #_evaluateSingle(Object)
+     */
+    private Object _evaluate(Object element) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (element == null) {</span>
+<span class="nc" id="L116">            return null;</span>
+        }
+<span class="fc" id="L118">        int index = expr.indexOf(&quot;=&quot;);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L120">            return _evaluate(element, index);</span>
+        }
+<span class="fc" id="L122">        index = expr.indexOf(&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L124">            return _evaluate(element, index);</span>
+        }
+<span class="fc" id="L126">        index = expr.indexOf(&quot;&lt;&quot;);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L128">            return _evaluate(element, index);</span>
+        }
+<span class="fc" id="L130">        index = expr.indexOf(&quot;%&quot;);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L132">            return _evaluate(element, index);</span>
+        }
+<span class="fc" id="L134">        return _evaluateSingle(element);</span>
+
+    }
+
+    /**
+     * This internal method handles breaking down an expression into it's
+     * components (lvalue, rvalue, comparand), and then passing along to the
+     * next internal processor.
+     *
+     * @param element either a List or a StructuredContent object
+     * @param index   pointer to the comparator within the predicate expression
+     * @return either a List or a StructuredContent object
+     * @see #_evaluateLeftEqualsRight(Object, String, String)
+     * @see #_evaluateLeftGreaterRight(Object, String, String)
+     * @see #_evaluateLeftLessRight(Object, String, String)
+     */
+    private Object _evaluate(Object element, int index) {
+<span class="fc" id="L151">        String lvalue = expr.substring(0, index).trim();</span>
+<span class="fc" id="L152">        String rvalue = expr.substring(index + 1).trim();</span>
+<span class="fc" id="L153">        char comparator = expr.charAt(index);</span>
+<span class="pc bpc" id="L154" title="1 of 5 branches missed.">        switch (comparator) {</span>
+            case '=':
+<span class="fc" id="L156">                return _evaluateLeftEqualsRight(element, lvalue, rvalue);</span>
+            case '&gt;':
+<span class="fc" id="L158">                return _evaluateLeftGreaterRight(element, lvalue, rvalue);</span>
+            case '&lt;':
+<span class="fc" id="L160">                return _evaluateLeftLessRight(element, lvalue, rvalue);</span>
+            case '%':
+<span class="fc" id="L162">                return _evaluateLeftContainsRight(element, lvalue, rvalue);</span>
+        }
+<span class="nc" id="L164">        return null;</span>
+    }
+
+    /**
+     * This internal method simply makes a type safe call the the proper
+     * abstract method based on the type of element passed.
+     *
+     * @param element either a StructuredContent or List object.
+     * @param lvalue  lvalue of predicate expression
+     * @param rvalue  rvalue of predicate expression
+     * @return either a StructuredContent or List object.
+     * @see #evaluateLeftLessRight(StructuredContent, String, String)
+     * @see #evaluateLeftLessRight(List, String, String)
+     */
+    private Object _evaluateLeftLessRight(Object element, String lvalue,
+                                          String rvalue) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L181">            return evaluateLeftLessRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L183">            return evaluateLeftLessRight((StructuredContent) element, lvalue,</span>
+                    rvalue);
+        }
+    }
+
+    /**
+     * This internal method simply makes a type safe call the the proper
+     * abstract method based on the type of element passed.
+     *
+     * @param element either a StructuredContent or List object.
+     * @param lvalue  lvalue of predicate expression
+     * @param rvalue  rvalue of predicate expression
+     * @return either a StructuredContent or List object.
+     * @see #evaluateLeftGreaterRight(StructuredContent, String, String)
+     * @see #evaluateLeftGreaterRight(List, String, String)
+     */
+    private Object _evaluateLeftGreaterRight(Object element, String lvalue,
+                                             String rvalue) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L202">            return evaluateLeftGreaterRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L204">            return evaluateLeftGreaterRight((StructuredContent) element,</span>
+                    lvalue, rvalue);
+        }
+    }
+
+    /**
+     * This internal method simply makes a type safe call the the proper
+     * abstract method based on the type of element passed.
+     *
+     * @param element either a StructuredContent or List object.
+     * @param lvalue  lvalue of predicate expression
+     * @param rvalue  rvalue of predicate expression
+     * @return either a StructuredContent or List object.
+     * @see #evaluateLeftEqualsRight(List, String, String)
+     * @see #evaluateLeftEqualsRight(StructuredContent, String, String)
+     */
+    private Object _evaluateLeftEqualsRight(Object element, String lvalue,
+                                            String rvalue) {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L223">            return evaluateLeftEqualsRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L225">            return evaluateLeftEqualsRight((StructuredContent) element, lvalue,</span>
+                    rvalue);
+        }
+    }
+
+    /**
+     * This internal method simply makes a type safe call the the proper
+     * abstract method based on the type of element passed.
+     *
+     * @param element either a StructuredContent or List object.
+     * @param lvalue  lvalue of predicate expression
+     * @param rvalue  rvalue of predicate expression
+     * @return either a StructuredContent or List object.
+     * @see #evaluateLeftContainsRight(List, String, String)
+     * @see #evaluateLeftContainsRight(StructuredContent, String, String)
+     */
+    private Object _evaluateLeftContainsRight(Object element, String lvalue,
+                                              String rvalue) {
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L244">            return evaluateLeftContainsRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L246">            return evaluateLeftContainsRight((StructuredContent) element, lvalue,</span>
+                    rvalue);
+        }
+    }
+
+    /**
+     * This internal method simply makes a type safe call the the proper
+     * abstract method based on the type of element passed.
+     *
+     * @param element either a StructuredContent or List object.
+     * @param lvalue  lvalue of predicate expression
+     * @param rvalue  rvalue of predicate expression
+     * @return either a StructuredContent or List object.
+     * @see #evaluateSingle(StructuredContent, String)
+     * @see #evaluateSingle(List, String)
+     */
+    private Object _evaluateSingle(Object element) {
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L264">            return evaluateSingle((List) element, expr);</span>
+        } else {
+<span class="nc" id="L266">            return evaluateSingle((StructuredContent) element, expr);</span>
+        }
+    }
+
+    /**
+     * Utility method for subclasses to determine if an entire string is digits
+     *
+     * @param text value to test
+     * @return true of the value contains only digits.
+     */
+    protected boolean isNumeric(String text) {
+<span class="fc" id="L277">        text = text.trim();</span>
+<span class="fc" id="L278">        int tlen = text.length();</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        for (int i = 0; i &lt; tlen; i++) {</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (!Character.isDigit(text.charAt(i))) {</span>
+<span class="fc" id="L281">                return false;</span>
+            }
+        }
+<span class="fc" id="L284">        return true;</span>
+    }
+
+    /**
+     * Utility method for subclasses to determine strip single/double quotes
+     * from a string
+     *
+     * @param text value to transform
+     * @return the value without quotes.
+     */
+    protected String stripQuotes(String rvalue) {
+<span class="fc" id="L295">        StringBuffer buf = new StringBuffer();</span>
+<span class="fc" id="L296">        int rvlen = rvalue.length();</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (int i = 0; i &lt; rvlen; i++) {</span>
+<span class="fc" id="L298">            char ch = rvalue.charAt(i);</span>
+<span class="pc bpc" id="L299" title="1 of 4 branches missed.">            if (ch != '\'' &amp;&amp; ch != '\&quot;') {</span>
+<span class="fc" id="L300">                buf.append(ch);</span>
+            }
+        }
+<span class="fc" id="L303">        return buf.toString();</span>
+    }
+
+    /**
+     * Utility method for subclasses to convert a string to an array, delimited
+     * by comma, optionally enclosed in brackets, and elements optionally
+     * enclosed in quotes.
+     *
+     * @param text value to transform
+     * @return the value as an array.
+     */
+    protected String[] explode(String arrayAsString) {
+<span class="fc" id="L315">        arrayAsString = arrayAsString.trim();</span>
+<span class="pc bpc" id="L316" title="1 of 4 branches missed.">        if (arrayAsString.startsWith(&quot;(&quot;) &amp;&amp; arrayAsString.endsWith(&quot;)&quot;)) {</span>
+<span class="fc" id="L317">            arrayAsString = arrayAsString.substring(1, arrayAsString.length() - 1);</span>
+        }
+<span class="fc" id="L319">        List v = StringUtil.tokenizeString(arrayAsString, ',');</span>
+<span class="fc" id="L320">        String[] a = new String[v.size()];</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        for (int i = 0; i &lt; v.size(); i++) {</span>
+<span class="fc" id="L322">            a[i] = stripQuotes(v.get(i).toString().trim());</span>
+        }
+<span class="fc" id="L324">        return a;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression with no
+     * comparator.
+     *
+     * @param element a single StructuredContent element
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateSingle(StructuredContent element, String expr) {
+<span class="nc" id="L337">        return null;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression with no
+     * comparator. By default, this implementation will call evaluateSingle()
+     * against each element of the array, and return an array of all elements
+     * that didn't return null.
+     *
+     * @param element an array of StructuredContent elements
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateSingle(List elements, String expr) {
+        List array;
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="nc" id="L354">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L356">            array = new ArrayList();</span>
+        }
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        for (Iterator e = elements.iterator(); e.hasNext(); ) {</span>
+<span class="nc" id="L359">            Object o = e.next();</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                if ((o = evaluateSingle((StructuredContent) o, expr)) != null) {</span>
+<span class="nc" id="L362">                    array.add(o);</span>
+                }
+            }
+<span class="nc" id="L365">        }</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        if (array.size() == 1) {</span>
+<span class="nc" id="L367">            return array.get(0);</span>
+        }
+<span class="nc" id="L369">        return array;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue &lt; rvalue. By default, this implementation will call
+     * evaluateLeftLessRight() against each element of the array, and return an
+     * array of all elements that didn't return null.
+     *
+     * @param element an array of StructuredContent elements
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftLessRight(List elements, String lvalue,
+                                           String rvalue) {
+        List array;
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="nc" id="L387">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L389">            array = new ArrayList();</span>
+        }
+
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        for (Iterator e = elements.iterator(); e.hasNext(); ) {</span>
+<span class="nc" id="L393">            Object o = e.next();</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                if ((o = evaluateLeftLessRight((StructuredContent) o, lvalue, rvalue)) != null) {</span>
+<span class="nc" id="L396">                    array.add(o);</span>
+                }
+            }
+<span class="nc" id="L399">        }</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        if (array.size() == 1) {</span>
+<span class="nc" id="L401">            return array.get(0);</span>
+        }
+<span class="nc" id="L403">        return array;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue &lt; rvalue.
+     *
+     * @param element a single StructuredContent element
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftLessRight(StructuredContent element,
+                                           String lvalue, String rvalue) {
+<span class="nc" id="L417">        return null;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue &gt; rvalue. By default, this implementation will call
+     * evaluateLeftGreaterRight() against each element of the array, and return
+     * an array of all elements that didn't return null.
+     *
+     * @param element an array of StructuredContent elements
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftGreaterRight(List elements, String lvalue,
+                                              String rvalue) {
+        List array;
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="nc" id="L435">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L437">            array = new ArrayList();</span>
+        }
+
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        for (Iterator e = elements.iterator(); e.hasNext(); ) {</span>
+<span class="nc" id="L441">            Object o = e.next();</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                if ((o = evaluateLeftGreaterRight((StructuredContent) o, lvalue, rvalue)) != null) {</span>
+<span class="nc" id="L444">                    array.add(o);</span>
+                }
+            }
+<span class="nc" id="L447">        }</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        if (array.size() == 1) {</span>
+<span class="nc" id="L449">            return array.get(0);</span>
+        }
+<span class="nc" id="L451">        return array;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue &gt; rvalue.
+     *
+     * @param element a single StructuredContent element
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftGreaterRight(StructuredContent element,
+                                              String lvalue, String rvalue) {
+<span class="nc" id="L465">        return null;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue = rvalue. By default, this implementation will call
+     * evaluateLeftEqualsRight() against each element of the array, and return
+     * an array of all elements that didn't return null.
+     *
+     * @param element an array of StructuredContent elements
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftEqualsRight(List elements, String lvalue,
+                                             String rvalue) {
+        List array;
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="fc" id="L483">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L485">            array = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        for (Iterator e = elements.iterator(); e.hasNext(); ) {</span>
+<span class="fc" id="L489">            Object o = e.next();</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="fc bfc" id="L491" title="All 2 branches covered.">                if ((o = evaluateLeftEqualsRight((StructuredContent) o, lvalue, rvalue)) != null) {</span>
+<span class="fc" id="L492">                    array.add(o);</span>
+                }
+            }
+<span class="fc" id="L495">        }</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">        if (array.size() == 1) {</span>
+<span class="fc" id="L497">            return array.get(0);</span>
+        }
+<span class="nc" id="L499">        return array;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue = rvalue.
+     *
+     * @param element a single StructuredContent element
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftEqualsRight(StructuredContent element,
+                                             String lvalue, String rvalue) {
+<span class="nc" id="L513">        return null;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue % rvalue. By default, this implementation will call
+     * evaluateLeftContainsRight() against each element of the array, and return
+     * an array of all elements that didn't return null.
+     *
+     * @param element an array of StructuredContent elements
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftContainsRight(List elements, String lvalue,
+                                               String rvalue) {
+        List array;
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="fc" id="L531">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L533">            array = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L536" title="All 2 branches covered.">        for (Iterator e = elements.iterator(); e.hasNext(); ) {</span>
+<span class="fc" id="L537">            Object o = e.next();</span>
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">                if ((o = evaluateLeftContainsRight((StructuredContent) o, lvalue, rvalue)) != null) {</span>
+<span class="fc" id="L540">                    array.add(o);</span>
+                }
+            }
+<span class="fc" id="L543">        }</span>
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">        if (array.size() == 1) {</span>
+<span class="fc" id="L545">            return array.get(0);</span>
+        }
+<span class="nc" id="L547">        return array;</span>
+    }
+
+    /**
+     * Override this element to handle testing a predicate expression where
+     * lvalue % rvalue.
+     *
+     * @param element a single StructuredContent element
+     * @param expr    the full predicate expression
+     * @return either a single StructuredContent or an array (List) of
+     * StructuredContent object.
+     */
+    protected Object evaluateLeftContainsRight(StructuredContent element,
+                                               String lvalue, String rvalue) {
+<span class="nc" id="L561">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

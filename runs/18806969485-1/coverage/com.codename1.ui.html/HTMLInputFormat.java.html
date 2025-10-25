@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTMLInputFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">HTMLInputFormat.java</span></div><h1>HTMLInputFormat.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Enumeration;
+import java.util.Vector;
+
+/**
+ * This class implements HTML's input format restrictions.
+ * These restrictions can be provided in the FORMAT attribute of the INPUT tag and are relevant for textfields.
+ * However as the FORMAT tag was deprectaed it is more standard to supply them in the '-wap-input-format' of the input field CSS or Style.
+ *
+ * @author Ofir Leitner
+ */
+class HTMLInputFormat {
+
+    /**
+     * The allowed literals in an input format defintion
+     */
+<span class="nc" id="L45">    private static final char[] literals = {'a', 'A', 'n', 'N', 'x', 'X', 'm', 'M'};</span>
+
+    /**
+     * The matching allowed character set for each literal
+     */
+<span class="nc" id="L50">    private static final int[] literalConstraints =</span>
+            {FormatConstraint.TYPE_LOWERCASE | FormatConstraint.TYPE_SYMBOL,
+                    FormatConstraint.TYPE_UPPERCASE | FormatConstraint.TYPE_SYMBOL,
+                    FormatConstraint.TYPE_NUMERIC | FormatConstraint.TYPE_SYMBOL,
+                    FormatConstraint.TYPE_NUMERIC,
+                    FormatConstraint.TYPE_LOWERCASE | FormatConstraint.TYPE_NUMERIC | FormatConstraint.TYPE_SYMBOL,
+                    FormatConstraint.TYPE_UPPERCASE | FormatConstraint.TYPE_NUMERIC | FormatConstraint.TYPE_SYMBOL,
+                    FormatConstraint.TYPE_LOWERCASE | FormatConstraint.TYPE_ANY,
+                    FormatConstraint.TYPE_UPPERCASE | FormatConstraint.TYPE_ANY
+            };
+
+    private int minLength;
+    private int maxLength;
+<span class="nc" id="L63">    private final Vector formatConstraints = new Vector();</span>
+
+
+    /**
+     * A private constructor, to obtain an HTMLInputFormat object use HTMLInputFormat.getInputFormat
+     *
+     * @param formatString The string representing the format defintion (As taken from the HTML/CSS)
+     */
+<span class="nc" id="L71">    private HTMLInputFormat(String formatString) {</span>
+<span class="nc" id="L72">        String count = &quot;&quot;;</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        for (int i = 0; i &lt; formatString.length(); i++) {</span>
+<span class="nc" id="L74">            char c = formatString.charAt(i);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (c == '*') {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                if (!count.equals(&quot;&quot;)) {</span>
+<span class="nc" id="L77">                    throw new IllegalArgumentException(&quot;Malformed format string. The wildcard * can't appear after any other count indicator.&quot;);</span>
+                } else {
+<span class="nc" id="L79">                    count += c;</span>
+                }
+<span class="nc bnc" id="L81" title="All 4 branches missed.">            } else if ((c &gt;= '0') &amp;&amp; (c &lt;= '9')) {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                if (count.equals(&quot;*&quot;)) {</span>
+<span class="nc" id="L83">                    throw new IllegalArgumentException(&quot;Malformed format string. Count indicators cannot appear after the wildcard *&quot;);</span>
+                } else {
+<span class="nc" id="L85">                    count += c;</span>
+                }
+            } else {
+<span class="nc" id="L88">                int constraint = -1;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                for (int j = 0; j &lt; literals.length; j++) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                    if (c == literals[j]) {</span>
+<span class="nc" id="L91">                        constraint = literalConstraints[j];</span>
+<span class="nc" id="L92">                        break;</span>
+                    }
+                }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                if (constraint == -1) {</span>
+<span class="nc" id="L96">                    throw new IllegalArgumentException(&quot;Malformed format string. Unrecognized literal &quot; + c);</span>
+                }
+<span class="nc" id="L98">                FormatConstraint fc = new FormatConstraint(constraint, count);</span>
+<span class="nc" id="L99">                formatConstraints.addElement(fc);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                if (maxLength != Integer.MAX_VALUE) {</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                    if (fc.count == FormatConstraint.COUNT_EXACTLY_ONE) {</span>
+<span class="nc" id="L102">                        maxLength++;</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                    } else if (fc.count == FormatConstraint.COUNT_NO_LIMIT) {</span>
+<span class="nc" id="L104">                        maxLength = Integer.MAX_VALUE;</span>
+                    } else {
+<span class="nc" id="L106">                        maxLength += fc.count;</span>
+                    }
+                }
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (fc.count == FormatConstraint.COUNT_EXACTLY_ONE) {</span>
+<span class="nc" id="L110">                    minLength++;</span>
+                }
+
+<span class="nc" id="L113">                count = &quot;&quot;;</span>
+
+            }
+        }
+<span class="nc" id="L117">    }</span>
+
+    /**
+     * This static method is used to create an HTMLInputFormat
+     *
+     * @param formatString The string representing the format defintion (As taken from the HTML/CSS)
+     * @return An HTMLInputFormat object containing all the constraints or null if there are none or if the string is invalid
+     */
+    static HTMLInputFormat getInputFormat(String formatString) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (formatString == null) {</span>
+<span class="nc" id="L127">            return null;</span>
+        }
+        try {
+<span class="nc" id="L130">            HTMLInputFormat format = new HTMLInputFormat(formatString);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (format.formatConstraints.size() == 0) {</span>
+<span class="nc" id="L132">                return null;</span>
+            }
+<span class="nc" id="L134">            return format;</span>
+<span class="nc" id="L135">        } catch (Exception e) {</span>
+<span class="nc" id="L136">            System.out.println(e.getMessage() + &quot; at input format string &quot; + formatString);</span>
+<span class="nc" id="L137">            return null;</span>
+        }
+    }
+
+    /**
+     * Applies the constrains represented by this object to the given TextArea.
+     * After invoking this method the returned TextArea should be used as restrictions are made sometimes on a new object.
+     * In case this is a TextField, this method will also set the input modes as needed.
+     *
+     * @param ta The TextArea to apply the constraints on.
+     * @return An instance of TextArea (Either the given one or a new one) with the constraints.
+     */
+    TextArea applyConstraints(TextArea ta) {
+<span class="nc" id="L150">        int widestConstraint = 0;</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        for (Enumeration e = formatConstraints.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L152">            FormatConstraint constraint = (FormatConstraint) e.nextElement();</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            for (int i = 1; i &lt;= 16; i *= 2) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                if ((constraint.type &amp; i) != 0) {</span>
+<span class="nc" id="L155">                    widestConstraint |= i;</span>
+                }
+            }
+<span class="nc" id="L158">        }</span>
+
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (maxLength != Integer.MAX_VALUE) {</span>
+<span class="nc" id="L161">            ta.setMaxSize(maxLength);</span>
+        }
+
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (widestConstraint == FormatConstraint.TYPE_NUMERIC) {</span>
+<span class="nc" id="L165">            ta.setConstraint(ta.getConstraint() | TextArea.NUMERIC);</span>
+        }
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (ta instanceof TextField) {</span>
+<span class="nc" id="L168">            TextField tf = (TextField) ta;</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">            if (((widestConstraint &amp; FormatConstraint.TYPE_SYMBOL) == 0) &amp;&amp; ((widestConstraint &amp; FormatConstraint.TYPE_ANY) == 0)) { // No symbols allowed</span>
+<span class="nc" id="L170">                tf = new TextField(ta.getText()) {</span>
+                    protected void showSymbolDialog() { // Block symbols dialog
+<span class="nc" id="L172">                    }</span>
+                };
+<span class="nc" id="L174">                tf.setConstraint(ta.getConstraint());</span>
+<span class="nc" id="L175">                ta = tf;</span>
+            }
+
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if ((widestConstraint &amp; FormatConstraint.TYPE_ANY) != 0) {</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                if ((widestConstraint &amp; FormatConstraint.TYPE_UPPERCASE) != 0) {</span>
+<span class="nc" id="L180">                    tf.setInputMode(&quot;ABC&quot;);</span>
+                } else {
+<span class="nc" id="L182">                    tf.setInputMode(&quot;abc&quot;);</span>
+                }
+            } else {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                if ((widestConstraint &amp; FormatConstraint.TYPE_LOWERCASE) == 0) {</span>
+<span class="nc" id="L186">                    excludeInputMode(tf, &quot;abc&quot;);</span>
+<span class="nc" id="L187">                    excludeInputMode(tf, &quot;Abc&quot;);</span>
+                }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                if ((widestConstraint &amp; FormatConstraint.TYPE_UPPERCASE) == 0) {</span>
+<span class="nc" id="L190">                    excludeInputMode(tf, &quot;ABC&quot;);</span>
+<span class="nc" id="L191">                    excludeInputMode(tf, &quot;Abc&quot;);</span>
+                }
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                if ((widestConstraint &amp; FormatConstraint.TYPE_NUMERIC) == 0) {</span>
+<span class="nc" id="L194">                    excludeInputMode(tf, &quot;123&quot;);</span>
+                }
+            }
+
+        }
+<span class="nc" id="L199">        return ta;</span>
+
+    }
+
+    /**
+     * Excludes the given input mode from the given TextField
+     *
+     * @param tf            The TextField to work on
+     * @param modeToExclude The mode to exclude
+     */
+    private void excludeInputMode(TextField tf, String modeToExclude) {
+<span class="nc" id="L210">        String[] curModes = tf.getInputModeOrder();</span>
+<span class="nc" id="L211">        String[] newModes = new String[curModes.length - 1];</span>
+<span class="nc" id="L212">        int j = 0;</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        for (int i = 0; i &lt; curModes.length; i++) {</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            if (!curModes[i].equals(modeToExclude)) {</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                if (j &lt; newModes.length) {</span>
+<span class="nc" id="L216">                    newModes[j] = curModes[i];</span>
+<span class="nc" id="L217">                    j++;</span>
+                } else {
+<span class="nc" id="L219">                    return; //Mode was not there in the first place</span>
+                }
+            }
+        }
+<span class="nc" id="L223">        tf.setInputModeOrder(newModes);</span>
+<span class="nc" id="L224">    }</span>
+
+    /**
+     * Verifies that the given String conforms to the constraints represented by this object.
+     *
+     * @param str The string to verify
+     * @return true if the string is valid, false otherwise.
+     */
+    boolean verifyString(String str) {
+<span class="nc bnc" id="L233" title="All 4 branches missed.">        if ((str.length() &gt; maxLength) || (str.length() &lt; minLength)) {</span>
+<span class="nc" id="L234">            return false;</span>
+        }
+<span class="nc" id="L236">        int i = 0;</span>
+<span class="nc" id="L237">        Enumeration e = formatConstraints.elements();</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (!str.equals(&quot;&quot;)) {</span>
+<span class="nc" id="L239">            char c = str.charAt(i);</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            while (e.hasMoreElements()) {</span>
+<span class="nc" id="L241">                FormatConstraint constraint = (FormatConstraint) e.nextElement();</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                if (constraint.count == FormatConstraint.COUNT_EXACTLY_ONE) {</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                    if (!verifyChar(c, constraint.type)) {</span>
+<span class="nc" id="L244">                        return false;</span>
+                    }
+<span class="nc" id="L246">                    i++;</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                    if (i &lt; str.length()) {</span>
+<span class="nc" id="L248">                        c = str.charAt(i);</span>
+                    } else {
+                        break;
+                    }
+                } else {
+<span class="nc" id="L253">                    int charNum = 0;</span>
+<span class="nc bnc" id="L254" title="All 4 branches missed.">                    while ((i &lt; str.length()) &amp;&amp; (charNum &lt; constraint.count)) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                        if (!verifyChar(c, constraint.type)) {</span>
+                            // Note that if a char doesn't apply to the current constraint it might conform to the next one (since we are in an
+                            // &quot;up to X chars&quot; count, so perhaps from the current constraint segment there are less chars, this is why we don't
+                            // fail, but break out, and let the char be compared against the next constraint
+<span class="nc" id="L259">                            break;</span>
+                        }
+<span class="nc" id="L261">                        i++;</span>
+<span class="nc" id="L262">                        charNum++;</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                        if (i &lt; str.length()) {</span>
+<span class="nc" id="L264">                            c = str.charAt(i);</span>
+                        } else {
+                            break;
+                        }
+                    }
+
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                    if (i &gt;= str.length()) {</span>
+<span class="nc" id="L271">                        break;</span>
+                    }
+                }
+<span class="nc" id="L274">            }</span>
+
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            if (i &lt; str.length()) { // Chars left that are not covered by any constraint</span>
+<span class="nc" id="L277">                return false;</span>
+            }
+        }
+
+        // All chars covered, but more perhaps more constraints are still available
+        // They will be checked to see if anyone forces to have one more char and if so fail the verification
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        while (e.hasMoreElements()) {</span>
+<span class="nc" id="L284">            FormatConstraint constraint = (FormatConstraint) e.nextElement();</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            if (constraint.count == FormatConstraint.COUNT_EXACTLY_ONE) {</span>
+<span class="nc" id="L286">                return false;</span>
+            }
+<span class="nc" id="L288">        }</span>
+
+<span class="nc" id="L290">        return true;</span>
+    }
+
+    /**
+     * Verifies the given character. THis method is used by verifyString on each char
+     *
+     * @param c          The char to verify
+     * @param constraint The constraint to verify againts
+     * @return true if the char conforms to the given constraint, false otherwise
+     */
+    private boolean verifyChar(char c, int constraint) {
+<span class="nc bnc" id="L301" title="All 20 branches missed.">        if (((constraint &amp; FormatConstraint.TYPE_ANY) != 0) ||</span>
+                (((constraint &amp; FormatConstraint.TYPE_NUMERIC) != 0) &amp;&amp; (c &gt;= '0') &amp;&amp; (c &lt;= '9')) ||
+                (((constraint &amp; FormatConstraint.TYPE_UPPERCASE) != 0) &amp;&amp; (c &gt;= 'A') &amp;&amp; (c &lt;= 'Z')) ||
+                (((constraint &amp; FormatConstraint.TYPE_LOWERCASE) != 0) &amp;&amp; (c &gt;= 'a') &amp;&amp; (c &lt;= 'z'))) {
+<span class="nc" id="L305">            return true;</span>
+        }
+
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if ((constraint &amp; FormatConstraint.TYPE_SYMBOL) != 0) {</span>
+<span class="nc" id="L309">            char[] symbols = TextField.getSymbolTable();</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            for (int i = 0; i &lt; symbols.length; i++) {</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                if (symbols[i] == c) {</span>
+<span class="nc" id="L312">                    return true;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L317">        return false;</span>
+    }
+
+    /**
+     * A printout of a user-friendly string describing the format
+     *
+     * @return a printout of a user-friendly string describing the format
+     */
+    public String toString() {
+<span class="nc" id="L326">        String str = &quot;&quot;;</span>
+<span class="nc" id="L327">        String followedBy = &quot;&quot;;</span>
+<span class="nc" id="L328">        int lastType = -1;</span>
+<span class="nc" id="L329">        String lastString = &quot;&quot;;</span>
+<span class="nc" id="L330">        int singlesCount = 0;</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        for (Enumeration e = formatConstraints.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L332">            FormatConstraint constraint = (FormatConstraint) e.nextElement();</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            if (constraint.count == FormatConstraint.COUNT_EXACTLY_ONE) {</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                if (lastType != -1) {</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">                    if (lastType != constraint.type) {</span>
+<span class="nc" id="L336">                        str += followedBy + singlesCount + lastString;</span>
+<span class="nc" id="L337">                        followedBy = &quot; followed by &quot;;</span>
+<span class="nc" id="L338">                        singlesCount = 1;</span>
+<span class="nc" id="L339">                        lastType = constraint.type;</span>
+<span class="nc" id="L340">                        lastString = constraint.toString();</span>
+                    } else {
+<span class="nc" id="L342">                        singlesCount++;</span>
+                    }
+                } else { //lastType==-1
+<span class="nc" id="L345">                    lastType = constraint.type;</span>
+<span class="nc" id="L346">                    lastString = constraint.toString();</span>
+<span class="nc" id="L347">                    singlesCount = 1;</span>
+                }
+            } else {
+<span class="nc bnc" id="L350" title="All 2 branches missed.">                if (lastType != -1) {</span>
+<span class="nc" id="L351">                    str += followedBy + singlesCount + lastString;</span>
+<span class="nc" id="L352">                    followedBy = &quot; followed by &quot;;</span>
+<span class="nc" id="L353">                    lastType = -1;</span>
+<span class="nc" id="L354">                    singlesCount = 0;</span>
+<span class="nc" id="L355">                    lastString = &quot;&quot;;</span>
+                }
+<span class="nc" id="L357">                str += followedBy + constraint;</span>
+<span class="nc" id="L358">                followedBy = &quot; followed by &quot;;</span>
+
+            }
+
+
+<span class="nc" id="L363">        }</span>
+
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (lastType != -1) {</span>
+<span class="nc" id="L366">            str += followedBy + singlesCount + lastString;</span>
+        }
+
+<span class="nc" id="L369">        return str;</span>
+    }
+
+    // Inner classes:
+
+    /**
+     * This class reprensents a single constraint on an input field
+     * The HTMLInputFormat breaks down the format string into 1 or more FormatConstraint objects
+     * &lt;p&gt;
+     * Each constraint is represented by a type and a count.
+     * The type indicated which typs of characters are allows and can be one or more of the TYPE_* constants ORed together.
+     * The count is either a number that indicates we allow up to this count or one of the COUNT_* constants (See below)
+     *
+     * @author Ofir Leitner
+     */
+    class FormatConstraint {
+
+        /**
+         * All lowercase english letters are allowed
+         */
+        static final int TYPE_LOWERCASE = 1;
+
+        /**
+         * All uppercase english letters are allowed
+         */
+        static final int TYPE_UPPERCASE = 2;
+
+        /**
+         * All numbers are allowed
+         */
+        static final int TYPE_NUMERIC = 4;
+
+        /**
+         * Symbols according to the TextField symbols table are allowed
+         */
+        static final int TYPE_SYMBOL = 8;
+
+        /**
+         * All characters are allowed
+         */
+        static final int TYPE_ANY = 16;
+
+        /**
+         * A constant representing that there must be one and one only of this type
+         */
+        static final int COUNT_EXACTLY_ONE = Integer.MIN_VALUE;
+
+        /**
+         * A constant representing that there can be 0 or more of this type
+         */
+        static final int COUNT_NO_LIMIT = Integer.MAX_VALUE;
+
+        int type;
+        int count;
+
+        /**
+         * The constructor which converts the count string into an integer or one of the COUNT_* constants above
+         *
+         * @param type     The constraint type (one or more of the TYPE_* constants ORed together)
+         * @param countStr A string representing the constraint count
+         */
+<span class="nc" id="L430">        FormatConstraint(int type, String countStr) {</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">            if (countStr.equals(&quot;*&quot;)) {</span>
+<span class="nc" id="L432">                count = COUNT_NO_LIMIT;</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            } else if (countStr.equals(&quot;&quot;)) {</span>
+<span class="nc" id="L434">                count = COUNT_EXACTLY_ONE;</span>
+            } else {
+                try {
+<span class="nc" id="L437">                    count = Integer.parseInt(countStr);</span>
+<span class="nc" id="L438">                } catch (NumberFormatException nfe) {</span>
+<span class="nc" id="L439">                    System.out.println(&quot;Invalid FormatConstraint count &quot; + countStr);</span>
+<span class="nc" id="L440">                }</span>
+            }
+<span class="nc" id="L442">            this.type = type;</span>
+<span class="nc" id="L443">        }</span>
+
+        /**
+         * A printout of a user-friendly string describing this constraint
+         *
+         * @return a printout of a user-friendly string describing this constraint
+         */
+        public String toString() {
+<span class="nc" id="L451">            String str = &quot;&quot;;</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if (count == COUNT_EXACTLY_ONE) {</span>
+                //str+=&quot;&quot;;
+<span class="nc bnc" id="L454" title="All 2 branches missed.">            } else if (count == COUNT_NO_LIMIT) {</span>
+<span class="nc" id="L455">                str += UIManager.getInstance().localize(&quot;html.format.anynumber&quot;, &quot;any number of&quot;);</span>
+            } else {
+<span class="nc" id="L457">                str += UIManager.getInstance().localize(&quot;html.format.upto&quot;, &quot;up to&quot;) + &quot; &quot; + count;</span>
+            }
+<span class="nc" id="L459">            str += &quot; &quot;;</span>
+<span class="nc" id="L460">            String orString = &quot; &quot; + UIManager.getInstance().localize(&quot;html.format.or&quot;, &quot;or&quot;) + &quot; &quot;;</span>
+<span class="nc" id="L461">            String or = &quot;&quot;;</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">            if ((type &amp; TYPE_ANY) != 0) {</span>
+<span class="nc" id="L463">                str += &quot;any&quot;;</span>
+            } else {
+<span class="nc bnc" id="L465" title="All 2 branches missed.">                if ((type &amp; TYPE_LOWERCASE) != 0) {</span>
+<span class="nc" id="L466">                    str += UIManager.getInstance().localize(&quot;html.format.lowercase&quot;, &quot;lowercase&quot;);</span>
+<span class="nc" id="L467">                    or = orString;</span>
+                }
+<span class="nc bnc" id="L469" title="All 2 branches missed.">                if ((type &amp; TYPE_UPPERCASE) != 0) {</span>
+<span class="nc" id="L470">                    str += or + UIManager.getInstance().localize(&quot;html.format.uppercase&quot;, &quot;uppercase&quot;);</span>
+<span class="nc" id="L471">                    or = orString;</span>
+                }
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                if ((type &amp; TYPE_NUMERIC) != 0) {</span>
+<span class="nc" id="L474">                    str += or + UIManager.getInstance().localize(&quot;html.format.numeric&quot;, &quot;numeric&quot;);</span>
+<span class="nc" id="L475">                    or = orString;</span>
+                }
+<span class="nc bnc" id="L477" title="All 2 branches missed.">                if ((type &amp; TYPE_SYMBOL) != 0) {</span>
+<span class="nc" id="L478">                    str += or + UIManager.getInstance().localize(&quot;html.format.symbol&quot;, &quot;symbol&quot;);</span>
+                }
+            }
+<span class="nc" id="L481">            str += &quot; &quot;;</span>
+
+<span class="nc bnc" id="L483" title="All 4 branches missed.">            if ((count != COUNT_EXACTLY_ONE) &amp;&amp; (count != 1)) {</span>
+<span class="nc" id="L484">                str += UIManager.getInstance().localize(&quot;html.format.chars&quot;, &quot;characters&quot;);</span>
+            } else {
+<span class="nc" id="L486">                str += UIManager.getInstance().localize(&quot;html.format.char&quot;, &quot;character&quot;);</span>
+            }
+
+<span class="nc" id="L489">            return str;</span>
+        }
+
+    }
+
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
