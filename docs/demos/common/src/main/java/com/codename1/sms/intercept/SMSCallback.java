@@ -1,10 +1,10 @@
+// tag::smsCallback[]
 package com.codename1.sms.intercept; // <1>
 
 import com.codename1.util.FailureCallback;
 import com.codename1.util.SuccessCallback;
 import static com.codename1.ui.CN.*;
 
-// tag::smsCallback[]
 class SMSCallback {
     static SuccessCallback<String> onSuccess;
     static FailureCallback onFail;
