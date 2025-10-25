@@ -48,14 +48,11 @@ run_with_timeout() {
 wait_for_boot() {
   # wait_for_boot <udid> <timeout_seconds>
   local udid="$1" timeout="$2" waited=0
-  # Try to start boot if not already booted
   xcrun simctl boot "$udid" >/dev/null 2>&1 || true
   while (( waited < timeout )); do
-    # bootstatus -b: boot if needed; exit 0 when fully booted on newer Xcodes; otherwise fall back to parsing
     if xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1; then
       return 0
     fi
-    # Fallback check: look for "(Booted)" in device list
     if xcrun simctl list devices 2>/dev/null | grep -q "$udid" | grep -q 'Booted'; then
       return 0
     fi
@@ -89,10 +86,6 @@ if [ ! -d "$WORKSPACE_PATH" ]; then
   exit 3
 fi
 
-if [ -n "$APP_BUNDLE_PATH" ]; then
-  ri_log "Using simulator app bundle at $APP_BUNDLE_PATH"
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
@@ -101,10 +94,7 @@ CN1SS_MAIN_CLASS="Cn1ssChunkTools"
 PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
 RENDER_SCREENSHOT_REPORT_CLASS="RenderScreenshotReport"
 CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/android/tests"
-if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
-  ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
-  exit 3
-fi
+[ -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ] || { ri_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java"; exit 3; }
 
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 cn1ss_log() { ri_log "$1"; }
@@ -172,7 +162,7 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-# --- begin: robust destination selection (no Python) ---
+# --- begin: robust destination selection (text-only, no Python) ---
 dump_sim_info() {
   xcrun simctl list             > "$ARTIFACTS_DIR/simctl-list.txt"           2>&1 || true
   xcrun simctl list runtimes    > "$ARTIFACTS_DIR/sim-runtimes.txt"          2>&1 || true
@@ -182,7 +172,6 @@ dump_sim_info() {
 }
 
 pick_destination_from_showdestinations() {
-  # Prefer xcodebuild-proposed, real UUID (id: <uuid>), platform:iOS Simulator, prefer iPhone
   xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null | \
   awk '
     BEGIN{ FS="[, ]+"; best=""; }
@@ -201,18 +190,12 @@ pick_destination_from_showdestinations() {
 }
 
 pick_available_device_udid() {
-  # From simctl list devices available (text), pick first iPhone
   xcrun simctl list devices available 2>/dev/null | \
-  awk '
-    # Example: "iPhone 16 (18.5) [UDID] (Available)"
-    /[([]Available[])]/ && /iPhone/ && /\[/ {
-      gsub(/^.*\[/,""); gsub(/\].*$/,""); print; exit
-    }'
+  awk '/\[/ && /Available/ && /iPhone/ { sub(/^.*\[/,""); sub(/\].*$/,""); print; exit }'
 }
 
 create_temp_device_on_latest_runtime() {
-  # Find latest available iOS runtime identifier (text)
-  local rt
+  local rt dt name udid
   rt="$(xcrun simctl list runtimes 2>/dev/null | \
     awk '
       /iOS/ && /(Available|installed)/ {
@@ -224,14 +207,12 @@ create_temp_device_on_latest_runtime() {
         }
       }
     ' | sort | tail -n1 | cut -d"|" -f2)"
-  if [ -z "$rt" ]; then
-    echo ""
-    return 0
-  fi
-  # Prefer a modern iPhone device type if present
-  local dt
+  [ -n "$rt" ] || { echo ""; return; }
   dt="$(xcrun simctl list devicetypes 2>/dev/null | \
     awk -F '[()]' '
+      /iPhone 17 Pro Max/ {print $2; exit}
+      /iPhone 17 Pro/     {print $2; exit}
+      /iPhone 17/         {print $2; exit}
       /iPhone 16 Pro Max/ {print $2; exit}
       /iPhone 16 Pro/     {print $2; exit}
       /iPhone 16/         {print $2; exit}
@@ -240,50 +221,29 @@ create_temp_device_on_latest_runtime() {
       /iPhone 15/         {print $2; exit}
       /iPhone/            {print $2; exit}
     ' )"
-  [ -z "$dt" ] && dt="com.apple.CoreSimulator.SimDeviceType.iPhone-16"
-
-  local name="CN1 UI Test iPhone"
-  local udid
+  [ -n "$dt" ] || dt="com.apple.CoreSimulator.SimDeviceType.iPhone-16"
+  name="CN1 UI Test iPhone"
   udid="$(xcrun simctl create "$name" "$dt" "$rt" 2>/dev/null || true)"
-  if [ -n "$udid" ]; then
-    SIM_UDID_CREATED="$udid"
-    echo "$udid"
-  else
-    echo ""
-  fi
+  if [ -n "$udid" ]; then SIM_UDID_CREATED="$udid"; echo "$udid"; else echo ""; fi
 }
 
 dump_sim_info
 
 SIM_UDID=""
-# 1) Best: take what xcodebuild wants
 SIM_UDID="$(pick_destination_from_showdestinations || true)"
-if [ -n "$SIM_UDID" ]; then
-  ri_log "Chose simulator from xcodebuild -showdestinations: $SIM_UDID"
-fi
-
-# 2) Otherwise: any available iPhone device
-if [ -z "$SIM_UDID" ]; then
-  SIM_UDID="$(pick_available_device_udid || true)"
-  if [ -n "$SIM_UDID" ]; then
-    ri_log "Chose available simulator from simctl list: $SIM_UDID"
-  fi
-fi
-
-# 3) Last resort: create a temp device on the newest runtime
-if [ -z "$SIM_UDID" ]; then
-  SIM_UDID="$(create_temp_device_on_latest_runtime || true)"
-  if [ -n "$SIM_UDID" ]; then
-    ri_log "Created simulator for tests: $SIM_UDID"
-  fi
-fi
+[ -n "$SIM_UDID" ] && ri_log "Chose simulator from xcodebuild -showdestinations: $SIM_UDID"
+[ -n "$SIM_UDID" ] || SIM_UDID="$(pick_available_device_udid || true)"
+[ -n "$SIM_UDID" ] && ri_log "Chose available simulator from simctl list: $SIM_UDID"
+[ -n "$SIM_UDID" ] || SIM_UDID="$(create_temp_device_on_latest_runtime || true)"
+[ -n "$SIM_UDID" ] && ri_log "Created simulator for tests: $SIM_UDID"
 
 if [ -z "$SIM_UDID" ]; then
   ri_log "FATAL: No *available* iOS simulator runtime or device found on this runner"
   exit 3
 fi
 
-# Boot and wait (portable: no -t flag)
+# Clean, boot, wait
+xcrun simctl erase "$SIM_UDID" >/dev/null 2>&1 || true
 if ! wait_for_boot "$SIM_UDID" 180; then
   ri_log "FATAL: Simulator never reached booted state"
   echo "Usage: simctl bootstatus <device> [-bcd]"
@@ -311,56 +271,48 @@ if ! xcodebuild \
   -configuration Debug \
   -destination "$SIM_DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_DIR" \
+  ONLY_ACTIVE_ARCH=YES \
+  EXCLUDED_ARCHS_i386="i386" EXCLUDED_ARCHS_x86_64="x86_64" \
   build-for-testing | tee "$ARTIFACTS_DIR/xcodebuild-build.log"; then
   ri_log "STAGE:BUILD_FAILED -> See $ARTIFACTS_DIR/xcodebuild-build.log"
   exit 1
 fi
 
-# Prefer the product we just built; fall back to the optional arg2 if provided
-AUT_APP="$(/bin/ls -1d "$DERIVED_DATA_DIR"/Build/Products/Debug-iphonesimulator/*.app 2>/dev/null | head -n1 || true)"
+# Locate products we need
+AUT_APP="$(/bin/ls -1d "$DERIVED_DATA_DIR"/Build/Products/Debug-iphonesimulator/*.app 2>/dev/null | grep -v '\-Runner\.app$' | head -n1 || true)"
+RUNNER_APP="$(/bin/ls -1d "$DERIVED_DATA_DIR"/Build/Products/Debug-iphonesimulator/*-Runner.app 2>/dev/null | head -n1 || true)"
+
+# Fallback to optional arg2 if AUT not found
 if [ -z "$AUT_APP" ] && [ -n "$APP_BUNDLE_PATH" ] && [ -d "$APP_BUNDLE_PATH" ]; then
   AUT_APP="$APP_BUNDLE_PATH"
 fi
+
+# Install AUT + Runner explicitly (prevents "unknown to FrontBoard")
 if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
-  ri_log "Using simulator app bundle at $AUT_APP"
+  ri_log "Installing AUT: $AUT_APP"
+  xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
   AUT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$AUT_APP/Info.plist" 2>/dev/null || true)
-  if [ -n "$AUT_BUNDLE_ID" ]; then
-    export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"
-    ri_log "Exported CN1_AUT_BUNDLE_ID=$AUT_BUNDLE_ID"
-    # Inject AUT bundle id into the scheme, if a placeholder exists
-    if [ -f "$SCHEME_FILE" ]; then
-      if sed --version >/dev/null 2>&1; then
-        sed -i -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
-      else
-        sed -i '' -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
-      fi
-      ri_log "Injected CN1_AUT_BUNDLE_ID into scheme: $SCHEME_FILE"
-    fi
-  fi
-
-  # Start syslog capture for this simulator
-  SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
-  ri_log "Capturing simulator syslog at $SIM_SYSLOG"
-  ( xcrun simctl spawn "$SIM_UDID" log stream --style syslog --level debug \
-    || xcrun simctl spawn "$SIM_UDID" log stream --style compact ) > "$SIM_SYSLOG" 2>&1 &
-  SYSLOG_PID=$!
-
-  # Start video recording
-  RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
-  ri_log "Recording simulator video to $RUN_VIDEO"
-  ( xcrun simctl io "$SIM_UDID" recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
-  VIDEO_PID="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
-
-  # Warm-launch for pre-XCTest telemetry
-  if [ -n "${AUT_BUNDLE_ID:-}" ]; then
-    ri_log "Warm-launching $AUT_BUNDLE_ID"
-    xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
-    LAUNCH_OUT="$(xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" 2>&1 || true)"
-    ri_log "simctl launch output: $LAUNCH_OUT"
-    ri_log "Simulator screenshot (pre-XCTest)"
-    xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/pre-xctest.png" || true
-  fi
+  [ -n "$AUT_BUNDLE_ID" ] && ri_log "AUT bundle id: $AUT_BUNDLE_ID"
 fi
+if [ -n "$RUNNER_APP" ] && [ -d "$RUNNER_APP" ]; then
+  ri_log "Installing Test Runner: $RUNNER_APP"
+  xcrun simctl install "$SIM_UDID" "$RUNNER_APP" || true
+else
+  ri_log "WARN: Test Runner app not found under derived data"
+fi
+
+# Begin syslog capture (after install)
+SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
+ri_log "Capturing simulator syslog at $SIM_SYSLOG"
+( xcrun simctl spawn "$SIM_UDID" log stream --style syslog --level debug \
+  || xcrun simctl spawn "$SIM_UDID" log stream --style compact ) > "$SIM_SYSLOG" 2>&1 &
+SYSLOG_PID=$!
+
+# Optional: record video of the run
+RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
+ri_log "Recording simulator video to $RUN_VIDEO"
+( xcrun simctl io "$SIM_UDID" recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
+VIDEO_PID="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
 
 # Run only the UI test bundle
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
@@ -370,7 +322,6 @@ XCODE_TEST_FILTERS=(
 )
 
 ri_log "STAGE:TEST -> xcodebuild test-without-building (destination=$SIM_DESTINATION)"
-set -o pipefail
 if ! run_with_timeout 1500 xcodebuild \
   -workspace "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
@@ -382,7 +333,7 @@ if ! run_with_timeout 1500 xcodebuild \
   "${XCODE_TEST_FILTERS[@]}" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   GENERATE_INFOPLIST_FILE=YES \
-  -maximum-test-execution-time-allowance 1200 \
+  -parallel-testing-enabled NO \
   test-without-building | tee "$TEST_LOG"; then
   rc=$?
   if [ "$rc" = "124" ]; then
@@ -404,20 +355,19 @@ if [ -f "$SCREENSHOT_TMP_DIR/video.pid" ]; then
   fi
 fi
 
-# --- Begin: xcresult JSON export ---
+# Export xcresult JSON (best effort)
 if [ -d "$RESULT_BUNDLE" ]; then
   ri_log "Exporting xcresult JSON"
   /usr/bin/xcrun xcresulttool get --format json --path "$RESULT_BUNDLE" > "$ARTIFACTS_DIR/xcresult.json" 2>/dev/null || true
 else
   ri_log "xcresult bundle not found at $RESULT_BUNDLE"
 fi
-# --- End: xcresult JSON export ---
 
 ri_log "Final simulator screenshot"
 xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/final.png" || true
 # --- End: Stop video + final screenshots ---
 
-set +o pipefail
+# --- CN1SS extraction & reporting (unchanged) ---
 declare -a CN1SS_SOURCES=()
 if [ -s "$TEST_LOG" ]; then
   CN1SS_SOURCES+=("XCODELOG:$TEST_LOG")
@@ -543,7 +493,7 @@ if [ -s "$SUMMARY_FILE" ]; then
   while IFS='|' read -r status test message copy_flag path preview_note; do
     [ -n "${test:-}" ] || continue
     ri_log "Test '${test}': ${message}"
-    if [ "$copy_flag" = "1" ] && [ -n "${path:-}" ] && [ -f "$path" ]; then
+    if [ "$copy_flag" = "1" && -n "${path:-}" ] && [ -f "$path" ]; then
       cp -f "$path" "$ARTIFACTS_DIR/${test}.png" 2>/dev/null || true
       ri_log "  -> Stored PNG artifact copy at $ARTIFACTS_DIR/${test}.png"
     fi
@@ -557,10 +507,7 @@ if [ -s "$SUMMARY_FILE" ]; then
 fi
 
 cp -f "$COMPARE_JSON" "$ARTIFACTS_DIR/screenshot-compare.json" 2>/dev/null || true
-if [ -s "$COMMENT_FILE" ]; then
-  cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
-
-fi
+[ -s "$COMMENT_FILE" ] && cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
 
 # --- Begin: stop syslog capture ---
 if [ -n "${SYSLOG_PID:-}" ]; then
