@@ -50,7 +50,7 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: macos-15           # pinning macos-15 avoids surprises during the cutover window
-    timeout-minutes: 80         # allow enough time for dependency installs and full build
+    timeout-minutes: 100         # allow enough time for dependency installs and full build
     concurrency:                # ensure only one mac build runs at once
       group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
       cancel-in-progress: true
@@ -109,7 +109,7 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "${{ steps.build-ios-app.outputs.app_bundle }}" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 45
+        timeout-minutes: 60
 
       - name: Upload iOS artifacts
         if: always()
