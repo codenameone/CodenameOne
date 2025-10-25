@@ -160,76 +160,96 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-# --- begin: pick latest available iOS runtime + an iPhone device type (JSON-based) ---
+# --- begin: pick latest available iOS runtime + an iPhone device type (robust, non-fatal probing) ---
 require_cmd() { command -v "$1" >/dev/null 2>&1 || { ri_log "FATAL: '$1' not found"; exit 3; }; }
 require_cmd xcrun
-require_cmd python3
 
-# Allow manual override from env if you want to pin a specific runtime/device on a given runner:
-# IOS_RUNTIME_ID="com.apple.CoreSimulator.SimRuntime.iOS-18-5"
-# IOS_DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-16"
 RUNTIME_ID="${IOS_RUNTIME_ID:-}"
 DEVICE_TYPE="${IOS_DEVICE_TYPE:-}"
+RUNTIMES_JSON=""; DEVICETYPES_JSON=""
 
-if [ -z "$RUNTIME_ID" ]; then
-  RUNTIME_ID="$(xcrun simctl list runtimes --json 2>/dev/null | python3 - <<'PY'
+# Don’t let set -e kill us while probing/parsing
+set +e
+
+# Try JSON first (if python3 exists)
+if command -v python3 >/dev/null 2>&1; then
+  RUNTIMES_JSON="$(xcrun simctl list runtimes --json 2>/dev/null || true)"
+  DEVICETYPES_JSON="$(xcrun simctl list devicetypes --json 2>/dev/null || true)"
+  if [ -z "$RUNTIME_ID" ] && [ -n "$RUNTIMES_JSON" ]; then
+    RUNTIME_ID="$(printf '%s' "$RUNTIMES_JSON" | python3 - <<'PY' || true
 import json, sys
-try:
-    data=json.load(sys.stdin)
-except Exception:
-    sys.exit(1)
+try: data=json.load(sys.stdin)
+except: sys.exit(0)
 c=[]
 for r in data.get("runtimes", []):
-    # Newer Xcodes use platform == "iOS"; older had name strings. Check both.
     plat = r.get("platform") or r.get("name","")
     if "iOS" not in str(plat): continue
     if not r.get("isAvailable", False): continue
     ident = r.get("identifier") or ""
     ver   = r.get("version") or ""
-    # Turn version into a sortable tuple
     parts=[]
     for p in str(ver).split("."):
         try: parts.append(int(p))
         except: parts.append(0)
     c.append((parts, ident))
-if not c:
-    sys.exit(2)
-c.sort()
-print(c[-1][1])
+if c:
+    c.sort()
+    print(c[-1][1])
 PY
-  )"
-fi
-
-if [ -z "$RUNTIME_ID" ]; then
-  ri_log "FATAL: No *available* iOS simulator runtime found on this runner"
-  xcrun simctl list runtimes || true
-  exit 3
-fi
-
-if [ -z "$DEVICE_TYPE" ]; then
-  DEVICE_TYPE="$(xcrun simctl list devicetypes --json 2>/dev/null | python3 - <<'PY'
+    )"
+  fi
+  if [ -z "$DEVICE_TYPE" ] && [ -n "$DEVICETYPES_JSON" ]; then
+    DEVICE_TYPE="$(printf '%s' "$DEVICETYPES_JSON" | python3 - <<'PY' || true
 import json, sys
-try:
-    data=json.load(sys.stdin)
-except Exception:
-    sys.exit(1)
-dts=data.get("devicetypes",[])
-# prefer newest iPhone names if present, else any iPhone, else first available
-prefs = ["iPhone 16 Pro Max","iPhone 16 Pro","iPhone 16","iPhone 15 Pro Max","iPhone 15 Pro","iPhone 15","iPhone"]
+try: d=json.load(sys.stdin)
+except: sys.exit(0)
+prefs = ["iPhone 16 Pro Max","iPhone 16 Pro","iPhone 16",
+         "iPhone 15 Pro Max","iPhone 15 Pro","iPhone 15","iPhone"]
+dts = d.get("devicetypes", [])
 for pref in prefs:
     for dt in dts:
         if pref in (dt.get("name") or ""):
             print(dt.get("identifier","")); sys.exit(0)
-if dts:
-    print(dts[0].get("identifier","")); sys.exit(0)
-sys.exit(2)
+for dt in dts:
+    if "iPhone" in (dt.get("name") or ""):
+        print(dt.get("identifier","")); sys.exit(0)
+if dts: print(dts[0].get("identifier",""))
 PY
-  )"
+    )"
+  fi
 fi
 
+# Fallback to text parsing if needed
+if [ -z "$RUNTIME_ID" ]; then
+  RUNTIME_ID="$(xcrun simctl list runtimes 2>/dev/null | awk '
+    $0 ~ /iOS/ && $0 ~ /(Available|installed)/ {
+      id=$NF; gsub(/[()]/,"",id); last=id
+    } END { if (last!="") print last }
+  ' || true)"
+fi
+if [ -z "$DEVICE_TYPE" ]; then
+  DEVICE_TYPE="$(xcrun simctl list devicetypes 2>/dev/null | awk -F '[()]' '
+    /iPhone/ && /identifier/ { print $2; found=1; exit }
+    END { if (!found) print "" }
+  ' || true)"
+fi
+
+set -e
+
+# Emit debug to artifacts
+if [ -n "${ARTIFACTS_DIR:-}" ]; then
+  printf '%s\n' "${RUNTIMES_JSON:-}"      > "$ARTIFACTS_DIR/sim-runtimes.json"      2>/dev/null || true
+  printf '%s\n' "${DEVICETYPES_JSON:-}"   > "$ARTIFACTS_DIR/sim-devicetypes.json"   2>/dev/null || true
+  xcrun simctl list runtimes            > "$ARTIFACTS_DIR/sim-runtimes.txt"        2>&1 || true
+  xcrun simctl list devicetypes         > "$ARTIFACTS_DIR/sim-devicetypes.txt"     2>&1 || true
+fi
+
+if [ -z "$RUNTIME_ID" ]; then
+  ri_log "FATAL: No *available* iOS simulator runtime found on this runner"
+  exit 3
+fi
 if [ -z "$DEVICE_TYPE" ]; then
   ri_log "FATAL: Could not determine an iPhone device type"
-  xcrun simctl list devicetypes || true
   exit 3
 fi
 
@@ -249,7 +269,7 @@ if ! xcrun simctl bootstatus "$SIM_UDID" -b -t 180; then
 fi
 ri_log "Simulator booted: $SIM_UDID"
 SIM_DESTINATION="id=$SIM_UDID"
-# --- end: pick latest available iOS runtime + an iPhone device type (JSON-based) ---
+# --- end: pick latest available iOS runtime + an iPhone device type (robust, non-fatal probing) ---
 
 ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 
@@ -286,7 +306,7 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
     export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"
     ri_log "Exported CN1_AUT_BUNDLE_ID=$AUT_BUNDLE_ID"
     # Inject AUT bundle id into the scheme, if a placeholder exists
-    if [ -f "$SCHEME_FILE" ] && [ -n "$AUT_BUNDLE_ID" ]; then
+    if [ -f "$SCHEME_FILE" ]; then
       if sed --version >/dev/null 2>&1; then
         sed -i -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
       else
@@ -296,64 +316,27 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
     fi
   fi
 
-  # Resolve a UDID for the chosen destination name (no regex groups to keep BSD awk happy)
-  SIM_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
-  SIM_UDID="$(
-    xcrun simctl list devices available 2>/dev/null | \
-    awk -v name="$SIM_NAME" '
-      # Match a line that contains the selected device name followed by " ("
-      index($0, name" (") && index($0, "[") {
-        ud=$0
-        sub(/^.*\[/,"",ud)     # drop everything up to and including the first '['
-        sub(/\].*$/,"",ud)     # drop everything after the closing ']'
-        if (length(ud)>0) { print ud; exit }
-      }'
-  )"
+  # Start syslog capture for this simulator
+  SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
+  ri_log "Capturing simulator syslog at $SIM_SYSLOG"
+  ( xcrun simctl spawn "$SIM_UDID" log stream --style syslog --level debug \
+    || xcrun simctl spawn "$SIM_UDID" log stream --style compact ) > "$SIM_SYSLOG" 2>&1 &
+  SYSLOG_PID=$!
 
-  ri_log "Simulator devices (available):"
-  xcrun simctl list devices available || true
+  # Start video recording
+  RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
+  ri_log "Recording simulator video to $RUN_VIDEO"
+  ( xcrun simctl io "$SIM_UDID" recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
+  VIDEO_PID="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
 
-  if [ -n "$SIM_UDID" ]; then
-    ri_log "Boot status for $SIM_UDID:"
-    xcrun simctl bootstatus "$SIM_UDID" -b || true
-
-    ri_log "Processes in simulator:"
-    xcrun simctl spawn "$SIM_UDID" launchctl print system | head -n 200 || true
-  fi
-
-  if [ -n "$SIM_UDID" ]; then
-    xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
-    xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
-    if [ -n "$AUT_BUNDLE_ID" ]; then
-      ri_log "Warm-launching $AUT_BUNDLE_ID"
-      xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
-      xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
-      xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/pre-xctest.png" || true
-    fi
-
-    # Start syslog capture for this simulator
-    SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
-    ri_log "Capturing simulator syslog at $SIM_SYSLOG"
-    ( xcrun simctl spawn "$SIM_UDID" log stream --style syslog --level debug \
-      || xcrun simctl spawn "$SIM_UDID" log stream --style compact ) > "$SIM_SYSLOG" 2>&1 &
-    SYSLOG_PID=$!
-
-    # Start video recording
-    RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
-    ri_log "Recording simulator video to $RUN_VIDEO"
-    ( xcrun simctl io "$SIM_UDID" recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
-    VIDEO_PID="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
-
-    if [ -n "$AUT_BUNDLE_ID" ] && [ -n "$SIM_UDID" ]; then
-      ri_log "Warm-launching $AUT_BUNDLE_ID"
-      xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
-      LAUNCH_OUT="$(xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" 2>&1 || true)"
-      ri_log "simctl launch output: $LAUNCH_OUT"
-      ri_log "Simulator screenshot (pre-XCTest)"
-      xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/pre-xctest.png" || true
-    fi
-  else
-    ri_log "WARN: Could not resolve simulator UDID for '$SIM_NAME'; skipping warm launch"
+  # Warm-launch for pre-XCTest telemetry
+  if [ -n "${AUT_BUNDLE_ID:-}" ]; then
+    ri_log "Warm-launching $AUT_BUNDLE_ID"
+    xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
+    LAUNCH_OUT="$(xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" 2>&1 || true)"
+    ri_log "simctl launch output: $LAUNCH_OUT"
+    ri_log "Simulator screenshot (pre-XCTest)"
+    xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/pre-xctest.png" || true
   fi
 fi
 
@@ -409,10 +392,8 @@ else
 fi
 # --- End: xcresult JSON export ---
 
-
-
 ri_log "Final simulator screenshot"
-xcrun simctl io booted screenshot "$ARTIFACTS_DIR/final.png" || true
+xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/final.png" || true
 # --- End: Stop video + final screenshots ---
 
 set +o pipefail
@@ -573,4 +554,3 @@ if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
 fi
 
 exit $comment_rc
-
