@@ -4,6 +4,48 @@ set -euo pipefail
 
 ri_log() { echo "[run-ios-ui-tests] $1"; }
 
+# --- begin: global cleanup/watchdog helpers ---
+VIDEO_PID=""
+SYSLOG_PID=""
+SIM_UDID_CREATED=""
+
+cleanup() {
+  # Stop recorders
+  [ -n "$VIDEO_PID" ] && kill "$VIDEO_PID" >/dev/null 2>&1 || true
+  [ -n "$SYSLOG_PID" ] && kill "$SYSLOG_PID" >/dev/null 2>&1 || true
+  # Shutdown and delete the temp simulator we created (if any)
+  if [ -n "$SIM_UDID_CREATED" ]; then
+    xcrun simctl shutdown "$SIM_UDID_CREATED" >/dev/null 2>&1 || true
+    xcrun simctl delete "$SIM_UDID_CREATED"   >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+run_with_timeout() {
+  # run_with_timeout <seconds> <cmd...>
+  local t="$1"; shift
+  local log="${ARTIFACTS_DIR:-.}/xcodebuild-live.log"
+  ( "$@" 2>&1 | tee -a "$log" ) &  # background xcodebuild
+  local child=$!
+  local waited=0
+  while kill -0 "$child" >/dev/null 2>&1; do
+    sleep 5
+    waited=$((waited+5))
+    # heartbeat so CI doesn’t think we're idle
+    if (( waited % 60 == 0 )); then echo "[run-ios-ui-tests] heartbeat: ${waited}s"; fi
+    if (( waited >= t )); then
+      echo "[run-ios-ui-tests] WATCHDOG: Killing long-running process (>${t}s)"
+      kill -TERM "$child" >/dev/null 2>&1 || true
+      sleep 2
+      kill -KILL "$child" >/dev/null 2>&1 || true
+      wait "$child" || true
+      return 124
+    fi
+  done
+  wait "$child"
+}
+# --- end: global cleanup/watchdog helpers ---
+
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
 if [ $# -lt 1 ]; then
@@ -123,72 +165,30 @@ SDKROOT_OS="${SDKROOT#iphonesimulator}"
 DESIRED_OS_MAJOR="${SDKROOT_OS%%.*}"
 DESIRED_OS_MINOR="${SDKROOT_OS#*.}"; [ "$DESIRED_OS_MINOR" = "$SDKROOT_OS" ] && DESIRED_OS_MINOR=""
 
-auto_select_destination() {
-  # 1) Try xcodebuild -showdestinations, but skip placeholder ids
-  if command -v xcodebuild >/dev/null 2>&1; then
-    sel="$(
-      xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null |
-      awk -v wantMajor="${DESIRED_OS_MAJOR:-}" -v wantMinor="${DESIRED_OS_MINOR:-}" '
-        function is_uuid(s) { return match(s, /^[0-9A-Fa-f-]{8}-[0-9A-Fa-f-]{4}-[0-9A-Fa-f-]{4}-[0-9A-Fa-f-]{4}-[0-9A-Fa-f-]{12}$/) }
-        /platform:iOS Simulator/ && /name:/ && /id:/ {
-          os=""; name=""; id="";
-          for (i=1;i<=NF;i++) {
-            if ($i ~ /^OS:/)   { sub(/^OS:/,"",$i); os=$i }
-            if ($i ~ /^name:/) { sub(/^name:/,"",$i); name=$i }
-            if ($i ~ /^id:/)   { sub(/^id:/,"",$i); id=$i }
-          }
-          if (!is_uuid(id)) next;                    # skip placeholders
-          gsub(/[^0-9.]/,"",os)                      # keep 18.5 form if present
-          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0)
-          # preference score: major-match first, then minor proximity if same major
-          split(os, p, "."); major=p[1]; minor=p[2]
-          major_ok = (wantMajor=="" || major==wantMajor) ? 1 : 0
-          minor_pen = (wantMinor=="" || major!=wantMajor) ? 999 : (minor=="" ? 500 : (minor<wantMinor ? wantMinor-minor : minor-wantMinor))
-          printf("%d|%d|%03d|%s|%s\n", pri, major_ok, minor_pen, name, id)
-        }
-      ' | sort -t'|' -k2,2nr -k1,1nr -k3,3n | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$5}'
-    )"
-    [ -n "$sel" ] && { echo "$sel"; return; }
-  fi
-
-  # 2) Fallback: simctl list devices available (plain text)
-  if command -v xcrun >/dev/null 2>&1; then
-    sel="$(
-      xcrun simctl list devices available 2>/dev/null |
-      awk -v wantMajor="${DESIRED_OS_MAJOR:-}" -v wantMinor="${DESIRED_OS_MINOR:-}" '
-        # Example: "iPhone 16e (18.5) [UDID] (Available)"
-        /\[/ && /\)/ {
-          line=$0
-          name=line; sub(/ *\(.*/,"",name); sub(/^ +/,"",name)
-          os=""; if (match(line, /\(([0-9.]+)\)/, a)) os=a[1]
-          udid=""; if (match(line, /\[([0-9A-Fa-f-]+)\]/, b)) udid=b[1]
-          if (udid=="") next
-          pri=(name ~ /iPhone/)?2:((name ~ /iPad/)?1:0)
-          split(os, p, "."); major=p[1]; minor=p[2]
-          major_ok = (wantMajor=="" || major==wantMajor) ? 1 : 0
-          minor_pen = (wantMinor=="" || major!=wantMajor) ? 999 : (minor=="" ? 500 : (minor<wantMinor ? wantMinor-minor : minor-wantMinor))
-          printf("%d|%d|%03d|%s|%s\n", pri, major_ok, minor_pen, name, udid)
-        }
-      ' | sort -t'|' -k2,2nr -k1,1nr -k3,3n | head -n1 | awk -F'|' '{print "platform=iOS Simulator,id="$5}'
-    )"
-    [ -n "$sel" ] && { echo "$sel"; return; }
-  fi
-}
-
-SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
-if [ -z "$SIM_DESTINATION" ]; then
-  SELECTED_DESTINATION="$(auto_select_destination || true)"
-  if [ -n "${SELECTED_DESTINATION:-}" ]; then
-    SIM_DESTINATION="$SELECTED_DESTINATION"
-    ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
-  else
-    ri_log "Simulator auto-selection did not return a destination"
-  fi
+# Determine an iOS 18 runtime and create a throwaway iPhone 16 device
+RUNTIME_ID="$(xcrun simctl list runtimes | awk '/iOS 18\./ && $0 ~ /Available/ {print $NF; exit}')"
+if [ -z "$RUNTIME_ID" ]; then
+  ri_log "FATAL: No iOS 18.x simulator runtime available"
+  exit 3
 fi
-if [ -z "$SIM_DESTINATION" ]; then
-  SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16,OS=latest"
-  ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
+DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-16"
+SIM_NAME="CN1 UI Test iPhone"
+SIM_UDID="$(xcrun simctl create "$SIM_NAME" "$DEVICE_TYPE" "$RUNTIME_ID" 2>/dev/null || true)"
+if [ -z "$SIM_UDID" ]; then
+  ri_log "FATAL: Failed to create simulator ($DEVICE_TYPE, $RUNTIME_ID)"
+  exit 3
 fi
+SIM_UDID_CREATED="$SIM_UDID"
+ri_log "Created simulator $SIM_NAME ($SIM_UDID) with runtime $RUNTIME_ID"
+
+# Boot it and wait until it's ready
+xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+if ! xcrun simctl bootstatus "$SIM_UDID" -b -t 180; then
+  ri_log "FATAL: Simulator never reached booted state"
+  exit 4
+fi
+ri_log "Simulator booted: $SIM_UDID"
+SIM_DESTINATION="id=$SIM_UDID"
 
 ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 
@@ -263,17 +263,25 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   if [ -n "$SIM_UDID" ]; then
     xcrun simctl bootstatus "$SIM_UDID" -b || xcrun simctl boot "$SIM_UDID"
     xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
+    if [ -n "$AUT_BUNDLE_ID" ]; then
+      ri_log "Warm-launching $AUT_BUNDLE_ID"
+      xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
+      xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" --args -AppleLocale en_US -AppleLanguages "(en)" || true
+      xcrun simctl io "$SIM_UDID" screenshot "$ARTIFACTS_DIR/pre-xctest.png" || true
+    fi
 
-    # Now that a device is definitely booted, start syslog and video
+    # Start syslog capture for this simulator
     SIM_SYSLOG="$ARTIFACTS_DIR/simulator-syslog.txt"
     ri_log "Capturing simulator syslog at $SIM_SYSLOG"
-    (xcrun simctl spawn "$SIM_UDID" log stream --style syslog --level debug \
-      || xcrun simctl spawn "$SIM_UDID" log stream --style compact) > "$SIM_SYSLOG" 2>&1 &
+    ( xcrun simctl spawn "$SIM_UDID" log stream --style syslog --level debug \
+      || xcrun simctl spawn "$SIM_UDID" log stream --style compact ) > "$SIM_SYSLOG" 2>&1 &
     SYSLOG_PID=$!
 
+    # Start video recording
     RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
     ri_log "Recording simulator video to $RUN_VIDEO"
     ( xcrun simctl io "$SIM_UDID" recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
+    VIDEO_PID="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
 
     if [ -n "$AUT_BUNDLE_ID" ] && [ -n "$SIM_UDID" ]; then
       ri_log "Warm-launching $AUT_BUNDLE_ID"
@@ -302,8 +310,9 @@ XCODE_TEST_FILTERS=(
   -skip-testing:HelloCodenameOneTests
 )
 
+ri_log "STAGE:TEST -> xcodebuild test-without-building (destination=$SIM_DESTINATION)"
 set -o pipefail
-if ! xcodebuild \
+if ! run_with_timeout 1500 xcodebuild \
   -workspace "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
@@ -314,10 +323,17 @@ if ! xcodebuild \
   "${XCODE_TEST_FILTERS[@]}" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
   GENERATE_INFOPLIST_FILE=YES \
+  -maximum-test-execution-time-allowance 1200 \
   test-without-building | tee "$TEST_LOG"; then
-  ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
+  rc=$?
+  if [ "$rc" = "124" ]; then
+    ri_log "STAGE:WATCHDOG_TRIGGERED -> Killed stalled xcodebuild"
+  else
+    ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
+  fi
   exit 10
 fi
+set +o pipefail
 
 # --- Begin: Stop video + final screenshots ---
 if [ -f "$SCREENSHOT_TMP_DIR/video.pid" ]; then
