@@ -524,22 +524,7 @@ To test this API see the following simple contacts app:
 
 [source,java]
 ----
-Form f = new Form("Contacts", BoxLayout.y());
-f.add(new InfiniteProgress());
-Display.getInstance().invokeAndBlock(() -> {
-    Contact[] ct = Display.getInstance().getAllContacts(true, true, false, true, true, false);
-    Display.getInstance().callSerially(() -> {
-        f.removeAll();
-        for(Contact c : ct) {
-            MultiButton mb = new MultiButton(c.getDisplayName());
-            mb.setTextLine2(c.getPrimaryPhoneNumber());
-            f.add(mb);
-        }
-        f.revalidate();
-    });
-});
-
-f.show();
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PermissionSnippets.java[tag=contactsPermission,indent=0]
 ----
 
 If you explicitly lower the target SDK (e.g. `android.targetSDKVersion=21`) and install this app on an Android 6 device you will still see the legacy install prompt with all permissions listed up front:
@@ -582,7 +567,7 @@ When permission is requested a user will be seamlessly prompted/warned, Codename
 
 [source,java]
 ----
-Display.getInstance().setProperty("android.permission.READ_CONTACTS", "MyCoolChatApp needs access to your contacts so we can show you which of your friends already have MyCoolChatApp installed");
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PermissionSnippets.java[tag=permissionPrompt,indent=0]
 ----
 
 This is optional as there is a default value defined. You can define this once in the `init(Object)` method but for some extreme cases permission might be needed for different things e.g. you might ask for this permission with one reason at one point in the app and with a different reason at another point in the app.
@@ -615,12 +600,7 @@ To get a permission you can use this code as such:
 
 [source,java]
 ----
-if(!AndroidNativeUtil.checkForPermission(
-    Manifest.permission.READ_PHONE_STATE, "
-    This should be the description shown to the user...")){
-    // you didn't get the permission, you might want to return here
-}
-// you have the permission, do what you need
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PermissionSnippets.java[tag=androidCheckForPermission,indent=0]
 ----
 
 This will prompt the user with the native UI and later on with the fallback option as described above. Notice that the `checkForPermission` method is a blocking method and it will return when there is a final conclusion on the subject. It uses `invokeAndBlock` and can be safely invoked on the event dispatch thread without concern.
@@ -692,11 +672,7 @@ E.g. to create a simple hello world interface do something like:
 
 [source,java]
 ----
-package com.mycompany.myapp;
-import com.codename1.system.NativeInterface;
-public interface MyNative extends NativeInterface {
-    String helloWorld(String hi);
-}
+include::../demos/common/src/main/java/com/mycompany/myapp/MyNative.java[tag=myNativeInterface,indent=0]
 ----
 
 We now need to right click the class in the IDE and select the #Generate Native Access# menu item:
@@ -723,30 +699,16 @@ For now lets leave the stubs and come back to them soon. From the Codename One J
 
 [source,java]
 ----
-MyNative my = NativeLookup.create(MyNative.class);
-if(my != null && my.isSupported()) {
-    Log.p(my.helloWorld("Hi"));
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/NativeInterfaceSnippets.java[tag=nativeLookup,indent=0]
 ----
 
 Notice that for this to work you must implement the native code on all supported platforms.
 
-We'll start with Android which should be familiar and intuitive to many developers, this is how the generated file under the `native/android` directory looks:
+We'll start with Android which should be familiar and intuitive to many developers. The helper `MyNativeImplStub` class below mirrors the stub that the tooling generates under the `native/android` directory:
 
 [source,java]
 ----
-package com.mycompany.myapp;
-
-public class MyNativeImpl {
-    public String helloWorld(String param) {
-        return null;
-    }
-
-    public boolean isSupported() {
-        return false;
-    }
-
-}
+include::../demos/common/src/main/java/com/mycompany/myapp/MyNativeImplStub.java[tag=myNativeAndroidStub,indent=0]
 ----
 
 The stub implementation always returns `false`, `null` or `0` by default. The `isSupported` also defaults to `false` thus allowing us to implement a `NativeInterface` on some platforms and leave the rest out without really knowing anything about these platforms.
@@ -755,21 +717,7 @@ We can implement the Android version using code similar to this:
 
 [source,java]
 ----
-package com.mycompany.myapp;
-
-import android.util.Log; // <1>
-
-public class MyNativeImpl { // <2>
-    // <3>
-    public String helloWorld(String param) {
-        Log.d("MyApp", param);
-        return "Tada";
-    }
-
-    public boolean isSupported() { // <4>
-        return true;
-    }
-}
+include::../demos/android/src/main/java/com/mycompany/myapp/MyNativeImpl.java[tag=myNativeAndroidImpl,indent=0]
 ----
 
 <1> Notice that we are using the Android native `android.util.Log` class which isn't accessible from standard Codename One code
@@ -805,22 +753,14 @@ Within your native code in Android do something like:
 
 [source,java]
 ----
-com.codename1.impl.android.AndroidNativeUtil.getActivity().runOnUiThread(new Runnable() {
-    public void run() {
-       // your native code here...
-    }
-});
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/AndroidThreadSnippets.java[tag=androidRunOnUiThread,indent=0]
 ----
 
 This will execute the block within `run()` asynchronously on the native Android UI thread. If you need synchronous execution we have a special method for Codename One:
 
 [source,java]
 ----
-com.codename1.impl.android.AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {
-    public void run() {
-       // your native code here...
-    }
-});
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/AndroidThreadSnippets.java[tag=androidRunOnUiThreadAndBlock,indent=0]
 ----
 
 This blocks in a way that's OK with the Codename One EDT which is unique to our Android port.
@@ -868,14 +808,7 @@ The `.m` files are the Objective-C equivalent of `.c` files and `.h` files conta
 
 [source,objective-c]
 ----
-#import <Foundation/Foundation.h>
-
-@interface com_mycompany_myapp_MyNativeImpl : NSObject {
-}
-
--(NSString*)helloWorld:(NSString*)param;
--(BOOL)isSupported;
-@end
+include::../demos/ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.h[tag=myNativeHeader,indent=0]
 ----
 
 
@@ -883,19 +816,7 @@ And `com_mycompany_myapp_MyNativeImpl.m` contains:
 
 [source,objective-c]
 ----
-#import "com_mycompany_myapp_MyNativeImpl.h"
-
-@implementation com_mycompany_myapp_MyNativeImpl
-
--(NSString*)helloWorld:(NSString*)param{
-    return nil;
-}
-
--(BOOL)isSupported{
-    return NO;
-}
-
-@end
+include::../demos/ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m[tag=myNativeImplStub,indent=0]
 ----
 
 IMPORTANT: Objective-C relies on argument names as part of the message (method) signature. So `-(NSString*)helloWorld:(NSString*)param` isn't the same as `-(NSString*)helloWorld:(NSString*)iChangedThisName`! +
@@ -905,20 +826,7 @@ Here is a simple implementation similar to above:
 
 [source,objective-c]
 ----
-#import "com_mycompany_myapp_MyNativeImpl.h"
-
-@implementation com_mycompany_myapp_MyNativeImpl
-
--(NSString*)helloWorld:(NSString*)param{
-    NSLog(@"MyApp: %@", param);
-    return @"Tada";
-}
-
--(BOOL)isSupported{
-    return YES;
-}
-
-@end
+include::../demos/ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m[tag=myNativeImplExample,indent=0]
 ----
 
 ===== Using the iOS Main Thread (Native EDT)
@@ -929,18 +837,14 @@ On iOS this is pretty similar to Android (if you consider objective-c to be simi
 
 [source,objc]
 ----
-dispatch_async(dispatch_get_main_queue(), ^{
-    // your native code here...
-});
+include::../demos/ios/src/main/objectivec/DispatchExamples.m[tag=dispatchAsync,indent=0]
 ----
 
 You can use this for synchronous invocation, notice the lack of the `a` in the dispatch call:
 
 [source,objc]
 ----
-dispatch_sync(dispatch_get_main_queue(), ^{
-    // your native code here...
-});
+include::../demos/ios/src/main/objectivec/DispatchExamples.m[tag=dispatchSync,indent=0]
 ----
 
 The problem with the synchronous call is that it will block the caller thread, if the caller thread is the EDT this can cause performance issues and even a deadlock. It's important to be very cautious with this call!
@@ -1021,7 +925,7 @@ Java API:
 
 [source,java]
 ----
-public void print(String str);
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/JavaScriptNativeApi.java[tag=jsPrintMethod,indent=0]
 ----
 
 becomes
@@ -1038,7 +942,7 @@ Java API:
 
 [source,java]
 ----
-public int add(int a, int b);
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/JavaScriptNativeApi.java[tag=jsAddTwoArgs,indent=0]
 ----
 
 becomes
@@ -1052,7 +956,7 @@ o.add__int_int = function(param1, param2, callback) {
 
 [source,java]
 ----
-public int add(int[] a);
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/JavaScriptNativeApi.java[tag=jsAddArray,indent=0]
 ----
 
 becomes
@@ -1074,23 +978,21 @@ https://www.codenameone.com/javadoc/com/codename1/ui/PeerComponent.html[PeerComp
 
 [source,java]
 ----
-public PeerComponent` createPeer();
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/PeerComponentExamples.java[tag=peerComponentApi,indent=0]
 ----
 
 Android native implementation would use:
 
 [source,java]
 ----
-public View createPeer() {
-    return null;
-}
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PeerComponentAndroidExamples.java[tag=androidPeerImplementation,indent=0]
 ----
 
 The iphone would need to return a pointer to a view e.g.:
 
 [source,objective-c]
 ----
-- (UIView*)createPeer;
+include::../demos/ios/src/main/objectivec/PeerComponentExamples.m[tag=createPeer,indent=0]
 ----
 
 TIP: Not all platforms support native peers. Specifically JavaSE doesn't support them due to the way the JavaSE native interfaces are mapped to their implementation. +
@@ -1157,38 +1059,19 @@ The examples below demonstrate the signatures for this method on all platforms:
 .NativeInterface definition
 [source,java]
 ----
-public void test(byte b, boolean boo, char c, short s,
-    int i, long l, float f, double d, String ss,
-    byte[] ba, boolean[] booa, char[] ca, short[] sa, int[] ia,
-    long[] la, float[] fa, double[] da,
-    PeerComponent cmp);
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/PeerComponentExamples.java[tag=allTypesSignature,indent=0]
 ----
 
 .Android Version
 [source,java]
 ----
-public void test(byte param, boolean param1, char param2,
-    short param3, int param4, long param5, float param6,
-    double param7, String param8, byte[] param9,
-    boolean[] param10, char[] param11, short[] param12,
-    int[] param13, long[] param14, float[] param15,
-    double[] param16, android.view.View param17) {
-}
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/PeerComponentAndroidExamples.java[tag=androidAllTypesSignature,indent=0]
 ----
 
 .iOS Version
 [source,objective-c]
 ----
--(void)test:(char)param param1:(BOOL)param1
-    param2:(int)param2 param3:(short)param3 param4:(int)param4
-    param5:(long long)param5 param6:(float)param6
-    param7:(double)param7 param8:(NSString*)param8
-    param9:(NSData*)param9 param10:(NSData*)param10
-    param11:(NSData*)param11 param12:(NSData*)param12
-    param13:(NSData*)param13 param14:(NSData*)param14
-    param15:(NSData*)param15 param16:(NSData*)param16
-    param17:(void*)param17;
-}
+include::../demos/ios/src/main/objectivec/PeerComponentExamples.m[tag=iosAllTypesSignature,indent=0]
 ----
 
 NOTE: We had to break lines for the print version, the JavaScript version is a really long method name that literally broke the book!
@@ -1207,8 +1090,7 @@ _1ARRAY_com_codename1_ui_PeerComponent = function(param1, param2, param3, param4
 .Java SE Version
 [source,java]
 ----
-public void test(byte param, boolean param1, char param2, short param3, int param4, long param5, float param6, double param7, String param8, byte[] param9, boolean[] param10, char[] param11, short[] param12, int[] param13, long[] param14, float[] param15, double[] param16, com.codename1.ui.PeerComponent param17) {
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/PeerComponentExamples.java[tag=javascriptAllTypesSignature,indent=0]
 ----
 
 
@@ -1280,18 +1162,7 @@ You can work with `AndroidNativeUtil` using native code such as this:
 
 [source,java]
 ----
-import com.codename1.impl.android.AndroidNativeUtil;
-
-class NativeCallsImpl {
-     public void nativeMethod() {
-        AndroidNativeUtil.getActivity().runOnUiThread(new Runnable() {
-            public void run() {
-               ...
-            }
-        });
-     }
-    ....
-}
+include::../demos/android/src/main/java/com/codenameone/developerguide/advancedtopics/NativeCallsImpl.java[tag=nativeCallsImpl,indent=0]
 ----
 
 ==== Broadcast Receiver
@@ -1304,38 +1175,7 @@ The solution is to place any native Android class into the `native/android` dire
 
 [source,java]
 ----
-package com.codename1.sms.intercept;
-
-import android.content.*;
-import android.os.Bundle;
-import android.telephony.*;
-import com.codename1.io.Log;
-
-public class SMSListener extends BroadcastReceiver {
-
-    @Override
-    public void onReceive(Context cntxt, Intent intent) {
-        // based on code from https://stackoverflow.com/questions/39526138/broadcast-receiver-for-receive-sms-is-not-working-when-declared-in-manifeststat
-        if(intent.getAction().equals("android.provider.Telephony.SMS_RECEIVED")) {
-            Bundle bundle = intent.getExtras();
-            SmsMessage[] msgs = null;
-            if (bundle != null){
-                try{
-                    Object[] pdus = (Object[]) bundle.get("pdus");
-                    msgs = new SmsMessage[pdus.length];
-                    for(int i=0; i<msgs.length; i++){
-                        msgs[i] = SmsMessage.createFromPdu((byte[])pdus[i]);
-                        String msgBody = msgs[i].getMessageBody();
-                        SMSCallback.smsReceived(msgBody);
-                    }
-                } catch(Exception e) {
-                    Log.e(e);
-                    SMSCallback.smsReceiveError(e);
-                }
-            }
-        }
-    }
-}
+include::../demos/android/src/main/java/com/codename1/sms/intercept/SMSListener.java[tag=smsListener,indent=0]
 ----
 
 The code above is pretty standard native Android code, it's just a callback in which most of the logic is similar to the native Android code mentioned in this https://stackoverflow.com/questions/39526138/broadcast-receiver-for-receive-sms-is-not-working-when-declared-in-manifeststat[stackoverflow question].
@@ -1414,10 +1254,7 @@ The native sample in stack overflow bound the listener in the activity but here 
 
 [source,java]
 ----
-public interface NativeSMSInterceptor extends NativeInterface {
-    public void bindSMSListener();
-    public void unbindSMSListener();
-}
+include::../demos/common/src/main/java/com/codenameone/sms/intercept/NativeSMSInterceptor.java[tag=nativeSmsInterceptor,indent=0]
 ----
 
 That's easy!
@@ -1428,31 +1265,7 @@ The implementation is pretty easy too:
 
 [source,java]
 ----
-package com.codename1.sms.intercept;
-
-import android.Manifest;
-import android.content.IntentFilter;
-import com.codename1.impl.android.AndroidNativeUtil;
-
-public class NativeSMSInterceptorImpl {
-    private SMSListener smsListener;
-    public void bindSMSListener() {
-        if(AndroidNativeUtil.checkForPermission(Manifest.permission.RECEIVE_SMS, "We can automatically enter the SMS code for you")) { // <1>
-            smsListener = new SMSListener();
-            IntentFilter filter = new IntentFilter();
-            filter.addAction("android.provider.Telephony.SMS_RECEIVED");
-            AndroidNativeUtil.getActivity().registerReceiver(smsListener, filter); // <2>
-        }
-    }
-
-    public void unbindSMSListener() {
-        AndroidNativeUtil.getActivity().unregisterReceiver(smsListener);
-    }
-
-    public boolean isSupported() {
-        return true;
-    }
-}
+include::../demos/android/src/main/java/com/codename1/sms/intercept/NativeSMSInterceptorImpl.java[tag=nativeSmsInterceptorImpl,indent=0]
 ----
 
 <1> This will trigger the permission prompt on Android 6 and newer. Even though the permission is declared in XML this isn't enough for 6+. Notice that even when you run on Android 6 you still need to declare permissions in XML!
@@ -1472,12 +1285,7 @@ the package `com.mycompany` that has the method: `public static void callback()`
 
 [source,java]
 ----
-package com.mycompany;
-public class NativeCallback {
-    public static void callback() {
-        // do stuff
-    }
-}
+include::../demos/common/src/main/java/com/mycompany/NativeCallback.java[tag=nativeCallback,indent=0]
 ----
 
 
@@ -1485,14 +1293,14 @@ So if I want to call it from Android or all of the Java based platforms I can ju
 
 [source,java]
 ----
-com.mycompany.NativeCallback.callback();
+include::../demos/common/src/main/java/com/mycompany/NativeCallbackUsage.java[tag=nativeCallbackUsage,indent=0]
 ----
 
 I can also pass a argument as we do later on:
 
 [source,java]
 ----
-com.mycompany.NativeCallback.callback("My Arg");
+include::../demos/common/src/main/java/com/mycompany/NativeCallbackUsage.java[tag=nativeCallbackUsage,indent=0]
 ----
 
 ===== Accessing Callbacks from Objective-C
@@ -1503,8 +1311,7 @@ Add an include statement as such:
 
 [source,objc]
 ----
-#include "com_mycompany_NativeCallback.h"
-#include "CodenameOne_GLViewController.h"
+include::../demos/ios/src/main/objectivec/NativeCallbackSnippets.m[tag=nativeCallbackIncludes,indent=0]
 ----
 
 Notice that the `CodenameOne_GLViewController.h` include defines various macros such as `CN1_THREAD_STATE_PASS_SINGLE_ARG`.
@@ -1513,7 +1320,7 @@ Then when we want to trigger the method just do:
 
 [source,objc]
 ----
-com_mycompany_NativeCallback_callback__(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+include::../demos/ios/src/main/objectivec/NativeCallbackSnippets.m[tag=nativeCallbackInvoke,indent=0]
 ----
 
 TIP: For most callbacks you should use the macro `CN1_THREAD_GET_STATE_PASS_SINGLE_ARG` instead of `CN1_THREAD_STATE_PASS_SINGLE_ARG` also make sure to add `#include "cn1_globals.h" in the file
@@ -1524,14 +1331,14 @@ We can easily pass arguments like:
 
 [source,java]
 ----
-public static void callback(int arg)
+include::../demos/common/src/main/java/com/mycompany/NativeCallback.java[tag=nativeCallbackInt,indent=0]
 ----
 
 Which maps to native as (notice the extra _ before the int):
 
 [source,objc]
 ----
-com_mycompany_NativeCallback_callback___int(CN1_THREAD_GET_STATE_PASS_ARG intValue);
+include::../demos/ios/src/main/objectivec/NativeCallbackSnippets.m[tag=nativeCallbackInvokeInt,indent=0]
 ----
 
 Notice that there is no comma between the CN1_THREAD_GET_STATE_PASS_ARG and the value!
@@ -1549,7 +1356,7 @@ Assuming a method like this:
 
 [source,java]
 ----
-public static void callback(String arg)
+include::../demos/common/src/main/java/com/mycompany/NativeCallback.java[tag=nativeCallbackString,indent=0]
 ----
 
 You would need to convert the `NSString*` value you already have to a `java.lang.String` which the callback expects.
@@ -1558,21 +1365,21 @@ The `fromNSString` function also needs this special argument so you will need to
 
 [source,objc]
 ----
-com_mycompany_NativeCallback_callback___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG nsStringValue));
+include::../demos/ios/src/main/objectivec/NativeCallbackSnippets.m[tag=nativeCallbackInvokeString,indent=0]
 ----
 
 And finally you might want to return a value from callback as such:
 
 [source,java]
 ----
-public static int callback(int arg)
+include::../demos/common/src/main/java/com/mycompany/NativeCallback.java[tag=nativeCallbackReturn,indent=0]
 ----
 
 This is tricky since the method name changes to support covariant return types and so the signature would be:
 
 [source,objc]
 ----
-com_mycompany_NativeCallback_callback___int_R_int(intValue);
+include::../demos/ios/src/main/objectivec/NativeCallbackSnippets.m[tag=nativeCallbackInvokeReturn,indent=0]
 ----
 
 The upper case R allows us to differentiate between void `callback(int,int)` and `int callback(int)`.
@@ -1587,7 +1394,7 @@ For example, the Google Maps project includes the static callback method:
 
 [source,java]
 ----
-static void fireMapChangeEvent(int mapId, final int zoom, final double lat, final double lon) { ... }
+include::../demos/common/src/main/java/com/codenameone/googlemaps/MapContainerCallbacks.java[tag=fireMapChangeEvent,indent=0]
 ----
 
 defined in the `com.codename1.googlemaps.MapContainer` class.
@@ -1612,44 +1419,7 @@ The SMS Broadcast Receiver code from before also used callbacks such as this:
 
 [source,java]
 ----
-package com.codename1.sms.intercept; // <1>
-
-import com.codename1.util.FailureCallback;
-import com.codename1.util.SuccessCallback;
-import static com.codename1.ui.CN.*;
-
-/**
- * This is an internal class, it's package protect to hide that
- */
-class SMSCallback {
-    static SuccessCallback<String> onSuccess;
-    static FailureCallback onFail;
-
-    public static void smsReceived(String sms) {
-        if(onSuccess != null) {
-            SuccessCallback<String> s = onSuccess;
-            onSuccess = null;
-            onFail = null;
-            SMSInterceptor.unbindListener();
-            callSerially(() -> s.onSucess(sms)); // <2>
-        }
-    }
-
-    public static void smsReceiveError(Exception err) {
-        if(onFail != null) {
-            FailureCallback f = onFail;
-            onFail = null;
-            SMSInterceptor.unbindListener();
-            onSuccess = null;
-            callSerially(() -> f.onError(null, err, 1, err.toString()));
-        } else {
-            if(onSuccess != null) {
-                SMSInterceptor.unbindListener();
-                onSuccess = null;
-            }
-        }
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/sms/intercept/SMSCallback.java[tag=smsCallback,indent=0]
 ----
 
 
@@ -2030,7 +1800,7 @@ You can access the value of the URL that launched the app using:
 
 [source,java]
 ----
-String arg = Display.getInstance().getProperty("AppArg");
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/RearrangeableItemsDemo.java[tag=rearrangeableItems,indent=0]
 ----
 
 This value would be null if the app was launched via the icon.
@@ -2244,11 +2014,7 @@ The interface definition for `UnreadUpdatesCallback` is:
 
 [source,java]
 ----
-public interface UnreadUpdatesCallback {
-    //This method is called once the unread updates count is available.
-    void onResult(MobihelpCallbackStatus status, Integer count);
-
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/AppArgSnippet.java[tag=appArg,indent=0]
 ----
 
 I.e. If we were to implement this method (which I plan to do), we need to have a way for the native code to call the `callback.onResult()` method of the passed parameter.
@@ -2264,31 +2030,7 @@ For the second issue, we'll create a static method that can take the token gener
 
 [source,java]
 ----
-public class MobihelpNativeCallback {
-    private static int nextId = 0;
-    private static Map<Integer,UnreadUpdatesCallback> callbacks = new HashMap<Integer,UnreadUpdatesCallback>();
-
-    static int registerUnreadUpdatesCallback(UnreadUpdatesCallback callback) {
-        callbacks.put(nextId, callback);
-        return nextId++;
-    }
-
-    public static void fireUnreadUpdatesCallback(int callbackId, final int status, final int count) {
-        final UnreadUpdatesCallback cb = callbacks.get(callbackId);
-        if (cb != null) {
-            callbacks.remove(callbackId);
-            Display.getInstance().callSerially(new Runnable() {
-
-                public void run() {
-                    MobihelpCallbackStatus status2 = MobihelpCallbackStatus.values()[status];
-                    cb.onResult(status2, count);
-                }
-
-            });
-        }
-    }
-
-}
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/UnreadUpdatesCallback.java[tag=unreadUpdatesCallback,indent=0]
 ----
 
 *Things to notice here:*
@@ -2310,150 +2052,28 @@ There are many solutions to this problem, but the one I chose was to provide two
 
 [source,java]
 ----
-public final static void initIOS(MobihelpConfig config)
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeCallback.java[tag=mobihelpNativeCallback,indent=0]
 ----
 
 and
 
 [source,java]
 ----
-public final static void initAndroid(MobihelpConfig config)
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpInitIOS,indent=0]
 ----
 
 Then I can set up the API with code like:
 
 [source,java]
 ----
-MobihelpConfig config = new MobihelpConfig();
-config.setAppSecret("xxxxxxx");
-config.setAppId("freshdeskdemo-2-xxxxxx");
-config.setDomain("codenameonetest1.freshdesk.com");
-Mobihelp.initIOS(config);
-
-config = new MobihelpConfig();
-config.setAppSecret("yyyyyyyy");
-config.setAppId("freshdeskdemo-1-yyyyyyyy");
-config.setDomain("https://codenameonetest1.freshdesk.com");
-Mobihelp.initAndroid(config);
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpInitAndroid,indent=0]
 ----
 
 ===== The Resulting Public API
 
 [source,java]
 ----
-public class Mobihelp {
-
-    private static char[] separators = new char[]{',','|','/','@','#','%','!','^','&','*','=','+','*','<'};
-    private static MobihelpNative peer;
-
-    public static boolean isSupported() {
-        ....
-    }
-
-    public static void setPeer(MobihelpNative peer) {
-        ....
-    }
-
-    //Attach the given custom data (key-value pair) to the conversations/tickets.
-    public final static void	addCustomData(String key, String value) {
-        ...
-    }
-    //Attach the given custom data (key-value pair) to the conversations/tickets with the ability to flag sensitive data.
-    public final static void	addCustomData(String key, String value, boolean isSensitive) {
-        ...
-    }
-    //Clear all breadcrumb data.
-    public final static void	clearBreadCrumbs() {
-        ...
-    }
-    //Clear all custom data.
-    public final static void	clearCustomData() {
-        ...
-    }
-    //Clears User information.
-    public final static void	clearUserData() {
-        ...
-    }
-    //Retrieve the number of unread items across all the conversations for the user synchronously i.e.
-    public final static int	getUnreadCount() {
-        ...
-    }
-
-    //Retrieve the number of unread items across all the conversations for the user asynchronously, count is delivered to the supplied UnreadUpdatesCallback instance Note : This may return 0 or stale value when there is no network connectivity etc
-    public final static void	getUnreadCountAsync(UnreadUpdatesCallback callback) {
-        ...
-    }
-    //Initialize the Mobihelp support section with necessary app configuration.
-    public final static void	initAndroid(MobihelpConfig config) {
-        ...
-    }
-
-    public final static void initIOS(MobihelpConfig config) {
-        ...
-    }
-
-
-    //Attaches the given text as a breadcrumb to the conversations/tickets.
-    public final static void	leaveBreadCrumb(String crumbText) {
-        ...
-    }
-    //Set the email of the user to be reported on the Freshdesk Portal
-    public final static void	setUserEmail(String email) {
-        ...
-    }
-
-    //Set the name of the user to be reported on the Freshdesk Portal.
-    public final static void	setUserFullName(String name) {
-        ...
-    }
-
-    //Display the App Rating dialog with option to Rate, Leave feedback etc
-    public static void	showAppRateDialog() {
-        ...
-    }
-    //Directly launch Conversation list screen from anywhere within the application
-    public final static void	showConversations() {
-        ...
-    }
-    //Directly launch Feedback Screen from anywhere within the application.
-    public final static void	showFeedback(FeedbackRequest feedbackRequest) {
-        ...
-    }
-    //Directly launch Feedback Screen from anywhere within the application.
-    public final static void	showFeedback() {
-        ...
-    }
-    //Displays the Support landing page (Solution Article List Activity) where only solutions tagged with the given tags are displayed.
-    public final static void	showSolutions(ArrayList<String> tags) {
-        ...
-    }
-
-    private static String findUnusedSeparator(ArrayList<String> tags) {
-        ...
-
-    }
-
-    //Displays the Support landing page (Solution Article List Activity) from where users can do the following
-    //View solutions,
-    //Search solutions,
-    public final static void	showSolutions() {
-        ...
-    }
-    //Displays the Integrated Support landing page where only solutions tagged with the given tags are displayed.
-    public final static void	showSupport(ArrayList<String> tags) {
-        ...
-    }
-
-    //Displays the Integrated Support landing page (Solution Article List Activity) from where users can do the following
-    //View solutions,
-    //Search solutions,
-    //  Start a new conversation,
-    //View existing conversations update/ unread count etc
-    public final static void	showSupport() {
-        ...
-    }
-
-}
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpUsage.java[tag=mobihelpUsage,indent=0]
 ----
 
 ===== The Native Interface
@@ -2462,138 +2082,7 @@ The final native interface is nearly identical to our public API, except in case
 
 [source,java]
 ----
-public interface MobihelpNative extends NativeInterface {
-
-    /**
-     * @return the appId
-     */
-    public String config_getAppId();
-
-    /**
-     * @param appId the appId to set
-     */
-    public void config_setAppId(String appId);
-
-    /**
-     * @return the appSecret
-     */
-    public String config_getAppSecret();
-
-    /**
-     * @param appSecret the appSecret to set
-     */
-    public void config_setAppSecret(String appSecret);
-    /**
-     * @return the domain
-     */
-    public String config_getDomain();
-    /**
-     * @param domain the domain to set
-     */
-    public void config_setDomain(String domain) ;
-
-    /**
-     * @return the feedbackType
-     */
-    public int config_getFeedbackType() ;
-
-    /**
-     * @param feedbackType the feedbackType to set
-     */
-    public void config_setFeedbackType(int feedbackType);
-
-    /**
-     * @return the launchCountForReviewPrompt
-     */
-    public int config_getLaunchCountForReviewPrompt() ;
-    /**
-     * @param launchCountForReviewPrompt the launchCountForReviewPrompt to set
-     */
-    public void config_setLaunchCountForReviewPrompt(int launchCountForReviewPrompt);
-    /**
-     * @return the prefetchSolutions
-     */
-    public boolean config_isPrefetchSolutions();
-    /**
-     * @param prefetchSolutions the prefetchOptions to set
-     */
-    public void config_setPrefetchSolutions(boolean prefetchSolutions);
-    /**
-     * @return the autoReplyEnabled
-     */
-    public boolean config_isAutoReplyEnabled();
-
-    /**
-     * @param autoReplyEnabled the autoReplyEnabled to set
-     */
-    public void config_setAutoReplyEnabled(boolean autoReplyEnabled) ;
-
-    /**
-     * @return the enhancedPrivacyModeEnabled
-     */
-    public boolean config_isEnhancedPrivacyModeEnabled() ;
-
-    /**
-     * @param enhancedPrivacyModeEnabled the enhancedPrivacyModeEnabled to set
-     */
-    public void config_setEnhancedPrivacyModeEnabled(boolean enhancedPrivacyModeEnabled) ;
-
-
-
-    //Attach the given custom data (key-value pair) to the conversations/tickets.
-    public void	addCustomData(String key, String value);
-    //Attach the given custom data (key-value pair) to the conversations/tickets with the ability to flag sensitive data.
-    public void addCustomDataWithSensitivity(String key, String value, boolean isSensitive);
-    //Clear all breadcrumb data.
-    public void	clearBreadCrumbs() ;
-    //Clear all custom data.
-    public void	clearCustomData();
-    //Clears User information.
-    public void	clearUserData();
-    //Retrieve the number of unread items across all the conversations for the user synchronously i.e.
-    public int getUnreadCount();
-
-    //Retrieve the number of unread items across all the conversations for the user asynchronously, count is delivered to the supplied UnreadUpdatesCallback instance Note : This may return 0 or stale value when there is no network connectivity etc
-    public void	getUnreadCountAsync(int callbackId);
-
-    public void initNative();
-
-    //Attaches the given text as a breadcrumb to the conversations/tickets.
-    public  void leaveBreadCrumb(String crumbText);
-    //Set the email of the user to be reported on the Freshdesk Portal
-
-    public void setUserEmail(String email);
-
-    //Set the name of the user to be reported on the Freshdesk Portal.
-    public void setUserFullName(String name);
-
-    //Display the App Rating dialog with option to Rate, Leave feedback etc
-    public void	showAppRateDialog();
-    //Directly launch Conversation list screen from anywhere within the application
-    public void showConversations();
-
-    //Directly launch Feedback Screen from anywhere within the application.
-    public void	showFeedbackWithArgs(String subject, String description);
-    //Directly launch Feedback Screen from anywhere within the application.
-    public void	showFeedback();
-
-    //Displays the Support landing page (Solution Article List Activity) where only solutions tagged with the given tags are displayed.
-    public void	showSolutionsWithTags(String tags, String separator);
-
-    //Displays the Support landing page (Solution Article List Activity) from where users can do the following
-    //View solutions,
-    //Search solutions,
-    public void	showSolutions();
-    //Displays the Integrated Support landing page where only solutions tagged with the given tags are displayed.
-    public void	showSupportWithTags(String tags, String separator);
-
-    //Displays the Integrated Support landing page (Solution Article List Activity) from where users can do the following
-    //View solutions,
-    //Search solutions,
-    //  Start a new conversation,
-    //View existing conversations update/ unread count etc
-    public void	showSupport();
-}
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpClassOverview,indent=0]
 ----
 
 Notice also, that the native interface includes a set of methods with names prefixed with `config__`.  This is just a naming conventions I used to identify methods that map to the `MobihelpConfig` class.  I could have used a separate native interface for these, but decided to keep all the native stuff in one class for simplicity and maintainability.
@@ -2604,44 +2093,14 @@ So we have a public API, and we have a native interface.  The idea is that the p
 
 [source,java]
 ----
-public class Mobihelp {
-    private static MobihelpNative peer;
-    //...
-}
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpNative.java[tag=mobihelpNative,indent=0]
 ----
 
 We'll initialize this `peer` inside the `init()` method of the `Mobihelp` class.  Notice, though that `init()` is `private` since we have provided abstractions for the Android and iOS apps separately:
 
 [source,java]
 ----
-    //Initialize the Mobihelp support section with necessary app configuration.
-    public final static void initAndroid(MobihelpConfig config) {
-        if ("and".equals(Display.getInstance().getPlatformName())) {
-            init(config);
-        }
-    }
-
-    public final static void initIOS(MobihelpConfig config) {
-        if ("ios".equals(Display.getInstance().getPlatformName())) {
-            init(config);
-        }
-    }
-
-    private static void init(MobihelpConfig config) {
-        peer = (MobihelpNative)NativeLookup.create(MobihelpNative.class);
-        peer.config_setAppId(config.getAppId());
-        peer.config_setAppSecret(config.getAppSecret());
-        peer.config_setAutoReplyEnabled(config.isAutoReplyEnabled());
-        peer.config_setDomain(config.getDomain());
-        peer.config_setEnhancedPrivacyModeEnabled(config.isEnhancedPrivacyModeEnabled());
-        if (config.getFeedbackType() != null) {
-            peer.config_setFeedbackType(config.getFeedbackType().ordinal());
-        }
-        peer.config_setLaunchCountForReviewPrompt(config.getLaunchCountForReviewPrompt());
-        peer.config_setPrefetchSolutions(config.isPrefetchSolutions());
-        peer.initNative();
-
-    }
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpClassOverview,indent=0]
 ----
 
 *Things to Notice*:
@@ -2655,9 +2114,7 @@ For most of the methods in the `Mobihelp` class, we can see that the public API 
 
 [source,java]
 ----
-public final static void setUserFullName(String name) {
-    peer.setUserFullName(name);
-}
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpInitMethods,indent=0]
 ----
 
 For some other methods, the public API needs to break apart the parameters into a form that the native interface can accept.  E.g. the `init()` method, shown above, takes a `MobihelpConfig` object as a parameter, but it passed the properties of the `config` object individually into the native interface.
@@ -2666,24 +2123,14 @@ Another example, is the `showSupport(ArrayList<String> tags)` method.  The corre
 
 [source,java]
 ----
-public final static void showSupport(ArrayList<String> tags) {
-    String separator = findUnusedSeparator(tags);
-    StringBuilder sb = new StringBuilder();
-    for (String tag : tags) {
-        sb.append(tag).append(separator);
-    }
-    peer.showSupportWithTags(sb.toString().substring(0, sb.length()-separator.length()), separator);
-}
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpSetUserFullNameMethod,indent=0]
 ----
 
 The only other non-trivial wrapper is the `getUnreadCountAsync()` method that we discussed before:
 
 [source,java]
 ----
-   public final static void getUnreadCountAsync(UnreadUpdatesCallback callback) {
-        int callbackId = MobihelpNativeCallback.registerUnreadUpdatesCallback(callback);
-        peer.getUnreadCountAsync(callbackId);
-    }
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpShowSupportWithTags,indent=0]
 ----
 
 ==== Step 5: Implementing the Native Interface in Android
@@ -2710,31 +2157,20 @@ Our implementation will be a thin wrapper around the native Android SDK.  See th
 +
 [source,java]
 ----
-private static Context context() {
-    return com.codename1.impl.android.AndroidNativeUtil.getActivity().getApplicationContext();
-}
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpGetUnreadCountAsync,indent=0]
 ----
 +
 This will enable us to easily wrap the freshdesk native API.  E.g.:
 +
 [source,java]
 ----
-public void clearUserData() {
-    com.freshdesk.mobihelp.Mobihelp.clearUserData(context());
-}
+include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeContext,indent=0]
 ----
 2. `runOnUiThread()` - Many of the calls to the FreshDesk API may have been made from the Codename One EDT.  However, Android has its own event dispatch thread that should be used for interacting with native Android UI.  Therefore, any API calls that look like they initiate some sort of native Android UI process should be wrapped inside Android's `runOnUiThread()` method which is similar to Codename One's `Display.callSerially()` method. E.g. see the `showSolutions()` method:
 +
 [source,java]
 ----
-    public void showSolutions() {
-        activity().runOnUiThread(new Runnable() {
-            public void run() {
-                com.freshdesk.mobihelp.Mobihelp.showSolutions(context());
-            }
-        });
-
-    }
+include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeClearUserData,indent=0]
 ----
 +
 (Note here that the `activity()` method is another convenience method to retrieve the app's current `Activity` from the `AndroidNativeUtil` class).
@@ -2742,18 +2178,7 @@ public void clearUserData() {
 +
 [source,java]
 ----
-    public void getUnreadCountAsync(final int callbackId) {
-        activity().runOnUiThread(new Runnable() {
-            public void run() {
-                com.freshdesk.mobihelp.Mobihelp.getUnreadCountAsync(context(), new com.freshdesk.mobihelp.UnreadUpdatesCallback() {
-                    public void onResult(com.freshdesk.mobihelp.MobihelpCallbackStatus status, Integer count) {
-                        MobihelpNativeCallback.fireUnreadUpdatesCallback(callbackId, status.ordinal(), count);
-                    }
-                });
-            }
-        });
-
-    }
+include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeShowSolutions,indent=0]
 ----
 
 ==== Step 6: Bundling the Native SDKs
@@ -2999,24 +2424,19 @@ We more-or-less just follow the http://developer.freshdesk.com/mobihelp/ios/inte
 +
 [source]
 ----
-#import "Mobihelp.h"
+include::../demos/ios/src/main/objectivec/com_codename1_freshdesk_MobihelpNativeImpl.m[tag=mobihelpImport,indent=0]
 ----
 . Similar to our use of `runOnUiThread()` in Android, we will wrap all of our API calls in either `dispatch_async()` or `dispatch_sync()` calls to ensure that we are interacting with the Mobihelp API on the app's main thread rather than the Codename One EDT.
 . Some methods/messages in the Mobihelp SDK require us to pass a `UIViewController` as a parameter. In Codename One, the entire application uses a single UIViewController: `CodenameOne_GLViewController`.  You can obtain a reference to this using the `[CodenameOne_GLViewController instance]` message.  We need to import its header file:
 +
 ----
-#import "CodenameOne_GLViewController.h"
+include::../demos/ios/src/main/objectivec/com_codename1_freshdesk_MobihelpNativeImpl.m[tag=mobihelpControllerImport,indent=0]
 ----
 +
 As an example, let's look at the `showFeedback()` method:
 +
 ----
--(void)showFeedback{
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[Mobihelp sharedInstance] presentFeedback:[CodenameOne_GLViewController instance]];
-    });
-}
+include::../demos/ios/src/main/objectivec/com_codename1_freshdesk_MobihelpNativeImpl.m[tag=mobihelpShowFeedback,indent=0]
 ----
 
 ==== Using the MobihelpNativeCallback
@@ -3024,15 +2444,7 @@ As an example, let's look at the `showFeedback()` method:
 We described earlier how we created a static method on the `MobihelpNativeCallback` class so that native code could easily fire a callback method.  Now let's take a look at how this looks from the iOS side of the fence.  Here is the implementation of `getUnreadCountAsync()`:
 
 ----
--(void)getUnreadCountAsync:(int)param{
-  dispatch_async(dispatch_get_main_queue(), ^{
-    [[Mobihelp sharedInstance]
-      unreadCountWithCompletion:^(NSInteger count){
-        com_codename1_freshdesk_MobihelpNativeCallback_fireUnreadUpdatesCallback___int_int_int(
-                CN1_THREAD_GET_STATE_PASS_ARG param, 3 /*SUCCESS*/, count);
-      }];
-  });
-}
+include::../demos/ios/src/main/objectivec/com_codename1_freshdesk_MobihelpNativeImpl.m[tag=mobihelpGetUnreadCountAsync,indent=0]
 ----
 
 In our case the iOS SDK version of this method is `+unreadCountWithCompletion:` which takes a block (which is like an anonymous function) as a parameter.
@@ -3050,7 +2462,7 @@ com_codename1_freshdesk_MobihelpNativeCallback_fireUnreadUpdatesCallback___int_i
 . We also need to import the header file for this class:
 +
 ----
-#import "com_codename1_freshdesk_MobihelpNativeCallback.h"
+include::../demos/ios/src/main/objectivec/com_codename1_freshdesk_MobihelpNativeImpl.m[tag=mobihelpCallbackImport,indent=0]
 ----
 
 ==== Bundling Native iOS SDK
@@ -3112,59 +2524,7 @@ This is a layout manager that just arranges components in a center column aligne
 
 [source,java]
 ----
-class CenterLayout extends Layout {
-    public void layoutContainer(Container parent) {
-        int components = parent.getComponentCount();
-        Style parentStyle = parent.getStyle();
-        int centerPos = parent.getLayoutWidth() / 2 + parentStyle.getMargin(Component.LEFT);
-        int y = parentStyle.getMargin(Component.TOP);
-        boolean rtl = parent.isRTL();
-        for (int iter = 0; iter < components; iter++) {
-            Component current = parent.getComponentAt(iter);
-            Dimension d = current.getPreferredSize();
-            Style currentStyle = current.getStyle();
-            int marginRight = currentStyle.getMarginRight(rtl);
-            int marginLeft = currentStyle.getMarginLeft(rtl);
-            int marginTop = currentStyle.getMarginTop();
-            int marginBottom = currentStyle.getMarginBottom();
-            current.setSize(d);
-            int actualWidth = d.getWidth() + marginLeft + marginRight;
-            current.setX(centerPos - actualWidth / 2 + marginLeft);
-            y += marginTop;
-            current.setY(y);
-            y += d.getHeight() + marginBottom;
-        }
-    }
-
-    public Dimension getPreferredSize(Container parent) {
-        int components = parent.getComponentCount();
-        Style parentStyle = parent.getStyle();
-        int height = parentStyle.getMargin(Component.TOP) + parentStyle.getMargin(Component.BOTTOM);
-        int marginX = parentStyle.getMargin(Component.RIGHT) + parentStyle.getMargin(Component.LEFT);
-        int width = marginX;
-        for (int iter = 0; iter < components; iter++) {
-            Component current = parent.getComponentAt(iter);
-            Dimension d = current.getPreferredSize();
-            Style currentStyle = current.getStyle();
-            width = Math.max(d.getWidth() + marginX + currentStyle.getMargin(Component.RIGHT)
-                    + currentStyle.getMargin(Component.LEFT), width);
-            height += currentStyle.getMargin(Component.TOP) + d.getHeight()
-                    + currentStyle.getMargin(Component.BOTTOM);
-        }
-        Dimension size = new Dimension(width, height);
-        return size;
-    }
-}
-
-Form hi = new Form("Center Layout", new CenterLayout());
-for(int iter = 1 ; iter < 10 ; iter++) {
-    Label l = new Label("Label: " + iter);
-    l.getUnselectedStyle().setMarginLeft(iter * 3);
-    l.getUnselectedStyle().setMarginRight(0);
-    hi.add(l);
-}
-hi.add(new Label("Really Wide Label Text!!!"));
-hi.show();
+include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeGetUnreadCountAsync,indent=0]
 ----
 
 .Center layout staircase effect with margin
@@ -3400,9 +2760,7 @@ That's a big mess of stuff, but it's pretty easy to pick through it when you kno
 
 [source,java]
 ----
-public final class com.codename1.hellokotlin2.KotlinForm extends com.codename1.ui.Form {
-    //...
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/CenterLayoutDemo.java[tag=centerLayout,indent=0]
 ----
 
 Even just comparing this line with the class definition from the source file we have learned something about the Kotlin compiler.  It has made the class `final` by default.  That observation shouldn't affect our assessment here, but it is kind of interesting.
@@ -3521,8 +2879,7 @@ Finally, I call my library from the start() method of my app:
 
 [source,java]
 ----
-HelloKotlin hello = new HelloKotlin();
-hello.hello();
+include::../demos/common/src/main/java/com/codename1/hellokotlin2/KotlinForm.java[tag=kotlinForm,indent=0]
 ----
 
 If we run this in the Simulator, it should print "Hello from Kotlin" in the output console.  If we get an error, then we can dig in and try to figure out what went wrong using my standard debugging techniques.  *EXPECT* an error on the first run.  Hopefully it will just be a missing import or something simple.
