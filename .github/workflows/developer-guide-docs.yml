@@ -47,7 +47,7 @@ jobs:
           mkdir -p "$HOME/.codenameone"
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml test
+          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml install
 
       - name: Install ImageMagick for screenshot comparison
         if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true'
