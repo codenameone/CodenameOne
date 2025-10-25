@@ -4,12 +4,14 @@ import com.codename1.io.Storage;
 import com.codename1.io.TestImplementationProvider;
 import com.codename1.io.Util;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.junit.TestLogger;
 import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,6 +81,7 @@ public class PurchaseTest {
 
     @BeforeEach
     public void setup() throws Exception {
+        TestLogger.install();
         Field receiptsKeyField = Purchase.class.getDeclaredField("RECEIPTS_KEY");
         receiptsKeyField.setAccessible(true);
         receiptsKey = (String) receiptsKeyField.get(null);
@@ -131,6 +134,7 @@ public class PurchaseTest {
         Field storageInstanceField = Storage.class.getDeclaredField("INSTANCE");
         storageInstanceField.setAccessible(true);
         storageInstanceField.set(null, originalStorageInstance);
+        TestLogger.remove();
     }
 
     private void resetPurchaseStatics() throws Exception {
@@ -175,7 +179,7 @@ public class PurchaseTest {
     }
 
     @Test
-    public void testGetReceiptsLoadsFromStorageAndCaches() {
+    public void testGetReceiptsLoadsFromStorageAndCaches() throws IOException {
         List<Receipt> stored = new ArrayList<Receipt>();
         stored.add(createReceipt("basic", new Date(1000L), new Date(2000L)));
         Storage.getInstance().writeObject(receiptsKey, new ArrayList<Receipt>(stored));
@@ -203,6 +207,7 @@ public class PurchaseTest {
         assertTrue(receipts.isEmpty(), "Unexpected data should clear cached receipts");
         assertEquals("bad-data", Storage.getInstance().readObject(receiptsKey),
                 "Storage contents should remain untouched when data cannot be cast");
+        assertEquals(1, TestLogger.getThrowables().size(), "An exception should have been logged");
         resetPurchaseStatics();
     }
 

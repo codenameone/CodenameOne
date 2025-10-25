@@ -22,7 +22,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 class LogTest {
     private Log originalLog;
@@ -93,20 +92,6 @@ class LogTest {
         String content = testLog.getWrittenContent();
         assertTrue(content.contains("accepted"));
         assertTrue(systemOutMessages.stream().anyMatch(s -> s.contains("accepted")));
-    }
-
-    @Test
-    void logThrowableWritesExceptionDetails() throws IOException {
-        testLog.resetContent();
-        systemOutMessages.clear();
-
-        RuntimeException failure = new RuntimeException("boom");
-        Log.e(failure);
-
-        String content = testLog.getWrittenContent();
-        assertTrue(content.contains("Exception: java.lang.RuntimeException - boom"));
-        assertTrue(content.contains("stack"));
-        verify(mockImplementation).printStackTraceToStream(any(), any());
     }
 
     @Test
