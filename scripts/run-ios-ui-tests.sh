@@ -44,6 +44,26 @@ run_with_timeout() {
   done
   wait "$child"
 }
+
+wait_for_boot() {
+  # wait_for_boot <udid> <timeout_seconds>
+  local udid="$1" timeout="$2" waited=0
+  # Try to start boot if not already booted
+  xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+  while (( waited < timeout )); do
+    # bootstatus -b: boot if needed; exit 0 when fully booted on newer Xcodes; otherwise fall back to parsing
+    if xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1; then
+      return 0
+    fi
+    # Fallback check: look for "(Booted)" in device list
+    if xcrun simctl list devices 2>/dev/null | grep -q "$udid" | grep -q 'Booted'; then
+      return 0
+    fi
+    sleep 3
+    waited=$((waited+3))
+  done
+  return 1
+}
 # --- end: global cleanup/watchdog helpers ---
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
@@ -152,12 +172,12 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-# --- begin: robust destination selection (no Python, no JSON) ---
+# --- begin: robust destination selection (no Python) ---
 dump_sim_info() {
-  xcrun simctl list          > "$ARTIFACTS_DIR/simctl-list.txt"           2>&1 || true
-  xcrun simctl list runtimes > "$ARTIFACTS_DIR/sim-runtimes.txt"          2>&1 || true
-  xcrun simctl list devicetypes > "$ARTIFACTS_DIR/sim-devicetypes.txt"    2>&1 || true
-  xcodebuild -showsdks       > "$ARTIFACTS_DIR/xcodebuild-showsdks.txt"   2>&1 || true
+  xcrun simctl list             > "$ARTIFACTS_DIR/simctl-list.txt"           2>&1 || true
+  xcrun simctl list runtimes    > "$ARTIFACTS_DIR/sim-runtimes.txt"          2>&1 || true
+  xcrun simctl list devicetypes > "$ARTIFACTS_DIR/sim-devicetypes.txt"       2>&1 || true
+  xcodebuild -showsdks          > "$ARTIFACTS_DIR/xcodebuild-showsdks.txt"   2>&1 || true
   xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations > "$ARTIFACTS_DIR/xcodebuild-showdestinations.txt" 2>&1 || true
 }
 
@@ -167,7 +187,6 @@ pick_destination_from_showdestinations() {
   awk '
     BEGIN{ FS="[, ]+"; best=""; }
     /platform:iOS Simulator/ && /id:/ {
-      # Extract fields like name:<...> id:<UUID>
       name=""; id="";
       for (i=1;i<=NF;i++) {
         if ($i ~ /^name:/) name=substr($i,6);
@@ -197,9 +216,7 @@ create_temp_device_on_latest_runtime() {
   rt="$(xcrun simctl list runtimes 2>/dev/null | \
     awk '
       /iOS/ && /(Available|installed)/ {
-        # last field often looks like (com.apple.CoreSimulator.SimRuntime.iOS-18-5)
         id=$NF; gsub(/[()]/,"",id);
-        # extract version parts to sort, keep id
         if (match($0,/iOS[[:space:]]+([0-9]+)\.([0-9]+)/,m)) {
           printf("%03d.%03d|%s\n", m[1], m[2], id);
         } else if (match($0,/iOS[[:space:]]+([0-9]+)/,m2)) {
@@ -266,10 +283,10 @@ if [ -z "$SIM_UDID" ]; then
   exit 3
 fi
 
-# Boot and wait
-xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
-if ! xcrun simctl bootstatus "$SIM_UDID" -b -t 180; then
+# Boot and wait (portable: no -t flag)
+if ! wait_for_boot "$SIM_UDID" 180; then
   ri_log "FATAL: Simulator never reached booted state"
+  echo "Usage: simctl bootstatus <device> [-bcd]"
   exit 4
 fi
 ri_log "Simulator booted: $SIM_UDID"
