@@ -160,28 +160,88 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
-# Derive desired simulator OS from SDKROOT (e.g., iphonesimulator18.5 -> 18 / 5)
-SDKROOT_OS="${SDKROOT#iphonesimulator}"
-DESIRED_OS_MAJOR="${SDKROOT_OS%%.*}"
-DESIRED_OS_MINOR="${SDKROOT_OS#*.}"; [ "$DESIRED_OS_MINOR" = "$SDKROOT_OS" ] && DESIRED_OS_MINOR=""
+# --- begin: pick latest available iOS runtime + an iPhone device type (JSON-based) ---
+require_cmd() { command -v "$1" >/dev/null 2>&1 || { ri_log "FATAL: '$1' not found"; exit 3; }; }
+require_cmd xcrun
+require_cmd python3
 
-# Determine an iOS 18 runtime and create a throwaway iPhone 16 device
-RUNTIME_ID="$(xcrun simctl list runtimes | awk '/iOS 18\./ && $0 ~ /Available/ {print $NF; exit}')"
+# Allow manual override from env if you want to pin a specific runtime/device on a given runner:
+# IOS_RUNTIME_ID="com.apple.CoreSimulator.SimRuntime.iOS-18-5"
+# IOS_DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-16"
+RUNTIME_ID="${IOS_RUNTIME_ID:-}"
+DEVICE_TYPE="${IOS_DEVICE_TYPE:-}"
+
 if [ -z "$RUNTIME_ID" ]; then
-  ri_log "FATAL: No iOS 18.x simulator runtime available"
+  RUNTIME_ID="$(xcrun simctl list runtimes --json 2>/dev/null | python3 - <<'PY'
+import json, sys
+try:
+    data=json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+c=[]
+for r in data.get("runtimes", []):
+    # Newer Xcodes use platform == "iOS"; older had name strings. Check both.
+    plat = r.get("platform") or r.get("name","")
+    if "iOS" not in str(plat): continue
+    if not r.get("isAvailable", False): continue
+    ident = r.get("identifier") or ""
+    ver   = r.get("version") or ""
+    # Turn version into a sortable tuple
+    parts=[]
+    for p in str(ver).split("."):
+        try: parts.append(int(p))
+        except: parts.append(0)
+    c.append((parts, ident))
+if not c:
+    sys.exit(2)
+c.sort()
+print(c[-1][1])
+PY
+  )"
+fi
+
+if [ -z "$RUNTIME_ID" ]; then
+  ri_log "FATAL: No *available* iOS simulator runtime found on this runner"
+  xcrun simctl list runtimes || true
   exit 3
 fi
-DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-16"
+
+if [ -z "$DEVICE_TYPE" ]; then
+  DEVICE_TYPE="$(xcrun simctl list devicetypes --json 2>/dev/null | python3 - <<'PY'
+import json, sys
+try:
+    data=json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+dts=data.get("devicetypes",[])
+# prefer newest iPhone names if present, else any iPhone, else first available
+prefs = ["iPhone 16 Pro Max","iPhone 16 Pro","iPhone 16","iPhone 15 Pro Max","iPhone 15 Pro","iPhone 15","iPhone"]
+for pref in prefs:
+    for dt in dts:
+        if pref in (dt.get("name") or ""):
+            print(dt.get("identifier","")); sys.exit(0)
+if dts:
+    print(dts[0].get("identifier","")); sys.exit(0)
+sys.exit(2)
+PY
+  )"
+fi
+
+if [ -z "$DEVICE_TYPE" ]; then
+  ri_log "FATAL: Could not determine an iPhone device type"
+  xcrun simctl list devicetypes || true
+  exit 3
+fi
+
 SIM_NAME="CN1 UI Test iPhone"
 SIM_UDID="$(xcrun simctl create "$SIM_NAME" "$DEVICE_TYPE" "$RUNTIME_ID" 2>/dev/null || true)"
 if [ -z "$SIM_UDID" ]; then
-  ri_log "FATAL: Failed to create simulator ($DEVICE_TYPE, $RUNTIME_ID)"
+  ri_log "FATAL: Failed to create simulator (deviceType=$DEVICE_TYPE, runtime=$RUNTIME_ID)"
   exit 3
 fi
 SIM_UDID_CREATED="$SIM_UDID"
-ri_log "Created simulator $SIM_NAME ($SIM_UDID) with runtime $RUNTIME_ID"
+ri_log "Created simulator $SIM_NAME ($SIM_UDID) deviceType=$DEVICE_TYPE runtime=$RUNTIME_ID"
 
-# Boot it and wait until it's ready
 xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
 if ! xcrun simctl bootstatus "$SIM_UDID" -b -t 180; then
   ri_log "FATAL: Simulator never reached booted state"
@@ -189,6 +249,7 @@ if ! xcrun simctl bootstatus "$SIM_UDID" -b -t 180; then
 fi
 ri_log "Simulator booted: $SIM_UDID"
 SIM_DESTINATION="id=$SIM_UDID"
+# --- end: pick latest available iOS runtime + an iPhone device type (JSON-based) ---
 
 ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 
@@ -297,13 +358,6 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
 fi
 
 # Run only the UI test bundle
-# --- Begin: Start run video recording ---
-RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
-ri_log "Recording simulator video to $RUN_VIDEO"
-# recordVideo exits only when killed, so background it and store pid
-( xcrun simctl io booted recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
-# --- End: Start run video recording ---
-
 UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
