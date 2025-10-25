@@ -1,5 +1,6 @@
 package com.codename1.testing;
 
+import com.codename1.junit.TestLogger;
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
@@ -67,6 +68,7 @@ class TestRunnerComponentTest extends UITestBase {
 
     @Test
     void runTestsAddsFailureActionListenerOnException() throws Exception {
+        TestLogger.install();
         RuntimeException failure = new RuntimeException("explode");
         TestRunnerComponent component = new TestRunnerComponent();
         component.add(new SimpleTest("Explosive", true, true, failure));
@@ -90,6 +92,8 @@ class TestRunnerComponentTest extends UITestBase {
             }
         }
         assertTrue(found);
+        assertEquals(1, TestLogger.getThrowables().size());
+        TestLogger.remove();
     }
 
     private Container getResultsPane(TestRunnerComponent component) throws Exception {
