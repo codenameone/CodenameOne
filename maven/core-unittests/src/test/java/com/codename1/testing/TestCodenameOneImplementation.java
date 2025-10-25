@@ -685,10 +685,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void closingOutput(Object stream) {
-        if (stream instanceof OutputStream) {
+    public void closingOutput(OutputStream stream) {
+        if (stream != null) {
             try {
-                ((OutputStream) stream).close();
+                stream.close();
             } catch (IOException ignored) {
             }
         }
@@ -700,9 +700,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void addConnectionToQueue(ConnectionRequest r) {
-        if (r != null) {
-            r.complete();
-        }
+        super.addConnectionToQueue(r);
     }
 
     @Override
