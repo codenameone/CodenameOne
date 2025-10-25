@@ -119,7 +119,6 @@ public class TestRunnerComponent extends Container {
             }
 
         } catch (final Throwable t) {
-            Log.e(t);
             CN.callSerially(new Runnable() {
                 public void run() {
                     statusLabel.setText(test + ": Failed");
