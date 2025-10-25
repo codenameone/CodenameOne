@@ -1,9 +1,11 @@
 package com.codename1.testing;
 
+import com.codename1.io.Log;
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,31 +73,57 @@ class TestRunnerComponentTest extends UITestBase {
         TestRunnerComponent component = new TestRunnerComponent();
         component.add(new SimpleTest("Explosive", true, true, failure));
 
+        RecordingLog recordingLog = new RecordingLog();
+        Log originalLog = replaceLog(recordingLog);
+
         Form form = component.showForm();
         assertNotNull(form);
 
-        assertDoesNotThrow(component::runTests);
-        flushSerialCalls();
+        try {
+            assertDoesNotThrow(component::runTests);
+            flushSerialCalls();
 
-        Container resultsPane = getResultsPane(component);
-        assertEquals(2, resultsPane.getComponentCount());
-        Button status = (Button) resultsPane.getComponentAt(1);
-        assertEquals("Explosive: Failed", status.getText());
+            Container resultsPane = getResultsPane(component);
+            assertEquals(2, resultsPane.getComponentCount());
+            Button status = (Button) resultsPane.getComponentAt(1);
+            assertEquals("Explosive: Failed", status.getText());
 
-        boolean found = false;
-        for (Object listener : status.getListeners()) {
-            if (listener instanceof ActionListener) {
-                found = true;
-                break;
+            ActionListener failureListener = null;
+            for (Object listener : status.getListeners()) {
+                if (listener instanceof ActionListener) {
+                    ActionListener candidate = (ActionListener) listener;
+                    candidate.actionPerformed(new ActionEvent(status));
+                    if (recordingLog.loggedThrowable != null) {
+                        failureListener = candidate;
+                        break;
+                    }
+                }
             }
+            assertNotNull(failureListener, "failure action listener should be installed");
+            assertSame(failure, recordingLog.loggedThrowable, "failure should be forwarded to Log.e");
+        } finally {
+            restoreLog(originalLog);
         }
-        assertTrue(found);
     }
 
     private Container getResultsPane(TestRunnerComponent component) throws Exception {
         Field field = TestRunnerComponent.class.getDeclaredField("resultsPane");
         field.setAccessible(true);
         return (Container) field.get(component);
+    }
+
+    private Log replaceLog(Log replacement) throws Exception {
+        Field field = Log.class.getDeclaredField("instance");
+        field.setAccessible(true);
+        Log original = (Log) field.get(null);
+        field.set(null, replacement);
+        return original;
+    }
+
+    private void restoreLog(Log original) throws Exception {
+        Field field = Log.class.getDeclaredField("instance");
+        field.setAccessible(true);
+        field.set(null, original);
     }
 
     private static class SimpleTest extends AbstractTest {
@@ -126,6 +154,15 @@ class TestRunnerComponentTest extends UITestBase {
         @Override
         public String toString() {
             return name;
+        }
+    }
+
+    private static class RecordingLog extends Log {
+        private Throwable loggedThrowable;
+
+        @Override
+        protected void logThrowable(Throwable t) {
+            loggedThrowable = t;
         }
     }
 }
