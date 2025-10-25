@@ -35,19 +35,7 @@ This sort of behavior creates a special case where setting the size/position mak
 
 [source,java]
 ----
-Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
-Button fall = new Button("Fall"); // <1>
-fall.addActionListener((e) -> {
-    for(int iter = 0 ; iter < 10 ; iter++) {
-        Label b = new Label ("Label " + iter);
-        b.setWidth(fall.getWidth());
-        b.setHeight(fall.getHeight());
-        b.setY(-fall.getHeight());
-        hi.add(b);
-    }
-    hi.animateLayout(20000); // <2>
-});
-hi.add(fall);
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LayoutAnimationsDemo.java[tag=layoutAnimations,indent=0]
 ----
 
 There are a couple of things that you should notice about this example:
@@ -80,32 +68,7 @@ WARNING: An unlayout animation always leaves the container in an invalidated sta
 [[animateUnlayutSampleCode]]
 [source,java]
 ----
-Form hi = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
-Button fall = new Button("Fall");
-fall.addActionListener((e) -> {
-    if(hi.getContentPane().getComponentCount() == 1) {
-        fall.setText("Rise");
-        for(int iter = 0 ; iter < 10 ; iter++) {
-            Label b = new Label ("Label " + iter);
-            b.setWidth(fall.getWidth());
-            b.setHeight(fall.getHeight());
-            b.setY(-fall.getHeight());
-            hi.add(b);
-        }
-        hi.animateLayout(20000);
-    } else {
-        fall.setText("Fall");
-        for(int iter = 1 ; iter < hi.getContentPane().getComponentCount() ; iter++) { // <1>
-            Component c = hi.getContentPane().getComponentAt(iter);
-            c.setY(-fall.getHeight()); // <2>
-        }
-        hi.animateUnlayoutAndWait(20000, 255); // <3>
-        hi.removeAll(); // <4>
-        hi.add(fall);
-        hi.revalidate();
-    }
-});
-hi.add(fall);
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/UnlayoutAnimationsDemo.java[tag=unlayoutAnimation,indent=0]
 ----
 
 You will notice some similarities with the unlayout animation but the differences represent the exact opposite of the layout animation:
@@ -127,16 +90,7 @@ This functionality might be undesirable which is why there is a version of the `
 
 [source,java]
 ----
-Button toHide = new Button("Will Be Hidden");
-Button hide = new Button("Hide It");
-hide.addActionListener((e) -> {
-    hide.setEnabled(false);
-    boolean t = !toHide.isHidden();
-    toHide.setHidden(t);
-    toHide.getParent().animateLayoutAndWait(200);
-    toHide.setVisible(!t);
-    hide.setEnabled(true);
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/HiddenComponentDemo.java[tag=hiddenComponent,indent=0]
 ----
 
 TIP: Notice that the code above uses `setVisible()`, which shouldn't be confused with `setHidden`. `setVisible()` just toggles the visibility of the component it would still occupy the same amount of space
@@ -157,9 +111,7 @@ The `AndWait` variant blocks the calling thread until the animation completes. T
 
 [source,java]
 ----
-arrangeForInterlace(effects);
-effects.animateUnlayoutAndWait(800, 20);
-effects.animateLayoutFade(800, 20);
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationSynchronicityDemo.java[tag=animationSequence,indent=0]
 ----
 
 First the UI goes thru an "unlayout" animation, once that completes the layout itself is performed.
@@ -180,11 +132,7 @@ The callback variant is similar to the `invokeAndBlock` variant but uses a more 
 
 [source,java]
 ----
-hi.animateUnlayout(20000, 255, () -> {
-    hi.removeAll();
-    hi.add(fall);
-    hi.revalidate();
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/UnlayoutAnimationsDemo.java[tag=unlayoutCallback,indent=0]
 ----
 
 ===== Animation Fade and Hierarchy
@@ -197,20 +145,7 @@ Some animate layout methods are hierarchy based. They work just like the regular
 
 [source,java]
 ----
-for(int iter = 0 ; iter < demoComponents.size() ; iter++) {
-    Component cmp = (Component)demoComponents.elementAt(iter);
-    if(iter < componentsPerRow) {
-        cmp.setX(-cmp.getWidth());
-    } else {
-        if(iter < componentsPerRow * 2) {
-            cmp.setX(dw);
-        } else {
-            cmp.setX(-cmp.getWidth());
-        }
-    }
-}
-boxContainer.setShouldCalcPreferredSize(true);
-boxContainer.animateHierarchyFade(3000, 30);
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/HierarchyAnimationDemo.java[tag=hierarchyAnimation,indent=0]
 ----
 
 The `demoComponents` `Vector` contains components from separate containers and this code would not work with a simple animate layout.
@@ -224,13 +159,7 @@ This effectively prevents two animations from mutating the UI in parallel so we 
 
 [source,java]
 ----
-cnt.add(myButton);
-int componentCount = cnt.getComponentCount();
-cnt.animateLayout(300);
-cnt.removeComponent(myButton);
-if(componentCount == cnt.getComponentCount()) {
-    // this will happen...
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerProblem,indent=0]
 ----
 
 The reason this happens is that the second remove gets postponed to the end of the animation so it won't break the animation. This works for remove and add operations on a https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] as well as other animations.
@@ -239,13 +168,7 @@ The simple *yet problematic* fix would be:
 
 [source,java]
 ----
-cnt.add(myButton);
-int componentCount = cnt.getComponentCount();
-cnt.animateLayoutAndWait(300);
-cnt.removeComponent(myButton);
-if(componentCount == cnt.getComponentCount()) {
-    // this probably won't happen...
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerWait,indent=0]
 ----
 
 So why that might still fail?
@@ -262,15 +185,7 @@ We can flush the animation queue and run synchronously after all the animations 
 
 [source,java]
 ----
-cnt.add(myButton);
-int componentCount = cnt.getComponentCount();
-cnt.animateLayout(300);
-cnt.getAnimationManager().flushAnimation(() -> {
-    cnt.removeComponent(myButton);
-    if(componentCount == cnt.getComponentCount()) {
-        // this shouldn't happen...
-    }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/AnimationManagerDemo.java[tag=animationManagerFlush,indent=0]
 ----
 
 === Low Level Animations
@@ -291,17 +206,12 @@ E.g. you can add additional animation logic using code like this:
 
 [source,java]
 ----
-myForm.registerAnimated(this);
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LowLevelAnimationDemo.java[tag=registerAnimated,indent=0]
+----
 
-private int spinValue;
-public boolean animate() {
-   if(userStatusPending) {
-       spinValue++;
-       super.animate();
-       return true;
-   }
-   return super.animate();
-}
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/LowLevelAnimationDemo.java[tag=lowLevelAnimate,indent=0]
 ----
 
 ==== Why Not Just Write Code In Paint?
@@ -363,14 +273,7 @@ To apply a transition to a component we can just use the `Container.replace()` m
 
 [source,java]
 ----
-Form hi = new Form("Replace", new BoxLayout(BoxLayout.Y_AXIS));
-Button replace = new Button("Replace Pending");
-Label replaceDestiny = new Label("Destination Replace");
-hi.add(replace);
-replace.addActionListener((e) -> {
-    replace.getParent().replaceAndWait(replace, replaceDestiny, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 800));
-    replaceDestiny.getParent().replaceAndWait(replaceDestiny, replace, CommonTransitions.createUncover(CommonTransitions.SLIDE_VERTICAL, true, 800));
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/ReplaceTransitionDemo.java[tag=replaceTransition,indent=0]
 ----
 
 TIP: Replace even works when you have a layout constraint in place e.g. replacing a component in a border layout will do the "right thing". However, some layouts such as `TableLayout` might be tricky in such cases so we recommend wrapping a potentially replaceable `Component` in a border layout and replacing the content.
@@ -390,68 +293,7 @@ The code below demonstrates the usage of all the main transitions:
 
 [source,java]
 ----
-Toolbar.setGlobalToolbar(true);
-Form hi = new Form("Transitions", new BoxLayout(BoxLayout.Y_AXIS));
-Style bg = hi.getContentPane().getUnselectedStyle();
-bg.setBgTransparency(255);
-bg.setBgColor(0xff0000);
-Button showTransition = new Button("Show");
-Picker pick = new Picker();
-pick.setStrings("Slide", "SlideFade", "Cover", "Uncover", "Fade", "Flip");
-pick.setSelectedString("Slide");
-TextField duration = new TextField("10000", "Duration", 6, TextArea.NUMERIC);
-CheckBox horizontal = CheckBox.createToggle("Horizontal");
-pick.addActionListener((e) -> {
-    String s = pick.getSelectedString().toLowerCase();
-    horizontal.setEnabled(s.equals("slide") || s.indexOf("cover") > -1);
-});
-horizontal.setSelected(true);
-hi.add(showTransition).
-    add(pick).
-    add(duration).
-    add(horizontal);
-
-Form dest = new Form("Destination");
-bg = dest.getContentPane().getUnselectedStyle();
-bg.setBgTransparency(255);
-bg.setBgColor(0xff);
-dest.setBackCommand(
-        dest.getToolbar().addCommandToLeftBar("Back", null, (e) -> hi.showBack()));
-
-showTransition.addActionListener((e) -> {
-    int h = CommonTransitions.SLIDE_HORIZONTAL;
-    if(!horizontal.isSelected()) {
-        h = CommonTransitions.SLIDE_VERTICAL;
-    }
-    switch(pick.getSelectedString()) {
-        case "Slide":
-            hi.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
-            dest.setTransitionOutAnimator(CommonTransitions.createSlide(h, true, duration.getAsInt(3000)));
-            break;
-        case "SlideFade":
-            hi.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
-            dest.setTransitionOutAnimator(CommonTransitions.createSlideFadeTitle(true, duration.getAsInt(3000)));
-            break;
-        case "Cover":
-            hi.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
-            dest.setTransitionOutAnimator(CommonTransitions.createCover(h, true, duration.getAsInt(3000)));
-            break;
-        case "Uncover":
-            hi.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
-            dest.setTransitionOutAnimator(CommonTransitions.createUncover(h, true, duration.getAsInt(3000)));
-            break;
-        case "Fade":
-            hi.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
-            dest.setTransitionOutAnimator(CommonTransitions.createFade(duration.getAsInt(3000)));
-            break;
-        case "Flip":
-            hi.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
-            dest.setTransitionOutAnimator(new FlipTransition(-1, duration.getAsInt(3000)));
-            break;
-    }
-    dest.show();
-});
-hi.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SlideTransitionsDemo.java[tag=slideTransitions,indent=0]
 ----
 
 
@@ -498,51 +340,7 @@ NOTE: The code below manipulates styles and look. This is done to make the code 
 
 [source,java]
 ----
-Form hi = new Form("Bubble");
-Button showBubble = new Button("+");
-showBubble.setName("BubbleButton");
-Style buttonStyle = showBubble.getAllStyles();
-buttonStyle.setBorder(Border.createEmpty());
-buttonStyle.setFgColor(0xffffff);
-buttonStyle.setBgPainter((g, rect) -> {
-    g.setColor(0xff);
-    int actualWidth = rect.getWidth();
-    int actualHeight = rect.getHeight();
-    int xPos, yPos;
-    int size;
-    if(actualWidth > actualHeight) {
-        yPos = rect.getY();
-        xPos = rect.getX() + (actualWidth - actualHeight) / 2;
-        size = actualHeight;
-    } else {
-        yPos = rect.getY() + (actualHeight - actualWidth) / 2;
-        xPos = rect.getX();
-        size = actualWidth;
-    }
-    g.setAntiAliased(true);
-    g.fillArc(xPos, yPos, size, size, 0, 360);
-});
-hi.add(showBubble);
-hi.setTintColor(0);
-showBubble.addActionListener((e) -> {
-    Dialog dlg = new Dialog("Bubbled");
-    dlg.setLayout(new BorderLayout());
-    SpanLabel sl = new SpanLabel("This dialog should appear with a bubble transition from the button", "DialogBody");
-    sl.getTextUnselectedStyle().setFgColor(0xffffff);
-    dlg.add(BorderLayout.CENTER, sl);
-    dlg.setTransitionInAnimator(new BubbleTransition(500, "BubbleButton"));
-    dlg.setTransitionOutAnimator(new BubbleTransition(500, "BubbleButton"));
-    dlg.setDisposeWhenPointerOutOfBounds(true);
-    dlg.getTitleStyle().setFgColor(0xffffff);
-
-    Style dlgStyle = dlg.getDialogStyle();
-    dlgStyle.setBorder(Border.createEmpty());
-    dlgStyle.setBgColor(0xff);
-    dlgStyle.setBgTransparency(0xff);
-    dlg.showPacked(BorderLayout.NORTH, true);
-});
-
-hi.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/BubbleTransitionDemo.java[tag=bubbleTransition,indent=0]
 ----
 
 .Bubble transition converting a circular button to a Dialog
@@ -573,25 +371,7 @@ forms so the transition will be able to find them.
 
 [source,java]
 ----
-Form demoForm = new Form(currentDemo.getDisplayName());
-demoForm.setScrollable(false);
-demoForm.setLayout(new BorderLayout());
-Label demoLabel = new Label(currentDemo.getDisplayName());
-demoLabel.setIcon(currentDemo.getDemoIcon());
-demoLabel.setName("DemoLabel");
-demoForm.addComponent(BorderLayout.NORTH, demoLabel);
-demoForm.addComponent(BorderLayout.CENTER, wrapInShelves(n));
-....
-demoForm.setBackCommand(backCommand);
-demoForm.setTransitionOutAnimator(
-    MorphTransition.create(3000).morph(
-        currentDemo.getDisplayName(),
-        "DemoLabel"));
-f.setTransitionOutAnimator(
-    MorphTransition.create(3000).
-        morph(currentDemo.getDisplayName(),
-        "DemoLabel"));
-demoForm.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/MorphTransitionDemo.java[tag=morphTransition,indent=0]
 ----
 
 ==== SwipeBackSupport
@@ -600,15 +380,25 @@ iOS7+ allows swiping back one form to the previous form, Codenmae One has an API
 
 [source,java]
 ----
-SwipeBackSupport.bindBack(Form currentForm, LazyValue<Form> destination);
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SwipeBackSupportDemo.java[tag=swipeBackBind,indent=0]
 ----
 
 That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows us to pass a value lazily:
 
 [source,java]
 ----
+/**
+ * Useful when passing a value that might not exist to a function, e.g. when we
+ * pass a form that we might need to construct dynamically later on.
+ */
 public interface LazyValue<T> {
-    public T get(Object... args);
+    /**
+     * Returns the actual value.
+     *
+     * @param args optional arguments for the creation of the lazy value
+     * @return the value
+     */
+    T get(Object... args);
 }
 ----
 
@@ -620,5 +410,5 @@ The code below should work for the transition sample above. Notice that this API
 
 [source,java]
 ----
-SwipeBackSupport.bindBack(dest, (args) -> hi);
+include::../demos/common/src/main/java/com/codenameone/developerguide/animations/SwipeBackSupportDemo.java[tag=swipeBackBindExample,indent=0]
 ----
