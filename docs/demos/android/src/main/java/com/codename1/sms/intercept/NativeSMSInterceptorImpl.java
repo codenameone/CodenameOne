@@ -8,11 +8,11 @@ import com.codename1.impl.android.AndroidNativeUtil;
 public class NativeSMSInterceptorImpl {
     private SMSListener smsListener;
     public void bindSMSListener() {
-        if (AndroidNativeUtil.checkForPermission(Manifest.permission.RECEIVE_SMS, "We can automatically enter the SMS code for you")) {
+        if (AndroidNativeUtil.checkForPermission(Manifest.permission.RECEIVE_SMS, "We can automatically enter the SMS code for you")) { // <1>
             smsListener = new SMSListener();
             IntentFilter filter = new IntentFilter();
             filter.addAction("android.provider.Telephony.SMS_RECEIVED");
-            AndroidNativeUtil.getActivity().registerReceiver(smsListener, filter);
+            AndroidNativeUtil.getActivity().registerReceiver(smsListener, filter); // <2>
         }
     }
 

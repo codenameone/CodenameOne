@@ -1254,7 +1254,7 @@ The native sample in stack overflow bound the listener in the activity but here 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/sms/intercept/NativeSMSInterceptor.java[tag=nativeSmsInterceptor,indent=0]
+include::../demos/common/src/main/java/com/codename1/sms/intercept/NativeSMSInterceptor.java[tag=nativeSmsInterceptor,indent=0]
 ----
 
 That's easy!
@@ -1394,7 +1394,7 @@ For example, the Google Maps project includes the static callback method:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/googlemaps/MapContainerCallbacks.java[tag=fireMapChangeEvent,indent=0]
+include::../demos/common/src/main/java/com/codename1/googlemaps/MapContainerCallbacks.java[tag=fireMapChangeEvent,indent=0]
 ----
 
 defined in the `com.codename1.googlemaps.MapContainer` class.
@@ -1419,7 +1419,7 @@ The SMS Broadcast Receiver code from before also used callbacks such as this:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/sms/intercept/SMSCallback.java[tag=smsCallback,indent=0]
+include::../demos/common/src/main/java/com/codename1/sms/intercept/SMSCallback.java[tag=smsCallback,indent=0]
 ----
 
 

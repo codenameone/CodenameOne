@@ -1,4 +1,4 @@
-package com.codename1.sms.intercept;
+package com.codename1.sms.intercept; // <1>
 
 import com.codename1.util.FailureCallback;
 import com.codename1.util.SuccessCallback;
@@ -15,7 +15,7 @@ class SMSCallback {
             onSuccess = null;
             onFail = null;
             SMSInterceptor.unbindListener();
-            callSerially(() -> s.onSucess(sms));
+            callSerially(() -> s.onSucess(sms)); // <2>
         }
     }
 
