@@ -1,12 +1,14 @@
 package com.codename1.test;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.junit.TestLogger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -22,7 +24,6 @@ import static org.mockito.ArgumentMatchers.anyChar;
 import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -33,9 +34,15 @@ public abstract class UITestBase {
     protected CodenameOneImplementation implementation;
     protected PluginSupport pluginSupport;
     private Graphics codenameOneGraphics;
+    private boolean installedLogger;
 
     @BeforeEach
     protected void setUpDisplay() throws Exception {
+        installedLogger = false;
+        if (!(Log.getInstance() instanceof TestLogger)) {
+            TestLogger.install();
+            installedLogger = true;
+        }
         display = Display.getInstance();
         resetUIManager();
 
@@ -62,6 +69,10 @@ public abstract class UITestBase {
         setDisplayField("codenameOneRunning", false);
         setDisplayField("edt", null);
         Util.setImplementation(null);
+        if (installedLogger) {
+            TestLogger.remove();
+            installedLogger = false;
+        }
     }
 
     private void setDisplayField(String fieldName, Object value) throws Exception {
@@ -95,7 +106,7 @@ public abstract class UITestBase {
     }
 
     protected CodenameOneImplementation createImplementation() {
-        return mock(CodenameOneImplementation.class);
+        return new TestCodenameOneImplementation();
     }
 
     protected void configureImplementation(CodenameOneImplementation implementation) {
