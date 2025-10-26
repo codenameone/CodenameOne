@@ -10,9 +10,12 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -44,6 +47,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean timeoutSupported;
     private boolean timeoutInvoked;
     private int timeoutValue;
+    private boolean translationSupported;
+    private boolean translateInvoked;
+    private boolean shapeSupported;
+    private boolean drawShapeInvoked;
+    private boolean fillShapeInvoked;
+    private Shape lastClipShape;
+    private Shape lastDrawShape;
+    private Shape lastFillShape;
+    private Stroke lastDrawStroke;
     private String[] accessPointIds = new String[0];
     private final Map<String, Integer> accessPointTypes = new HashMap<>();
     private final Map<String, String> accessPointNames = new HashMap<>();
@@ -126,6 +138,58 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void resetTimeoutTracking() {
         timeoutInvoked = false;
         timeoutValue = 0;
+    }
+
+    public void setTranslationSupported(boolean translationSupported) {
+        this.translationSupported = translationSupported;
+    }
+
+    public boolean wasTranslateInvoked() {
+        return translateInvoked;
+    }
+
+    public void resetTranslateTracking() {
+        translateInvoked = false;
+    }
+
+    public void setShapeSupported(boolean shapeSupported) {
+        this.shapeSupported = shapeSupported;
+    }
+
+    public boolean wasDrawShapeInvoked() {
+        return drawShapeInvoked;
+    }
+
+    public boolean wasFillShapeInvoked() {
+        return fillShapeInvoked;
+    }
+
+    public Shape getLastClipShape() {
+        return lastClipShape;
+    }
+
+    public Shape getLastDrawShape() {
+        return lastDrawShape;
+    }
+
+    public Shape getLastFillShape() {
+        return lastFillShape;
+    }
+
+    public Stroke getLastDrawStroke() {
+        return lastDrawStroke;
+    }
+
+    public void resetShapeTracking() {
+        drawShapeInvoked = false;
+        fillShapeInvoked = false;
+        lastDrawShape = null;
+        lastFillShape = null;
+        lastDrawStroke = null;
+    }
+
+    public void resetClipTracking() {
+        lastClipShape = null;
     }
 
     // -----------------------------------------------------------------
@@ -257,6 +321,29 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTranslationSupported() {
+        return translationSupported;
+    }
+
+    @Override
+    public void translate(Object graphics, int x, int y) {
+        translateInvoked = true;
+        TestGraphics g = (TestGraphics) graphics;
+        g.translateX += x;
+        g.translateY += y;
+    }
+
+    @Override
+    public int getTranslateX(Object graphics) {
+        return ((TestGraphics) graphics).translateX;
+    }
+
+    @Override
+    public int getTranslateY(Object graphics) {
+        return ((TestGraphics) graphics).translateY;
+    }
+
+    @Override
     public int getColor(Object graphics) {
         return ((TestGraphics) graphics).color;
     }
@@ -302,6 +389,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void setClip(Object graphics, Shape shape) {
+        lastClipShape = shape;
+        if (shape == null) {
+            setClip(graphics, 0, 0, getDisplayWidth(), getDisplayHeight());
+            return;
+        }
+        Rectangle bounds = shape.getBounds();
+        setClip(graphics, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+    }
+
+    @Override
     public void setClip(Object graphics, int x, int y, int width, int height) {
         TestGraphics g = (TestGraphics) graphics;
         g.clipX = x;
@@ -321,6 +419,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         g.clipY = newY;
         g.clipWidth = newW;
         g.clipHeight = newH;
+    }
+
+    @Override
+    public boolean isShapeSupported(Object nativeGraphics) {
+        return shapeSupported;
+    }
+
+    @Override
+    public void drawShape(Object graphics, Shape shape, Stroke stroke) {
+        drawShapeInvoked = true;
+        lastDrawShape = shape;
+        lastDrawStroke = stroke;
+    }
+
+    @Override
+    public void fillShape(Object graphics, Shape shape) {
+        fillShapeInvoked = true;
+        lastFillShape = shape;
     }
 
     @Override
@@ -743,6 +859,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int clipY;
         int clipWidth;
         int clipHeight;
+        int translateX;
+        int translateY;
         TestFont font;
 
         TestGraphics(int width, int height) {

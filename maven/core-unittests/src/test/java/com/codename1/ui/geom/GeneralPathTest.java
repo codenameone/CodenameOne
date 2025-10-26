@@ -1,6 +1,6 @@
 package com.codename1.ui.geom;
 
-import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Transform;
 import org.junit.jupiter.api.Test;
 
@@ -9,11 +9,6 @@ import java.util.List;
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyFloat;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 
 class GeneralPathTest {
 
@@ -90,41 +85,23 @@ class GeneralPathTest {
         original.setRect(new Rectangle(0, 0, 10, 10), null);
 
         Transform translation = Transform.makeTranslation(5f, 10f);
-        CodenameOneImplementation implementation = mock(CodenameOneImplementation.class);
-        doAnswer(invocation -> {
-            int pointSize = invocation.getArgument(0);
-            float tx = invocation.getArgument(1);
-            float ty = invocation.getArgument(2);
-            float tz = invocation.getArgument(3);
-            float[] in = invocation.getArgument(4);
-            int srcPos = invocation.getArgument(5);
-            float[] out = invocation.getArgument(6);
-            int destPos = invocation.getArgument(7);
-            int numPoints = invocation.getArgument(8);
-            for (int i = 0; i < numPoints; i++) {
-                int inIndex = srcPos + i * pointSize;
-                int outIndex = destPos + i * pointSize;
-                out[outIndex] = in[inIndex] + tx;
-                if (pointSize > 1) {
-                    out[outIndex + 1] = in[inIndex + 1] + ty;
-                }
-                if (pointSize > 2) {
-                    out[outIndex + 2] = in[inIndex + 2] + tz;
-                }
-            }
-            return null;
-        }).when(implementation).translatePoints(anyInt(), anyFloat(), anyFloat(), anyFloat(), any(float[].class), anyInt(), any(float[].class), anyInt(), anyInt());
+        TestCodenameOneImplementation implementation = new TestCodenameOneImplementation();
         Field implField = Transform.class.getDeclaredField("impl");
         implField.setAccessible(true);
-        implField.set(translation, implementation);
+        Object previous = implField.get(translation);
+        try {
+            implField.set(translation, implementation);
 
-        Shape transformed = original.createTransformedShape(translation);
-        assertTrue(transformed instanceof GeneralPath);
-        Rectangle bounds = transformed.getBounds();
-        assertEquals(5, bounds.getX());
-        assertEquals(10, bounds.getY());
-        assertEquals(10, bounds.getWidth());
-        assertEquals(10, bounds.getHeight());
+            Shape transformed = original.createTransformedShape(translation);
+            assertTrue(transformed instanceof GeneralPath);
+            Rectangle bounds = transformed.getBounds();
+            assertEquals(5, bounds.getX());
+            assertEquals(10, bounds.getY());
+            assertEquals(10, bounds.getWidth());
+            assertEquals(10, bounds.getHeight());
+        } finally {
+            implField.set(translation, previous);
+        }
     }
 
     @Test
