@@ -75,8 +75,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
                     saveScreenshot(storageKeyFor(demo.getTitle()), screenshot);
                 }
 
-                host.show();
-                waitForHost(host);
+                returnToHost(activeForm, host);
             }
 
             return true;
@@ -161,6 +160,20 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             }
         }
         TestUtils.waitFor(200);
+    }
+
+    private void returnToHost(Form demoForm, Form host) {
+        if (host == null) {
+            return;
+        }
+
+        if (demoForm != null && demoForm != host) {
+            demoForm.showBack();
+        } else {
+            host.show();
+        }
+
+        waitForHost(host);
     }
 
     private void triggerAnimationIfNeeded(Demo demo, Form form) {
