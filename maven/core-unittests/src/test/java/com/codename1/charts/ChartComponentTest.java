@@ -11,10 +11,12 @@ import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.AbstractChart;
 import com.codename1.charts.views.ClickableArea;
 import com.codename1.charts.views.XYChart;
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.test.UITestBase;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
+import com.codename1.testing.TestCodenameOneImplementation;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -23,6 +25,13 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ChartComponentTest extends UITestBase {
+    private TestCodenameOneImplementation testImplementation;
+
+    @Override
+    protected CodenameOneImplementation createImplementation() {
+        testImplementation = new TestCodenameOneImplementation();
+        return testImplementation;
+    }
     @Test
     void constructorCopiesPanAndZoomSettingsFromXYChart() {
         XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
@@ -59,18 +68,30 @@ class ChartComponentTest extends UITestBase {
         ChartComponent component = new PositionedChartComponent(chart, 10, 15);
 
         Rectangle screenRect = new Rectangle(component.getAbsoluteX(), component.getAbsoluteY(), 40, 50);
-        Rectangle chartBounds = component.screenToChartShape(screenRect).getBounds();
-        assertEquals(0, chartBounds.getX());
-        assertEquals(0, chartBounds.getY());
-        assertEquals(0, chartBounds.getSize().getWidth());
-        assertEquals(0, chartBounds.getSize().getHeight());
+        Shape chartShape = component.screenToChartShape(screenRect);
+        Rectangle chartBounds = chartShape.getBounds();
+        Shape roundTripScreenShape = component.chartToScreenShape(chartShape);
+        Rectangle roundTripScreenBounds = roundTripScreenShape.getBounds();
+        assertEquals(screenRect.getX(), roundTripScreenBounds.getX());
+        assertEquals(screenRect.getY(), roundTripScreenBounds.getY());
+        assertEquals(screenRect.getWidth(), chartBounds.getWidth());
+        assertEquals(screenRect.getHeight(), chartBounds.getHeight());
+        assertEquals(screenRect.getWidth(), roundTripScreenBounds.getWidth());
+        assertEquals(screenRect.getHeight(), roundTripScreenBounds.getHeight());
 
         Rectangle chartRect = new Rectangle(0, 0, 40, 50);
         Rectangle screenBounds = component.chartToScreenShape(chartRect).getBounds();
-        assertEquals(0, screenBounds.getX());
-        assertEquals(0, screenBounds.getY());
-        assertEquals(0, screenBounds.getSize().getWidth());
-        assertEquals(0, screenBounds.getSize().getHeight());
+        assertEquals(component.getAbsoluteX(), screenBounds.getX());
+        assertEquals(component.getAbsoluteY(), screenBounds.getY());
+        assertEquals(40, screenBounds.getWidth());
+        assertEquals(50, screenBounds.getHeight());
+
+        Shape roundTripChartShape = component.screenToChartShape(component.chartToScreenShape(chartRect));
+        Rectangle roundTripChartBounds = roundTripChartShape.getBounds();
+        assertEquals(chartRect.getX(), roundTripChartBounds.getX());
+        assertEquals(chartRect.getY(), roundTripChartBounds.getY());
+        assertEquals(chartRect.getWidth(), roundTripChartBounds.getWidth());
+        assertEquals(chartRect.getHeight(), roundTripChartBounds.getHeight());
     }
 
     @Test
