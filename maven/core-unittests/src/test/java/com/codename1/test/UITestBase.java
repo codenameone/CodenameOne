@@ -37,8 +37,6 @@ public abstract class UITestBase {
     @BeforeEach
     protected void setUpDisplay() throws Exception {
         display = Display.getInstance();
-        resetUIManager();
-
         implementation = createImplementation();
         configureImplementation(implementation);
 
@@ -51,6 +49,7 @@ public abstract class UITestBase {
         codenameOneGraphics = createGraphics();
         setDisplayField("codenameOneGraphics", codenameOneGraphics);
         Util.setImplementation(implementation);
+        resetUIManager();
     }
 
     @AfterEach
@@ -77,7 +76,7 @@ public abstract class UITestBase {
     private void resetUIManager() throws Exception {
         Field instanceField = UIManager.class.getDeclaredField("instance");
         instanceField.setAccessible(true);
-        instanceField.set(null, null);
+        instanceField.set(null, UIManager.createInstance());
     }
 
     private Graphics createGraphics() throws Exception {
