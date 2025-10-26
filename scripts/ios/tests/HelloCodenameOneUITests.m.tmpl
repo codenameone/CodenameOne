@@ -47,13 +47,20 @@
     NSLog(@"CN1SS:INFO:state_after_activation=%ld exists=%d",
           (long)_app.state, _app.exists ? 1 : 0);
 
-    // As a last resort, terminate and relaunch once
+    // As a last resort, terminate and relaunch once (no SpringBoard)
     if (_app.state != XCUIApplicationStateRunningForeground) {
         @try { [_app terminate]; } @catch (__unused NSException *e) {}
         [self cn1_saveScreenPreferApp:@"pre_relaunch"];
         [_app launch];
         [_app activate];
         [self cn1_waitForeground:_app timeout:45.0 step:0.5 label:@"post_relaunch"];
+        // One extra nudge if still not foreground
+        if (_app.state != XCUIApplicationStateRunningForeground) {
+            @try { [_app terminate]; } @catch (__unused NSException *e) {}
+            [_app launch];
+            [_app activate];
+            [self cn1_waitForeground:_app timeout:20.0 step:0.5 label:@"post_second_relaunch"];
+        }
     }
 }
 
@@ -79,8 +86,11 @@
 #pragma mark - CN1SS emission
 
 - (void)cn1_emitScreenshotNamed:(NSString *)name app:(XCUIApplication *)app {
-    // Prefer full-screen first (always safe), then app-specific
-    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot ?: app.screenshot;   // <-- changed
+    // SAFETY: avoid failable app.screenshot if app isn't ready
+    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot;
+    if (!shot && app && app.exists && app.state == XCUIApplicationStateRunningForeground) {
+        @try { shot = app.screenshot; } @catch (__unused NSException *e) { shot = nil; }
+    }
     if (!shot) { NSLog(@"CN1SS:WARN:test=%@ no_screenshot", name); return; }
 
     NSData *png = shot.PNGRepresentation;
@@ -131,8 +141,10 @@
 #pragma mark - Snapshots & waits (prefer app image)
 
 - (void)cn1_saveScreenPreferApp:(NSString *)name {
-    // Prefer full-screen first (always safe), then app-specific
-    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot ?: _app.screenshot;  // <-- changed
+    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot;
+    if (!shot && _app && _app.exists && _app.state == XCUIApplicationStateRunningForeground) {
+        @try { shot = _app.screenshot; } @catch (__unused NSException *e) { shot = nil; }
+    }
     if (!shot) return;
 
     NSData *png = shot.PNGRepresentation;

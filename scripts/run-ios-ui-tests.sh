@@ -287,6 +287,11 @@ if [ -z "$AUT_APP" ] && [ -n "$APP_BUNDLE_PATH" ] && [ -d "$APP_BUNDLE_PATH" ]; 
   AUT_APP="$APP_BUNDLE_PATH"
 fi
 
+if [ -n "$AUT_BUNDLE_ID" ]; then
+  ri_log "Uninstalling any previous AUT: $AUT_BUNDLE_ID"
+  xcrun simctl uninstall "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
+fi
+
 # Install AUT + Runner explicitly (prevents "unknown to FrontBoard")
 if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   ri_log "Installing AUT: $AUT_APP"
@@ -363,8 +368,17 @@ XCODE_TEST_FILTERS=(
   -skip-testing:HelloCodenameOneTests
 )
 
+if [ -n "${AUT_BUNDLE_ID:-}" ]; then
+  ri_log "Pre-warming AUT: $AUT_BUNDLE_ID"
+  xcrun simctl launch "$SIM_UDID" "$AUT_BUNDLE_ID" \
+    -AppleLocale en_US -AppleLanguages "(en)" -ApplePersistenceIgnoreState YES \
+    --cn1-test-mode 1 >/dev/null 2>&1 || true
+  sleep 5
+  xcrun simctl terminate "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
+fi
+
 ri_log "STAGE:TEST -> xcodebuild test-without-building (destination=$SIM_DESTINATION)"
-if ! run_with_timeout 1500 xcodebuild \
+if ! run_with_timeout 1500 env CN1_AUT_BUNDLE_ID="${AUT_BUNDLE_ID:-com.codenameone.examples}" xcodebuild \
   -workspace "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
