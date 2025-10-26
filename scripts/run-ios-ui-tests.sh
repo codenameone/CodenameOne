@@ -294,6 +294,29 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   AUT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$AUT_APP/Info.plist" 2>/dev/null || true)
   [ -n "$AUT_BUNDLE_ID" ] && ri_log "AUT bundle id: $AUT_BUNDLE_ID"
 fi
+
+if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
+  ri_log "Installing AUT: $AUT_APP"
+  xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
+  AUT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$AUT_APP/Info.plist" 2>/dev/null || true)
+  [ -n "$AUT_BUNDLE_ID" ] && ri_log "AUT bundle id: $AUT_BUNDLE_ID"
+
+  # >>> ADD THIS <<<
+  if [ -n "$AUT_BUNDLE_ID" ]; then
+    export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"   # lets anything we spawn inherit it
+
+    # If the scheme has a placeholder, bake it in so the test runner gets it, too
+    if [ -f "$SCHEME_FILE" ]; then
+      if sed --version >/dev/null 2>&1; then
+        sed -i -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
+      else
+        sed -i '' -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
+      fi
+      ri_log "Injected CN1_AUT_BUNDLE_ID into scheme: $SCHEME_FILE"
+    fi
+  fi
+fi
+
 if [ -n "$RUNNER_APP" ] && [ -d "$RUNNER_APP" ]; then
   ri_log "Installing Test Runner: $RUNNER_APP"
   xcrun simctl install "$SIM_UDID" "$RUNNER_APP" || true

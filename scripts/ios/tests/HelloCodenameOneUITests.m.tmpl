@@ -123,9 +123,8 @@
 #pragma mark - CN1SS emission
 
 - (void)cn1_emitScreenshotNamed:(NSString *)name app:(XCUIApplication *)app {
-    // Prefer app screenshot; fallback to full screen
-    XCUIScreenshot *shot = app.screenshot;
-    if (!shot) shot = XCUIScreen.mainScreen.screenshot;
+    // Prefer full-screen first (always safe), then app-specific
+    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot ?: app.screenshot;   // <-- changed
     if (!shot) { NSLog(@"CN1SS:WARN:test=%@ no_screenshot", name); return; }
 
     NSData *png = shot.PNGRepresentation;
@@ -176,8 +175,8 @@
 #pragma mark - Snapshots & waits (prefer app image)
 
 - (void)cn1_saveScreenPreferApp:(NSString *)name {
-    XCUIScreenshot *shot = _app.screenshot;
-    if (!shot) shot = XCUIScreen.mainScreen.screenshot;
+    // Prefer full-screen first (always safe), then app-specific
+    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot ?: _app.screenshot;  // <-- changed
     if (!shot) return;
 
     NSData *png = shot.PNGRepresentation;
