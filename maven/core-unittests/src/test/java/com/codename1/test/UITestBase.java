@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyChar;
 import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -106,7 +107,7 @@ public abstract class UITestBase {
     }
 
     protected CodenameOneImplementation createImplementation() {
-        return new TestCodenameOneImplementation();
+        return mock(CodenameOneImplementation.class);
     }
 
     protected void configureImplementation(CodenameOneImplementation implementation) {
