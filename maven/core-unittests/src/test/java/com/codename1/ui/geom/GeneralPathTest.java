@@ -1,16 +1,24 @@
 package com.codename1.ui.geom;
 
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.test.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Transform;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class GeneralPathTest {
+class GeneralPathTest extends UITestBase {
+    private TestCodenameOneImplementation testImplementation;
+
+    @Override
+    protected CodenameOneImplementation createImplementation() {
+        testImplementation = new TestCodenameOneImplementation();
+        return testImplementation;
+    }
 
     @Test
     void testLineToWithoutMoveThrowsException() {
@@ -80,28 +88,18 @@ class GeneralPathTest {
     }
 
     @Test
-    void testCreateTransformedShapeReturnsScaledCopy() throws Exception {
+    void testCreateTransformedShapeReturnsScaledCopy() {
         GeneralPath original = new GeneralPath();
         original.setRect(new Rectangle(0, 0, 10, 10), null);
 
         Transform translation = Transform.makeTranslation(5f, 10f);
-        TestCodenameOneImplementation implementation = new TestCodenameOneImplementation();
-        Field implField = Transform.class.getDeclaredField("impl");
-        implField.setAccessible(true);
-        Object previous = implField.get(translation);
-        try {
-            implField.set(translation, implementation);
-
-            Shape transformed = original.createTransformedShape(translation);
-            assertTrue(transformed instanceof GeneralPath);
-            Rectangle bounds = transformed.getBounds();
-            assertEquals(5, bounds.getX());
-            assertEquals(10, bounds.getY());
-            assertEquals(10, bounds.getWidth());
-            assertEquals(10, bounds.getHeight());
-        } finally {
-            implField.set(translation, previous);
-        }
+        Shape transformed = original.createTransformedShape(translation);
+        assertTrue(transformed instanceof GeneralPath);
+        Rectangle bounds = transformed.getBounds();
+        assertEquals(5, bounds.getX());
+        assertEquals(10, bounds.getY());
+        assertEquals(10, bounds.getWidth());
+        assertEquals(10, bounds.getHeight());
     }
 
     @Test

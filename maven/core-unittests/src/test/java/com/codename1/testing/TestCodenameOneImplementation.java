@@ -192,6 +192,98 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         lastClipShape = null;
     }
 
+    @Override
+    public boolean isTransformSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isTransformSupported(Object graphics) {
+        return true;
+    }
+
+    @Override
+    public Object makeTransformIdentity() {
+        return new TestTransform();
+    }
+
+    @Override
+    public void setTransformIdentity(Object transform) {
+        ((TestTransform) transform).setIdentity();
+    }
+
+    @Override
+    public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
+        TestTransform transform = new TestTransform();
+        transform.setTranslation(translateX, translateY, translateZ);
+        return transform;
+    }
+
+    @Override
+    public void setTransformTranslation(Object transform, float translateX, float translateY, float translateZ) {
+        ((TestTransform) transform).setTranslation(translateX, translateY, translateZ);
+    }
+
+    @Override
+    public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
+        TestTransform transform = new TestTransform();
+        transform.setScale(scaleX, scaleY, scaleZ);
+        return transform;
+    }
+
+    @Override
+    public void setTransformScale(Object transform, float scaleX, float scaleY, float scaleZ) {
+        ((TestTransform) transform).setScale(scaleX, scaleY, scaleZ);
+    }
+
+    @Override
+    public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
+        TestTransform transform = new TestTransform();
+        transform.setAffine((float) m00, (float) m01, (float) m02, (float) m10, (float) m11, (float) m12);
+        return transform;
+    }
+
+    @Override
+    public Object makeTransformInverse(Object nativeTransform) {
+        return ((TestTransform) nativeTransform).createInverse();
+    }
+
+    @Override
+    public void setTransformInverse(Object nativeTransform) {
+        ((TestTransform) nativeTransform).invert();
+    }
+
+    @Override
+    public void concatenateTransform(Object left, Object right) {
+        ((TestTransform) left).concatenate((TestTransform) right);
+    }
+
+    @Override
+    public void copyTransform(Object src, Object dest) {
+        ((TestTransform) dest).copyFrom((TestTransform) src);
+    }
+
+    @Override
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
+        if (t1 == t2) {
+            return true;
+        }
+        if (t1 == null || t2 == null) {
+            return false;
+        }
+        return ((TestTransform) t1).equals((TestTransform) t2);
+    }
+
+    @Override
+    public void transformPoint(Object nativeTransform, float[] in, float[] out) {
+        if (nativeTransform == null) {
+            int len = Math.min(in.length, out.length);
+            System.arraycopy(in, 0, out, 0, len);
+            return;
+        }
+        ((TestTransform) nativeTransform).transformPoint(in, out);
+    }
+
     // -----------------------------------------------------------------
     // CodenameOneImplementation abstract methods
     // -----------------------------------------------------------------
@@ -521,6 +613,31 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public Object createFont(int face, int style, int size) {
         return new TestFont(defaultFont.charWidth, defaultFont.height);
+    }
+
+    @Override
+    public Object loadTrueTypeFont(String fontName, String fileName) {
+        return new TestFont(defaultFont.charWidth, defaultFont.height);
+    }
+
+    @Override
+    public Object deriveTrueTypeFont(Object font, float size, int weight) {
+        return new TestFont(defaultFont.charWidth, defaultFont.height);
+    }
+
+    @Override
+    public Object loadNativeFont(String lookup) {
+        return new TestFont(defaultFont.charWidth, defaultFont.height);
+    }
+
+    @Override
+    public boolean isTrueTypeSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
     }
 
     @Override
@@ -866,6 +983,174 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         TestGraphics(int width, int height) {
             this.clipWidth = width;
             this.clipHeight = height;
+        }
+    }
+
+    private static final class TestTransform {
+        private float m00;
+        private float m01;
+        private float m02;
+        private float m10;
+        private float m11;
+        private float m12;
+        private float m20;
+        private float m21;
+        private float m22;
+        private float translateZ;
+
+        TestTransform() {
+            setIdentity();
+        }
+
+        void setIdentity() {
+            m00 = 1f;
+            m01 = 0f;
+            m02 = 0f;
+            m10 = 0f;
+            m11 = 1f;
+            m12 = 0f;
+            m20 = 0f;
+            m21 = 0f;
+            m22 = 1f;
+            translateZ = 0f;
+        }
+
+        void setTranslation(float tx, float ty, float tz) {
+            setIdentity();
+            m02 = tx;
+            m12 = ty;
+            translateZ = tz;
+        }
+
+        void setScale(float sx, float sy, float sz) {
+            setIdentity();
+            m00 = sx;
+            m11 = sy;
+            m22 = sz;
+        }
+
+        void setAffine(float nm00, float nm01, float nm02, float nm10, float nm11, float nm12) {
+            m00 = nm00;
+            m01 = nm01;
+            m02 = nm02;
+            m10 = nm10;
+            m11 = nm11;
+            m12 = nm12;
+            m20 = 0f;
+            m21 = 0f;
+            m22 = 1f;
+            translateZ = 0f;
+        }
+
+        void copyFrom(TestTransform other) {
+            m00 = other.m00;
+            m01 = other.m01;
+            m02 = other.m02;
+            m10 = other.m10;
+            m11 = other.m11;
+            m12 = other.m12;
+            m20 = other.m20;
+            m21 = other.m21;
+            m22 = other.m22;
+            translateZ = other.translateZ;
+        }
+
+        TestTransform createInverse() {
+            TestTransform inverse = new TestTransform();
+            inverse.copyFrom(this);
+            inverse.invert();
+            return inverse;
+        }
+
+        void invert() {
+            float det = m00 * m11 - m01 * m10;
+            if (Math.abs(det) < 1.0e-6f) {
+                setIdentity();
+                return;
+            }
+            float invDet = 1f / det;
+            float nm00 = m11 * invDet;
+            float nm01 = -m01 * invDet;
+            float nm02 = (m01 * m12 - m11 * m02) * invDet;
+            float nm10 = -m10 * invDet;
+            float nm11 = m00 * invDet;
+            float nm12 = (m10 * m02 - m00 * m12) * invDet;
+            m00 = nm00;
+            m01 = nm01;
+            m02 = nm02;
+            m10 = nm10;
+            m11 = nm11;
+            m12 = nm12;
+            translateZ = -translateZ;
+        }
+
+        void concatenate(TestTransform right) {
+            float nm00 = m00 * right.m00 + m01 * right.m10;
+            float nm01 = m00 * right.m01 + m01 * right.m11;
+            float nm02 = m00 * right.m02 + m01 * right.m12 + m02;
+            float nm10 = m10 * right.m00 + m11 * right.m10;
+            float nm11 = m10 * right.m01 + m11 * right.m11;
+            float nm12 = m10 * right.m02 + m11 * right.m12 + m12;
+            float nm20 = m20 * right.m00 + m21 * right.m10 + m22 * right.m20;
+            float nm21 = m20 * right.m01 + m21 * right.m11 + m22 * right.m21;
+            float nm22 = m20 * right.m02 + m21 * right.m12 + m22 * right.m22;
+            m00 = nm00;
+            m01 = nm01;
+            m02 = nm02;
+            m10 = nm10;
+            m11 = nm11;
+            m12 = nm12;
+            m20 = nm20;
+            m21 = nm21;
+            m22 = nm22;
+            translateZ = translateZ + right.translateZ;
+        }
+
+        void transformPoint(float[] in, float[] out) {
+            float x = in[0];
+            float y = in[1];
+            out[0] = m00 * x + m01 * y + m02;
+            out[1] = m10 * x + m11 * y + m12;
+            if (in.length > 2 && out.length > 2) {
+                float z = in[2];
+                out[2] = m22 * z + translateZ;
+            }
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof TestTransform)) {
+                return false;
+            }
+            TestTransform other = (TestTransform) obj;
+            return Float.compare(m00, other.m00) == 0
+                    && Float.compare(m01, other.m01) == 0
+                    && Float.compare(m02, other.m02) == 0
+                    && Float.compare(m10, other.m10) == 0
+                    && Float.compare(m11, other.m11) == 0
+                    && Float.compare(m12, other.m12) == 0
+                    && Float.compare(m20, other.m20) == 0
+                    && Float.compare(m21, other.m21) == 0
+                    && Float.compare(m22, other.m22) == 0
+                    && Float.compare(translateZ, other.translateZ) == 0;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Float.floatToIntBits(m00);
+            result = 31 * result + Float.floatToIntBits(m01);
+            result = 31 * result + Float.floatToIntBits(m02);
+            result = 31 * result + Float.floatToIntBits(m10);
+            result = 31 * result + Float.floatToIntBits(m11);
+            result = 31 * result + Float.floatToIntBits(m12);
+            result = 31 * result + Float.floatToIntBits(m20);
+            result = 31 * result + Float.floatToIntBits(m21);
+            result = 31 * result + Float.floatToIntBits(m22);
+            result = 31 * result + Float.floatToIntBits(translateZ);
+            return result;
         }
     }
 
