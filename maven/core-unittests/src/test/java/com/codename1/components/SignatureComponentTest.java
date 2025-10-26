@@ -1,11 +1,13 @@
 package com.codename1.components;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Util;
 import com.codename1.test.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Button;
 import com.codename1.ui.Image;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,16 +17,16 @@ import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
 
 class SignatureComponentTest extends UITestBase {
+    @Override
+    protected CodenameOneImplementation createImplementation() {
+        return new TestCodenameOneImplementation();
+    }
+
     @BeforeEach
     void configureDisplay() {
         Util.setImplementation(implementation);
-        when(implementation.isAnimation(any())).thenReturn(false);
-        when(implementation.animateImage(any(), anyLong())).thenReturn(false);
     }
 
     @AfterEach
