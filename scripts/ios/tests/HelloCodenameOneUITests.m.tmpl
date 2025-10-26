@@ -21,13 +21,12 @@
     NSLog(@"CN1SS:INFO:env=%@", env);
 
     NSString *bundleID = env[@"CN1_AUT_BUNDLE_ID"];
-    if (bundleID.length > 0) {
-        NSLog(@"CN1SS:INFO:ui_test_target_bundle_id=%@", bundleID);
-        _app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
-    } else {
-        NSLog(@"CN1SS:INFO:ui_test_target_bundle_id=(default)");
-        _app = [[XCUIApplication alloc] init];
+    if (bundleID.length == 0) {
+        // Last resort: your normal AUT id
+        bundleID = @"com.codenameone.examples";
     }
+    NSLog(@"CN1SS:INFO:ui_test_target_bundle_id=%@", bundleID);
+    _app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
 
     // Keep iOS from restoring previous state and force English locale.
     _app.launchArguments = @[
@@ -42,27 +41,19 @@
 
     NSLog(@"CN1SS:INFO:launch:start args=%@", _app.launchArguments);
     [_app launch];
-
-    // Make absolutely sure our AUT is foregrounded
     [_app activate];
-    [self cn1_waitForeground:_app timeout:20.0 step:0.25 label:@"post_launch"];
-
-    if (_app.state != XCUIApplicationStateRunningForeground) {
-        NSLog(@"CN1SS:WARN:not_foreground_after_launch -> trying SpringBoard icon");
-        [self cn1_trySpringBoardActivateWithName:@"HelloCodenameOne" bundleID:bundleID ?: @"com.codenameone.examples"];
-        [self cn1_waitForeground:_app timeout:10.0 step:0.25 label:@"post_springboard_tap"];
-    }
+    [self cn1_waitForeground:_app timeout:45.0 step:0.5 label:@"post_launch"];
 
     NSLog(@"CN1SS:INFO:state_after_activation=%ld exists=%d",
           (long)_app.state, _app.exists ? 1 : 0);
 
     // As a last resort, terminate and relaunch once
     if (_app.state != XCUIApplicationStateRunningForeground) {
-        [_app terminate];
+        @try { [_app terminate]; } @catch (__unused NSException *e) {}
         [self cn1_saveScreenPreferApp:@"pre_relaunch"];
         [_app launch];
         [_app activate];
-        [self cn1_waitForeground:_app timeout:15.0 step:0.25 label:@"post_relaunch"];
+        [self cn1_waitForeground:_app timeout:45.0 step:0.5 label:@"post_relaunch"];
     }
 }
 
@@ -83,41 +74,6 @@
         NSLog(@"CN1SS:WARN:testSmokeLaunchAndScreenshot caught exception; continuing");
     }
     // No asserts — we only emit CN1SS output for the Java side to parse.
-}
-
-#pragma mark - Foregrounding & SpringBoard fallback
-
-- (void)cn1_trySpringBoardActivateWithName:(NSString *)displayName
-                                 bundleID:(NSString *)bundleID
-{
-    // Try activate again first (works if it was backgrounded)
-    @try { [_app activate]; } @catch (__unused NSException *e) {}
-
-    // Then try tapping the icon on SpringBoard
-    XCUIApplication *sb = [[XCUIApplication alloc] initWithBundleIdentifier:@"com.apple.springboard"];
-    [sb activate];
-    XCUIElement *icon = nil;
-
-    if (displayName.length > 0) {
-        icon = sb.icons[displayName];
-        if (!icon.exists) {
-            // Sometimes the icon label differs; attempt to locate by predicate on identifier/label
-            NSPredicate *pred = [NSPredicate predicateWithFormat:@"label CONTAINS[c] %@ OR identifier CONTAINS[c] %@", displayName, displayName];
-            icon = [[sb.icons matchingPredicate:pred] elementBoundByIndex:0];
-        }
-    }
-    if (!icon.exists && bundleID.length > 0) {
-        NSPredicate *bundlePred = [NSPredicate predicateWithFormat:@"identifier CONTAINS[c] %@", bundleID];
-        XCUIElementQuery *q = [sb.icons matchingPredicate:bundlePred];
-        icon = q.count > 0 ? [q elementBoundByIndex:0] : nil;
-    }
-
-    if (icon.exists) {
-        [icon tap];
-        NSLog(@"CN1SS:INFO:springboard_icon_tapped");
-    } else {
-        NSLog(@"CN1SS:WARN:springboard_icon_not_found");
-    }
 }
 
 #pragma mark - CN1SS emission

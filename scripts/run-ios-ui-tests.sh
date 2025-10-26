@@ -301,18 +301,36 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   AUT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$AUT_APP/Info.plist" 2>/dev/null || true)
   [ -n "$AUT_BUNDLE_ID" ] && ri_log "AUT bundle id: $AUT_BUNDLE_ID"
 
-  # >>> ADD THIS <<<
+  # >>> ADD OR REPLACE THIS BLOCK <<<
   if [ -n "$AUT_BUNDLE_ID" ]; then
-    export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"   # lets anything we spawn inherit it
-
-    # If the scheme has a placeholder, bake it in so the test runner gets it, too
+    export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"   # ensure subprocesses also see it
     if [ -f "$SCHEME_FILE" ]; then
-      if sed --version >/dev/null 2>&1; then
-        sed -i -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
-      else
-        sed -i '' -e "s|__CN1_AUT_BUNDLE_ID__|$AUT_BUNDLE_ID|g" "$SCHEME_FILE"
-      fi
-      ri_log "Injected CN1_AUT_BUNDLE_ID into scheme: $SCHEME_FILE"
+      python3 - "$SCHEME_FILE" "$AUT_BUNDLE_ID" <<'PY'
+import sys, xml.etree.ElementTree as ET
+path, val = sys.argv[1], sys.argv[2]
+tree = ET.parse(path); root = tree.getroot()
+# Find TestAction (direct or nested)
+ta = root.find('TestAction')
+if ta is None:
+    for c in root:
+        if c.tag.endswith('TestAction'):
+            ta = c; break
+if ta is not None:
+    envs = ta.find('EnvironmentVariables')
+    if envs is None:
+        envs = ET.SubElement(ta, 'EnvironmentVariables')
+    found = None
+    for ev in envs.findall('EnvironmentVariable'):
+        if ev.get('key') == 'CN1_AUT_BUNDLE_ID':
+            found = ev; break
+    if found is None:
+        ET.SubElement(envs, 'EnvironmentVariable',
+                      {'key':'CN1_AUT_BUNDLE_ID','value':val,'isEnabled':'YES'})
+    else:
+        found.set('value', val); found.set('isEnabled','YES')
+    tree.write(path, encoding='utf-8', xml_declaration=True)
+PY
+      ri_log "Injected CN1_AUT_BUNDLE_ID into scheme TestAction (no placeholder needed)"
     fi
   fi
 fi
