@@ -8,6 +8,7 @@ import com.codename1.ui.AnimationManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -171,7 +172,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
 
         if (demoForm != null && demoForm != currentForm()) {
-            demoForm.showBack();
+            unwindForm(demoForm, host);
         }
 
         while (System.currentTimeMillis() <= deadline) {
@@ -183,10 +184,11 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             if (active == null) {
                 host.show();
             } else {
-                active.showBack();
+                unwindForm(active, host);
             }
 
-            TestUtils.waitFor(150);
+            Display.getInstance().animate();
+            TestUtils.waitFor(120);
         }
 
         if (currentForm() != host) {
@@ -194,6 +196,23 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         }
 
         waitForHost(host);
+    }
+
+    private void unwindForm(Form form, Form host) {
+        if (form == null) {
+            return;
+        }
+
+        if (form instanceof Dialog) {
+            ((Dialog) form).dispose();
+            return;
+        }
+
+        if (form == host) {
+            return;
+        }
+
+        form.showBack();
     }
 
     private Form currentForm() {
