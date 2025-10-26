@@ -280,8 +280,40 @@ if ! xcodebuild \
 fi
 
 # Locate products we need
-AUT_APP="$(/bin/ls -1d "$DERIVED_DATA_DIR"/Build/Products/Debug-iphonesimulator/*.app 2>/dev/null | grep -v '\-Runner\.app$' | head -n1 || true)"
+## Locate products we need (deterministic)
 RUNNER_APP="$(/bin/ls -1d "$DERIVED_DATA_DIR"/Build/Products/Debug-iphonesimulator/*-Runner.app 2>/dev/null | head -n1 || true)"
+
+best_app=""
+best_score=-1
+for app in "$DERIVED_DATA_DIR"/Build/Products/Debug-iphonesimulator/*.app; do
+  [ -d "$app" ] || continue
+  case "$app" in *-Runner.app) continue ;; esac
+  id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist" 2>/dev/null || true)
+  name=$(/usr/libexec/PlistBuddy -c 'Print CFBundleName' "$app/Info.plist" 2>/dev/null || true)
+  disp=$(/usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' "$app/Info.plist" 2>/dev/null || true)
+  exec=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Info.plist" 2>/dev/null || true)
+  mtime=$(stat -f %m "$app" 2>/dev/null || echo 0)
+  score=0
+  # Prefer the expected names first
+  [[ "$name" =~ ^HelloCodenameOne$ ]] && score=$((score+100))
+  [[ "$disp" =~ ^Hello[[:space:]]*Codename[[:space:]]*One$ ]] && score=$((score+80))
+  [[ "$exec" =~ ^HelloCodenameOne$ ]] && score=$((score+60))
+  # Avoid obvious samples/templates if present
+  [[ "$name" =~ Sample|Template ]] && score=$((score-40))
+  [[ "$id" =~ \.sample|\.template ]] && score=$((score-40))
+  # Slight recency tie-breaker
+  score=$((score + (mtime % 17)))
+  ri_log "Found .app candidate: path=$app id=${id:-<none>} name=${name:-<none>} display=${disp:-<none>} exec=${exec:-<none>} score=$score"
+  if [ "$score" -gt "$best_score" ]; then
+    best_score="$score"; best_app="$app"
+  fi
+done
+
+AUT_APP="$best_app"
+if [ -z "$AUT_APP" ]; then
+  ri_log "FATAL: No AUT .app found in derived products"; exit 1
+fi
+ri_log "Selected AUT: $AUT_APP (score=$best_score)"
 
 # Fallback to optional arg2 if AUT not found
 if [ -z "$AUT_APP" ] && [ -n "$APP_BUNDLE_PATH" ] && [ -d "$APP_BUNDLE_PATH" ]; then
@@ -293,20 +325,16 @@ if [ -n "${AUT_BUNDLE_ID:-}" ]; then
   xcrun simctl uninstall "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
 fi
 
-# Install AUT + Runner explicitly (prevents "unknown to FrontBoard")
+## Install AUT + capture bundle id (single block)
 if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   ri_log "Installing AUT: $AUT_APP"
   xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
   AUT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$AUT_APP/Info.plist" 2>/dev/null || true)
-  [ -n "$AUT_BUNDLE_ID" ] && ri_log "AUT bundle id: $AUT_BUNDLE_ID"
-fi
-
-if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
-  ri_log "Installing AUT: $AUT_APP"
-  xcrun simctl install "$SIM_UDID" "$AUT_APP" || true
-  AUT_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$AUT_APP/Info.plist" 2>/dev/null || true)
-  [ -n "$AUT_BUNDLE_ID" ] && ri_log "AUT bundle id: $AUT_BUNDLE_ID"
-
+  if [ -n "${AUT_BUNDLE_ID:-}" ]; then
+    ri_log "AUT bundle id: $AUT_BUNDLE_ID"
+  else
+    ri_log "FATAL: Could not read CFBundleIdentifier from AUT Info.plist"; exit 1
+  fi
   # >>> ADD OR REPLACE THIS BLOCK <<<
   if [ -n "${AUT_BUNDLE_ID:-}" ]; then
     export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"   # ensure subprocesses also see it
