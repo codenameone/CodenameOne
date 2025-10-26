@@ -14,6 +14,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.ImageIO;
 import com.codenameone.developerguide.Demo;
+import com.codenameone.developerguide.DemoBrowserForm;
 import com.codenameone.developerguide.DemoRegistry;
 
 import java.io.IOException;
@@ -30,7 +31,7 @@ import java.util.Set;
  * that external tooling can compare them against the developer guide imagery.
  */
 public class AnimationDemosScreenshotTest extends AbstractTest {
-    private static final String HOST_TITLE = "Demo Test Host";
+    private static final String HOST_TITLE = "Developer Guide Demos";
     private static final long FORM_TIMEOUT_MS = 10000L;
     private static final String STORAGE_PREFIX = "developer-guide.animations.";
     private static final int FRAMES_PER_ANIMATION = 6;
@@ -51,7 +52,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         boolean previousSlowMotion = Motion.isSlowMotion();
         Motion.setSlowMotion(true);
         try {
-            Form host = new Form(HOST_TITLE);
+            Form host = new DemoBrowserForm();
             host.show();
             TestUtils.waitForFormTitle(HOST_TITLE, FORM_TIMEOUT_MS);
 
