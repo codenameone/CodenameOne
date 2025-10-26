@@ -8,6 +8,7 @@ ri_log() { echo "[run-ios-ui-tests] $1"; }
 VIDEO_PID=""
 SYSLOG_PID=""
 SIM_UDID_CREATED=""
+AUT_BUNDLE_ID=""
 
 cleanup() {
   # Stop recorders
@@ -287,7 +288,7 @@ if [ -z "$AUT_APP" ] && [ -n "$APP_BUNDLE_PATH" ] && [ -d "$APP_BUNDLE_PATH" ]; 
   AUT_APP="$APP_BUNDLE_PATH"
 fi
 
-if [ -n "$AUT_BUNDLE_ID" ]; then
+if [ -n "${AUT_BUNDLE_ID:-}" ]; then
   ri_log "Uninstalling any previous AUT: $AUT_BUNDLE_ID"
   xcrun simctl uninstall "$SIM_UDID" "$AUT_BUNDLE_ID" >/dev/null 2>&1 || true
 fi
@@ -307,7 +308,7 @@ if [ -n "$AUT_APP" ] && [ -d "$AUT_APP" ]; then
   [ -n "$AUT_BUNDLE_ID" ] && ri_log "AUT bundle id: $AUT_BUNDLE_ID"
 
   # >>> ADD OR REPLACE THIS BLOCK <<<
-  if [ -n "$AUT_BUNDLE_ID" ]; then
+  if [ -n "${AUT_BUNDLE_ID:-}" ]; then
     export CN1_AUT_BUNDLE_ID="$AUT_BUNDLE_ID"   # ensure subprocesses also see it
     if [ -f "$SCHEME_FILE" ]; then
       python3 - "$SCHEME_FILE" "$AUT_BUNDLE_ID" <<'PY'
