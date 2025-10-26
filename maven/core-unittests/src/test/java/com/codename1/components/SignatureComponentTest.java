@@ -1,15 +1,12 @@
 package com.codename1.components;
 
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Util;
 import com.codename1.test.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Button;
 import com.codename1.ui.Image;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -21,17 +18,17 @@ import static org.junit.jupiter.api.Assertions.*;
 class SignatureComponentTest extends UITestBase {
     @Override
     protected CodenameOneImplementation createImplementation() {
-        return new TestCodenameOneImplementation();
-    }
+        return new TestCodenameOneImplementation() {
+            @Override
+            public boolean animateImage(Object nativeImage, long lastUpdate) {
+                return false;
+            }
 
-    @BeforeEach
-    void configureDisplay() {
-        Util.setImplementation(implementation);
-    }
-
-    @AfterEach
-    void clearUtil() {
-        Util.setImplementation(null);
+            @Override
+            public boolean isAnimation(Object nativeImage) {
+                return false;
+            }
+        };
     }
 
     @Test
