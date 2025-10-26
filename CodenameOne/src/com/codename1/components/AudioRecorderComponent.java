@@ -406,7 +406,6 @@ public class AudioRecorderComponent extends Container implements ActionSource {
 
     private void setState(RecorderState state) {
         if (this.state != state) {
-            System.out.println("State is now " + state);
             this.state = state;
             actionListeners.fireActionEvent(new ActionEvent(this));
         }
