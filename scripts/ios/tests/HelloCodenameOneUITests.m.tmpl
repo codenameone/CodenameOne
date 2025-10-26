@@ -1,5 +1,5 @@
 // HelloCodenameOneUITests.m.tmpl
-// Objective-C (no modules), ultra-defensive, never throws
+// Objective-C, no modules required
 
 #import <XCTest/XCTest.h>
 #import <UIKit/UIKit.h>
@@ -11,7 +11,7 @@
     XCUIApplication *_app;
 }
 
-#pragma mark - Minimal, non-failable setup/teardown
+#pragma mark - Setup/Teardown (non-failable)
 
 - (void)setUp {
     [super setUp];
@@ -29,26 +29,40 @@
         _app = [[XCUIApplication alloc] init];
     }
 
+    // Keep iOS from restoring previous state and force English locale.
     _app.launchArguments = @[
         @"-AppleLocale", @"en_US",
         @"-AppleLanguages", @"(en)",
+        @"-ApplePersistenceIgnoreState", @"YES",
         @"--cn1-test-mode", @"1"
     ];
 
-    [self cn1_saveScreen:@"pre_launch"];
+    // Pre-launch snapshot (may be SpringBoard)
+    [self cn1_saveScreenPreferApp:@"pre_launch"];
+
     NSLog(@"CN1SS:INFO:launch:start args=%@", _app.launchArguments);
     [_app launch];
 
+    // Make absolutely sure our AUT is foregrounded
+    [_app activate];
     [self cn1_waitForeground:_app timeout:20.0 step:0.25 label:@"post_launch"];
-    NSLog(@"CN1SS:INFO:state_after_launch=%ld", (long)_app.state);
 
     if (_app.state != XCUIApplicationStateRunningForeground) {
-        NSLog(@"CN1SS:WARN:not_foreground:attempting_relaunch");
+        NSLog(@"CN1SS:WARN:not_foreground_after_launch -> trying SpringBoard icon");
+        [self cn1_trySpringBoardActivateWithName:@"HelloCodenameOne" bundleID:bundleID ?: @"com.codenameone.examples"];
+        [self cn1_waitForeground:_app timeout:10.0 step:0.25 label:@"post_springboard_tap"];
+    }
+
+    NSLog(@"CN1SS:INFO:state_after_activation=%ld exists=%d",
+          (long)_app.state, _app.exists ? 1 : 0);
+
+    // As a last resort, terminate and relaunch once
+    if (_app.state != XCUIApplicationStateRunningForeground) {
         [_app terminate];
-        [self cn1_saveScreen:@"pre_relaunch"];
+        [self cn1_saveScreenPreferApp:@"pre_relaunch"];
         [_app launch];
+        [_app activate];
         [self cn1_waitForeground:_app timeout:15.0 step:0.25 label:@"post_relaunch"];
-        NSLog(@"CN1SS:INFO:state_after_relaunch=%ld", (long)_app.state);
     }
 }
 
@@ -58,7 +72,7 @@
     [super tearDown];
 }
 
-#pragma mark - Single smoke test that never throws
+#pragma mark - Single smoke test (no assertions)
 
 - (void)testSmokeLaunchAndScreenshot {
     @try {
@@ -66,35 +80,65 @@
         NSLog(@"CN1SS:INFO:final_app_state=%ld exists=%d",
               (long)_app.state, _app.exists ? 1 : 0);
     } @catch (__unused NSException *e) {
-        // Swallow to avoid “failable invocation” skips
         NSLog(@"CN1SS:WARN:testSmokeLaunchAndScreenshot caught exception; continuing");
     }
-    // Intentionally no assertions. We just produce CN1SS output.
+    // No asserts — we only emit CN1SS output for the Java side to parse.
 }
 
-#pragma mark - CN1SS emit + helpers (no failable XCTest calls)
+#pragma mark - Foregrounding & SpringBoard fallback
+
+- (void)cn1_trySpringBoardActivateWithName:(NSString *)displayName
+                                 bundleID:(NSString *)bundleID
+{
+    // Try activate again first (works if it was backgrounded)
+    @try { [_app activate]; } @catch (__unused NSException *e) {}
+
+    // Then try tapping the icon on SpringBoard
+    XCUIApplication *sb = [[XCUIApplication alloc] initWithBundleIdentifier:@"com.apple.springboard"];
+    [sb activate];
+    XCUIElement *icon = nil;
+
+    if (displayName.length > 0) {
+        icon = sb.icons[displayName];
+        if (!icon.exists) {
+            // Sometimes the icon label differs; attempt to locate by predicate on identifier/label
+            NSPredicate *pred = [NSPredicate predicateWithFormat:@"label CONTAINS[c] %@ OR identifier CONTAINS[c] %@", displayName, displayName];
+            icon = [[sb.icons matchingPredicate:pred] elementBoundByIndex:0];
+        }
+    }
+    if (!icon.exists && bundleID.length > 0) {
+        NSPredicate *bundlePred = [NSPredicate predicateWithFormat:@"identifier CONTAINS[c] %@", bundleID];
+        XCUIElementQuery *q = [sb.icons matchingPredicate:bundlePred];
+        icon = q.count > 0 ? [q elementBoundByIndex:0] : nil;
+    }
+
+    if (icon.exists) {
+        [icon tap];
+        NSLog(@"CN1SS:INFO:springboard_icon_tapped");
+    } else {
+        NSLog(@"CN1SS:WARN:springboard_icon_not_found");
+    }
+}
+
+#pragma mark - CN1SS emission
 
 - (void)cn1_emitScreenshotNamed:(NSString *)name app:(XCUIApplication *)app {
-    XCUIScreenshot *shot = app.screenshot ?: XCUIScreen.mainScreen.screenshot;
+    // Prefer app screenshot; fallback to full screen
+    XCUIScreenshot *shot = app.screenshot;
+    if (!shot) shot = XCUIScreen.mainScreen.screenshot;
     if (!shot) { NSLog(@"CN1SS:WARN:test=%@ no_screenshot", name); return; }
 
     NSData *png = shot.PNGRepresentation;
     if (png.length == 0) { NSLog(@"CN1SS:WARN:test=%@ empty_png", name); return; }
 
-    // Emit raw CN1SS base64 chunks (primary signal for your parser)
     [self cn1ssEmitChannel:@"" name:name bytes:png];
 
-    // Emit a tiny preview JPEG (optional, used by your preview step)
     UIImage *img = [UIImage imageWithData:png];
     if (img) {
         NSData *jpeg = UIImageJPEGRepresentation(img, 0.12);
-        if (jpeg.length > 0) {
-            [self cn1ssEmitChannel:@"PREVIEW" name:name bytes:jpeg];
-        }
+        if (jpeg.length > 0) [self cn1ssEmitChannel:@"PREVIEW" name:name bytes:jpeg];
     }
 
-    // Avoid potentially failable helpers; attach using a non-failable path
-    // If attachment throws for any reason, swallow.
     @try {
         XCTAttachment *att = [XCTAttachment attachmentWithUniformTypeIdentifier:@"public.png"
                                                                            name:name
@@ -104,8 +148,7 @@
         [self addAttachment:att];
     } @catch (__unused NSException *e) {}
 
-    // Also save to tmp so you have a file on disk
-    [self cn1_saveScreen:[NSString stringWithFormat:@"attach_%@", name]];
+    [self cn1_saveScreenPreferApp:[NSString stringWithFormat:@"attach_%@", name]];
 }
 
 - (void)cn1ssEmitChannel:(NSString *)channel name:(NSString *)name bytes:(NSData *)bytes {
@@ -113,17 +156,16 @@
     NSString *prefix = channel.length ? [@"CN1SS" stringByAppendingString:channel] : @"CN1SS";
     NSString *b64 = [bytes base64EncodedStringWithOptions:0];
 
-    const NSUInteger chunkSize = 2000;
+    const NSUInteger chunk = 2000;
     NSUInteger pos = 0, chunks = 0;
     while (pos < b64.length) {
         @autoreleasepool {
-            NSUInteger len = MIN(chunkSize, b64.length - pos);
-            NSString *chunk = [b64 substringWithRange:NSMakeRange(pos, len)];
+            NSUInteger len = MIN(chunk, b64.length - pos);
+            NSString *seg = [b64 substringWithRange:NSMakeRange(pos, len)];
             printf("%s:%s:%06lu:%s\n",
                    prefix.UTF8String, name.UTF8String,
-                   (unsigned long)pos, chunk.UTF8String);
-            pos += len;
-            chunks += 1;
+                   (unsigned long)pos, seg.UTF8String);
+            pos += len; chunks += 1;
         }
     }
     printf("CN1SS:END:%s\n", name.UTF8String);
@@ -131,9 +173,13 @@
            name.UTF8String, (unsigned long)chunks, (unsigned long)b64.length);
 }
 
-- (void)cn1_saveScreen:(NSString *)name {
-    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot ?: _app.screenshot;
+#pragma mark - Snapshots & waits (prefer app image)
+
+- (void)cn1_saveScreenPreferApp:(NSString *)name {
+    XCUIScreenshot *shot = _app.screenshot;
+    if (!shot) shot = XCUIScreen.mainScreen.screenshot;
     if (!shot) return;
+
     NSData *png = shot.PNGRepresentation;
     if (png.length == 0) return;
 
@@ -163,17 +209,19 @@
               (unsigned long)attempt, (long)state);
 
         if (state == XCUIApplicationStateRunningForeground) {
-            [self cn1_saveScreen:[NSString stringWithFormat:@"%@_foreground_%lu",
-                                  label, (unsigned long)attempt]];
+            [self cn1_saveScreenPreferApp:[NSString stringWithFormat:@"%@_foreground_%lu",
+                                           label, (unsigned long)attempt]];
             return;
         } else {
-            [self cn1_saveScreen:[NSString stringWithFormat:@"%@_state_%lu",
-                                  label, (unsigned long)attempt]];
+            [self cn1_saveScreenPreferApp:[NSString stringWithFormat:@"%@_state_%lu",
+                                           label, (unsigned long)attempt]];
         }
+
+        // Nudge: re-activate periodically in case of transient backgrounding
+        if ((attempt % 8) == 0) { @try { [app activate]; } @catch (__unused NSException *e) {} }
 
         [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:step]];
     }
-
     NSLog(@"CN1SS:WARN:%@_timeout state=%ld", label, (long)app.state);
 }
 

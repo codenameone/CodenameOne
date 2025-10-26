@@ -308,10 +308,11 @@ ri_log "Capturing simulator syslog at $SIM_SYSLOG"
   || xcrun simctl spawn "$SIM_UDID" log stream --style compact ) > "$SIM_SYSLOG" 2>&1 &
 SYSLOG_PID=$!
 
-# Optional: record video of the run
+# Optional: record video of the run (force H.264 + overwrite)
 RUN_VIDEO="$ARTIFACTS_DIR/run.mp4"
 ri_log "Recording simulator video to $RUN_VIDEO"
-( xcrun simctl io "$SIM_UDID" recordVideo "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
+# --force ensures overwriting an existing file; --codec=h264 makes QuickTime-friendly mp4
+( xcrun simctl io "$SIM_UDID" recordVideo --codec=h264 --force "$RUN_VIDEO" & echo $! > "$SCREENSHOT_TMP_DIR/video.pid" ) || true
 VIDEO_PID="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
 
 # Run only the UI test bundle
@@ -345,14 +346,39 @@ if ! run_with_timeout 1500 xcodebuild \
 fi
 set +o pipefail
 
-# --- Begin: Stop video + final screenshots ---
+# Gracefully stop the recorder so the container is finalized
 if [ -f "$SCREENSHOT_TMP_DIR/video.pid" ]; then
   rec_pid="$(cat "$SCREENSHOT_TMP_DIR/video.pid" 2>/dev/null || true)"
   if [ -n "$rec_pid" ]; then
     ri_log "Stopping simulator video recording (pid=$rec_pid)"
-    kill "$rec_pid" >/dev/null 2>&1 || true
-    sleep 1
+    # 1) Ask nicely: SIGINT makes simctl finalize and close the MP4 properly
+    kill -INT "$rec_pid" >/dev/null 2>&1 || true
+
+    # 2) Wait a few seconds for a clean exit
+    for _ in 1 2 3 4 5; do
+      if ! kill -0 "$rec_pid" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+
+    # 3) Nudge with TERM, then KILL as a last resort
+    if kill -0 "$rec_pid" >/dev/null 2>&1; then
+      kill -TERM "$rec_pid" >/dev/null 2>&1 || true
+      sleep 1
+    fi
+    if kill -0 "$rec_pid" >/dev/null 2>&1; then
+      kill -KILL "$rec_pid" >/dev/null 2>&1 || true
+    fi
   fi
+fi
+
+# Best-effort sanity check: ensure file exists and is non-empty
+if [ -f "$RUN_VIDEO" ]; then
+  size="$(/usr/bin/stat -f%z "$RUN_VIDEO" 2>/dev/null || echo 0)"
+  ri_log "Recorded video size: ${size} bytes"
+else
+  ri_log "WARN: Expected run video not found at $RUN_VIDEO"
 fi
 
 # Export xcresult JSON (best effort)
