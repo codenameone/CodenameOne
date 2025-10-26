@@ -31,8 +31,12 @@ jobs:
           filters: |
             demos:
               - 'docs/demos/**'
+              - '.github/workflows/developer-guide-docs.yml'
             docs:
               - 'docs/developer-guide/**'
+              - '.github/workflows/developer-guide-docs.yml'
+            workflow:
+              - '.github/workflows/developer-guide-docs.yml'
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -41,16 +45,16 @@ jobs:
           java-version: '11'
 
       - name: Build Codename One demos
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.codenameone"
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml test
+          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -pl common -am -f docs/demos/pom.xml install
 
       - name: Install ImageMagick for screenshot comparison
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -58,7 +62,7 @@ jobs:
 
       - name: Compare animation screenshots
         id: compare_animation_screenshots
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -168,7 +172,7 @@ jobs:
           fi
 
       - name: Build Developer Guide HTML and PDF
-        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           OUTPUT_ROOT="build/developer-guide"

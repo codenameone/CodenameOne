@@ -299,9 +299,7 @@
           <!-- Profile for running Unit Tests -->
           <id>test</id>
           <activation>
-              <property>
-                      <name>!skipTests</name>
-              </property>
+              <activeByDefault>true</activeByDefault>
           </activation>
           <properties>
               <codename1.platform>javase</codename1.platform>
