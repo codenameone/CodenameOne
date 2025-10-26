@@ -62,15 +62,15 @@ class ChartComponentTest extends UITestBase {
         Rectangle chartBounds = component.screenToChartShape(screenRect).getBounds();
         assertEquals(0, chartBounds.getX());
         assertEquals(0, chartBounds.getY());
-        assertEquals(0, chartBounds.getSize().getWidth());
-        assertEquals(0, chartBounds.getSize().getHeight());
+        assertEquals(40, chartBounds.getSize().getWidth());
+        assertEquals(50, chartBounds.getSize().getHeight());
 
         Rectangle chartRect = new Rectangle(0, 0, 40, 50);
         Rectangle screenBounds = component.chartToScreenShape(chartRect).getBounds();
-        assertEquals(0, screenBounds.getX());
-        assertEquals(0, screenBounds.getY());
-        assertEquals(0, screenBounds.getSize().getWidth());
-        assertEquals(0, screenBounds.getSize().getHeight());
+        assertEquals(component.getAbsoluteX(), screenBounds.getX());
+        assertEquals(component.getAbsoluteY(), screenBounds.getY());
+        assertEquals(40, screenBounds.getSize().getWidth());
+        assertEquals(50, screenBounds.getSize().getHeight());
     }
 
     @Test

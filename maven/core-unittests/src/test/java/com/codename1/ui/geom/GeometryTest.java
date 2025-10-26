@@ -60,7 +60,7 @@ class GeometryTest {
         assertEquals(0d, derivativeX[2], 0.0001);
         double[] derivativeY = curve.getDerivativeCoefficientsY();
         assertEquals(200d, derivativeY[0], 0.0001);
-        assertEquals(-200d, derivativeY[1], 0.0001);
+        assertEquals(-400d, derivativeY[1], 0.0001);
         assertEquals(0d, derivativeY[2], 0.0001);
     }
 
