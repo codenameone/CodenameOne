@@ -19,6 +19,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>xalan</groupId>
+            <artifactId>serializer</artifactId>
+            <version>2.7.2</version>
+        </dependency>
+
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
 
