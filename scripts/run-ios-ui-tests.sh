@@ -493,7 +493,7 @@ if [ -s "$SUMMARY_FILE" ]; then
   while IFS='|' read -r status test message copy_flag path preview_note; do
     [ -n "${test:-}" ] || continue
     ri_log "Test '${test}': ${message}"
-    if [ "$copy_flag" = "1" && -n "${path:-}" ] && [ -f "$path" ]; then
+    if [ "$copy_flag" = "1" ] && [ -n "${path:-}" ] && [ -f "$path" ]; then
       cp -f "$path" "$ARTIFACTS_DIR/${test}.png" 2>/dev/null || true
       ri_log "  -> Stored PNG artifact copy at $ARTIFACTS_DIR/${test}.png"
     fi
