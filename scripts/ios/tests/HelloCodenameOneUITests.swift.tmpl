@@ -37,7 +37,7 @@ final class HelloCodenameOneUITests: XCTestCase {
     }
 
     private func captureScreenshot(named name: String) throws {
-        let shot = XCUIScreen.main.screenshot()
+        let shot = bestScreenshot()
 
         // Save into sandbox tmp (optional – mainly for local debugging)
         let pngURL = outputDirectory.appendingPathComponent("\(name).png")
@@ -50,6 +50,24 @@ final class HelloCodenameOneUITests: XCTestCase {
         add(att)
 
         emitScreenshotPayloads(for: shot, name: name)
+    }
+
+    private func bestScreenshot() -> XCUIScreenshot {
+        let screenShot = XCUIScreen.main.screenshot()
+        let appShot = app.screenshot()
+        let screenBytes = screenShot.pngRepresentation.count
+        let appBytes = appShot.pngRepresentation.count
+
+        if appBytes > screenBytes && appBytes > 0 {
+            return appShot
+        }
+        if screenBytes == 0 && appBytes > 0 {
+            return appShot
+        }
+        if appBytes == 0 && screenBytes > 0 {
+            return screenShot
+        }
+        return screenBytes >= appBytes ? screenShot : appShot
     }
 
     /// Wait for foreground + a short settle time
