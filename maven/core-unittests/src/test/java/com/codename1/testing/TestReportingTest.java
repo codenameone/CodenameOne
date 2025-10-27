@@ -2,6 +2,7 @@ package com.codename1.testing;
 
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Util;
+import com.codename1.junit.TestLogger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ class TestReportingTest {
 
     @BeforeEach
     void installImplementation() {
+        TestLogger.install();
         implementation = mock(CodenameOneImplementation.class);
         when(implementation.isInitialized()).thenReturn(true);
         when(implementation.handleEDTException(any(Throwable.class))).thenReturn(false);
@@ -34,6 +36,7 @@ class TestReportingTest {
     void resetSingleton() {
         TestReporting.setInstance(null);
         Util.setImplementation(null);
+        TestLogger.remove();
     }
 
     @Test
@@ -51,6 +54,7 @@ class TestReportingTest {
         String report = new String(out.toByteArray(), "UTF-8");
         assertTrue(report.contains("alpha passed"));
         assertTrue(report.contains("beta failed"));
+        assertTrue(!TestLogger.getPrinted().isEmpty());
     }
 
     @Test

@@ -10,9 +10,7 @@ One of the biggest advantages with UIID’s is the ability to change the UIID of
 
 [source,java]
 ----
-TextArea t = …;
-t.setUIID("Label");
-t.setEditable(false);
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=textAreaLabel,indent=0]
 ----
 
 TIP: This is pretty much how components such as https://www.codenameone.com/javadoc/com/codename1/components/SpanLabel.html[SpanLabel] are implemented internally
@@ -42,14 +40,14 @@ For a non-gui builder app the theme loading looks like this by default:
 
 [source,java]
 ----
-theme = UIManager.initFirstTheme("/theme");
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=initFirstTheme,indent=0]
 ----
 
 You should fix it to look like this:
 
 [source,java]
 ----
-theme = UIManager.initNamedTheme("/theme", "Theme");
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=initNamedTheme,indent=0]
 ----
 
 NOTE: This assumes the name of your main theme is "Theme" (not the layer theme you just added).
@@ -60,7 +58,7 @@ When you want to add the theme layer use:
 
 [source,java]
 ----
-UIManager.getInstance().addThemeProps(theme.getTheme("NameOfLayerTheme"));
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=addThemeProps,indent=0]
 ----
 
 The `addThemeProps` call will layer the secondary theme on top of the primary "Theme" and keep the original UIID's defined in the "Theme" intact.
@@ -670,7 +668,7 @@ To truly understand a theme we need to understand what it is. Internally a theme
 
 [source,java]
 ----
-Button.fgColor=ffffff
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=buttonFgColor,indent=0]
 ----
 
 Will set the foreground color of the https://www.codenameone.com/javadoc/com/codename1/ui/Button.html[Button] UIID to white.
@@ -713,10 +711,7 @@ E.g. to increase the size of all fonts in the application, we can do something l
 
 [source,java]
 ----
-Hashtable h = new Hashtable();
-h.put("font", largeFont);
-UIManager.getInstance().addThemeProps(h);
-Display.getInstance().getCurrent().refreshTheme();
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=addThemeHashtable,indent=0]
 ----
 
 [[understanding-images-and-multi-images]]
@@ -798,16 +793,14 @@ E.g.
 
 [source,java]
 ----
-double pixelsPerMM = ((double)Display.getInstance().convertToPixels(10, true)) / 10.0;
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=pixelsPerMM,indent=0]
 ----
 
 And now you can set the padding on an element to 1.5mm. E.g.
 
 [source,java]
 ----
-myButton.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-int pixels = (int)(1.5 * pixelsPerMM);
-myButton.getAllStyles().setPadding(pixels, pixels, pixels, pixels);
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSnippets.java[tag=paddingFromMM,indent=0]
 ----
 
 === Creating a Great Looking Side Menu
@@ -823,22 +816,7 @@ The code for the side menu is this:
 
 [source,java]
 ----
-Form hi = new Form("Hi World");
-
-Toolbar tb = hi.getToolbar();
-Image icon = theme.getImage("icon.png"); // <1>
-Container topBar = BorderLayout.east(new Label(icon));
-topBar.add(BorderLayout.SOUTH, new Label("Cool App Tagline...", "SidemenuTagline")); // <2>
-topBar.setUIID("SideCommand");
-tb.addComponentToSideMenu(topBar);
-
-tb.addMaterialCommandToSideMenu("Home", FontImage.MATERIAL_HOME, e -> {}); // <3>
-tb.addMaterialCommandToSideMenu("Website", FontImage.MATERIAL_WEB, e -> {});
-tb.addMaterialCommandToSideMenu("Settings", FontImage.MATERIAL_SETTINGS, e -> {});
-tb.addMaterialCommandToSideMenu("About", FontImage.MATERIAL_INFO, e -> {});
-
-hi.addComponent(new Label("Hi World"));
-hi.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/AdvancedThemingSideMenu.java[tag=sideMenu,indent=0]
 ----
 
 
@@ -1078,94 +1056,12 @@ Here is the source code we used to work with the UI above there are comments wit
 
 [source,java]
 ----
-private Label createSeparator() {
-    Label sep = new Label();
-    sep.setUIID("Separator");
-    // the separator line  is implemented in the theme using padding and background color, by default labels
-    // are hidden when they have no content, this method disables that behavior
-    sep.setShowEvenIfBlank(true);
-    return sep;
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/PsdTutorialDemo.java[tag=createSeparator,indent=0]
+----
 
-public void start() {
-    if(current != null){
-        current.show();
-        return;
-    }
-    // The toolbar uses the layered mode so it resides on top of the background image, the theme makes
-    // it transparent so we will see the image below it, we use border layout to place the background image on
-    // top and the "Get started" button in the south
-    Form psdTutorial = new Form("Signup", new BorderLayout());
-    Toolbar tb = new Toolbar(true);
-    psdTutorial.setToolbar(tb);
-
-    // we create 4mm material arrow images for the back button and the Get started button
-    Style iconStyle = psdTutorial.getUIManager().getComponentStyle("Title");
-    FontImage leftArrow = FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, iconStyle, 4);
-    FontImage rightArrow = FontImage.createMaterial(FontImage.MATERIAL_ARROW_FORWARD, iconStyle, 4);
-
-    // we place the back and done commands in the toolbar, we need to change UIID of the "Done" command
-    // so we can color it in Red
-    tb.addCommandToLeftBar("", leftArrow, (e) -> Log.p("Back pressed"));
-    Command doneCommand = tb.addCommandToRightBar("Done", null, (e) -> Log.p("Done pressed"));
-    tb.findCommandComponent(doneCommand).setUIID("RedCommand");
-
-    // The camera button is comprised of 3 pieces. A label containing the image and the transparent button
-    // with the camera icon on top. This is all wrapped in the title container where the title background image
-    // is placed using the theme. We chose to use a Label rather than a background using the cameraLayer so
-    // the label will preserve the original size of the image without scaling it and take up the space it needs
-    Button cameraButton = new Button(theme.getImage("camera.png"));
-    Container cameraLayer = LayeredLayout.encloseIn(
-            new Label(theme.getImage("camera-button.png")),
-            cameraButton);
-    cameraButton.setUIID("CameraButton");
-    Container titleContainer = Container.encloseIn(
-            new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER),
-            cameraLayer, BorderLayout.CENTER);
-    titleContainer.setUIID("TitleContainer");
-
-    TextField firstName = new TextField("", "First Name");
-    TextField lastName = new TextField("", "Last Name");
-    TextField email = new TextField("", "Email Address", 20, TextField.EMAILADDR);
-    TextField password = new TextField("", "Choose a Password", 20, TextField.PASSWORD);
-    TextField phone = new TextField("", "Phone Number", 20, TextField.PHONENUMBER);
-    Label phonePrefix = new Label("+1");
-    phonePrefix.setUIID("TextField");
-
-    // The phone and full name have vertical separators, we use two table layouts to arrange them correctly
-    // so the vertical separator will be in the right place
-    TableLayout fullNameLayout = new TableLayout(1, 3);
-    Container fullName = new Container(fullNameLayout);
-    fullName.add(fullNameLayout.createConstraint().widthPercentage(49), firstName).
-        add(fullNameLayout.createConstraint().widthPercentage(1), createSeparator()).
-        add(fullNameLayout.createConstraint().widthPercentage(50), lastName);
-    Container fullPhone = TableLayout.encloseIn(3, phonePrefix, createSeparator(), phone);
-
-    // The button in the south portion needs the arrow icon to be on the right side so we place the text on the left
-    Button southButton = new Button("Get started", rightArrow);
-    southButton.setTextPosition(Component.LEFT);
-    southButton.setUIID("SouthButton");
-
-    // we add the components and the separators the center portion contains all of the elements in a box
-    // Y container which we allow to scroll. BorderLayout Containers implicitly disable scrolling
-    Container by = BoxLayout.encloseY(
-                    fullName,
-                    createSeparator(),
-                    email,
-                    createSeparator(),
-                    password,
-                    createSeparator(),
-                    fullPhone,
-                    createSeparator()
-            );
-    by.setScrollableY(true);
-    psdTutorial.add(BorderLayout.NORTH, titleContainer).
-            add(BorderLayout.SOUTH, southButton).
-            add(BorderLayout.CENTER, by);
-
-
-    psdTutorial.show();
-}
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtheming/PsdTutorialDemo.java[tag=psdStart,indent=0]
 ----
 
 ==== Styling The UI

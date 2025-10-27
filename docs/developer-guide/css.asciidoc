@@ -362,8 +362,22 @@ RoundRectLabel {
 * `cn1-box-shadow-v` -- Accepts values in real values or integers (not a scalar unit).  This maps directly to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowY-float-[shadowY] property.
 * `cn1-box-shadow-blur` -- Scalar value.  Maps to the border's https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html#shadowBlur-float-[shadowBlur] property.
 * `cn1-box-shadow-color` -- The shadow color
+* `cn1-box-shadow-inset` -- Set to `inset` to render an inner shadow instead of the default outer shadow spread.
 
 Currently using the regular CSS `box-shadow` in conjunction with `border-radius` will cause a 9-piece border to be generated rather than mapping to the `RoundRectBorder`.  If, however, you use the `cn1-box-*` properties for the shadow instead, it will use the RoundRectBorder -- assuming that no other styles are specified that trigger an image border to be generated.
+
+Codename One also exposes per-corner elliptical radius controls that map to the `RoundBorder`'s X/Y radii. You can set them directly with `cn1-border-top-left-radius-x` / `cn1-border-top-left-radius-y` (and the equivalent `top-right`, `bottom-left`, and `bottom-right` pairs) to fine tune horizontal and vertical curvature independently. The CSS parser automatically populates these properties when you use standard `border-radius` syntax, including the longhand declarations and the `border-radius: <x-radii> / <y-radii>` shorthand.
+
+[source,css]
+----
+EllipticalBorder {
+    border-radius: 2mm 4mm 6mm 1mm / 1mm 3mm 5mm 7mm;
+    cn1-box-shadow-spread: 1.5mm;
+    cn1-box-shadow-inset: inset;
+}
+----
+
+In the example above, the four horizontal radii (`2mm 4mm 6mm 1mm`) populate the `cn1-border-*-radius-x` properties clockwise from the top-left corner. The four values after the slash fill the matching `cn1-border-*-radius-y` entries. Setting `cn1-box-shadow-inset: inset;` converts the shadow into an inset glow that follows the same elliptical curvature.
 
 
 
