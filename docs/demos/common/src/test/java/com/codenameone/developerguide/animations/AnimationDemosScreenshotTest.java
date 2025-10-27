@@ -12,6 +12,7 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.ImageIO;
 import com.codenameone.developerguide.Demo;
@@ -58,9 +59,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             TestUtils.waitForFormTitle(HOST_TITLE, FORM_TIMEOUT_MS);
 
             for (Demo demo : DemoRegistry.getDemos()) {
-                Form previous = Display.getInstance().getCurrent();
                 demo.show(host);
-                Form demoForm = waitForFormChange(previous);
+                Form demoForm = waitForDemoForm(host);
                 waitForFormReady(demoForm);
 
                 waitForAnimationsToFinish(demoForm);
@@ -129,16 +129,32 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         return screenshot;
     }
 
-    private Form waitForFormChange(Form previous) {
+    private Form waitForDemoForm(Form host) {
         long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
-        while (Display.getInstance().getCurrent() == previous) {
+        while (System.currentTimeMillis() <= deadline) {
+            Component current = Display.getInstance().getCurrent();
+            Form form = (current instanceof Form) ? (Form) current : null;
+            if (form != null && form != host && !HOST_TITLE.equals(formTitle(form))) {
+                return form;
+            }
+            animateCurrentForm();
             TestUtils.waitFor(50);
-            if (System.currentTimeMillis() > deadline) {
-                fail("Timed out waiting for demo form to appear.");
-                break;
+        }
+        fail("Timed out waiting for demo form to appear.");
+        return host;
+    }
+
+    private String formTitle(Form form) {
+        if (form == null) {
+            return null;
+        }
+        if (form.getToolbar() != null) {
+            Component titleComponent = form.getToolbar().getTitleComponent();
+            if (titleComponent instanceof Label) {
+                return ((Label) titleComponent).getText();
             }
         }
-        return Display.getInstance().getCurrent();
+        return form.getTitle();
     }
 
     private void waitForFormReady(Form form) {
