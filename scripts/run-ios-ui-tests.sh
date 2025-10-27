@@ -5,12 +5,25 @@ set -euo pipefail
 ri_log() { echo "[run-ios-ui-tests] $1"; }
 
 if [ $# -lt 1 ]; then
-  ri_log "Usage: $0 <workspace_path> [scheme]" >&2
+  ri_log "Usage: $0 <workspace_path> [app_bundle] [scheme]" >&2
   exit 2
 fi
 
 WORKSPACE_PATH="$1"
-REQUESTED_SCHEME="${2:-}"
+APP_BUNDLE_PATH="${2:-}"
+REQUESTED_SCHEME="${3:-}"
+
+# Backwards compatibility: if the optional app bundle argument is omitted but the
+# second parameter was historically used for the scheme, treat it as such when it
+# is not a directory path.
+if [ -n "$APP_BUNDLE_PATH" ] && [ ! -d "$APP_BUNDLE_PATH" ] && [ -z "$REQUESTED_SCHEME" ]; then
+  REQUESTED_SCHEME="$APP_BUNDLE_PATH"
+  APP_BUNDLE_PATH=""
+fi
+
+if [ -n "$APP_BUNDLE_PATH" ]; then
+  ri_log "Ignoring deprecated app bundle argument '$APP_BUNDLE_PATH'"
+fi
 
 if [ ! -d "$WORKSPACE_PATH" ]; then
   ri_log "Workspace not found at $WORKSPACE_PATH" >&2
@@ -68,17 +81,23 @@ rm -rf "$DERIVED_DATA_DIR"
 
 find_sim_udid() {
   local desired="${1:-iPhone 16}" json
-  if ! json="$(xcrun simctl list devices --json)"; then
+  if ! json="$(xcrun simctl list devices --json 2>/dev/null)"; then
     return 1
   fi
-  python3 - "$desired" <<'PY2'
-import json, sys
+  SIMCTL_JSON="$json" python3 - "$desired" <<'PY2'
+import json, os, sys
+
 
 def normalize(name: str) -> str:
     return name.strip().lower()
 
+
 target = normalize(sys.argv[1])
-data = json.load(sys.stdin)
+try:
+    data = json.loads(os.environ.get("SIMCTL_JSON", "{}"))
+except json.JSONDecodeError:
+    sys.exit(1)
+
 for runtime, devices in (data.get("devices") or {}).items():
     if "iOS" not in runtime:
         continue
@@ -86,8 +105,11 @@ for runtime, devices in (data.get("devices") or {}).items():
         if not device.get("isAvailable"):
             continue
         if normalize(device.get("name", "")) == target:
-            print(device.get("udid", ""))
+            udid = device.get("udid", "")
+            if udid:
+                print(udid)
             sys.exit(0)
+
 print("")
 PY2
 }
