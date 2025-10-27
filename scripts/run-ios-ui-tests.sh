@@ -369,6 +369,17 @@ PY
   fi
 fi
 
+UITEST_PLIST="$DERIVED_DATA_DIR/Build/Products/Debug-iphonesimulator/HelloCodenameOneUITests-Runner.app/PlugIns/HelloCodenameOneUITests.xctest/Info.plist"
+
+if [ -f "$UITEST_PLIST" ] && [ -n "${AUT_BUNDLE_ID:-}" ]; then
+  ri_log "Pinning UI test TargetApplicationBundleIdentifier to $AUT_BUNDLE_ID"
+  /usr/libexec/PlistBuddy -c "Delete :TargetApplicationBundleIdentifier" "$UITEST_PLIST" >/dev/null 2>&1 || true
+  /usr/libexec/PlistBuddy -c "Add :TargetApplicationBundleIdentifier string $AUT_BUNDLE_ID" "$UITEST_PLIST"
+  # (belt-and-suspenders) also clear any stale TargetApplicationPath
+  /usr/libexec/PlistBuddy -c "Delete :TargetApplicationPath" "$UITEST_PLIST" >/dev/null 2>&1 || true
+fi
+
+
 if [ -n "$RUNNER_APP" ] && [ -d "$RUNNER_APP" ]; then
   ri_log "Installing Test Runner: $RUNNER_APP"
   xcrun simctl install "$SIM_UDID" "$RUNNER_APP" || true
@@ -407,7 +418,7 @@ if [ -n "${AUT_BUNDLE_ID:-}" ]; then
 fi
 
 ri_log "STAGE:TEST -> xcodebuild test-without-building (destination=$SIM_DESTINATION)"
-if ! run_with_timeout 1500 env CN1_AUT_BUNDLE_ID="${AUT_BUNDLE_ID:-com.codenameone.examples}" xcodebuild \
+if ! run_with_timeout 1500 env CN1_AUT_BUNDLE_ID="${AUT_BUNDLE_ID}" xcodebuild \
   -workspace "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
