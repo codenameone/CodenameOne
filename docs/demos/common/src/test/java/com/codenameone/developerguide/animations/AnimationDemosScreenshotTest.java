@@ -176,6 +176,14 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         }
 
         while (System.currentTimeMillis() <= deadline) {
+            Dialog activeDialog = Dialog.getActiveDialog();
+            if (activeDialog != null) {
+                activeDialog.dispose();
+                animateCurrentForm();
+                TestUtils.waitFor(120);
+                continue;
+            }
+
             Form active = currentForm();
             if (active == host) {
                 break;
@@ -224,6 +232,12 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         Form current = currentForm();
         if (current != null) {
             current.animate();
+            return;
+        }
+
+        Dialog dialog = Dialog.getActiveDialog();
+        if (dialog != null) {
+            dialog.animate();
         }
     }
 
