@@ -176,7 +176,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         }
 
         while (System.currentTimeMillis() <= deadline) {
-            Dialog activeDialog = Dialog.getActiveDialog();
+            Dialog activeDialog = activeDialog();
             if (activeDialog != null) {
                 activeDialog.dispose();
                 animateCurrentForm();
@@ -228,6 +228,11 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         return (current instanceof Form) ? (Form) current : null;
     }
 
+    private Dialog activeDialog() {
+        Component current = Display.getInstance().getCurrent();
+        return (current instanceof Dialog) ? (Dialog) current : null;
+    }
+
     private void animateCurrentForm() {
         Form current = currentForm();
         if (current != null) {
@@ -235,7 +240,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             return;
         }
 
-        Dialog dialog = Dialog.getActiveDialog();
+        Dialog dialog = activeDialog();
         if (dialog != null) {
             dialog.animate();
         }
