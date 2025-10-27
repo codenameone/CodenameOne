@@ -152,15 +152,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     }
 
     private void waitForHost(Form host) {
-        long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
-        while (Display.getInstance().getCurrent() != host) {
-            animateCurrentForm();
-            TestUtils.waitFor(50);
-            if (System.currentTimeMillis() > deadline) {
-                fail("Timed out waiting to return to host form.");
-                break;
-            }
-        }
+        TestUtils.waitForFormTitle(HOST_TITLE, FORM_TIMEOUT_MS);
         TestUtils.waitFor(200);
     }
 
@@ -170,40 +162,50 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         }
 
         long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
-
-        if (demoForm != null && demoForm != currentForm()) {
-            unwindForm(demoForm, host);
+        boolean restoreSlowMotion = Motion.isSlowMotion();
+        if (restoreSlowMotion) {
+            Motion.setSlowMotion(false);
         }
 
-        while (System.currentTimeMillis() <= deadline) {
-            Dialog activeDialog = activeDialog();
-            if (activeDialog != null) {
-                activeDialog.dispose();
+        try {
+            if (demoForm != null && demoForm != currentForm()) {
+                unwindForm(demoForm, host);
+            }
+
+            while (System.currentTimeMillis() <= deadline) {
+                Dialog activeDialog = activeDialog();
+                if (activeDialog != null) {
+                    activeDialog.dispose();
+                    animateCurrentForm();
+                    TestUtils.waitFor(120);
+                    continue;
+                }
+
+                Form active = currentForm();
+                if (active == host) {
+                    break;
+                }
+
+                if (active == null) {
+                    host.show();
+                } else {
+                    unwindForm(active, host);
+                }
+
                 animateCurrentForm();
                 TestUtils.waitFor(120);
-                continue;
             }
 
-            Form active = currentForm();
-            if (active == host) {
-                break;
-            }
-
-            if (active == null) {
+            if (currentForm() != host) {
                 host.show();
-            } else {
-                unwindForm(active, host);
             }
 
-            animateCurrentForm();
-            TestUtils.waitFor(120);
+            waitForHost(host);
+        } finally {
+            if (restoreSlowMotion) {
+                Motion.setSlowMotion(true);
+            }
         }
-
-        if (currentForm() != host) {
-            host.show();
-        }
-
-        waitForHost(host);
     }
 
     private void unwindForm(Form form, Form host) {
