@@ -154,7 +154,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private void waitForHost(Form host) {
         long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
         while (Display.getInstance().getCurrent() != host) {
-            Display.getInstance().animate();
+            animateCurrentForm();
             TestUtils.waitFor(50);
             if (System.currentTimeMillis() > deadline) {
                 fail("Timed out waiting to return to host form.");
@@ -187,7 +187,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
                 unwindForm(active, host);
             }
 
-            Display.getInstance().animate();
+            animateCurrentForm();
             TestUtils.waitFor(120);
         }
 
@@ -218,6 +218,13 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private Form currentForm() {
         Component current = Display.getInstance().getCurrent();
         return (current instanceof Form) ? (Form) current : null;
+    }
+
+    private void animateCurrentForm() {
+        Form current = currentForm();
+        if (current != null) {
+            current.animate();
+        }
     }
 
     private void triggerAnimationIfNeeded(Demo demo, Form form) {
