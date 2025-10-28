@@ -17,19 +17,25 @@ def ri_log(message: str) -> None:
     print(f"[run-ios-ui-tests] {message}", file=sys.stderr)
 
 
-def run_xcresult(args: Sequence[str]) -> str:
+def run_xcresult(args: Sequence[str], allow_failure: bool = False) -> Optional[str]:
     cmd = ["xcrun", "xcresulttool", *args]
-    try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except subprocess.CalledProcessError as exc:
-        stderr = exc.stderr.decode("utf-8", "ignore").strip()
+    result = subprocess.run(
+        cmd,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", "ignore").strip()
         ri_log(f"xcresulttool command failed: {' '.join(cmd)}\n{stderr}")
-        raise
+        if allow_failure:
+            return None
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            cmd,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
     return result.stdout.decode("utf-8")
 
 
@@ -37,8 +43,17 @@ def get_json(bundle_path: str, object_id: Optional[str] = None) -> Dict:
     args = ["get", "--legacy", "--path", bundle_path, "--format", "json"]
     if object_id:
         args.extend(["--id", object_id])
-    output = run_xcresult(args)
-    return json.loads(output or "{}")
+    output = run_xcresult(args, allow_failure=True)
+    if not output:
+        return {}
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError:
+        ri_log(
+            "Failed to decode xcresult JSON payload; "
+            "continuing without structured data"
+        )
+        return {}
 
 
 def extract_id(ref: object) -> Optional[str]:
