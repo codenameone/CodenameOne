@@ -13,6 +13,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.CN;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.ImageIO;
 import com.codenameone.developerguide.Demo;
@@ -132,8 +133,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private Form waitForDemoForm(Form host) {
         long deadline = System.currentTimeMillis() + FORM_TIMEOUT_MS;
         while (System.currentTimeMillis() <= deadline) {
-            Component current = Display.getInstance().getCurrent();
-            Form form = (current instanceof Form) ? (Form) current : null;
+            Form form = currentForm();
             if (form != null && form != host && !HOST_TITLE.equals(formTitle(form))) {
                 return form;
             }
@@ -243,7 +243,14 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
 
     private Form currentForm() {
         Component current = Display.getInstance().getCurrent();
-        return (current instanceof Form) ? (Form) current : null;
+        if (current instanceof Form) {
+            return (Form) current;
+        }
+        Form cnForm = CN.getCurrentForm();
+        if (cnForm instanceof Dialog) {
+            return null;
+        }
+        return cnForm;
     }
 
     private Dialog activeDialog() {
