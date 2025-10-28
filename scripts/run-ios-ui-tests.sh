@@ -174,7 +174,7 @@ rm -rf "$EXPORT_DIR"
 mkdir -p "$EXPORT_DIR"
 
 ri_log "Exporting screenshot attachments from $RESULT_BUNDLE"
-if ! xcrun xcresulttool export --path "$RESULT_BUNDLE" --type file --output-path "$EXPORT_DIR" >/dev/null; then
+if ! xcrun xcresulttool export --legacy --path "$RESULT_BUNDLE" --type file --output-path "$EXPORT_DIR" >/dev/null; then
   ri_log "xcresulttool export failed"
   exit 11
 fi
