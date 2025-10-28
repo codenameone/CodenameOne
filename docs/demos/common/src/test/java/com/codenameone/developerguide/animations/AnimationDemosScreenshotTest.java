@@ -53,13 +53,14 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         clearPreviousScreenshots();
 
         boolean previousSlowMotion = Motion.isSlowMotion();
-        Motion.setSlowMotion(true);
+        Motion.setSlowMotion(false);
         try {
             Form host = new DemoBrowserForm();
             host.show();
             TestUtils.waitForFormTitle(HOST_TITLE, FORM_TIMEOUT_MS);
 
             for (Demo demo : DemoRegistry.getDemos()) {
+                Motion.setSlowMotion(false);
                 demo.show(host);
                 Form demoForm = waitForDemoForm(host);
                 waitForFormReady(demoForm);
@@ -69,12 +70,17 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
                 triggerAnimationIfNeeded(demo, demoForm);
                 Form activeForm = ensureCurrentFormReady(demoForm);
 
-                if (waitForAnimationStart(activeForm, ANIMATION_CAPTURE_TIMEOUT_MS)) {
-                    captureAnimationFrames(demo, activeForm);
-                    finalizeAnimations(activeForm);
-                } else {
-                    Image screenshot = capture(activeForm);
-                    saveScreenshot(storageKeyFor(demo.getTitle()), screenshot);
+                Motion.setSlowMotion(true);
+                try {
+                    if (waitForAnimationStart(activeForm, ANIMATION_CAPTURE_TIMEOUT_MS)) {
+                        captureAnimationFrames(demo, activeForm);
+                        finalizeAnimations(activeForm);
+                    } else {
+                        Image screenshot = capture(activeForm);
+                        saveScreenshot(storageKeyFor(demo.getTitle()), screenshot);
+                    }
+                } finally {
+                    Motion.setSlowMotion(false);
                 }
 
                 returnToHost(activeForm, host);
