@@ -41,6 +41,18 @@ def get_json(bundle_path: str, object_id: Optional[str] = None) -> Dict:
     return json.loads(output or "{}")
 
 
+def extract_id(ref: object) -> Optional[str]:
+    if isinstance(ref, str):
+        return ref
+    if isinstance(ref, dict):
+        if "id" in ref:
+            return extract_id(ref["id"])
+        if "_value" in ref:
+            value = ref["_value"]
+            return value if isinstance(value, str) else None
+    return None
+
+
 def collect_nodes(node) -> Tuple[List[Dict], List[str]]:
     attachments: List[Dict] = []
     refs: List[str] = []
@@ -55,13 +67,13 @@ def collect_nodes(node) -> Tuple[List[Dict], List[str]]:
                         attachments.append(item)
             for key, value in current.items():
                 if key.endswith("Ref") and isinstance(value, dict):
-                    ref_id = value.get("id")
+                    ref_id = extract_id(value)
                     if isinstance(ref_id, str) and ref_id:
                         refs.append(ref_id)
                 elif key.endswith("Refs") and isinstance(value, dict):
                     for entry in value.get("_values", []):
                         if isinstance(entry, dict):
-                            ref_id = entry.get("id")
+                            ref_id = extract_id(entry)
                             if isinstance(ref_id, str) and ref_id:
                                 refs.append(ref_id)
                 if isinstance(value, (dict, list)):
@@ -71,14 +83,41 @@ def collect_nodes(node) -> Tuple[List[Dict], List[str]]:
     return attachments, refs
 
 
+def _looks_like_image(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    lower = value.lower()
+    if lower.endswith((".png", ".jpg", ".jpeg")):
+        return True
+    keywords = ("png", "jpeg", "image", "screenshot")
+    return any(keyword in lower for keyword in keywords)
+
+
 def is_image_attachment(attachment: Dict) -> bool:
-    uti = (attachment.get("uniformTypeIdentifier") or "").lower()
-    filename = (attachment.get("filename") or attachment.get("name") or "").lower()
-    if filename.endswith((".png", ".jpg", ".jpeg")):
+    filename = attachment.get("filename") or attachment.get("name")
+    if _looks_like_image(filename):
         return True
-    if "png" in uti or "jpeg" in uti:
-        return True
-    return False
+
+    uti_candidates = [
+        attachment.get("uniformTypeIdentifier"),
+        attachment.get("contentType"),
+        attachment.get("uti"),
+    ]
+    payload = (
+        attachment.get("payloadRef")
+        or attachment.get("inlinePayloadRef")
+        or attachment.get("payload")
+    )
+    if isinstance(payload, dict):
+        uti_candidates.extend(
+            [
+                payload.get("contentType"),
+                payload.get("uti"),
+                payload.get("uniformTypeIdentifier"),
+            ]
+        )
+
+    return any(_looks_like_image(candidate) for candidate in uti_candidates)
 
 
 def sanitize_filename(name: str) -> str:
@@ -101,8 +140,13 @@ def ensure_extension(name: str, uti: str) -> str:
 def export_attachment(
     bundle_path: str, attachment: Dict, destination_dir: str, used_names: Set[str]
 ) -> None:
-    payload = attachment.get("payloadRef") or {}
-    attachment_id = payload.get("id")
+    payload = (
+        attachment.get("payloadRef")
+        or attachment.get("inlinePayloadRef")
+        or attachment.get("payload")
+        or {}
+    )
+    attachment_id = extract_id(payload)
     if not attachment_id:
         return
     name = attachment.get("filename") or attachment.get("name") or attachment_id
@@ -141,8 +185,13 @@ def handle_attachments(
     seen_attachment_ids: Set[str],
 ) -> None:
     for attachment in items:
-        payload = attachment.get("payloadRef") or {}
-        attachment_id = payload.get("id")
+        payload = (
+            attachment.get("payloadRef")
+            or attachment.get("inlinePayloadRef")
+            or attachment.get("payload")
+            or {}
+        )
+        attachment_id = extract_id(payload)
         if not attachment_id or attachment_id in seen_attachment_ids:
             continue
         if not is_image_attachment(attachment):
