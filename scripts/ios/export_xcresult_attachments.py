@@ -34,7 +34,7 @@ def run_xcresult(args: Sequence[str]) -> str:
 
 
 def get_json(bundle_path: str, object_id: Optional[str] = None) -> Dict:
-    args = ["get", "--path", bundle_path, "--format", "json"]
+    args = ["get", "--legacy", "--path", bundle_path, "--format", "json"]
     if object_id:
         args.extend(["--id", object_id])
     output = run_xcresult(args)
