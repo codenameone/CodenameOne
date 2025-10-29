@@ -6,6 +6,7 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.TestImplementationProvider;
 import com.codename1.io.Util;
+import com.codename1.junit.TestLogger;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -161,11 +162,13 @@ class PushTest {
 
     @Test
     void pushConnectionHandlesNetworkFailures() {
+        TestLogger.install();
         Push.PushConnection connection = new Push.PushConnection();
         connection.handleErrorResponseCode(500, "server");
         assertFalse(connection.successful);
         connection.handleException(new RuntimeException("boom"));
         assertFalse(connection.successful);
+        TestLogger.remove();
     }
 
     @Test
