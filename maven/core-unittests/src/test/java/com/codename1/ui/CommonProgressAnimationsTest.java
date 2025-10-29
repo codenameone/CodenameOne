@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.CommonProgressAnimations.CircleProgress;
 import com.codename1.ui.CommonProgressAnimations.EmptyAnimation;
@@ -62,11 +63,13 @@ class CommonProgressAnimationsTest extends UITestBase {
 
     @Test
     void testMarkComponentLoadingWithoutParentThrowsException() {
+        TestLogger.install();
         Label orphan = new Label("Missing Parent");
         RuntimeException failure = assertThrows(RuntimeException.class,
                 () -> ProgressAnimation.markComponentLoading(orphan, CircleProgress.class));
         assertNotNull(failure.getMessage());
         assertTrue(failure.getMessage().contains("Component has no parent"));
+        TestLogger.remove();
     }
 
     @Test
