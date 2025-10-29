@@ -36,7 +36,7 @@ class ContainerTest extends UITestBase {
                 }
             }
         }).start();
-        content.morphAndWait(a, c, 120);
+        content.morphAndWait(a, c, 500);
         running[0] = false;
         assertEquals(3, content.getComponentCount());
         assertEquals(c.getBounds(), a.getBounds());
