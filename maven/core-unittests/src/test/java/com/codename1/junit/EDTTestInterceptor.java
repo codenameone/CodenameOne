@@ -32,6 +32,11 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     }
 
     private void runOnMyThread(Invocation<Void> invocation) throws Throwable {
+        if (CN.isEdt()) {
+            pretest();
+            invocation.proceed();
+            return;
+        }
         beforePretest();
         AtomicReference<Throwable> thrown = new AtomicReference<>();
         CN.callSeriallyAndWait(() -> {
