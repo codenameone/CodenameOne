@@ -14,6 +14,7 @@ class ContainerTest extends UITestBase {
 
     @FormTest
     void testMorphAnimation() {
+        final boolean[] running = {true};
         Form form = CN.getCurrentForm();
         form.setAllowEnableLayoutOnPaint(false);
         form.setLayout(new BorderLayout());
@@ -24,7 +25,19 @@ class ContainerTest extends UITestBase {
         Container content = BoxLayout.encloseY(a, b, c);
         form.add(BorderLayout.CENTER, content);
         form.revalidate();
-        content.morphAndWait(a, c, 20);
+        assertNotEquals(c.getBounds(), a.getBounds());
+        new Thread(() -> {
+            while (running[0]) {
+                System.out.println("a.y = " + a.getY() + " c.y = " + c.getY());
+                try {
+                    Thread.currentThread().sleep(2);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }).start();
+        content.morphAndWait(a, c, 120);
+        running[0] = false;
         assertEquals(3, content.getComponentCount());
         assertEquals(c.getBounds(), a.getBounds());
     }
