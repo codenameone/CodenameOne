@@ -2,11 +2,10 @@ package com.codename1.testing;
 
 import com.codename1.io.Util;
 import com.codename1.junit.EdtTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.Form;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -20,6 +19,16 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DeviceRunnerTest extends UITestBase {
+    @BeforeEach
+    void disableLogger() {
+        TestLogger.install();
+    }
+
+    @AfterEach
+    void restoreLogger() {
+        TestLogger.remove();
+    }
+
     @EdtTest
     void runTestsProcessesTestsDatAndReportsResults() throws Exception {
         byte[] data = createTestsDat(PassingUnitTest.class.getName(), FailingUnitTest.class.getName());
