@@ -120,29 +120,37 @@ def _looks_like_image(value) -> bool:
     return any(keyword in lower for keyword in keywords)
 
 
+def _first_text(mapping: Optional[Dict], keys: Sequence[str]) -> Optional[str]:
+    if not isinstance(mapping, dict):
+        return None
+    for key in keys:
+        if key in mapping:
+            text = _as_text(mapping.get(key))
+            if text:
+                return text
+    return None
+
+
 def is_image_attachment(attachment: Dict) -> bool:
-    filename = _as_text(attachment.get("filename") or attachment.get("name"))
+    filename = _first_text(attachment, ["filename", "name"])
     if _looks_like_image(filename):
         return True
 
-    uti_candidates = [
-        _as_text(attachment.get("uniformTypeIdentifier")),
-        _as_text(attachment.get("contentType")),
-        _as_text(attachment.get("uti")),
-    ]
+    uti_candidates: List[str] = []
+    for key in ("uniformTypeIdentifier", "contentType", "uti"):
+        text = _as_text(attachment.get(key))
+        if text:
+            uti_candidates.append(text)
     payload = (
         attachment.get("payloadRef")
         or attachment.get("inlinePayloadRef")
         or attachment.get("payload")
     )
     if isinstance(payload, dict):
-        uti_candidates.extend(
-            [
-                _as_text(payload.get("contentType")),
-                _as_text(payload.get("uti")),
-                _as_text(payload.get("uniformTypeIdentifier")),
-            ]
-        )
+        for key in ("contentType", "uti", "uniformTypeIdentifier"):
+            text = _as_text(payload.get(key))
+            if text:
+                uti_candidates.append(text)
 
     return any(_looks_like_image(candidate) for candidate in uti_candidates)
 
@@ -176,11 +184,11 @@ def export_attachment(
     attachment_id = extract_id(payload)
     if not attachment_id:
         return
-    name = (
-        _as_text(attachment.get("filename") or attachment.get("name"))
-        or attachment_id
-    )
-    name = ensure_extension(name, _as_text(attachment.get("uniformTypeIdentifier")))
+    name = _first_text(attachment, ["filename", "name"]) or attachment_id
+    uti_hint = _first_text(attachment, ["uniformTypeIdentifier", "contentType", "uti"])
+    if not uti_hint and isinstance(payload, dict):
+        uti_hint = _first_text(payload, ["uniformTypeIdentifier", "contentType", "uti"])
+    name = ensure_extension(name, uti_hint)
     name = sanitize_filename(name)
     candidate = name
     counter = 1
