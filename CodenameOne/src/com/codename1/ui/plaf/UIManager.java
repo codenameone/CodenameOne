@@ -643,7 +643,7 @@ public class UIManager {
         }
 
         if (installedTheme == null || !installedTheme.containsKey("SignatureButtonBox.derive")) {
-            themeProps.put("SignatureButtonBox.fgColor", centerAlign);
+            themeProps.put("SignatureButtonBox.fgColor", foreground);
             themeProps.put("SignatureButtonBox.sel#derive", "SignatureButtonBox");
             themeProps.put("SignatureButtonBox.press#derive", "SignatureButtonBox");
             themeProps.put("SignatureButtonBox.dis#derive", "SignatureButtonBox");
