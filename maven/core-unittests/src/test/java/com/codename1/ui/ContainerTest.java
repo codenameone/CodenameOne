@@ -15,6 +15,7 @@ class ContainerTest extends UITestBase {
     @FormTest
     void testMorphAnimation() {
         Form form = CN.getCurrentForm();
+        form.setAllowEnableLayoutOnPaint(false);
         form.setLayout(new BorderLayout());
 
         Button a = new Button("A");
