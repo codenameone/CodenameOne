@@ -463,6 +463,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void resetAffine(Object nativeGraphics) {
+    }
+
+    @Override
+    public void scale(Object nativeGraphics, float x, float y) {
+    }
+
+
+    @Override
+    public void rotate(Object nativeGraphics, float angle, int pivotX, int pivotY) {
+    }
+
+    @Override
+    public void shear(Object nativeGraphics, float x, float y) {
+    }
+
+    @Override
     public boolean isTransformSupported() {
         return true;
     }

@@ -13,14 +13,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LocationManagerTest extends UITestBase {
     private TestLocationManager manager;
-    private Object originalEdt;
 
     @BeforeEach
     void initManager() throws Exception {
         manager = new TestLocationManager();
         implementation.setLocationManager(manager);
-        originalEdt = getDisplayField("edt");
-        setDisplayField("edt", new Thread());
     }
 
     @AfterEach
@@ -28,7 +25,6 @@ class LocationManagerTest extends UITestBase {
         manager.notifyOnBind = true;
         manager.setLocationListener(null);
         manager.setBackgroundLocationListener(null);
-        setDisplayField("edt", originalEdt);
     }
 
     @FormTest
@@ -123,16 +119,6 @@ class LocationManagerTest extends UITestBase {
         Field field = Display.class.getDeclaredField(name);
         field.setAccessible(true);
         return field.get(Display.getInstance());
-    }
-
-    private void setDisplayField(String name, Object value) throws Exception {
-        Field field = Display.class.getDeclaredField(name);
-        field.setAccessible(true);
-        if ((field.getModifiers() & java.lang.reflect.Modifier.STATIC) != 0) {
-            field.set(null, value);
-        } else {
-            field.set(Display.getInstance(), value);
-        }
     }
 
     private static class DummyLocationListener implements LocationListener {

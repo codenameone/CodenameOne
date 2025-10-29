@@ -1,16 +1,11 @@
 package com.codename1.components;
 
-import com.codename1.io.Util;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Button;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionListener;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -19,17 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SignatureComponentTest extends UITestBase {
-    @BeforeEach
-    void configureDisplay() {
-        Util.setImplementation(new TestCodenameOneImplementation());
-    }
-
-    @AfterEach
-    void clearUtil() {
-        Util.setImplementation(null);
-    }
-
-    @Test
+    @FormTest
     void testPreferredSizeUsesDisplayConversions() {
         SignatureComponent component = new SignatureComponent();
         Dimension preferred = component.getPreferredSize();
@@ -37,7 +22,7 @@ class SignatureComponentTest extends UITestBase {
         assertEquals(40, preferred.getHeight());
     }
 
-    @Test
+    @FormTest
     void testSetSignatureImageScalesIconAndClearsLeadText() throws Exception {
         SignatureComponent component = new SignatureComponent();
         Button lead = getLeadButton(component);
@@ -55,7 +40,7 @@ class SignatureComponentTest extends UITestBase {
         assertEquals(60, icon.getHeight(), "Scaled icon height should match available height");
     }
 
-    @Test
+    @FormTest
     void testSetSignatureImageNullRestoresLeadState() throws Exception {
         SignatureComponent component = new SignatureComponent();
         Button lead = getLeadButton(component);
@@ -70,7 +55,7 @@ class SignatureComponentTest extends UITestBase {
         assertNull(lead.getIcon());
     }
 
-    @Test
+    @FormTest
     void testGetSignatureImageReturnsStoredImage() {
         SignatureComponent component = new SignatureComponent();
         StubImage image = new StubImage(50, 25);
