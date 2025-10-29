@@ -1,6 +1,7 @@
 package com.codename1.javascript;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
@@ -35,19 +36,11 @@ class JavascriptContextTest extends UITestBase {
     void setUpBrowser() {
         browser = mock(BrowserComponent.class);
         when(browser.getBrowserNavigationCallback()).thenReturn(null);
-        when(implementation.createSoftWeakRef(any())).thenAnswer(invocation -> new WeakReference<Object>(invocation.getArgument(0)));
-        when(implementation.extractHardRef(any())).thenAnswer(invocation -> {
-            Object ref = invocation.getArgument(0);
-            if (ref instanceof WeakReference) {
-                return ((WeakReference) ref).get();
-            }
-            return null;
-        });
         doNothing().when(browser).execute(anyString());
         when(browser.executeAndReturnString(anyString())).thenReturn("undefined");
     }
 
-    @Test
+    @FormTest
     void constructorInstallsNavigationCallbackAndListener() {
         BrowserNavigationCallback original = mock(BrowserNavigationCallback.class);
         when(browser.getBrowserNavigationCallback()).thenReturn(original);
@@ -60,7 +53,7 @@ class JavascriptContextTest extends UITestBase {
         verify(browser).addWebEventListener(eq("scriptMessageReceived"), any(ActionListener.class));
     }
 
-    @Test
+    @FormTest
     void setBrowserComponentUninstallsPreviousInstance() {
         BrowserNavigationCallback original = mock(BrowserNavigationCallback.class);
         when(browser.getBrowserNavigationCallback()).thenReturn(original);
@@ -82,7 +75,7 @@ class JavascriptContextTest extends UITestBase {
         verify(replacement).addWebEventListener(eq("scriptMessageReceived"), any(ActionListener.class));
     }
 
-    @Test
+    @FormTest
     void getReturnsNumericValuesAndResetsReturnVariable() {
         JavascriptContext context = new JavascriptContext(browser);
         Queue<String> responses = new ArrayDeque<String>();
@@ -97,7 +90,7 @@ class JavascriptContextTest extends UITestBase {
         verify(browser).execute(contains("=undefined"));
     }
 
-    @Test
+    @FormTest
     void getReturnsBooleanValues() {
         JavascriptContext context = new JavascriptContext(browser);
         Queue<String> responses = new ArrayDeque<String>();
@@ -110,7 +103,7 @@ class JavascriptContextTest extends UITestBase {
         assertSame(Boolean.TRUE, value);
     }
 
-    @Test
+    @FormTest
     void getWrapsObjectsWithJSObject() {
         JavascriptContext context = new JavascriptContext(browser);
         Queue<String> responses = new ArrayDeque<String>();
@@ -128,7 +121,7 @@ class JavascriptContextTest extends UITestBase {
         assertEquals(context.jsLookupTable + "[" + object.objectId + "]", object.toJSPointer());
     }
 
-    @Test
+    @FormTest
     void setEscapesStringsAndHandlesNumbers() {
         JavascriptContext context = new JavascriptContext(browser);
         Queue<String> responses = new ArrayDeque<String>();
@@ -147,7 +140,7 @@ class JavascriptContextTest extends UITestBase {
         verify(browser, times(2)).executeAndReturnString(anyString());
     }
 
-    @Test
+    @FormTest
     void setUsesJSObjectPointerWhenProvided() {
         JavascriptContext context = new JavascriptContext(browser);
         Queue<String> responses = new ArrayDeque<String>();
@@ -164,7 +157,7 @@ class JavascriptContextTest extends UITestBase {
         assertTrue(jsCaptor.getValue().contains("window.child=lookup[7]"));
     }
 
-    @Test
+    @FormTest
     void getAsyncRegistersCallbackAndExecutesScript() {
         JavascriptContext context = new JavascriptContext(browser);
         JSObject window = mock(JSObject.class);
@@ -191,7 +184,7 @@ class JavascriptContextTest extends UITestBase {
         verify(window).set(eq("callback$$0"), isNull(), eq(true));
     }
 
-    @Test
+    @FormTest
     void cleanupReleasesCollectedEntries() throws Exception {
         JavascriptContext context = new JavascriptContext(browser);
         java.lang.reflect.Field mapField = JavascriptContext.class.getDeclaredField("objectMap");

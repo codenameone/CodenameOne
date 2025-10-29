@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.layouts.FlowLayout;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class MenuBarTest extends UITestBase {
     private boolean originalGlobalToolbar;
@@ -24,9 +24,6 @@ class MenuBarTest extends UITestBase {
     void configureImplementation() {
         originalGlobalToolbar = Toolbar.isGlobalToolbar();
         Toolbar.setGlobalToolbar(false);
-        when(implementation.getSoftkeyCount()).thenReturn(2);
-        when(implementation.isThirdSoftButton()).thenReturn(false);
-        when(implementation.isNativeTitle()).thenReturn(false);
         Display display = Display.getInstance();
         originalTouchScreen = display.isTouchScreenDevice();
         display.setTouchScreenDevice(true);
@@ -38,7 +35,7 @@ class MenuBarTest extends UITestBase {
         Display.getInstance().setTouchScreenDevice(originalTouchScreen);
     }
 
-    @Test
+    @FormTest
     void testInitMenuBarAssignsParentAndCreatesButtons() {
         TestForm form = new TestForm();
         MenuBar menuBar = new MenuBar();
@@ -50,7 +47,7 @@ class MenuBarTest extends UITestBase {
         assertFalse(menuBar.isMenuShowing());
     }
 
-    @Test
+    @FormTest
     void testSetSelectAndBackCommands() {
         TestForm form = new TestForm();
         MenuBar menuBar = new MenuBar();
@@ -65,7 +62,7 @@ class MenuBarTest extends UITestBase {
         assertSame(back, menuBar.getBackCommand());
     }
 
-    @Test
+    @FormTest
     void testSetTransitionsStoresValues() throws Exception {
         TestForm form = new TestForm();
         MenuBar menuBar = new MenuBar();
@@ -84,7 +81,7 @@ class MenuBarTest extends UITestBase {
         assertSame(out, outField.get(menuBar));
     }
 
-    @Test
+    @FormTest
     void testMenuCellRendererSetterStoresRenderer() throws Exception {
         TestForm form = new TestForm();
         MenuBar menuBar = new MenuBar();
@@ -108,7 +105,7 @@ class MenuBarTest extends UITestBase {
         assertSame(renderer, rendererField.get(menuBar));
     }
 
-    @Test
+    @FormTest
     void testStaticSoftKeyDetectionUsesConfiguredCodes() throws Exception {
         Field leftField = MenuBar.class.getDeclaredField("leftSK");
         Field rightField = MenuBar.class.getDeclaredField("rightSK");

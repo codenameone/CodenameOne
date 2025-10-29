@@ -1,7 +1,6 @@
 package com.codename1.ui.geom;
 
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Transform;
 import org.junit.jupiter.api.Test;
@@ -14,11 +13,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class GeneralPathTest extends UITestBase {
     private TestCodenameOneImplementation testImplementation;
 
-    @Override
-    protected CodenameOneImplementation createImplementation() {
-        testImplementation = new TestCodenameOneImplementation();
-        return testImplementation;
-    }
 
     @Test
     void testLineToWithoutMoveThrowsException() {

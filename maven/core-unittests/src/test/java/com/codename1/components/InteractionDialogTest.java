@@ -1,5 +1,7 @@
 package com.codename1.components;
 
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -12,13 +14,12 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
-class InteractionDialogTest extends ComponentTestBase {
+class InteractionDialogTest extends UITestBase {
 
     @BeforeEach
     void stubOrientation() {
-        when(implementation.isPortrait()).thenReturn(true);
+        implementation.setPortrait(true);
     }
 
     @Test
@@ -42,7 +43,7 @@ class InteractionDialogTest extends ComponentTestBase {
     @Test
     void showPlacesDialogOnLayeredPane() {
         Form form = new Form(new BorderLayout());
-        when(implementation.getCurrentForm()).thenReturn(form);
+        implementation.setCurrentForm(form);
         InteractionDialog dialog = new InteractionDialog("Title");
         dialog.setAnimateShow(false);
         dialog.show(10, 20, 30, 40);
@@ -56,7 +57,7 @@ class InteractionDialogTest extends ComponentTestBase {
     @Test
     void showPopupDialogUpdatesUiidsAndUsesLayeredPane() throws Exception {
         Form form = new Form(new BorderLayout());
-        when(implementation.getCurrentForm()).thenReturn(form);
+        implementation.setCurrentForm(form);
         InteractionDialog dialog = new InteractionDialog();
         dialog.setAnimateShow(false);
         Rectangle rect = new Rectangle(20, 30, 80, 60);
@@ -72,7 +73,7 @@ class InteractionDialogTest extends ComponentTestBase {
     @Test
     void pointerOutOfBoundsListenersInstalledWhenEnabled() throws Exception {
         Form form = new Form(new BorderLayout());
-        when(implementation.getCurrentForm()).thenReturn(form);
+        implementation.setCurrentForm(form);
         InteractionDialog dialog = new InteractionDialog();
         dialog.setDisposeWhenPointerOutOfBounds(true);
         dialog.setAnimateShow(false);
@@ -82,10 +83,10 @@ class InteractionDialogTest extends ComponentTestBase {
         dialog.dispose();
     }
 
-    @Test
+    @FormTest
     void formModeUsesFormLayeredPane() {
         Form form = new Form(new BorderLayout());
-        when(implementation.getCurrentForm()).thenReturn(form);
+        implementation.setCurrentForm(form);
         InteractionDialog dialog = new InteractionDialog();
         dialog.setAnimateShow(false);
         dialog.setFormMode(true);

@@ -1,13 +1,12 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.ui.plaf.Style;
 import com.codename1.util.SuccessCallback;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Field;
 import java.net.URLEncoder;
@@ -18,17 +17,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.when;
 
 public class BrowserComponentTest extends UITestBase {
 
-    @Test
+    @FormTest
     void constructorCreatesPeerComponentWhenImplementationProvidesOne() throws Exception {
         DummyPeerComponent peer = new DummyPeerComponent();
-        when(implementation.createBrowserComponent(any())).thenReturn(peer);
+        implementation.setBrowserComponent(peer);
 
         BrowserComponent browser = new BrowserComponent();
         flushSerialCalls();
@@ -40,9 +35,9 @@ public class BrowserComponentTest extends UITestBase {
         assertEquals("BrowserComponent", browser.getUIID());
     }
 
-    @Test
+    @FormTest
     void constructorKeepsPlaceholderWhenPeerUnavailable() throws Exception {
-        when(implementation.createBrowserComponent(any())).thenReturn(null);
+        implementation.setBrowserComponent(null);
 
         BrowserComponent browser = new BrowserComponent();
         flushSerialCalls();
@@ -54,10 +49,10 @@ public class BrowserComponentTest extends UITestBase {
         assertSame(placeholder, browser.getComponentAt(0));
     }
 
-    @Test
+    @FormTest
     void webEventListenersUpdateReadyState() throws Exception {
         DummyPeerComponent peer = new DummyPeerComponent();
-        when(implementation.createBrowserComponent(any())).thenReturn(peer);
+        implementation.setBrowserComponent(peer);
 
         BrowserComponent browser = new BrowserComponent();
         flushSerialCalls();
@@ -81,10 +76,10 @@ public class BrowserComponentTest extends UITestBase {
         assertFalse(listeners.containsKey(BrowserComponent.onLoad), "Listener map should be cleaned when last listener removed");
     }
 
-    @Test
+    @FormTest
     void readyCallbackInvokedOnStartAndImmediatelyAfterReady() throws Exception {
         DummyPeerComponent peer = new DummyPeerComponent();
-        when(implementation.createBrowserComponent(any())).thenReturn(peer);
+        implementation.setBrowserComponent(peer);
 
         BrowserComponent browser = new BrowserComponent();
         flushSerialCalls();
@@ -111,22 +106,19 @@ public class BrowserComponentTest extends UITestBase {
         assertEquals(2, callbacks.get(), "Callback registered after ready should run immediately");
     }
 
-    @Test
+    @FormTest
     void postMessageFallsBackToJavaScriptWhenNativePostFails() throws Exception {
         DummyPeerComponent peer = new DummyPeerComponent();
-        when(implementation.createBrowserComponent(any())).thenReturn(peer);
-        when(implementation.postMessage(any(), anyString(), anyString())).thenReturn(false);
-        ArgumentCaptor<String> script = ArgumentCaptor.forClass(String.class);
-        doNothing().when(implementation).browserExecute(any(PeerComponent.class), script.capture());
+        implementation.setBrowserComponent(peer);
 
         BrowserComponent browser = new BrowserComponent();
         flushSerialCalls();
 
         browser.postMessage("payload", "*");
 
-        assertFalse(script.getAllValues().isEmpty(), "Fallback should execute JavaScript when native post fails");
+        assertFalse(implementation.getBrowserExecuted().isEmpty(), "Fallback should execute JavaScript when native post fails");
         boolean found = false;
-        for (String value : script.getAllValues()) {
+        for (String value : implementation.getBrowserExecuted()) {
             if (value.contains("window.postMessage")) {
                 found = true;
                 assertTrue(value.contains("payload"));
@@ -137,11 +129,10 @@ public class BrowserComponentTest extends UITestBase {
         assertTrue(found, "Generated script should invoke window.postMessage");
     }
 
-    @Test
+    @FormTest
     void fireBrowserNavigationCallbacksDispatchesReturnValues() throws Exception {
         DummyPeerComponent peer = new DummyPeerComponent();
-        when(implementation.createBrowserComponent(any())).thenReturn(peer);
-        doNothing().when(implementation).browserExecute(any(PeerComponent.class), anyString());
+        implementation.setBrowserComponent(peer);
 
         BrowserComponent browser = new BrowserComponent();
         flushSerialCalls();

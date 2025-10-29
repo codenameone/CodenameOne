@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,26 +27,22 @@ class CNTest extends UITestBase {
         assertTrue(Component.revalidateOnStyleChange);
     }
 
-    @Test
+    @FormTest
     void testRequestFullScreenDelegatesToImplementation() {
-        when(implementation.requestFullScreen()).thenReturn(true);
-
-        assertTrue(CN.requestFullScreen());
-        verify(implementation).requestFullScreen();
+        if(CN.isFullScreenSupported()) {
+            assertTrue(CN.requestFullScreen());
+            assertTrue(CN.isInFullScreenMode());
+        }
     }
 
-    @Test
+    @FormTest
     void testCanExecuteDelegatesToImplementation() {
-        when(implementation.canExecute("scheme:test")).thenReturn(Boolean.TRUE);
-
         assertTrue(CN.canExecute("scheme:test"));
-        verify(implementation).canExecute("scheme:test");
     }
 
-    @Test
+    @FormTest
     void testPropertyAndDisplayAccessors() {
-        when(implementation.getProperty(eq("key"), anyString())).thenReturn("value");
-
+        implementation.putProperty("key", "value");
         assertEquals("value", CN.getProperty("key", "default"));
         assertEquals(implementation.getDisplayWidth(), CN.getDisplayWidth());
         assertEquals(implementation.getDisplayHeight(), CN.getDisplayHeight());

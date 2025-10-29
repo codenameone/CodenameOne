@@ -1,6 +1,6 @@
 package com.codename1.ui.animations;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;

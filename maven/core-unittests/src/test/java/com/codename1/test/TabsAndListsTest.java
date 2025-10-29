@@ -1,5 +1,7 @@
 package com.codename1.test;
 
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.ComboBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Label;
@@ -15,7 +17,7 @@ import java.util.Vector;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TabsAndListsTest extends UITestBase {
-    @Test
+    @FormTest
     void tabsSelectionTracksComponents() {
         Tabs tabs = new Tabs();
         Component first = new Label("First");

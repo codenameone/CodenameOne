@@ -1,7 +1,8 @@
 package com.codename1.testing;
 
 import com.codename1.io.Util;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,35 +18,12 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.when;
 
 class DeviceRunnerTest extends UITestBase {
-    private Form currentForm;
-
-    @BeforeEach
-    void setupRunnerEnvironment() throws Exception {
-        currentForm = null;
-        when(implementation.getCurrentForm()).thenAnswer(invocation -> currentForm);
-        doAnswer(invocation -> {
-            currentForm = invocation.getArgument(0);
-            return null;
-        }).when(implementation).setCurrentForm(any(Form.class));
-        Util.setImplementation(implementation);
-    }
-
-    @AfterEach
-    void resetReporting() {
-        TestReporting.setInstance(null);
-        Util.setImplementation(null);
-    }
-
-    @Test
+    @EdtTest
     void runTestsProcessesTestsDatAndReportsResults() throws Exception {
         byte[] data = createTestsDat(PassingUnitTest.class.getName(), FailingUnitTest.class.getName());
-        when(implementation.getResourceAsStream(any(), eq("/tests.dat"))).thenAnswer(invocation -> new ByteArrayInputStream(data));
+        implementation.putResource("/tests.dat", new ByteArrayInputStream(data));
 
         RecordingTestReporting reporting = new RecordingTestReporting();
         TestReporting.setInstance(reporting);
@@ -54,6 +32,7 @@ class DeviceRunnerTest extends UITestBase {
         PassingUnitTest.reset();
         FailingUnitTest.reset();
 
+        Util.setImplementation(implementation);
         runner.runTests();
 
         assertEquals(Arrays.asList(PassingUnitTest.class.getName(), FailingUnitTest.class.getName()), reporting.startedTests);
@@ -69,7 +48,7 @@ class DeviceRunnerTest extends UITestBase {
         assertEquals(runner.getClass().getName(), reporting.finishedSuites.get(0));
     }
 
-    @Test
+    @EdtTest
     void runTestHandlesInstantiationFailureGracefully() throws Exception {
         RecordingTestReporting reporting = new RecordingTestReporting();
         TestReporting.setInstance(reporting);
@@ -85,7 +64,7 @@ class DeviceRunnerTest extends UITestBase {
         assertTrue(runner.lifecycle.isEmpty());
     }
 
-    @Test
+    @EdtTest
     void runTestCapturesExceptionsDuringExecution() throws Exception {
         RecordingTestReporting reporting = new RecordingTestReporting();
         TestReporting.setInstance(reporting);

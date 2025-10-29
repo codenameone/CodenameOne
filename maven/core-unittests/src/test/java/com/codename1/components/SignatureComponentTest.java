@@ -1,7 +1,9 @@
 package com.codename1.components;
 
 import com.codename1.io.Util;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Button;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
@@ -15,16 +17,11 @@ import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
 
 class SignatureComponentTest extends UITestBase {
     @BeforeEach
     void configureDisplay() {
-        Util.setImplementation(implementation);
-        when(implementation.isAnimation(any())).thenReturn(false);
-        when(implementation.animateImage(any(), anyLong())).thenReturn(false);
+        Util.setImplementation(new TestCodenameOneImplementation());
     }
 
     @AfterEach
@@ -84,7 +81,7 @@ class SignatureComponentTest extends UITestBase {
         assertNull(component.getSignatureImage());
     }
 
-    @Test
+    @FormTest
     void testActionListenersFireAndCanBeRemoved() throws Exception {
         SignatureComponent component = new SignatureComponent();
         AtomicInteger counter = new AtomicInteger();

@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.util.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,38 +13,17 @@ import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
 
 class EncodedImageTest extends UITestBase {
-    private AtomicInteger density;
 
-    @BeforeEach
-    void configureDensity() {
-        density = new AtomicInteger(Display.DENSITY_MEDIUM);
-        when(implementation.getDeviceDensity()).thenAnswer(invocation -> density.get());
-        when(implementation.createSoftWeakRef(any())).thenAnswer(invocation -> new SimpleRef(invocation.getArgument(0)));
-        when(implementation.extractHardRef(any())).thenAnswer(invocation -> {
-            Object ref = invocation.getArgument(0);
-            if (ref == null) {
-                return null;
-            }
-            return ((SimpleRef) ref).value;
-        });
-    }
-
-    @Test
+    @FormTest
     void testCreateFromByteArrayReturnsSameData() {
         byte[] data = new byte[]{1, 2, 3, 4};
         EncodedImage encoded = EncodedImage.create(data);
         assertSame(data, encoded.getImageData());
     }
 
-    @Test
+    @FormTest
     void testCreateWithMetadataSetsOpaqueAndDimensions() {
         byte[] data = new byte[]{9, 8, 7};
         EncodedImage encoded = EncodedImage.create(data, 21, 13, true);
@@ -52,7 +32,7 @@ class EncodedImageTest extends UITestBase {
         assertTrue(encoded.isOpaque());
     }
 
-    @Test
+    @FormTest
     void testCreateMultiSelectsDataForDeviceDensity() {
         byte[][] data = new byte[][]{
                 {1}, {2}, {3}
@@ -60,25 +40,20 @@ class EncodedImageTest extends UITestBase {
         int[] dpis = new int[]{Display.DENSITY_LOW, Display.DENSITY_MEDIUM, Display.DENSITY_VERY_HIGH};
         EncodedImage encoded = EncodedImage.createMulti(dpis, data);
 
-        density.set(Display.DENSITY_LOW);
+        implementation.setDeviceDensity(Display.DENSITY_LOW);
         assertSame(data[0], encoded.getImageData());
 
-        density.set(Display.DENSITY_VERY_HIGH);
+        implementation.setDeviceDensity(Display.DENSITY_VERY_HIGH);
         assertSame(data[2], encoded.getImageData());
 
-        density.set(Display.DENSITY_HIGH);
+        implementation.setDeviceDensity(Display.DENSITY_HIGH);
         assertSame(data[1], encoded.getImageData());
     }
 
-    @Test
+    @FormTest
     void testCreateFromImageUsesRequestedFormatAndCachesDimensions() {
         RecordingImageIO imageIO = new RecordingImageIO(true, true);
-        when(implementation.getImageIO()).thenReturn(imageIO);
-
-        Object nativeImage = new Object();
-        when(implementation.createMutableImage(eq(12), eq(18), anyInt())).thenReturn(nativeImage);
-        when(implementation.getImageWidth(nativeImage)).thenReturn(12);
-        when(implementation.getImageHeight(nativeImage)).thenReturn(18);
+        implementation.setImageIO(imageIO);
 
         Image image = Image.createImage(12, 18);
         EncodedImage encoded = EncodedImage.createFromImage(image, true);
@@ -94,7 +69,7 @@ class EncodedImageTest extends UITestBase {
     @Test
     void testScaledEncodedUsesImageIoAndPreservesOpacity() {
         RecordingImageIO imageIO = new RecordingImageIO(true, true);
-        when(implementation.getImageIO()).thenReturn(imageIO);
+        implementation.setImageIO(imageIO);
 
         EncodedImage encoded = EncodedImage.create(new byte[]{5, 4, 3, 2}, 40, 20, true);
         EncodedImage scaled = encoded.scaledEncoded(10, 5);
@@ -108,7 +83,7 @@ class EncodedImageTest extends UITestBase {
         assertEquals(5, imageIO.lastHeight);
     }
 
-    @Test
+    @FormTest
     void testCreateFromInputStreamReadsExactSize() throws IOException {
         byte[] payload = new byte[32];
         for (int i = 0; i < payload.length; i++) {
@@ -119,7 +94,7 @@ class EncodedImageTest extends UITestBase {
         assertArrayEquals(payload, encoded.getImageData());
     }
 
-    @Test
+    @FormTest
     void testLockAndUnlockPromotesCachedImage() throws Exception {
         EncodedImage encoded = EncodedImage.create(new byte[]{1, 2, 3, 4}, 6, 6, false);
         Image actual = Image.createImage(6, 6);
@@ -142,14 +117,6 @@ class EncodedImageTest extends UITestBase {
         Object cachedRef = cacheField.get(encoded);
         assertNotNull(cachedRef);
         assertSame(actual, Display.getInstance().extractHardRef(cachedRef));
-    }
-
-    private static class SimpleRef {
-        private final Object value;
-
-        SimpleRef(Object value) {
-            this.value = value;
-        }
     }
 
     private static class RecordingImageIO extends ImageIO {

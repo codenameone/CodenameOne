@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.Test;
@@ -9,7 +10,6 @@ import java.util.Hashtable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class RadioButtonTest extends UITestBase {
 
@@ -23,7 +23,7 @@ class RadioButtonTest extends UITestBase {
         assertEquals("ToggleButton", radio.getUIID());
     }
 
-    @Test
+    @FormTest
     void testSelectionChangeNotifiesListeners() {
         RadioButton radio = new RadioButton("Pick me");
         AtomicInteger changes = new AtomicInteger();
@@ -42,7 +42,7 @@ class RadioButtonTest extends UITestBase {
 
     @Test
     void testReleasedHonorsUnselectAllowedFlag() {
-        when(implementation.isBuiltinSoundsEnabled()).thenReturn(false);
+        implementation.setBuiltinSoundsEnabled(false);
         RadioButton radio = new RadioButton("Option");
         radio.setSelected(true);
         radio.setUnselectAllowed(false);

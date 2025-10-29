@@ -1,10 +1,10 @@
 package com.codename1.location;
 
 import com.codename1.io.Storage;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class GeofenceManagerTest extends UITestBase {
     private Storage originalStorage;
@@ -30,7 +29,7 @@ class GeofenceManagerTest extends UITestBase {
         Location origin = new Location(0.0, 0.0);
         locationManager.setCurrentLocation(origin);
         locationManager.setLastLocation(origin);
-        when(implementation.getLocationManager()).thenReturn(locationManager);
+        implementation.setLocationManager(locationManager);
         resetSingleton();
         manager = GeofenceManager.getInstance();
         locationManager.clearRecords();
@@ -45,7 +44,7 @@ class GeofenceManagerTest extends UITestBase {
         resetSingleton();
     }
 
-    @Test
+    @FormTest
     void addStoresGeofencesAndUpdatesSize() {
         Geofence first = createGeofence("first", 0.001, 0.0, 120, -1L);
         Geofence second = createGeofence("second", 0.002, 0.0, 80, -1L);
@@ -57,7 +56,7 @@ class GeofenceManagerTest extends UITestBase {
         assertTrue(manager.asMap().containsKey("second"));
     }
 
-    @Test
+    @FormTest
     void removeAndClearDeleteTrackedGeofences() {
         Geofence first = createGeofence("one", 0.0, 0.001, 100, -1L);
         Geofence second = createGeofence("two", 0.0, 0.002, 100, -1L);
@@ -71,7 +70,7 @@ class GeofenceManagerTest extends UITestBase {
         assertEquals(0, manager.size());
     }
 
-    @Test
+    @FormTest
     void updateActivatesGeofencesWithinBubble() {
         Geofence near = createGeofence("near", 0.001, 0.001, 50, -1L);
         Geofence far = createGeofence("far", 2.0, 2.0, 100, -1L);
@@ -86,7 +85,7 @@ class GeofenceManagerTest extends UITestBase {
         assertFalse(locationManager.removedIds.contains("near"));
     }
 
-    @Test
+    @FormTest
     void updateWithNullLocationRegistersBackgroundListener() {
         locationManager.setCurrentLocation(null);
         locationManager.clearRecords();
@@ -98,7 +97,7 @@ class GeofenceManagerTest extends UITestBase {
         assertTrue(locationManager.addedIds.isEmpty());
     }
 
-    @Test
+    @FormTest
     void listenerClassPersistsAndClears() {
         manager.setListenerClass(TestGeofenceListener.class);
         assertSame(TestGeofenceListener.class, manager.getListenerClass());
@@ -107,7 +106,7 @@ class GeofenceManagerTest extends UITestBase {
         assertNull(manager.getListenerClass());
     }
 
-    @Test
+    @FormTest
     void asSortedListOrdersByProximity() {
         Location reference = new Location(0.0, 0.0);
         locationManager.setLastLocation(reference);
@@ -121,7 +120,7 @@ class GeofenceManagerTest extends UITestBase {
         assertEquals(2, sorted.size());
     }
 
-    @Test
+    @FormTest
     void isBubbleRecognizesBubbleId() {
         assertTrue(manager.isBubble("$AsyncGeoStreamer.bubble"));
         assertFalse(manager.isBubble("not-bubble"));

@@ -1,6 +1,6 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.Test;
 

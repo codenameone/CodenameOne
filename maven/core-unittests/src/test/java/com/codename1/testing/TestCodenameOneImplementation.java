@@ -9,24 +9,29 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
+import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
+import com.codename1.util.AsyncResource;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * Lightweight {@link CodenameOneImplementation} used by unit tests.  It provides deterministic,
@@ -65,9 +70,273 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private ImageIO imageIO;
     private MediaRecorderBuilderHandler mediaRecorderBuilderHandler;
     private MediaRecorderHandler mediaRecorderHandler;
+    private boolean animation;
+    private String[] availableRecordingMimeTypes;
+    private Media mediaRecorder;
+    private boolean trueTypeSupported = true;
+    private static TestCodenameOneImplementation instance;
+    private Map<String, String> properties = new HashMap<>();
+    private boolean blockCopyAndPaste;
+    private PeerComponent browserComponent;
+    private final List<String> browserExecuted = new ArrayList<>();
+    private AsyncResource<Media> backgroundMediaAsync;
+    private Media backgroundMedia;
+    private Media media;
+    private AsyncResource<Media> mediaAsync;
+    private int startRemoteControlInvocations;
+    private int stopRemoteControlInvocations;
+    private boolean mutableImagesFast = true;
+    private boolean nativeTitle;
+    private int softkeyCount = 2;
+    private boolean thirdSoftButton = false;
+    private boolean nativeFontSchemeSupported = true;
+    private Map<String, InputStream> resourceAsStreams = new HashMap<>();
+    private Object nativeBrowserWindow;
+    private final List<ActionListener> nativeBrowserWindowOnLoadListener = new ArrayList<>();
+    private String nativeBrowserWindowTitle;
+    private Dimension nativeBrowserWindowSize;
+    private final List<ActionListener> nativeBrowserWindowCloseListener = new ArrayList<>();
+    private boolean nativeBrowserWindowShowInvoked;
+    private boolean nativeBrowserWindowCleanupInvoked;
+    private boolean nativeBrowserWindowHideInvoked;
+
 
     public TestCodenameOneImplementation() {
         this(true);
+        instance = this;
+    }
+
+    @Override
+    public InputStream getResourceAsStream(Class cls, String resource) {
+        return resourceAsStreams.get(resource);
+    }
+
+    public void putResource(String s, InputStream i) {
+        resourceAsStreams.put(s, i);
+    }
+
+    @Override
+    public boolean isNativeTitle() {
+        return nativeTitle;
+    }
+
+    public void setNativeTitle(boolean nativeTitle) {
+        this.nativeTitle = nativeTitle;
+    }
+
+    @Override
+    public boolean areMutableImagesFast() {
+        return mutableImagesFast;
+    }
+
+    public void setMutableImagesFast(boolean mutableImagesFast) {
+        this.mutableImagesFast = mutableImagesFast;
+    }
+
+    @Override
+    public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
+        return backgroundMediaAsync;
+    }
+
+    public void setBackgroundMediaAsync(AsyncResource<Media> backgroundMediaAsync) {
+        this.backgroundMediaAsync = backgroundMediaAsync;
+    }
+
+    public void setBackgroundMedia(Media backgroundMedia) {
+        this.backgroundMedia = backgroundMedia;
+    }
+
+    @Override
+    public Media createBackgroundMedia(String uri) throws IOException {
+        return backgroundMedia;
+    }
+
+    @Override
+    public AsyncResource<Media> createMediaAsync(String uri, boolean video, Runnable onCompletion) {
+        return mediaAsync;
+    }
+
+    @Override
+    public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
+        return media;
+    }
+
+    @Override
+    public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
+        return media;
+    }
+
+    public void setMedia(Media media) {
+        this.media = media;
+    }
+
+    public void setMediaAsync(AsyncResource<Media> mediaAsync) {
+        this.mediaAsync = mediaAsync;
+    }
+
+    @Override
+    public void startRemoteControl() {
+        startRemoteControlInvocations++;
+    }
+
+    @Override
+    public void stopRemoteControl() {
+        stopRemoteControlInvocations++;
+    }
+
+    public int getStartRemoteControlInvocations() {
+        return startRemoteControlInvocations;
+    }
+
+    public int getStopRemoteControlInvocations() {
+        return stopRemoteControlInvocations;
+    }
+
+    @Override
+    public AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
+        return mediaAsync;
+    }
+
+    @Override
+    public Object createNativeBrowserWindow(String startURL) {
+        return nativeBrowserWindow;
+    }
+
+    public void setNativeBrowserWindow(Object nativeBrowserWindow) {
+        this.nativeBrowserWindow = nativeBrowserWindow;
+    }
+
+    @Override
+    public void nativeBrowserWindowAddCloseListener(Object window, ActionListener l) {
+        nativeBrowserWindowCloseListener.add(l);
+    }
+
+    @Override
+    public void nativeBrowserWindowRemoveCloseListener(Object window, ActionListener l) {
+        nativeBrowserWindowCloseListener.remove(l);
+    }
+
+    public List<ActionListener> getNativeBrowserWindowCloseListener() {
+        return nativeBrowserWindowCloseListener;
+    }
+
+    @Override
+    public void nativeBrowserWindowShow(Object window) {
+        nativeBrowserWindowShowInvoked = true;
+    }
+
+    public boolean isNativeBrowserWindowShowInvoked() {
+        return nativeBrowserWindowShowInvoked;
+    }
+
+    @Override
+    public void nativeBrowserWindowCleanup(Object window) {
+        nativeBrowserWindowCleanupInvoked = true;
+    }
+
+    @Override
+    public void nativeBrowserWindowHide(Object window) {
+        nativeBrowserWindowHideInvoked = true;
+    }
+
+    public boolean isNativeBrowserWindowCleanupInvoked() {
+        return nativeBrowserWindowCleanupInvoked;
+    }
+
+    public boolean isNativeBrowserWindowHideInvoked() {
+        return nativeBrowserWindowHideInvoked;
+    }
+
+    @Override
+    public void addNativeBrowserWindowOnLoadListener(Object window, ActionListener l) {
+        nativeBrowserWindowOnLoadListener.add(l);
+    }
+
+    @Override
+    public void removeNativeBrowserWindowOnLoadListener(Object window, ActionListener l) {
+        nativeBrowserWindowOnLoadListener.remove(l);
+    }
+
+    public List<ActionListener> getNativeBrowserWindowOnLoadListener() {
+        return nativeBrowserWindowOnLoadListener;
+    }
+
+    @Override
+    public void nativeBrowserWindowSetTitle(Object window, String title) {
+        nativeBrowserWindowTitle = title;
+    }
+
+    public String getNativeBrowserWindowTitle() {
+        return nativeBrowserWindowTitle;
+    }
+
+    @Override
+    public void nativeBrowserWindowSetSize(Object window, int width, int height) {
+        nativeBrowserWindowSize = new Dimension(width, height);
+    }
+
+    public Dimension getNativeBrowserWindowSize() {
+        return nativeBrowserWindowSize;
+    }
+
+    @Override
+    public PeerComponent createBrowserComponent(Object browserComponent) {
+        return this.browserComponent;
+    }
+
+    public void setBrowserComponent(PeerComponent browserComponent) {
+        this.browserComponent = browserComponent;
+    }
+
+    @Override
+    public void browserExecute(PeerComponent browserPeer, String javaScript) {
+        browserExecuted.add(javaScript);
+    }
+
+    @Override
+    public String browserExecuteAndReturnString(PeerComponent internal, String javaScript) {
+        browserExecuted.add(javaScript);
+        return javaScript;
+    }
+
+    public List<String> getBrowserExecuted() {
+        return browserExecuted;
+    }
+
+    @Override
+    public void blockCopyPaste(boolean blockCopyPaste) {
+        this.blockCopyAndPaste = blockCopyPaste;
+    }
+
+    public boolean isBlockCopyAndPaste() {
+        return blockCopyAndPaste;
+    }
+
+    public static TestCodenameOneImplementation getInstance() {
+        return instance;
+    }
+
+    @Override
+    public String[] getAvailableRecordingMimeTypes() {
+        return availableRecordingMimeTypes;
+    }
+
+    public void setAvailableRecordingMimeTypes(String[] availableRecordingMimeTypes) {
+        this.availableRecordingMimeTypes = availableRecordingMimeTypes;
+    }
+
+    public void setAnimation(boolean animation) {
+        this.animation = animation;
+    }
+
+    @Override
+    public boolean isAnimation(Object nativeImage) {
+        return animation;
+    }
+
+    @Override
+    public boolean animateImage(Object nativeImage, long lastFrame) {
+        return animation;
     }
 
     public TestCodenameOneImplementation(boolean timeoutSupported) {
@@ -107,6 +376,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public LocationManager getLocationManager() {
+        return locationManager;
+    }
+
     public void setLocationManager(LocationManager locationManager) {
         this.locationManager = locationManager;
     }
@@ -117,10 +391,6 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setImageIO(ImageIO imageIO) {
         this.imageIO = imageIO;
-    }
-
-    public void setMediaRecorderBuilderHandler(MediaRecorderBuilderHandler handler) {
-        this.mediaRecorderBuilderHandler = handler;
     }
 
     public void setMediaRecorderHandler(MediaRecorderHandler handler) {
@@ -374,7 +644,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public int getSoftkeyCount() {
-        return 2;
+        return softkeyCount;
+    }
+
+    public void setSoftkeyCount(int softkeyCount) {
+        this.softkeyCount = softkeyCount;
+    }
+
+    @Override
+    public boolean isThirdSoftButton() {
+        return thirdSoftButton;
+    }
+
+    public void setThirdSoftButton(boolean thirdSoftButton) {
+        this.thirdSoftButton = thirdSoftButton;
     }
 
     @Override
@@ -552,6 +835,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public Boolean canExecute(String url) {
+        return url.startsWith("scheme:");
+    }
+
+    @Override
     public void fillArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
     }
 
@@ -587,22 +875,26 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
-        return ((TestFont) nativeFont).charsWidth(ch, offset, length);
+        return font(nativeFont).charsWidth(ch, offset, length);
+    }
+    
+    private TestFont font(Object nativeFont) {
+        return nativeFont == null ? defaultFont : (TestFont) nativeFont;
     }
 
     @Override
     public int stringWidth(Object nativeFont, String str) {
-        return ((TestFont) nativeFont).stringWidth(str);
+        return font(nativeFont).stringWidth(str);
     }
 
     @Override
     public int charWidth(Object nativeFont, char ch) {
-        return ((TestFont) nativeFont).charWidth(ch);
+        return font(nativeFont).charWidth(ch);
     }
 
     @Override
     public int getHeight(Object nativeFont) {
-        return ((TestFont) nativeFont).height;
+        return font(nativeFont).height;
     }
 
     @Override
@@ -617,6 +909,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
+        if(fontName != null && fontName.toLowerCase().contains("missing") ||
+                fileName != null && fileName.toLowerCase().contains("missing")) {
+            return null;
+        }
         return new TestFont(defaultFont.charWidth, defaultFont.height);
     }
 
@@ -632,12 +928,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isTrueTypeSupported() {
-        return true;
+        return trueTypeSupported;
+    }
+
+    public void setTrueTypeSupported(boolean trueTypeSupported) {
+        this.trueTypeSupported = trueTypeSupported;
     }
 
     @Override
     public boolean isNativeFontSchemeSupported() {
-        return true;
+        return nativeFontSchemeSupported;
+    }
+
+    public void setNativeFontSchemeSupported(boolean nativeFontSchemeSupported) {
+        this.nativeFontSchemeSupported = nativeFontSchemeSupported;
     }
 
     @Override
@@ -815,6 +1119,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public String getProperty(String key, String defaultValue) {
+        return properties.getOrDefault(key, defaultValue);
+    }
+
+    public void putProperty(String key, String value) {
+        properties.put(key, value);
+    }
+
+
+    @Override
     public String getPlatformName() {
         return "test";
     }
@@ -885,23 +1199,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public Form getCurrentForm() {
-        return null;
-    }
-
-    @Override
     public ImageIO getImageIO() {
         return imageIO;
     }
 
+    public void setMediaRecorder(Media mediaRecorder) {
+        this.mediaRecorder = mediaRecorder;
+    }
+
     @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) {
-        return mediaRecorderBuilderHandler == null ? null : mediaRecorderBuilderHandler.create(builder);
+        return mediaRecorder;
     }
 
     @Override
     public Media createMediaRecorder(String path, String mime) {
-        return mediaRecorderHandler == null ? null : mediaRecorderHandler.create(path, mime);
+        return mediaRecorder;
     }
 
     @Override

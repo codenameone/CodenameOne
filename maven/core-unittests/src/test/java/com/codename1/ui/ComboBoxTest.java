@@ -1,8 +1,6 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
-import com.codename1.ui.Component;
-import com.codename1.ui.Image;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
