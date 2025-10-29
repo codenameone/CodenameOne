@@ -98,10 +98,22 @@ def collect_nodes(node) -> Tuple[List[Dict], List[str]]:
     return attachments, refs
 
 
-def _looks_like_image(value: Optional[str]) -> bool:
-    if not value:
+def _as_text(value) -> Optional[str]:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("_value", "value", "rawValue", "string", "text"):
+            candidate = value.get(key)
+            if isinstance(candidate, str):
+                return candidate
+    return None
+
+
+def _looks_like_image(value) -> bool:
+    text = _as_text(value)
+    if not text:
         return False
-    lower = value.lower()
+    lower = text.lower()
     if lower.endswith((".png", ".jpg", ".jpeg")):
         return True
     keywords = ("png", "jpeg", "image", "screenshot")
@@ -109,14 +121,14 @@ def _looks_like_image(value: Optional[str]) -> bool:
 
 
 def is_image_attachment(attachment: Dict) -> bool:
-    filename = attachment.get("filename") or attachment.get("name")
+    filename = _as_text(attachment.get("filename") or attachment.get("name"))
     if _looks_like_image(filename):
         return True
 
     uti_candidates = [
-        attachment.get("uniformTypeIdentifier"),
-        attachment.get("contentType"),
-        attachment.get("uti"),
+        _as_text(attachment.get("uniformTypeIdentifier")),
+        _as_text(attachment.get("contentType")),
+        _as_text(attachment.get("uti")),
     ]
     payload = (
         attachment.get("payloadRef")
@@ -126,9 +138,9 @@ def is_image_attachment(attachment: Dict) -> bool:
     if isinstance(payload, dict):
         uti_candidates.extend(
             [
-                payload.get("contentType"),
-                payload.get("uti"),
-                payload.get("uniformTypeIdentifier"),
+                _as_text(payload.get("contentType")),
+                _as_text(payload.get("uti")),
+                _as_text(payload.get("uniformTypeIdentifier")),
             ]
         )
 
@@ -140,11 +152,11 @@ def sanitize_filename(name: str) -> str:
     return safe or "attachment"
 
 
-def ensure_extension(name: str, uti: str) -> str:
+def ensure_extension(name: str, uti: Optional[str]) -> str:
     base, ext = os.path.splitext(name)
     if ext:
         return name
-    uti = uti.lower()
+    uti = (uti or "").lower()
     if "png" in uti:
         return f"{name}.png"
     if "jpeg" in uti:
@@ -164,8 +176,11 @@ def export_attachment(
     attachment_id = extract_id(payload)
     if not attachment_id:
         return
-    name = attachment.get("filename") or attachment.get("name") or attachment_id
-    name = ensure_extension(name, attachment.get("uniformTypeIdentifier") or "")
+    name = (
+        _as_text(attachment.get("filename") or attachment.get("name"))
+        or attachment_id
+    )
+    name = ensure_extension(name, _as_text(attachment.get("uniformTypeIdentifier")))
     name = sanitize_filename(name)
     candidate = name
     counter = 1
