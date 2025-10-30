@@ -4299,8 +4299,6 @@ public class Container extends Component implements Iterable<Component> {
             }
             this.thisContainer = thisContainer;
             this.motions = motions;
-            animatedComponents = new Vector();
-            opacity = new Motion[0];
         }
 
         @Override
@@ -4331,7 +4329,7 @@ public class Container extends Component implements Iterable<Component> {
                     currentCmp.setY(motions[1][iter].getValue());
                     currentCmp.setWidth(motions[2][iter].getValue());
                     currentCmp.setHeight(motions[3][iter].getValue());
-                    if (opacity != null) {
+                    if (opacity != null && iter < opacity.length) {
                         currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
                     }
                 }
@@ -4351,7 +4349,7 @@ public class Container extends Component implements Iterable<Component> {
                     currentCmp.setY(motions[1][iter].getValue());
                     currentCmp.setWidth(motions[2][iter].getValue());
                     currentCmp.setHeight(motions[3][iter].getValue());
-                    if (opacity != null) {
+                    if (opacity != null && iter < opacity.length) {
                         currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
                     }
                 }
