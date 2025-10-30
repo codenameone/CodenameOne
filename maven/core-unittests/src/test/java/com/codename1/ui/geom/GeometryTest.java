@@ -1,5 +1,9 @@
 package com.codename1.ui.geom;
 
+import com.codename1.junit.UITestBase;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.Geometry.BezierCurve;
 import org.junit.jupiter.api.Test;
 
@@ -8,7 +12,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class GeometryTest {
+class GeometryTest extends UITestBase {
 
     @Test
     void testBezierCurveRequiresEvenNumberOfCoordinates() {
@@ -65,6 +69,13 @@ class GeometryTest {
     }
 
     @Test
+    void testDerivativeCoefficientsUnsupportedOrder() {
+        BezierCurve curve = new BezierCurve(0d, 0d, 1d, 1d, 2d, 0d, 3d, -1d, 4d, 0d);
+        assertThrows(IllegalArgumentException.class, curve::getDerivativeCoefficientsX);
+        assertThrows(IllegalArgumentException.class, curve::getDerivativeCoefficientsY);
+    }
+
+    @Test
     void testReverseSwapsStartAndEndPoints() {
         BezierCurve curve = new BezierCurve(0d, 0d, 10d, 0d);
         BezierCurve reversed = curve.reverse();
@@ -86,6 +97,13 @@ class GeometryTest {
     }
 
     @Test
+    void testSegmentRejectsInvalidParameters() {
+        BezierCurve curve = new BezierCurve(0d, 0d, 50d, 100d, 100d, 0d);
+        assertThrows(IllegalArgumentException.class, () -> curve.segment(0d, new ArrayList<BezierCurve>()));
+        assertThrows(IllegalArgumentException.class, () -> curve.segment(1d, new ArrayList<BezierCurve>()));
+    }
+
+    @Test
     void testBoundingRectIncludesCurveExtrema() {
         BezierCurve curve = new BezierCurve(0d, 0d, 50d, 100d, 100d, 0d);
         Rectangle2D bounds = curve.getBoundingRect();
@@ -103,5 +121,67 @@ class GeometryTest {
         curve.segment(rect, segments);
         assertEquals(1, segments.size());
         assertTrue(curve.equals(segments.get(0), 0.0001));
+    }
+
+    @Test
+    void testFindTValuesForXFiltersOutsideRange() {
+        BezierCurve curve = new BezierCurve(0d, 0d, 50d, 100d, 100d, 0d);
+        double[] results = new double[3];
+        int count = curve.findTValuesForX(50d, 30d, 80d, results);
+        assertEquals(1, count);
+        assertEquals(0.5d, results[0], 0.0001);
+    }
+
+    @Test
+    void testFindTValuesForYFiltersOutsideRange() {
+        BezierCurve curve = new BezierCurve(0d, 0d, 50d, 100d, 100d, 0d);
+        double[] results = new double[3];
+        int count = curve.findTValuesForY(50d, 20d, 80d, results);
+        assertEquals(1, count);
+        assertEquals(0.5d, results[0], 0.0001);
+    }
+
+    @Test
+    void testSegmentRectangleSplitsAtIntersections() {
+        BezierCurve curve = new BezierCurve(0d, 0d, 50d, 120d, 100d, 0d);
+        Rectangle2D rect = new Rectangle2D(20d, 20d, 60d, 60d);
+        List<BezierCurve> segments = new ArrayList<BezierCurve>();
+        curve.segment(rect, segments);
+        assertTrue(segments.size() >= 2);
+    }
+
+    @Test
+    void testStrokeInvokesDrawShapeWithTranslation() {
+        BezierCurve curve = new BezierCurve(0d, 0d, 10d, 10d);
+        Graphics graphics = Image.createImage(10, 10).getGraphics();
+        implementation.setShapeSupported(true);
+        implementation.resetShapeTracking();
+        curve.stroke(graphics, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f), 2, 3);
+        Shape shape = implementation.getLastDrawShape();
+        assertNotNull(shape);
+        Rectangle bounds = shape.getBounds();
+        assertEquals(2, bounds.getX());
+        assertEquals(3, bounds.getY());
+        assertTrue(implementation.wasDrawShapeInvoked());
+    }
+
+    @Test
+    void testAddToPathJoinsExistingPath() {
+        BezierCurve curve = new BezierCurve(0d, 0d, 10d, 10d);
+        GeneralPath path = new GeneralPath();
+        path.moveTo(-5f, -5f);
+        curve.addToPath(path, true);
+        PathIterator iterator = path.getPathIterator();
+        float[] coords = new float[6];
+        iterator.next();
+        assertEquals(PathIterator.SEG_LINETO, iterator.currentSegment(coords));
+    }
+
+    @Test
+    void testEqualsRespectsEpsilon() {
+        BezierCurve baseline = new BezierCurve(0d, 0d, 50d, 100d, 100d, 0d);
+        BezierCurve almost = new BezierCurve(0d, 0d, 50.0005d, 100d, 100d, 0d);
+        assertTrue(baseline.equals(almost, 0.001d));
+        assertFalse(baseline.equals(almost, 0.0001d));
     }
 }

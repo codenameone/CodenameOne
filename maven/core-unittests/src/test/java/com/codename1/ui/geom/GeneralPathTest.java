@@ -1,7 +1,6 @@
 package com.codename1.ui.geom;
 
 import com.codename1.junit.UITestBase;
-import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Transform;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +10,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GeneralPathTest extends UITestBase {
-    private TestCodenameOneImplementation testImplementation;
 
 
     @Test
@@ -105,6 +103,83 @@ class GeneralPathTest extends UITestBase {
         assertEquals(200, bounds.getY());
         assertEquals(300, bounds.getWidth());
         assertEquals(400, bounds.getHeight());
+    }
+
+    @Test
+    void testDefaultWindingRuleAndValidation() {
+        GeneralPath path = new GeneralPath();
+        assertEquals(GeneralPath.WIND_NON_ZERO, path.getWindingRule());
+        assertThrows(IllegalArgumentException.class, () -> path.setWindingRule(3));
+        path.setWindingRule(GeneralPath.WIND_EVEN_ODD);
+        assertEquals(GeneralPath.WIND_EVEN_ODD, path.getWindingRule());
+    }
+
+    @Test
+    void testAppendWithoutConnectionCreatesSeparateSubPath() {
+        GeneralPath first = new GeneralPath();
+        first.moveTo(0f, 0f);
+        first.lineTo(1f, 1f);
+
+        GeneralPath second = new GeneralPath();
+        second.moveTo(2f, 2f);
+        second.lineTo(3f, 3f);
+
+        first.append(second, false);
+
+        List<Integer> segmentTypes = new ArrayList<Integer>();
+        PathIterator iterator = first.getPathIterator();
+        float[] coords = new float[6];
+        while (!iterator.isDone()) {
+            segmentTypes.add(iterator.currentSegment(coords));
+            iterator.next();
+        }
+
+        assertEquals(5, segmentTypes.size());
+        assertEquals(PathIterator.SEG_MOVETO, segmentTypes.get(0).intValue());
+        assertEquals(PathIterator.SEG_MOVETO, segmentTypes.get(2).intValue());
+    }
+
+    @Test
+    void testTransformScalingUpdatesBounds() {
+        GeneralPath path = new GeneralPath();
+        path.moveTo(1f, 1f);
+        path.lineTo(2f, 1f);
+        path.lineTo(2f, 2f);
+        path.closePath();
+
+        path.transform(Transform.makeScale(2f, 3f));
+
+        Rectangle bounds = path.getBounds();
+        assertEquals(2, bounds.getX());
+        assertEquals(3, bounds.getY());
+        assertEquals(2, bounds.getWidth());
+        assertEquals(3, bounds.getHeight());
+    }
+
+    @Test
+    void testContainsAndIntersectsRectangle() {
+        GeneralPath path = new GeneralPath();
+        path.setRect(new Rectangle(0, 0, 10, 10), null);
+        assertTrue(path.contains(5, 5));
+        assertFalse(path.contains(20, 20));
+
+        Rectangle overlap = new Rectangle(8, 8, 10, 10);
+        assertTrue(path.intersect(overlap));
+        Rectangle noOverlap = new Rectangle(30, 30, 5, 5);
+        assertFalse(path.intersect(noOverlap));
+    }
+
+    @Test
+    void testEqualsWithTransform() {
+        GeneralPath original = new GeneralPath();
+        original.setRect(new Rectangle(0, 0, 10, 10), null);
+
+        GeneralPath translated = new GeneralPath();
+        translated.setRect(new Rectangle(5, 5, 10, 10), null);
+
+        Transform translation = Transform.makeTranslation(5f, 5f);
+        assertTrue(translated.equals(original, translation));
+        assertFalse(translated.equals(original, null));
     }
 
     @Test
