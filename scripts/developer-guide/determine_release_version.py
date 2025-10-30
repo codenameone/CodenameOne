@@ -14,6 +14,9 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
+VERSION_PATTERN = re.compile(r"\d+(?:\.\d+)*$")
+
+
 def _sanitize_tag(value: str) -> str:
     value = value.strip()
     if value.lower().startswith("refs/tags/"):
@@ -23,6 +26,10 @@ def _sanitize_tag(value: str) -> str:
     if value and value[0] in {"v", "V"} and value[1:2].isdigit():
         value = value[1:]
     return value.strip()
+
+
+def _looks_like_version(tag: str) -> bool:
+    return bool(tag and VERSION_PATTERN.fullmatch(tag))
 
 
 def _parse_version_components(version: str) -> List[int]:
@@ -41,12 +48,14 @@ def release_tag_from_event() -> str:
             release = data.get("release") or {}
             tag = release.get("tag_name") or release.get("target_commitish") or ""
             if tag:
-                return _sanitize_tag(tag)
+                sanitized = _sanitize_tag(tag)
+                if _looks_like_version(sanitized):
+                    return sanitized
     for key in ("GITHUB_REF_NAME", "GITHUB_REF"):
         value = os.environ.get(key)
         if value:
             sanitized = _sanitize_tag(value)
-            if sanitized:
+            if _looks_like_version(sanitized):
                 return sanitized
     return ""
 
