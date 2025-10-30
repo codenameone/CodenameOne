@@ -25,8 +25,8 @@ public class FormTestInterceptor extends EDTTestInterceptor {
     }
 
     @Override
-    protected void pretest() throws Throwable {
-        Form form = new Form("Test Form");
+    protected void pretest(String testName) {
+        Form form = new Form(testName);
         form.show();
     }
 }

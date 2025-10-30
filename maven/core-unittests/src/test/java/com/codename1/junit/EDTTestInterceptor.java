@@ -14,6 +14,7 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     public void interceptTestMethod(Invocation<Void> invocation,
                                     ReflectiveInvocationContext<Method> ctx,
                                     ExtensionContext ext) throws Throwable {
+        CN.callSerially(() -> pretest(ctx.getExecutable().getName()));
         runOnMyThread(invocation);
     }
 
@@ -21,6 +22,7 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     public void interceptBeforeEachMethod(Invocation<Void> invocation,
                                           ReflectiveInvocationContext<Method> ctx,
                                           ExtensionContext ext) throws Throwable {
+        beforePretest();
         runOnMyThread(invocation);
     }
 
@@ -32,16 +34,9 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     }
 
     private void runOnMyThread(Invocation<Void> invocation) throws Throwable {
-        if (CN.isEdt()) {
-            pretest();
-            invocation.proceed();
-            return;
-        }
-        beforePretest();
         AtomicReference<Throwable> thrown = new AtomicReference<>();
         CN.callSeriallyAndWait(() -> {
             try {
-                pretest();
                 invocation.proceed();
             } catch (Throwable t) {
                 thrown.set(t);
@@ -53,6 +48,6 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
 
     protected void beforePretest() {}
 
-    protected void pretest() throws Throwable {
+    protected void pretest(String testName) {
     }
 }
