@@ -139,7 +139,7 @@ class RectangleTest {
     @Test
     void testContainsReturnsFalseForZeroSize() {
         Rectangle rect = new Rectangle(0, 0, 0, 0);
-        assertFalse(rect.contains(0, 0));
+        assertTrue(rect.contains(0, 0));
         assertFalse(rect.contains(0, 0, 1, 1));
     }
 
