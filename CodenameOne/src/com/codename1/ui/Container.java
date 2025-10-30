@@ -3740,6 +3740,7 @@ public class Container extends Component implements Iterable<Component> {
         if (wait) {
             System.out.println("MORPH-Debug: addAnimationAndBlock...");
             getAnimationManager().addAnimationAndBlock(a);
+            System.out.println("MORPH-Debug: addAnimationAndBlock finished...");
         } else {
             if (onCompletion != null) {
                 getAnimationManager().addAnimation(a, onCompletion);
