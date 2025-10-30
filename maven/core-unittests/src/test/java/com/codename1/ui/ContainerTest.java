@@ -1,5 +1,6 @@
 package com.codename1.ui;
 
+import com.codename1.junit.EdtTest;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.geom.Dimension;
@@ -12,19 +13,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ContainerTest extends UITestBase {
 
-    @FormTest
+    @EdtTest
     void testMorphAnimation() {
         final boolean[] running = {true};
-        Form form = CN.getCurrentForm();
+        Form form = new Form(new BorderLayout());
         form.setAllowEnableLayoutOnPaint(false);
-        form.setLayout(new BorderLayout());
 
         Button a = new Button("A");
         Button b = new Button("B");
         Label c = new Label("C");
         Container content = BoxLayout.encloseY(a, b, c);
         form.add(BorderLayout.CENTER, content);
-        form.revalidate();
+        form.show();
         assertNotEquals(c.getBounds(), a.getBounds());
         new Thread(() -> {
             while (running[0]) {
