@@ -14,7 +14,7 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     public void interceptTestMethod(Invocation<Void> invocation,
                                     ReflectiveInvocationContext<Method> ctx,
                                     ExtensionContext ext) throws Throwable {
-        CN.callSerially(() -> pretest(ctx.getExecutable().getName()));
+        CN.callSeriallyAndWait(() -> pretest(ctx.getExecutable().getName()));
         runOnMyThread(invocation);
     }
 
