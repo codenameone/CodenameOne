@@ -1,5 +1,7 @@
 package com.codename1.io;
 
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.FormTest;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
@@ -27,7 +29,6 @@ class NetworkManagerTest {
         Util.setImplementation(implementation);
         manager = NetworkManager.getInstance();
         resetManagerState();
-        bootstrapDisplayThread();
     }
 
     @AfterEach
@@ -52,7 +53,7 @@ class NetworkManagerTest {
         assertEquals("value", ((java.util.Hashtable) headers).get("X-Test"));
     }
 
-    @Test
+    @FormTest
     void errorListenersReceiveEvents() {
         AtomicInteger invocations = new AtomicInteger();
         ActionListener<NetworkEvent> listener = evt -> {
@@ -65,7 +66,7 @@ class NetworkManagerTest {
         assertEquals(1, invocations.get());
     }
 
-    @Test
+    @FormTest
     void progressListenersTrackUpdates() {
         AtomicInteger lengths = new AtomicInteger();
         ActionListener<NetworkEvent> listener = evt -> lengths.addAndGet(evt.getLength());
@@ -198,13 +199,6 @@ class NetworkManagerTest {
         timeoutField.setInt(manager, 300000);
 
         getPendingQueue().clear();
-    }
-
-    private void bootstrapDisplayThread() throws Exception {
-        Display display = Display.getInstance();
-        Field edtField = Display.class.getDeclaredField("edt");
-        edtField.setAccessible(true);
-        edtField.set(display, Thread.currentThread());
     }
 
     private static class MockConnectionRequest extends ConnectionRequest {

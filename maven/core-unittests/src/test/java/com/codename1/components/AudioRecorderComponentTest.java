@@ -1,7 +1,9 @@
 package com.codename1.components;
 
+import com.codename1.junit.FormTest;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
@@ -15,22 +17,18 @@ import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-class AudioRecorderComponentTest extends ComponentTestBase {
+class AudioRecorderComponentTest extends UITestBase {
 
     private Media media;
 
     @BeforeEach
     void prepareMediaMocks() throws Exception {
-        when(implementation.getAvailableRecordingMimeTypes()).thenReturn(new String[]{"audio/wav"});
+        implementation.setAvailableRecordingMimeTypes(new String[]{"audio/wav"});
         media = mock(Media.class);
-        when(implementation.createMediaRecorder(any(MediaRecorderBuilder.class))).thenReturn(media);
-        when(implementation.createMediaRecorder(anyString(), anyString())).thenReturn(media);
+        implementation.setMediaRecorder(media);
     }
 
     private AudioRecorderComponent createRecorder(boolean redirect) {
@@ -42,14 +40,14 @@ class AudioRecorderComponentTest extends ComponentTestBase {
         return component;
     }
 
-    @Test
+    @FormTest
     void initializationQueuesAndAppliesPausedState() {
         AudioRecorderComponent recorder = createRecorder(false);
         assertEquals(AudioRecorderComponent.RecorderState.Paused, recorder.getState());
         assertTrue(recorder.getComponentCount() > 0, "Recorder UI should be constructed after initialization");
     }
 
-    @Test
+    @FormTest
     void recordAndPauseActionsUpdateMediaState() throws Exception {
         AudioRecorderComponent recorder = createRecorder(false);
         Button recordButton = getPrivateButton(recorder, "record");
@@ -63,7 +61,7 @@ class AudioRecorderComponentTest extends ComponentTestBase {
         verify(media).pause();
     }
 
-    @Test
+    @FormTest
     void doneActionRedirectAcceptsRecordingAndNotifiesListeners() throws Exception {
         AudioRecorderComponent recorder = createRecorder(true);
         Button recordButton = getPrivateButton(recorder, "record");
@@ -80,7 +78,7 @@ class AudioRecorderComponentTest extends ComponentTestBase {
         assertEquals(1, eventCount.get(), "AudioRecorderComponent only fires action events when the recording is accepted");
     }
 
-    @Test
+    @FormTest
     void animateUpdatesRecordingTime() throws Exception {
         AudioRecorderComponent recorder = createRecorder(false);
         setPrivateField(recorder, "state", AudioRecorderComponent.RecorderState.Recording);

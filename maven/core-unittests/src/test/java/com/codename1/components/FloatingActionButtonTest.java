@@ -1,5 +1,7 @@
 package com.codename1.components;
 
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -7,16 +9,14 @@ import com.codename1.ui.FontImage;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
-class FloatingActionButtonTest extends ComponentTestBase {
+class FloatingActionButtonTest extends UITestBase {
 
     private boolean originalAutoSizing;
     private float originalDefaultSize;
@@ -25,7 +25,6 @@ class FloatingActionButtonTest extends ComponentTestBase {
     void captureDefaults() {
         originalAutoSizing = FloatingActionButton.isAutoSizing();
         originalDefaultSize = FloatingActionButton.getIconDefaultSize();
-        when(implementation.isPortrait()).thenReturn(true);
     }
 
     @AfterEach
@@ -34,7 +33,7 @@ class FloatingActionButtonTest extends ComponentTestBase {
         FloatingActionButton.setIconDefaultSize(originalDefaultSize);
     }
 
-    @Test
+    @EdtTest
     void autoSizingUsesIconDimensions() {
         FloatingActionButton.setAutoSizing(true);
         FloatingActionButton fab = new FloatingActionButton(FontImage.MATERIAL_ADD, null, FloatingActionButton.getIconDefaultSize());
@@ -44,7 +43,7 @@ class FloatingActionButtonTest extends ComponentTestBase {
         assertEquals(expectedHeight, fab.getPreferredSize().getHeight());
     }
 
-    @Test
+    @EdtTest
     void createSubFabStoresButtonsInMenu() throws Exception {
         FloatingActionButton fab = new FloatingActionButton(FontImage.MATERIAL_ADD, null, FloatingActionButton.getIconDefaultSize());
         FloatingActionButton first = fab.createSubFAB(FontImage.MATERIAL_CAMERA, "Camera");
@@ -56,7 +55,7 @@ class FloatingActionButtonTest extends ComponentTestBase {
         assertSame(second, subMenu.get(1));
     }
 
-    @Test
+    @EdtTest
     void popupContentCreatesTextActionsThatTriggerSubFab() throws Exception {
         FloatingActionButton fab = new FloatingActionButton(FontImage.MATERIAL_ADD, null, FloatingActionButton.getIconDefaultSize());
         fab.setFloatingActionTextUIID("PopupText");
@@ -81,7 +80,7 @@ class FloatingActionButtonTest extends ComponentTestBase {
         assertTrue(subFab.releasedCalled);
     }
 
-    @Test
+    @EdtTest
     void badgeCreationKeepsTextAndUiid() {
         FloatingActionButton badge = FloatingActionButton.createBadge("3");
         assertEquals("Badge", badge.getUIID());

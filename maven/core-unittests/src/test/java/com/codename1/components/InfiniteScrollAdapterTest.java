@@ -1,5 +1,6 @@
 package com.codename1.components;
 
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
@@ -12,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class InfiniteScrollAdapterTest extends ComponentTestBase {
+class InfiniteScrollAdapterTest extends UITestBase {
 
     @Test
     void createInfiniteScrollAddsProgressAndInvokesFetch() {

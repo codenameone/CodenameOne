@@ -1,6 +1,6 @@
 package com.codename1.javascript;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.util.Callback;
 import com.codename1.util.SuccessCallback;
@@ -70,14 +70,6 @@ class JSObjectTest extends UITestBase {
         browser = mock(BrowserComponent.class);
         responses = new ArrayDeque<String>();
         when(browser.getBrowserNavigationCallback()).thenReturn(null);
-        when(implementation.createSoftWeakRef(any())).thenAnswer(invocation -> new WeakReference<Object>(invocation.getArgument(0)));
-        when(implementation.extractHardRef(any())).thenAnswer(invocation -> {
-            Object ref = invocation.getArgument(0);
-            if (ref instanceof WeakReference) {
-                return ((WeakReference) ref).get();
-            }
-            return null;
-        });
         doNothing().when(browser).execute(anyString());
         when(browser.executeAndReturnString(anyString())).thenAnswer(invocation -> responses.isEmpty() ? "0" : responses.remove());
     }

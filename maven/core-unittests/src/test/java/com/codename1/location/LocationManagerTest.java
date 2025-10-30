@@ -1,27 +1,23 @@
 package com.codename1.location;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class LocationManagerTest extends UITestBase {
     private TestLocationManager manager;
-    private Object originalEdt;
 
     @BeforeEach
     void initManager() throws Exception {
         manager = new TestLocationManager();
-        when(implementation.getLocationManager()).thenReturn(manager);
-        originalEdt = getDisplayField("edt");
-        setDisplayField("edt", new Thread());
+        implementation.setLocationManager(manager);
     }
 
     @AfterEach
@@ -29,10 +25,9 @@ class LocationManagerTest extends UITestBase {
         manager.notifyOnBind = true;
         manager.setLocationListener(null);
         manager.setBackgroundLocationListener(null);
-        setDisplayField("edt", originalEdt);
     }
 
-    @Test
+    @FormTest
     void getCurrentLocationSyncWithoutListenerBindsAndReturnsResult() {
         Location expected = new Location(1.0, 2.0);
         manager.setCurrentLocation(expected);
@@ -45,7 +40,7 @@ class LocationManagerTest extends UITestBase {
         assertNull(manager.getStoredRequest());
     }
 
-    @Test
+    @FormTest
     void getCurrentLocationSyncWithExistingListenerUsesCurrentLocationDirectly() throws IOException {
         manager.notifyOnBind = false;
         Location expected = new Location(4.0, 5.0);
@@ -59,7 +54,7 @@ class LocationManagerTest extends UITestBase {
         assertEquals(1, manager.getCurrentLocationCalls);
     }
 
-    @Test
+    @FormTest
     void setLocationListenerWithRequestStoresRequest() {
         manager.notifyOnBind = false;
         LocationRequest request = new LocationRequest();
@@ -70,7 +65,7 @@ class LocationManagerTest extends UITestBase {
         assertNotNull(manager.getCurrentListener());
     }
 
-    @Test
+    @FormTest
     void getLastKnownLocationReturnsStoredLocation() {
         Location expected = new Location(9.0, 10.0);
         manager.setLastLocation(expected);
@@ -78,7 +73,7 @@ class LocationManagerTest extends UITestBase {
         assertSame(expected, manager.getLastKnownLocation());
     }
 
-    @Test
+    @FormTest
     void setLocationListenerNullClearsRequestAndStatus() {
         manager.notifyOnBind = false;
         LocationRequest request = new LocationRequest();
@@ -93,7 +88,7 @@ class LocationManagerTest extends UITestBase {
         assertNull(manager.getCurrentListener());
     }
 
-    @Test
+    @FormTest
     void replacingLocationListenerClearsPreviousListener() {
         manager.notifyOnBind = false;
         manager.setLocationListener(new DummyLocationListener(), new LocationRequest());
@@ -104,7 +99,7 @@ class LocationManagerTest extends UITestBase {
         assertNotNull(manager.getCurrentListener());
     }
 
-    @Test
+    @FormTest
     void backgroundLocationListenerBindsAndClears() {
         manager.setBackgroundLocationListener(DummyLocationListener.class);
         assertTrue(manager.backgroundBound);
@@ -115,7 +110,7 @@ class LocationManagerTest extends UITestBase {
         assertNull(manager.getCurrentBackgroundListener());
     }
 
-    @Test
+    @FormTest
     void isGPSEnabledThrowsByDefault() {
         assertThrows(RuntimeException.class, () -> manager.isGPSEnabled());
     }
@@ -124,16 +119,6 @@ class LocationManagerTest extends UITestBase {
         Field field = Display.class.getDeclaredField(name);
         field.setAccessible(true);
         return field.get(Display.getInstance());
-    }
-
-    private void setDisplayField(String name, Object value) throws Exception {
-        Field field = Display.class.getDeclaredField(name);
-        field.setAccessible(true);
-        if ((field.getModifiers() & java.lang.reflect.Modifier.STATIC) != 0) {
-            field.set(null, value);
-        } else {
-            field.set(Display.getInstance(), value);
-        }
     }
 
     private static class DummyLocationListener implements LocationListener {

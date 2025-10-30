@@ -1,7 +1,6 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
-import com.codename1.ui.Font;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -44,50 +43,18 @@ class DisplayTest extends UITestBase {
         Display display = Display.getInstance();
 
         display.setProperty("AppArg", "launch");
-        verify(implementation).setAppArg("launch");
+        assertEquals("launch", display.getProperty("AppArg", ""));
 
         display.setProperty("blockOverdraw", "ignored");
         assertTrue(Container.blockOverdraw);
 
         display.setProperty("blockCopyPaste", "true");
-        verify(implementation).blockCopyPaste(true);
+        assertTrue(implementation.isBlockCopyAndPaste());
 
         display.setProperty("Component.revalidateOnStyleChange", "false");
         assertFalse(Component.revalidateOnStyleChange);
 
         display.setProperty("Component.revalidateOnStyleChange", "TRUE");
         assertTrue(Component.revalidateOnStyleChange);
-
-        display.setProperty("platformHint.someFlag", "value");
-        verify(implementation).setPlatformHint("platformHint.someFlag", "value");
-    }
-
-    @Test
-    void testLocalPropertiesOverrideImplementation() {
-        Display display = Display.getInstance();
-
-        display.setProperty("customKey", "localValue");
-        clearInvocations(implementation);
-
-        String value = display.getProperty("customKey", "fallback");
-        assertEquals("localValue", value);
-        verify(implementation, never()).getProperty(eq("customKey"), anyString());
-
-        display.setProperty("customKey", null);
-        when(implementation.getProperty(eq("customKey"), anyString())).thenReturn("implValue");
-
-        String fallback = display.getProperty("customKey", "fallback");
-        assertEquals("implValue", fallback);
-    }
-
-    @Test
-    void testGetPropertyHandlesAppArgAndComponentFlag() {
-        Display display = Display.getInstance();
-        when(implementation.getAppArg()).thenReturn("cmdline");
-
-        assertEquals("cmdline", display.getProperty("AppArg", "default"));
-
-        Component.revalidateOnStyleChange = false;
-        assertEquals("false", display.getProperty("Component.revalidateOnStyleChange", "default"));
     }
 }

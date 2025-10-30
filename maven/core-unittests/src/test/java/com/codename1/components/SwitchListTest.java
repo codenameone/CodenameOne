@@ -1,6 +1,7 @@
 package com.codename1.components;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
@@ -12,14 +13,11 @@ import java.util.Arrays;
 
 import static com.codename1.ui.ComponentSelector.$;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.when;
 
 class SwitchListTest extends UITestBase {
     @BeforeEach
     void configureDisplay() {
-        when(implementation.isBuiltinSoundsEnabled()).thenReturn(false);
-        doNothing().when(implementation).playBuiltinSound(org.mockito.ArgumentMatchers.anyString());
+        implementation.setBuiltinSoundsEnabled(false);
     }
 
     @Test
@@ -28,7 +26,7 @@ class SwitchListTest extends UITestBase {
         assertTrue(list.isAllowMultipleSelection());
     }
 
-    @Test
+    @FormTest
     void testCreateButtonContainsSwitchAndLabel() {
         DefaultListModel<String> model = new DefaultListModel<>("Alpha", "Beta");
         SwitchList list = new SwitchList(model);
@@ -42,7 +40,7 @@ class SwitchListTest extends UITestBase {
         assertEquals("Alpha", label.getText());
     }
 
-    @Test
+    @FormTest
     void testSetSelectedUpdatesSwitchState() {
         DefaultListModel<String> model = new DefaultListModel<>("Red", "Green");
         SwitchList list = new SwitchList(model);
@@ -59,7 +57,7 @@ class SwitchListTest extends UITestBase {
         assertFalse(sw.isOn());
     }
 
-    @Test
+    @FormTest
     void testChangeListenerSynchronizesModel() {
         DefaultListModel<String> model = new DefaultListModel<>("One", "Two", "Three");
         SwitchList list = new SwitchList(model);
@@ -76,7 +74,7 @@ class SwitchListTest extends UITestBase {
                 "Removing listeners should stop model synchronization");
     }
 
-    @Test
+    @FormTest
     void testUndecorateRemovesActionListener() {
         DefaultListModel<String> model = new DefaultListModel<>("A", "B");
         SwitchList list = new SwitchList(model);

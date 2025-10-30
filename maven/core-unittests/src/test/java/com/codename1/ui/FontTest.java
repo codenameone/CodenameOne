@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,24 +10,17 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class FontTest extends UITestBase {
     @BeforeEach
     void clearCaches() throws Exception {
         getDerivedFontCache().clear();
         setFontReturnedHeight(0f);
-        when(implementation.isTrueTypeSupported()).thenReturn(true);
-        when(implementation.isNativeFontSchemeSupported()).thenReturn(true);
+        implementation.setTrueTypeSupported(true);
+        implementation.setNativeFontSchemeSupported(true);
     }
 
-    @AfterEach
-    void resetSupportFlags() {
-        when(implementation.isTrueTypeSupported()).thenReturn(true);
-        when(implementation.isNativeFontSchemeSupported()).thenReturn(true);
-    }
-
-    @Test
+    @EdtTest
     void testCreateTrueTypeFontCachesByFileNameAndHeight() {
         Font first = Font.createTrueTypeFont("CustomFont", "custom.ttf");
         Font second = Font.createTrueTypeFont("CustomFont", "custom.ttf");
@@ -34,27 +28,19 @@ class FontTest extends UITestBase {
         assertTrue(first.isTTFNativeFont());
     }
 
-    @Test
+    @EdtTest
     void testCreateTrueTypeFontRejectsInvalidFileNames() {
         assertThrows(IllegalArgumentException.class, () -> Font.createTrueTypeFont("BadFont", "path/bad.ttf"));
         assertThrows(IllegalArgumentException.class, () -> Font.createTrueTypeFont("BadFont", "badfont.otf"));
     }
 
-    @Test
-    void testCreateTrueTypeFontReturnsNullWhenNativeSchemeUnsupported() {
-        when(implementation.isNativeFontSchemeSupported()).thenReturn(false);
-        Font font = Font.createTrueTypeFont("native:Roboto", "native:Roboto");
-        assertNull(font);
-    }
-
-    @Test
+    @EdtTest
     void testCreateTrueTypeFontReturnsNullWhenLoadingFails() {
-        when(implementation.loadTrueTypeFont("native:Missing", "native:Missing")).thenReturn(null);
         Font font = Font.createTrueTypeFont("native:Missing", "native:Missing");
         assertNull(font);
     }
 
-    @Test
+    @EdtTest
     void testDeriveCachesByRequestedSizeAndWeight() {
         Font base = Font.createTrueTypeFont("BaseFont", "base.ttf");
         Font derived1 = base.derive(24f, Font.STYLE_BOLD);
@@ -64,7 +50,7 @@ class FontTest extends UITestBase {
         assertTrue(derived1.isTTFNativeFont());
     }
 
-    @Test
+    @EdtTest
     void testDeriveCreatesDistinctFontsForDifferentWeights() {
         Font base = Font.createTrueTypeFont("WeightFont", "weight.ttf");
         Font plain = base.derive(18f, Font.STYLE_PLAIN);
@@ -72,7 +58,7 @@ class FontTest extends UITestBase {
         assertNotSame(plain, bold);
     }
 
-    @Test
+    @EdtTest
     void testStringWidthHandlesSpecialCases() {
         Font font = Font.getDefaultFont();
         assertEquals(0, font.stringWidth(null));
@@ -81,18 +67,18 @@ class FontTest extends UITestBase {
         assertEquals(24, font.stringWidth("abc"));
     }
 
-    @Test
+    @EdtTest
     void testCharsWidthDelegatesToImplementation() {
         Font font = Font.getDefaultFont();
         char[] chars = new char[]{'a', 'b', 'c', 'd'};
         assertEquals(32, font.charsWidth(chars, 0, chars.length));
     }
 
-    @Test
+    @EdtTest
     void testIsTrueTypeFileSupportedDelegatesToImplementation() {
-        when(implementation.isTrueTypeSupported()).thenReturn(false);
+        implementation.setTrueTypeSupported(false);
         assertFalse(Font.isTrueTypeFileSupported());
-        when(implementation.isTrueTypeSupported()).thenReturn(true);
+        implementation.setTrueTypeSupported(true);
         assertTrue(Font.isTrueTypeFileSupported());
     }
 

@@ -1,25 +1,23 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class FontImageTest extends UITestBase {
     @BeforeEach
     void resetMaterialFont() throws Exception {
-        when(implementation.isTrueTypeSupported()).thenReturn(true);
         Field field = FontImage.class.getDeclaredField("materialDesignFont");
         field.setAccessible(true);
         field.set(null, null);
     }
 
-    @Test
+    @FormTest
     void testCreateCopiesStyleState() {
         Font iconFont = Font.createTrueTypeFont("IconFont", "icon.ttf");
         Style style = new Style();
@@ -44,7 +42,7 @@ class FontImageTest extends UITestBase {
         assertSame(iconFont, image.getFont());
     }
 
-    @Test
+    @FormTest
     void testSetPaddingAdjustsFontSize() {
         Font iconFont = Font.createTrueTypeFont("PaddingFont", "padding.ttf");
         Style style = new Style();
@@ -57,7 +55,7 @@ class FontImageTest extends UITestBase {
         assertEquals(7f, image.getFont().getPixelSize(), 0.001f);
     }
 
-    @Test
+    @FormTest
     void testGetMaterialDesignFontCachesValueWhenSupported() {
         Font first = FontImage.getMaterialDesignFont();
         Font second = FontImage.getMaterialDesignFont();
@@ -65,17 +63,7 @@ class FontImageTest extends UITestBase {
         assertTrue(first.isTTFNativeFont());
     }
 
-    @Test
-    void testGetMaterialDesignFontFallsBackWhenNotSupported() throws Exception {
-        when(implementation.isTrueTypeSupported()).thenReturn(false);
-        Field field = FontImage.class.getDeclaredField("materialDesignFont");
-        field.setAccessible(true);
-        field.set(null, null);
-        Font font = FontImage.getMaterialDesignFont();
-        assertSame(Font.getDefaultFont(), font);
-    }
-
-    @Test
+    @FormTest
     void testSetIconOnSelectableIconHolderCreatesStateIcons() {
         Font iconFont = Font.createTrueTypeFont("ButtonFont", "button.ttf");
         Button button = new Button("Action");

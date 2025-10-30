@@ -1,5 +1,6 @@
 package com.codename1.test;
 
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;

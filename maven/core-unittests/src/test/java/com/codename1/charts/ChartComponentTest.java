@@ -11,8 +11,7 @@ import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.AbstractChart;
 import com.codename1.charts.views.ClickableArea;
 import com.codename1.charts.views.XYChart;
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
@@ -27,11 +26,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class ChartComponentTest extends UITestBase {
     private TestCodenameOneImplementation testImplementation;
 
-    @Override
-    protected CodenameOneImplementation createImplementation() {
-        testImplementation = new TestCodenameOneImplementation();
-        return testImplementation;
-    }
     @Test
     void constructorCopiesPanAndZoomSettingsFromXYChart() {
         XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();

@@ -1,7 +1,8 @@
 package com.codename1.components;
 
 import com.codename1.io.Storage;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import org.junit.jupiter.api.AfterEach;
@@ -14,18 +15,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
 
 class StorageImageAsyncTest extends UITestBase {
     private Storage originalStorage;
 
     @BeforeEach
     void configureMocks() {
-        when(implementation.createImage(any(byte[].class), anyInt(), anyInt())).thenReturn(new Object());
-        when(implementation.createImage(any(int[].class), anyInt(), anyInt())).thenReturn(new Object());
-        when(implementation.isAnimation(any())).thenReturn(false);
-        when(implementation.animateImage(any(), anyLong())).thenReturn(false);
         originalStorage = Storage.getInstance();
     }
 
@@ -34,7 +29,7 @@ class StorageImageAsyncTest extends UITestBase {
         Storage.setStorageInstance(originalStorage);
     }
 
-    @Test
+    @FormTest
     void testGetInternalReturnsPlaceholderUntilDataLoaded() {
         InMemoryStorage storage = new InMemoryStorage();
         byte[] encoded = new byte[]{1, 2, 3};
@@ -47,7 +42,7 @@ class StorageImageAsyncTest extends UITestBase {
         assertSame(placeholder, internal, "Placeholder should be returned before data is loaded");
     }
 
-    @Test
+    @FormTest
     void testBackgroundLoadPopulatesImageData() throws Exception {
         InMemoryStorage storage = new InMemoryStorage();
         byte[] encoded = new byte[]{10, 20, 30, 40};
@@ -66,7 +61,7 @@ class StorageImageAsyncTest extends UITestBase {
         assertTrue(isImageCreated(image));
     }
 
-    @Test
+    @FormTest
     void testAnimateLifecycle() throws Exception {
         TestImage placeholder = new TestImage(5, 5);
         StorageImageAsync image = StorageImageAsync.create("ignored", placeholder);
@@ -81,7 +76,7 @@ class StorageImageAsyncTest extends UITestBase {
         assertFalse(getBooleanField(image, "changePending"));
     }
 
-    @Test
+    @FormTest
     void testIsAnimationAlwaysTrue() {
         TestImage placeholder = new TestImage(6, 6);
         StorageImageAsync image = StorageImageAsync.create("anything", placeholder);

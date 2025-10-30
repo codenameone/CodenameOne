@@ -1390,7 +1390,7 @@ public final class Display extends CN1Constants {
                         inputEventStackPointerTmp = inputEventStackPointer;
                     }
                     try {
-                        // yeald the CPU for a very short time to let the invoke thread
+                        // yield the CPU for a very short time to let the invoke thread
                         // get started
                         lock.wait(2);
                     } catch (InterruptedException ex) {

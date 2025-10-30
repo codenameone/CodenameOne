@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ class CheckBoxTest extends UITestBase {
         assertEquals("ToggleButton", checkBox.getUIID());
     }
 
-    @Test
+    @FormTest
     void testSelectionChangeNotifiesListenersAndBinding() {
         CheckBox checkBox = new CheckBox("Accept");
         AtomicInteger changes = new AtomicInteger();
@@ -39,9 +40,9 @@ class CheckBoxTest extends UITestBase {
         assertEquals(Boolean.TRUE, checkBox.getBoundPropertyValue("selected"));
     }
 
-    @Test
+    @FormTest
     void testReleasedTogglesSelection() {
-        when(implementation.isBuiltinSoundsEnabled()).thenReturn(false);
+        implementation.setBuiltinSoundsEnabled(false);
         CheckBox checkBox = new CheckBox("Notify");
         assertFalse(checkBox.isSelected());
 

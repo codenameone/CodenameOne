@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.Test;
@@ -9,13 +10,12 @@ import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class ButtonTest extends UITestBase {
 
-    @Test
+    @FormTest
     void testSetCommandBindsCommandAndFiresAction() throws Exception {
-        when(implementation.isBuiltinSoundsEnabled()).thenReturn(false);
+        implementation.setBuiltinSoundsEnabled(false);
         AtomicInteger actionCount = new AtomicInteger();
         Command cmd = new Command("Go") {
             @Override
@@ -38,9 +38,9 @@ class ButtonTest extends UITestBase {
         assertEquals(1, actionCount.get());
     }
 
-    @Test
+    @FormTest
     void testStateChangeListenerReceivesPressedAndReleasedEvents() {
-        when(implementation.isBuiltinSoundsEnabled()).thenReturn(false);
+        implementation.setBuiltinSoundsEnabled(false);
         Button button = new Button();
         AtomicInteger stateChanges = new AtomicInteger();
         ActionListener listener = evt -> stateChanges.incrementAndGet();
@@ -60,9 +60,9 @@ class ButtonTest extends UITestBase {
         assertEquals(3, stateChanges.get());
     }
 
-    @Test
+    @FormTest
     void testBindStateMirrorsSourceStateUntilUnbound() {
-        when(implementation.isBuiltinSoundsEnabled()).thenReturn(false);
+        implementation.setBuiltinSoundsEnabled(false);
         Button source = new Button();
         Button follower = new Button();
         follower.bindStateTo(source);
@@ -78,7 +78,7 @@ class ButtonTest extends UITestBase {
         assertEquals(Button.STATE_DEFAULT, follower.getState());
     }
 
-    @Test
+    @FormTest
     void testRippleDefaultAppliesToNewButtons() {
         boolean original = Button.isButtonRippleEffectDefault();
         try {

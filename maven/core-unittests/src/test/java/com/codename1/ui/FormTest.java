@@ -1,22 +1,19 @@
 package com.codename1.ui;
 
-import com.codename1.test.UITestBase;
-import com.codename1.ui.Painter;
-import com.codename1.ui.Graphics;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.FlowLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class FormTest extends UITestBase {
     private boolean originalGlobalToolbar;
@@ -25,9 +22,8 @@ class FormTest extends UITestBase {
     void prepareMocks() {
         originalGlobalToolbar = Toolbar.isGlobalToolbar();
         Toolbar.setGlobalToolbar(false);
-        when(implementation.isNativeTitle()).thenReturn(false);
-        when(implementation.getSoftkeyCount()).thenReturn(2);
-        when(implementation.isThirdSoftButton()).thenReturn(false);
+        implementation.setNativeTitle(false);
+        implementation.setThirdSoftButton(false);
     }
 
     @AfterEach
@@ -35,7 +31,7 @@ class FormTest extends UITestBase {
         Toolbar.setGlobalToolbar(originalGlobalToolbar);
     }
 
-    @Test
+    @EdtTest
     void testContentPaneConfiguredWithFlowLayoutAndScrollable() {
         TestForm form = new TestForm();
         Container content = form.getContentPane();
@@ -44,7 +40,7 @@ class FormTest extends UITestBase {
         assertEquals("ContentPane", content.getUIID());
     }
 
-    @Test
+    @EdtTest
     void testAddComponentDelegatesToContentPane() {
         TestForm form = new TestForm();
         Label label = new Label("Child");
@@ -53,7 +49,7 @@ class FormTest extends UITestBase {
         assertEquals(1, form.getContentPane().getComponentCount());
     }
 
-    @Test
+    @EdtTest
     void testSetMenuBarInvokesInitialization() {
         TestForm form = new TestForm();
         TrackingMenuBar menuBar = new TrackingMenuBar();
@@ -63,7 +59,7 @@ class FormTest extends UITestBase {
         assertTrue(menuBar.initCalled);
     }
 
-    @Test
+    @EdtTest
     void testSetToolbarBindsMenuBar() {
         TestForm form = new TestForm();
         TrackingMenuBar menuBar = new TrackingMenuBar();
@@ -74,7 +70,7 @@ class FormTest extends UITestBase {
         assertTrue(menuBar.initCalled);
     }
 
-    @Test
+    @EdtTest
     void testPropertyAccessorsUpdateTitleUiids() {
         TestForm form = new TestForm();
         assertArrayEquals(new String[]{"titleUIID", "titleAreaUIID"}, form.getPropertyNames());
@@ -88,14 +84,14 @@ class FormTest extends UITestBase {
         assertEquals("CustomTitleArea", form.getTitleArea().getUIID());
     }
 
-    @Test
+    @EdtTest
     void testSetTitleUpdatesLabelWhenNoToolbar() {
         TestForm form = new TestForm();
         form.setTitle("Dashboard");
         assertEquals("Dashboard", form.getTitle());
     }
 
-    @Test
+    @EdtTest
     void testSetGlassPaneTriggersRepaint() {
         RepaintTrackingForm form = new RepaintTrackingForm();
         Painter painter = (g, rect) -> { };
@@ -104,7 +100,7 @@ class FormTest extends UITestBase {
         assertSame(painter, form.getGlassPane());
     }
 
-    @Test
+    @EdtTest
     void testSetTitleComponentWithTransitionReplacesComponent() {
         TestForm form = new TestForm();
         Label original = form.getTitleComponent();
@@ -123,7 +119,7 @@ class FormTest extends UITestBase {
         assertSame(form.getTitleArea(), replacement.getParent());
     }
 
-    @Test
+    @EdtTest
     void testAddAndRemoveKeyListenerManageInternalMap() throws Exception {
         TestForm form = new TestForm();
         ActionListener<ActionEvent> listener = evt -> { };

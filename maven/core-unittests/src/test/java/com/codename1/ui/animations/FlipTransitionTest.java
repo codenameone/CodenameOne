@@ -1,6 +1,6 @@
 package com.codename1.ui.animations;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;

@@ -1,6 +1,6 @@
 package com.codename1.l10n;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -10,7 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class SimpleDateFormatTest extends UITestBase {
     private L10NManager l10nManager;
@@ -20,7 +19,7 @@ class SimpleDateFormatTest extends UITestBase {
     void setUpLocalization() {
         originalRestrict = SimpleDateFormat.isRestrictMonthNameLength();
         l10nManager = new StubL10NManager();
-        when(implementation.getLocalizationManager()).thenReturn(l10nManager);
+        implementation.setLocalizationManager(l10nManager);
     }
 
     @AfterEach

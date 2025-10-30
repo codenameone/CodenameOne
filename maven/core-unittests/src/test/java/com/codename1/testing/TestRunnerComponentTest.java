@@ -1,46 +1,25 @@
 package com.codename1.testing;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionListener;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.when;
 
 class TestRunnerComponentTest extends UITestBase {
-    private Form currentForm;
-
-    @BeforeEach
-    void prepareDisplay() throws Exception {
-        currentForm = null;
-        when(implementation.getCurrentForm()).thenAnswer(invocation -> currentForm);
-        doAnswer(invocation -> {
-            currentForm = invocation.getArgument(0);
-            return null;
-        }).when(implementation).setCurrentForm(any(Form.class));
-    }
-
-    @AfterEach
-    void cleanupForms() {
-        currentForm = null;
-    }
-
-    @Test
+    @FormTest
     void runTestsUpdatesStatusForSuccessAndFailure() throws Exception {
         TestRunnerComponent component = new TestRunnerComponent();
         component.add(new SimpleTest("PassingTest", true, true, null), new SimpleTest("FailingTest", false, false, null));
         Form form = component.showForm();
         assertNotNull(form);
-        assertSame(form, currentForm);
+        assertSame(form, implementation.getCurrentForm());
 
         component.runTests();
         flushSerialCalls();
@@ -56,7 +35,7 @@ class TestRunnerComponentTest extends UITestBase {
         assertEquals(0xff0000, second.getUnselectedStyle().getBgColor());
     }
 
-    @Test
+    @FormTest
     void showFormCreatesAndReusesHostForm() {
         TestRunnerComponent component = new TestRunnerComponent();
         Form first = component.showForm();
@@ -66,7 +45,7 @@ class TestRunnerComponentTest extends UITestBase {
         assertTrue(first.contains(component));
     }
 
-    @Test
+    @FormTest
     void runTestsAddsFailureActionListenerOnException() throws Exception {
         TestLogger.install();
         RuntimeException failure = new RuntimeException("explode");

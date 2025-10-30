@@ -1,6 +1,7 @@
 package com.codename1.ui.animations;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Image;
 import com.codename1.util.LazyValue;
 import org.junit.jupiter.api.AfterEach;
@@ -178,13 +179,13 @@ public class CommonTransitionsTest extends UITestBase {
         assertSame(manual, produced);
     }
 
-    @Test
+    @FormTest
     public void testCreateFastSlideUsesMutableImageHint() {
-        when(implementation.areMutableImagesFast()).thenReturn(false);
+        implementation.setMutableImagesFast(false);
         CommonTransitions slow = CommonTransitions.createFastSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 90);
         assertTrue(slow.isHorizontalSlide());
 
-        when(implementation.areMutableImagesFast()).thenReturn(true);
+        implementation.setMutableImagesFast(true);
         CommonTransitions fast = CommonTransitions.createFastSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 90);
         assertTrue(fast.isHorizontalSlide());
     }
