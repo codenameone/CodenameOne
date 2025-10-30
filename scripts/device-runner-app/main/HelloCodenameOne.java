@@ -1,4 +1,4 @@
-package @PACKAGE@;
+package com.codenameone.examples.hellocodenameone;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.BrowserComponent;
@@ -10,7 +10,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
-public class @MAIN_NAME@ {
+public class HelloCodenameOne {
     private Form current;
     private Form mainForm;
 
