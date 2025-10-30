@@ -1324,7 +1324,6 @@ public final class Display extends CN1Constants {
      * @since 7.0
      */
     public void invokeWithoutBlocking(Runnable r) {
-        new Exception("MORPH-Debug: invokeWithoutBlocking invoked").printStackTrace();
         if (disableInvokeAndBlock || !isEdt()) {
             r.run();
         } else {
@@ -1333,7 +1332,6 @@ public final class Display extends CN1Constants {
                 r.run();
             } finally {
                 disableInvokeAndBlock = false;
-                System.out.println("MORPH-Debug: invokeWithoutBlocking finished");
             }
         }
     }
@@ -1349,7 +1347,6 @@ public final class Display extends CN1Constants {
      * @since 7.0
      */
     public <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
-        new Exception("MORPH-Debug: invokeWithoutBlockingWithResultSync invoked").printStackTrace();
         if (disableInvokeAndBlock || !isEdt()) {
             return r.run();
         } else {
@@ -1358,7 +1355,6 @@ public final class Display extends CN1Constants {
                 return r.run();
             } finally {
                 disableInvokeAndBlock = false;
-                System.out.println("MORPH-Debug: invokeWithoutBlockingWithResultSync finished");
             }
         }
     }
@@ -1377,7 +1373,6 @@ public final class Display extends CN1Constants {
      *                                     inside a call to {@link #invokeWithoutBlocking(java.lang.Runnable) } on the EDT).
      */
     public void invokeAndBlock(Runnable r, boolean dropEvents) {
-        System.out.println("MORPH-Debug: invokeAndBlockEntering on isEdt: " + isEdt() + " and disableInvokeAndBlock: " + disableInvokeAndBlock);
         this.dropEvents = dropEvents;
         try {
             if (isEdt()) {
@@ -1395,7 +1390,7 @@ public final class Display extends CN1Constants {
                         inputEventStackPointerTmp = inputEventStackPointer;
                     }
                     try {
-                        // yeald the CPU for a very short time to let the invoke thread
+                        // yield the CPU for a very short time to let the invoke thread
                         // get started
                         lock.wait(2);
                     } catch (InterruptedException ex) {
