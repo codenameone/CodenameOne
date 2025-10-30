@@ -8,30 +8,36 @@ import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Hashtable;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+
 // TODO: fix this to use proper mocking
-/*class GoogleConnectTest extends UITestBase {
+class GoogleConnectTest extends UITestBase {
 
     private NetworkManager originalNetworkManager;
     private NetworkManager mockNetworkManager;
 
-    @BeforeEach
+    //@BeforeEach
     void setUpEnvironment() throws Exception {
         resetGoogleSingleton();
         mockNetworkManager();
         clearStoredCredentials();
     }
 
-    @AfterEach
+    //@AfterEach
     void tearDownEnvironment() throws Exception {
         restoreNetworkManager();
         clearStoredCredentials();
     }
 
-    @FormTest
+    //@FormTest
     void testGetInstanceReturnsSingletonWhenNoImplClass() {
         GoogleConnect first = GoogleConnect.getInstance();
         GoogleConnect second = GoogleConnect.getInstance();
@@ -39,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
         assertEquals(GoogleConnect.class, first.getClass());
     }
 
-    @FormTest
+    //@FormTest
     void testGetInstanceUsesImplClass() throws Exception {
         resetGoogleSingleton();
         GoogleConnect.implClass = CustomGoogleConnect.class;
@@ -48,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
         assertTrue(((CustomGoogleConnect) instance).constructed);
     }
 
-    @FormTest
+    //@FormTest
     void testGetInstanceFallsBackWhenInstantiationFails() throws Exception {
         resetGoogleSingleton();
         GoogleConnect.implClass = ThrowingGoogleConnect.class;
@@ -56,12 +62,12 @@ import static org.junit.jupiter.api.Assertions.*;
         assertEquals(GoogleConnect.class, instance.getClass());
     }
 
-    @FormTest
+    //@FormTest
     void testIsNativeLoginSupportedAlwaysFalse() {
         assertFalse(new GoogleConnect().isNativeLoginSupported());
     }
 
-    @FormTest
+    //@FormTest
     void testCreateOauth2IncludesOfflineAccessParameters() throws Exception {
         GoogleConnect connect = new GoogleConnect();
         connect.setClientId("client");
@@ -88,7 +94,7 @@ import static org.junit.jupiter.api.Assertions.*;
         assertEquals("https://www.googleapis.com/oauth2/v3/token", getFieldValue(oauth, "tokenRequestURL"));
     }
 
-    @FormTest
+    //@FormTest
     void testValidateTokenReturnsFalseOnAuthorizationError() throws Exception {
         GoogleConnect connect = new GoogleConnect();
         doAnswer(invocation -> {
@@ -109,7 +115,7 @@ import static org.junit.jupiter.api.Assertions.*;
         verify(mockNetworkManager).addToQueueAndWait(any(ConnectionRequest.class));
     }
 
-    @FormTest
+    //@FormTest
     void testValidateTokenReturnsTrueWhenNoError() throws Exception {
         GoogleConnect connect = new GoogleConnect();
         final AtomicReference<ConnectionRequest> captured = new AtomicReference<ConnectionRequest>();
@@ -140,16 +146,16 @@ import static org.junit.jupiter.api.Assertions.*;
     }
 
     private void resetGoogleSingleton() throws Exception {
-        if (googleInstanceField == null) {
+/*        if (googleInstanceField == null) {
             googleInstanceField = GoogleConnect.class.getDeclaredField("instance");
             googleInstanceField.setAccessible(true);
         }
         googleInstanceField.set(null, null);
-        GoogleConnect.implClass = null;
+        GoogleConnect.implClass = null;*/
     }
 
     private void mockNetworkManager() throws Exception {
-        if (networkManagerInstanceField == null) {
+        /*if (networkManagerInstanceField == null) {
             networkManagerInstanceField = NetworkManager.class.getDeclaredField("INSTANCE");
             networkManagerInstanceField.setAccessible(true);
             Field modifiersField = Field.class.getDeclaredField("modifiers");
@@ -158,13 +164,13 @@ import static org.junit.jupiter.api.Assertions.*;
         }
         originalNetworkManager = (NetworkManager) networkManagerInstanceField.get(null);
         mockNetworkManager = mock(NetworkManager.class);
-        networkManagerInstanceField.set(null, mockNetworkManager);
+        networkManagerInstanceField.set(null, mockNetworkManager);*/
     }
 
     private void restoreNetworkManager() throws Exception {
-        if (networkManagerInstanceField != null) {
+        /*if (networkManagerInstanceField != null) {
             networkManagerInstanceField.set(null, originalNetworkManager);
-        }
+        }*/
     }
 
     private void clearStoredCredentials() {
@@ -185,4 +191,4 @@ import static org.junit.jupiter.api.Assertions.*;
             throw new RuntimeException("failure");
         }
     }
-}*/
+}

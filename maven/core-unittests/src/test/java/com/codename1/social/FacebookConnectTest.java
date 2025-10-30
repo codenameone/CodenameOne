@@ -25,7 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 // TODO: Restore this with proper mocking
-/*class FacebookConnectTest extends UITestBase {
+class FacebookConnectTest extends UITestBase {
 
     private Field facebookInstanceField;
     private Field networkManagerInstanceField;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.verify;
     private String originalRedirectUri;
     private String[] originalPermissions;
 
-    @BeforeEach
+    //@BeforeEach
     void setUpSingletons() throws Exception {
         resetFacebookInstance();
         captureFaceBookAccessDefaults();
@@ -44,14 +44,14 @@ import static org.mockito.Mockito.verify;
         clearStoredCredentials();
     }
 
-    @AfterEach
+    //@AfterEach
     void restoreEnvironment() throws Exception {
         restoreNetworkManager();
         restoreFaceBookAccessDefaults();
         clearStoredCredentials();
     }
 
-    @Test
+    //@Test
     void testGetInstanceReturnsSingletonWhenNoImplClass() {
         FacebookConnect first = FacebookConnect.getInstance();
         FacebookConnect second = FacebookConnect.getInstance();
@@ -59,7 +59,7 @@ import static org.mockito.Mockito.verify;
         assertEquals(FacebookConnect.class, first.getClass());
     }
 
-    @Test
+    //@Test
     void testGetInstanceUsesImplClass() throws Exception {
         resetFacebookInstance();
         FacebookConnect.implClass = CustomFacebookConnect.class;
@@ -68,7 +68,7 @@ import static org.mockito.Mockito.verify;
         assertTrue(((CustomFacebookConnect) instance).constructed);
     }
 
-    @Test
+    //@Test
     void testGetInstanceFallsBackWhenInstantiationFails() throws Exception {
         resetFacebookInstance();
         FacebookConnect.implClass = ThrowingFacebookConnect.class;
@@ -76,7 +76,7 @@ import static org.mockito.Mockito.verify;
         assertEquals(FacebookConnect.class, instance.getClass());
     }
 
-    @Test
+    //@Test
     void testDoLogoutClearsTokensAndInvokesNetworkManager() throws Exception {
         FacebookConnect connect = new FacebookConnect();
         AccessToken stored = new AccessToken("stored", null);
@@ -100,7 +100,7 @@ import static org.mockito.Mockito.verify;
         verify(mockNetworkManager).addToQueueAndWait(any(ConnectionRequest.class));
     }
 
-    @Test
+    //@Test
     void testDoLogoutSkipsFacebookAccessWhenNativeSupported() {
         FaceBookAccess.setToken("keepToken");
         NativeSupportedFacebookConnect connect = new NativeSupportedFacebookConnect();
@@ -109,7 +109,7 @@ import static org.mockito.Mockito.verify;
         assertEquals("keepToken", FaceBookAccess.getToken());
     }
 
-    @Test
+    //@Test
     void testGetAccessTokenReturnsStoredTokenWhenPresent() {
         FacebookConnect connect = new FacebookConnect();
         AccessToken token = new AccessToken("value", "refresh");
@@ -117,7 +117,7 @@ import static org.mockito.Mockito.verify;
         assertSame(token, connect.getAccessToken());
     }
 
-    @Test
+    //@Test
     void testGetAccessTokenReturnsNativeTokenWhenSupported() {
         FacebookConnect connect = new FacebookConnect() {
             @Override
@@ -133,7 +133,7 @@ import static org.mockito.Mockito.verify;
         assertEquals("nativeValue", connect.getAccessToken().getToken());
     }
 
-    @Test
+    //@Test
     void testCreateOauth2ConfiguresFaceBookAccess() throws Exception {
         FacebookConnect connect = new FacebookConnect();
         connect.setClientId("client");
@@ -158,7 +158,7 @@ import static org.mockito.Mockito.verify;
         assertArrayEquals(new String[]{"public_profile", "email", "user_friends"}, (String[]) getStaticFieldValue("permissions"));
     }
 
-    @Test
+    //@Test
     void testBridgeMethodsDelegateToDeprecatedImplementations() {
         TestableFacebookConnect connect = new TestableFacebookConnect();
         connect.nativelogin();
@@ -167,7 +167,7 @@ import static org.mockito.Mockito.verify;
         assertEquals(1, connect.logoutCalls);
     }
 
-    @Test
+    //@Test
     void testUnsupportedOperationsThrow() {
         FacebookConnect connect = new FacebookConnect();
         assertThrows(RuntimeException.class, connect::login);
@@ -281,4 +281,4 @@ import static org.mockito.Mockito.verify;
             logoutCalls++;
         }
     }
-}*/
+}

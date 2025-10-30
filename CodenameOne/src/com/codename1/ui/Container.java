@@ -3738,9 +3738,7 @@ public class Container extends Component implements Iterable<Component> {
         a.scrollTo = destination;
 
         if (wait) {
-            System.out.println("MORPH-Debug: addAnimationAndBlock...");
             getAnimationManager().addAnimationAndBlock(a);
-            System.out.println("MORPH-Debug: addAnimationAndBlock finished...");
         } else {
             if (onCompletion != null) {
                 getAnimationManager().addAnimation(a, onCompletion);
@@ -4301,18 +4299,17 @@ public class Container extends Component implements Iterable<Component> {
             }
             this.thisContainer = thisContainer;
             this.motions = motions;
+            animatedComponents = new Vector();
+            opacity = new Motion[0];
         }
 
         @Override
         public boolean isInProgress() {
-            System.out.println("MORPH-Debug: isInProgress: " + (!finished));
             return !finished;
         }
 
         @Override
         public void flush() {
-            System.out.println("MORPH-Debug: flush()");
-            new Exception().printStackTrace();
             for (Motion[] mm : motions) {
                 for (Motion m : mm) {
                     if (m != null) {
@@ -4325,7 +4322,6 @@ public class Container extends Component implements Iterable<Component> {
 
         @Override
         protected void updateState() {
-            System.out.println("MORPH-Debug: updateState()");
             if (animatedComponents != null) {
                 int componentCount = animatedComponents.size();
                 for (int iter = 0; iter < componentCount; iter++) {

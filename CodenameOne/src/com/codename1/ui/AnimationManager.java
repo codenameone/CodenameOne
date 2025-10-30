@@ -131,18 +131,13 @@ public final class AnimationManager {
         final Object LOCK = new Object();
         an.setNotifyLock(LOCK);
         addAnimation(an);
-        System.out.println("MORPH-Debug: addAnimationAndBlock before invoke and block on isEDT: " + Display.getInstance().isEdt());
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
-                System.out.println("MORPH-Debug: addAnimationAndBlock before loop an.isInProgress(): " + an.isInProgress() + " anims.contains(an): " + anims.contains(an));
                 while (an.isInProgress() && anims.contains(an)) {
                     Util.wait(LOCK, 50);
-                    System.out.println("MORPH-Debug: addAnimationAndBlock inside loop an.isInProgress(): " + an.isInProgress() + " anims.contains(an): " + anims.contains(an));
                 }
-                System.out.println("MORPH-Debug: addAnimationAndBlock after loop an.isInProgress(): " + an.isInProgress() + " anims.contains(an): " + anims.contains(an));
             }
         });
-        System.out.println("MORPH-Debug: addAnimationAndBlock after invoke and block");
     }
 
 
