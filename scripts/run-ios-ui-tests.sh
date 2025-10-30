@@ -64,14 +64,15 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
 
+DEFAULT_SCHEME="HelloCodenameOne-CI"
 if [ -z "$REQUESTED_SCHEME" ]; then
-  if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
-    REQUESTED_SCHEME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
-  else
-    REQUESTED_SCHEME="$(basename "$WORKSPACE_PATH")"
-  fi
+  SCHEME="$DEFAULT_SCHEME"
+elif [ "$REQUESTED_SCHEME" != "$DEFAULT_SCHEME" ]; then
+  ri_log "Ignoring requested scheme '$REQUESTED_SCHEME'; forcing $DEFAULT_SCHEME"
+  SCHEME="$DEFAULT_SCHEME"
+else
+  SCHEME="$DEFAULT_SCHEME"
 fi
-SCHEME="$REQUESTED_SCHEME"
 ri_log "Using scheme $SCHEME"
 
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
@@ -145,7 +146,7 @@ fi
 
 ri_log "Running UI tests on destination '$SIM_DESTINATION'"
 
-UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
+UI_TEST_TARGET="HelloCodenameOneUITests"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
   -skip-testing:HelloCodenameOneTests

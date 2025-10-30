@@ -6,12 +6,13 @@ final class HelloCodenameOneUITests: XCTestCase {
     private var outputDirectory: URL!
     private let chunkSize = 2000
     private let previewChannel = "PREVIEW"
+    private let appBundleIdentifier = "com.codenameone.examples.HelloCodenameOne"
     private let previewQualities: [CGFloat] = [0.60, 0.50, 0.40, 0.35, 0.30, 0.25, 0.20, 0.18, 0.16, 0.14, 0.12, 0.10, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01]
     private let maxPreviewBytes = 20 * 1024
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
+        app = XCUIApplication(bundleIdentifier: appBundleIdentifier)
 
         // Locale for determinism
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
