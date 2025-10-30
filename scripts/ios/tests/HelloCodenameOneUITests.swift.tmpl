@@ -101,9 +101,17 @@ final class HelloCodenameOneUITests: XCTestCase {
     private func makeApplication() -> XCUIApplication {
         let env = ProcessInfo.processInfo.environment
         if let identifier = preferredBundleIdentifier(from: env) {
-            return XCUIApplication(bundleIdentifier: identifier)
+            print("CN1SS:INFO:preferred_bundle=\(identifier)")
+            let configured = XCUIApplication(bundleIdentifier: identifier)
+            configured.launchEnvironment["CN1_APP_BUNDLE_ID"] = identifier
+            return configured
         }
-        return XCUIApplication()
+        print("CN1SS:INFO:preferred_bundle=<default_target>")
+        let fallback = XCUIApplication()
+        if let inferred = env["CN1_APP_BUNDLE_ID"]?.trimmingCharacters(in: .whitespacesAndNewlines), !inferred.isEmpty {
+            fallback.launchEnvironment["CN1_APP_BUNDLE_ID"] = inferred
+        }
+        return fallback
     }
 
     private func preferredBundleIdentifier(from environment: [String: String]) -> String? {

@@ -67,6 +67,7 @@ GROUP_ID="com.codenameone.examples"
 ARTIFACT_ID="hello-codenameone-ios"
 MAIN_NAME="HelloCodenameOne"
 PACKAGE_NAME="$GROUP_ID"
+IOS_BUNDLE_ID="com.codenameone.examples.HelloCodenameOne"
 
 SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
 if [ ! -d "$SOURCE_PROJECT" ]; then
@@ -125,6 +126,7 @@ set_property() {
 
 set_property "codename1.packageName" "$PACKAGE_NAME"
 set_property "codename1.mainName" "$MAIN_NAME"
+set_property "codename1.ios.appid" "$IOS_BUNDLE_ID"
 
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
@@ -214,6 +216,9 @@ export XCODEPROJ
 bia_log "Using Xcode project: $XCODEPROJ"
 
 # --- Ensure UITests target + CI scheme (save_as gets a PATH, not a Project) ---
+export CN1_APP_BUNDLE_ID="${CN1_APP_BUNDLE_ID:-$IOS_BUNDLE_ID}"
+export CN1_MAIN_NAME="$MAIN_NAME"
+
 ruby -rrubygems -rxcodeproj -e '
 require "fileutils"
 proj_path = ENV["XCODEPROJ"] or abort("XCODEPROJ env not set")
@@ -222,6 +227,21 @@ proj = Xcodeproj::Project.open(proj_path)
 app_target = proj.targets.find { |t| t.product_type == "com.apple.product-type.application" } || proj.targets.first
 ui_name    = "HelloCodenameOneUITests"
 ui_target  = proj.targets.find { |t| t.name == ui_name }
+bundle_id  = ENV.fetch("CN1_APP_BUNDLE_ID", "").strip
+bundle_id  = "com.codenameone.examples.HelloCodenameOne" if bundle_id.empty?
+ui_bundle  = "#{bundle_id}.uitests"
+main_name  = ENV.fetch("CN1_MAIN_NAME", "HelloCodenameOne")
+
+if app_target
+  %w[Debug Release].each do |cfg|
+    xc = app_target.build_configuration_list[cfg]
+    next unless xc
+    bs = xc.build_settings
+    bs["PRODUCT_BUNDLE_IDENTIFIER"] = bundle_id
+    bs["PRODUCT_NAME"] ||= main_name
+    bs["INFOPLIST_KEY_CFBundleDisplayName"] ||= main_name
+  end
+end
 
 unless ui_target
   ui_target = proj.new_target(:ui_test_bundle, ui_name, :ios, "18.0")
@@ -253,9 +273,9 @@ ui_target.add_file_references([file_ref]) unless ui_target.source_build_phase.fi
   bs["GENERATE_INFOPLIST_FILE"]      = "YES"
   bs["CODE_SIGNING_ALLOWED"]         = "NO"
   bs["CODE_SIGNING_REQUIRED"]        = "NO"
-  bs["PRODUCT_BUNDLE_IDENTIFIER"]  ||= "com.codenameone.examples.uitests"
+  bs["PRODUCT_BUNDLE_IDENTIFIER"]    = ui_bundle
   bs["PRODUCT_NAME"]               ||= ui_name
-  bs["TEST_TARGET_NAME"]           ||= app_target&.name || "HelloCodenameOne"
+  bs["TEST_TARGET_NAME"]           ||= app_target&.name || main_name
   # Optional but harmless on simulators; avoids other edge cases:
   bs["ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES"] = "YES"
   bs["TARGETED_DEVICE_FAMILY"] ||= "1,2"
@@ -350,10 +370,11 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "workspace=$WORKSPACE"
     echo "scheme=$SCHEME"
+    echo "bundle_id=$CN1_APP_BUNDLE_ID"
   } >> "$GITHUB_OUTPUT"
 fi
 
-bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=$SCHEME"
+bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=$SCHEME, bundle_id=$CN1_APP_BUNDLE_ID"
 
 # (Optional) dump xcodebuild -list for debugging
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"

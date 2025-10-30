@@ -65,9 +65,6 @@ mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
 
 DEFAULT_SCHEME="HelloCodenameOne-CI"
-DEFAULT_APP_BUNDLE_ID="com.codenameone.examples.HelloCodenameOne"
-APP_BUNDLE_ID="${CN1_APP_BUNDLE_ID:-$DEFAULT_APP_BUNDLE_ID}"
-export CN1_APP_BUNDLE_ID="$APP_BUNDLE_ID"
 if [ -z "$REQUESTED_SCHEME" ]; then
   SCHEME="$DEFAULT_SCHEME"
 elif [ "$REQUESTED_SCHEME" != "$DEFAULT_SCHEME" ]; then
@@ -77,6 +74,53 @@ else
   SCHEME="$DEFAULT_SCHEME"
 fi
 ri_log "Using scheme $SCHEME"
+
+detect_app_bundle_id() {
+  local workspace="$1" scheme="$2"
+  python3 - "$workspace" "$scheme" <<'PY'
+import json
+import subprocess
+import sys
+
+workspace, scheme = sys.argv[1:3]
+cmd = [
+    "xcodebuild",
+    "-workspace",
+    workspace,
+    "-scheme",
+    scheme,
+    "-showBuildSettings",
+    "-json",
+]
+proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+if proc.returncode != 0:
+    sys.exit(0)
+try:
+    payload = json.loads(proc.stdout.decode("utf-8"))
+except json.JSONDecodeError:
+    sys.exit(0)
+for entry in payload:
+    target = entry.get("target") or ""
+    if target.endswith("UITests"):
+        continue
+    bundle = (entry.get("buildSettings") or {}).get("PRODUCT_BUNDLE_IDENTIFIER")
+    if bundle:
+        print(bundle)
+        break
+PY
+}
+
+DETECTED_APP_BUNDLE_ID=""
+if DETECTED_APP_BUNDLE_ID="$(detect_app_bundle_id "$WORKSPACE_PATH" "$SCHEME" 2>/dev/null)"; then
+  DETECTED_APP_BUNDLE_ID="${DETECTED_APP_BUNDLE_ID//[$'\r\n']}"
+fi
+if [ -n "$DETECTED_APP_BUNDLE_ID" ]; then
+  ri_log "Detected bundle identifier $DETECTED_APP_BUNDLE_ID from build settings"
+fi
+
+DEFAULT_APP_BUNDLE_ID="com.codenameone.examples.HelloCodenameOne"
+APP_BUNDLE_ID="${CN1_APP_BUNDLE_ID:-${IOS_APP_BUNDLE_ID:-${DETECTED_APP_BUNDLE_ID:-$DEFAULT_APP_BUNDLE_ID}}}"
+export CN1_APP_BUNDLE_ID="$APP_BUNDLE_ID"
 ri_log "Targeting app bundle $APP_BUNDLE_ID"
 
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
