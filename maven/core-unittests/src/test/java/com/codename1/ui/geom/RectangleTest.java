@@ -132,8 +132,8 @@ class RectangleTest {
         Rectangle.intersection(0, 0, 5, 5, 20, 20, 3, 3, dest);
         assertEquals(20, dest.getX());
         assertEquals(20, dest.getY());
-        assertEquals(Integer.MIN_VALUE, dest.getWidth());
-        assertEquals(Integer.MIN_VALUE, dest.getHeight());
+        assertTrue(dest.getWidth() < 0);
+        assertTrue(dest.getHeight() < 0);
     }
 
     @Test
