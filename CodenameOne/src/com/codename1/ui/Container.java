@@ -4311,6 +4311,7 @@ public class Container extends Component implements Iterable<Component> {
         @Override
         public void flush() {
             System.out.println("MORPH-Debug: flush()");
+            new Exception().printStackTrace();
             for (Motion[] mm : motions) {
                 for (Motion m : mm) {
                     if (m != null) {
