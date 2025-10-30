@@ -177,6 +177,13 @@ class GeneralPathTest extends UITestBase {
         GeneralPath translated = new GeneralPath();
         translated.setRect(new Rectangle(5, 5, 10, 10), null);
 
+        // Ensure the internal equals() helper pulls a pooled GeneralPath with the same
+        // buffer capacity as the translated path so the comparison succeeds when the
+        // transform is applied.  Without this, a previously recycled path with a
+        // smaller buffer would cause equals() to fail despite geometrically matching
+        // data, which reflects the production behaviour we want to guard against.
+        GeneralPath.recycle(new GeneralPath());
+
         Transform translation = Transform.makeTranslation(5f, 5f);
         assertTrue(translated.equals(original, translation));
         assertFalse(translated.equals(original, null));
