@@ -30,6 +30,23 @@ class ContainerTest extends UITestBase {
         assertEquals(c.getBounds(), a.getBounds());
     }
 
+    @FormTest
+    void testAnimateHierarchyWithDefaultOpacityDoesNotCrash() {
+        Form form = CN.getCurrentForm();
+        form.removeAll();
+        form.setLayout(BoxLayout.y());
+
+        Label first = new Label("First");
+        Label second = new Label("Second");
+        form.addAll(first, second);
+        form.revalidate();
+
+        assertDoesNotThrow(() -> {
+            form.animateHierarchy(100);
+            form.getAnimationManager().flush();
+        });
+    }
+
     @Test
     void testScrollableFlagsRespectBorderLayout() {
         Container container = new Container(new BorderLayout());
