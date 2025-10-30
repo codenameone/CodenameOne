@@ -41,6 +41,12 @@ class ContainerTest extends UITestBase {
         form.addAll(first, second);
         form.revalidate();
 
+        // Regression guard for commit 4e5cbc2c2092721c8861a34d557fe56fe742e82b where
+        // MorphAnimation's constructor began initializing opacity to an empty array.
+        // When animateHierarchy() is invoked without fade (the default, matching
+        // Form.animateHierarchy and Codename One 7.0.208), MorphAnimation.opacity
+        // remains zero-length yet non-null. The flush() call below mirrors Display.flushEdt()
+        // from the stack trace and would previously trigger an ArrayIndexOutOfBoundsException.
         assertDoesNotThrow(() -> {
             form.animateHierarchy(100);
             form.getAnimationManager().flush();
