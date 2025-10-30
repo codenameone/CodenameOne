@@ -152,7 +152,7 @@ class GeometryTest extends UITestBase {
 
     @Test
     void testStrokeInvokesDrawShapeWithTranslation() {
-        BezierCurve curve = new BezierCurve(0d, 0d, 10d, 10d);
+        BezierCurve curve = new BezierCurve(0d, 0d, 5d, 5d, 10d, 10d);
         Graphics graphics = Image.createImage(10, 10).getGraphics();
         implementation.setShapeSupported(true);
         implementation.resetShapeTracking();
