@@ -4,6 +4,7 @@ import UIKit
 final class HelloCodenameOneUITests: XCTestCase {
     private var app: XCUIApplication!
     private var outputDirectory: URL!
+    private var resolvedBundleIdentifier: String?
     private let chunkSize = 2000
     private let previewChannel = "PREVIEW"
     private let defaultAppBundleIdentifier = "com.codenameone.examples.HelloCodenameOne"
@@ -90,10 +91,11 @@ final class HelloCodenameOneUITests: XCTestCase {
                 app = fallback
             }
         }
-        if let bundle = app.bundleIdentifier {
+        if let bundle = resolvedBundleIdentifier, !bundle.isEmpty {
             print("CN1SS:INFO:active_bundle=\(bundle) state=\(app.state.rawValue)")
         } else {
-            print("CN1SS:INFO:active_bundle=unknown state=\(app.state.rawValue)")
+            let fallbackBundle = ProcessInfo.processInfo.environment["CN1_APP_BUNDLE_ID"] ?? "<unset>"
+            print("CN1SS:INFO:active_bundle=\(fallbackBundle) state=\(app.state.rawValue)")
         }
         waitForStableFrame()
     }
@@ -104,12 +106,16 @@ final class HelloCodenameOneUITests: XCTestCase {
             print("CN1SS:INFO:preferred_bundle=\(identifier)")
             let configured = XCUIApplication(bundleIdentifier: identifier)
             configured.launchEnvironment["CN1_APP_BUNDLE_ID"] = identifier
+            resolvedBundleIdentifier = identifier
             return configured
         }
         print("CN1SS:INFO:preferred_bundle=<default_target>")
         let fallback = XCUIApplication()
         if let inferred = env["CN1_APP_BUNDLE_ID"]?.trimmingCharacters(in: .whitespacesAndNewlines), !inferred.isEmpty {
             fallback.launchEnvironment["CN1_APP_BUNDLE_ID"] = inferred
+            resolvedBundleIdentifier = inferred
+        } else {
+            resolvedBundleIdentifier = nil
         }
         return fallback
     }
