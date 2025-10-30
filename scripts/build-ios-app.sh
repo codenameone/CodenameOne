@@ -125,8 +125,6 @@ set_property() {
 
 set_property "codename1.packageName" "$PACKAGE_NAME"
 set_property "codename1.mainName" "$MAIN_NAME"
-set_property "codename1.arg.build.unitTest" "1"
-set_property "codename1.arg.build.testReporter" "$PACKAGE_NAME.tests.Cn1ssDeviceRunnerReporter"
 
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
@@ -143,7 +141,7 @@ cp "$MAIN_FILE_SOURCE" "$JAVA_DIR/${MAIN_NAME}.java"
 bia_log "Wrote main application class to $JAVA_DIR/${MAIN_NAME}.java"
 
 TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/tests"
-TEST_JAVA_DIR="$APP_DIR/common/src/test/java/${PACKAGE_PATH}/tests"
+TEST_JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}/tests"
 mkdir -p "$TEST_JAVA_DIR"
 if [ ! -d "$TEST_SOURCE_DIR" ]; then
   bia_log "DeviceRunner test sources not found: $TEST_SOURCE_DIR" >&2

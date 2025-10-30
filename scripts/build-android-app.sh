@@ -232,14 +232,14 @@ cp "$MAIN_FILE_SOURCE" "$JAVA_DIR/${MAIN_NAME}.java"
 ba_log "Setting Codename One application metadata"
 set_prop "codename1.packageName" "$PACKAGE_NAME"
 set_prop "codename1.mainName" "$MAIN_NAME"
-set_prop "codename1.arg.build.unitTest" "1"
-set_prop "codename1.arg.build.testReporter" "$PACKAGE_NAME.tests.Cn1ssDeviceRunnerReporter"
+# DeviceRunner integration is handled inside the copied sources, so unit test
+# build mode is not required (and is unsupported for local Android builds).
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
 
 # --- Install DeviceRunner UI tests ---
 TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/tests"
-TEST_JAVA_DIR="$APP_DIR/common/src/test/java/${PACKAGE_PATH}/tests"
+TEST_JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}/tests"
 mkdir -p "$TEST_JAVA_DIR"
 if [ ! -d "$TEST_SOURCE_DIR" ]; then
   ba_log "DeviceRunner test sources not found: $TEST_SOURCE_DIR" >&2
