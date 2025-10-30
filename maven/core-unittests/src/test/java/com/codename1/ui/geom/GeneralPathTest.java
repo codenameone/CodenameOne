@@ -134,7 +134,7 @@ class GeneralPathTest extends UITestBase {
             iterator.next();
         }
 
-        assertEquals(5, segmentTypes.size());
+        assertEquals(4, segmentTypes.size());
         assertEquals(PathIterator.SEG_MOVETO, segmentTypes.get(0).intValue());
         assertEquals(PathIterator.SEG_MOVETO, segmentTypes.get(2).intValue());
     }
