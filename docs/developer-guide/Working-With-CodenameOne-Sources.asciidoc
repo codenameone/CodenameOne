@@ -81,8 +81,8 @@ project), adjust the `pom.xml` properties to reference your snapshot version:
 ----
 <properties>
     <!-- Replace with the snapshot printed during mvn install -->
-    <cn1.version>7.0.21-SNAPSHOT</cn1.version>
-    <cn1.plugin.version>7.0.21-SNAPSHOT</cn1.plugin.version>
+    <cn1.version>{cn1-snapshot-version}</cn1.version>
+    <cn1.plugin.version>{cn1-snapshot-version}</cn1.plugin.version>
 </properties>
 ----
 

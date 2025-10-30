@@ -50,8 +50,8 @@ E.g. Open the `pom.xml` file, and look for the following:
 
 [source,xml]
 ----
-<cn1.plugin.version>7.0.19</cn1.plugin.version>
-<cn1.version>7.0.19</cn1.version>
+<cn1.plugin.version>{cn1-plugin-release-version}</cn1.plugin.version>
+<cn1.version>{cn1-release-version}</cn1.version>
 ----
 
 Change these values to reflect the latest version of the `codenameone-maven-plugin` found https://search.maven.org/artifact/com.codenameone/codenameone-maven-plugin[here].

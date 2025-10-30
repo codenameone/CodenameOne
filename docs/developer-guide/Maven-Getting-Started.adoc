@@ -78,7 +78,7 @@ Here is an example which generates a project based on the bare-bones kotlin temp
 
 [source,bash]
 ----
-mvn com.codenameone:codenameone-maven-plugin:7.0.19:generate-app-project \
+mvn com.codenameone:codenameone-maven-plugin:{cn1-plugin-release-version}:generate-app-project \
   -DarchetypeGroupId=$archetypeGroupId \
   -DarchetypeArtifactId=$archetypeArtifactId \
   -DarchetypeVersion=$archetypeVersion \
@@ -96,7 +96,7 @@ Like the `archetype:generate` goal, this will create the project in a directory 
 
 Some notes here:
 
-. The `com.codenameone:codenameone-maven-plugin:7.0.19:generate-app-project` argument is the fully-qualified goal name for the `generate-app-project`.  This is necessary since we aren't running this goal in the context of any existing project.  You should adjust the version number (`7.0.19`) to reflect the https://search.maven.org/search?q=a:codenameone-maven-plugin[latest available Codename One version on Maven Central].
+. The `com.codenameone:codenameone-maven-plugin:{cn1-plugin-release-version}:generate-app-project` argument is the fully-qualified goal name for the `generate-app-project`.  This is necessary since we aren't running this goal in the context of any existing project.  You should adjust the version number (`{cn1-plugin-release-version}`) to reflect the https://search.maven.org/search?q=a:codenameone-maven-plugin[latest available Codename One version on Maven Central].
 . The `archetypeGroupId`, `archetypeArtifactId`, and `archetypeVersion` parameters are the same as when using the `archetype:generate` goal, and they will (almost) always refer to the <<cn1app-archetype>>.
 . The `groupId`, `artifactId`, and `version` work the same as for the `archetype:generate` goal.  That is, that they specify the coordinates for your newly created project.
 . The `mainName` specifies the Main class name for your app.  This is just the class name, and should not include the full package.  E.g. "MyApp", not "com.example.MyApp"
@@ -121,7 +121,7 @@ A minimal invocation of this goal would look like:
 # Specify your the version of the codenameone-maven-plugin.
 # Find the latest version at
 # https://search.maven.org/search?q=a:codenameone-maven-plugin
-CN1VERSION=7.0.19
+CN1VERSION={cn1-plugin-release-version}
 mvn com.codenameone:codenameone-maven-plugin:$CN1VERSION:generate-app-project \
   -DgroupId=YOUR_GROUP_ID \
   -DartifactId=YOUR_ARTIFACT_ID \
@@ -212,7 +212,7 @@ The following is a bash script that uses curl to download this project as a zip 
 
 [source,bash]
 ----
-CN1_VERSION=7.0.19
+CN1_VERSION={cn1-plugin-release-version}
 curl -L https://github.com/codenameone/KitchenSink/archive/v1.0-cn7.0.11.zip > master.zip
 unzip master.zip
 rm master.zip
