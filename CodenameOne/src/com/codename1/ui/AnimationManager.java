@@ -133,9 +133,11 @@ public final class AnimationManager {
         addAnimation(an);
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
+                System.out.println("MORPH-Debug: addAnimationAndBlock before loop an.isInProgress(): " + an.isInProgress() + " anims.contains(an): " + anims.contains(an));
                 while (an.isInProgress() && anims.contains(an)) {
                     Util.wait(LOCK, 50);
                 }
+                System.out.println("MORPH-Debug: addAnimationAndBlock after loop an.isInProgress(): " + an.isInProgress() + " anims.contains(an): " + anims.contains(an));
             }
         });
     }
