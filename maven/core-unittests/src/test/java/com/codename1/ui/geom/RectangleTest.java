@@ -106,4 +106,61 @@ class RectangleTest {
         float[] bounds = rect.getBounds2D();
         assertArrayEquals(new float[]{3f, 4f, 5f, 6f}, bounds, 0.0001f);
     }
+
+    @Test
+    void testSetBoundsInvalidatesCachedPath() {
+        Rectangle rect = new Rectangle(0, 0, 4, 4);
+        collectPoints(rect.getPathIterator());
+        rect.setWidth(8);
+        List<float[]> coords = collectPoints(rect.getPathIterator());
+        assertEquals(8f, coords.get(1)[0], 0.0001f);
+    }
+
+    @Test
+    void testSetBoundsCopiesFromRectangle() {
+        Rectangle rect = new Rectangle();
+        rect.setBounds(new Rectangle(2, 3, 4, 5));
+        assertEquals(2, rect.getX());
+        assertEquals(3, rect.getY());
+        assertEquals(4, rect.getWidth());
+        assertEquals(5, rect.getHeight());
+    }
+
+    @Test
+    void testStaticIntersectionWhenNoOverlapProducesEmptyRectangle() {
+        Rectangle dest = new Rectangle();
+        Rectangle.intersection(0, 0, 5, 5, 20, 20, 3, 3, dest);
+        assertEquals(20, dest.getX());
+        assertEquals(20, dest.getY());
+        assertTrue(dest.getWidth() < 0);
+        assertTrue(dest.getHeight() < 0);
+    }
+
+    @Test
+    void testContainsReturnsFalseForZeroSize() {
+        Rectangle rect = new Rectangle(0, 0, 0, 0);
+        assertTrue(rect.contains(0, 0));
+        assertFalse(rect.contains(0, 0, 1, 1));
+    }
+
+    @Test
+    void testHashCodeReflectsBoundsChanges() {
+        Rectangle rect = new Rectangle(1, 2, 3, 4);
+        int initialHash = rect.hashCode();
+        rect.setHeight(10);
+        assertNotEquals(initialHash, rect.hashCode());
+    }
+
+    private static List<float[]> collectPoints(PathIterator iterator) {
+        List<float[]> points = new ArrayList<float[]>();
+        float[] buffer = new float[6];
+        while (!iterator.isDone()) {
+            int segment = iterator.currentSegment(buffer);
+            if (segment != PathIterator.SEG_CLOSE) {
+                points.add(new float[]{buffer[0], buffer[1]});
+            }
+            iterator.next();
+        }
+        return points;
+    }
 }

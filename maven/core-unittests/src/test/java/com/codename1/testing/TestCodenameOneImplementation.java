@@ -755,6 +755,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return ((TestGraphics) graphics).alpha;
     }
 
+    public Object getFont(Object graphics) {
+        return ((TestGraphics) graphics).font;
+    }
+
     @Override
     public void setNativeFont(Object graphics, Object font) {
         ((TestGraphics) graphics).font = (TestFont) font;
