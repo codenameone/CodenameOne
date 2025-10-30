@@ -65,6 +65,9 @@ mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
 
 DEFAULT_SCHEME="HelloCodenameOne-CI"
+DEFAULT_APP_BUNDLE_ID="com.codenameone.examples.HelloCodenameOne"
+APP_BUNDLE_ID="${CN1_APP_BUNDLE_ID:-$DEFAULT_APP_BUNDLE_ID}"
+export CN1_APP_BUNDLE_ID="$APP_BUNDLE_ID"
 if [ -z "$REQUESTED_SCHEME" ]; then
   SCHEME="$DEFAULT_SCHEME"
 elif [ "$REQUESTED_SCHEME" != "$DEFAULT_SCHEME" ]; then
@@ -74,6 +77,7 @@ else
   SCHEME="$DEFAULT_SCHEME"
 fi
 ri_log "Using scheme $SCHEME"
+ri_log "Targeting app bundle $APP_BUNDLE_ID"
 
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
 RESULT_BUNDLE="$SCREENSHOT_TMP_DIR/test-results.xcresult"

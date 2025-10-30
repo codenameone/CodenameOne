@@ -6,13 +6,13 @@ final class HelloCodenameOneUITests: XCTestCase {
     private var outputDirectory: URL!
     private let chunkSize = 2000
     private let previewChannel = "PREVIEW"
-    private let appBundleIdentifier = "com.codenameone.examples.HelloCodenameOne"
+    private let defaultAppBundleIdentifier = "com.codenameone.examples.HelloCodenameOne"
     private let previewQualities: [CGFloat] = [0.60, 0.50, 0.40, 0.35, 0.30, 0.25, 0.20, 0.18, 0.16, 0.14, 0.12, 0.10, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.01]
     private let maxPreviewBytes = 20 * 1024
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication(bundleIdentifier: appBundleIdentifier)
+        app = makeApplication()
 
         // Locale for determinism
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
@@ -28,8 +28,7 @@ final class HelloCodenameOneUITests: XCTestCase {
         }
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
-        app.launch()
-        waitForStableFrame()
+        launchAppAndStabilize()
     }
 
     override func tearDownWithError() throws {
@@ -75,6 +74,43 @@ final class HelloCodenameOneUITests: XCTestCase {
     private func waitForStableFrame(timeout: TimeInterval = 30, settle: TimeInterval = 1.2) {
         _ = app.wait(for: .runningForeground, timeout: timeout)
         RunLoop.current.run(until: Date(timeIntervalSinceNow: settle))
+    }
+
+    private func launchAppAndStabilize() {
+        let originalArguments = app.launchArguments
+        let originalEnvironment = app.launchEnvironment
+        app.launch()
+        if app.state != .runningForeground {
+            let fallback = XCUIApplication()
+            fallback.launchArguments = originalArguments
+            fallback.launchEnvironment = originalEnvironment
+            fallback.launch()
+            if fallback.state == .runningForeground {
+                print("CN1SS:INFO:using_fallback_application state=\(fallback.state.rawValue)")
+                app = fallback
+            }
+        }
+        if let bundle = app.bundleIdentifier {
+            print("CN1SS:INFO:active_bundle=\(bundle) state=\(app.state.rawValue)")
+        } else {
+            print("CN1SS:INFO:active_bundle=unknown state=\(app.state.rawValue)")
+        }
+        waitForStableFrame()
+    }
+
+    private func makeApplication() -> XCUIApplication {
+        let env = ProcessInfo.processInfo.environment
+        if let identifier = preferredBundleIdentifier(from: env) {
+            return XCUIApplication(bundleIdentifier: identifier)
+        }
+        return XCUIApplication()
+    }
+
+    private func preferredBundleIdentifier(from environment: [String: String]) -> String? {
+        if let explicit = environment["CN1_APP_BUNDLE_ID"]?.trimmingCharacters(in: .whitespacesAndNewlines), !explicit.isEmpty {
+            return explicit
+        }
+        return defaultAppBundleIdentifier
     }
 
     /// Tap using normalized coordinates (0...1)
