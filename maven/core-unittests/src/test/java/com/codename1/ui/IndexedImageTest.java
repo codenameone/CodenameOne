@@ -1,7 +1,7 @@
 package com.codename1.ui;
 
 import com.codename1.junit.UITestBase;
-import org.junit.jupiter.api.Test;
+import com.codename1.junit.FormTest;
 
 import java.io.IOException;
 
@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class IndexedImageTest extends UITestBase {
 
-    @Test
+    @FormTest
     void testCreateIndexedImageWithPalette() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{0, 1, 2, 1, 0, 2, 2, 1, 0};
@@ -20,7 +20,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(3, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testIndexedImageGetPalette() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFFFF};
         byte[] data = new byte[]{0, 1, 2, 3};
@@ -29,7 +29,7 @@ class IndexedImageTest extends UITestBase {
         assertArrayEquals(palette, image.getPalette());
     }
 
-    @Test
+    @FormTest
     void testIndexedImageGetImageDataByte() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00};
         byte[] data = new byte[]{0, 1, 1, 0};
@@ -38,7 +38,7 @@ class IndexedImageTest extends UITestBase {
         assertArrayEquals(data, image.getImageDataByte());
     }
 
-    @Test
+    @FormTest
     void testIndexedImageDimensions() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[20];
@@ -48,7 +48,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(4, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testPackImageWithSmallPalette() {
         int[] rgb = new int[]{
                 0xFFFF0000, 0xFFFF0000,
@@ -62,7 +62,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(2, packed.getPalette().length);
     }
 
-    @Test
+    @FormTest
     void testPackImageWithLargePaletteReturnsNull() {
         // Create an image with more than 256 unique colors
         int[] rgb = new int[512];
@@ -74,7 +74,7 @@ class IndexedImageTest extends UITestBase {
         assertNull(packed, "Should return null when palette exceeds 256 colors");
     }
 
-    @Test
+    @FormTest
     void testPackImageObjectWithSmallPalette() {
         int[] rgb = new int[]{
                 0xFFFF0000, 0xFF00FF00,
@@ -88,7 +88,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(2, packed.getHeight());
     }
 
-    @Test
+    @FormTest
     void testPackImageObjectWithLargePaletteReturnsSource() {
         int[] rgb = new int[300];
         for (int i = 0; i < 300; i++) {
@@ -100,7 +100,7 @@ class IndexedImageTest extends UITestBase {
         assertSame(source, packed, "Should return source image when packing fails");
     }
 
-    @Test
+    @FormTest
     void testPackImageByName() throws IOException {
         // This test verifies the pack(String) method calls through correctly
         // Since we can't create actual image files in tests, we'll skip this
@@ -108,7 +108,7 @@ class IndexedImageTest extends UITestBase {
         // IndexedImage.pack("imageName") would need file system support
     }
 
-    @Test
+    @FormTest
     void testSubImage() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{
@@ -124,7 +124,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(2, sub.getHeight());
     }
 
-    @Test
+    @FormTest
     void testModifyAlpha() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{0, 1, 2, 1};
@@ -136,7 +136,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(2, modified.getHeight());
     }
 
-    @Test
+    @FormTest
     void testModifyAlphaPreservesTransparentColors() {
         int[] palette = new int[]{0x00FF0000, 0xFFFF0000};
         byte[] data = new byte[]{0, 1, 1, 0};
@@ -150,7 +150,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(0x00000000, indexed.getPalette()[0] & 0xFF000000);
     }
 
-    @Test
+    @FormTest
     void testGetGraphicsThrowsException() {
         int[] palette = new int[]{0xFFFF0000};
         byte[] data = new byte[]{0, 0, 0, 0};
@@ -160,7 +160,7 @@ class IndexedImageTest extends UITestBase {
                 "IndexedImage should not support getGraphics()");
     }
 
-    @Test
+    @FormTest
     void testRotateThrowsException() {
         int[] palette = new int[]{0xFFFF0000};
         byte[] data = new byte[]{0, 0, 0, 0};
@@ -170,7 +170,7 @@ class IndexedImageTest extends UITestBase {
                 "IndexedImage should not support rotate()");
     }
 
-    @Test
+    @FormTest
     void testScaled() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00};
         byte[] data = new byte[]{0, 1, 1, 0};
@@ -182,7 +182,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(4, scaled.getHeight());
     }
 
-    @Test
+    @FormTest
     void testScaledReturnsSameWhenDimensionsMatch() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00};
         byte[] data = new byte[]{0, 1, 1, 0};
@@ -192,7 +192,7 @@ class IndexedImageTest extends UITestBase {
         assertSame(image, scaled, "Should return same instance when dimensions match");
     }
 
-    @Test
+    @FormTest
     void testScaleInPlace() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00};
         byte[] data = new byte[]{0, 1, 1, 0, 0, 1, 1, 0, 0};
@@ -203,7 +203,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(6, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testGetRGB() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{0, 1, 2, 1};
@@ -218,7 +218,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(0xFF00FF00, rgb[3]);
     }
 
-    @Test
+    @FormTest
     void testToByteArray() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00};
         byte[] data = new byte[]{0, 1, 1, 0};
@@ -229,7 +229,7 @@ class IndexedImageTest extends UITestBase {
         assertTrue(serialized.length > 0);
     }
 
-    @Test
+    @FormTest
     void testLoadFromByteArray() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{0, 1, 2, 1, 0, 2};
@@ -245,7 +245,7 @@ class IndexedImageTest extends UITestBase {
         assertArrayEquals(palette, loaded.getPalette());
     }
 
-    @Test
+    @FormTest
     void testOpaqueImageWhenAllColorsOpaque() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{0, 1, 2, 1};
@@ -254,7 +254,7 @@ class IndexedImageTest extends UITestBase {
         assertTrue(image.isOpaque(), "Image with all opaque colors should be opaque");
     }
 
-    @Test
+    @FormTest
     void testTransparentImageWhenSomeColorsTransparent() {
         int[] palette = new int[]{0x80FF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{0, 1, 2, 1};
@@ -263,7 +263,7 @@ class IndexedImageTest extends UITestBase {
         assertFalse(image.isOpaque(), "Image with transparent colors should not be opaque");
     }
 
-    @Test
+    @FormTest
     void testRequiresDrawImage() {
         int[] palette = new int[]{0xFFFF0000};
         byte[] data = new byte[]{0, 0};
@@ -272,7 +272,7 @@ class IndexedImageTest extends UITestBase {
         assertTrue(image.requiresDrawImage());
     }
 
-    @Test
+    @FormTest
     void testPackWithSingleColor() {
         int[] rgb = new int[]{0xFFFF0000, 0xFFFF0000, 0xFFFF0000, 0xFFFF0000};
         IndexedImage packed = IndexedImage.pack(rgb, 2, 2);
@@ -282,7 +282,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(0xFFFF0000, packed.getPalette()[0]);
     }
 
-    @Test
+    @FormTest
     void testPackWith256Colors() {
         int[] rgb = new int[256];
         for (int i = 0; i < 256; i++) {
@@ -294,7 +294,7 @@ class IndexedImageTest extends UITestBase {
         assertEquals(256, packed.getPalette().length);
     }
 
-    @Test
+    @FormTest
     void testPackWith257ColorsReturnsNull() {
         int[] rgb = new int[257];
         for (int i = 0; i < 257; i++) {
@@ -305,7 +305,7 @@ class IndexedImageTest extends UITestBase {
         assertNull(packed, "Should return null when more than 256 colors");
     }
 
-    @Test
+    @FormTest
     void testEmptyImageDataHandling() {
         int[] palette = new int[]{0xFFFF0000};
         byte[] data = new byte[1];

@@ -1,9 +1,9 @@
 package com.codename1.ui;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ImageTest extends UITestBase {
 
-    @Test
+    @FormTest
     void testCreateImageFromRgbArray() {
         int[] rgb = new int[]{
                 0xFFFF0000, 0xFF00FF00,
@@ -25,7 +25,7 @@ class ImageTest extends UITestBase {
         assertEquals(2, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testCreateMutableImageWithDefaultFillColor() {
         Image image = Image.createImage(10, 10);
 
@@ -34,7 +34,7 @@ class ImageTest extends UITestBase {
         assertEquals(10, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testCreateMutableImageWithCustomFillColor() {
         Image image = Image.createImage(15, 20, 0xFF0000FF);
 
@@ -43,7 +43,7 @@ class ImageTest extends UITestBase {
         assertEquals(20, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testCreateImageFromByteArray() {
         byte[] data = new byte[]{10, 20, 30, 40, 50};
         Image image = Image.createImage(data, 0, data.length);
@@ -53,7 +53,7 @@ class ImageTest extends UITestBase {
         assertTrue(image.getHeight() >= 1);
     }
 
-    @Test
+    @FormTest
     void testCreateImageFromByteArrayWithOffset() {
         byte[] data = new byte[]{0, 1, 10, 20, 30, 40, 50};
         Image image = Image.createImage(data, 2, 5);
@@ -63,7 +63,7 @@ class ImageTest extends UITestBase {
         assertTrue(image.getHeight() >= 1);
     }
 
-    @Test
+    @FormTest
     void testCreateImageFromInputStream() throws IOException {
         byte[] data = new byte[]{10, 20, 30, 40};
         ByteArrayInputStream stream = new ByteArrayInputStream(data);
@@ -74,7 +74,7 @@ class ImageTest extends UITestBase {
         assertTrue(image.getHeight() >= 1);
     }
 
-    @Test
+    @FormTest
     void testCreateIndexedImage() {
         int[] palette = new int[]{0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
         byte[] data = new byte[]{0, 1, 2, 1, 0, 2};
@@ -85,7 +85,7 @@ class ImageTest extends UITestBase {
         assertEquals(2, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testScaledWidth() {
         Image source = Image.createImage(100, 50);
         Image scaled = source.scaledWidth(200);
@@ -95,7 +95,7 @@ class ImageTest extends UITestBase {
         assertEquals(100, scaled.getHeight());
     }
 
-    @Test
+    @FormTest
     void testScaledHeight() {
         Image source = Image.createImage(100, 50);
         Image scaled = source.scaledHeight(100);
@@ -105,7 +105,7 @@ class ImageTest extends UITestBase {
         assertEquals(100, scaled.getHeight());
     }
 
-    @Test
+    @FormTest
     void testScaled() {
         Image source = Image.createImage(100, 100);
         Image scaled = source.scaled(50, 75);
@@ -115,7 +115,7 @@ class ImageTest extends UITestBase {
         assertEquals(75, scaled.getHeight());
     }
 
-    @Test
+    @FormTest
     void testScaledSmallerRatio() {
         Image source = Image.createImage(100, 100);
         Image scaled = source.scaledSmallerRatio(150, 50);
@@ -125,7 +125,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, scaled.getHeight());
     }
 
-    @Test
+    @FormTest
     void testScaledLargerRatio() {
         Image source = Image.createImage(100, 100);
         Image scaled = source.scaledLargerRatio(150, 200);
@@ -135,7 +135,7 @@ class ImageTest extends UITestBase {
         assertEquals(200, scaled.getHeight());
     }
 
-    @Test
+    @FormTest
     void testFill() {
         Image source = Image.createImage(50, 50);
         Image filled = source.fill(100, 100);
@@ -145,7 +145,7 @@ class ImageTest extends UITestBase {
         assertEquals(100, filled.getHeight());
     }
 
-    @Test
+    @FormTest
     void testGetRGB() {
         int[] rgb = new int[]{
                 0xFFFF0000, 0xFF00FF00,
@@ -158,7 +158,7 @@ class ImageTest extends UITestBase {
         assertEquals(4, retrieved.length);
     }
 
-    @Test
+    @FormTest
     void testGetRGBCached() {
         int[] rgb = new int[]{
                 0xFFFF0000, 0xFF00FF00,
@@ -172,7 +172,7 @@ class ImageTest extends UITestBase {
         assertSame(first, second, "Cached RGB should return same instance");
     }
 
-    @Test
+    @FormTest
     void testGetRGBWithProvidedArray() {
         int[] rgb = new int[]{
                 0xFFFF0000, 0xFF00FF00,
@@ -186,7 +186,7 @@ class ImageTest extends UITestBase {
         assertNotEquals(0, target[0]);
     }
 
-    @Test
+    @FormTest
     void testSubImage() {
         Image source = Image.createImage(100, 100, 0xFFFF0000);
         Image sub = source.subImage(10, 10, 20, 20, false);
@@ -196,7 +196,7 @@ class ImageTest extends UITestBase {
         assertEquals(20, sub.getHeight());
     }
 
-    @Test
+    @FormTest
     void testMirror() {
         Image source = Image.createImage(50, 50);
         Image mirrored = source.mirror();
@@ -206,7 +206,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, mirrored.getHeight());
     }
 
-    @Test
+    @FormTest
     void testRotate90Degrees() {
         Image source = Image.createImage(50, 100);
         Image rotated = source.rotate(90);
@@ -216,7 +216,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, rotated.getHeight());
     }
 
-    @Test
+    @FormTest
     void testRotate180Degrees() {
         Image source = Image.createImage(50, 100);
         Image rotated = source.rotate(180);
@@ -226,7 +226,7 @@ class ImageTest extends UITestBase {
         assertEquals(100, rotated.getHeight());
     }
 
-    @Test
+    @FormTest
     void testRotate270Degrees() {
         Image source = Image.createImage(50, 100);
         Image rotated = source.rotate(270);
@@ -236,7 +236,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, rotated.getHeight());
     }
 
-    @Test
+    @FormTest
     void testModifyAlpha() {
         Image source = Image.createImage(10, 10, 0xFFFF0000);
         Image modified = source.modifyAlpha((byte) 128);
@@ -246,7 +246,7 @@ class ImageTest extends UITestBase {
         assertEquals(10, modified.getHeight());
     }
 
-    @Test
+    @FormTest
     void testModifyAlphaWithTranslucency() {
         Image source = Image.createImage(10, 10, 0xFFFF0000);
         Image modified = source.modifyAlphaWithTranslucency((byte) 128);
@@ -256,7 +256,7 @@ class ImageTest extends UITestBase {
         assertEquals(10, modified.getHeight());
     }
 
-    @Test
+    @FormTest
     void testModifyAlphaWithRemoveColor() {
         Image source = Image.createImage(10, 10, 0xFFFF0000);
         Image modified = source.modifyAlpha((byte) 128, 0xFF0000FF);
@@ -266,7 +266,7 @@ class ImageTest extends UITestBase {
         assertEquals(10, modified.getHeight());
     }
 
-    @Test
+    @FormTest
     void testGetGraphicsOnMutableImage() {
         Image image = Image.createImage(50, 50);
         Graphics g = image.getGraphics();
@@ -274,7 +274,7 @@ class ImageTest extends UITestBase {
         assertNotNull(g);
     }
 
-    @Test
+    @FormTest
     void testScaleInPlace() {
         Image image = Image.createImage(100, 100);
         image.scale(50, 50);
@@ -283,7 +283,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, image.getHeight());
     }
 
-    @Test
+    @FormTest
     void testLockAndUnlock() {
         Image image = Image.createImage(10, 10);
 
@@ -296,20 +296,20 @@ class ImageTest extends UITestBase {
         assertFalse(image.isLocked());
     }
 
-    @Test
+    @FormTest
     void testIsAnimationDefaultsFalse() {
         Image image = Image.createImage(10, 10);
         assertFalse(image.isAnimation());
     }
 
-    @Test
+    @FormTest
     void testAlphaMutableImageSupported() {
         boolean supported = Image.isAlphaMutableImageSupported();
         // Just verify the method doesn't throw
         assertTrue(supported || !supported);
     }
 
-    @Test
+    @FormTest
     void testActionListenerAddAndRemove() {
         Image image = Image.createImage(10, 10);
         ActionListener listener = new ActionListener() {
@@ -322,7 +322,7 @@ class ImageTest extends UITestBase {
         image.removeActionListener(listener);
     }
 
-    @Test
+    @FormTest
     void testCreateMaskReturnsNonNull() {
         Image image = Image.createImage(10, 10);
         Object mask = image.createMask();
@@ -330,7 +330,7 @@ class ImageTest extends UITestBase {
         assertNotNull(mask);
     }
 
-    @Test
+    @FormTest
     void testApplyMask() {
         Image image = Image.createImage(50, 50);
         Object mask = image.createMask();
@@ -341,7 +341,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, masked.getHeight());
     }
 
-    @Test
+    @FormTest
     void testApplyMaskWithOffset() {
         Image image = Image.createImage(50, 50);
         Object mask = image.createMask();
@@ -352,7 +352,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, masked.getHeight());
     }
 
-    @Test
+    @FormTest
     void testApplyMaskAutoScale() {
         Image image = Image.createImage(50, 50);
         Object mask = image.createMask();
@@ -363,7 +363,7 @@ class ImageTest extends UITestBase {
         assertEquals(50, masked.getHeight());
     }
 
-    @Test
+    @FormTest
     void testScaledReturnsSameImageWhenSizeMatches() {
         Image image = Image.createImage(50, 50);
         Image scaled = image.scaled(50, 50);
@@ -371,7 +371,7 @@ class ImageTest extends UITestBase {
         assertSame(image, scaled, "Should return same instance when dimensions match");
     }
 
-    @Test
+    @FormTest
     void testIsOpaqueInitialState() {
         Image image = Image.createImage(10, 10);
         // Just verify the method works - actual opaqueness depends on implementation
@@ -379,52 +379,52 @@ class ImageTest extends UITestBase {
         assertTrue(opaque || !opaque);
     }
 
-    @Test
+    @FormTest
     void testImageNameSetAndGet() {
         Image image = Image.createImage(10, 10);
         image.setImageName("test-image");
         assertEquals("test-image", image.getImageName());
     }
 
-    @Test
+    @FormTest
     void testImageNameDefaultsNull() {
         Image image = Image.createImage(10, 10);
         assertNull(image.getImageName());
     }
 
-    @Test
+    @FormTest
     void testIsSVGDefaultsFalse() {
         Image image = Image.createImage(10, 10);
         assertFalse(image.isSVG());
     }
 
-    @Test
+    @FormTest
     void testGetSVGDocumentDefaultsNull() {
         Image image = Image.createImage(10, 10);
         assertNull(image.getSVGDocument());
     }
 
-    @Test
+    @FormTest
     void testDispose() {
         Image image = Image.createImage(10, 10);
         // Just verify it doesn't throw
         image.dispose();
     }
 
-    @Test
+    @FormTest
     void testRequiresDrawImage() {
         Image image = Image.createImage(10, 10);
         assertFalse(image.requiresDrawImage());
     }
 
-    @Test
+    @FormTest
     void testGetImage() {
         Image image = Image.createImage(10, 10);
         Object nativeImage = image.getImage();
         assertNotNull(nativeImage);
     }
 
-    @Test
+    @FormTest
     void testAsyncLock() {
         Image image = Image.createImage(10, 10);
         Image internal = Image.createImage(5, 5);
@@ -432,14 +432,14 @@ class ImageTest extends UITestBase {
         image.asyncLock(internal);
     }
 
-    @Test
+    @FormTest
     void testFireChangedEventWithoutListeners() {
         Image image = Image.createImage(10, 10);
         // Should not throw even without listeners
         image.fireChangedEvent();
     }
 
-    @Test
+    @FormTest
     void testFireChangedEventWithListener() {
         Image image = Image.createImage(10, 10);
         final boolean[] called = {false};

@@ -2,7 +2,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.plaf.UIManager;
-import org.junit.jupiter.api.Test;
+import com.codename1.junit.FormTest;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,14 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LabelTest extends UITestBase {
 
-    @Test
+    @FormTest
     void testTextPositionValidation() {
         Label label = new Label();
         label.setTextPosition(Label.RIGHT);
         assertThrows(IllegalArgumentException.class, () -> label.setTextPosition(999));
     }
 
-    @Test
+    @FormTest
     void testBadgeConfigurationCreatesStyleComponent() {
         Label label = new Label();
         assertNull(label.getBadgeStyleComponent());
@@ -31,7 +31,7 @@ class LabelTest extends UITestBase {
         assertEquals("CustomBadge", label.getBadgeStyleComponent().getUIID());
     }
 
-    @Test
+    @FormTest
     void testLocalizationCanBeDisabledPerLabel() {
         Map<String, String> bundle = new HashMap<String, String>();
         bundle.put("key", "Localized");
@@ -47,7 +47,7 @@ class LabelTest extends UITestBase {
         assertEquals("key", raw.getText());
     }
 
-    @Test
+    @FormTest
     void testMaskGapAndShiftSettingsPersist() {
         Label label = new Label();
         Object mask = new Object();
@@ -76,7 +76,7 @@ class LabelTest extends UITestBase {
 
     // New comprehensive tests
 
-    @Test
+    @FormTest
     void testDefaultConstructor() {
         Label label = new Label();
         assertNotNull(label);
@@ -84,21 +84,21 @@ class LabelTest extends UITestBase {
         assertNull(label.getIcon());
     }
 
-    @Test
+    @FormTest
     void testTextConstructor() {
         Label label = new Label("Hello");
         assertEquals("Hello", label.getText());
         assertNull(label.getIcon());
     }
 
-    @Test
+    @FormTest
     void testTextAndUIIDConstructor() {
         Label label = new Label("World", "CustomLabel");
         assertEquals("World", label.getText());
         assertEquals("CustomLabel", label.getUIID());
     }
 
-    @Test
+    @FormTest
     void testIconConstructor() {
         Image icon = Image.createImage(10, 10);
         Label label = new Label(icon);
@@ -106,7 +106,7 @@ class LabelTest extends UITestBase {
         assertEquals("", label.getText());
     }
 
-    @Test
+    @FormTest
     void testIconAndUIIDConstructor() {
         Image icon = Image.createImage(10, 10);
         Label label = new Label(icon, "IconLabel");
@@ -114,7 +114,7 @@ class LabelTest extends UITestBase {
         assertEquals("IconLabel", label.getUIID());
     }
 
-    @Test
+    @FormTest
     void testTextAndIconConstructor() {
         Image icon = Image.createImage(10, 10);
         Label label = new Label("Text", icon);
@@ -122,7 +122,7 @@ class LabelTest extends UITestBase {
         assertSame(icon, label.getIcon());
     }
 
-    @Test
+    @FormTest
     void testTextIconAndUIIDConstructor() {
         Image icon = Image.createImage(10, 10);
         Label label = new Label("Text", icon, "FullLabel");
@@ -131,21 +131,21 @@ class LabelTest extends UITestBase {
         assertEquals("FullLabel", label.getUIID());
     }
 
-    @Test
+    @FormTest
     void testSetText() {
         Label label = new Label();
         label.setText("New Text");
         assertEquals("New Text", label.getText());
     }
 
-    @Test
+    @FormTest
     void testSetTextNull() {
         Label label = new Label("Initial");
         label.setText(null);
         assertEquals("", label.getText());
     }
 
-    @Test
+    @FormTest
     void testSetIcon() {
         Label label = new Label();
         Image icon = Image.createImage(20, 20);
@@ -153,7 +153,7 @@ class LabelTest extends UITestBase {
         assertSame(icon, label.getIcon());
     }
 
-    @Test
+    @FormTest
     void testSetIconNull() {
         Image icon = Image.createImage(20, 20);
         Label label = new Label(icon);
@@ -161,7 +161,7 @@ class LabelTest extends UITestBase {
         assertNull(label.getIcon());
     }
 
-    @Test
+    @FormTest
     void testAlignmentDefault() {
         Label label = new Label();
         // Default alignment varies, just ensure it returns a valid value
@@ -169,7 +169,7 @@ class LabelTest extends UITestBase {
         assertTrue(align == Component.LEFT || align == Component.CENTER || align == Component.RIGHT);
     }
 
-    @Test
+    @FormTest
     void testSetAlignment() {
         Label label = new Label();
         label.setAlignment(Component.CENTER);
@@ -182,14 +182,14 @@ class LabelTest extends UITestBase {
         assertEquals(Component.RIGHT, label.getAlignment());
     }
 
-    @Test
+    @FormTest
     void testVerticalAlignmentDefault() {
         Label label = new Label();
         int valign = label.getVerticalAlignment();
         assertTrue(valign == Component.TOP || valign == Component.CENTER || valign == Component.BOTTOM);
     }
 
-    @Test
+    @FormTest
     void testSetVerticalAlignment() {
         Label label = new Label();
         label.setVerticalAlignment(Component.TOP);
@@ -202,14 +202,14 @@ class LabelTest extends UITestBase {
         assertEquals(Component.BOTTOM, label.getVerticalAlignment());
     }
 
-    @Test
+    @FormTest
     void testTextPositionDefault() {
         Label label = new Label();
         int pos = label.getTextPosition();
         assertTrue(pos == Label.LEFT || pos == Label.RIGHT || pos == Label.BOTTOM || pos == Label.TOP);
     }
 
-    @Test
+    @FormTest
     void testSetTextPosition() {
         Label label = new Label();
         label.setTextPosition(Label.LEFT);
@@ -225,13 +225,13 @@ class LabelTest extends UITestBase {
         assertEquals(Label.BOTTOM, label.getTextPosition());
     }
 
-    @Test
+    @FormTest
     void testGapDefault() {
         Label label = new Label();
         assertEquals(Label.getDefaultGap(), label.getGap());
     }
 
-    @Test
+    @FormTest
     void testSetGap() {
         Label label = new Label();
         label.setGap(10);
@@ -241,7 +241,7 @@ class LabelTest extends UITestBase {
         assertEquals(0, label.getGap());
     }
 
-    @Test
+    @FormTest
     void testDefaultGapStatic() {
         int original = Label.getDefaultGap();
 
@@ -255,7 +255,7 @@ class LabelTest extends UITestBase {
         Label.setDefaultGap(original);
     }
 
-    @Test
+    @FormTest
     void testDefaultTickerEnabled() {
         boolean original = Label.isDefaultTickerEnabled();
 
@@ -269,7 +269,7 @@ class LabelTest extends UITestBase {
         Label.setDefaultTickerEnabled(original);
     }
 
-    @Test
+    @FormTest
     void testBadgeTextNull() {
         Label label = new Label();
         label.setBadgeText("Badge");
@@ -279,7 +279,7 @@ class LabelTest extends UITestBase {
         assertNull(label.getBadgeText());
     }
 
-    @Test
+    @FormTest
     void testBadgeUIID() {
         Label label = new Label();
         label.setBadgeText("5");
@@ -290,7 +290,7 @@ class LabelTest extends UITestBase {
         assertEquals("NotificationBadge", badge.getUIID());
     }
 
-    @Test
+    @FormTest
     void testIconStyleComponent() {
         Label label = new Label();
         Image icon = Image.createImage(10, 10);
@@ -300,14 +300,14 @@ class LabelTest extends UITestBase {
         assertNotNull(iconStyle);
     }
 
-    @Test
+    @FormTest
     void testMaterialIcon() {
         Label label = new Label();
         label.setMaterialIcon('A');
         assertEquals('A', label.getMaterialIcon());
     }
 
-    @Test
+    @FormTest
     void testMaterialIconWithSize() {
         Label label = new Label();
         label.setMaterialIcon('B', 5.0f);
@@ -315,14 +315,14 @@ class LabelTest extends UITestBase {
         assertEquals(5.0f, label.getMaterialIconSize(), 0.001f);
     }
 
-    @Test
+    @FormTest
     void testFontIcon() {
         Label label = new Label();
         label.setFontIcon('X');
         assertEquals('X', label.getFontIcon());
     }
 
-    @Test
+    @FormTest
     void testFontIconWithFont() {
         Label label = new Label();
         Font font = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
@@ -331,7 +331,7 @@ class LabelTest extends UITestBase {
         assertSame(font, label.getIconFont());
     }
 
-    @Test
+    @FormTest
     void testFontIconWithFontAndSize() {
         Label label = new Label();
         Font font = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
@@ -340,7 +340,7 @@ class LabelTest extends UITestBase {
         assertEquals(3.5f, label.getFontIconSize(), 0.001f);
     }
 
-    @Test
+    @FormTest
     void testGetIconFont() {
         Label label = new Label();
         Font font = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
@@ -348,7 +348,7 @@ class LabelTest extends UITestBase {
         assertSame(font, label.getIconFont());
     }
 
-    @Test
+    @FormTest
     void testShiftText() {
         Label label = new Label();
         label.setShiftText(5);
@@ -358,42 +358,42 @@ class LabelTest extends UITestBase {
         assertEquals(-3, label.getShiftText());
     }
 
-    @Test
+    @FormTest
     void testAutoSizeDefault() {
         Label label = new Label();
         assertTrue(label.getMaxAutoSize() > 0);
         assertTrue(label.getMinAutoSize() > 0);
     }
 
-    @Test
+    @FormTest
     void testSetMaxAutoSize() {
         Label label = new Label();
         label.setMaxAutoSize(10.0f);
         assertEquals(10.0f, label.getMaxAutoSize(), 0.001f);
     }
 
-    @Test
+    @FormTest
     void testSetMinAutoSize() {
         Label label = new Label();
         label.setMinAutoSize(2.0f);
         assertEquals(2.0f, label.getMinAutoSize(), 0.001f);
     }
 
-    @Test
+    @FormTest
     void testGetBaseline() {
         Label label = new Label("Test");
         int baseline = label.getBaseline(100, 50);
         assertTrue(baseline >= 0);
     }
 
-    @Test
+    @FormTest
     void testGetBaselineResizeBehavior() {
         Label label = new Label();
         int behavior = label.getBaselineResizeBehavior();
         assertTrue(behavior >= Component.BRB_CONSTANT_ASCENT);
     }
 
-    @Test
+    @FormTest
     void testSetUIIDUpdatesStyles() {
         Label label = new Label();
         String originalUIID = label.getUIID();
@@ -401,7 +401,7 @@ class LabelTest extends UITestBase {
         assertEquals("CustomLabelStyle", label.getUIID());
     }
 
-    @Test
+    @FormTest
     void testRefreshTheme() {
         Label label = new Label("Test");
         // Just verify it doesn't throw
@@ -409,7 +409,7 @@ class LabelTest extends UITestBase {
         label.refreshTheme(true);
     }
 
-    @Test
+    @FormTest
     void testEndsWith3Points() {
         Label label = new Label();
         label.setEndsWith3Points(true);
@@ -419,7 +419,7 @@ class LabelTest extends UITestBase {
         assertFalse(label.isEndsWith3Points());
     }
 
-    @Test
+    @FormTest
     void testShowEvenIfBlank() {
         Label label = new Label();
         label.setShowEvenIfBlank(true);
@@ -429,7 +429,7 @@ class LabelTest extends UITestBase {
         assertFalse(label.isShowEvenIfBlank());
     }
 
-    @Test
+    @FormTest
     void testTickerEnabled() {
         Label label = new Label();
         label.setTickerEnabled(true);
@@ -439,7 +439,7 @@ class LabelTest extends UITestBase {
         assertFalse(label.isTickerEnabled());
     }
 
-    @Test
+    @FormTest
     void testShouldLocalize() {
         Label label = new Label();
         label.setShouldLocalize(true);
@@ -449,7 +449,7 @@ class LabelTest extends UITestBase {
         assertFalse(label.shouldLocalize());
     }
 
-    @Test
+    @FormTest
     void testMaskName() {
         Label label = new Label();
         label.setMaskName("circle");
@@ -459,7 +459,7 @@ class LabelTest extends UITestBase {
         assertEquals("square", label.getMaskName());
     }
 
-    @Test
+    @FormTest
     void testMask() {
         Label label = new Label();
         Object mask1 = new Object();
@@ -472,7 +472,7 @@ class LabelTest extends UITestBase {
         assertSame(mask2, label.getMask());
     }
 
-    @Test
+    @FormTest
     void testShiftMillimeters() {
         Label label = new Label();
         label.setShiftMillimeters(3);
@@ -482,7 +482,7 @@ class LabelTest extends UITestBase {
         assertEquals(7, label.getShiftMillimeters());
     }
 
-    @Test
+    @FormTest
     void testShiftMillimetersFloat() {
         Label label = new Label();
         label.setShiftMillimeters(2.5f);
@@ -492,7 +492,7 @@ class LabelTest extends UITestBase {
         assertEquals(4.7f, label.getShiftMillimetersF(), 0.0001f);
     }
 
-    @Test
+    @FormTest
     void testTextAndIconTogether() {
         Image icon = Image.createImage(15, 15);
         Label label = new Label("Combined", icon);
@@ -510,7 +510,7 @@ class LabelTest extends UITestBase {
         assertSame(newIcon, label.getIcon());
     }
 
-    @Test
+    @FormTest
     void testTextPositionAffectsLayout() {
         Image icon = Image.createImage(10, 10);
         Label label = new Label("Text", icon);
@@ -524,7 +524,7 @@ class LabelTest extends UITestBase {
         assertEquals(Label.BOTTOM, label.getTextPosition());
     }
 
-    @Test
+    @FormTest
     void testPreferredSizeCalculation() {
         Label label = new Label("Test Label");
         int prefW = label.getPreferredW();
@@ -534,7 +534,7 @@ class LabelTest extends UITestBase {
         assertTrue(prefH > 0);
     }
 
-    @Test
+    @FormTest
     void testPreferredSizeWithIcon() {
         Image icon = Image.createImage(30, 30);
         Label label = new Label("Text", icon);
@@ -546,7 +546,7 @@ class LabelTest extends UITestBase {
         assertTrue(prefH > 0);
     }
 
-    @Test
+    @FormTest
     void testEmptyLabelSize() {
         Label label = new Label();
         // Empty label should still have some size

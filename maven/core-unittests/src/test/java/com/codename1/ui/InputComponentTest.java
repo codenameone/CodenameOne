@@ -3,7 +3,7 @@ package com.codename1.ui;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
-import org.junit.jupiter.api.Test;
+import com.codename1.junit.FormTest;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,14 +25,14 @@ class InputComponentTest extends UITestBase {
         }
     }
 
-    @Test
+    @FormTest
     void testInputComponentCreation() {
         TestInputComponent input = new TestInputComponent();
         assertNotNull(input);
         assertNotNull(input.getEditor());
     }
 
-    @Test
+    @FormTest
     void testLabelText() {
         TestInputComponent input = new TestInputComponent();
         input.label("Username");
@@ -42,7 +42,7 @@ class InputComponentTest extends UITestBase {
         assertEquals("Username", label.getText());
     }
 
-    @Test
+    @FormTest
     void testLabelChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.label("Email");
@@ -50,7 +50,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "label() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testErrorMessage() {
         TestInputComponent input = new TestInputComponent();
         input.errorMessage("Invalid input");
@@ -61,7 +61,7 @@ class InputComponentTest extends UITestBase {
         assertEquals("Invalid input", ((TextHolder) errorMsg).getText());
     }
 
-    @Test
+    @FormTest
     void testErrorMessageChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.errorMessage("Error");
@@ -69,7 +69,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "errorMessage() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testClearErrorMessage() {
         TestInputComponent input = new TestInputComponent();
         input.errorMessage("Error");
@@ -82,7 +82,7 @@ class InputComponentTest extends UITestBase {
         assertNull(((TextHolder) errorMsg).getText());
     }
 
-    @Test
+    @FormTest
     void testDescriptionMessage() {
         TestInputComponent input = new TestInputComponent();
         input.descriptionMessage("Enter your username");
@@ -92,7 +92,7 @@ class InputComponentTest extends UITestBase {
         assertEquals("Enter your username", descMsg.getText());
     }
 
-    @Test
+    @FormTest
     void testDescriptionMessageChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.descriptionMessage("Description");
@@ -100,7 +100,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "descriptionMessage() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testOnTopModeDefault() {
         TestInputComponent input = new TestInputComponent();
         // Default may vary, just verify it returns a value
@@ -108,7 +108,7 @@ class InputComponentTest extends UITestBase {
         assertTrue(mode || !mode);
     }
 
-    @Test
+    @FormTest
     void testOnTopModeSet() {
         TestInputComponent input = new TestInputComponent();
         input.onTopMode(true);
@@ -119,7 +119,7 @@ class InputComponentTest extends UITestBase {
         assertFalse(input.isOnTopMode());
     }
 
-    @Test
+    @FormTest
     void testOnTopModeChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.onTopMode(true);
@@ -127,7 +127,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "onTopMode() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testActionText() {
         TestInputComponent input = new TestInputComponent();
         input.actionText("Submit");
@@ -137,7 +137,7 @@ class InputComponentTest extends UITestBase {
         assertNotNull(input.getAction());
     }
 
-    @Test
+    @FormTest
     void testActionTextChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.actionText("OK");
@@ -145,7 +145,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "actionText() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testActionIcon() {
         TestInputComponent input = new TestInputComponent();
         input.action('X');
@@ -154,7 +154,7 @@ class InputComponentTest extends UITestBase {
         assertNotNull(input.getAction());
     }
 
-    @Test
+    @FormTest
     void testActionIconChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.action('X');
@@ -162,7 +162,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "action() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testActionClick() {
         TestInputComponent input = new TestInputComponent();
         final boolean[] clicked = {false};
@@ -186,7 +186,7 @@ class InputComponentTest extends UITestBase {
         assertTrue(clicked[0], "Action listener should be invoked");
     }
 
-    @Test
+    @FormTest
     void testActionClickChaining() {
         TestInputComponent input = new TestInputComponent();
         ActionListener listener = new ActionListener() {
@@ -199,7 +199,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "actionClick() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testActionUIID() {
         TestInputComponent input = new TestInputComponent();
         input.actionText("Action");
@@ -210,7 +210,7 @@ class InputComponentTest extends UITestBase {
         assertEquals("CustomActionButton", input.getAction().getUIID());
     }
 
-    @Test
+    @FormTest
     void testActionUIIDChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.actionUIID("Custom");
@@ -218,13 +218,13 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "actionUIID() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testActionAsButtonDefault() {
         TestInputComponent input = new TestInputComponent();
         assertFalse(input.isActionAsButton());
     }
 
-    @Test
+    @FormTest
     void testActionAsButtonSet() {
         TestInputComponent input = new TestInputComponent();
         input.actionAsButton(true);
@@ -235,7 +235,7 @@ class InputComponentTest extends UITestBase {
         assertFalse(input.isActionAsButton());
     }
 
-    @Test
+    @FormTest
     void testActionAsButtonChaining() {
         TestInputComponent input = new TestInputComponent();
         InputComponent result = input.actionAsButton(true);
@@ -243,7 +243,7 @@ class InputComponentTest extends UITestBase {
         assertSame(input, result, "actionAsButton() should return this for chaining");
     }
 
-    @Test
+    @FormTest
     void testGroupComponents() {
         TestInputComponent input1 = new TestInputComponent();
         TestInputComponent input2 = new TestInputComponent();
@@ -271,7 +271,7 @@ class InputComponentTest extends UITestBase {
         assertEquals(width2, width3);
     }
 
-    @Test
+    @FormTest
     void testGroupOnlyAffectsNonOnTopMode() {
         TestInputComponent input1 = new TestInputComponent();
         TestInputComponent input2 = new TestInputComponent();
@@ -286,7 +286,7 @@ class InputComponentTest extends UITestBase {
         InputComponent.group(input1, input2);
     }
 
-    @Test
+    @FormTest
     void testMultiLineErrorMessageStaticSetter() {
         boolean original = InputComponent.isMultiLineErrorMessage();
 
@@ -300,13 +300,13 @@ class InputComponentTest extends UITestBase {
         InputComponent.setMultiLineErrorMessage(original);
     }
 
-    @Test
+    @FormTest
     void testGetActionReturnsNullWhenNoActionSet() {
         TestInputComponent input = new TestInputComponent();
         assertNull(input.getAction());
     }
 
-    @Test
+    @FormTest
     void testConstructUICreatesLayout() {
         TestInputComponent input = new TestInputComponent();
         input.label("Test");
@@ -317,7 +317,7 @@ class InputComponentTest extends UITestBase {
         assertTrue(input.getComponentCount() > 0, "constructUI should add components");
     }
 
-    @Test
+    @FormTest
     void testConstructUIOnlyOnce() {
         TestInputComponent input = new TestInputComponent();
         input.label("Test");
@@ -330,7 +330,7 @@ class InputComponentTest extends UITestBase {
                 "constructUI should not add components if already constructed");
     }
 
-    @Test
+    @FormTest
     void testOnTopModeLayoutDifference() {
         TestInputComponent onTop = new TestInputComponent();
         onTop.onTopMode(true);
@@ -347,7 +347,7 @@ class InputComponentTest extends UITestBase {
         assertTrue(side.getComponentCount() > 0);
     }
 
-    @Test
+    @FormTest
     void testEditorHasLabelForComponent() {
         TestInputComponent input = new TestInputComponent();
         input.label("Username");
@@ -357,13 +357,13 @@ class InputComponentTest extends UITestBase {
         assertSame(input.getLabel(), editor.getLabelForComponent());
     }
 
-    @Test
+    @FormTest
     void testUIIDDefaultsToTextComponent() {
         TestInputComponent input = new TestInputComponent();
         assertEquals("TextComponent", input.getUIID());
     }
 
-    @Test
+    @FormTest
     void testLabelIsFocusable() {
         TestInputComponent input = new TestInputComponent();
         input.label("Test");
@@ -372,7 +372,7 @@ class InputComponentTest extends UITestBase {
         assertFalse(input.getLabel().isFocusable());
     }
 
-    @Test
+    @FormTest
     void testChainedConfiguration() {
         TestInputComponent input = new TestInputComponent();
 
@@ -394,7 +394,7 @@ class InputComponentTest extends UITestBase {
         assertEquals("Verify", input.getActionText());
     }
 
-    @Test
+    @FormTest
     void testCalcPreferredSizeBeforeConstruction() {
         TestInputComponent input = new TestInputComponent();
         input.label("Test");
@@ -403,7 +403,7 @@ class InputComponentTest extends UITestBase {
         assertNotNull(input.getPreferredSize());
     }
 
-    @Test
+    @FormTest
     void testCalcPreferredSizeAfterConstruction() {
         TestInputComponent input = new TestInputComponent();
         input.label("Test");
@@ -414,7 +414,7 @@ class InputComponentTest extends UITestBase {
         assertTrue(input.getPreferredH() > 0);
     }
 
-    @Test
+    @FormTest
     void testActionButtonClearedWithNullText() {
         TestInputComponent input = new TestInputComponent();
         input.actionText("Submit");
