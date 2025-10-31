@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -8,7 +9,6 @@ import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Locale;
 
 final class Cn1ssDeviceRunnerHelper {
     private static final int CHUNK_SIZE = 2000;
@@ -20,11 +20,8 @@ final class Cn1ssDeviceRunnerHelper {
     }
 
     static void waitForMillis(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-        }
+        int duration = (int) Math.max(1, Math.min(Integer.MAX_VALUE, millis));
+        Util.sleep(duration);
     }
 
     static boolean emitCurrentFormScreenshot(String testName) {
@@ -110,7 +107,7 @@ final class Cn1ssDeviceRunnerHelper {
         for (int pos = 0; pos < base64.length(); pos += CHUNK_SIZE) {
             int end = Math.min(pos + CHUNK_SIZE, base64.length());
             String chunk = base64.substring(pos, end);
-            println(prefix + ":" + safeName + ":" + String.format(Locale.US, "%06d", pos) + ":" + chunk);
+            println(prefix + ":" + safeName + ":" + zeroPad(pos, 6) + ":" + chunk);
             count++;
         }
         println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + base64.length());
@@ -123,6 +120,19 @@ final class Cn1ssDeviceRunnerHelper {
             return "default";
         }
         return testName.replaceAll("[^A-Za-z0-9_.-]", "_");
+    }
+
+    private static String zeroPad(int value, int width) {
+        String text = Integer.toString(value);
+        if (text.length() >= width) {
+            return text;
+        }
+        StringBuilder builder = new StringBuilder(width);
+        for (int i = text.length(); i < width; i++) {
+            builder.append('0');
+        }
+        builder.append(text);
+        return builder.toString();
     }
 
     private static void println(String line) {

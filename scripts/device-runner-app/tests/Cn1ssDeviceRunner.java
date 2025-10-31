@@ -20,12 +20,14 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     @Override
     protected void startApplicationInstance() {
-        Display.getInstance().callSeriallyAndWait(() -> {
-            Form current = Display.getInstance().getCurrent();
-            if (current != null) {
-                current.revalidate();
-            } else {
-                new Form().show();
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    current.revalidate();
+                } else {
+                    new Form().show();
+                }
             }
         });
         Cn1ssDeviceRunnerHelper.waitForMillis(200);
@@ -33,11 +35,13 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     @Override
     protected void stopApplicationInstance() {
-        Display.getInstance().callSeriallyAndWait(() -> {
-            Form current = Display.getInstance().getCurrent();
-            if (current != null) {
-                current.removeAll();
-                current.revalidate();
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    current.removeAll();
+                    current.revalidate();
+                }
             }
         });
         Cn1ssDeviceRunnerHelper.waitForMillis(200);
