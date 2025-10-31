@@ -142,7 +142,8 @@ class LabelTest extends UITestBase {
     void testSetTextNull() {
         Label label = new Label("Initial");
         label.setText(null);
-        assertEquals("", label.getText());
+        // setText(null) preserves null, doesn't convert to empty string
+        assertNull(label.getText());
     }
 
     @FormTest
@@ -361,8 +362,9 @@ class LabelTest extends UITestBase {
     @FormTest
     void testAutoSizeDefault() {
         Label label = new Label();
-        assertTrue(label.getMaxAutoSize() > 0);
-        assertTrue(label.getMinAutoSize() > 0);
+        // Default values are -1 (not set)
+        assertEquals(-1.0f, label.getMaxAutoSize(), 0.001f);
+        assertEquals(-1.0f, label.getMinAutoSize(), 0.001f);
     }
 
     @FormTest
