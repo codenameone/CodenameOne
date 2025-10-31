@@ -192,15 +192,15 @@ DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 
 # Run only the UI test bundle
-UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodnameOneUITests}"
+UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
   -skip-testing:HelloCodenameOneTests
 )
 
 set -o pipefail
-if ! java scripts/java/BuildAndRun.java ios | tee "$TEST_LOG"; then
-  ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
+if ! "$JAVA17_HOME/bin/java" -cp scripts/java BuildAndRun ios | tee "$TEST_LOG"; then
+  ri_log "STAGE:TEST_FAILED -> See $TEST_LOG"
   exit 10
 fi
 set +o pipefail

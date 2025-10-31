@@ -74,8 +74,8 @@ cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 set -o pipefail
 ra_log "Running instrumentation tests (stdout -> $TEST_LOG; stderr -> terminal)"
 (
-  java scripts/java/BuildAndRun.java android | tee "$TEST_LOG"
-) || { ra_log "STAGE:GRADLE_TEST_FAILED (see $TEST_LOG)"; exit 10; }
+  "$JAVA17_HOME/bin/java" -cp scripts/java BuildAndRun android | tee "$TEST_LOG"
+) || { ra_log "STAGE:TEST_FAILED (see $TEST_LOG)"; exit 10; }
 
 echo
 ra_log "==== Begin connectedAndroidTest.log (tail -n 200) ===="

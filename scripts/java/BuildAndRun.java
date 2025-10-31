@@ -12,21 +12,26 @@ import java.util.stream.Stream;
 
 public class BuildAndRun {
     public static void main(String[] args) throws IOException, InterruptedException {
+        System.out.println("BuildAndRun started");
         String platform = args[0];
         Path projectDir = Paths.get("scripts/DeviceRunnerTest");
 
+        System.out.println("Building for platform: " + platform);
         ProcessBuilder mvn = new ProcessBuilder(
                 "mvn",
-                "-e",
+                "-f",
+                projectDir.resolve("pom.xml").toString(),
                 "com.codenameone:codenameone-maven-plugin:build",
                 "-Dcodename1.platform=" + platform,
                 "-Dcodename1.buildTarget=" + platform + "-device"
         );
-        mvn.directory(projectDir.toFile());
+
         mvn.inheritIO();
         if (mvn.start().waitFor() != 0) {
+            System.err.println("Build failed");
             System.exit(1);
         }
+        System.out.println("Build successful");
 
         if ("android".equals(platform)) {
             runAndroid();
@@ -36,12 +41,16 @@ public class BuildAndRun {
     }
 
     private static void runAndroid() throws IOException, InterruptedException {
+        System.out.println("Running Android test");
         Path apk = findApk(Paths.get("scripts/DeviceRunnerTest/target/android"));
+        System.out.println("Found apk: " + apk);
         ProcessBuilder adbInstall = new ProcessBuilder("adb", "install", "-r", apk.toString());
         adbInstall.inheritIO();
         if (adbInstall.start().waitFor() != 0) {
+            System.err.println("adb install failed");
             System.exit(1);
         }
+        System.out.println("adb install successful");
 
         new ProcessBuilder("adb", "logcat", "-c").start().waitFor();
 
@@ -62,16 +71,20 @@ public class BuildAndRun {
             }
         });
 
+        System.out.println("Starting app");
         ProcessBuilder amStart = new ProcessBuilder("adb", "shell", "am", "start", "-n", "com.mycompany.app/com.mycompany.app.DeviceRunnerTestStub");
         amStart.inheritIO();
         amStart.start().waitFor();
+        System.out.println("App started");
 
         executor.shutdown();
         executor.awaitTermination(1, TimeUnit.MINUTES);
     }
 
     private static void runIOS() throws IOException, InterruptedException {
+        System.out.println("Running iOS test");
         Path xcodeProject = Paths.get("scripts/DeviceRunnerTest/target/ios/DeviceRunnerTest.xcodeproj");
+        System.out.println("Found Xcode project: " + xcodeProject);
         new ProcessBuilder("xcrun", "simctl", "boot", "iPhone 15 Pro").inheritIO().start().waitFor();
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -91,7 +104,9 @@ public class BuildAndRun {
             }
         });
 
+        System.out.println("Running xcodebuild");
         new ProcessBuilder("xcodebuild", "-project", xcodeProject.toString(), "-scheme", "DeviceRunnerTest", "-destination", "platform=iOS Simulator,name=iPhone 15 Pro", "test").inheritIO().start().waitFor();
+        System.out.println("xcodebuild finished");
 
         executor.shutdown();
         executor.awaitTermination(1, TimeUnit.MINUTES);
