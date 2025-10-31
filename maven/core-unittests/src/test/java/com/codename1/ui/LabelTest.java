@@ -443,10 +443,10 @@ class LabelTest extends UITestBase {
     void testShouldLocalize() {
         Label label = new Label();
         label.setShouldLocalize(true);
-        assertTrue(label.shouldLocalize());
+        assertTrue(label.isShouldLocalize());
 
         label.setShouldLocalize(false);
-        assertFalse(label.shouldLocalize());
+        assertFalse(label.isShouldLocalize());
     }
 
     @FormTest
