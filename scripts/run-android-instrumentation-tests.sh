@@ -74,11 +74,7 @@ cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 set -o pipefail
 ra_log "Running instrumentation tests (stdout -> $TEST_LOG; stderr -> terminal)"
 (
-  cd "$GRADLE_PROJECT_DIR"
-  ORIG_JAVA_HOME="${JAVA_HOME:-}"
-  export JAVA_HOME="${JAVA17_HOME:?JAVA17_HOME not set}"
-  ./gradlew --no-daemon --console=plain connectedDebugAndroidTest | tee "$TEST_LOG"
-  export JAVA_HOME="$ORIG_JAVA_HOME"
+  java scripts/java/BuildAndRun.java android | tee "$TEST_LOG"
 ) || { ra_log "STAGE:GRADLE_TEST_FAILED (see $TEST_LOG)"; exit 10; }
 
 echo

@@ -192,25 +192,14 @@ DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 
 # Run only the UI test bundle
-UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
+UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodnameOneUITests}"
 XCODE_TEST_FILTERS=(
   -only-testing:"${UI_TEST_TARGET}"
   -skip-testing:HelloCodenameOneTests
 )
 
 set -o pipefail
-if ! xcodebuild \
-  -workspace "$WORKSPACE_PATH" \
-  -scheme "$SCHEME" \
-  -sdk iphonesimulator \
-  -configuration Debug \
-  -destination "$SIM_DESTINATION" \
-  -derivedDataPath "$DERIVED_DATA_DIR" \
-  -resultBundlePath "$RESULT_BUNDLE" \
-  "${XCODE_TEST_FILTERS[@]}" \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-  GENERATE_INFOPLIST_FILE=YES \
-  test | tee "$TEST_LOG"; then
+if ! java scripts/java/BuildAndRun.java ios | tee "$TEST_LOG"; then
   ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
   exit 10
 fi
