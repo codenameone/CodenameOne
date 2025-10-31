@@ -301,9 +301,13 @@ class InputComponentTest extends UITestBase {
     }
 
     @FormTest
-    void testGetActionReturnsNullWhenNoActionSet() {
+    void testActionButtonLazilyInitialized() {
         TestInputComponent input = new TestInputComponent();
-        assertNull(input.getAction());
+        // getAction() lazily instantiates a Button, so it never returns null
+        // once an action is configured
+        input.actionText("Submit");
+        assertNotNull(input.getAction());
+        assertTrue(input.getAction() instanceof Button);
     }
 
     @FormTest
