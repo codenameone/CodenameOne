@@ -1,5 +1,6 @@
 package com.codename1.ui.layouts;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -89,12 +90,12 @@ class CoordinateLayoutTest extends UITestBase {
         assertTrue(preferredSize.getHeight() >= 150 + button2.getPreferredH());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithoutDimensions() {
         // Layout with default constructor (no scaling)
         CoordinateLayout layout = new CoordinateLayout();
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Button button = new Button("Button");
         button.setX(50);
@@ -109,12 +110,12 @@ class CoordinateLayoutTest extends UITestBase {
         assertEquals(100, button.getY());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithDimensions() {
         // Layout with specified dimensions (scaling enabled)
         CoordinateLayout layout = new CoordinateLayout(400, 300);
         Container container = new Container(layout);
-        container.setSize(800, 600);
+        container.setSize(new Dimension(800, 600));
 
         Button button = new Button("Button");
         button.setX(100);
@@ -130,11 +131,11 @@ class CoordinateLayoutTest extends UITestBase {
         assertEquals(150, button.getY());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerSetsPreferredSize() {
         CoordinateLayout layout = new CoordinateLayout(400, 300);
         Container container = new Container(layout);
-        container.setSize(400, 300);
+        container.setSize(new Dimension(400, 300));
 
         Button button = new Button("Button");
         button.setX(50);
@@ -149,21 +150,21 @@ class CoordinateLayoutTest extends UITestBase {
         assertEquals(button.getPreferredH(), button.getHeight());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithEmptyContainer() {
         CoordinateLayout layout = new CoordinateLayout(400, 300);
         Container container = new Container(layout);
-        container.setSize(400, 300);
+        container.setSize(new Dimension(400, 300));
 
         // Should not throw exception with empty container
         assertDoesNotThrow(() -> container.layoutContainer());
     }
 
-    @Test
+    @FormTest
     void testMultipleComponentsAtDifferentPositions() {
         CoordinateLayout layout = new CoordinateLayout(500, 500);
         Container container = new Container(layout);
-        container.setSize(500, 500);
+        container.setSize(new Dimension(500, 500));
 
         Button button1 = new Button("1");
         button1.setX(10);
@@ -215,11 +216,11 @@ class CoordinateLayoutTest extends UITestBase {
         assertNotNull(preferredSize);
     }
 
-    @Test
+    @FormTest
     void testScalingDownFromLargerDimensions() {
         CoordinateLayout layout = new CoordinateLayout(1000, 1000);
         Container container = new Container(layout);
-        container.setSize(500, 500);
+        container.setSize(new Dimension(500, 500));
 
         Button button = new Button("Button");
         button.setX(400);
@@ -234,11 +235,11 @@ class CoordinateLayoutTest extends UITestBase {
         assertEquals(200, button.getY());
     }
 
-    @Test
+    @FormTest
     void testScalingUpFromSmallerDimensions() {
         CoordinateLayout layout = new CoordinateLayout(200, 200);
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Button button = new Button("Button");
         button.setX(50);
@@ -271,11 +272,11 @@ class CoordinateLayoutTest extends UITestBase {
         assertTrue(preferredSize.getHeight() >= button.getPreferredH());
     }
 
-    @Test
+    @FormTest
     void testNonUniformScaling() {
         CoordinateLayout layout = new CoordinateLayout(400, 200);
         Container container = new Container(layout);
-        container.setSize(800, 600);
+        container.setSize(new Dimension(800, 600));
 
         Button button = new Button("Button");
         button.setX(200);

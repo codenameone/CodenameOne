@@ -1,5 +1,6 @@
 package com.codename1.ui.layouts;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -162,7 +163,7 @@ class GridLayoutTest extends UITestBase {
     void testPreferredSizeWithEmptyContainer() {
         GridLayout layout = new GridLayout(2, 2);
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         Dimension preferredSize = layout.getPreferredSize(container);
         assertNotNull(preferredSize);
@@ -174,7 +175,7 @@ class GridLayoutTest extends UITestBase {
     void testPreferredSizeWithComponents() {
         GridLayout layout = new GridLayout(2, 2);
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -188,11 +189,11 @@ class GridLayoutTest extends UITestBase {
         assertTrue(preferredSize.getHeight() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainer2x2Grid() {
         GridLayout layout = new GridLayout(2, 2);
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Button button1 = new Button("1");
         Button button2 = new Button("2");
@@ -225,7 +226,7 @@ class GridLayoutTest extends UITestBase {
     void testLayoutContainerWithExtraComponents() {
         GridLayout layout = new GridLayout(2, 2);
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         // Add 5 components to a 2x2 grid
         for (int i = 0; i < 5; i++) {
@@ -240,7 +241,7 @@ class GridLayoutTest extends UITestBase {
     void testLayoutContainerWithFewerComponents() {
         GridLayout layout = new GridLayout(3, 3);
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         // Add only 5 components to a 3x3 grid
         for (int i = 0; i < 5; i++) {
@@ -251,11 +252,11 @@ class GridLayoutTest extends UITestBase {
         assertDoesNotThrow(() -> container.layoutContainer());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithSingleColumn() {
         GridLayout layout = new GridLayout(1);
         Container container = new Container(layout);
-        container.setSize(200, 400);
+        container.setSize(new Dimension(200, 400));
 
         Button button1 = new Button("1");
         Button button2 = new Button("2");
@@ -269,11 +270,11 @@ class GridLayoutTest extends UITestBase {
         assertTrue(button1.getY() < button2.getY());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithEmptyContainer() {
         GridLayout layout = new GridLayout(2, 2);
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         // Should not throw exception with empty container
         assertDoesNotThrow(() -> container.layoutContainer());
@@ -283,7 +284,7 @@ class GridLayoutTest extends UITestBase {
     void testAutoFitLayoutAdjustsColumns() {
         GridLayout layout = GridLayout.autoFit();
         Container container = new Container(layout);
-        container.setSize(400, 200);
+        container.setSize(new Dimension(400, 200));
 
         // Add components with known preferred width
         for (int i = 0; i < 6; i++) {
@@ -303,7 +304,7 @@ class GridLayoutTest extends UITestBase {
         layout.setFillLastRow(true);
 
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         // Add 4 components (less than 2*3)
         for (int i = 0; i < 4; i++) {
@@ -320,7 +321,7 @@ class GridLayoutTest extends UITestBase {
         layout.setHideZeroSized(true);
 
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Button button1 = new Button("1");
         Button button2 = new Button("2");
@@ -371,11 +372,11 @@ class GridLayoutTest extends UITestBase {
         assertFalse(layout.obscuresPotential(container));
     }
 
-    @Test
+    @FormTest
     void test1x1Grid() {
         GridLayout layout = new GridLayout(1, 1);
         Container container = new Container(layout);
-        container.setSize(100, 100);
+        container.setSize(new Dimension(100, 100));
 
         Button button = new Button("Button");
         container.add(button);
@@ -391,7 +392,7 @@ class GridLayoutTest extends UITestBase {
     void test3x3GridWith9Components() {
         GridLayout layout = new GridLayout(3, 3);
         Container container = new Container(layout);
-        container.setSize(300, 300);
+        container.setSize(new Dimension(300, 300));
 
         for (int i = 0; i < 9; i++) {
             container.add(new Button("" + i));
@@ -409,11 +410,11 @@ class GridLayoutTest extends UITestBase {
         }
     }
 
-    @Test
+    @FormTest
     void testGridLayoutWithVariedComponentSizes() {
         GridLayout layout = new GridLayout(2, 2);
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         // Add components with different preferred sizes
         Button smallButton = new Button("S");

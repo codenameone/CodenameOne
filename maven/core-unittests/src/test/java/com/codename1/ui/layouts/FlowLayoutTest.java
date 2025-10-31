@@ -1,5 +1,6 @@
 package com.codename1.ui.layouts;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -305,7 +306,7 @@ class FlowLayoutTest extends UITestBase {
     void testPreferredSizeWithEmptyContainer() {
         FlowLayout layout = new FlowLayout();
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         Dimension preferredSize = layout.getPreferredSize(container);
         assertNotNull(preferredSize);
@@ -317,7 +318,7 @@ class FlowLayoutTest extends UITestBase {
     void testPreferredSizeWithComponents() {
         FlowLayout layout = new FlowLayout();
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -331,11 +332,11 @@ class FlowLayoutTest extends UITestBase {
         assertTrue(preferredSize.getHeight() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerLeftAlign() {
         FlowLayout layout = new FlowLayout(Component.LEFT);
         Container container = new Container(layout);
-        container.setSize(400, 200);
+        container.setSize(new Dimension(400, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -349,21 +350,21 @@ class FlowLayoutTest extends UITestBase {
         assertTrue(button1.getX() < button2.getX());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithEmptyContainer() {
         FlowLayout layout = new FlowLayout();
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         // Should not throw exception with empty container
         assertDoesNotThrow(() -> container.layoutContainer());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithSingleComponent() {
         FlowLayout layout = new FlowLayout();
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         Button button = new Button("Button");
         container.add(button);
@@ -379,7 +380,7 @@ class FlowLayoutTest extends UITestBase {
     void testLayoutContainerMultipleRows() {
         FlowLayout layout = new FlowLayout();
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         // Add many components to force multiple rows
         for (int i = 0; i < 10; i++) {
@@ -396,13 +397,13 @@ class FlowLayoutTest extends UITestBase {
         }
     }
 
-    @Test
+    @FormTest
     void testFillRowsBehavior() {
         FlowLayout layout = new FlowLayout();
         layout.setFillRows(true);
 
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         Button button1 = new Button("1");
         Button button2 = new Button("2");
@@ -417,11 +418,11 @@ class FlowLayoutTest extends UITestBase {
         assertTrue(button2.getWidth() > 0);
     }
 
-    @Test
+    @FormTest
     void testBaselineAlignment() {
         FlowLayout layout = new FlowLayout(Component.LEFT, Component.BASELINE);
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -433,11 +434,11 @@ class FlowLayoutTest extends UITestBase {
         assertDoesNotThrow(() -> container.layoutContainer());
     }
 
-    @Test
+    @FormTest
     void testTopAlignment() {
         FlowLayout layout = new FlowLayout(Component.LEFT, Component.TOP);
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -451,11 +452,11 @@ class FlowLayoutTest extends UITestBase {
         assertTrue(Math.abs(button1.getY() - button2.getY()) < 5);
     }
 
-    @Test
+    @FormTest
     void testCenterAlignment() {
         FlowLayout layout = new FlowLayout(Component.CENTER);
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         Button button = new Button("Button");
         container.add(button);
@@ -466,11 +467,11 @@ class FlowLayoutTest extends UITestBase {
         assertTrue(button.getX() > 0);
     }
 
-    @Test
+    @FormTest
     void testRightAlignment() {
         FlowLayout layout = new FlowLayout(Component.RIGHT);
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         Button button = new Button("Button");
         container.add(button);
@@ -481,11 +482,11 @@ class FlowLayoutTest extends UITestBase {
         assertTrue(button.getX() > 0);
     }
 
-    @Test
+    @FormTest
     void testValignByRowTrue() {
         FlowLayout layout = new FlowLayout(Component.LEFT, Component.CENTER, true);
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -497,11 +498,11 @@ class FlowLayoutTest extends UITestBase {
         assertDoesNotThrow(() -> container.layoutContainer());
     }
 
-    @Test
+    @FormTest
     void testValignByRowFalse() {
         FlowLayout layout = new FlowLayout(Component.LEFT, Component.CENTER, false);
         Container container = new Container(layout);
-        container.setSize(300, 200);
+        container.setSize(new Dimension(300, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");

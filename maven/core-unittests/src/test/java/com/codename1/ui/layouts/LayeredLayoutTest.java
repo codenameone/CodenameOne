@@ -1,5 +1,6 @@
 package com.codename1.ui.layouts;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -89,11 +90,11 @@ class LayeredLayoutTest extends UITestBase {
         assertTrue(preferredSize.getHeight() >= largeButton.getPreferredH());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerBasic() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -110,11 +111,11 @@ class LayeredLayoutTest extends UITestBase {
         assertTrue(button2.getHeight() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerComponentsOverlap() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -129,21 +130,21 @@ class LayeredLayoutTest extends UITestBase {
         assertEquals(button1.getY(), button2.getY());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithEmptyContainer() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
-        container.setSize(200, 200);
+        container.setSize(new Dimension(200, 200));
 
         // Should not throw exception with empty container
         assertDoesNotThrow(() -> container.layoutContainer());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithSingleComponent() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
-        container.setSize(300, 300);
+        container.setSize(new Dimension(300, 300));
 
         Button button = new Button("Button");
         container.add(button);
@@ -157,11 +158,11 @@ class LayeredLayoutTest extends UITestBase {
         assertTrue(button.getHeight() > 0);
     }
 
-    @Test
+    @FormTest
     void testMultipleLayeredComponents() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Label background = new Label("Background");
         Label middle = new Label("Middle");
@@ -249,11 +250,11 @@ class LayeredLayoutTest extends UITestBase {
         assertEquals(0, container.getComponentCount());
     }
 
-    @Test
+    @FormTest
     void testLayoutComponentsGetSameSizeAsContainer() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
-        container.setSize(500, 300);
+        container.setSize(new Dimension(500, 300));
 
         Button button1 = new Button("1");
         Button button2 = new Button("2");
@@ -281,11 +282,11 @@ class LayeredLayoutTest extends UITestBase {
         assertEquals(LayeredLayout.UNIT_BASELINE, LayeredLayout.UNIT_BASELINE);
     }
 
-    @Test
+    @FormTest
     void testLayeredLayoutWithVariedSizes() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Button smallButton = new Button("S");
         Button mediumButton = new Button("Medium");

@@ -1,5 +1,6 @@
 package com.codename1.ui.layouts;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -239,11 +240,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(preferredSize.getWidth() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerYAxis() {
         BoxLayout layout = new BoxLayout(BoxLayout.Y_AXIS);
         Container container = new Container(layout);
-        container.setSize(200, 400);
+        container.setSize(new Dimension(200, 400));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -265,11 +266,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(button3.getWidth() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerXAxis() {
         BoxLayout layout = new BoxLayout(BoxLayout.X_AXIS);
         Container container = new Container(layout);
-        container.setSize(400, 200);
+        container.setSize(new Dimension(400, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -291,11 +292,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(button3.getHeight() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerXAxisNoGrow() {
         BoxLayout layout = new BoxLayout(BoxLayout.X_AXIS_NO_GROW);
         Container container = new Container(layout);
-        container.setSize(400, 200);
+        container.setSize(new Dimension(400, 200));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -313,11 +314,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(button2.getHeight() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerYAxisBottomLast() {
         BoxLayout layout = new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);
         Container container = new Container(layout);
-        container.setSize(200, 400);
+        container.setSize(new Dimension(200, 400));
 
         Button button1 = new Button("Button 1");
         Button button2 = new Button("Button 2");
@@ -333,11 +334,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(button3.getY() + button3.getHeight() >= container.getHeight() - 10);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithEmptyContainer() {
         BoxLayout layout = new BoxLayout(BoxLayout.Y_AXIS);
         Container container = new Container(layout);
-        container.setSize(200, 400);
+        container.setSize(new Dimension(200, 400));
 
         // Should not throw exception with empty container
         assertDoesNotThrow(() -> container.layoutContainer());
@@ -354,11 +355,11 @@ class BoxLayoutTest extends UITestBase {
         assertEquals(0, preferredSize.getHeight());
     }
 
-    @Test
+    @FormTest
     void testYAxisCenterAlignment() {
         BoxLayout layout = BoxLayout.yCenter();
         Container container = new Container(layout);
-        container.setSize(200, 400);
+        container.setSize(new Dimension(200, 400));
 
         Button smallButton = new Button("Small");
         container.add(smallButton);
@@ -370,11 +371,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(smallButton.getY() > 0);
     }
 
-    @Test
+    @FormTest
     void testYAxisBottomAlignment() {
         BoxLayout layout = BoxLayout.yBottom();
         Container container = new Container(layout);
-        container.setSize(200, 400);
+        container.setSize(new Dimension(200, 400));
 
         Button smallButton = new Button("Small");
         container.add(smallButton);
@@ -385,11 +386,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(smallButton.getY() > 0);
     }
 
-    @Test
+    @FormTest
     void testXAxisCenterAlignment() {
         BoxLayout layout = BoxLayout.xCenter();
         Container container = new Container(layout);
-        container.setSize(400, 200);
+        container.setSize(new Dimension(400, 200));
 
         Button smallButton = new Button("Small");
         container.add(smallButton);
@@ -400,11 +401,11 @@ class BoxLayoutTest extends UITestBase {
         assertTrue(smallButton.getX() > 0);
     }
 
-    @Test
+    @FormTest
     void testXAxisRightAlignment() {
         BoxLayout layout = BoxLayout.xRight();
         Container container = new Container(layout);
-        container.setSize(400, 200);
+        container.setSize(new Dimension(400, 200));
 
         Button smallButton = new Button("Small");
         container.add(smallButton);

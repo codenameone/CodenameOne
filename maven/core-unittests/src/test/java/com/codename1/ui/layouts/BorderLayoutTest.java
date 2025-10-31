@@ -1,5 +1,6 @@
 package com.codename1.ui.layouts;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -293,7 +294,7 @@ class BorderLayoutTest extends UITestBase {
     void testPreferredSizeWithNoComponents() {
         BorderLayout layout = new BorderLayout();
         Container container = new Container(layout);
-        container.setSize(100, 100);
+        container.setSize(new Dimension(100, 100));
 
         Dimension preferredSize = layout.getPreferredSize(container);
         assertNotNull(preferredSize);
@@ -318,11 +319,11 @@ class BorderLayoutTest extends UITestBase {
         assertTrue(preferredSize.getHeight() > 0);
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerBasicPositioning() {
         BorderLayout layout = new BorderLayout();
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Label north = new Label("North");
         Label south = new Label("South");
@@ -349,11 +350,11 @@ class BorderLayoutTest extends UITestBase {
         assertTrue(center.getY() + center.getHeight() <= south.getY());
     }
 
-    @Test
+    @FormTest
     void testLayoutContainerWithOverlay() {
         BorderLayout layout = new BorderLayout();
         Container container = new Container(layout);
-        container.setSize(400, 400);
+        container.setSize(new Dimension(400, 400));
 
         Label center = new Label("Center");
         Label overlay = new Label("Overlay");
