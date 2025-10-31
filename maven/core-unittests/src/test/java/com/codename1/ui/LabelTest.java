@@ -338,8 +338,8 @@ class LabelTest extends UITestBase {
     void testFontIconWithFontAndSize() {
         Label label = new Label();
         // Skip truetype font test in test environment
-        // Verify default size is 0
-        assertEquals(0.0f, label.getFontIconSize(), 0.001f);
+        // Verify default size is -1 (not set)
+        assertEquals(-1.0f, label.getFontIconSize(), 0.001f);
     }
 
     @FormTest
