@@ -79,7 +79,7 @@ cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
-TEST_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
+TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 
 if [ -z "$REQUESTED_SCHEME" ]; then
   if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
@@ -95,7 +95,6 @@ SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots"
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
 SCREENSHOT_RAW_DIR="$SCREENSHOT_TMP_DIR/raw"
 SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
-RESULT_BUNDLE="$SCREENSHOT_TMP_DIR/test-results.xcresult"
 mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
@@ -127,53 +126,97 @@ auto_select_destination() {
   if show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null)"; then
     selected="$(
       printf '%s\n' "$show_dest" | python3 - <<'PY'
-import re, sys
-def parse_version_tuple(v): return tuple(int(p) if p.isdigit() else 0 for p in v.split('.') if p)
-for block in re.findall(r"\{([^}]+)\}", sys.stdin.read()):
-    f = dict(s.split(':',1) for s in block.split(',') if ':' in s)
-    if f.get('platform')!='iOS Simulator': continue
-    name=f.get('name',''); os=f.get('OS') or f.get('os') or ''
-    pri=2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
-    print(f"__CAND__|{pri}|{'.'.join(map(str,parse_version_tuple(os.replace('latest',''))))}|{name}|{os}|{f.get('id','')}")
-cands=[l.split('|',5) for l in sys.stdin if False]
+import sys
+
+def version_key(value: str):
+    value = (value or '').replace('latest', '').replace('(', '').replace(')', '')
+    parts = []
+    for part in value.split('.'):
+        if part.isdigit():
+            parts.append(int(part))
+        elif part:
+            parts.append(0)
+    return tuple(parts)
+
+candidates = []
+for line in sys.stdin:
+    text = line.strip()
+    if not (text.startswith('{') and text.endswith('}')):
+        continue
+    fields = {}
+    for segment in text.strip('{}').split(','):
+        if ':' not in segment:
+            continue
+        key, value = segment.split(':', 1)
+        fields[key.strip().lower()] = value.strip()
+    if fields.get('platform') != 'iOS Simulator':
+        continue
+    ident = fields.get('id')
+    if not ident:
+        continue
+    name = fields.get('name', '')
+    os_version = fields.get('os', '')
+    priority = 2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
+    candidates.append((priority, version_key(os_version), name, ident))
+
+if candidates:
+    priority, os_version, name, ident = sorted(candidates, reverse=True)[0]
+    print(f"platform=iOS Simulator,id={ident}")
 PY
     )"
   fi
 
-  if [ -z "${selected:-}" ]; then
-    if command -v xcrun >/dev/null 2>&1; then
-      selected="$(
-        xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
-import json, sys
-def parse_version_tuple(v): return tuple(int(p) if p.isdigit() else 0 for p in v.split('.') if p)
-try: data=json.load(sys.stdin)
-except: sys.exit(0)
-c=[]
+  if [ -z "${selected:-}" ] && command -v xcrun >/dev/null 2>&1; then
+    selected="$(
+      xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
+import json
+import sys
+
+def version_key(value: str):
+    value = (value or '').replace('latest', '')
+    parts = []
+    for part in value.replace('-', '.').split('.'):
+        if part.isdigit():
+            parts.append(int(part))
+        elif part:
+            parts.append(0)
+    return tuple(parts)
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+
+candidates = []
 for runtime, entries in (data.get('devices') or {}).items():
-    if 'iOS' not in runtime: continue
-    ver=runtime.split('iOS-')[-1].replace('-','.')
-    vt=parse_version_tuple(ver)
-    for e in entries or []:
-        if not e.get('isAvailable'): continue
-        name=e.get('name') or ''; ident=e.get('udid') or ''
-        pri=2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
-        c.append((pri, vt, name, ident))
-if c:
-    pri, vt, name, ident = sorted(c, reverse=True)[0]
+    if 'iOS' not in runtime:
+        continue
+    version = runtime.split('iOS-')[-1]
+    vkey = version_key(version)
+    for entry in entries or []:
+        if not entry.get('isAvailable'):
+            continue
+        name = entry.get('name') or ''
+        ident = entry.get('udid') or ''
+        priority = 2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
+        candidates.append((priority, vkey, name, ident))
+
+if candidates:
+    priority, version_key_value, name, ident = sorted(candidates, reverse=True)[0]
     print(f"platform=iOS Simulator,id={ident}")
 PY
-      )"
-    fi
+    )"
   fi
 
   if [ -n "${selected:-}" ]; then
-    echo "$selected"
+    printf '%s\n' "$selected"
   fi
+  return 0
 }
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
 if [ -z "$SIM_DESTINATION" ]; then
-  SELECTED_DESTINATION="$(auto_select_destination || true)"
+  SELECTED_DESTINATION="$(auto_select_destination)"
   if [ -n "${SELECTED_DESTINATION:-}" ]; then
     SIM_DESTINATION="$SELECTED_DESTINATION"
     ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
@@ -186,19 +229,13 @@ if [ -z "$SIM_DESTINATION" ]; then
   ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
 fi
 
-ri_log "Running UI tests on destination '$SIM_DESTINATION'"
+ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
 
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
+BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
-# Run only the UI test bundle
-UI_TEST_TARGET="${UI_TEST_TARGET:-HelloCodenameOneUITests}"
-XCODE_TEST_FILTERS=(
-  -only-testing:"${UI_TEST_TARGET}"
-  -skip-testing:HelloCodenameOneTests
-)
-
-set -o pipefail
+ri_log "Building simulator app with xcodebuild"
 if ! xcodebuild \
   -workspace "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
@@ -206,28 +243,140 @@ if ! xcodebuild \
   -configuration Debug \
   -destination "$SIM_DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_DIR" \
-  -resultBundlePath "$RESULT_BUNDLE" \
-  "${XCODE_TEST_FILTERS[@]}" \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-  GENERATE_INFOPLIST_FILE=YES \
-  test | tee "$TEST_LOG"; then
-  ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
+  build | tee "$BUILD_LOG"; then
+  ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
   exit 10
 fi
-set +o pipefail
-declare -a CN1SS_SOURCES=()
-if [ -s "$TEST_LOG" ]; then
-  CN1SS_SOURCES+=("XCODELOG:$TEST_LOG")
-else
-  ri_log "FATAL: Test log missing or empty at $TEST_LOG"
+
+BUILD_SETTINGS="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
+TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
+WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
+if [ -z "$TARGET_BUILD_DIR" ] || [ -z "$WRAPPER_NAME" ]; then
+  ri_log "FATAL: Unable to determine build output paths"
   exit 11
 fi
+APP_BUNDLE_PATH="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+if [ ! -d "$APP_BUNDLE_PATH" ]; then
+  ri_log "FATAL: Simulator app bundle missing at $APP_BUNDLE_PATH"
+  exit 11
+fi
+BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_BUNDLE_PATH/Info.plist" 2>/dev/null || true)"
+if [ -z "$BUNDLE_IDENTIFIER" ]; then
+  ri_log "FATAL: Unable to determine CFBundleIdentifier"
+  exit 11
+fi
+APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
+
+SIM_DEVICE_ID="${SIM_DESTINATION##*id=}"
+SIM_DEVICE_ID="${SIM_DEVICE_ID%%,*}"
+if [ -z "$SIM_DEVICE_ID" ] || [ "$SIM_DEVICE_ID" = "$SIM_DESTINATION" ]; then
+  SIM_DEVICE_NAME="$(echo "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
+  if [ -n "$SIM_DEVICE_NAME" ] && command -v python3 >/dev/null 2>&1; then
+    SIM_DEVICE_ID="$(xcrun simctl list devices --json 2>/dev/null | python3 - "$SIM_DEVICE_NAME" <<'EOS'
+import json, sys
+name = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit()
+for runtime, devices in (data.get("devices") or {}).items():
+    for device in devices or []:
+        if not device.get("isAvailable"):
+            continue
+        if device.get("name") == name:
+            print(device.get("udid") or "")
+            sys.exit()
+EOS
+)"
+  fi
+fi
+if [ -n "$SIM_DEVICE_ID" ]; then
+  ri_log "Booting simulator $SIM_DEVICE_ID"
+  xcrun simctl boot "$SIM_DEVICE_ID" >/dev/null 2>&1 || true
+  xcrun simctl bootstatus "$SIM_DEVICE_ID" -b
+else
+  ri_log "Warning: simulator UDID not resolved; relying on default booted device"
+  xcrun simctl bootstatus booted -b || true
+fi
+
+LOG_STREAM_PID=0
+cleanup() {
+  if [ "$LOG_STREAM_PID" -ne 0 ]; then
+    kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
+    wait "$LOG_STREAM_PID" 2>/dev/null || true
+  fi
+  if [ -n "$SIM_DEVICE_ID" ] && [ -n "$BUNDLE_IDENTIFIER" ]; then
+    xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+ri_log "Streaming simulator logs to $TEST_LOG"
+if [ -n "$SIM_DEVICE_ID" ]; then
+  xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+  xcrun simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+  xcrun simctl spawn "$SIM_DEVICE_ID" log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
+else
+  xcrun simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
+fi
+LOG_STREAM_PID=$!
+sleep 2
+
+ri_log "Installing simulator app bundle"
+if [ -n "$SIM_DEVICE_ID" ]; then
+  if ! xcrun simctl install "$SIM_DEVICE_ID" "$APP_BUNDLE_PATH"; then
+    ri_log "FATAL: simctl install failed"
+    exit 11
+  fi
+  if ! xcrun simctl launch "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+    ri_log "FATAL: simctl launch failed"
+    exit 11
+  fi
+else
+  if ! xcrun simctl install booted "$APP_BUNDLE_PATH"; then
+    ri_log "FATAL: simctl install failed"
+    exit 11
+  fi
+  if ! xcrun simctl launch booted "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+    ri_log "FATAL: simctl launch failed"
+    exit 11
+  fi
+fi
+
+END_MARKER="CN1SS:SUITE:FINISHED"
+TIMEOUT_SECONDS=300
+START_TIME="$(date +%s)"
+ri_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
+while true; do
+  if grep -q "$END_MARKER" "$TEST_LOG"; then
+    ri_log "Detected DeviceRunner completion marker"
+    break
+  fi
+  NOW="$(date +%s)"
+  if [ $(( NOW - START_TIME )) -ge $TIMEOUT_SECONDS ]; then
+    ri_log "STAGE:TIMEOUT -> DeviceRunner did not emit completion marker within ${TIMEOUT_SECONDS}s"
+    break
+  fi
+  sleep 5
+done
+
+sleep 3
+
+kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
+wait "$LOG_STREAM_PID" 2>/dev/null || true
+LOG_STREAM_PID=0
+
+if [ -n "$SIM_DEVICE_ID" ]; then
+  xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+fi
+
+declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG")
 
 LOG_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"; LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"; : "${LOG_CHUNKS:=0}"
-ri_log "Chunk counts -> xcodebuild log: ${LOG_CHUNKS}"
+ri_log "Chunk counts -> simulator log: ${LOG_CHUNKS}"
 
 if [ "${LOG_CHUNKS:-0}" = "0" ]; then
-  ri_log "STAGE:MARKERS_NOT_FOUND -> xcodebuild output did not include CN1SS chunks"
+  ri_log "STAGE:MARKERS_NOT_FOUND -> simulator output did not include CN1SS chunks"
   ri_log "---- CN1SS lines (if any) ----"
   (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
   exit 12
@@ -357,9 +506,13 @@ cp -f "$COMPARE_JSON" "$ARTIFACTS_DIR/screenshot-compare.json" 2>/dev/null || tr
 if [ -s "$COMMENT_FILE" ]; then
   cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
 fi
+cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
+cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
 
 ri_log "STAGE:COMMENT_POST -> Submitting PR feedback"
 comment_rc=0
+export CN1SS_COMMENT_MARKER="<!-- CN1SS_IOS_COMMENT -->"
+export CN1SS_COMMENT_LOG_PREFIX="[run-ios-device-tests]"
 if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
   comment_rc=$?
 fi

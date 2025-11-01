@@ -69,142 +69,135 @@ cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 [ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
-# ---- Run tests -------------------------------------------------------------
+# ---- Prepare app + emulator state -----------------------------------------
 
-set -o pipefail
-ra_log "Running instrumentation tests (stdout -> $TEST_LOG; stderr -> terminal)"
-(
-  cd "$GRADLE_PROJECT_DIR"
-  ORIG_JAVA_HOME="${JAVA_HOME:-}"
-  export JAVA_HOME="${JAVA17_HOME:?JAVA17_HOME not set}"
-  ./gradlew --no-daemon --console=plain connectedDebugAndroidTest | tee "$TEST_LOG"
-  export JAVA_HOME="$ORIG_JAVA_HOME"
-) || { ra_log "STAGE:GRADLE_TEST_FAILED (see $TEST_LOG)"; exit 10; }
+APK_PATH="${2:-}"
+if [ -z "$APK_PATH" ]; then
+  APK_PATH="$(find "$GRADLE_PROJECT_DIR" -type f -path '*/outputs/apk/debug/*.apk' | head -n 1 || true)"
+fi
+if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+  ra_log "FATAL: Unable to locate debug APK under $GRADLE_PROJECT_DIR" >&2
+  exit 10
+fi
+ra_log "Using APK: $APK_PATH"
 
-echo
-ra_log "==== Begin connectedAndroidTest.log (tail -n 200) ===="
-tail -n 200 "$TEST_LOG" || true
-ra_log "==== End connectedAndroidTest.log ===="
-echo
+MANIFEST="$GRADLE_PROJECT_DIR/app/src/main/AndroidManifest.xml"
+if [ ! -f "$MANIFEST" ]; then
+  ra_log "FATAL: AndroidManifest.xml not found at $MANIFEST" >&2
+  exit 10
+fi
+PACKAGE_NAME="$(sed -n 's/.*package="\([^"]*\)".*/\1/p' "$MANIFEST" | head -n1)"
+if [ -z "$PACKAGE_NAME" ]; then
+  ra_log "FATAL: Unable to determine package name from AndroidManifest.xml" >&2
+  exit 10
+fi
+ra_log "Detected application package: $PACKAGE_NAME"
 
-# ---- Locate outputs (NO ADB) ----------------------------------------------
+if ! command -v adb >/dev/null 2>&1; then
+  ra_log "FATAL: adb not found on PATH" >&2
+  exit 10
+fi
 
-RESULTS_ROOT="$GRADLE_PROJECT_DIR/app/build/outputs/androidTest-results/connected"
-ra_log "Listing connected test outputs under: $RESULTS_ROOT"
-find "$RESULTS_ROOT" -maxdepth 4 -printf '%y %p\n' 2>/dev/null | sed 's/^/[run-android-instrumentation-tests]   /' || true
+ADB_BIN="$(command -v adb)"
+"$ADB_BIN" start-server >/dev/null 2>&1 || true
+"$ADB_BIN" wait-for-device
+ra_log "ADB connected devices:"
+"$ADB_BIN" devices -l | sed 's/^/[run-android-instrumentation-tests]   /'
 
-# Arrays must be declared for set -u safety
-declare -a XMLS=()
-declare -a LOGCATS=()
-TEST_EXEC_LOG=""
+ra_log "Installing APK onto device"
+"$ADB_BIN" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
+"$ADB_BIN" uninstall "$PACKAGE_NAME" >/dev/null 2>&1 || true
+if ! "$ADB_BIN" install -r "$APK_PATH"; then
+  ra_log "adb install failed; retrying after explicit uninstall"
+  "$ADB_BIN" uninstall "$PACKAGE_NAME" >/dev/null 2>&1 || true
+  if ! "$ADB_BIN" install "$APK_PATH"; then
+    ra_log "FATAL: adb install failed after retry"
+    exit 10
+  fi
+fi
 
-# XML result candidates (new + old formats), mtime desc
-mapfile -t XMLS < <(
-  find "$RESULTS_ROOT" -type f \( -name 'test-result.xml' -o -name 'TEST-*.xml' \) \
-  -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk '{ $1=""; sub(/^ /,""); print }'
-) || XMLS=()
+ra_log "Clearing logcat buffer"
+"$ADB_BIN" logcat -c || true
 
-# logcat files produced by AGP
-mapfile -t LOGCAT_FILES < <(
-  find "$RESULTS_ROOT" -type f -name 'logcat-*.txt' -print 2>/dev/null
-) || LOGCAT_FILES=()
+LOGCAT_PID=0
+cleanup() {
+  if [ "$LOGCAT_PID" -ne 0 ]; then
+    kill "$LOGCAT_PID" >/dev/null 2>&1 || true
+    wait "$LOGCAT_PID" 2>/dev/null || true
+  fi
+  "$ADB_BIN" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 
-# execution log (use first if present)
-TEST_EXEC_LOG="$(find "$RESULTS_ROOT" -type f -path '*/testlog/test-results.log' -print -quit 2>/dev/null || true)"
-[ -n "${TEST_EXEC_LOG:-}" ] || TEST_EXEC_LOG=""
+ra_log "Capturing device logcat to $TEST_LOG"
+"$ADB_BIN" logcat -v threadtime > "$TEST_LOG" 2>&1 &
+LOGCAT_PID=$!
+sleep 2
 
-declare -a CN1SS_SOURCES=()
-for x in "${XMLS[@]}"; do
-  CN1SS_SOURCES+=("XML:$x")
+ra_log "Launching Codename One DeviceRunner"
+"$ADB_BIN" shell pm clear "$PACKAGE_NAME" >/dev/null 2>&1 || true
+if ! "$ADB_BIN" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
+  ra_log "monkey launch failed; attempting am start fallback"
+  MAIN_ACTIVITY="$("$ADB_BIN" shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>/dev/null | head -n 1 | tr -d '\r' | sed 's/ .*//')"
+  if [[ "$MAIN_ACTIVITY" == */* ]]; then
+    if ! "$ADB_BIN" shell am start -n "$MAIN_ACTIVITY" >/dev/null 2>&1; then
+      ra_log "FATAL: Failed to start application via am start"
+      exit 10
+    fi
+  else
+    ra_log "FATAL: Unable to determine launchable activity"
+    exit 10
+  fi
+fi
+
+END_MARKER="CN1SS:SUITE:FINISHED"
+TIMEOUT_SECONDS=300
+START_TIME="$(date +%s)"
+ra_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
+while true; do
+  if grep -q "$END_MARKER" "$TEST_LOG"; then
+    ra_log "Detected DeviceRunner completion marker"
+    break
+  fi
+  NOW="$(date +%s)"
+  if [ $(( NOW - START_TIME )) -ge $TIMEOUT_SECONDS ]; then
+    ra_log "STAGE:TIMEOUT -> DeviceRunner did not emit completion marker within ${TIMEOUT_SECONDS}s"
+    break
+  fi
+  sleep 5
 done
-for logcat in "${LOGCAT_FILES[@]}"; do
-  CN1SS_SOURCES+=("LOGCAT:$logcat")
-done
-if [ -n "${TEST_EXEC_LOG:-}" ]; then
-  CN1SS_SOURCES+=("EXEC:$TEST_EXEC_LOG")
-fi
 
-if [ "${#XMLS[@]}" -gt 0 ]; then
-  ra_log "Found ${#XMLS[@]} test result file(s). First candidate: ${XMLS[0]}"
-else
-  ra_log "No test result XML files found under $RESULTS_ROOT"
-fi
+sleep 3
 
-if [ "${#LOGCAT_FILES[@]}" -eq 0 ]; then
-  ra_log "FATAL: No logcat-*.txt produced by connectedDebugAndroidTest (cannot extract CN1SS chunks)."
-  exit 12
-fi
+declare -a CN1SS_SOURCES=("LOGCAT:$TEST_LOG")
 
 
 # ---- Chunk accounting (diagnostics) ---------------------------------------
 
-XML_CHUNKS_TOTAL=0
-for x in "${XMLS[@]}"; do
-  c="$(cn1ss_count_chunks "$x")"; c="${c//[^0-9]/}"; : "${c:=0}"
-  XML_CHUNKS_TOTAL=$(( XML_CHUNKS_TOTAL + c ))
-done
-LOGCAT_CHUNKS=0
-for logcat in "${LOGCAT_FILES[@]}"; do
-  c="$(cn1ss_count_chunks "$logcat")"; c="${c//[^0-9]/}"; : "${c:=0}"
-  LOGCAT_CHUNKS=$(( LOGCAT_CHUNKS + c ))
-done
-EXECLOG_CHUNKS="$(cn1ss_count_chunks "${TEST_EXEC_LOG:-}")"; EXECLOG_CHUNKS="${EXECLOG_CHUNKS//[^0-9]/}"; : "${EXECLOG_CHUNKS:=0}"
+LOGCAT_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"
+LOGCAT_CHUNKS="${LOGCAT_CHUNKS//[^0-9]/}"; : "${LOGCAT_CHUNKS:=0}"
 
-ra_log "Chunk counts -> XML: ${XML_CHUNKS_TOTAL} | logcat: ${LOGCAT_CHUNKS} | test-results.log: ${EXECLOG_CHUNKS}"
+ra_log "Chunk counts -> logcat: ${LOGCAT_CHUNKS}"
 
-if [ "${LOGCAT_CHUNKS:-0}" = "0" ] && [ "${XML_CHUNKS_TOTAL:-0}" = "0" ] && [ "${EXECLOG_CHUNKS:-0}" = "0" ]; then
-  ra_log "STAGE:MARKERS_NOT_FOUND -> The test did not emit CN1SS chunks"
-  ra_log "Hints:"
-  ra_log "  • Ensure the test actually ran (check FAILED vs SUCCESS in $TEST_LOG)"
-  ra_log "  • Check for CN1SS:ERR or CN1SS:INFO lines below"
-  ra_log "---- CN1SS lines from any result files ----"
-  (grep -R "CN1SS:" "$RESULTS_ROOT" || true) | sed 's/^/[CN1SS] /'
+if [ "${LOGCAT_CHUNKS:-0}" = "0" ]; then
+  ra_log "STAGE:MARKERS_NOT_FOUND -> DeviceRunner output did not include CN1SS chunks"
+  ra_log "---- CN1SS lines from logcat ----"
+  (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
   exit 12
 fi
 
 # ---- Identify CN1SS test streams -----------------------------------------
 
-declare -A TEST_NAME_SET=()
-
-if [ "${#XMLS[@]}" -gt 0 ]; then
-  for x in "${XMLS[@]}"; do
-    while IFS= read -r name; do
-      [ -n "$name" ] || continue
-      TEST_NAME_SET["$name"]=1
-    done < <(cn1ss_list_tests "$x" 2>/dev/null || true)
-  done
-fi
-
-for logcat in "${LOGCAT_FILES[@]}"; do
-  [ -s "$logcat" ] || continue
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    TEST_NAME_SET["$name"]=1
-  done < <(cn1ss_list_tests "$logcat" 2>/dev/null || true)
-done
-
-if [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    TEST_NAME_SET["$name"]=1
-  done < <(cn1ss_list_tests "$TEST_EXEC_LOG" 2>/dev/null || true)
-fi
-
-if [ "${#TEST_NAME_SET[@]}" -eq 0 ] && { [ "${LOGCAT_CHUNKS:-0}" -gt 0 ] || [ "${XML_CHUNKS_TOTAL:-0}" -gt 0 ] || [ "${EXECLOG_CHUNKS:-0}" -gt 0 ]; }; then
-  TEST_NAME_SET["default"]=1
-fi
-
-if [ "${#TEST_NAME_SET[@]}" -eq 0 ]; then
-  ra_log "FATAL: Could not determine any CN1SS test streams"
-  exit 12
-fi
-
+TEST_NAMES_RAW="$(cn1ss_list_tests "$TEST_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
 declare -a TEST_NAMES=()
-for name in "${!TEST_NAME_SET[@]}"; do
-  TEST_NAMES+=("$name")
-done
-IFS=$'\n' TEST_NAMES=($(printf '%s\n' "${TEST_NAMES[@]}" | sort))
-unset IFS
+if [ -n "$TEST_NAMES_RAW" ]; then
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    TEST_NAMES+=("$name")
+  done <<< "$TEST_NAMES_RAW"
+else
+  TEST_NAMES+=("default")
+fi
 ra_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 
 declare -A TEST_OUTPUTS=()
@@ -229,27 +222,11 @@ for test in "${TEST_NAMES[@]}"; do
   else
     ra_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
     RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
-    {
-      local count
-      for logcat in "${LOGCAT_FILES[@]}"; do
-        [ -s "$logcat" ] || continue
-        count="$(cn1ss_count_chunks "$logcat" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-        if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$logcat" "$test"; fi
-      done
-      if [ "${#XMLS[@]}" -gt 0 ]; then
-        for x in "${XMLS[@]}"; do
-          count="$(cn1ss_count_chunks "$x" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-          if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$x" "$test"; fi
-        done
+    if cn1ss_extract_base64 "$TEST_LOG" "$test" > "$RAW_B64_OUT" 2>/dev/null; then
+      if [ -s "$RAW_B64_OUT" ]; then
+        head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
+        ra_log "Partial base64 saved at: $RAW_B64_OUT"
       fi
-      if [ -n "${TEST_EXEC_LOG:-}" ] && [ -s "$TEST_EXEC_LOG" ]; then
-        count="$(cn1ss_count_chunks "$TEST_EXEC_LOG" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-        if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$TEST_EXEC_LOG" "$test"; fi
-      fi
-    } > "$RAW_B64_OUT" 2>/dev/null || true
-    if [ -s "$RAW_B64_OUT" ]; then
-      head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-      ra_log "Partial base64 saved at: $RAW_B64_OUT"
     fi
     exit 12
   fi
@@ -324,17 +301,14 @@ fi
 
 ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
 comment_rc=0
+export CN1SS_COMMENT_MARKER="<!-- CN1SS_ANDROID_COMMENT -->"
+export CN1SS_COMMENT_LOG_PREFIX="[run-android-device-tests]"
 if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
   comment_rc=$?
 fi
 
 # Copy useful artifacts for GH Actions
-for logcat in "${LOGCAT_FILES[@]}"; do
-  cp -f "$logcat" "$ARTIFACTS_DIR/$(basename "$logcat")" 2>/dev/null || true
-done
-for x in "${XMLS[@]}"; do
-  cp -f "$x" "$ARTIFACTS_DIR/$(basename "$x")" 2>/dev/null || true
-done
+cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
 exit $comment_rc

@@ -271,9 +271,17 @@ cn1ss_post_pr_comment() {
   fi
   body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
   cn1ss_log "Attempting to post PR comment (payload bytes=${body_size})"
+  local -a extra_args=()
+  if [ -n "${CN1SS_COMMENT_MARKER:-}" ]; then
+    extra_args+=(--marker "${CN1SS_COMMENT_MARKER}")
+  fi
+  if [ -n "${CN1SS_COMMENT_LOG_PREFIX:-}" ]; then
+    extra_args+=(--log-prefix "${CN1SS_COMMENT_LOG_PREFIX}")
+  fi
   GITHUB_TOKEN="$comment_token" cn1ss_java_run "$CN1SS_POST_COMMENT_CLASS" \
     --body "$body_file" \
-    --preview-dir "$preview_dir"
+    --preview-dir "$preview_dir" \
+    "${extra_args[@]}"
   local rc=$?
   if [ $rc -eq 0 ]; then
     cn1ss_log "Posted screenshot comparison comment to PR"

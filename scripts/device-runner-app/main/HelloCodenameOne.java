@@ -1,5 +1,6 @@
-package @PACKAGE@;
+package com.codenameone.examples.hellocodenameone;
 
+import com.codename1.testing.TestReporting;
 import com.codename1.ui.Button;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Container;
@@ -7,21 +8,31 @@ import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
-public class @MAIN_NAME@ {
+import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner;
+import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter;
+
+public class HelloCodenameOne {
     private Form current;
     private Form mainForm;
+    private static boolean deviceRunnerExecuted;
 
     public void init(Object context) {
-        // No special initialization required for this sample
+        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());
     }
 
     public void start() {
         if (current != null) {
             current.show();
             return;
+        }
+        if (!deviceRunnerExecuted) {
+            deviceRunnerExecuted = true;
+            new Cn1ssDeviceRunner().runSuite();
         }
         showMainForm();
     }
@@ -52,7 +63,11 @@ public class @MAIN_NAME@ {
             body.getAllStyles().setFgColor(0xf9fafb);
 
             Button openBrowser = new Button("Open Browser Screen");
-            openBrowser.addActionListener(evt -> showBrowserForm());
+            openBrowser.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    showBrowserForm();
+                }
+            });
 
             content.add(heading);
             content.add(body);
@@ -73,7 +88,11 @@ public class @MAIN_NAME@ {
         browserForm.getToolbar().addMaterialCommandToLeftBar(
                 "Back",
                 FontImage.MATERIAL_ARROW_BACK,
-                evt -> showMainForm()
+                new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        showMainForm();
+                    }
+                }
         );
 
         current = browserForm;
