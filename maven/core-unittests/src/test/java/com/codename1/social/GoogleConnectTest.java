@@ -74,7 +74,7 @@ class GoogleConnectTest extends UITestBase {
         connect.setAccessToken(token);
 
         assertNotNull(connect.getAccessToken());
-        assertTrue(Storage.getInstance().storageFileExists(GoogleConnect.class.getName() + "AccessToken"));
+        assertTrue(Storage.getInstance().exists(GoogleConnect.class.getName() + "AccessToken"));
         assertEquals("stored-token", connect.getAccessToken().getToken());
     }
 
