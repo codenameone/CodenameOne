@@ -973,6 +973,19 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return connection;
     }
 
+    public TestConnection getConnection(String url) {
+        return connections.get(url);
+    }
+
+    public TestConnection createConnection(String url) {
+        TestConnection connection = connections.computeIfAbsent(url, TestConnection::new);
+        return connection;
+    }
+
+    public void clearConnections() {
+        connections.clear();
+    }
+
     @Override
     public void setHeader(Object connection, String key, String val) {
         ((TestConnection) connection).headers.put(key, val);
@@ -1272,9 +1285,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void startThread(String name, Runnable r) {
-        if (r != null) {
-            r.run();
+        if (r == null) {
+            return;
         }
+
+        Thread worker = new Thread(r, name == null ? "CN1-TestThread" : name);
+        worker.setDaemon(true);
+        worker.start();
     }
 
     // -----------------------------------------------------------------
@@ -1594,6 +1611,65 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
                 output = new ByteArrayOutputStream();
             }
             return output;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public Map<String, String> getHeaders() {
+            return new HashMap<String, String>(headers);
+        }
+
+        public boolean isReadRequested() {
+            return readRequested;
+        }
+
+        public boolean isWriteRequested() {
+            return writeRequested;
+        }
+
+        public boolean isPostRequest() {
+            return postRequest;
+        }
+
+        public void setPostRequest(boolean postRequest) {
+            this.postRequest = postRequest;
+        }
+
+        public int getResponseCode() {
+            return responseCode;
+        }
+
+        public void setResponseCode(int responseCode) {
+            this.responseCode = responseCode;
+        }
+
+        public String getResponseMessage() {
+            return responseMessage;
+        }
+
+        public void setResponseMessage(String responseMessage) {
+            this.responseMessage = responseMessage;
+        }
+
+        public void setInputData(byte[] inputData) {
+            this.inputData = inputData == null ? null : Arrays.copyOf(inputData, inputData.length);
+        }
+
+        public byte[] getInputData() {
+            return inputData == null ? null : Arrays.copyOf(inputData, inputData.length);
+        }
+
+        public byte[] getOutputData() {
+            if (output == null) {
+                return new byte[0];
+            }
+            return output.toByteArray();
+        }
+
+        public void setContentLength(int contentLength) {
+            this.contentLength = contentLength;
         }
     }
 

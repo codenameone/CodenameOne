@@ -2,259 +2,134 @@ package com.codename1.social;
 
 import com.codename1.facebook.FaceBookAccess;
 import com.codename1.io.AccessToken;
-import com.codename1.io.ConnectionRequest;
-import com.codename1.io.NetworkManager;
-import com.codename1.io.Oauth2;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Hashtable;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
-// TODO: Restore this with proper mocking
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 class FacebookConnectTest extends UITestBase {
 
-    private Field facebookInstanceField;
-    private Field networkManagerInstanceField;
-    private NetworkManager originalNetworkManager;
-    private NetworkManager mockNetworkManager;
-    private String originalClientId;
-    private String originalClientSecret;
-    private String originalRedirectUri;
-    private String[] originalPermissions;
+    private FacebookConnect connect;
 
-    //@BeforeEach
-    void setUpSingletons() throws Exception {
-        resetFacebookInstance();
-        captureFaceBookAccessDefaults();
-        mockNetworkManager();
+    @BeforeEach
+    void setUpFacebookConnect() {
+        implementation.clearConnections();
         clearStoredCredentials();
+        FaceBookAccess.setToken(null);
+        connect = new FacebookConnect();
     }
 
-    //@AfterEach
-    void restoreEnvironment() throws Exception {
-        restoreNetworkManager();
-        restoreFaceBookAccessDefaults();
+    @AfterEach
+    void tearDownFacebookConnect() {
         clearStoredCredentials();
-    }
-
-    //@Test
-    void testGetInstanceReturnsSingletonWhenNoImplClass() {
-        FacebookConnect first = FacebookConnect.getInstance();
-        FacebookConnect second = FacebookConnect.getInstance();
-        assertSame(first, second);
-        assertEquals(FacebookConnect.class, first.getClass());
-    }
-
-    //@Test
-    void testGetInstanceUsesImplClass() throws Exception {
-        resetFacebookInstance();
-        FacebookConnect.implClass = CustomFacebookConnect.class;
-        FacebookConnect instance = FacebookConnect.getInstance();
-        assertTrue(instance instanceof CustomFacebookConnect);
-        assertTrue(((CustomFacebookConnect) instance).constructed);
-    }
-
-    //@Test
-    void testGetInstanceFallsBackWhenInstantiationFails() throws Exception {
-        resetFacebookInstance();
-        FacebookConnect.implClass = ThrowingFacebookConnect.class;
-        FacebookConnect instance = FacebookConnect.getInstance();
-        assertEquals(FacebookConnect.class, instance.getClass());
-    }
-
-    //@Test
-    void testDoLogoutClearsTokensAndInvokesNetworkManager() throws Exception {
-        FacebookConnect connect = new FacebookConnect();
-        AccessToken stored = new AccessToken("stored", null);
-        connect.setAccessToken(stored);
-        FaceBookAccess.setToken("serverToken");
-
-        final AtomicReference<ConnectionRequest> captured = new AtomicReference<ConnectionRequest>();
-        doAnswer(invocation -> {
-            ConnectionRequest req = (ConnectionRequest) invocation.getArgument(0);
-            captured.set(req);
-            return null;
-        }).when(mockNetworkManager).addToQueueAndWait(any(ConnectionRequest.class));
-
-        connect.doLogout();
-
-        assertNull(connect.getAccessToken());
-        assertNull(FaceBookAccess.getToken());
-        assertNotNull(captured.get());
-        assertFalse(captured.get().isPost());
-        assertTrue(captured.get().getUrl().contains("logout.php"));
-        verify(mockNetworkManager).addToQueueAndWait(any(ConnectionRequest.class));
-    }
-
-    //@Test
-    void testDoLogoutSkipsFacebookAccessWhenNativeSupported() {
-        FaceBookAccess.setToken("keepToken");
-        NativeSupportedFacebookConnect connect = new NativeSupportedFacebookConnect();
-        connect.doLogout();
-        assertTrue(connect.logoutInvoked);
-        assertEquals("keepToken", FaceBookAccess.getToken());
-    }
-
-    //@Test
-    void testGetAccessTokenReturnsStoredTokenWhenPresent() {
-        FacebookConnect connect = new FacebookConnect();
-        AccessToken token = new AccessToken("value", "refresh");
-        connect.setAccessToken(token);
-        assertSame(token, connect.getAccessToken());
-    }
-
-    //@Test
-    void testGetAccessTokenReturnsNativeTokenWhenSupported() {
-        FacebookConnect connect = new FacebookConnect() {
-            @Override
-            public boolean isFacebookSDKSupported() {
-                return true;
-            }
-
-            @Override
-            public String getToken() {
-                return "nativeValue";
-            }
-        };
-        assertEquals("nativeValue", connect.getAccessToken().getToken());
-    }
-
-    //@Test
-    void testCreateOauth2ConfiguresFaceBookAccess() throws Exception {
-        FacebookConnect connect = new FacebookConnect();
-        connect.setClientId("client");
-        connect.setClientSecret("secret");
-        connect.setRedirectURI("redirect");
-        connect.setScope("scope");
-
-        Method createOauth = FacebookConnect.class.getDeclaredMethod("createOauth2");
-        createOauth.setAccessible(true);
-        Oauth2 oauth = (Oauth2) createOauth.invoke(connect);
-        assertNotNull(oauth);
-
-        Field additionalParamsField = Oauth2.class.getDeclaredField("additionalParams");
-        additionalParamsField.setAccessible(true);
-        Hashtable params = (Hashtable) additionalParamsField.get(oauth);
-        assertNotNull(params);
-        assertTrue(params.containsKey("display"));
-
-        assertEquals("client", getStaticFieldValue("clientId"));
-        assertEquals("secret", getStaticFieldValue("clientSecret"));
-        assertEquals("redirect", getStaticFieldValue("redirectURI"));
-        assertArrayEquals(new String[]{"public_profile", "email", "user_friends"}, (String[]) getStaticFieldValue("permissions"));
-    }
-
-    //@Test
-    void testBridgeMethodsDelegateToDeprecatedImplementations() {
-        TestableFacebookConnect connect = new TestableFacebookConnect();
-        connect.nativelogin();
-        connect.nativeLogout();
-        assertEquals(1, connect.loginCalls);
-        assertEquals(1, connect.logoutCalls);
-    }
-
-    //@Test
-    void testUnsupportedOperationsThrow() {
-        FacebookConnect connect = new FacebookConnect();
-        assertThrows(RuntimeException.class, connect::login);
-        assertThrows(RuntimeException.class, connect::logout);
-        assertThrows(RuntimeException.class, connect::getToken);
-        assertThrows(RuntimeException.class, connect::isLoggedIn);
-        assertThrows(RuntimeException.class, () -> connect.askPublishPermissions(null));
-        assertThrows(RuntimeException.class, connect::hasPublishPermissions);
-    }
-
-    private void resetFacebookInstance() throws Exception {
-        if (facebookInstanceField == null) {
-            facebookInstanceField = FacebookConnect.class.getDeclaredField("instance");
-            facebookInstanceField.setAccessible(true);
-        }
-        facebookInstanceField.set(null, null);
-        FacebookConnect.implClass = null;
-    }
-
-    private void captureFaceBookAccessDefaults() throws Exception {
-        originalClientId = (String) getStaticFieldValue("clientId");
-        originalClientSecret = (String) getStaticFieldValue("clientSecret");
-        originalRedirectUri = (String) getStaticFieldValue("redirectURI");
-        originalPermissions = ((String[]) getStaticFieldValue("permissions")).clone();
-    }
-
-    private Object getStaticFieldValue(String name) throws Exception {
-        Field field = FaceBookAccess.class.getDeclaredField(name);
-        field.setAccessible(true);
-        return field.get(null);
-    }
-
-    private void restoreFaceBookAccessDefaults() throws Exception {
-        setStaticField("clientId", originalClientId);
-        setStaticField("clientSecret", originalClientSecret);
-        setStaticField("redirectURI", originalRedirectUri);
-        setStaticField("permissions", originalPermissions.clone());
+        implementation.clearConnections();
         FaceBookAccess.setToken(null);
     }
 
-    private void setStaticField(String name, Object value) throws Exception {
-        Field field = FaceBookAccess.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(null, value);
+    @FormTest
+    void doLogoutClearsTokensAndInvokesGraphLogout() {
+        AccessToken stored = new AccessToken("cached-token", null);
+        connect.setAccessToken(stored);
+        Preferences.set(FacebookConnect.class.getName() + "Token", "cached-token");
+        FaceBookAccess.setToken("server-token");
+
+        runOffEdt(new Runnable() {
+            @Override
+            public void run() {
+                connect.doLogout();
+            }
+        });
+
+        assertNull(connect.getAccessToken());
+        assertNull(FaceBookAccess.getToken());
+        assertNull(Preferences.get(FacebookConnect.class.getName() + "Token", null));
+
+        TestConnection logoutRequest = implementation.getConnection("https://www.facebook.com/logout.php?access_token=server-token&confirm=1&next=https://www.codenameone.com/");
+        assertNotNull(logoutRequest);
+        assertFalse(logoutRequest.isPostRequest());
+        assertTrue(logoutRequest.getUrl().contains("logout.php"));
     }
 
-    private void mockNetworkManager() throws Exception {
-        if (networkManagerInstanceField == null) {
-            networkManagerInstanceField = NetworkManager.class.getDeclaredField("INSTANCE");
-            networkManagerInstanceField.setAccessible(true);
-            Field modifiersField = Field.class.getDeclaredField("modifiers");
-            modifiersField.setAccessible(true);
-            modifiersField.setInt(networkManagerInstanceField, networkManagerInstanceField.getModifiers() & ~Modifier.FINAL);
-        }
-        originalNetworkManager = (NetworkManager) networkManagerInstanceField.get(null);
-        mockNetworkManager = mock(NetworkManager.class);
-        networkManagerInstanceField.set(null, mockNetworkManager);
+    @FormTest
+    void doLogoutWhenNativeSupportedSkipsNetworkCall() {
+        FaceBookAccess.setToken("native-token");
+        NativeSupportedFacebookConnect nativeConnect = new NativeSupportedFacebookConnect();
+
+        runOffEdt(new Runnable() {
+            @Override
+            public void run() {
+                nativeConnect.doLogout();
+            }
+        });
+
+        assertTrue(nativeConnect.logoutInvoked);
+        assertEquals("native-token", FaceBookAccess.getToken());
+        assertNull(implementation.getConnection("https://www.facebook.com/logout.php?access_token=native-token&confirm=1&next=https://www.codenameone.com/"));
     }
 
-    private void restoreNetworkManager() throws Exception {
-        if (networkManagerInstanceField != null) {
-            networkManagerInstanceField.set(null, originalNetworkManager);
-        }
+    @FormTest
+    void getAccessTokenReturnsStoredTokenWhenAvailable() {
+        AccessToken token = new AccessToken("stored-token", "refresh-token");
+        connect.setAccessToken(token);
+
+        assertSame(token, connect.getAccessToken());
+    }
+
+    @FormTest
+    void getAccessTokenReturnsNativeTokenWhenSupported() {
+        NativeTokenFacebookConnect nativeConnect = new NativeTokenFacebookConnect();
+
+        AccessToken token = runOffEdt(new Callable<AccessToken>() {
+            @Override
+            public AccessToken call() {
+                return nativeConnect.getAccessToken();
+            }
+        });
+
+        assertNotNull(token);
+        assertEquals("native-value", token.getToken());
+    }
+
+    @FormTest
+    void bridgeMethodsDelegateToDeprecatedImplementations() {
+        BridgeFacebookConnect bridge = new BridgeFacebookConnect();
+
+        bridge.nativelogin();
+        bridge.nativeLogout();
+
+        assertEquals(1, bridge.loginInvocations);
+        assertEquals(1, bridge.logoutInvocations);
+    }
+
+    @FormTest
+    void unsupportedOperationsThrowRuntimeExceptions() {
+        assertThrows(RuntimeException.class, new FacebookConnect()::login);
+        assertThrows(RuntimeException.class, new FacebookConnect()::logout);
+        assertThrows(RuntimeException.class, new FacebookConnect()::getToken);
+        assertThrows(RuntimeException.class, new FacebookConnect()::isLoggedIn);
+        assertThrows(RuntimeException.class, () -> new FacebookConnect().askPublishPermissions(null));
+        assertThrows(RuntimeException.class, new FacebookConnect()::hasPublishPermissions);
     }
 
     private void clearStoredCredentials() {
         Storage.getInstance().deleteStorageFile(FacebookConnect.class.getName() + "AccessToken");
         Preferences.delete(FacebookConnect.class.getName() + "Token");
-        FaceBookAccess.setToken(null);
     }
 
-    private static class CustomFacebookConnect extends FacebookConnect {
-        boolean constructed;
-
-        CustomFacebookConnect() {
-            constructed = true;
-        }
-    }
-
-    private static class ThrowingFacebookConnect extends FacebookConnect {
-        ThrowingFacebookConnect() {
-            throw new RuntimeException("failure");
-        }
-    }
-
-    private static class NativeSupportedFacebookConnect extends FacebookConnect {
-        boolean logoutInvoked;
+    private static final class NativeSupportedFacebookConnect extends FacebookConnect {
+        private boolean logoutInvoked;
 
         @Override
         public boolean isFacebookSDKSupported() {
@@ -267,18 +142,62 @@ class FacebookConnectTest extends UITestBase {
         }
     }
 
-    private static class TestableFacebookConnect extends FacebookConnect {
-        int loginCalls;
-        int logoutCalls;
+    private static final class NativeTokenFacebookConnect extends FacebookConnect {
+        @Override
+        public boolean isFacebookSDKSupported() {
+            return true;
+        }
+
+        @Override
+        public String getToken() {
+            return "native-value";
+        }
+    }
+
+    private static final class BridgeFacebookConnect extends FacebookConnect {
+        private int loginInvocations;
+        private int logoutInvocations;
 
         @Override
         public void login() {
-            loginCalls++;
+            loginInvocations++;
         }
 
         @Override
         public void logout() {
-            logoutCalls++;
+            logoutInvocations++;
+        }
+    }
+
+    private void runOffEdt(Runnable runnable) {
+        runOffEdt(new Callable<Void>() {
+            @Override
+            public Void call() {
+                runnable.run();
+                return null;
+            }
+        });
+    }
+
+    private <T> T runOffEdt(Callable<T> callable) {
+        FutureTask<T> task = new FutureTask<T>(callable);
+        Thread worker = new Thread(task, "FacebookConnectTest-worker");
+        worker.setDaemon(true);
+        worker.start();
+        try {
+            return task.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            worker.interrupt();
+            throw new AssertionError("Timed out waiting for background operation", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            throw new AssertionError("Background operation failed", cause);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for background operation", e);
         }
     }
 }
