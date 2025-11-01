@@ -13,6 +13,12 @@ import org.junit.jupiter.api.BeforeEach;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 class FacebookConnectTest extends UITestBase {
 
     private FacebookConnect connect;
@@ -39,7 +45,12 @@ class FacebookConnectTest extends UITestBase {
         Preferences.set(FacebookConnect.class.getName() + "Token", "cached-token");
         FaceBookAccess.setToken("server-token");
 
-        connect.doLogout();
+        runOffEdt(new Runnable() {
+            @Override
+            public void run() {
+                connect.doLogout();
+            }
+        });
 
         assertNull(connect.getAccessToken());
         assertNull(FaceBookAccess.getToken());
@@ -56,7 +67,12 @@ class FacebookConnectTest extends UITestBase {
         FaceBookAccess.setToken("native-token");
         NativeSupportedFacebookConnect nativeConnect = new NativeSupportedFacebookConnect();
 
-        nativeConnect.doLogout();
+        runOffEdt(new Runnable() {
+            @Override
+            public void run() {
+                nativeConnect.doLogout();
+            }
+        });
 
         assertTrue(nativeConnect.logoutInvoked);
         assertEquals("native-token", FaceBookAccess.getToken());
@@ -75,7 +91,12 @@ class FacebookConnectTest extends UITestBase {
     void getAccessTokenReturnsNativeTokenWhenSupported() {
         NativeTokenFacebookConnect nativeConnect = new NativeTokenFacebookConnect();
 
-        AccessToken token = nativeConnect.getAccessToken();
+        AccessToken token = runOffEdt(new Callable<AccessToken>() {
+            @Override
+            public AccessToken call() {
+                return nativeConnect.getAccessToken();
+            }
+        });
 
         assertNotNull(token);
         assertEquals("native-value", token.getToken());
@@ -145,6 +166,38 @@ class FacebookConnectTest extends UITestBase {
         @Override
         public void logout() {
             logoutInvocations++;
+        }
+    }
+
+    private void runOffEdt(Runnable runnable) {
+        runOffEdt(new Callable<Void>() {
+            @Override
+            public Void call() {
+                runnable.run();
+                return null;
+            }
+        });
+    }
+
+    private <T> T runOffEdt(Callable<T> callable) {
+        FutureTask<T> task = new FutureTask<T>(callable);
+        Thread worker = new Thread(task, "FacebookConnectTest-worker");
+        worker.setDaemon(true);
+        worker.start();
+        try {
+            return task.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            worker.interrupt();
+            throw new AssertionError("Timed out waiting for background operation", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            throw new AssertionError("Background operation failed", cause);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for background operation", e);
         }
     }
 }
