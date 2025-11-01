@@ -19,7 +19,7 @@ public class Cn1ssDeviceRunnerReporter extends TestReporting {
     @Override
     public void logMessage(String message) {
         super.logMessage(message);
-        if (message != null && !message.isEmpty()) {
+        if (message != null && message.length() > 0) {
             System.out.println("CN1SS:INFO:message=" + message);
         }
     }

@@ -96,7 +96,7 @@ final class Cn1ssDeviceRunnerHelper {
     }
 
     private static void emitChannel(byte[] bytes, String safeName, String channel) {
-        String prefix = channel != null && !channel.isEmpty() ? "CN1SS" + channel : "CN1SS";
+        String prefix = channel != null && channel.length() > 0 ? "CN1SS" + channel : "CN1SS";
         if (bytes == null || bytes.length == 0) {
             println(prefix + ":END:" + safeName);
             System.out.flush();
@@ -119,7 +119,7 @@ final class Cn1ssDeviceRunnerHelper {
         if (testName == null || testName.length() == 0) {
             return "default";
         }
-        StringBuilder sanitized = new StringBuilder(testName.length());
+        StringBuffer sanitized = new StringBuffer(testName.length());
         for (int i = 0; i < testName.length(); i++) {
             char ch = testName.charAt(i);
             if (isSafeChar(ch)) {
@@ -146,7 +146,7 @@ final class Cn1ssDeviceRunnerHelper {
         if (text.length() >= width) {
             return text;
         }
-        StringBuilder builder = new StringBuilder(width);
+        StringBuffer builder = new StringBuffer(width);
         for (int i = text.length(); i < width; i++) {
             builder.append('0');
         }
