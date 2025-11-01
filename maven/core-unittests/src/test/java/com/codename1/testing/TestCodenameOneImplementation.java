@@ -1285,9 +1285,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void startThread(String name, Runnable r) {
-        if (r != null) {
-            r.run();
+        if (r == null) {
+            return;
         }
+
+        Thread worker = new Thread(r, name == null ? "CN1-TestThread" : name);
+        worker.setDaemon(true);
+        worker.start();
     }
 
     // -----------------------------------------------------------------
