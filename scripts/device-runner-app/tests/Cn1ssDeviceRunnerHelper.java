@@ -116,10 +116,29 @@ final class Cn1ssDeviceRunnerHelper {
     }
 
     static String sanitizeTestName(String testName) {
-        if (testName == null) {
+        if (testName == null || testName.length() == 0) {
             return "default";
         }
-        return testName.replaceAll("[^A-Za-z0-9_.-]", "_");
+        StringBuilder sanitized = new StringBuilder(testName.length());
+        for (int i = 0; i < testName.length(); i++) {
+            char ch = testName.charAt(i);
+            if (isSafeChar(ch)) {
+                sanitized.append(ch);
+            } else {
+                sanitized.append('_');
+            }
+        }
+        return sanitized.toString();
+    }
+
+    private static boolean isSafeChar(char ch) {
+        if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
+            return true;
+        }
+        if (ch >= '0' && ch <= '9') {
+            return true;
+        }
+        return ch == '_' || ch == '.' || ch == '-';
     }
 
     private static String zeroPad(int value, int width) {
