@@ -5,38 +5,26 @@ import com.codename1.testing.TestUtils;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 
 public class BrowserComponentScreenshotTest extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
         final boolean[] supported = new boolean[1];
-        Display.getInstance().callSeriallyAndWait(new Runnable() {
-            public void run() {
-                supported[0] = BrowserComponent.isNativeBrowserSupported();
-            }
-        });
+        Display.getInstance().callSeriallyAndWait(() -> supported[0] = BrowserComponent.isNativeBrowserSupported());
         if (!supported[0]) {
             TestUtils.log("BrowserComponent native support unavailable; skipping screenshot test");
             return true;
         }
 
         final boolean[] loadFinished = new boolean[1];
-        Display.getInstance().callSeriallyAndWait(new Runnable() {
-            public void run() {
-                Form form = new Form("Browser Test", new BorderLayout());
-                BrowserComponent browser = new BrowserComponent();
-                browser.addWebEventListener(BrowserComponent.onLoad, new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        loadFinished[0] = true;
-                    }
-                });
-                browser.setPage(buildHtml(), null);
-                form.add(BorderLayout.CENTER, browser);
-                form.show();
-            }
+        Display.getInstance().callSeriallyAndWait(() -> {
+            Form form = new Form("Browser Test", new BorderLayout());
+            BrowserComponent browser = new BrowserComponent();
+            browser.addWebEventListener(BrowserComponent.onLoad, evt -> loadFinished[0] = true);
+            browser.setPage(buildHtml(), null);
+            form.add(BorderLayout.CENTER, browser);
+            form.show();
         });
 
         for (int elapsed = 0; elapsed < 10000 && !loadFinished[0]; elapsed += 200) {
@@ -50,11 +38,7 @@ public class BrowserComponentScreenshotTest extends AbstractTest {
         Cn1ssDeviceRunnerHelper.waitForMillis(500);
 
         final boolean[] result = new boolean[1];
-        Display.getInstance().callSeriallyAndWait(new Runnable() {
-            public void run() {
-                result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("BrowserComponent");
-            }
-        });
+        Display.getInstance().callSeriallyAndWait(() -> result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("BrowserComponent"));
         return result[0];
     }
 

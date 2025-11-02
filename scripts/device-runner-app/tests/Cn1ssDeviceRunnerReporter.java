@@ -29,7 +29,7 @@ public class Cn1ssDeviceRunnerReporter extends TestReporting {
         super.logException(err);
         System.out.println("CN1SS:ERR:exception=" + err);
         if (err != null) {
-            err.printStackTrace(System.out);
+            err.printStackTrace();
         }
     }
 

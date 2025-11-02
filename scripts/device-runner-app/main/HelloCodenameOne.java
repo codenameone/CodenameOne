@@ -8,8 +8,6 @@ import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -63,11 +61,7 @@ public class HelloCodenameOne {
             body.getAllStyles().setFgColor(0xf9fafb);
 
             Button openBrowser = new Button("Open Browser Screen");
-            openBrowser.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    showBrowserForm();
-                }
-            });
+            openBrowser.addActionListener(evt -> showBrowserForm());
 
             content.add(heading);
             content.add(body);
@@ -88,11 +82,7 @@ public class HelloCodenameOne {
         browserForm.getToolbar().addMaterialCommandToLeftBar(
                 "Back",
                 FontImage.MATERIAL_ARROW_BACK,
-                new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        showMainForm();
-                    }
-                }
+                evt -> showMainForm()
         );
 
         current = browserForm;
