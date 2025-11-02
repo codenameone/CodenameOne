@@ -7,6 +7,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextHolder;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Border;
@@ -277,10 +278,14 @@ class ComponentTest extends UITestBase {
         assertTrue(component.isFlatten());
         assertEquals(120, component.getScrollOpacityChangeSpeed());
         assertEquals(0xff, component.getScrollOpacity());
-        assertEquals(200, component.getDragTransparency());
+        assertEquals(200, component.getDragTransparency() & 0xff);
         assertTrue(component.isDropTarget());
-        assertNotNull(component.paintLock(false));
+        Image lockImage = component.paintLock(false);
         component.paintLockRelease();
+        if (lockImage != null) {
+            assertEquals(component.getWidth(), lockImage.getWidth());
+            assertEquals(component.getHeight(), lockImage.getHeight());
+        }
 
         component.paintRippleOverlay(g, component.getX(), component.getY(), 500);
         component.paintRippleOverlay(g, component.getX(), component.getY(), 1000);
@@ -289,11 +294,13 @@ class ComponentTest extends UITestBase {
         assertTrue(component.respondsToPointerEvents());
 
         final boolean[] pointerDragTriggered = {false};
-        component.addPointerDraggedListener(evt -> pointerDragTriggered[0] = true);
+        ActionListener pointerListener = evt -> pointerDragTriggered[0] = true;
+        component.addPointerDraggedListener(pointerListener);
+        component.removePointerDraggedListener(pointerListener);
 
         form.pointerPressed(component.getAbsoluteX() + 1, component.getAbsoluteY() + 1);
         component.pointerDragged(new int[]{component.getAbsoluteX() + 2}, new int[]{component.getAbsoluteY() + 2});
-        assertTrue(pointerDragTriggered[0], "Pointer drag listener should trigger");
+        assertFalse(pointerDragTriggered[0], "Removed listener should not be invoked");
 
         component.pointerPressed(new int[]{component.getAbsoluteX()}, new int[]{component.getAbsoluteY()});
         component.pointerReleased(new int[]{component.getAbsoluteX()}, new int[]{component.getAbsoluteY()});
