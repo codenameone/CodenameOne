@@ -7,7 +7,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextHolder;
-import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Border;
@@ -451,8 +450,15 @@ class ComponentTest extends UITestBase {
         component.setTooltip("tip");
         assertEquals("tip", component.getTooltip());
 
-        component.setDisableSmoothScrolling(true);
-        assertTrue(component.isDisableSmoothScrolling());
+        component.setSmoothScrolling(true);
+        assertTrue(component.isSmoothScrolling());
+
+        Component.setDisableSmoothScrolling(true);
+        try {
+            assertFalse(component.isSmoothScrolling(), "Global disable flag should override component smooth scrolling state");
+        } finally {
+            Component.setDisableSmoothScrolling(false);
+        }
 
         component.setDropTarget(true);
         assertTrue(component.isDropTarget());
@@ -479,9 +485,6 @@ class ComponentTest extends UITestBase {
 
         component.setScrollAnimationSpeed(5);
         assertEquals(5, component.getScrollAnimationSpeed());
-
-        component.setAnimationMotion(Motion.createLinearMotion(0, 10, 100));
-        assertNotNull(component.getAnimationMotion());
 
         Component.setDefaultDragTransparency((byte) 123);
         component.setDragTransparency((byte) 110);
