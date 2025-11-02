@@ -241,8 +241,8 @@ class ComponentTest extends UITestBase {
         component.setX(5);
         component.setY(7);
         component.setDraggable(true);
-        component.setScrollableX(true);
-        component.setScrollableY(true);
+        component.setTestScrollableX(true);
+        component.setTestScrollableY(true);
         component.setScrollOpacityChangeSpeed(120);
         component.setDragTransparency((byte) 200);
         component.setDropTarget(true);
@@ -747,8 +747,29 @@ class ComponentTest extends UITestBase {
     }
 
     private static class CoverageComponent extends Component {
+        private boolean scrollableX;
+        private boolean scrollableY;
+
         CoverageComponent() {
             setUIID("Label");
+        }
+
+        void setTestScrollableX(boolean value) {
+            scrollableX = value;
+        }
+
+        void setTestScrollableY(boolean value) {
+            scrollableY = value;
+        }
+
+        @Override
+        public boolean isScrollableX() {
+            return scrollableX;
+        }
+
+        @Override
+        public boolean isScrollableY() {
+            return scrollableY;
         }
 
         @Override
