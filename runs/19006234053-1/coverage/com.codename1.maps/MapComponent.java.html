@@ -1,0 +1,1157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MapComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps</a> &gt; <span class="el_source">MapComponent.java</span></div><h1>MapComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2010, 2011 Itiner.pl. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Itiner designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Itiner in the LICENSE.txt file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+package com.codename1.maps;
+
+import com.codename1.location.Location;
+import com.codename1.location.LocationManager;
+import com.codename1.maps.layers.Layer;
+import com.codename1.maps.layers.PointsLayer;
+import com.codename1.maps.providers.MapProvider;
+import com.codename1.maps.providers.OpenStreetMapProvider;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Point;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.UITimer;
+import com.codename1.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Vector;
+
+
+/**
+ * All communication with the map and layers should be done in WGS84, it takes
+ * care of coordinates transformation.
+ *
+ * @author Roman Kamyk &lt;roman.kamyk@itiner.pl&gt;
+ * @deprecated we highly recommend migrating to the native maps cn1lib
+ */
+public class MapComponent extends Container {
+
+<span class="nc" id="L60">    private static final Font attributionFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);</span>
+    private Coord _center;
+    private int _zoom;
+    private final MapProvider _map;
+    private final Vector _layers;
+<span class="nc" id="L65">    private final boolean _debugInfo = false;</span>
+<span class="nc" id="L66">    private boolean _needTiles = true;</span>
+    private int draggedx, draggedy;
+    private int pressedx, pressedy;
+    private Vector _tiles;
+<span class="nc" id="L70">    private Point _delta = null;</span>
+<span class="nc" id="L71">    private double latitude = Double.NaN;</span>
+<span class="nc" id="L72">    private double longitude = Double.NaN;</span>
+<span class="nc" id="L73">    private boolean drawMapPointer = false;</span>
+<span class="nc" id="L74">    private double oldDistance = -1;</span>
+<span class="nc" id="L75">    private Image buffer = null;</span>
+<span class="nc" id="L76">    private boolean refreshLayers = false;</span>
+<span class="nc" id="L77">    private int scaleX = 0;</span>
+<span class="nc" id="L78">    private int scaleY = 0;</span>
+    private int translateX;
+    private int translateY;
+<span class="nc" id="L81">    private int zoomCenterX = 0;</span>
+<span class="nc" id="L82">    private int zoomCenterY = 0;</span>
+<span class="nc" id="L83">    private long lastPressed = -1;</span>
+<span class="nc" id="L84">    private int tapCount = 0;</span>
+<span class="nc" id="L85">    private final int singleTapThreshold = 200;</span>
+<span class="nc" id="L86">    private final int doubleTapThreshold = 200;</span>
+    private ArrayList&lt;MapListener&gt; listeners;
+
+    /**
+     * Empty constructor creates a map with OpenStreetMapProvider on the Last
+     * known Location of the LocationManager
+     */
+    public MapComponent() {
+<span class="nc" id="L94">        this(new OpenStreetMapProvider());</span>
+<span class="nc" id="L95">    }</span>
+
+    /**
+     * Constructor with a given provider
+     *
+     * @param provider map provider
+     */
+    public MapComponent(MapProvider provider) {
+<span class="nc" id="L103">        this(provider, (Coord) null, 4, true);</span>
+<span class="nc" id="L104">    }</span>
+
+    /**
+     * Constructor
+     *
+     * @param provider       map provider
+     * @param centerPosition center position
+     * @param zoomLevel      zoom level
+     */
+    public MapComponent(MapProvider provider, Location centerPosition, int zoomLevel) {
+<span class="nc" id="L114">        this(provider, centerPosition, zoomLevel, true);</span>
+<span class="nc" id="L115">    }</span>
+
+    /**
+     * Constructor
+     *
+     * @param provider       map provider
+     * @param centerPosition center position
+     * @param zoomLevel      zoom level
+     * @param cacheEnabled   is cache enabled
+     */
+    public MapComponent(MapProvider provider, Location centerPosition, int zoomLevel, boolean cacheEnabled) {
+<span class="nc" id="L126">        this(provider, new Coord(centerPosition.getLatitude(), centerPosition.getLongitude()), zoomLevel, cacheEnabled);</span>
+<span class="nc" id="L127">    }</span>
+
+    /**
+     * Constructor
+     *
+     * @param provider       map provider
+     * @param centerPosition center position
+     * @param zoomLevel      zoom level
+     */
+    public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel) {
+<span class="nc" id="L137">        this(provider, centerPosition, zoomLevel, true);</span>
+<span class="nc" id="L138">    }</span>
+
+    /**
+     * Constructor
+     *
+     * @param provider       map provider
+     * @param centerPosition center position
+     * @param zoomLevel      zoom level
+     * @param cacheEnabled   is cache enabled
+     */
+<span class="nc" id="L148">    public MapComponent(MapProvider provider, Coord centerPosition, int zoomLevel, boolean cacheEnabled) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (cacheEnabled) {</span>
+<span class="nc" id="L150">            _map = new CacheProviderProxy(provider);</span>
+        } else {
+<span class="nc" id="L152">            _map = provider;</span>
+        }
+
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (centerPosition == null) {</span>
+<span class="nc" id="L156">            Location l = LocationManager.getLocationManager().getLastKnownLocation();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (l != null) {</span>
+<span class="nc" id="L158">                Coord p = new Coord(l.getLatitude(), l.getLongitude());</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                _center = p.isProjected() ? p : _map.projection().fromWGS84(p);</span>
+<span class="nc" id="L160">            } else {</span>
+<span class="nc" id="L161">                _center = new Coord(0, 0, true);</span>
+            }
+<span class="nc" id="L163">        } else {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            _center = centerPosition.isProjected() ? centerPosition : _map.projection().fromWGS84(centerPosition);</span>
+        }
+
+<span class="nc" id="L167">        _zoom = zoomLevel;</span>
+<span class="nc" id="L168">        _layers = new Vector();</span>
+<span class="nc" id="L169">        setFocusable(false);</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        if (Display.getInstance().isTouchScreenDevice() &amp;&amp; getUIManager().isThemeConstant(&quot;mapZoomButtonsBool&quot;, true)) {</span>
+<span class="nc" id="L171">            setLayout(new BorderLayout());</span>
+<span class="nc" id="L172">            Container buttonsbar = new Container(new FlowLayout(Component.RIGHT));</span>
+<span class="nc" id="L173">            Button out = new Button(&quot;-&quot;);</span>
+<span class="nc" id="L174">            out.setUIID(&quot;MapZoomOut&quot;);</span>
+
+<span class="nc" id="L176">            out.addActionListener(new ActionListener() {</span>
+
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L179">                    zoomOut();</span>
+<span class="nc" id="L180">                    repaint();</span>
+<span class="nc" id="L181">                    fireMapListenerEvent();</span>
+<span class="nc" id="L182">                }</span>
+            });
+<span class="nc" id="L184">            buttonsbar.addComponent(out);</span>
+<span class="nc" id="L185">            Button in = new Button(&quot;+&quot;);</span>
+<span class="nc" id="L186">            in.setUIID(&quot;MapZoomIn&quot;);</span>
+<span class="nc" id="L187">            in.addActionListener(new ActionListener() {</span>
+
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L190">                    zoomIn();</span>
+<span class="nc" id="L191">                    repaint();</span>
+<span class="nc" id="L192">                    fireMapListenerEvent();</span>
+<span class="nc" id="L193">                }</span>
+            });
+<span class="nc" id="L195">            buttonsbar.addComponent(in);</span>
+<span class="nc" id="L196">            addComponent(BorderLayout.SOUTH, buttonsbar);</span>
+        }
+<span class="nc" id="L198">        drawMapPointer = UIManager.getInstance().isThemeConstant(&quot;drawMapPointerBool&quot;, false);</span>
+<span class="nc" id="L199">    }</span>
+
+    /**
+     * Returns the distance between 2 points in meters
+     *
+     * @param latitude1
+     * @param longitude1
+     * @param latitude2
+     * @param longitude2
+     * @return distance in meters
+     */
+    public static long distance(double latitude1, double longitude1, double latitude2, double longitude2) {
+<span class="nc" id="L211">        double latitudeSin = Math.sin(Math.toRadians(latitude2 - latitude1) / 2);</span>
+<span class="nc" id="L212">        double longitudeSin = Math.sin(Math.toRadians(longitude2 - longitude1) / 2);</span>
+<span class="nc" id="L213">        double a = latitudeSin * latitudeSin</span>
+<span class="nc" id="L214">                + Math.cos(Math.toRadians(latitude1)) * Math.cos(Math.toRadians(latitude2)) * longitudeSin * longitudeSin;</span>
+<span class="nc" id="L215">        double c = 2 * MathUtil.atan2(Math.sqrt(a), Math.sqrt(1 - a));</span>
+<span class="nc" id="L216">        return (long) (6378137 * c);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paintBackground(Graphics g) {
+<span class="nc" id="L223">        super.paintBackground(g);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            if (buffer == null) {</span>
+<span class="nc" id="L226">                buffer = ImageFactory.createImage(this, getWidth(), getHeight(), 0);</span>
+            }
+<span class="nc bnc" id="L228" title="All 4 branches missed.">            if (_needTiles || refreshLayers) {</span>
+<span class="nc" id="L229">                paintmap(buffer.getGraphics());</span>
+<span class="nc" id="L230">                refreshLayers = false;</span>
+            }
+<span class="nc" id="L232">            g.translate(-translateX, -translateY);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (scaleX &gt; 0) {</span>
+<span class="nc" id="L234">                float tx = (float) zoomCenterX / (float) getWidth();</span>
+<span class="nc" id="L235">                tx = tx * (float) (scaleX - getWidth());</span>
+<span class="nc" id="L236">                float ty = (float) zoomCenterY / (float) getHeight();</span>
+<span class="nc" id="L237">                ty = ty * (float) (scaleY - getHeight());</span>
+<span class="nc" id="L238">                g.drawImage(buffer, -(int) tx, -(int) ty, scaleX, scaleY);</span>
+<span class="nc" id="L239">            } else {</span>
+<span class="nc" id="L240">                g.drawImage(buffer, (getWidth() - buffer.getWidth()) / 2, (getHeight() - buffer.getHeight()) / 2);</span>
+            }
+
+<span class="nc" id="L243">            g.translate(translateX, translateY);</span>
+        } else {
+<span class="nc" id="L245">            int clipx = g.getClipX();</span>
+<span class="nc" id="L246">            int clipy = g.getClipY();</span>
+<span class="nc" id="L247">            int clipw = g.getClipWidth();</span>
+<span class="nc" id="L248">            int cliph = g.getClipHeight();</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            if (scaleX &gt; 0) {</span>
+<span class="nc" id="L250">                float sx = (float) scaleX / (float) getWidth();</span>
+<span class="nc" id="L251">                float sy = (float) scaleY / (float) getHeight();</span>
+<span class="nc" id="L252">                float tx = (float) zoomCenterX / (float) getWidth();</span>
+<span class="nc" id="L253">                tx = -tx * (float) (scaleX - getWidth()) / sx;</span>
+<span class="nc" id="L254">                float ty = (float) zoomCenterY / (float) getHeight();</span>
+<span class="nc" id="L255">                ty = -ty * (float) (scaleY - getHeight()) / sy;</span>
+<span class="nc" id="L256">                g.translate((int) tx, (int) ty);</span>
+<span class="nc" id="L257">                g.scale(sx, sy);</span>
+<span class="nc" id="L258">                paintmap(g);</span>
+<span class="nc" id="L259">                g.resetAffine();</span>
+<span class="nc" id="L260">                g.translate(-(int) tx, -(int) ty);</span>
+<span class="nc" id="L261">            } else {</span>
+<span class="nc" id="L262">                g.translate(-translateX, -translateY);</span>
+<span class="nc" id="L263">                paintmap(g);</span>
+<span class="nc" id="L264">                g.translate(translateX, translateY);</span>
+            }
+<span class="nc" id="L266">            g.setClip(clipx, clipy, clipw, cliph);</span>
+        }
+<span class="nc" id="L268">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void laidOut() {
+<span class="nc" id="L274">        super.laidOut();</span>
+        /*if (buffer != null) {
+            buffer.dispose();
+        }*/
+<span class="nc" id="L278">        refreshLayers = true;</span>
+<span class="nc" id="L279">        _needTiles = true;</span>
+<span class="nc" id="L280">        buffer = null;</span>
+        //super.repaint();
+<span class="nc" id="L282">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected boolean shouldBlockSideSwipe() {
+<span class="nc" id="L288">        return true;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Dimension calcPreferredSize() {
+<span class="nc" id="L295">        return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void focusGained() {
+<span class="nc" id="L302">        setHandlesInput(true);</span>
+<span class="nc" id="L303">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerDragged(int x, int y) {
+<span class="nc" id="L309">        super.pointerDragged(x, y);</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (oldDistance == -1) {</span>
+<span class="nc" id="L311">            translateX += (draggedx - x);</span>
+<span class="nc" id="L312">            translateY += (draggedy - y);</span>
+<span class="nc" id="L313">            draggedx = x;</span>
+<span class="nc" id="L314">            draggedy = y;</span>
+<span class="nc bnc" id="L315" title="All 4 branches missed.">            if (Math.abs(translateX) &gt; 10 || Math.abs(translateY) &gt; 10) {</span>
+<span class="nc" id="L316">                Coord scale = _map.scale(_zoom);</span>
+<span class="nc" id="L317">                _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());</span>
+<span class="nc" id="L318">                _needTiles = true;</span>
+<span class="nc" id="L319">                translateX = 0;</span>
+<span class="nc" id="L320">                translateY = 0;</span>
+            }
+        }
+<span class="nc" id="L323">        super.repaint();</span>
+<span class="nc" id="L324">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerPressed(int x, int y) {
+<span class="nc" id="L330">        super.pointerPressed(x, y);</span>
+<span class="nc" id="L331">        lastPressed = System.currentTimeMillis();</span>
+<span class="nc" id="L332">        pressedx = x;</span>
+<span class="nc" id="L333">        pressedy = y;</span>
+<span class="nc" id="L334">        draggedx = x;</span>
+<span class="nc" id="L335">        draggedy = y;</span>
+<span class="nc" id="L336">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (x.length &gt; 1) {</span>
+<span class="nc" id="L344">            double currentDis = distance(x, y);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            if (oldDistance == -1) {</span>
+<span class="nc" id="L346">                oldDistance = currentDis;</span>
+<span class="nc" id="L347">                zoomCenterX = (x[0] + x[1]) / 2 - getAbsoluteX();</span>
+<span class="nc" id="L348">                zoomCenterY = (y[0] + y[1]) / 2 - getAbsoluteY();</span>
+<span class="nc" id="L349">                scaleX = getWidth();</span>
+<span class="nc" id="L350">                scaleY = getHeight();</span>
+            }
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            if (Math.abs(currentDis - oldDistance) &gt; 10f) {</span>
+<span class="nc" id="L353">                double scale = currentDis / oldDistance;</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">                if (scale &gt; 1) {</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                    if (_zoom == getProvider().maxZoomLevel()) {</span>
+<span class="nc" id="L356">                        scaleX = 0;</span>
+<span class="nc" id="L357">                        scaleY = 0;</span>
+<span class="nc" id="L358">                        oldDistance = -1;</span>
+<span class="nc" id="L359">                        return;</span>
+                    }
+                } else {
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                    if (_zoom == getProvider().minZoomLevel()) {</span>
+<span class="nc" id="L363">                        scaleX = 0;</span>
+<span class="nc" id="L364">                        scaleY = 0;</span>
+<span class="nc" id="L365">                        oldDistance = -1;</span>
+<span class="nc" id="L366">                        return;</span>
+                    }
+                }
+<span class="nc" id="L369">                scaleX = (int) (scale * scaleX);</span>
+<span class="nc" id="L370">                scaleY = (int) (scale * scaleY);</span>
+<span class="nc" id="L371">                oldDistance = currentDis;</span>
+<span class="nc" id="L372">                super.repaint();</span>
+            }
+<span class="nc" id="L374">        } else {</span>
+<span class="nc" id="L375">            super.pointerDragged(x, y);</span>
+        }
+<span class="nc" id="L377">    }</span>
+
+    private double distance(int[] x, int[] y) {
+<span class="nc" id="L380">        int disx = x[0] - x[1];</span>
+<span class="nc" id="L381">        int disy = y[0] - y[1];</span>
+<span class="nc" id="L382">        return Math.sqrt(disx * disx + disy * disy);</span>
+    }
+
+    protected void pointerTapped(int x, int y, int tapCount) {
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if (tapCount == 2) {</span>
+<span class="nc" id="L387">            Coord c = this.getCoordFromPosition(x, y);</span>
+<span class="nc" id="L388">            _center = _map.projection().fromWGS84(c);</span>
+<span class="nc" id="L389">            zoomIn();</span>
+<span class="nc" id="L390">            super.repaint();</span>
+        }
+<span class="nc" id="L392">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerReleased(int x, int y) {
+<span class="nc" id="L398">        super.pointerReleased(x, y);</span>
+
+<span class="nc" id="L400">        final long currTime = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if (currTime - lastPressed &lt; singleTapThreshold) {</span>
+<span class="nc" id="L402">            tapCount++;</span>
+<span class="nc" id="L403">            final int tapX = x;</span>
+<span class="nc" id="L404">            final int tapY = y;</span>
+<span class="nc" id="L405">            final int currTapCount = tapCount;</span>
+<span class="nc" id="L406">            UITimer timer = new UITimer(new Runnable() {</span>
+
+                public void run() {
+<span class="nc bnc" id="L409" title="All 2 branches missed.">                    if (currTapCount == tapCount) {</span>
+<span class="nc" id="L410">                        pointerTapped(tapX, tapY, tapCount);</span>
+<span class="nc" id="L411">                        tapCount = 0;</span>
+                    }
+<span class="nc" id="L413">                }</span>
+
+            });
+<span class="nc" id="L416">            timer.schedule(doubleTapThreshold, false, this.getComponentForm());</span>
+<span class="nc" id="L417">        } else {</span>
+<span class="nc" id="L418">            tapCount = 0;</span>
+        }
+
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (oldDistance != -1) {</span>
+<span class="nc" id="L422">            double scale = (double) scaleX / (double) getWidth();</span>
+<span class="nc" id="L423">            Coord refCoord = this.getCoordFromPosition(zoomCenterX + getAbsoluteX(), zoomCenterY + getAbsoluteY());</span>
+<span class="nc" id="L424">            int oldZoom = _zoom;</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">            if (scale &gt; 1) {</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">                if (scale &lt; 1.2) {</span>
+                    //do nothing
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                } else if (scale &lt; 1.6) {</span>
+<span class="nc" id="L429">                    zoomIn();</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                } else if (scale &lt; 2.0) {</span>
+<span class="nc" id="L431">                    zoomIn();</span>
+<span class="nc" id="L432">                    zoomIn();</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">                } else if (scale &lt; 2.4) {</span>
+<span class="nc" id="L434">                    zoomIn();</span>
+<span class="nc" id="L435">                    zoomIn();</span>
+<span class="nc" id="L436">                    zoomIn();</span>
+                } else {
+<span class="nc" id="L438">                    zoomIn();</span>
+<span class="nc" id="L439">                    zoomIn();</span>
+<span class="nc" id="L440">                    zoomIn();</span>
+<span class="nc" id="L441">                    zoomIn();</span>
+                }
+            } else {
+<span class="nc bnc" id="L444" title="All 2 branches missed.">                if (scale &gt; 0.8) {</span>
+                    //do nothing
+<span class="nc bnc" id="L446" title="All 2 branches missed.">                } else if (scale &gt; 0.5) {</span>
+<span class="nc" id="L447">                    zoomOut();</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">                } else if (scale &gt; 0.2) {</span>
+<span class="nc" id="L449">                    zoomOut();</span>
+<span class="nc" id="L450">                    zoomOut();</span>
+                } else {
+<span class="nc" id="L452">                    zoomOut();</span>
+<span class="nc" id="L453">                    zoomOut();</span>
+<span class="nc" id="L454">                    zoomOut();</span>
+                }
+            }
+<span class="nc bnc" id="L457" title="All 2 branches missed.">            if (oldZoom != _zoom) {</span>
+<span class="nc" id="L458">                Coord c1 = this.getCoordFromPosition(0, 0);</span>
+<span class="nc" id="L459">                Coord c2 = this.getCoordFromPosition(getWidth(), getHeight());</span>
+<span class="nc" id="L460">                Coord pixelToCoord = new Coord((c2.getLatitude() - c1.getLatitude()) / (float) getHeight(), (c2.getLongitude() - c1.getLongitude()) / (float) getWidth());</span>
+<span class="nc" id="L461">                float offX = (getWidth() / 2) - zoomCenterX;</span>
+<span class="nc" id="L462">                float offY = (getHeight() / 2) - zoomCenterY;</span>
+<span class="nc" id="L463">                _center = _map.projection().fromWGS84(refCoord.translate(offY * pixelToCoord.getLatitude(), offX * pixelToCoord.getLongitude()));</span>
+            }
+<span class="nc" id="L465">            translateX = 0;</span>
+<span class="nc" id="L466">            translateY = 0;</span>
+<span class="nc" id="L467">            scaleX = 0;</span>
+<span class="nc" id="L468">            scaleY = 0;</span>
+<span class="nc" id="L469">            oldDistance = -1;</span>
+<span class="nc bnc" id="L470" title="All 2 branches missed.">            if (buffer != null) {</span>
+                //buffer.dispose();
+<span class="nc" id="L472">                buffer = null;</span>
+<span class="nc" id="L473">                refreshLayers = true;</span>
+            }
+<span class="nc bnc" id="L475" title="All 2 branches missed.">            if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc" id="L476">                super.repaint();</span>
+            } else {
+                // workaround for rounding error in scale/clipping
+<span class="nc" id="L479">                getComponentForm().repaint();</span>
+            }
+<span class="nc" id="L481">            fireMapListenerEvent();</span>
+<span class="nc" id="L482">            return;</span>
+        }
+<span class="nc" id="L484">        Coord scale = _map.scale(_zoom);</span>
+<span class="nc" id="L485">        _center = _center.translate(translateY * -scale.getLatitude(), translateX * scale.getLongitude());</span>
+<span class="nc" id="L486">        _needTiles = true;</span>
+<span class="nc" id="L487">        translateX = 0;</span>
+<span class="nc" id="L488">        translateY = 0;</span>
+
+<span class="nc" id="L490">        x = x - getAbsoluteX();</span>
+<span class="nc" id="L491">        y = y - getAbsoluteY();</span>
+<span class="nc" id="L492">        Tile t = screenTile();</span>
+<span class="nc" id="L493">        Coord southWest = t.position(x - 20, t.dimension().getHeight() - y - 20);</span>
+<span class="nc" id="L494">        Mercator.inverseMercator(southWest.getLatitude(), southWest.getLongitude());</span>
+<span class="nc" id="L495">        Coord northEast = t.position(x + 20, t.dimension().getHeight() - y + 20);</span>
+<span class="nc" id="L496">        Mercator.inverseMercator(northEast.getLatitude(), northEast.getLongitude());</span>
+
+<span class="nc" id="L498">        BoundingBox bbox = new BoundingBox(southWest, northEast);</span>
+<span class="nc" id="L499">        Enumeration e = _layers.elements();</span>
+<span class="nc bnc" id="L500" title="All 2 branches missed.">        while (e.hasMoreElements()) {</span>
+<span class="nc" id="L501">            LayerWithZoomLevels layer = (LayerWithZoomLevels) e.nextElement();</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">            if (layer.layer instanceof PointsLayer) {</span>
+<span class="nc" id="L503">                ((PointsLayer) layer.layer).fireActionEvent(bbox);</span>
+            }
+<span class="nc" id="L505">        }</span>
+<span class="nc" id="L506">        super.repaint();</span>
+<span class="nc" id="L507">        fireMapListenerEvent();</span>
+<span class="nc" id="L508">    }</span>
+
+    /**
+     * Gets the Coord location on the map from a x, y position.
+     *
+     * @param x X-coordinate
+     * @param y Y-coordinate
+     * @return a Coord Object.
+     */
+    public Coord getCoordFromPosition(int x, int y) {
+<span class="nc" id="L518">        x = x - getAbsoluteX();</span>
+<span class="nc" id="L519">        y = y - getAbsoluteY();</span>
+<span class="nc" id="L520">        Tile t = screenTile();</span>
+<span class="nc" id="L521">        Coord c = t.position(x, t.dimension().getHeight() - y);</span>
+<span class="nc" id="L522">        return _map.projection().toWGS84(c);</span>
+    }
+
+    /**
+     * Gets the screen coordinates of a specific Coord
+     *
+     * @param coord a lat,lon location
+     * @return the Point of the coordinate on the Map
+     */
+    public Point getPointFromCoord(Coord coord) {
+<span class="nc bnc" id="L532" title="All 2 branches missed.">        if (!coord.isProjected()) {</span>
+<span class="nc" id="L533">            coord = _map.projection().fromWGS84(coord);</span>
+        }
+<span class="nc" id="L535">        return screenTile().pointPosition(coord);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void keyPressed(int keyCode) {
+<span class="nc" id="L542">        int oldZoom = _zoom;</span>
+<span class="nc" id="L543">        Coord oldCenter = _center;</span>
+
+<span class="nc bnc" id="L545" title="All 2 branches missed.">        if (isLeftKey(keyCode)) {</span>
+<span class="nc" id="L546">            moveLeft();</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">        } else if (isRightKey(keyCode)) {</span>
+<span class="nc" id="L548">            moveRight();</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">        } else if (isDownKey(keyCode)) {</span>
+<span class="nc" id="L550">            moveDown();</span>
+<span class="nc bnc" id="L551" title="All 2 branches missed.">        } else if (isUpKey(keyCode)) {</span>
+<span class="nc" id="L552">            moveUp();</span>
+        }
+<span class="nc bnc" id="L554" title="All 2 branches missed.">        if (!_map.projection().extent().contains(_center)) {</span>
+<span class="nc" id="L555">            _center = oldCenter;</span>
+        }
+<span class="nc bnc" id="L557" title="All 2 branches missed.">        if (isZoomInKey(keyCode)) {</span>
+<span class="nc" id="L558">            zoomIn();</span>
+        }
+<span class="nc bnc" id="L560" title="All 2 branches missed.">        if (isZoomOutKey(keyCode)) {</span>
+<span class="nc" id="L561">            zoomOut();</span>
+        }
+<span class="nc bnc" id="L563" title="All 2 branches missed.">        if (isZoomToLayersKey(keyCode)) {</span>
+<span class="nc" id="L564">            zoomToLayers();</span>
+        }
+<span class="nc" id="L566">        super.keyPressed(keyCode);</span>
+<span class="nc bnc" id="L567" title="All 4 branches missed.">        if (_center != oldCenter || _zoom != oldZoom) {</span>
+<span class="nc" id="L568">            _needTiles = true;</span>
+        }
+<span class="nc" id="L570">        super.repaint();</span>
+<span class="nc" id="L571">        fireMapListenerEvent();</span>
+<span class="nc" id="L572">    }</span>
+
+    private void paintmap(Graphics g) {
+
+<span class="nc" id="L576">        g.translate(getX(), getY());</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">        if (_needTiles) {</span>
+<span class="nc" id="L578">            getTiles();</span>
+<span class="nc" id="L579">            _needTiles = false;</span>
+        }
+<span class="nc" id="L581">        drawTiles(g);</span>
+<span class="nc" id="L582">        drawLayers(g);</span>
+        if (_debugInfo) {
+            drawDebug(g);
+        }
+<span class="nc" id="L586">        drawPointer(g);</span>
+<span class="nc" id="L587">        drawAttribution(g, _map.attribution());</span>
+<span class="nc" id="L588">        g.translate(-getX(), -getY());</span>
+<span class="nc" id="L589">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    private Tile screenTile() {
+<span class="nc" id="L595">        Dimension componentDimension = new Dimension(getWidth(), getHeight());</span>
+<span class="nc" id="L596">        Coord southWest = _map.translate(_center, _zoom, -getWidth() / 2, -getHeight() / 2);</span>
+<span class="nc" id="L597">        Coord northEast = _map.translate(_center, _zoom, getWidth() / 2, getHeight() / 2);</span>
+<span class="nc" id="L598">        BoundingBox bbox = new BoundingBox(southWest, northEast);</span>
+<span class="nc" id="L599">        return new Tile(componentDimension, bbox, null);</span>
+    }
+
+    private void getTiles() throws RuntimeException {
+<span class="nc" id="L603">        _tiles = new Vector();</span>
+<span class="nc" id="L604">        Dimension tileSize = _map.tileSize();</span>
+<span class="nc" id="L605">        int posY = 0;</span>
+<span class="nc" id="L606">        _delta = null;</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">        while (posY - tileSize.getHeight() &lt; getHeight()) {</span>
+<span class="nc" id="L608">            int posX = 0;</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">            while (posX - tileSize.getWidth() &lt; getWidth()) {</span>
+                Tile tile;
+<span class="nc" id="L611">                Coord cur = _map.translate(_center, _zoom, posX - getWidth() / 2, getHeight() / 2 - posY);</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">                if (_map.projection().extent().contains(cur)) {</span>
+<span class="nc" id="L613">                    tile = _map.tileFor(_map.bboxFor(cur, _zoom));</span>
+<span class="nc bnc" id="L614" title="All 2 branches missed.">                    if (_delta == null) {</span>
+<span class="nc" id="L615">                        _delta = tile.pointPosition(cur);</span>
+                    }
+<span class="nc" id="L617">                    tile.setsTileReadyListener(new ActionListener() {</span>
+
+                        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L620">                            refreshLayers = true;</span>
+<span class="nc" id="L621">                            repaint();</span>
+<span class="nc" id="L622">                        }</span>
+                    });
+<span class="nc" id="L624">                    _tiles.addElement(new PositionedTile(new Point(posX, posY), tile));</span>
+                }
+<span class="nc" id="L626">                posX += tileSize.getWidth();</span>
+<span class="nc" id="L627">            }</span>
+<span class="nc" id="L628">            posY += tileSize.getHeight();</span>
+<span class="nc" id="L629">        }</span>
+<span class="nc" id="L630">    }</span>
+
+    private void drawTiles(Graphics g) {
+<span class="nc bnc" id="L633" title="All 2 branches missed.">        if (_delta == null) {</span>
+            //#debug
+<span class="nc" id="L635">            System.out.println(&quot;Delta is null!&quot;);</span>
+<span class="nc" id="L636">            return;</span>
+        }
+<span class="nc" id="L638">        Enumeration e = _tiles.elements();</span>
+<span class="nc" id="L639">        g.translate(-_delta.getX(), -_delta.getY());</span>
+<span class="nc bnc" id="L640" title="All 2 branches missed.">        while (e.hasMoreElements()) {</span>
+<span class="nc" id="L641">            PositionedTile pt = (PositionedTile) e.nextElement();</span>
+<span class="nc" id="L642">            pt.tile().paint(g, pt.position().getX(), pt.position().getY());</span>
+<span class="nc" id="L643">        }</span>
+<span class="nc" id="L644">        g.translate(_delta.getX(), _delta.getY());</span>
+<span class="nc" id="L645">    }</span>
+
+    private void drawAttribution(Graphics g, String attribution) {
+<span class="nc bnc" id="L648" title="All 2 branches missed.">        if (attribution == null) {</span>
+<span class="nc" id="L649">            return;</span>
+        }
+<span class="nc" id="L651">        g.setColor(0);</span>
+<span class="nc" id="L652">        g.setFont(attributionFont);</span>
+<span class="nc" id="L653">        Font f = g.getFont();</span>
+<span class="nc" id="L654">        g.drawString(attribution, getWidth() - f.stringWidth(attribution) - 2, getHeight() - f.getHeight() - 2);</span>
+<span class="nc" id="L655">    }</span>
+
+    private void drawLayers(Graphics g) {
+<span class="nc" id="L658">        Enumeration e = _layers.elements();</span>
+<span class="nc" id="L659">        Tile screenTile = screenTile();</span>
+<span class="nc bnc" id="L660" title="All 2 branches missed.">        while (e.hasMoreElements()) {</span>
+<span class="nc" id="L661">            LayerWithZoomLevels layer = (LayerWithZoomLevels) e.nextElement();</span>
+<span class="nc bnc" id="L662" title="All 4 branches missed.">            if (_zoom &gt;= layer.minZoomLevel &amp;&amp; _zoom &lt;= layer.maxZoomLevel) {</span>
+<span class="nc" id="L663">                layer.layer.paint(g, screenTile);</span>
+            }
+<span class="nc" id="L665">        }</span>
+<span class="nc" id="L666">    }</span>
+
+    private void drawPointer(Graphics g) {
+<span class="nc bnc" id="L669" title="All 2 branches missed.">        if (drawMapPointer) {</span>
+<span class="nc" id="L670">            g.setColor(0xFF0000);</span>
+<span class="nc" id="L671">            int centerX = getWidth() / 2;</span>
+<span class="nc" id="L672">            int centerY = getHeight() / 2;</span>
+<span class="nc" id="L673">            int halfSize = 5;</span>
+<span class="nc" id="L674">            g.drawRoundRect(centerX - halfSize, centerY - halfSize, 2 * halfSize, 2 * halfSize, halfSize, halfSize);</span>
+        }
+<span class="nc" id="L676">    }</span>
+
+    private void drawDebug(Graphics g) {
+<span class="nc" id="L679">        g.setColor(0x000000);</span>
+<span class="nc" id="L680">        g.setFont(Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));</span>
+<span class="nc" id="L681">        g.drawString(_map.projection().toWGS84(_center).toString(), 5, 5);</span>
+<span class="nc" id="L682">        g.drawString(&quot;Zoom:&quot; + _zoom, 5, 5 + g.getFont().getHeight());</span>
+<span class="nc bnc" id="L683" title="All 2 branches missed.">        for (int i = 0; i &lt; _layers.size(); i++) {</span>
+<span class="nc" id="L684">            LayerWithZoomLevels lwzl = (LayerWithZoomLevels) _layers.elementAt(i);</span>
+<span class="nc" id="L685">            g.drawString(&quot;Layer &quot; + lwzl.layer.getName(), 5, 5 + (i + 2) * g.getFont().getHeight());</span>
+        }
+<span class="nc" id="L687">    }</span>
+
+    /**
+     * Adds a layer to the map
+     *
+     * @param layer to add
+     */
+    public void addLayer(Layer layer) {
+<span class="nc" id="L695">        addLayer(layer, 0, _map.maxZoomLevel());</span>
+<span class="nc" id="L696">    }</span>
+
+    /**
+     * Adds a layer to the map
+     *
+     * @param layer        to add
+     * @param minZoomLevel min zoom level of this Layer
+     * @param maxZoomLevel max zoom level of this Layer
+     */
+    public void addLayer(Layer layer, int minZoomLevel, int maxZoomLevel) {
+<span class="nc" id="L706">        _layers.addElement(new LayerWithZoomLevels(layer, minZoomLevel, maxZoomLevel));</span>
+<span class="nc" id="L707">        refreshLayers = true;</span>
+<span class="nc" id="L708">        super.repaint();</span>
+<span class="nc" id="L709">    }</span>
+
+    /**
+     * Removes a Layer from the map
+     *
+     * @param layer to remove
+     */
+    public void removeLayer(Layer layer) {
+<span class="nc" id="L717">        int length = _layers.size();</span>
+        int no;
+<span class="nc bnc" id="L719" title="All 2 branches missed.">        for (no = 0; no &lt; length; no++) {</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">            if (((LayerWithZoomLevels) _layers.elementAt(no)).layer == layer) {</span>
+<span class="nc" id="L721">                break;</span>
+            }
+        }
+<span class="nc" id="L724">        _layers.removeElementAt(no);</span>
+<span class="nc" id="L725">        refreshLayers = true;</span>
+<span class="nc" id="L726">        super.repaint();</span>
+<span class="nc" id="L727">    }</span>
+
+    /**
+     * Removes all layers from the map
+     */
+    public void removeAllLayers() {
+<span class="nc" id="L733">        _layers.removeAllElements();</span>
+<span class="nc" id="L734">        refreshLayers = true;</span>
+<span class="nc" id="L735">        super.repaint();</span>
+<span class="nc" id="L736">    }</span>
+
+    /**
+     * Returns layers count
+     *
+     * @return The number of layers.
+     */
+    public int getLayersConut() {
+<span class="nc" id="L744">        return _layers.size();</span>
+    }
+
+    /**
+     * Returns Layer at index
+     *
+     * @param index the index of the layer
+     * @return The layer at the given index.
+     * @throws ArrayIndexOutOfBoundsException - if the index is out of range
+     *                                        (index &amp;lt; 0 || index &amp;gt;= size())
+     */
+    public Layer getLayerAt(int index) {
+<span class="nc" id="L756">        Layer l = ((LayerWithZoomLevels) _layers.elementAt(index)).layer;</span>
+<span class="nc" id="L757">        return l;</span>
+    }
+
+    /**
+     * Gets the map provider
+     *
+     * @return the map provider
+     */
+    public MapProvider getProvider() {
+<span class="nc" id="L766">        return _map;</span>
+    }
+
+    @Override
+    public void repaint() {
+<span class="nc" id="L771">        refreshLayers = true;</span>
+<span class="nc" id="L772">        _needTiles = true;</span>
+<span class="nc" id="L773">        super.repaint();</span>
+<span class="nc" id="L774">    }</span>
+
+    /**
+     * move the map 25% left
+     */
+    public void moveLeft() {
+<span class="nc" id="L780">        Coord scale = _map.scale(_zoom);</span>
+<span class="nc" id="L781">        double partX = 1.0 * getWidth() / 4;</span>
+<span class="nc" id="L782">        _center = _center.translate(0, partX * -scale.getLongitude());</span>
+<span class="nc" id="L783">        _needTiles = true;</span>
+<span class="nc" id="L784">    }</span>
+
+    /**
+     * move the map 25% right
+     */
+    public void moveRight() {
+<span class="nc" id="L790">        Coord scale = _map.scale(_zoom);</span>
+<span class="nc" id="L791">        double partX = 1.0 * getWidth() / 4;</span>
+<span class="nc" id="L792">        _center = _center.translate(0, partX * scale.getLongitude());</span>
+<span class="nc" id="L793">        _needTiles = true;</span>
+<span class="nc" id="L794">    }</span>
+
+    /**
+     * move the map 25% up
+     */
+    public void moveUp() {
+<span class="nc" id="L800">        Coord scale = _map.scale(_zoom);</span>
+<span class="nc" id="L801">        double partY = 1.0 * getHeight() / 4;</span>
+<span class="nc" id="L802">        _center = _center.translate(partY * scale.getLatitude(), 0);</span>
+<span class="nc" id="L803">        _needTiles = true;</span>
+<span class="nc" id="L804">    }</span>
+
+    /**
+     * move the map 25% down
+     */
+    public void moveDown() {
+<span class="nc" id="L810">        Coord scale = _map.scale(_zoom);</span>
+<span class="nc" id="L811">        double partY = 1.0 * getHeight() / 4;</span>
+<span class="nc" id="L812">        _center = _center.translate(partY * -scale.getLatitude(), 0);</span>
+<span class="nc" id="L813">        _needTiles = true;</span>
+<span class="nc" id="L814">    }</span>
+
+    /**
+     * zoom in the map one level if possible
+     */
+    public void zoomIn() {
+<span class="nc bnc" id="L820" title="All 2 branches missed.">        if (_zoom &lt; _map.maxZoomLevel()) {</span>
+<span class="nc" id="L821">            _zoom += 1;</span>
+<span class="nc" id="L822">            _needTiles = true;</span>
+        }
+<span class="nc" id="L824">    }</span>
+
+    /**
+     * zoom out the map one level if possible
+     */
+    public void zoomOut() {
+<span class="nc bnc" id="L830" title="All 2 branches missed.">        if (_zoom &gt; _map.minZoomLevel()) {</span>
+<span class="nc" id="L831">            _zoom -= 1;</span>
+<span class="nc" id="L832">            _needTiles = true;</span>
+        }
+<span class="nc" id="L834">    }</span>
+
+    /**
+     * Zoom the map the the giving bounding box
+     *
+     * @param boundingBox to zoom to
+     * @throws IllegalArgumentException if the boundingBox is not wg84 format
+     */
+    public void zoomTo(BoundingBox boundingBox) {
+<span class="nc bnc" id="L843" title="All 2 branches missed.">        if (boundingBox.projected()) {</span>
+<span class="nc" id="L844">            throw new IllegalArgumentException(&quot;boundingBox should be wg84 format&quot;);</span>
+        }
+
+<span class="nc" id="L847">        Dimension dimension = null;</span>
+<span class="nc bnc" id="L848" title="All 4 branches missed.">        if (getWidth() == 0 || getHeight() == 0) {</span>
+<span class="nc" id="L849">            dimension = getPreferredSize();</span>
+        } else {
+<span class="nc" id="L851">            dimension = new Dimension(getWidth(), getHeight());</span>
+        }
+<span class="nc" id="L853">        final BoundingBox projectedBBOX = _map.projection().fromWGS84(boundingBox);</span>
+<span class="nc" id="L854">        Tile tile = new Tile(dimension, projectedBBOX, null);</span>
+<span class="nc" id="L855">        _zoom = _map.maxZoomFor(tile);</span>
+<span class="nc" id="L856">        _center = tile.position(tile.dimension().getWidth() / 2, tile.dimension().getHeight() / 2);</span>
+<span class="nc" id="L857">        _needTiles = true;</span>
+<span class="nc" id="L858">        super.repaint();</span>
+<span class="nc" id="L859">    }</span>
+
+    /**
+     * Zoom map to the center of the given coordinate with the given zoom level
+     *
+     * @param coord     center map to this coordinate, coord should be in wg84
+     *                  format
+     * @param zoomLevel zoom map to this level;
+     * @throws IllegalArgumentException if the coord is not wg84 format
+     */
+    public void zoomTo(Coord coord, int zoomLevel) {
+<span class="nc bnc" id="L870" title="All 2 branches missed.">        if (coord.isProjected()) {</span>
+<span class="nc" id="L871">            throw new IllegalArgumentException(&quot;coord should be wg84 format&quot;);</span>
+        }
+<span class="nc" id="L873">        _center = _map.projection().fromWGS84(coord);</span>
+<span class="nc" id="L874">        _zoom = zoomLevel;</span>
+<span class="nc" id="L875">        _needTiles = true;</span>
+<span class="nc" id="L876">        super.repaint();</span>
+<span class="nc" id="L877">    }</span>
+
+    /**
+     * zoom map to largest zoom while all Layers are contained
+     */
+    public void zoomToLayers() {
+<span class="nc" id="L883">        BoundingBox bbox = null;</span>
+<span class="nc" id="L884">        Enumeration e = _layers.elements();</span>
+<span class="nc bnc" id="L885" title="All 2 branches missed.">        while (e.hasMoreElements()) {</span>
+<span class="nc" id="L886">            LayerWithZoomLevels layer = (LayerWithZoomLevels) e.nextElement();</span>
+
+<span class="nc" id="L888">            BoundingBox layerBbox = layer.layer.boundingBox();</span>
+<span class="nc bnc" id="L889" title="All 2 branches missed.">            if (layerBbox == null) {</span>
+<span class="nc" id="L890">                continue;</span>
+            }
+<span class="nc bnc" id="L892" title="All 2 branches missed.">            if (bbox == null) {</span>
+<span class="nc" id="L893">                bbox = layerBbox;</span>
+            } else {
+<span class="nc" id="L895">                bbox = bbox.extend(layerBbox);</span>
+            }
+<span class="nc" id="L897">        }</span>
+<span class="nc bnc" id="L898" title="All 2 branches missed.">        if (bbox != null) {</span>
+<span class="nc bnc" id="L899" title="All 2 branches missed.">            if (bbox.projected()) {</span>
+<span class="nc" id="L900">                bbox = _map.projection().toWGS84(bbox);</span>
+            }
+<span class="nc" id="L902">            zoomTo(bbox);</span>
+        }
+<span class="nc" id="L904">        _needTiles = true;</span>
+<span class="nc" id="L905">    }</span>
+
+    /**
+     * Gets the center location of the map in WGS84 format.
+     *
+     * @return Coordinate of center location of map.
+     */
+    public Coord getCenter() {
+<span class="nc" id="L913">        return _map.projection().toWGS84(_center);</span>
+    }
+
+    /**
+     * Returns the current zoom level of the map.
+     *
+     * @return zoom level
+     */
+    public int getZoomLevel() {
+<span class="nc" id="L922">        return _zoom;</span>
+    }
+
+    /**
+     * Sets the current zoom level of the map.
+     *
+     * @param zoom Zoom level
+     */
+    public void setZoomLevel(int zoom) {
+<span class="nc bnc" id="L931" title="All 4 branches missed.">        if (zoom &lt;= getMaxZoomLevel() &amp;&amp; zoom &gt;= getMinZoomLevel()) {</span>
+<span class="nc" id="L932">            _zoom = zoom;</span>
+<span class="nc" id="L933">            _needTiles = true;</span>
+<span class="nc" id="L934">            super.repaint();</span>
+        } else {
+<span class="nc" id="L936">            System.out.println(&quot;zoom level must be bigger then the min zoom &quot;</span>
+                    + &quot;level and smaller then the max zoom level&quot;);
+        }
+<span class="nc" id="L939">    }</span>
+
+    /**
+     * Returns the max zoom level of the map
+     *
+     * @return max zoom level
+     */
+    public int getMaxZoomLevel() {
+<span class="nc" id="L947">        return _map.maxZoomLevel();</span>
+    }
+
+    /**
+     * Returns the min zoom level of the map
+     *
+     * @return min zoom level
+     */
+    public int getMinZoomLevel() {
+<span class="nc" id="L956">        return _map.minZoomLevel();</span>
+    }
+
+    /**
+     * Gets the center of the map.
+     *
+     * @return Coord in WGS84
+     */
+    public Coord center() {
+<span class="nc" id="L965">        return _map.projection().toWGS84(_center);</span>
+    }
+
+    /**
+     * Checks if key code is left keycode.
+     *
+     * @param keyCode The key-code to check.
+     * @return true if this is a left keycode
+     */
+    protected boolean isLeftKey(int keyCode) {
+<span class="nc" id="L975">        int game = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc bnc" id="L976" title="All 2 branches missed.">        return game == Display.GAME_LEFT;</span>
+    }
+
+    /**
+     * Returns true if this is a right keycode
+     *
+     * @param keyCode The key code to check
+     * @return true if this is a right keycode.
+     */
+    protected boolean isRightKey(int keyCode) {
+<span class="nc" id="L986">        int game = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc bnc" id="L987" title="All 2 branches missed.">        return game == Display.GAME_RIGHT;</span>
+    }
+
+    /**
+     * Returns true if this is a down keycode
+     *
+     * @param keyCode The key code to check.
+     * @return True if key code is down key.
+     */
+    protected boolean isDownKey(int keyCode) {
+<span class="nc" id="L997">        int game = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc bnc" id="L998" title="All 2 branches missed.">        return game == Display.GAME_DOWN;</span>
+    }
+
+    /**
+     * Returns true if this is a up keycode
+     *
+     * @param keyCode The key code to check.
+     * @return true if key code is up key.
+     */
+    protected boolean isUpKey(int keyCode) {
+<span class="nc" id="L1008">        int game = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">        return game == Display.GAME_UP;</span>
+    }
+
+    /**
+     * Returns true if this is a zoom in keycode
+     *
+     * @param keyCode The key code to check
+     * @return true if key code is zoom-in key.
+     */
+    protected boolean isZoomInKey(int keyCode) {
+<span class="nc bnc" id="L1019" title="All 2 branches missed.">        return keyCode == '1';</span>
+    }
+
+    /**
+     * Returns true if this is a zoom out keycode
+     *
+     * @param keyCode The key code to check.
+     * @return true if the key code for the zoom-out key.
+     */
+    protected boolean isZoomOutKey(int keyCode) {
+<span class="nc bnc" id="L1029" title="All 2 branches missed.">        return keyCode == '3';</span>
+    }
+
+    /**
+     * Returns true if this is a zoom to layers keycode
+     *
+     * @param keyCode The key-code to check.
+     * @return true if the key code is for the zoom to layers key.
+     */
+    protected boolean isZoomToLayersKey(int keyCode) {
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">        return keyCode == '5';</span>
+    }
+
+    private void setLatitude(double latitude) {
+<span class="nc" id="L1043">        this.latitude = latitude;</span>
+<span class="nc" id="L1044">        setCoord(latitude, longitude);</span>
+<span class="nc" id="L1045">    }</span>
+
+    private void setLongitude(double longitude) {
+<span class="nc" id="L1048">        this.longitude = longitude;</span>
+<span class="nc" id="L1049">        setCoord(latitude, longitude);</span>
+<span class="nc" id="L1050">    }</span>
+
+    private void setCoord(double latitude, double longitude) {
+<span class="nc bnc" id="L1053" title="All 4 branches missed.">        if (Double.isNaN(latitude) &amp;&amp; Double.isNaN(longitude)) {</span>
+<span class="nc" id="L1054">            _center = _map.projection().fromWGS84(new Coord(latitude, longitude));</span>
+<span class="nc" id="L1055">            _needTiles = true;</span>
+<span class="nc" id="L1056">            super.repaint();</span>
+        }
+<span class="nc" id="L1058">    }</span>
+
+    private void fireMapListenerEvent() {
+        // assuming always EDT
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">        if (listeners != null) {</span>
+<span class="nc bnc" id="L1063" title="All 2 branches missed.">            for (MapListener l : listeners) {</span>
+<span class="nc" id="L1064">                l.mapPositionUpdated(this, _zoom, getCenter());</span>
+<span class="nc" id="L1065">            }</span>
+        }
+<span class="nc" id="L1067">    }</span>
+
+    /**
+     * Adds a listener to map panning/zooming
+     *
+     * @param listener the listener callback
+     */
+    public void addMapListener(MapListener listener) {
+<span class="nc bnc" id="L1075" title="All 2 branches missed.">        if (listeners == null) {</span>
+<span class="nc" id="L1076">            listeners = new ArrayList&lt;MapListener&gt;();</span>
+        }
+<span class="nc" id="L1078">        listeners.add(listener);</span>
+<span class="nc" id="L1079">    }</span>
+
+    /**
+     * Removes the map listener callback
+     *
+     * @param listener the listener
+     */
+    public void removeMapListener(MapListener listener) {
+<span class="nc bnc" id="L1087" title="All 2 branches missed.">        if (listeners == null) {</span>
+<span class="nc" id="L1088">            return;</span>
+        }
+<span class="nc" id="L1090">        listeners.remove(listener);</span>
+<span class="nc" id="L1091">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L1097">        return new String[]{&quot;latitude&quot;, &quot;longitude&quot;, &quot;zoom&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L1104">        return new Class[]{Double.class, Double.class, Integer.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L1111" title="All 2 branches missed.">        if (name.equals(&quot;latitude&quot;)) {</span>
+<span class="nc" id="L1112">            Coord c = _map.projection().toWGS84(_center);</span>
+<span class="nc" id="L1113">            return new Double(c.getLatitude());</span>
+        }
+<span class="nc bnc" id="L1115" title="All 2 branches missed.">        if (name.equals(&quot;longitude&quot;)) {</span>
+<span class="nc" id="L1116">            Coord c = _map.projection().toWGS84(_center);</span>
+<span class="nc" id="L1117">            return new Double(c.getLongitude());</span>
+        }
+<span class="nc bnc" id="L1119" title="All 2 branches missed.">        if (name.equals(&quot;zoom&quot;)) {</span>
+<span class="nc" id="L1120">            return Integer.valueOf(getZoomLevel());</span>
+        }
+<span class="nc" id="L1122">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L1129" title="All 2 branches missed.">        if (name.equals(&quot;latitude&quot;)) {</span>
+<span class="nc" id="L1130">            setLatitude(((Double) value).doubleValue());</span>
+<span class="nc" id="L1131">            return null;</span>
+        }
+<span class="nc bnc" id="L1133" title="All 2 branches missed.">        if (name.equals(&quot;longitude&quot;)) {</span>
+<span class="nc" id="L1134">            setLongitude(((Double) value).doubleValue());</span>
+<span class="nc" id="L1135">            return null;</span>
+        }
+<span class="nc bnc" id="L1137" title="All 2 branches missed.">        if (name.equals(&quot;zoom&quot;)) {</span>
+<span class="nc" id="L1138">            setZoomLevel(((Integer) value).intValue());</span>
+<span class="nc" id="L1139">            return null;</span>
+        }
+<span class="nc" id="L1141">        return super.setPropertyValue(name, value);</span>
+    }
+}
+
+class LayerWithZoomLevels {
+
+    public Layer layer;
+    public int minZoomLevel;
+    public int maxZoomLevel;
+
+<span class="nc" id="L1151">    public LayerWithZoomLevels(Layer l, int min, int max) {</span>
+<span class="nc" id="L1152">        layer = l;</span>
+<span class="nc" id="L1153">        minZoomLevel = min;</span>
+<span class="nc" id="L1154">        maxZoomLevel = max;</span>
+<span class="nc" id="L1155">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

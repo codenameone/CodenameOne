@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushActionCategory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.push</a> &gt; <span class="el_source">PushActionCategory.java</span></div><h1>PushActionCategory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.push;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Encapsulates a category for push notifications.  If a push notification specifies a category, and the
+ * app's main class implements {@link PushActionsProvider}, then the push notification will provide a
+ * set of buttons to select among the actions available for that category.  If the user selects an
+ * action in the push notification, their choice will be made available inside the {@link PushCallback#push(java.lang.String) }
+ * method via the {@link PushContent#getActionId() } method.
+ *
+ * &lt;p&gt;Applications that wish to support actions must implement {@link PushActionsProvider} in its main class.  The {@link PushActionsProvider#getPushActionCategories() }
+ * implementation defines all of the categories that are available for push notifications.&lt;/p&gt;
+ *
+ * @author shannah
+ */
+public class PushActionCategory {
+    private final String id;
+    private final List&lt;PushAction&gt; actions;
+
+    /**
+     * Creates a category with the specified actions.
+     *
+     * @param id      The ID of the category.  Should correspond with the &quot;category&quot; of a push notification.
+     * @param actions The actions that are available for this category.
+     */
+<span class="nc" id="L52">    public PushActionCategory(String id, PushAction... actions) {</span>
+<span class="nc" id="L53">        this.actions = new java.util.ArrayList&lt;PushAction&gt;();</span>
+<span class="nc" id="L54">        this.id = id;</span>
+<span class="nc" id="L55">        this.actions.addAll(Arrays.asList(actions));</span>
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Convenience method to return all of the actions in the provided categories.
+     *
+     * @param categories The categories from which to get actions.
+     * @return List of actions in all of the provided categories.
+     */
+    public static PushAction[] getAllActions(PushActionCategory... categories) {
+<span class="nc" id="L65">        Set&lt;PushAction&gt; actions = new HashSet&lt;PushAction&gt;();</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        for (PushActionCategory cat : categories) {</span>
+<span class="nc" id="L67">            actions.addAll(Arrays.asList(cat.getActions()));</span>
+        }
+<span class="nc" id="L69">        return actions.toArray(new PushAction[actions.size()]);</span>
+
+    }
+
+    /**
+     * Gets the actions in this category.  These actions will be manifested as buttons in push notifications
+     * directed at this category.
+     *
+     * @return
+     */
+    public PushAction[] getActions() {
+<span class="nc" id="L80">        return actions.toArray(new PushAction[actions.size()]);</span>
+    }
+
+    /**
+     * Gets the ID of the category.  This corresponds with the category of a push notification.
+     *
+     * @return the id
+     * @see PushContent#getCategory()
+     */
+    public String getId() {
+<span class="nc" id="L90">        return id;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

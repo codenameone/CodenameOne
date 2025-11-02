@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>REUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">REUtil.java</span></div><h1>REUtil.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.codename1.util.regex;
+
+/**
+ * This is a class that contains utility helper methods for this package.
+ *
+ * @author &lt;a href=&quot;mailto:jonl@muppetlabs.com&quot;&gt;Jonathan Locke&lt;/a&gt;
+ * @version $Id: REUtil.java 518156 2007-03-14 14:31:26Z vgritsenko $
+ */
+<span class="nc" id="L26">public class REUtil {</span>
+    /**
+     * complex:
+     */
+    private static final String complexPrefix = &quot;complex:&quot;;
+
+    /**
+     * Creates a regular expression, permitting simple or complex syntax
+     *
+     * @param expression The expression, beginning with a prefix if it's complex or
+     *                   having no prefix if it's simple
+     * @param matchFlags Matching style flags
+     * @return The regular expression object
+     * @throws RESyntaxException thrown in case of error
+     */
+    public static RE createRE(String expression, int matchFlags) throws RESyntaxException {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (expression.startsWith(complexPrefix)) {</span>
+<span class="nc" id="L43">            return new RE(expression.substring(complexPrefix.length()), matchFlags);</span>
+        }
+<span class="nc" id="L45">        return new RE(RE.simplePatternToFullRegularExpression(expression), matchFlags);</span>
+    }
+
+    /**
+     * Creates a regular expression, permitting simple or complex syntax
+     *
+     * @param expression The expression, beginning with a prefix if it's complex or
+     *                   having no prefix if it's simple
+     * @return The regular expression object
+     * @throws RESyntaxException thrown in case of error
+     */
+    public static RE createRE(String expression) throws RESyntaxException {
+<span class="nc" id="L57">        return createRE(expression, RE.MATCH_NORMAL);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTMLUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">HTMLUtils.java</span></div><h1>HTMLUtils.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import java.util.Hashtable;
+
+/**
+ * This class contains several useful static methods for HTML
+ *
+ * @author Ofir Leitner
+ * @deprecated the HTML package is no longer used or maintained and may be removed in a future revision
+ */
+public class HTMLUtils {
+
+    /**
+     * The char entities strings supported in XML. When a char entity is found these will be compared against first.
+     */
+<span class="nc" id="L39">    private static final String[] XML_CHAR_ENTITIES = {</span>
+            &quot;lt&quot;, // lesser-than
+            &quot;gt&quot;, // greater-than
+            &quot;amp&quot;, // ampersand
+            &quot;quot&quot;, //quotation mark
+            &quot;apos&quot;, // apostrophe
+            //&quot;bull&quot;, //bullet
+            //&quot;euro&quot; //euro
+    };
+    /**
+     * The numericals value of char entities strings above.
+     */
+<span class="nc" id="L51">    private static final int[] XML_CHAR_ENTITIES_VALS = {</span>
+            60, // &quot;lt&quot;, // lesser-than
+            62, // &quot;gt&quot;, // greater-than
+            38, // &quot;amp&quot;, // ampersand
+            34, // &quot;quot&quot;, //quotation mark
+            39, // &quot;apos&quot;, // apostrophe
+            //8226, // &quot;bull&quot;, //bullet
+            //8364 // &quot;euro&quot;}; //euro
+    };
+    /**
+     * This is a list of ISO 8859-1 Symbols that can be used as HTML char entities
+     */
+<span class="nc" id="L63">    private static final String[] HTML_BASIC_CHAR_ENTITY_STRINGS = {</span>
+            &quot;nbsp&quot;, &quot;iexcl&quot;, &quot;cent&quot;, &quot;pound&quot;, &quot;curren&quot;, &quot;yen&quot;, &quot;brvbar&quot;, &quot;sect&quot;, &quot;uml&quot;, &quot;copy&quot;, &quot;ordf&quot;, &quot;laquo&quot;, &quot;not&quot;, &quot;shy&quot;, &quot;reg&quot;, &quot;macr&quot;, &quot;deg&quot;, &quot;plusmn&quot;, &quot;sup2&quot;, &quot;sup3&quot;, &quot;acute&quot;,
+            &quot;micro&quot;, &quot;para&quot;, &quot;middot&quot;, &quot;cedil&quot;, &quot;sup1&quot;, &quot;ordm&quot;, &quot;raquo&quot;, &quot;frac14&quot;, &quot;frac12&quot;, &quot;frac34&quot;, &quot;iquest&quot;, &quot;Agrave&quot;, &quot;Aacute&quot;, &quot;Acirc&quot;, &quot;Atilde&quot;, &quot;Auml&quot;, &quot;Aring&quot;, &quot;AElig&quot;,
+            &quot;Ccedil&quot;, &quot;Egrave&quot;, &quot;Eacute&quot;, &quot;Ecirc&quot;, &quot;Euml&quot;, &quot;Igrave&quot;, &quot;Iacute&quot;, &quot;Icirc&quot;, &quot;Iuml&quot;, &quot;ETH&quot;, &quot;Ntilde&quot;, &quot;Ograve&quot;, &quot;Oacute&quot;, &quot;Ocirc&quot;, &quot;Otilde&quot;, &quot;Ouml&quot;, &quot;times&quot;, &quot;Oslash&quot;,
+            &quot;Ugrave&quot;, &quot;Uacute&quot;, &quot;Ucirc&quot;, &quot;Uuml&quot;, &quot;Yacute&quot;, &quot;THORN&quot;, &quot;szlig&quot;, &quot;agrave&quot;, &quot;aacute&quot;, &quot;acirc&quot;, &quot;atilde&quot;, &quot;auml&quot;, &quot;aring&quot;, &quot;aelig&quot;, &quot;ccedil&quot;, &quot;egrave&quot;, &quot;eacute&quot;, &quot;ecirc&quot;,
+            &quot;euml&quot;, &quot;igrave&quot;, &quot;iacute&quot;, &quot;icirc&quot;, &quot;iuml&quot;, &quot;eth&quot;, &quot;ntilde&quot;, &quot;ograve&quot;, &quot;oacute&quot;, &quot;ocirc&quot;, &quot;otilde&quot;, &quot;ouml&quot;, &quot;divide&quot;, &quot;oslash&quot;, &quot;ugrave&quot;, &quot;uacute&quot;, &quot;ucirc&quot;, &quot;uuml&quot;,
+            &quot;yacute&quot;, &quot;thorn&quot;, &quot;yuml&quot;};
+
+    // Prevents instantiation - this class has static method only
+    private HTMLUtils() {
+
+    }
+
+    /**
+     * Converts an XML char entity to the matching character or string.
+     * This is a convenience method that uses convertCharEntity with false for lookupHTMLentities and a null userDefinedCharEntities
+     *
+     * @param charEntity The char entity to convert (Not including the &amp;amp; and ;)
+     * @return A string containing a single char, or the original char entity string  (with &amp;amp; and ;) if the char entity couldn't be resolved
+     */
+    public static String convertXMLCharEntity(String charEntity) {
+<span class="nc" id="L84">        return convertCharEntity(charEntity, false, null);</span>
+    }
+
+    /**
+     * Converts an HTML char entity to the matching character or string.
+     * This is a convenience method that uses convertCharEntity with true for lookupHTMLentities and a null userDefinedCharEntities
+     *
+     * @param charEntity The char entity to convert (Not including the &amp;amp; and ;)
+     * @return A string containing a single char, or the original char entity string  (with &amp;amp; and ;) if the char entity couldn't be resolved
+     */
+    public static String convertHTMLCharEntity(String charEntity) {
+<span class="nc" id="L95">        return convertCharEntity(charEntity, true, null);</span>
+    }
+
+
+    /**
+     * Converts a char entity to the matching character or string.
+     * This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
+     *
+     * @param charEntity              The char entity to convert (Not including the &amp;amp; and ;)
+     * @param lookupHTMLentities      true to include the basic HTML named char entities (unicode 160-255), false otherwise
+     * @param userDefinedCharEntities A hashtable containing (String,int) dentoing the char entity name and its unicode
+     * @return A string containing a single char, or the original char entity string  (with &amp;amp; and ;) if the char entity couldn't be resolved
+     */
+    public static String convertCharEntity(String charEntity, boolean lookupHTMLentities, Hashtable userDefinedCharEntities) {
+<span class="nc" id="L109">        int charCode = -1;</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (charEntity.startsWith(&quot;#&quot;)) { //numbered char entity</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (charEntity.startsWith(&quot;#x&quot;)) { //hex</span>
+                try {
+<span class="nc" id="L113">                    charCode = Integer.parseInt(charEntity.substring(2), 16);</span>
+<span class="nc" id="L114">                } catch (NumberFormatException nfe) {</span>
+                    //if not a number - simply ignore char entity
+<span class="nc" id="L116">                }</span>
+            } else {
+                try {
+<span class="nc" id="L119">                    charCode = Integer.parseInt(charEntity.substring(1));</span>
+<span class="nc" id="L120">                } catch (NumberFormatException nfe) {</span>
+                    //if not a number - simply ignore char entity
+<span class="nc" id="L122">                }</span>
+            }
+        } else { //not numbered, rather a symbol
+<span class="nc" id="L125">            charCode = getCharEntityCode(charEntity, lookupHTMLentities, userDefinedCharEntities);</span>
+        }
+
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (charCode != -1) {</span>
+<span class="nc" id="L129">            return &quot;&quot; + (char) charCode;</span>
+        } else {
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;Unknown character entity - &quot; + charEntity);</span>
+            //notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY,null,null,null, &quot;Unrecognized char entity: &quot;+charEntity);
+            //return &quot;&amp;&quot;+charEntity+&quot;;&quot;; // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the &amp; char (instead of &amp;apos;)
+        }
+
+    }
+
+    private static int getCharEntityCode(String symbol, boolean html, Hashtable userDefined) {
+        // First tries the XML basic char entities
+<span class="nc" id="L140">        int val = -1;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        for (int i = 0; i &lt; XML_CHAR_ENTITIES.length; i++) {</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            if (symbol.equalsIgnoreCase(XML_CHAR_ENTITIES[i])) {</span>
+<span class="nc" id="L143">                return XML_CHAR_ENTITIES_VALS[i];</span>
+            }
+        }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (val != -1) {</span>
+<span class="nc" id="L147">            return val;</span>
+        } else {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (html) {</span>
+                // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
+<span class="nc" id="L151">                val = getStringVal(symbol, HTML_BASIC_CHAR_ENTITY_STRINGS);</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (val != -1) {</span>
+<span class="nc" id="L153">                    return val + 160;</span>
+                }
+            }
+
+            // Not found in the standard symbol table, see if it is in the user defined symbols table
+<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (userDefined != null) {</span>
+<span class="nc" id="L159">                Object charObj = userDefined.get(symbol);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (charObj != null) {</span>
+<span class="nc" id="L161">                    return ((Integer) charObj).intValue();</span>
+                }
+            }
+
+            // Not found anywhere
+<span class="nc" id="L166">            return -1;</span>
+        }
+    }
+
+    /**
+     * Encodes the specified string to &quot;percent-encoding&quot; or URL encoding.
+     * This encodes reserved, unsafe and unicode characters
+     *
+     * @param str The string to be encoded
+     * @return A percent-encoding of the string (safe characters remain the same)
+     */
+    public static String encodeString(String str) {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (str == null) {</span>
+<span class="nc" id="L179">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L181">        String encodedStr = &quot;&quot;;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        for (int i = 0; i &lt; str.length(); i++) {</span>
+<span class="nc" id="L183">            char c = str.charAt(i);</span>
+<span class="nc bnc" id="L184" title="All 20 branches missed.">            if (</span>
+                // Checks for unreserved characters that RFC 3986 defines that shouldn't be encoded
+                    ((c &gt;= 'a') &amp;&amp; (c &lt;= 'z')) || ((c &gt;= 'A') &amp;&amp; (c &lt;= 'Z')) ||
+                            ((c &gt;= '0') &amp;&amp; (c &lt;= '9')) ||
+                            (c == '-') || (c == '.') || (c == '_') || (c == '~')) {
+<span class="nc" id="L189">                encodedStr += c;</span>
+<span class="nc bnc" id="L190" title="All 4 branches missed.">            } else if ((c &gt;= 0x80) &amp;&amp; (c &lt;= 0xffff)) { // UTF encoding - See http://en.wikipedia.org/wiki/UTF-8</span>
+<span class="nc" id="L191">                int firstLiteral = c / 256;</span>
+<span class="nc" id="L192">                int secLiteral = c % 256;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                if (c &lt;= 0x07ff) { // 2 literals unicode</span>
+<span class="nc" id="L194">                    firstLiteral = 192 + (firstLiteral &lt;&lt; 2) + (secLiteral &gt;&gt; 6);</span>
+<span class="nc" id="L195">                    secLiteral = 128 + (secLiteral &amp; 63);</span>
+<span class="nc" id="L196">                    encodedStr += &quot;%&quot; + Integer.toHexString(firstLiteral).toUpperCase() + &quot;%&quot; + Integer.toHexString(secLiteral).toUpperCase();</span>
+                } else { // 3 literals unicode
+<span class="nc" id="L198">                    int thirdLiteral = 128 + (secLiteral &amp; 63);</span>
+<span class="nc" id="L199">                    secLiteral = 128 + ((firstLiteral % 16) &lt;&lt; 2) + (secLiteral &gt;&gt; 6);</span>
+<span class="nc" id="L200">                    firstLiteral = 224 + (firstLiteral &gt;&gt; 4);</span>
+<span class="nc" id="L201">                    encodedStr += &quot;%&quot; + Integer.toHexString(firstLiteral).toUpperCase() + &quot;%&quot; + Integer.toHexString(secLiteral).toUpperCase()</span>
+<span class="nc" id="L202">                            + &quot;%&quot; + Integer.toHexString(thirdLiteral).toUpperCase();</span>
+                }
+//            The max value of a char is 0xffff, so though URL encoding supports values bigger than that, we can't provide for it
+            /*} else if (c&gt;0xffff) { // 4 literals unicode (CJK upper ranges and others)
+                int z=c/65536;
+                int y=c%65536;
+                int x=y%256;
+                y=y/256;
+                int[] literal=new int[4];
+                literal[0]=240+(z&gt;&gt;2);
+                literal[1]=128+((z%4)&lt;&lt;4)+(y&gt;&gt;4);
+                literal[2]=128+((y%16)&lt;&lt;2)+(x&gt;&gt;6);
+                literal[3]=128+(x &amp; 63);
+                for(int l=0;l&lt;literal.length;l++) {
+                    encodedStr+=&quot;%&quot;+Integer.toHexString(literal[l]).toUpperCase();
+                }*/
+<span class="nc" id="L218">            } else {</span>
+<span class="nc" id="L219">                String prefix = &quot;%&quot;;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                if (c &lt; 16) {</span>
+<span class="nc" id="L221">                    prefix += &quot;0&quot;; //For a value lesser than 16, we'd like to get %0F and not %F</span>
+                }
+<span class="nc" id="L223">                encodedStr += prefix + Integer.toHexString(c).toUpperCase();</span>
+
+            }
+        }
+<span class="nc" id="L227">        return encodedStr;</span>
+    }
+
+
+    /**
+     * Matches the given string to the given options and returns the matching value, or -1 if none found.
+     *
+     * @param str     The string to compare
+     * @param options The options to match the string against
+     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options -1 is returned.
+     */
+    static int getStringVal(String str, String[] options) {
+<span class="nc" id="L239">        return getStringVal(str, options, null, -1);</span>
+    }
+
+    /**
+     * Matches the given string to the given options and returns the matching value, or -1 if none found.
+     *
+     * @param str     The string to compare
+     * @param options The options to match the string against
+     * @param vals    The values to match to each option (According to the position in the array), this can be null.
+     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options -1 is returned.
+     */
+    static int getStringVal(String str, String[] options, int[] vals) {
+<span class="nc" id="L251">        return getStringVal(str, options, vals, -1);</span>
+    }
+
+    /**
+     * Matches the given string to the given options and returns the matching value, or the default one if none found.
+     *
+     * @param str          The string to compare
+     * @param options      The options to match the string against
+     * @param defaultValue The default value to return if the string was null or not found among the options
+     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, the int X will be returned. If the string didn't match any of the options the defaultValue is returned.
+     */
+    static int getStringVal(String str, String[] options, int defaultValue) {
+<span class="nc" id="L263">        return getStringVal(str, options, null, defaultValue);</span>
+    }
+
+    /**
+     * Matches the given string to the given options and returns the matching value, or the default one if none found.
+     *
+     * @param str          The string to compare
+     * @param options      The options to match the string against
+     * @param vals         The values to match to each option (According to the position in the array), this can be null.
+     * @param defaultValue The default value to return if the string was null or not found among the options
+     * @return The appropriate matching value: If the string equals (case ignored) to the option in the X position of the options array, this returns the value in the X position of the vals array, or simply X if vals is null. If the string didn't match any of the options the defaultValue is returned.
+     */
+    static int getStringVal(String str, String[] options, int[] vals, int defaultValue) {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (str != null) {</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            for (int i = 0; i &lt; options.length; i++) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                if (str.equals(options[i])) {</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                    if (vals != null) {</span>
+<span class="nc" id="L280">                        return vals[i];</span>
+                    } else {
+<span class="nc" id="L282">                        return i;</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L287">        return defaultValue;</span>
+    }
+
+
+}
+     
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

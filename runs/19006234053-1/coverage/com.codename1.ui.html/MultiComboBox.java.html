@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MultiComboBox.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">MultiComboBox.java</span></div><h1>MultiComboBox.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.List;
+import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.list.ListModel;
+
+import java.util.Vector;
+
+/**
+ * A ComboBox control that allows multiple selection and supports OPTGROUP labels.
+ * Note that this does not inherit from ComboBox but rather from List, since basically like an HTML multiple ComboBox we show an open List
+ * The List/Combo size is controlled from the outside in HTMLComponent using a wrapping Container.
+ * &lt;p&gt;
+ * This class is also used by HTMLComboBox as the list popup when opening the HTMLComboBox (To allow OPTGROUP support)
+ *
+ * @author Ofir Leitner
+ */
+class MultiComboBox extends List {
+
+    private final boolean multiple; // true if this is a multiple choice combo
+    private final MultiListModel model;
+
+    MultiComboBox(boolean multiple) {
+<span class="nc" id="L52">        this(null, multiple);</span>
+<span class="nc" id="L53">    }</span>
+
+
+    MultiComboBox(ListModel underlyingModel, boolean multiple) {
+<span class="nc" id="L57">        super();</span>
+<span class="nc" id="L58">        setUIID(&quot;ComboBox&quot;);</span>
+<span class="nc" id="L59">        this.multiple = multiple;</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        setScrollToSelected(!multiple); // In multiple comboboxes we don't scroll to selected, as there can be several</span>
+<span class="nc" id="L61">        model = new MultiListModel(underlyingModel, multiple);</span>
+<span class="nc" id="L62">        setModel(model);</span>
+<span class="nc" id="L63">        MultiCellRenderer multiRenderer = new MultiCellRenderer(model);</span>
+<span class="nc" id="L64">        setRenderer(multiRenderer);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (underlyingModel != null) { // Need to scan the existing data since there will be no &quot;addItem&quot; with an optgroup item</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            for (int i = 0; i &lt; underlyingModel.getSize(); i++) {</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                if (underlyingModel.getItemAt(i) instanceof String) {</span>
+<span class="nc" id="L68">                    multiRenderer.setOptgroup(true);</span>
+<span class="nc" id="L69">                    break;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L74">        ListCellRenderer r = getRenderer();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (r instanceof Component) {</span>
+<span class="nc" id="L76">            Component c = (Component) getRenderer();</span>
+<span class="nc" id="L77">            c.setUIID(&quot;ComboBoxItem&quot;);</span>
+<span class="nc" id="L78">            c.getSelectedStyle().setPadding(1, 1, 1, 1);</span>
+<span class="nc" id="L79">            c.getUnselectedStyle().setPadding(1, 1, 1, 1);</span>
+        }
+<span class="nc" id="L81">        Component c = getRenderer().getListFocusComponent(this);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc" id="L83">            c.setUIID(&quot;ComboBoxFocus&quot;);</span>
+        }
+<span class="nc" id="L85">    }</span>
+
+    Vector getSelected() {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (multiple) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (model != null) {</span>
+<span class="nc" id="L90">                return model.selected;</span>
+            }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        } else if (getSelectedItem() != null) {</span>
+<span class="nc" id="L93">            Vector v = new Vector();</span>
+<span class="nc" id="L94">            v.addElement(getSelectedItem());</span>
+<span class="nc" id="L95">            return v;</span>
+        }
+<span class="nc" id="L97">        return null;</span>
+    }
+
+
+    // Overiding List's methods to provide for multiple selection and OPTGROUP support:
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public void addItem(Object item) {
+<span class="nc" id="L107">        super.addItem(item);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (item instanceof String) {</span>
+<span class="nc" id="L109">            ((MultiCellRenderer) getRenderer()).setOptgroup(true);</span>
+        }
+<span class="nc" id="L111">    }</span>
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public void setSelectedItem(Object item) {
+<span class="nc" id="L117">        super.setSelectedItem(item);</span>
+<span class="nc" id="L118">        model.toggleSelected(item);</span>
+<span class="nc" id="L119">    }</span>
+
+    /**
+     * {{@inheritDoc}}
+     */
+    protected void fireActionEvent() {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (multiple) {</span>
+<span class="nc" id="L126">            Object obj = getSelectedItem();</span>
+<span class="nc" id="L127">            model.toggleSelected(obj);</span>
+<span class="nc" id="L128">        } else {</span>
+<span class="nc" id="L129">            super.fireActionEvent();</span>
+        }
+
+<span class="nc" id="L132">    }</span>
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public void keyReleased(int keyCode) {
+        // other events are in keyReleased to prevent the next event from reaching the next form
+
+<span class="nc" id="L140">        int gameAction = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">        if ((multiple) &amp;&amp; (gameAction == Display.GAME_FIRE)) {</span>
+<span class="nc" id="L142">            boolean h = handlesInput();</span>
+            //setHandlesInput(!h);
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (h) {</span>
+<span class="nc" id="L145">                fireActionEvent();</span>
+            }
+<span class="nc" id="L147">            repaint();</span>
+<span class="nc" id="L148">        } else {</span>
+<span class="nc" id="L149">            super.keyReleased(keyCode);</span>
+        }
+<span class="nc" id="L151">    }</span>
+
+    /**
+     * {{@inheritDoc}}
+     */
+    protected void fireClicked() {
+<span class="nc" id="L157">        boolean h = handlesInput();</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (!multiple) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            setHandlesInput(!h);</span>
+        }
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (h) {</span>
+<span class="nc" id="L162">            fireActionEvent();</span>
+        }
+<span class="nc" id="L164">        repaint();</span>
+<span class="nc" id="L165">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void keyPressed(int keyCode) {
+        // scrolling events are in keyPressed to provide immediate feedback
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (!handlesInput()) {</span>
+<span class="nc" id="L173">            return;</span>
+        }
+
+<span class="nc" id="L176">        int gameAction = Display.getInstance().getGameAction(keyCode);</span>
+        int keyFwd;
+        int keyBck;
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (getOrientation() != HORIZONTAL) {</span>
+<span class="nc" id="L180">            keyFwd = Display.GAME_DOWN;</span>
+<span class="nc" id="L181">            keyBck = Display.GAME_UP;</span>
+<span class="nc bnc" id="L182" title="All 4 branches missed.">            if (gameAction == Display.GAME_LEFT || gameAction == Display.GAME_RIGHT) {</span>
+<span class="nc" id="L183">                setHandlesInput(false);</span>
+            }
+        } else {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (isRTL()) {</span>
+<span class="nc" id="L187">                keyFwd = Display.GAME_LEFT;</span>
+<span class="nc" id="L188">                keyBck = Display.GAME_RIGHT;</span>
+            } else {
+<span class="nc" id="L190">                keyFwd = Display.GAME_RIGHT;</span>
+<span class="nc" id="L191">                keyBck = Display.GAME_LEFT;</span>
+            }
+<span class="nc bnc" id="L193" title="All 4 branches missed.">            if (gameAction == Display.GAME_DOWN || gameAction == Display.GAME_UP) {</span>
+<span class="nc" id="L194">                setHandlesInput(false);</span>
+            }
+        }
+
+<span class="nc" id="L198">        int selectedIndex = model.getSelectedIndex();</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (gameAction == keyBck) {</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (selectedIndex &gt; 0) {</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                if (model.getItemAt(selectedIndex - 1) instanceof String) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                    if (selectedIndex == 1) { // First item is an optgroup</span>
+<span class="nc" id="L203">                        return;</span>
+                    }
+<span class="nc" id="L205">                    model.setDirection(-1);</span>
+<span class="nc" id="L206">                    selectedIndex--;</span>
+<span class="nc" id="L207">                    model.setSelectedIndex(selectedIndex);</span>
+                }
+            }
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        } else if (gameAction == keyFwd) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if (selectedIndex &lt; size() - 1) {</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                if (model.getItemAt(selectedIndex + 1) instanceof String) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                    if (selectedIndex == size() - 2) { //Last item is an optgroup</span>
+<span class="nc" id="L214">                        return;</span>
+                    }
+<span class="nc" id="L216">                    model.setDirection(1);</span>
+<span class="nc" id="L217">                    selectedIndex++;</span>
+<span class="nc" id="L218">                    model.setSelectedIndex(selectedIndex);</span>
+                }
+            }
+        }
+<span class="nc" id="L222">        super.keyPressed(keyCode);</span>
+<span class="nc" id="L223">        model.setDirection(0);</span>
+<span class="nc" id="L224">    }</span>
+
+    // Inner classes:
+
+    /**
+     * A model that knows to handle both multiple selection and OPTGORUP labels
+     *
+     * @author Ofir Leitner
+     */
+    class MultiListModel extends DefaultListModel {
+
+<span class="nc" id="L235">        Vector selected = new Vector();</span>
+        int direction;
+        boolean multiple;
+        ListModel underlyingModel;
+
+<span class="nc" id="L240">        public MultiListModel(ListModel underlyingModel, boolean multiple) {</span>
+<span class="nc" id="L241">            this.multiple = multiple;</span>
+<span class="nc" id="L242">            this.underlyingModel = underlyingModel;</span>
+<span class="nc" id="L243">        }</span>
+
+        public Object getItemAt(int index) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (underlyingModel != null) {</span>
+<span class="nc" id="L247">                return underlyingModel.getItemAt(index);</span>
+            } else {
+<span class="nc" id="L249">                return super.getItemAt(index);</span>
+            }
+        }
+
+        public int getSize() {
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            if (underlyingModel != null) {</span>
+<span class="nc" id="L255">                return underlyingModel.getSize();</span>
+            } else {
+<span class="nc" id="L257">                return super.getSize();</span>
+            }
+        }
+
+        public int getSelectedIndex() {
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            if (underlyingModel != null) {</span>
+<span class="nc" id="L263">                return underlyingModel.getSelectedIndex();</span>
+            } else {
+<span class="nc" id="L265">                return super.getSelectedIndex();</span>
+            }
+        }
+
+        public void setSelectedIndex(int index) {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">            if (getItemAt(index) instanceof String) { //don't select optgroup</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                if (direction == 0) {</span>
+<span class="nc" id="L272">                    toggleSelected(getItemAt(getSelectedIndex())); //Since the incorrect item is toggled later, we toggle it here</span>
+<span class="nc" id="L273">                    return;</span>
+                }
+            }
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            if (underlyingModel != null) {</span>
+<span class="nc" id="L277">                underlyingModel.setSelectedIndex(index);</span>
+            } else {
+<span class="nc" id="L279">                super.setSelectedIndex(index);</span>
+            }
+<span class="nc" id="L281">        }</span>
+
+        void setDirection(int direction) {
+<span class="nc" id="L284">            this.direction = direction;</span>
+<span class="nc" id="L285">        }</span>
+
+        void toggleSelected(Object item) {
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            if (multiple) {</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                if (selected.contains(item)) {</span>
+<span class="nc" id="L290">                    selected.removeElement(item);</span>
+                } else {
+<span class="nc" id="L292">                    selected.addElement(item);</span>
+                }
+            }
+<span class="nc" id="L295">        }</span>
+
+        boolean isSelected(Object item) {
+<span class="nc bnc" id="L298" title="All 4 branches missed.">            return ((multiple) &amp;&amp; (selected.contains(item)));</span>
+        }
+
+    }
+
+    /**
+     * A renderer that knows to handle both multiple selection and OPTGORUP labels
+     *
+     * @author Ofir Leitner
+     */
+    class MultiCellRenderer extends DefaultListCellRenderer {
+
+        private final MultiListModel model;
+        private boolean optgroup;
+<span class="nc" id="L312">        private int bgColor = -1;</span>
+<span class="nc" id="L313">        private int fgColor = -1;</span>
+
+<span class="nc" id="L315">        MultiCellRenderer(MultiListModel model) {</span>
+<span class="nc" id="L316">            super(false);</span>
+<span class="nc" id="L317">            this.model = model;</span>
+<span class="nc" id="L318">        }</span>
+
+        void setOptgroup(boolean optgroup) {
+<span class="nc" id="L321">            this.optgroup = optgroup;</span>
+<span class="nc" id="L322">        }</span>
+
+        public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+<span class="nc" id="L325">            Component cmp = super.getListCellRendererComponent(list, value, index, isSelected);</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">            if (model.isSelected(value)) {</span>
+<span class="nc" id="L327">                setUIID(&quot;HTMLMultiComboBoxItem&quot;);</span>
+<span class="nc" id="L328">                fgColor = getUnselectedStyle().getFgColor();</span>
+<span class="nc" id="L329">                bgColor = getUnselectedStyle().getBgColor();</span>
+            } else {
+<span class="nc" id="L331">                setUIID(&quot;ComboBoxItem&quot;);</span>
+<span class="nc" id="L332">                bgColor = -1;</span>
+<span class="nc" id="L333">                fgColor = -1;</span>
+            }
+
+<span class="nc bnc" id="L336" title="All 2 branches missed.">            if (optgroup) {</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                if (value instanceof String) {</span>
+<span class="nc" id="L338">                    setUIID(&quot;HTMLOptgroup&quot;);</span>
+                } else {
+<span class="nc" id="L340">                    setUIID(&quot;HTMLOptgroupItem&quot;);</span>
+                }
+            }
+
+<span class="nc bnc" id="L344" title="All 2 branches missed.">            if (fgColor != -1) {</span>
+<span class="nc" id="L345">                getSelectedStyle().setFgColor(fgColor);</span>
+<span class="nc" id="L346">                getUnselectedStyle().setFgColor(fgColor);</span>
+            }
+
+<span class="nc" id="L349">            return cmp;</span>
+
+        }
+
+        public void paint(Graphics g) {
+<span class="nc bnc" id="L354" title="All 2 branches missed.">            if (hasFocus()) {</span>
+<span class="nc" id="L355">                g.setColor(getListFocusComponent(null).getSelectedStyle().getBgColor());</span>
+<span class="nc" id="L356">                g.fillRect(getX(), getY(), getWidth(), getHeight());</span>
+
+            }
+<span class="nc bnc" id="L359" title="All 2 branches missed.">            if (bgColor != -1) {</span>
+<span class="nc" id="L360">                g.setColor(bgColor);</span>
+<span class="nc" id="L361">                g.fillRect(getX() + getStyle().getPaddingLeftNoRTL(), getY() + getStyle().getPaddingTop(),</span>
+<span class="nc" id="L362">                        getWidth() - +getStyle().getPaddingLeftNoRTL() - +getStyle().getPaddingRightNoRTL(),</span>
+<span class="nc" id="L363">                        getHeight() - +getStyle().getPaddingTop() - +getStyle().getPaddingBottom());</span>
+            }
+<span class="nc" id="L365">            super.paint(g);</span>
+<span class="nc" id="L366">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MapProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps.providers</a> &gt; <span class="el_source">MapProvider.java</span></div><h1>MapProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2010, 2011 Itiner.pl. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Itiner designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Itiner in the LICENSE.txt file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+package com.codename1.maps.providers;
+
+import com.codename1.maps.BoundingBox;
+import com.codename1.maps.Coord;
+import com.codename1.maps.Projection;
+import com.codename1.maps.Tile;
+import com.codename1.ui.geom.Dimension;
+
+/**
+ * This is a generic map provider.
+ *
+ * @author Roman Kamyk &lt;roman.kamyk@itiner.pl&gt;
+ */
+public abstract class MapProvider {
+
+    private final Projection _projection;
+    private final Dimension _tileSize;
+
+    /**
+     * Creates a new MapProvider
+     *
+     * @param p        the projection system
+     * @param tileSize the tile size
+     */
+<span class="nc" id="L44">    protected MapProvider(Projection p, Dimension tileSize) {</span>
+<span class="nc" id="L45">        _projection = p;</span>
+<span class="nc" id="L46">        _tileSize = tileSize;</span>
+<span class="nc" id="L47">    }</span>
+
+    /**
+     * Request map to provide tiles of specific sizes. May not be supported by map provider.
+     * By default it does nothing;
+     *
+     * @param size requested tile size
+     */
+    public void tileSize(Dimension size) {
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Returns the bounding box of a position ina given zoom level
+     *
+     * @param position  on the map
+     * @param zoomLevel the zoom level
+     * @return a bounding box
+     */
+    public abstract BoundingBox bboxFor(Coord position, int zoomLevel);
+
+    /**
+     * Gets a tile for the given bounding box
+     *
+     * @param bbox a bounding box
+     * @return a Tile for the given bounding box
+     */
+    public abstract Tile tileFor(BoundingBox bbox);
+
+    /**
+     * Maximal zoom level. Zoom levels are counted from zero to maxZoomLevel().
+     * 0 is farest view, where the scale is greatest.
+     *
+     * @return
+     */
+    public abstract int maxZoomLevel();
+
+    /**
+     * Minimal zoom level user is able to see.
+     *
+     * @return
+     */
+    public int minZoomLevel() {
+<span class="nc" id="L89">        return 0;</span>
+    }
+
+    /**
+     * Scale is the distance in map units between each pixel in tile at given zoom level.
+     *
+     * @return Scale at given zoom level.
+     */
+    public abstract Coord scale(int zoomLevel);
+
+    /**
+     * Translates position by [pixelsX, pixelsY] at zoomLevel acordingly to maps scale.
+     *
+     * @param position  in map projection
+     * @param zoomLevel
+     * @param pixelsX
+     * @param pixelsY
+     * @return translated position.
+     */
+    public Coord translate(Coord position, int zoomLevel, int pixelsX, int pixelsY) {
+<span class="nc" id="L109">        Coord scale = scale(zoomLevel);</span>
+<span class="nc" id="L110">        return position.translate(pixelsY * scale.getLatitude(), pixelsX * scale.getLongitude());</span>
+    }
+
+    /**
+     * Gets the Provider projection
+     *
+     * @return the Provider projection
+     */
+    public Projection projection() {
+<span class="nc" id="L119">        return _projection;</span>
+    }
+
+    /**
+     * Gets the tile size
+     *
+     * @return the tile size
+     */
+    public Dimension tileSize() {
+<span class="nc" id="L128">        return _tileSize;</span>
+    }
+
+    /**
+     * The provider attribution.
+     *
+     * @return a String of the provider attribution
+     */
+    public abstract String attribution();
+
+    /**
+     * Returns the maximum zoom of a specific Tile.
+     *
+     * @param tile tile to check the max zoom
+     * @return the max zoom of the tile
+     */
+    public int maxZoomFor(Tile tile) {
+        int zoom;
+<span class="nc" id="L146">        int height = tile.dimension().getHeight();</span>
+<span class="nc" id="L147">        int width = tile.dimension().getWidth();</span>
+<span class="nc" id="L148">        double latitude = tile.getBoundingBox().latitudeDifference();</span>
+<span class="nc" id="L149">        double longitude = tile.getBoundingBox().longitudeDifference();</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        for (zoom = maxZoomLevel(); zoom &gt; 0; zoom--) {</span>
+<span class="nc" id="L151">            Coord scale = scale(zoom);</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">            if ((scale.getLatitude() * height) &gt; latitude &amp;&amp; (scale.getLongitude() * width) &gt; longitude) {</span>
+<span class="nc" id="L153">                break;</span>
+            }
+        }
+<span class="nc" id="L156">        return zoom;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FullScreenAdService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl</a> &gt; <span class="el_source">FullScreenAdService.java</span></div><h1>FullScreenAdService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+/**
+ * Abstract class for fullscreen ads that appear before and possibly after application
+ * execution as well as randomly between application screen transitions.
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L51">public abstract class FullScreenAdService {</span>
+<span class="nc" id="L52">    private static final Object LOCK = new Object();</span>
+<span class="nc" id="L53">    private boolean allowWithoutNetwork = true;</span>
+<span class="nc" id="L54">    private int timeout = 10000;</span>
+<span class="nc" id="L55">    private int adDisplayTime = 6000;</span>
+    // PMD Fix (UnusedPrivateField): Removed redundant timeForNext cache; timing is provided per invocation.
+    private boolean scaleMode;
+    private boolean allowSkipping;
+
+    /**
+     * Creates a new request for an ad
+     *
+     * @return the network operation
+     */
+    protected abstract ConnectionRequest createAdRequest();
+
+    /**
+     * Component representing a given ad
+     *
+     * @return the ad that is currently pending
+     */
+    protected abstract Component getPendingAd();
+
+    /**
+     * Just checks if an ad is already fetched
+     *
+     * @return returns true if an ad is already waiting in the queue
+     */
+    protected abstract boolean hasPendingAd();
+
+    /**
+     * Removes the pending ad data so we can fetch a new ad
+     */
+    protected abstract void clearPendingAd();
+
+    /**
+     * Returns the URL for the ad
+     *
+     * @return the ad URL
+     */
+    protected abstract String getAdDestination();
+
+    /**
+     * Returns true if the connection failed
+     */
+    protected abstract boolean failed();
+
+    /**
+     * Invoked on application startup, this code will download an ad or timeout
+     */
+    public void showWelcomeAd() {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (!UIManager.getInstance().wasThemeInstalled()) {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (Display.getInstance().hasNativeTheme()) {</span>
+<span class="nc" id="L104">                Display.getInstance().installNativeTheme();</span>
+            }
+        }
+<span class="nc" id="L107">        ConnectionRequest r = createAdRequest();</span>
+<span class="nc" id="L108">        r.setPriority(ConnectionRequest.PRIORITY_HIGH);</span>
+<span class="nc" id="L109">        r.setTimeout(timeout);</span>
+<span class="nc" id="L110">        InfiniteProgress ip = new InfiniteProgress();</span>
+<span class="nc" id="L111">        Dialog ipDialog = ip.showInifiniteBlocking();</span>
+<span class="nc" id="L112">        NetworkManager.getInstance().addToQueueAndWait(r);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (failed()) {</span>
+<span class="nc" id="L114">            ipDialog.dispose();</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (!allowWithoutNetwork) {</span>
+<span class="nc" id="L116">                ipDialog.dispose();</span>
+<span class="nc" id="L117">                Dialog.show(&quot;Network Error&quot;, &quot;Please try again later&quot;, &quot;Exit&quot;, null);</span>
+<span class="nc" id="L118">                Display.getInstance().exitApplication();</span>
+            } else {
+<span class="nc" id="L120">                return;</span>
+            }
+        }
+<span class="nc" id="L123">        Component c = getPendingAd();</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc" id="L125">            Form adForm = new AdForm(c);</span>
+<span class="nc" id="L126">            adForm.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L127">            adForm.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L128">            adForm.show();</span>
+        }
+<span class="nc" id="L130">    }</span>
+
+    /**
+     * Binds an ad to appear periodically after a given timeout
+     *
+     * @param timeForNext the timeout in which an ad should be shown in milliseconds
+     */
+    public void bindTransitionAd(final int timeForNext) {
+<span class="nc" id="L138">        Runnable onTransitionAndExit = new Runnable() {</span>
+<span class="nc" id="L139">            private long lastTime = System.currentTimeMillis();</span>
+
+            public void run() {
+<span class="nc" id="L142">                long t = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (t - lastTime &gt; timeForNext) {</span>
+<span class="nc" id="L144">                    lastTime = t;</span>
+<span class="nc" id="L145">                    Component c = getPendingAd();</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                    if (c != null) {</span>
+<span class="nc" id="L147">                        Form adForm = new AdForm(c);</span>
+<span class="nc" id="L148">                        adForm.show();</span>
+                    }
+                }
+<span class="nc" id="L151">            }</span>
+        };
+<span class="nc" id="L153">        CodenameOneImplementation.setOnCurrentFormChange(onTransitionAndExit);</span>
+<span class="nc" id="L154">        CodenameOneImplementation.setOnExit(onTransitionAndExit);</span>
+<span class="nc" id="L155">        Timer t = new Timer();</span>
+<span class="nc" id="L156">        int tm = Math.max(5000, timeForNext - 600);</span>
+<span class="nc" id="L157">        t.schedule(new TimerTask() {</span>
+            public void run() {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                if (!hasPendingAd()) {</span>
+<span class="nc" id="L160">                    ConnectionRequest r = createAdRequest();</span>
+<span class="nc" id="L161">                    r.setPriority(ConnectionRequest.PRIORITY_LOW);</span>
+<span class="nc" id="L162">                    r.setTimeout(timeout);</span>
+<span class="nc" id="L163">                    NetworkManager.getInstance().addToQueue(r);</span>
+                }
+<span class="nc" id="L165">            }</span>
+        }, tm, tm);
+<span class="nc" id="L167">    }</span>
+
+    /**
+     * If set to true this flag allows the application to load even if an Ad cannot be displayed
+     *
+     * @return the allowWithoutNetwork
+     */
+    public boolean isAllowWithoutNetwork() {
+<span class="nc" id="L175">        return allowWithoutNetwork;</span>
+    }
+
+    /**
+     * If set to true this flag allows the application to load even if an Ad cannot be displayed
+     *
+     * @param allowWithoutNetwork the allowWithoutNetwork to set
+     */
+    public void setAllowWithoutNetwork(boolean allowWithoutNetwork) {
+<span class="nc" id="L184">        this.allowWithoutNetwork = allowWithoutNetwork;</span>
+<span class="nc" id="L185">    }</span>
+
+    /**
+     * The timeout in milliseconds for an ad request
+     *
+     * @return the timeout
+     */
+    public int getTimeout() {
+<span class="nc" id="L193">        return timeout;</span>
+    }
+
+    /**
+     * The timeout in milliseconds for an ad request
+     *
+     * @param timeout the timeout to set
+     */
+    public void setTimeout(int timeout) {
+<span class="nc" id="L202">        this.timeout = timeout;</span>
+<span class="nc" id="L203">    }</span>
+
+    /**
+     * @return the adDisplayTime
+     */
+    public int getAdDisplayTime() {
+<span class="nc" id="L209">        return adDisplayTime;</span>
+    }
+
+    /**
+     * @param adDisplayTime the adDisplayTime to set
+     */
+    public void setAdDisplayTime(int adDisplayTime) {
+<span class="nc" id="L216">        this.adDisplayTime = adDisplayTime;</span>
+<span class="nc" id="L217">    }</span>
+
+    /**
+     * @return the scaleMode
+     */
+    public boolean isScaleMode() {
+<span class="nc" id="L223">        return scaleMode;</span>
+    }
+
+    /**
+     * @param scaleMode the scaleMode to set
+     */
+    public void setScaleMode(boolean scaleMode) {
+<span class="nc" id="L230">        this.scaleMode = scaleMode;</span>
+<span class="nc" id="L231">    }</span>
+
+    /**
+     * @return the allowSkipping
+     */
+    public boolean isAllowSkipping() {
+<span class="nc" id="L237">        return allowSkipping;</span>
+    }
+
+    /**
+     * @param allowSkipping the allowSkipping to set
+     */
+    public void setAllowSkipping(boolean allowSkipping) {
+<span class="nc" id="L244">        this.allowSkipping = allowSkipping;</span>
+<span class="nc" id="L245">    }</span>
+
+    void unlock(final ActionListener callback) {
+<span class="nc" id="L248">        AdForm adf = (AdForm) Display.getInstance().getCurrent();</span>
+<span class="nc" id="L249">        synchronized (LOCK) {</span>
+<span class="nc" id="L250">            adf.blocked = false;</span>
+<span class="nc" id="L251">            LOCK.notify();</span>
+<span class="nc" id="L252">        }</span>
+
+        // move to the next screen so the ad will be shown and so we 
+        // can return to the next screen and not this screen
+<span class="nc" id="L256">        Display.getInstance().callSerially(new Runnable() {</span>
+            public void run() {
+                // prevent a potential race condition with the locking
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                if (Display.getInstance().getCurrent() instanceof AdForm) {</span>
+<span class="nc" id="L260">                    Display.getInstance().callSerially(this);</span>
+<span class="nc" id="L261">                    return;</span>
+                }
+<span class="nc" id="L263">                callback.actionPerformed(null);</span>
+<span class="nc" id="L264">            }</span>
+        });
+<span class="nc" id="L266">    }</span>
+
+    class AdForm extends Form {
+<span class="nc" id="L269">        boolean blocked = true;</span>
+<span class="nc" id="L270">        private long shown = -1;</span>
+
+<span class="nc" id="L272">        public AdForm(Component ad) {</span>
+<span class="nc" id="L273">            BorderLayout bl = new BorderLayout();</span>
+<span class="nc" id="L274">            setLayout(bl);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            if (!isScaleMode()) {</span>
+<span class="nc" id="L276">                bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER);</span>
+            }
+<span class="nc" id="L278">            addComponent(BorderLayout.CENTER, ad);</span>
+<span class="nc" id="L279">            Command open = new Command(&quot;Open&quot;) {</span>
+                public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L281">                    synchronized (LOCK) {</span>
+<span class="nc" id="L282">                        blocked = false;</span>
+<span class="nc" id="L283">                        LOCK.notify();</span>
+<span class="nc" id="L284">                    }</span>
+
+                    // move to the next screen so the ad will be shown and so we 
+                    // can return to the next screen and not this screen
+<span class="nc" id="L288">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        public void run() {
+                            // prevent a potential race condition with the locking
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                            if (Display.getInstance().getCurrent() instanceof AdForm) {</span>
+<span class="nc" id="L292">                                Display.getInstance().callSerially(this);</span>
+<span class="nc" id="L293">                                return;</span>
+                            }
+<span class="nc" id="L295">                            Display.getInstance().execute(getAdDestination());</span>
+<span class="nc" id="L296">                        }</span>
+                    });
+<span class="nc" id="L298">                }</span>
+            };
+<span class="nc" id="L300">            Command skip = new Command(&quot;Skip&quot;) {</span>
+                public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L302">                    synchronized (LOCK) {</span>
+<span class="nc" id="L303">                        blocked = false;</span>
+<span class="nc" id="L304">                        LOCK.notify();</span>
+<span class="nc" id="L305">                    }</span>
+<span class="nc" id="L306">                }</span>
+            };
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            if (Display.getInstance().isTouchScreenDevice()) {</span>
+<span class="nc" id="L309">                Container grid = new Container(new GridLayout(1, 2));</span>
+<span class="nc" id="L310">                grid.addComponent(new Button(open));</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                if (isAllowSkipping()) {</span>
+<span class="nc" id="L312">                    grid.addComponent(new Button(skip));</span>
+                }
+<span class="nc" id="L314">                addComponent(BorderLayout.SOUTH, grid);</span>
+<span class="nc" id="L315">            } else {</span>
+<span class="nc" id="L316">                addCommand(open);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                if (isAllowSkipping()) {</span>
+<span class="nc" id="L318">                    addCommand(skip);</span>
+                }
+            }
+<span class="nc" id="L321">            registerAnimated(this);</span>
+<span class="nc" id="L322">        }</span>
+
+        protected void onShow() {
+<span class="nc" id="L325">            shown = System.currentTimeMillis();</span>
+<span class="nc" id="L326">        }</span>
+
+        public void show() {
+<span class="nc" id="L329">            super.showBack();</span>
+<span class="nc" id="L330">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                public void run() {
+                    try {
+<span class="nc" id="L333">                        synchronized (LOCK) {</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                            while (blocked) {</span>
+<span class="nc" id="L335">                                LOCK.wait(100);</span>
+                            }
+<span class="nc" id="L337">                        }</span>
+<span class="nc" id="L338">                    } catch (Exception err) {</span>
+<span class="nc" id="L339">                        err.printStackTrace();</span>
+<span class="nc" id="L340">                    }</span>
+<span class="nc" id="L341">                }</span>
+            });
+<span class="nc" id="L343">            clearPendingAd();</span>
+<span class="nc" id="L344">        }</span>
+
+        public boolean animate() {
+<span class="nc bnc" id="L347" title="All 4 branches missed.">            if (shown &gt; -1 &amp;&amp; System.currentTimeMillis() - shown &gt;= adDisplayTime) {</span>
+<span class="nc" id="L348">                blocked = false;</span>
+            }
+<span class="nc" id="L350">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

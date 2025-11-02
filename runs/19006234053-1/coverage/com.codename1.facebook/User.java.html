@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>User.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.facebook</a> &gt; <span class="el_source">User.java</span></div><h1>User.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.facebook;
+
+import java.util.Hashtable;
+
+/**
+ * This class represents a Facebook User objject
+ * http://developers.facebook.com/docs/reference/api/user/
+ *
+ * @author Chen Fishbein
+ */
+public class User extends FBObject {
+
+    private String username;
+    private String first_name;
+    private String last_name;
+    private String link;
+    private String about;
+    private String birthday;
+    private String email;
+    private String website;
+    private String bio;
+    private String quotes;
+    private String gender;
+    private String relationship_status;
+    private long timezone;
+    private String last_updated;
+    private String locale;
+    private FBObject location;
+    private FBObject hometown;
+
+    /**
+     * Empty Contructor
+     */
+<span class="nc" id="L57">    public User() {</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public User(Hashtable props) {
+<span class="nc" id="L64">        super(props);</span>
+<span class="nc" id="L65">        init(props);</span>
+<span class="nc" id="L66">    }</span>
+
+
+    /**
+     * @return the first_name
+     */
+    public String getFirst_name() {
+<span class="nc" id="L73">        return first_name;</span>
+    }
+
+    /**
+     * @return the last_name
+     */
+    public String getLast_name() {
+<span class="nc" id="L80">        return last_name;</span>
+    }
+
+    /**
+     * @return the link
+     */
+    public String getLink() {
+<span class="nc" id="L87">        return link;</span>
+    }
+
+    /**
+     * @return the about
+     */
+    public String getAbout() {
+<span class="nc" id="L94">        return about;</span>
+    }
+
+    /**
+     * @return the birthday
+     */
+    public String getBirthday() {
+<span class="nc" id="L101">        return birthday;</span>
+    }
+
+    /**
+     * @return the email
+     */
+    public String getEmail() {
+<span class="nc" id="L108">        return email;</span>
+    }
+
+    /**
+     * @return the website
+     */
+    public String getWebsite() {
+<span class="nc" id="L115">        return website;</span>
+    }
+
+    /**
+     * @return the bio
+     */
+    public String getBio() {
+<span class="nc" id="L122">        return bio;</span>
+    }
+
+    /**
+     * @return the quotes
+     */
+    public String getQuotes() {
+<span class="nc" id="L129">        return quotes;</span>
+    }
+
+    /**
+     * @return the gender
+     */
+    public String getGender() {
+<span class="nc" id="L136">        return gender;</span>
+    }
+
+    /**
+     * @return the relationship_status
+     */
+    public String getRelationship_status() {
+<span class="nc" id="L143">        return relationship_status;</span>
+    }
+
+    /**
+     * @return the timezone
+     */
+    public long getTimezone() {
+<span class="nc" id="L150">        return timezone;</span>
+    }
+
+    /**
+     * @return the last_updated
+     */
+    public String getLast_updated() {
+<span class="nc" id="L157">        return last_updated;</span>
+    }
+
+    /**
+     * @return the locale
+     */
+    public String getLocale() {
+<span class="nc" id="L164">        return locale;</span>
+    }
+
+    /**
+     * Returns the username
+     */
+    public String getUsername() {
+<span class="nc" id="L171">        return username;</span>
+    }
+
+    /**
+     * Gets the user City if available
+     *
+     * @return
+     */
+    public FBObject getLocation() {
+<span class="nc" id="L180">        return location;</span>
+    }
+
+    /**
+     * Gets the user Hometown if available
+     *
+     * @return
+     */
+    public FBObject getHometown() {
+<span class="nc" id="L189">        return hometown;</span>
+    }
+
+    /**
+     * copies the relevant values from the given hashtable
+     *
+     * @param props an hashtable to copy from
+     */
+    public void copy(Hashtable props) {
+<span class="nc" id="L198">        super.copy(props);</span>
+<span class="nc" id="L199">        init(props);</span>
+<span class="nc" id="L200">    }</span>
+
+    private void init(Hashtable toCopy) {
+<span class="nc" id="L203">        super.copy(toCopy);</span>
+<span class="nc" id="L204">        username = (String) toCopy.get(&quot;username&quot;);</span>
+<span class="nc" id="L205">        first_name = (String) toCopy.get(&quot;first_name&quot;);</span>
+<span class="nc" id="L206">        last_name = (String) toCopy.get(&quot;last_name&quot;);</span>
+<span class="nc" id="L207">        link = (String) toCopy.get(&quot;link&quot;);</span>
+<span class="nc" id="L208">        about = (String) toCopy.get(&quot;about&quot;);</span>
+<span class="nc" id="L209">        birthday = (String) toCopy.get(&quot;birthday&quot;);</span>
+<span class="nc" id="L210">        email = (String) toCopy.get(&quot;email&quot;);</span>
+<span class="nc" id="L211">        website = (String) toCopy.get(&quot;website&quot;);</span>
+<span class="nc" id="L212">        bio = (String) toCopy.get(&quot;bio&quot;);</span>
+<span class="nc" id="L213">        quotes = (String) toCopy.get(&quot;quotes&quot;);</span>
+<span class="nc" id="L214">        gender = (String) toCopy.get(&quot;gender&quot;);</span>
+<span class="nc" id="L215">        relationship_status = (String) toCopy.get(&quot;relationship_status&quot;);</span>
+<span class="nc" id="L216">        Object tz = toCopy.get(&quot;timezone&quot;);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (tz instanceof Integer) {</span>
+<span class="nc" id="L218">            timezone = ((Integer) tz).longValue();</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        } else if (tz instanceof Long) {</span>
+<span class="nc" id="L220">            timezone = ((Long) tz).longValue();</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        } else if (tz instanceof Short) {</span>
+<span class="nc" id="L222">            timezone = ((Short) tz).shortValue();</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        } else if (tz instanceof Byte) {</span>
+<span class="nc" id="L224">            timezone = ((Byte) tz).byteValue();</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        } else if (tz instanceof Double) {</span>
+<span class="nc" id="L226">            timezone = (long) ((Double) tz).doubleValue();</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        } else if (tz instanceof Float) {</span>
+<span class="nc" id="L228">            timezone = (long) ((Float) tz).floatValue();</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        } else if (tz instanceof String) {</span>
+            try {
+<span class="nc" id="L231">                timezone = Long.parseLong((String) tz);</span>
+<span class="nc" id="L232">            } catch (NumberFormatException ignore) {</span>
+<span class="nc" id="L233">                timezone = 0;</span>
+<span class="nc" id="L234">            }</span>
+        }
+<span class="nc" id="L236">        last_updated = (String) toCopy.get(&quot;last_updated&quot;);</span>
+<span class="nc" id="L237">        locale = (String) toCopy.get(&quot;locale&quot;);</span>
+<span class="nc" id="L238">        Hashtable l = (Hashtable) toCopy.get(&quot;location&quot;);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (l != null) {</span>
+<span class="nc" id="L240">            location = new FBObject(l);</span>
+        }
+<span class="nc" id="L242">        Hashtable h = (Hashtable) toCopy.get(&quot;hometown&quot;);</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (h != null) {</span>
+<span class="nc" id="L244">            hometown = new FBObject(h);</span>
+        }
+<span class="nc" id="L246">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

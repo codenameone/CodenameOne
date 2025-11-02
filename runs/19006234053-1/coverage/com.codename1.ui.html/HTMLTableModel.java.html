@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HTMLTableModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">HTMLTableModel.java</span></div><h1>HTMLTableModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.table.TableModel;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * HTMLTableModel is a TableModel that is adapted to HTMLTables and their creation. The difference from other models is:&lt;br&gt;
+ * - There are no column names, on the other hand each cell anywhere can be defined as a header (which merely changes it style).&lt;br&gt;
+ * - There is no prior declaration of the number of columns and rows in the table.&lt;br&gt;
+ * - Cells can be added only using the addCell method which adds them to the end of the current row.&lt;br&gt;
+ * - When a row ends, the commitRow method is called which results in creating a new empty row.&lt;br&gt;
+ * - Since a cell in an HTML table can be practically everthing (From a simple string to a whole document), the objects added to the table are in fact Codename One components.
+ *
+ * @author Ofir Leitner
+ */
+<span class="nc" id="L45">class HTMLTableModel implements TableModel {</span>
+
+    static final int SEGMENT_THEAD = 0;
+    static final int SEGMENT_TBODY = 1;
+    static final int SEGMENT_TFOOT = 2;
+<span class="nc" id="L50">    Vector rows = new Vector();</span>
+<span class="nc" id="L51">    Vector headers = new Vector();</span>
+    int maxColumn;
+<span class="nc" id="L53">    Vector currentRow = new Vector();</span>
+    Vector lastCommittedRow;
+<span class="nc" id="L55">    Hashtable constraints = new Hashtable();</span>
+    HTMLElement captionTextTag;
+    Vector segmentEnds;
+<span class="nc" id="L58">    int curSegmentType = SEGMENT_TBODY;</span>
+<span class="nc" id="L59">    int rowInsretionPos = -1;</span>
+<span class="nc" id="L60">    int bodyInsertionPos = 0;</span>
+    boolean hasTHead, hasTFoot;
+<span class="nc" id="L62">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+
+    /**
+     * Adds the given component as a cell to the end of the current row of the table
+     *
+     * @param cell       The component to add
+     * @param isHeader   true if this is a header cell (Element.TAG_TH), false otherwise
+     * @param constraint Specific constraints for this cell (alignment, spanning)
+     */
+    void addCell(Component cell, boolean isHeader, CellConstraint constraint) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (isHeader) {</span>
+<span class="nc" id="L73">            headers.addElement(cell);</span>
+        }
+<span class="nc" id="L75">        currentRow.addElement(cell);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (currentRow.size() &gt; maxColumn) {</span>
+<span class="nc" id="L77">            maxColumn = currentRow.size();</span>
+        }
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (constraint != null) {</span>
+<span class="nc" id="L80">            constraints.put(cell, constraint);</span>
+        }
+<span class="nc" id="L82">    }</span>
+
+    /**
+     * Sets the given alignment as a constraint to all cells in the table
+     *
+     * @param isHorizontal true to set horizontal alignment, false for vertical
+     * @param align        The requested alignment
+     */
+    void setAlignToAll(boolean isHorizontal, int align) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        for (Enumeration e = constraints.elements(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L92">            CellConstraint cc = (CellConstraint) e.nextElement();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (isHorizontal) {</span>
+<span class="nc" id="L94">                cc.setHorizontalAlign(align);</span>
+            } else {
+<span class="nc" id="L96">                cc.setVerticalAlign(align);</span>
+            }
+<span class="nc" id="L98">        }</span>
+<span class="nc" id="L99">    }</span>
+
+    /**
+     * Returns the constraint for the specified object/cell
+     *
+     * @param object The object/cell
+     * @return the constraint for the specified object/cell
+     */
+    CellConstraint getConstraint(Object object) {
+<span class="nc" id="L108">        return (CellConstraint) constraints.get(object);</span>
+    }
+
+    /**
+     * Checks if the object is a header
+     *
+     * @param object The object/cell in question
+     * @return true if object is a header, false otherwise
+     */
+    boolean isHeader(Object object) {
+<span class="nc" id="L118">        return headers.contains(object);</span>
+    }
+
+    /**
+     * Commits the current row. This opens a new empty row.
+     */
+    void commitRow() {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (rowInsretionPos == -1) {</span>
+<span class="nc" id="L126">            rows.addElement(currentRow);</span>
+        } else {
+<span class="nc" id="L128">            rows.insertElementAt(currentRow, rowInsretionPos++);</span>
+        }
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (curSegmentType != SEGMENT_TFOOT) {</span>
+<span class="nc" id="L131">            bodyInsertionPos++;</span>
+        }
+<span class="nc" id="L133">        lastCommittedRow = currentRow;</span>
+<span class="nc" id="L134">        currentRow = new Vector();</span>
+<span class="nc" id="L135">    }</span>
+
+    /**
+     * Commits the current row only if it is not empty
+     */
+    void commitRowIfNotEmpty() {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (currentRow.size() &gt; 0) {</span>
+<span class="nc" id="L142">            commitRow();</span>
+        }
+<span class="nc" id="L144">    }</span>
+
+    /**
+     * Signals a start for a segment (THEAD, TFOOT, TBODY)
+     *
+     * @param segmentType The segment type
+     */
+    void startSegment(int segmentType) {
+<span class="nc bnc" id="L152" title="All 4 branches missed.">        if ((segmentType == SEGMENT_THEAD) &amp;&amp; (!hasTHead)) { // Can only have one THEAD, second one will be considered as TBODY</span>
+<span class="nc" id="L153">            rowInsretionPos = 0;</span>
+<span class="nc" id="L154">            hasTHead = true;</span>
+<span class="nc" id="L155">            curSegmentType = SEGMENT_THEAD;</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">        } else if ((segmentType == SEGMENT_TFOOT) &amp;&amp; (!hasTFoot)) { // Can only have one TFOOT, second one will be considered as TBODY</span>
+<span class="nc" id="L157">            rowInsretionPos = -1;</span>
+<span class="nc" id="L158">            hasTFoot = true;</span>
+<span class="nc" id="L159">            curSegmentType = SEGMENT_TFOOT;</span>
+        } else { //body
+<span class="nc" id="L161">            rowInsretionPos = bodyInsertionPos;</span>
+<span class="nc" id="L162">            curSegmentType = SEGMENT_TBODY;</span>
+        }
+
+<span class="nc" id="L165">    }</span>
+
+    /**
+     * Signals the end of the current segment
+     */
+    void endSegment() {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (lastCommittedRow != null) {</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            if (segmentEnds == null) {</span>
+<span class="nc" id="L173">                segmentEnds = new Vector();</span>
+            }
+<span class="nc" id="L175">            segmentEnds.addElement(lastCommittedRow);</span>
+        }
+<span class="nc" id="L177">        curSegmentType = SEGMENT_TBODY; //-1;</span>
+<span class="nc" id="L178">        rowInsretionPos = bodyInsertionPos;</span>
+<span class="nc" id="L179">    }</span>
+
+
+    // TableModel methods:
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public int getRowCount() {
+<span class="nc" id="L188">        return rows.size();</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public int getColumnCount() {
+<span class="nc" id="L195">        return maxColumn;</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public String getColumnName(int i) {
+<span class="nc" id="L202">        return &quot;&quot;;</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public boolean isCellEditable(int row, int column) {
+<span class="nc" id="L209">        return false;</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public Object getValueAt(int row, int column) {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (row &gt;= rows.size()) {</span>
+<span class="nc" id="L217">            return null;</span>
+        }
+<span class="nc" id="L219">        Vector columns = (Vector) rows.elementAt(row);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (column &gt;= columns.size()) {</span>
+<span class="nc" id="L221">            return null;</span>
+        }
+<span class="nc" id="L223">        return columns.elementAt(column);</span>
+    }
+
+    /**
+     * {{@inheritDoc}}
+     */
+    public void setValueAt(int row, int column, Object o) {
+<span class="nc" id="L230">        Vector columns = (Vector) rows.elementAt(row);</span>
+<span class="nc" id="L231">        columns.removeElementAt(column);</span>
+<span class="nc" id="L232">        columns.setElementAt(o, column);</span>
+<span class="nc" id="L233">        dispatcher.fireDataChangeEvent(column, row);</span>
+<span class="nc" id="L234">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L240">        dispatcher.addListener(d);</span>
+<span class="nc" id="L241">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L247">        dispatcher.removeListener(d);</span>
+<span class="nc" id="L248">    }</span>
+
+    /**
+     * Checks if the specified row ends a segment in the table (and as such a line should be drawn after it)
+     * This is used when a the 'rules' attribute in the 'table' tag was set to 'groups'
+     *
+     * @param row The row to check
+     * @return true if the specified row ends a segment in the table, false otherwise
+     */
+    boolean isSegmentEnd(int row) {
+<span class="nc bnc" id="L258" title="All 6 branches missed.">        if ((segmentEnds == null) || (row &lt; 0) || (row &gt;= rows.size())) {</span>
+<span class="nc" id="L259">            return false;</span>
+        }
+<span class="nc" id="L261">        return segmentEnds.contains(rows.elementAt(row));</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

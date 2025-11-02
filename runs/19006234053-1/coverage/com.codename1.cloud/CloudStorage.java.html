@@ -1,0 +1,579 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CloudStorage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.cloud</a> &gt; <span class="el_source">CloudStorage.java</span></div><h1>CloudStorage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.cloud;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * The cloud storage class allows developers to use the Codename One cloud
+ * based storage API as a shared database for your application. The database
+ * will be visible only to a specific application (based on author/package
+ * definitions).&lt;br&gt;
+ * The calls to this class only become effective as a single batch when commit
+ * is sent. The commit can be synchronous or asynchronous.&lt;br&gt;
+ * &lt;b&gt;Important&lt;/b&gt; due to the nature of the underlying object data store queries
+ * can only be performed against an indexed field of which there are 10 hardcoded
+ * indexes! Basic data is case sensitive and queries/sort will be performed in a case
+ * sensitive way! In order to work around this create a property with an identical
+ * name that contains the field as lower or upper case in order to query/sort
+ * against.
+ *
+ * @author Shai Almog
+ * @deprecated this API is targeted for removal due to changes in Google App Engine API support
+ */
+public class CloudStorage { // PMD Fix: UnusedPrivateField removed pendingRefreshes cache
+    /**
+     * Return code for methods in this class indicating a successful operation
+     */
+    public static final int RETURN_CODE_SUCCESS = 0;
+
+    /**
+     * Return code for methods in this class indicating a failure due to server side
+     * modification of an object (e.g. different user changed the object)
+     */
+    public static final int RETURN_CODE_FAIL_OBJECT_MODIFIED = 1;
+
+    /**
+     * Return code for methods in this class indicating a failure due to generic server side
+     * error
+     */
+    public static final int RETURN_CODE_FAIL_SERVER_ERROR = 2;
+
+    /**
+     * Return code for methods in this class indicating a failure due to exceeding
+     * server storage quotas
+     */
+    public static final int RETURN_CODE_FAIL_QUOTA_EXCEEDED = 3;
+
+    /**
+     * Return code for methods in this class indicating an empty queue
+     */
+    public static final int RETURN_CODE_EMPTY_QUEUE = 4;
+
+    /**
+     * Return code for methods in this class indicating a failure due to exceeding
+     * server storage quotas
+     */
+    public static final int RETURN_CODE_FAIL_PERMISSION_VIOLATION = 5;
+
+    /**
+     * Indicates the type of the field for queries and filtering
+     */
+    static final String TYPE_FIELD = &quot;CN1Type&quot;;
+
+    /**
+     * Indicates the index field prefix
+     */
+    static final String INDEX_FIELD = &quot;CN1Index&quot;;
+
+    private static CloudStorage INSTANCE;
+
+
+    private CloudStorage() {
+    }
+
+    /**
+     * Creates an instance of the cloud storage object, only one instance should be used per application.
+     * This method is important since it may block to complete/cleanup a previous transaction that wasn't
+     * fully completed before exiting the application.
+     *
+     * @return the instance of the class
+     */
+    public static CloudStorage getInstance() {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (INSTANCE == null) {</span>
+<span class="nc" id="L105">            INSTANCE = new CloudStorage();</span>
+        }
+<span class="nc" id="L107">        return INSTANCE;</span>
+    }
+
+
+    /**
+     * Adds the given object to the save queue, the operation will only take place once committed
+     *
+     * @param object the object to save into the cloud, new objects are inserted. existing
+     *               objects are updated
+     */
+    public synchronized void save(CloudObject object) {
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * Deletes the following object from the cloud storage upon commit
+     *
+     * @param cl the cloud object to delete
+     */
+    public synchronized void delete(CloudObject cl) {
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * Refresh the given objects with data from the server if they were modified on the server (this is the asynchronous
+     * version of the method).
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param objects  objects to refresh
+     * @param response object for the response
+     */
+    public void refresh(CloudObject[] objects, CloudResponse&lt;Integer&gt; response) {
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Adds the given object to a set of refresh operations in which we don't
+     * really care if the operation is successful
+     *
+     * @param obj the object to refresh
+     */
+    public void refreshAsync(CloudObject obj) {
+<span class="nc" id="L146">    }</span>
+
+    /**
+     * Refresh the given objects with data from the server if they were modified on the server.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param objects objects to refresh
+     * @return status code matching the situation, one of: RETURN_CODE_SUCCESS,
+     * RETURN_CODE_FAIL_SERVER_ERROR
+     * @deprecated this feature is no longer supported
+     */
+    public int refresh(CloudObject[] objects) {
+<span class="nc" id="L158">        return -1;</span>
+    }
+
+    /**
+     * Fetches the objects from the server.
+     * This operation executes immediately without waiting for commit.
+     *
+     * @param cloudIds the object id's to fetch
+     * @return the cloud objects or null if a server error occurred
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public CloudObject[] fetch(String[] cloudIds) throws CloudException {
+<span class="nc" id="L170">        throw new CloudException(-1);</span>
+    }
+
+    /**
+     * Fetches the objects from the server asynchronously.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param cloudIds the object id's to fetch
+     * @param response returns the response from the server
+     * @return the cloud objects or null if a server error occurred
+     */
+    public void fetch(String[] cloudIds, final CloudResponse&lt;CloudObject[]&gt; response) {
+<span class="nc" id="L182">    }</span>
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is equal to the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return array of objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public CloudObject[] queryEquals(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+<span class="nc" id="L200">        return null;</span>
+    }
+
+    /**
+     * Performs a query to the server finding the objects where the sort is equal to the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index on which the sort is based
+     * @param ascending       indicates if the sort order is ascending or descending
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return array of objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public CloudObject[] querySorted(String type, int index, boolean ascending, int page, int limit, int visibilityScope) throws CloudException {
+<span class="nc" id="L218">        return null;</span>
+    }
+
+    /**
+     * Performs a query to the server finding the objects where the sort is equal to the given value and returning
+     * the cloud key of these objects.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index on which the sort is based
+     * @param ascending       indicates if the sort order is ascending or descending
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return the keys for the cloud objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public String[] querySortedKeys(String type, int index, boolean ascending, int page, int limit, int visibilityScope) throws CloudException {
+<span class="nc" id="L237">        return null;</span>
+    }
+
+    /**
+     * Equivalent to the standard query but just returns the keys matching the given query
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return the keys for the cloud objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public String[] queryEqualsKeys(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+<span class="nc" id="L254">        return null;</span>
+    }
+
+    /**
+     * Equivalent to the standard query but just returns the total count of entries that will be returned
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return the number of elements
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public int queryEqualsCount(String type, int index, String value, int visibilityScope) throws CloudException {
+<span class="nc" id="L269">        return -1;</span>
+    }
+
+    /**
+     * Equivalent to the standard query but just returns the total count of entries that will be returned
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return the number of elements
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public int queryGreaterThanCount(String type, int index, String value, int visibilityScope) throws CloudException {
+<span class="nc" id="L284">        return -1;</span>
+    }
+
+    /**
+     * Equivalent to the standard query but just returns the total count of entries that will be returned
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return the number of elements
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public int queryLessThanCount(String type, int index, String value, int visibilityScope) throws CloudException {
+<span class="nc" id="L299">        return -1;</span>
+    }
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is greater than the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return array of objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public CloudObject[] queryGreaterThan(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+<span class="nc" id="L318">        return null;</span>
+    }
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is smaller than the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return array of objects matching the query
+     * @throws CloudException thrown for a server side/connection error
+     */
+    public CloudObject[] queryLessThan(String type, int index, String value, int page, int limit, int visibilityScope) throws CloudException {
+<span class="nc" id="L337">        return null;</span>
+    }
+
+
+    /**
+     * Performs a query to the server finding the objects where the sort is equal to the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index on which the sort is based
+     * @param ascending       indicates if the sort order is ascending or descending
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     */
+    public void querySorted(String type, int index, boolean ascending, int page, int limit, int visibilityScope, CloudResponse&lt;CloudObject[]&gt; response) {
+<span class="nc" id="L354">    }</span>
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is equal to the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     */
+    public void queryEquals(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse&lt;CloudObject[]&gt; response) {
+
+<span class="nc" id="L371">    }</span>
+
+    /**
+     * Equivalent to the standard query but just returns the total count of entries that will be returned
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     */
+    public void queryEqualsCount(String type, int index, String value, int visibilityScope, CloudResponse&lt;Integer&gt; response) {
+<span class="nc" id="L383">    }</span>
+
+    /**
+     * Equivalent to the standard query but just returns the total count of entries that will be returned
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @return the number of elements
+     */
+    public void queryGreaterThanCount(String type, int index, String value, int visibilityScope, CloudResponse&lt;Integer&gt; response) {
+
+<span class="nc" id="L397">    }</span>
+
+    /**
+     * Performs a query to the server finding the objects where the sort is equal to the given value and returning
+     * the cloud key of these objects.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index on which the sort is based
+     * @param ascending       indicates if the sort order is ascending or descending
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     */
+    public void querySortedKeys(String type, int index, boolean ascending, int page, int limit, int visibilityScope, CloudResponse&lt;String[]&gt; response) {
+
+<span class="nc" id="L414">    }</span>
+
+    /**
+     * Equivalent to the standard query but just returns the keys matching the given query
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     */
+    public void queryEqualsKeys(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse&lt;String[]&gt; response) {
+
+<span class="nc" id="L429">    }</span>
+
+    /**
+     * Equivalent to the standard query but just returns the total count of entries that will be returned
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     */
+    public void queryLessThanCount(String type, int index, String value, int visibilityScope, CloudResponse&lt;Integer&gt; response) {
+
+<span class="nc" id="L442">    }</span>
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is greater than the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     */
+    public void queryGreaterThan(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse&lt;CloudObject[]&gt; response) {
+<span class="nc" id="L458">    }</span>
+
+    /**
+     * Performs a query to the server finding the objects where the key
+     * value is smaller than the given value.
+     * This operation executes immeditely without waiting for commit.
+     *
+     * @param type            the object type
+     * @param index           the index to query for the given value
+     * @param value           the value of said index to include in the response object
+     * @param page            the page of responses (allows for paging)
+     * @param limit           number of responses to fetch
+     * @param visibilityScope indicates the scope in which to look as one of the
+     *                        CloudObject constants ACCESS_*
+     * @param response        array of objects matching the query
+     */
+    public void queryLessThan(String type, int index, String value, int page, int limit, int visibilityScope, CloudResponse&lt;CloudObject[]&gt; response) {
+<span class="nc" id="L475">    }</span>
+
+    /**
+     * Allows uploading of images etc. to the cloud which can later on be referenced as URL's.
+     *
+     * @param mimeType the mimetype of the uploaded file
+     * @param file     the URL of the local file
+     * @return an ID for the given file that can be used to delete the file or construct a URL of the file
+     * @throws CloudException in case of a server side error
+     * @throws IOException    when a problem occurs with the file
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
+     */
+    public String uploadCloudFile(String mimeType, String file) throws CloudException, IOException {
+<span class="nc" id="L488">        return null;</span>
+    }
+
+    /**
+     * Allows uploading of images etc. to the cloud which can later on be referenced as URL's.
+     *
+     * @param mimeType the mimetype of the uploaded file
+     * @param filename a short name for the file uploaded (not a full path)
+     * @param data     input stream from which to read the file
+     * @param dataSize the size in bytes of the input stream (this is essential for file upload to work on all devices!)
+     * @return an ID for the given file that can be used to delete the file or construct a URL of the file
+     * @throws CloudException in case of a server side error
+     * @throws IOException    when a problem occurs with the file
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
+     */
+    public String uploadCloudFile(String mimeType, String filename, InputStream data, int dataSize) throws CloudException, IOException {
+<span class="nc" id="L504">        return null;</span>
+    }
+
+
+    /**
+     * Deletes a file from the cloud storage
+     *
+     * @param fileId the file id to delete
+     * @return true if the operation was successful
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
+     */
+    public boolean deleteCloudFile(String fileId) {
+<span class="nc" id="L516">        return false;</span>
+    }
+
+    /**
+     * Deletes all the cloud files under this user, notice that this method
+     * is asynchronous and a background server process performs the actual deletion
+     *
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
+     */
+    public void deleteAllCloudFilesForUser() {
+<span class="nc" id="L526">    }</span>
+
+    /**
+     * Deletes all the cloud files before the given time stamp for the given
+     * development account. Notice that this method is meant for internal use
+     * and not for distributable apps since it includes your developer account.
+     * This method works in a background server process and returns immediately.
+     *
+     * @param timestamp         the timestamp since epoch (as in System.currentTimemillis).
+     * @param developerAccount  your developer email
+     * @param developerPassword your developer password
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
+     */
+    public void deleteAllCloudFilesBefore(long timestamp, String developerAccount, String developerPassword) {
+<span class="nc" id="L540">    }</span>
+
+    /**
+     * Converts a file id to a URL with which the file can be downloaded, notice that the file URL is world
+     * readable!
+     *
+     * @param fileId the file ID
+     * @return a URL that allows downloading the file
+     * @deprecated this API is currently deprecated due to Googles cloud storage deprection
+     */
+    public String getUrlForCloudFileId(String fileId) {
+<span class="nc" id="L551">        return null;</span>
+    }
+
+    /**
+     * Commit works synchronously and returns one of the return codes above to indicate
+     * the status.
+     *
+     * @return status code from the constants in this class
+     */
+    public synchronized int commit() {
+<span class="nc" id="L561">        return RETURN_CODE_EMPTY_QUEUE;</span>
+    }
+
+    /**
+     * A commit version that works asynchronously and returns one of the return codes above to indicate
+     * the status.
+     *
+     * @param response response code with status code from the constants in this class
+     */
+    public void commit(CloudResponse&lt;Integer&gt; response) {
+<span class="nc" id="L571">    }</span>
+
+    /**
+     * Cancels current pending changes
+     */
+    public synchronized void rollback() {
+<span class="nc" id="L577">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

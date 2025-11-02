@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DoughnutChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">DoughnutChart.java</span></div><h1>DoughnutChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.MultipleCategorySeries;
+import com.codename1.charts.renderers.DefaultRenderer;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.ui.geom.Rectangle2D;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+/**
+ * Visualises a {@link MultipleCategorySeries} as concentric rings that share a
+ * common centre (also known as a doughnut chart).
+ * &lt;p&gt;
+ * Each category in the dataset is drawn as a separate ring, making it suitable
+ * for representing hierarchical proportions. Construct the chart with the
+ * dataset and a {@link DefaultRenderer} and wrap it in a
+ * {@link com.codename1.charts.ChartComponent} to place it on screen.
+ */
+public class DoughnutChart extends RoundChart {
+    /** The series dataset. */
+    private final MultipleCategorySeries mDataset;
+    /** A step variable to control the size of the legend shape. */
+    private int mStep;
+
+    /**
+     * Builds a new doughnut chart instance.
+     *
+     * @param dataset the series dataset
+     * @param renderer the series renderer
+     */
+    public DoughnutChart(MultipleCategorySeries dataset, DefaultRenderer renderer) {
+<span class="fc" id="L53">        super(null, renderer);</span>
+<span class="fc" id="L54">        mDataset = dataset;</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * The graphical representation of the doughnut chart.
+     *
+     * @param canvas the canvas to paint to
+     * @param x the top left x value of the view to draw to
+     * @param y the top left y value of the view to draw to
+     * @param width the width of the view to draw to
+     * @param height the height of the view to draw to
+     * @param paint the paint
+     */
+    @Override
+    public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+<span class="nc" id="L69">        paint.setAntiAlias(mRenderer.isAntialiasing());</span>
+<span class="nc" id="L70">        paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L71">        paint.setTextSize(mRenderer.getLabelsTextSize());</span>
+<span class="nc" id="L72">        int legendSize = getLegendSize(mRenderer, height / 5, 0);</span>
+<span class="nc" id="L73">        int left = x;</span>
+<span class="nc" id="L74">        int top = y;</span>
+<span class="nc" id="L75">        int right = x + width;</span>
+<span class="nc" id="L76">        int cLength = mDataset.getCategoriesCount();</span>
+<span class="nc" id="L77">        String[] categories = new String[cLength];</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (int category = 0; category &lt; cLength; category++) {</span>
+<span class="nc" id="L79">            categories[category] = mDataset.getCategory(category);</span>
+        }
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (mRenderer.isFitLegend()) {</span>
+<span class="nc" id="L82">            legendSize = drawLegend(canvas, mRenderer, categories, left, right, y, width, height,</span>
+                    legendSize, paint, true);
+        }
+
+<span class="nc" id="L86">        int bottom = y + height - legendSize;</span>
+<span class="nc" id="L87">        drawBackground(mRenderer, canvas, x, y, width, height, paint, false, DefaultRenderer.NO_COLOR);</span>
+<span class="nc" id="L88">        mStep = SHAPE_WIDTH * 3 / 4;</span>
+
+<span class="nc" id="L90">        int mRadius = Math.min(Math.abs(right - left), Math.abs(bottom - top));</span>
+<span class="nc" id="L91">        double rCoef = 0.35 * mRenderer.getScale();</span>
+<span class="nc" id="L92">        double decCoef = 0.2 / cLength;</span>
+<span class="nc" id="L93">        int radius = (int) (mRadius * rCoef);</span>
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterX == NO_VALUE) {</span>
+<span class="nc" id="L95">            mCenterX = (left + right) / 2;</span>
+        }
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterY == NO_VALUE) {</span>
+<span class="nc" id="L98">            mCenterY = (bottom + top) / 2;</span>
+        }
+<span class="nc" id="L100">        float shortRadius = radius * 0.9f;</span>
+<span class="nc" id="L101">        float longRadius = radius * 1.1f;</span>
+<span class="nc" id="L102">        List&lt;Rectangle2D&gt; prevLabelsBounds = new ArrayList&lt;Rectangle2D&gt;();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        for (int category = 0; category &lt; cLength; category++) {</span>
+<span class="nc" id="L104">            int sLength = mDataset.getItemCount(category);</span>
+<span class="nc" id="L105">            double total = 0;</span>
+<span class="nc" id="L106">            String[] titles = new String[sLength];</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="nc" id="L108">                total += mDataset.getValues(category)[i];</span>
+<span class="nc" id="L109">                titles[i] = mDataset.getTitles(category)[i];</span>
+            }
+<span class="nc" id="L111">            float currentAngle = mRenderer.getStartAngle();</span>
+<span class="nc" id="L112">            Rectangle2D oval = PkgUtils.makeRect(mCenterX - radius, mCenterY - radius, mCenterX + radius, mCenterY</span>
+                    + radius);
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="nc" id="L115">                paint.setColor(mRenderer.getSeriesRendererAt(i).getColor());</span>
+<span class="nc" id="L116">                float value = (float) mDataset.getValues(category)[i];</span>
+<span class="nc" id="L117">                float angle = (float) (value / total * 360);</span>
+<span class="nc" id="L118">                canvas.drawArc(oval, currentAngle, angle, true, paint);</span>
+<span class="nc" id="L119">                drawLabel(canvas, mDataset.getTitles(category)[i], mRenderer, prevLabelsBounds, mCenterX,</span>
+                        mCenterY, shortRadius, longRadius, currentAngle, angle, left, right,
+<span class="nc" id="L121">                        mRenderer.getLabelsColor(), paint, true, false);</span>
+<span class="nc" id="L122">                currentAngle += angle;</span>
+            }
+<span class="nc" id="L124">            radius -= mRadius * decCoef;</span>
+<span class="nc" id="L125">            shortRadius -= mRadius * decCoef - 2;</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (mRenderer.getBackgroundColor() != 0) {</span>
+<span class="nc" id="L127">                paint.setColor(mRenderer.getBackgroundColor());</span>
+            } else {
+<span class="nc" id="L129">                paint.setColor(ColorUtil.WHITE);</span>
+            }
+<span class="nc" id="L131">            paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L132">            oval = PkgUtils.makeRect(mCenterX - radius, mCenterY - radius, mCenterX + radius, mCenterY + radius);</span>
+<span class="nc" id="L133">            canvas.drawArc(oval, 0, 360, true, paint);</span>
+<span class="nc" id="L134">            radius -= 1;</span>
+        }
+<span class="nc" id="L136">        prevLabelsBounds.clear();</span>
+<span class="nc" id="L137">        drawLegend(canvas, mRenderer, categories, left, right, y, width, height, legendSize, paint,</span>
+                false);
+<span class="nc" id="L139">        drawTitle(canvas, x, y, width, paint);</span>
+<span class="nc" id="L140">    }</span>
+
+    /**
+     * Returns the legend shape width.
+     *
+     * @param seriesIndex the series index
+     * @return the legend shape width
+     */
+    public int getLegendShapeWidth(int seriesIndex) {
+<span class="fc" id="L149">        return SHAPE_WIDTH;</span>
+    }
+
+    /**
+     * The graphical representation of the legend shape.
+     *
+     * @param canvas the canvas to paint to
+     * @param renderer the series renderer
+     * @param x the x value of the point the shape should be drawn at
+     * @param y the y value of the point the shape should be drawn at
+     * @param seriesIndex the series index
+     * @param paint the paint to be used for drawing
+     */
+    public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
+                                int seriesIndex, Paint paint) {
+<span class="nc" id="L164">        mStep--;</span>
+<span class="nc" id="L165">        canvas.drawCircle(x + SHAPE_WIDTH - mStep, y, mStep, paint);</span>
+<span class="nc" id="L166">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

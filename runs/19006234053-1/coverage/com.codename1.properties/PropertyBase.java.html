@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PropertyBase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">PropertyBase.java</span></div><h1>PropertyBase.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Base class for property types
+ *
+ * @author Shai Almog
+ */
+public class PropertyBase&lt;T, K&gt; {
+    /**
+     * Used internally to detect if a property was read by a user
+     */
+    static PropertyChangeListener onGlobalGetProperty;
+    /**
+     * Used internally to detect if a property was modified by a user
+     */
+    static PropertyChangeListener onGlobalSetProperty;
+    private static PropertyChangeListener lastChangeListener;
+    private final String name;
+    PropertyIndex parent;
+    private Class genericType;
+    private ArrayList&lt;PropertyChangeListener&lt;T, K&gt;&gt; listeners;
+
+    /**
+     * All properties must have a name
+     *
+     * @param name the name of the property
+     */
+<span class="fc" id="L54">    protected PropertyBase(String name) {</span>
+<span class="fc" id="L55">        this.name = name;</span>
+<span class="fc" id="L56">    }</span>
+
+
+    /**
+     * All properties must have a name, a generic type is helpful
+     *
+     * @param name        the name of the property
+     * @param genericType the property type to workaround issues with erasure
+     */
+<span class="fc" id="L65">    protected PropertyBase(String name, Class genericType) {</span>
+<span class="fc" id="L66">        this.name = name;</span>
+<span class="fc" id="L67">        this.genericType = genericType;</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Binds an event callback for set calls and property mutation
+     *
+     * @param listener will be invoked whenever any mutable property is changed
+     * @throws RuntimeException if a set listener is already bound, there can be only one per application
+     * @deprecated Usage of this method isn't recommended, it's designed for internal use
+     */
+    public static void bindGlobalSetListener(PropertyChangeListener listener) {
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (onGlobalSetProperty != null &amp;&amp; listener != null) {</span>
+<span class="nc" id="L79">            throw new RuntimeException(&quot;Set Listener already bound&quot;);</span>
+        }
+<span class="fc" id="L81">        onGlobalSetProperty = listener;</span>
+<span class="fc" id="L82">    }</span>
+
+    /**
+     * Binds an event callback for get calls and property reads
+     *
+     * @param listener will be invoked whenever any property is read
+     * @throws RuntimeException if a get listener is already bound, there can be only one per application
+     * @deprecated Usage of this method isn't recommended, it's designed for internal use
+     */
+    public static void bindGlobalGetListener(PropertyChangeListener listener) {
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        if (onGlobalGetProperty != null &amp;&amp; listener != null) {</span>
+<span class="nc" id="L93">            throw new RuntimeException(&quot;Get Listener already bound&quot;);</span>
+        }
+<span class="fc" id="L95">        onGlobalGetProperty = listener;</span>
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * Provides the internal list of listeners
+     *
+     * @return internal list of listeners
+     */
+    List&lt;PropertyChangeListener&lt;T, K&gt;&gt; getListeners() {
+<span class="nc" id="L104">        return listeners;</span>
+    }
+
+    void internalGet() {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (onGlobalGetProperty != null) {</span>
+<span class="fc" id="L109">            onGlobalGetProperty.propertyChanged(this);</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    void internalSet() {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (onGlobalSetProperty != null) {</span>
+<span class="fc" id="L115">            onGlobalSetProperty.propertyChanged(this);</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    /**
+     * The property name is immutable and can't be changed after creation it should match the parent field name by convention
+     *
+     * @return the property name;
+     */
+    public String getName() {
+<span class="fc" id="L125">        return name;</span>
+    }
+
+    /**
+     * Delivers the property change event to listeners if applicable
+     */
+    protected void firePropertyChanged() {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (listeners != null) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            for (PropertyChangeListener pl : listeners) {</span>
+<span class="fc" id="L134">                lastChangeListener = pl;</span>
+<span class="fc" id="L135">                pl.propertyChanged(this);</span>
+<span class="fc" id="L136">                lastChangeListener = null;</span>
+<span class="fc" id="L137">            }</span>
+        }
+<span class="fc" id="L139">    }</span>
+
+    /**
+     * This method will work when invoked from a propertyChanged callback and should be similar to
+     * {@code removePropertyChangeListener(this)}. It's useful for lambda's where {@code this}
+     * means the base class and not the listener so {@code removePropertyChangeListener(this)}
+     * won't do what we want unless we convert to an inner class
+     */
+    public void stopListening() {
+<span class="nc" id="L148">        removeChangeListener(lastChangeListener);</span>
+<span class="nc" id="L149">    }</span>
+
+    /**
+     * Fires a notification that a property value changed to the given listener
+     *
+     * @param pl the listener
+     */
+    public void addChangeListener(PropertyChangeListener&lt;T, K&gt; pl) {
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (listeners == null) {</span>
+<span class="fc" id="L158">            listeners = new ArrayList&lt;PropertyChangeListener&lt;T, K&gt;&gt;();</span>
+        }
+<span class="fc" id="L160">        listeners.add(pl);</span>
+<span class="fc" id="L161">    }</span>
+
+    /**
+     * Removes the property change listener from the list of listeners
+     *
+     * @param pl the change listener
+     */
+    public void removeChangeListener(PropertyChangeListener&lt;T, K&gt; pl) {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (listeners != null) {</span>
+<span class="fc" id="L170">            listeners.remove(pl);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (listeners.size() == 0) {</span>
+<span class="fc" id="L172">                listeners = null;</span>
+            }
+        }
+<span class="fc" id="L175">    }</span>
+
+    /**
+     * Places a property that will apply statically to all instances of this property
+     *
+     * @param key the key to put
+     * @param o   the value object
+     */
+    public void putClientProperty(String key, Object o) {
+<span class="fc" id="L184">        parent.putMetaDataOfClass(&quot;cn1$field&quot; + name + &quot;-&quot; + key, o);</span>
+<span class="fc" id="L185">    }</span>
+
+    /**
+     * Returns the client property set to this property name
+     *
+     * @param key the key of the property
+     * @return the value that was previously placed with put client property
+     */
+    public Object getClientProperty(String key) {
+<span class="fc" id="L194">        return parent.getMetaDataOfClass(&quot;cn1$field&quot; + name + &quot;-&quot; + key);</span>
+    }
+
+    /**
+     * Compares this property to another property
+     *
+     * @param obj the other property
+     * @return true if they are equal in name and value
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">        if (obj != null &amp;&amp; obj.getClass() == getClass()) {</span>
+<span class="fc" id="L206">            PropertyBase other = (PropertyBase) obj;</span>
+<span class="fc" id="L207">            return other.getName().equals(name);</span>
+        }
+<span class="nc" id="L209">        return false;</span>
+    }
+
+    T get() {
+<span class="nc" id="L213">        return null;</span>
+    }
+
+    void setImpl(Object val) {
+<span class="fc" id="L217">    }</span>
+
+    /**
+     * Default toString that provides easier debug information
+     *
+     * @return a formatted representation of the property for debugging
+     */
+    public String toString() {
+<span class="nc" id="L225">        T o = get();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L227">            return getName() + &quot; = null&quot;;</span>
+        }
+<span class="nc" id="L229">        return getName() + &quot; = '&quot; + o + &quot;' : &quot; + o.getClass().getName();</span>
+    }
+
+    /**
+     * Returns the generic type of this property if it is known or null
+     *
+     * @return the generic type
+     */
+    public Class getGenericType() {
+<span class="fc" id="L238">        return genericType;</span>
+    }
+
+    /**
+     * The label of the property defaults to its name but can be changed to anything
+     *
+     * @return the label for the property
+     */
+    public String getLabel() {
+<span class="fc" id="L247">        String l = (String) getClientProperty(&quot;cn1PropertyLabel&quot;);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (l == null) {</span>
+<span class="fc" id="L249">            return getName();</span>
+        }
+<span class="fc" id="L251">        return l;</span>
+    }
+
+    /**
+     * The label of the property defaults to its name but can be changed to anything, it can be used
+     * when binding a property to UI elements
+     *
+     * @param label the new label value
+     */
+    public void setLabel(String label) {
+<span class="fc" id="L261">        putClientProperty(&quot;cn1PropertyLabel&quot;, label);</span>
+<span class="fc" id="L262">    }</span>
+
+    /**
+     * Validates that the collection type is valid and throws an exception otherwise
+     *
+     * @param elementType the generic type of the collection
+     */
+    protected final void validateCollectionType(Class elementType) {
+<span class="pc bpc" id="L270" title="1 of 4 branches missed.">        if (elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) {</span>
+<span class="pc bpc" id="L271" title="7 of 16 branches missed.">            if (elementType == String.class || elementType == Integer.class ||</span>
+                    elementType == Long.class || elementType == Double.class ||
+                    elementType == Byte.class || elementType == Float.class ||
+                    elementType == Boolean.class || elementType == Character.class) {
+<span class="fc" id="L275">                return;</span>
+            }
+<span class="fc" id="L277">            throw new IllegalArgumentException(</span>
+                    &quot;the element type class needs to be a subclass of PropertyBusinessObject&quot;);
+        }
+<span class="fc" id="L280">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1480 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+codenameone-core-unittests,com.codename1.io.services,RSSService.new XMLParser() {...},167,0,38,0,33,0,24,0,5,0
+codenameone-core-unittests,com.codename1.io.services,ImageDownloadService,1095,0,112,0,283,0,102,0,46,0
+codenameone-core-unittests,com.codename1.io.services,ImageDownloadService.new Runnable() {...},42,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io.services,ImageDownloadService.new Runnable() {...},55,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io.services,ImageDownloadService.new Runnable() {...},45,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io.services,ImageDownloadService.new Runnable() {...},60,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io.services,ImageDownloadService.new Runnable() {...},67,0,6,0,10,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io.services,ImageDownloadService.new Runnable() {...},23,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io.services,TwitterRESTService.new ConnectionRequest() {...},23,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io.services,RSSService.new RuntimeException() {...},6,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io.services,CachedDataService,125,0,16,0,38,0,15,0,7,0
+codenameone-core-unittests,com.codename1.io.services,TwitterRESTService,162,0,4,0,36,0,12,0,10,0
+codenameone-core-unittests,com.codename1.io.services,RSSService,277,0,24,0,69,0,23,0,11,0
+codenameone-core-unittests,com.codename1.io.services,CachedData,86,0,0,0,30,0,15,0,15,0
+codenameone-core-unittests,com.codename1.io.tar,TarOutputStream,181,0,16,0,40,0,15,0,7,0
+codenameone-core-unittests,com.codename1.io.tar,TarConstants,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io.tar,TarInputStream,330,0,48,0,82,0,36,0,12,0
+codenameone-core-unittests,com.codename1.io.tar,TarUtils,95,0,12,0,22,0,10,0,4,0
+codenameone-core-unittests,com.codename1.io.tar,TarHeader,114,0,12,0,25,0,9,0,3,0
+codenameone-core-unittests,com.codename1.io.tar,Octal,177,0,20,0,37,0,15,0,5,0
+codenameone-core-unittests,com.codename1.io.tar,TarEntry,566,0,18,0,126,0,37,0,28,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLForm.NamedCommand,44,0,2,0,15,0,5,0,4,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.new Runnable() {...},22,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.new Runnable() {...},27,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.new Runnable() {...},22,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.new Runnable() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.new Runnable() {...},21,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.new Runnable() {...},63,0,10,0,12,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,CSSElement.AttString,15,0,0,0,5,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.html,DefaultHTMLCallback,23,0,0,0,14,0,13,0,13,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLTableModel,295,0,38,0,77,0,37,0,18,0
+codenameone-core-unittests,com.codename1.ui.html,MultiComboBox.MultiListModel,111,0,20,0,30,0,18,0,8,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.ForLabel,35,0,2,0,12,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui.html,CSSElement,3477,0,165,0,276,0,110,0,25,0
+codenameone-core-unittests,com.codename1.ui.html,DefaultDocumentRequestHandler,171,0,24,0,45,0,22,0,10,0
+codenameone-core-unittests,com.codename1.ui.html,AsyncDocumentRequestHandlerImpl,155,0,20,0,42,0,16,0,6,0
+codenameone-core-unittests,com.codename1.ui.html,AsyncDocumentRequestHandlerImpl.new ConnectionRequest() {...},80,0,10,0,18,0,10,0,5,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLTable,102,0,8,0,30,0,10,0,6,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLInputFormat.new TextField() {...},8,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLParser,188,0,20,0,34,0,22,0,12,0
+codenameone-core-unittests,com.codename1.ui.html,DocumentInfo,389,0,44,0,91,0,42,0,20,0
+codenameone-core-unittests,com.codename1.ui.html,CSSEngine,4367,0,896,0,988,0,502,0,47,0
+codenameone-core-unittests,com.codename1.ui.html,CellConstraint,61,0,4,0,23,0,9,0,7,0
+codenameone-core-unittests,com.codename1.ui.html,OptionItem,21,0,2,0,8,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui.html,CSSBgPainter,294,0,43,0,71,0,31,0,8,0
+codenameone-core-unittests,com.codename1.ui.html,MultiComboBox,321,0,64,0,97,0,41,0,9,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLFont,577,0,96,0,104,0,72,0,21,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLUtils,787,0,60,0,68,0,40,0,10,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLEventsListener.new DataChangedListener() {...},39,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLEventsListener.new SelectionListener() {...},32,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLListItem,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.HTMLBullet,175,0,16,0,34,0,13,0,5,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLElement,4835,0,239,0,290,0,157,0,36,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.HTMLComboBox,30,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,MultiComboBox.MultiCellRenderer,150,0,12,0,34,0,10,0,4,0
+codenameone-core-unittests,com.codename1.ui.html,ResourceThreadQueue.ResourceThread.new Runnable() {...},40,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,ResourceThreadQueue,527,0,48,0,124,0,39,0,15,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.HTMLListIndex,162,0,14,0,32,0,15,0,6,0
+codenameone-core-unittests,com.codename1.ui.html,CSSParser,1404,0,312,0,305,0,178,0,22,0
+codenameone-core-unittests,com.codename1.ui.html,ResourceThreadQueue.ResourceThread,472,0,54,0,97,0,36,0,9,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLImageMap,77,0,14,0,20,0,9,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,CSSParser.ExtInputStreamReader,33,0,2,0,11,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLLink,190,0,28,0,54,0,22,0,8,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent,7514,0,1088,0,1756,0,700,0,117,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLComponent.RedirectThread,59,0,6,0,18,0,6,0,3,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLEventsListener,383,0,60,0,94,0,37,0,7,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLInputFormat.FormatConstraint,246,0,22,0,37,0,13,0,2,0
+codenameone-core-unittests,com.codename1.ui.html,ImageMapData,25,0,2,0,9,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLInputFormat,723,0,130,0,156,0,73,0,8,0
+codenameone-core-unittests,com.codename1.ui.html,HTMLForm,802,0,130,0,179,0,78,0,13,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateTimeSpinner,457,0,42,0,87,0,38,0,17,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerRenderer,388,0,36,0,62,0,24,0,6,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerNode.new SelectionListener() {...},35,0,10,0,6,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerNode.new NodePainter() {...},68,0,0,0,11,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerNode.new Label() {...},22,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerNode.new DataChangedListener() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner,1002,0,115,0,243,0,87,0,25,0
+codenameone-core-unittests,com.codename1.ui.spinner,CalendarPicker,34,0,0,0,11,0,4,0,4,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateTimeSpinner3D,669,0,56,0,141,0,58,0,30,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new ActionListener() {...},21,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new ActionListener() {...},21,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new Runnable() {...},30,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new Runnable() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new Command() {...},19,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new InteractionDialog() {...},51,0,8,0,14,0,7,0,3,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new ActionListener() {...},21,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.new ActionListener() {...},21,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.1.1.new ActionListener() {...},34,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerDateModel,218,0,2,0,54,0,14,0,13,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerNumberModel,252,0,12,0,60,0,23,0,17,0
+codenameone-core-unittests,com.codename1.ui.spinner,TimeSpinner3D,889,0,116,0,205,0,86,0,28,0
+codenameone-core-unittests,com.codename1.ui.spinner,GenericSpinner,704,0,78,0,143,0,67,0,28,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateTimeRenderer,556,0,39,0,87,0,33,0,11,0
+codenameone-core-unittests,com.codename1.ui.spinner,TimeSpinner3D.new SpinnerNode.RowFormatter() {...},15,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,TimeSpinner3D.new SpinnerNode.RowFormatter() {...},30,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,TimeSpinner3D.new SpinnerNode.RowFormatter() {...},15,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.4.new Runnable() {...},25,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,TimeSpinner.new SpinnerRenderer() {...},34,0,6,0,6,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,TimeSpinner.new SpinnerRenderer() {...},29,0,6,0,7,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,BaseSpinner.new Label() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D.NumberModelAdapter,55,0,0,0,20,0,11,0,11,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D.DateModelAdapter,116,0,4,0,33,0,13,0,11,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateSpinner3D,1327,0,114,0,252,0,92,0,35,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.new ActionListener() {...},71,0,2,0,13,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.new VirtualInputDevice() {...},49,0,4,0,9,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.new ActionListener() {...},1423,0,168,0,290,0,100,0,11,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.new Runnable() {...},108,0,6,0,19,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateSpinner3D.new SpinnerNode.RowFormatter() {...},31,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateSpinner3D.new SpinnerNode.RowFormatter() {...},15,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateSpinner3D.new SpinnerNode.RowFormatter() {...},15,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D.ScrollingContainer,12,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D,385,0,22,0,83,0,25,0,14,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateSpinner,499,0,50,0,114,0,47,0,22,0
+codenameone-core-unittests,com.codename1.ui.spinner,DateSpinner.new SpinnerRenderer() {...},73,0,10,0,13,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker.3.new Runnable() {...},28,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,TimeSpinner,717,0,92,0,178,0,67,0,21,0
+codenameone-core-unittests,com.codename1.ui.spinner,NumericSpinner,310,0,32,0,63,0,32,0,16,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner.new SpinnerRenderer() {...},58,0,6,0,10,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,SpinnerNode,1109,0,71,0,231,0,68,0,32,0
+codenameone-core-unittests,com.codename1.ui.spinner,BaseSpinner,141,0,8,0,39,0,13,0,9,0
+codenameone-core-unittests,com.codename1.ui.spinner,DurationSpinner3D,564,0,46,0,100,0,28,0,5,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D.new ScrollListener() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D.new ScrollListener() {...},12,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D.new Scene() {...},32,0,0,0,7,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.spinner,Spinner3D.new Spinner3D.ScrollingContainer() {...},96,0,4,0,16,0,7,0,5,0
+codenameone-core-unittests,com.codename1.ui.spinner,Picker,874,0,109,0,231,0,119,0,61,0
+codenameone-core-unittests,com.codename1.messaging,Message,100,0,12,0,30,0,20,0,14,0
+codenameone-core-unittests,com.codename1.location,Location,126,86,8,0,31,21,22,8,18,8
+codenameone-core-unittests,com.codename1.location,LocationRequest,21,16,0,0,6,7,3,2,3,2
+codenameone-core-unittests,com.codename1.location,Location.new Comparator() {...},30,0,4,0,4,0,4,0,2,0
+codenameone-core-unittests,com.codename1.location,Geofence,86,32,18,0,16,11,14,6,5,6
+codenameone-core-unittests,com.codename1.location,Geofence.new Comparator() {...},30,0,4,0,4,0,4,0,2,0
+codenameone-core-unittests,com.codename1.location,Geofence.new Comparator() {...},7,37,3,1,0,4,2,2,0,2
+codenameone-core-unittests,com.codename1.location,LocationManager.LL,43,31,7,1,15,11,5,4,1,4
+codenameone-core-unittests,com.codename1.location,LocationManager,21,98,0,10,12,39,9,17,9,12
+codenameone-core-unittests,com.codename1.location,GeofenceManager.Listener,16,0,0,0,8,0,5,0,5,0
+codenameone-core-unittests,com.codename1.location,GeofenceManager,314,652,58,60,78,149,53,47,12,29
+codenameone-core-unittests,com.codename1.media,AsyncMedia.MediaException,28,0,0,0,11,0,4,0,4,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new ActionListener() {...},0,37,3,3,0,8,3,2,0,2
+codenameone-core-unittests,com.codename1.media,AsyncMedia.MediaStateChangeEvent,3,13,0,0,1,5,1,2,1,2
+codenameone-core-unittests,com.codename1.media,AsyncMedia.MediaErrorEvent,10,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,AsyncMedia.State,0,24,0,0,0,3,0,1,0,1
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new ActionListener() {...},0,37,3,3,0,8,3,2,0,2
+codenameone-core-unittests,com.codename1.media,MediaManager.new AbstractMedia() {...},42,105,6,6,8,32,10,15,4,15
+codenameone-core-unittests,com.codename1.media,MediaManager,26,217,4,30,5,58,9,32,5,19
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,WAVWriter,472,0,6,0,84,0,8,0,5,0
+codenameone-core-unittests,com.codename1.media,AsyncMedia.PauseRequest,0,3,0,0,0,1,0,1,0,1
+codenameone-core-unittests,com.codename1.media,AbstractMedia,137,153,15,11,34,42,17,11,5,10
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,MediaManager.1.new TimerTask() {...},23,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,MediaManager.1.new TimerTask() {...},23,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AsyncMedia.PlayRequest,0,3,0,0,0,1,0,1,0,1
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback.new Runnable() {...},6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,AsyncMedia.MediaErrorType,89,0,0,0,11,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlListener,14,3,0,0,12,1,12,1,12,1
+codenameone-core-unittests,com.codename1.media,MediaMetaData,52,0,0,0,22,0,15,0,15,0
+codenameone-core-unittests,com.codename1.media,AudioBuffer,387,61,30,0,75,14,29,3,14,3
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new ActionListener() {...},21,12,2,0,5,1,2,1,1,1
+codenameone-core-unittests,com.codename1.media,AudioBuffer.new Runnable() {...},17,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,AudioBuffer.new Runnable() {...},17,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.media,RemoteControlCallback,75,0,2,0,28,0,16,0,15,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},20,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new AsyncMedia.PlayRequest() {...},14,20,3,1,4,5,3,2,1,2
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},20,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},20,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new ActionListener() {...},21,12,2,0,5,1,2,1,1,1
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new AsyncMedia.PauseRequest() {...},14,20,3,1,4,5,3,2,1,2
+codenameone-core-unittests,com.codename1.media,AbstractMedia.new SuccessCallback() {...},20,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.media,MediaRecorderBuilder,29,49,1,1,10,14,7,8,6,8
+codenameone-core-unittests,com.codename1.ui.geom,Point,36,0,0,0,11,0,6,0,6,0
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath.EPoint,0,3,0,0,0,1,0,1,0,1
+codenameone-core-unittests,com.codename1.ui.geom,Geometry,8,13,1,3,2,3,2,2,1,1
+codenameone-core-unittests,com.codename1.ui.geom,Dimension,20,77,4,4,3,24,5,9,1,9
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath.Ellipse,28,412,2,14,2,65,4,13,2,7
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath,808,1904,108,170,148,384,102,121,19,59
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath.Pt,9,0,0,0,3,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.geom,Dimension2D,37,15,0,0,11,6,5,3,5,3
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath.ShapeUtil.QuadCurve,132,171,35,11,19,29,21,7,1,4
+codenameone-core-unittests,com.codename1.ui.geom,Rectangle,75,751,39,63,19,169,43,44,4,32
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath.Iterator,99,124,7,7,15,26,6,9,2,6
+codenameone-core-unittests,com.codename1.ui.geom,Rectangle2D,656,61,70,4,138,11,66,6,29,6
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath.ShapeUtil.CubicCurve,458,0,50,0,55,0,31,0,6,0
+codenameone-core-unittests,com.codename1.ui.geom,GeneralPath.ShapeUtil,2526,1193,440,144,362,248,258,65,11,13
+codenameone-core-unittests,com.codename1.ui.geom,Geometry.BezierCurve,656,1369,62,93,72,199,54,62,1,31
+codenameone-core-unittests,com.codename1.ui.geom,AffineTransform,524,0,20,0,137,0,30,0,20,0
+codenameone-core-unittests,com.codename1.ui.geom,Point2D,21,15,0,0,5,6,3,3,3,3
+codenameone-core-unittests,com.codename1.ui.table,DefaultTableModel,165,0,4,0,40,0,16,0,14,0
+codenameone-core-unittests,com.codename1.ui.table,Table,1707,0,238,0,357,0,162,0,43,0
+codenameone-core-unittests,com.codename1.ui.table,SortableTableModel,223,0,16,0,47,0,25,0,17,0
+codenameone-core-unittests,com.codename1.ui.table,Table.Listener,309,0,39,0,72,0,23,0,3,0
+codenameone-core-unittests,com.codename1.ui.table,SortableTableModel.new Comparator() {...},63,0,2,0,8,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.table,Table.new ActionListener() {...},78,0,8,0,12,0,6,0,2,0
+codenameone-core-unittests,com.codename1.ui.table,Table.new Comparator() {...},86,0,18,0,26,0,11,0,2,0
+codenameone-core-unittests,com.codename1.ui.table,TableLayout.Constraint,196,0,4,0,54,0,30,0,28,0
+codenameone-core-unittests,com.codename1.ui.table,AbstractTableModel,26,0,2,0,10,0,7,0,6,0
+codenameone-core-unittests,com.codename1.ui.table,TableLayout,2118,0,271,0,389,0,187,0,49,0
+codenameone-core-unittests,com.codename1.compat.java.util,Objects,130,142,47,41,20,31,35,20,2,9
+codenameone-core-unittests,com.codename1.maps.layers,PointsLayer,205,0,14,0,47,0,18,0,11,0
+codenameone-core-unittests,com.codename1.maps.layers,LinesLayer,209,0,14,0,42,0,15,0,8,0
+codenameone-core-unittests,com.codename1.maps.layers,ArrowLinesLayer.ArrowHead,196,0,4,0,26,0,11,0,9,0
+codenameone-core-unittests,com.codename1.maps.layers,ArrowLinesLayer,401,0,14,0,60,0,20,0,13,0
+codenameone-core-unittests,com.codename1.maps.layers,AbstractLayer,15,0,0,0,6,0,3,0,3,0
+codenameone-core-unittests,com.codename1.maps.layers,PointLayer,114,0,8,0,26,0,12,0,8,0
+codenameone-core-unittests,com.codename1.notifications,LocalNotification,70,0,0,0,29,0,15,0,15,0
+codenameone-core-unittests,com.codename1.ui.validation,ExistInConstraint,117,0,10,0,28,0,14,0,9,0
+codenameone-core-unittests,com.codename1.ui.validation,GroupConstraint,41,0,4,0,10,0,5,0,3,0
+codenameone-core-unittests,com.codename1.ui.validation,LengthConstraint,50,0,8,0,12,0,8,0,4,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator.ComponentListener,178,0,12,0,32,0,10,0,4,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator.1.new Runnable() {...},21,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator.new FocusListener() {...},14,0,0,0,4,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator.new Runnable() {...},103,0,10,0,14,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator.new FocusListener() {...},150,0,18,0,31,0,12,0,3,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator,736,0,130,0,193,0,99,0,34,0
+codenameone-core-unittests,com.codename1.ui.validation,NotConstraint,54,0,6,0,14,0,7,0,4,0
+codenameone-core-unittests,com.codename1.ui.validation,RegexConstraint,51,0,4,0,10,0,9,0,7,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator.HighlightMode,44,0,0,0,5,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.validation,NumericConstraint,184,0,28,0,37,0,19,0,5,0
+codenameone-core-unittests,com.codename1.ui.validation,Validator.3.new ScrollListener() {...},23,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.social,LoginCallback,2,3,0,0,2,1,2,1,2,1
+codenameone-core-unittests,com.codename1.social,Login.LoginCallBackProxy.new Runnable() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.social,Login.LoginCallBackProxy.new Runnable() {...},18,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.social,GoogleConnect.new ConnectionRequest() {...},5,21,2,2,2,4,2,2,0,2
+codenameone-core-unittests,com.codename1.social,Login.LoginCallBackProxy,115,6,16,0,27,1,10,1,2,1
+codenameone-core-unittests,com.codename1.social,GoogleConnect,53,51,4,0,13,15,4,4,2,4
+codenameone-core-unittests,com.codename1.social,Login.new Runnable() {...},14,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.social,Login.new ActionListener() {...},91,0,14,0,23,0,9,0,2,0
+codenameone-core-unittests,com.codename1.social,Login.new LoginCallback() {...},23,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.social,Login,329,112,53,5,83,29,40,11,13,9
+codenameone-core-unittests,com.codename1.social,FacebookConnect.new ConnectionRequest() {...},26,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.social,FacebookConnect,75,92,4,6,26,28,9,17,7,14
+codenameone-core-unittests,com.codename1.javascript,JSObject.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JSObject.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JSObject.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JSObject.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JSObject.new Callback() {...},24,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.javascript,JSObject.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JSObject.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JSObject.new CallbackAdapter() {...},0,14,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.new JSFunction() {...},0,27,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.new Runnable() {...},169,0,16,0,28,0,10,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.new CallbackAdapter() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.NavigationCallback,21,6,4,0,4,1,3,1,1,1
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext,624,675,66,34,100,107,56,24,14,16
+codenameone-core-unittests,com.codename1.javascript,JSException,0,4,0,0,0,2,0,1,0,1
+codenameone-core-unittests,com.codename1.javascript,JSObject,259,399,6,10,58,62,36,29,31,26
+codenameone-core-unittests,com.codename1.javascript,JavascriptContext.ScriptMessageListener,39,6,2,0,10,1,2,1,1,1
+codenameone-core-unittests,com.codename1.javascript,JavascriptEvent,21,0,0,0,7,0,4,0,4,0
+codenameone-core-unittests,com.codename1.plugin,PluginSupport,0,68,0,4,0,19,0,6,0,4
+codenameone-core-unittests,com.codename1.share,SMSShare.1.2.new Command() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,SMSShare.1.2.new ActionListener() {...},45,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,SMSShare.1.2.1.new ActionListener() {...},48,0,0,0,8,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,FacebookShare.2.new ActionListener() {...},29,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,FacebookShare.2.new ActionListener() {...},17,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,SMSShare.new Runnable() {...},52,0,4,0,10,0,4,0,2,0
+codenameone-core-unittests,com.codename1.share,EmailShare.1.2.new Command() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,EmailShare.1.2.new ActionListener() {...},82,0,2,0,9,0,3,0,2,0
+codenameone-core-unittests,com.codename1.share,SMSShare,88,0,2,0,26,0,7,0,6,0
+codenameone-core-unittests,com.codename1.share,EmailShare.1.2.1.new ActionListener() {...},54,0,0,0,9,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,EmailShare.1.2.1.new ActionListener() {...},40,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,EmailShare,96,0,2,0,28,0,8,0,7,0
+codenameone-core-unittests,com.codename1.share,SMSShare.1.new Runnable() {...},44,0,0,0,8,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,SMSShare.1.new Runnable() {...},17,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,FacebookShare,102,0,10,0,26,0,11,0,6,0
+codenameone-core-unittests,com.codename1.share,ShareService,45,0,2,0,17,0,9,0,8,0
+codenameone-core-unittests,com.codename1.share,ShareForm.new Command() {...},0,14,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.share,EmailShare.new Runnable() {...},58,0,4,0,10,0,4,0,2,0
+codenameone-core-unittests,com.codename1.share,FacebookShare.new ActionListener() {...},52,0,0,0,10,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,FacebookShare.new ActionListener() {...},87,0,0,0,17,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,FacebookShare.1.new ActionListener() {...},17,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,FacebookShare.1.new ActionListener() {...},29,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,ShareForm,38,127,3,7,11,31,3,6,0,4
+codenameone-core-unittests,com.codename1.share,EmailShare.1.new Runnable() {...},17,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.share,EmailShare.1.new Runnable() {...},44,0,0,0,8,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.regex,REUtil,27,0,2,0,5,0,4,0,3,0
+codenameone-core-unittests,com.codename1.util.regex,StringCharacterIterator,31,0,2,0,7,0,6,0,5,0
+codenameone-core-unittests,com.codename1.util.regex,REProgram,177,0,26,0,44,0,20,0,6,0
+codenameone-core-unittests,com.codename1.util.regex,StreamCharacterIterator,149,0,16,0,42,0,16,0,8,0
+codenameone-core-unittests,com.codename1.util.regex,ReaderCharacterIterator,157,0,16,0,45,0,16,0,8,0
+codenameone-core-unittests,com.codename1.util.regex,CharacterArrayCharacterIterator,89,0,8,0,13,0,9,0,5,0
+codenameone-core-unittests,com.codename1.util.regex,StringReader,66,52,9,5,13,11,9,4,4,2
+codenameone-core-unittests,com.codename1.util.regex,RECompiler,2184,0,287,0,431,0,178,0,18,0
+codenameone-core-unittests,com.codename1.util.regex,RECompiler.RERange,345,0,52,0,68,0,32,0,6,0
+codenameone-core-unittests,com.codename1.util.regex,RECharacter,1186,0,66,0,19,0,45,0,12,0
+codenameone-core-unittests,com.codename1.util.regex,RE,1597,0,348,0,374,0,225,0,30,0
+codenameone-core-unittests,com.codename1.util.regex,RESyntaxException,11,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.util.regex,REDebugCompiler,347,0,20,0,66,0,17,0,7,0
+codenameone-core-unittests,com.codename1.util,CaseInsensitiveOrder,45,0,4,0,12,0,4,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource,537,37,72,2,126,14,58,3,21,3
+codenameone-core-unittests,com.codename1.util,Wrapper,13,0,0,0,6,0,3,0,3,0
+codenameone-core-unittests,com.codename1.util,DateUtil.new Comparator() {...},85,0,4,0,18,0,4,0,2,0
+codenameone-core-unittests,com.codename1.util,TLogical,2061,0,278,0,385,0,157,0,18,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.AsyncCallback.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.AsyncCallback.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.CancellationException,4,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.util,BigInteger,1653,0,78,0,86,0,93,0,54,0
+codenameone-core-unittests,com.codename1.util,EasyThread.new SuccessCallback() {...},34,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,EasyThread.new Runnable() {...},96,0,10,0,24,0,7,0,2,0
+codenameone-core-unittests,com.codename1.util,EasyThread.new Runnable() {...},26,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,EasyThread.new Runnable() {...},32,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,EasyThread.new Runnable() {...},26,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,EasyThread.new RunnableWithResult() {...},19,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,EasyThread,267,0,14,0,72,0,21,0,14,0
+codenameone-core-unittests,com.codename1.util,DateUtil,588,0,86,0,126,0,66,0,23,0
+codenameone-core-unittests,com.codename1.util,TElementary,1030,0,112,0,179,0,71,0,15,0
+codenameone-core-unittests,com.codename1.util,TBigDecimal,4927,0,659,0,908,0,435,0,102,0
+codenameone-core-unittests,com.codename1.util,TConversion,1432,0,178,0,238,0,101,0,6,0
+codenameone-core-unittests,com.codename1.util,StringUtil,311,111,45,11,78,32,31,7,7,3
+codenameone-core-unittests,com.codename1.util,CallbackDispatcher,80,0,8,0,23,0,9,0,5,0
+codenameone-core-unittests,com.codename1.util,TDivision,1810,0,176,0,387,0,111,0,23,0
+codenameone-core-unittests,com.codename1.util,MathUtil,2266,477,259,43,402,75,170,14,21,7
+codenameone-core-unittests,com.codename1.util,AsyncResource.AsyncCallback,54,0,12,0,13,0,8,0,2,0
+codenameone-core-unittests,com.codename1.util,AbstractStringBuilder,1363,0,238,0,286,0,158,0,39,0
+codenameone-core-unittests,com.codename1.util,CStringBuilder,183,0,8,0,59,0,33,0,29,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,TMathContext,346,0,34,0,53,0,26,0,9,0
+codenameone-core-unittests,com.codename1.util,TMultiplication,919,0,70,0,155,0,50,0,15,0
+codenameone-core-unittests,com.codename1.util,TRoundingMode,123,0,9,0,22,0,11,0,3,0
+codenameone-core-unittests,com.codename1.util,Base64,538,381,57,3,80,12,34,3,4,2
+codenameone-core-unittests,com.codename1.util,TPrimality,1509,0,76,0,84,0,43,0,5,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new Observer() {...},30,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new Runnable() {...},23,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},23,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},31,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},21,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},21,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new Runnable() {...},45,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},47,0,2,0,9,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util,AsyncResource.new SuccessCallback() {...},56,0,4,0,11,0,4,0,2,0
+codenameone-core-unittests,com.codename1.util,CallbackAdapter,2,3,0,0,2,1,2,1,2,1
+codenameone-core-unittests,com.codename1.util,AsyncResource.AsyncExecutionException,35,0,8,0,9,0,7,0,3,0
+codenameone-core-unittests,com.codename1.util,TBigInteger,2362,0,314,0,441,0,223,0,66,0
+codenameone-core-unittests,com.codename1.util,BigDecimal,289,0,10,0,47,0,31,0,26,0
+codenameone-core-unittests,com.codename1.util,TBitLevel,841,0,110,0,156,0,69,0,14,0
+codenameone-core-unittests,com.codename1.components,Switch,1361,310,121,18,263,94,102,36,36,32
+codenameone-core-unittests,com.codename1.components,CheckBoxList,54,0,0,0,15,0,6,0,6,0
+codenameone-core-unittests,com.codename1.components,RSSReader.BackCommand,14,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,InfiniteScrollAdapter.EdgeMarker,11,15,4,0,3,4,3,2,1,2
+codenameone-core-unittests,com.codename1.components,FileTree,48,0,4,0,13,0,5,0,3,0
+codenameone-core-unittests,com.codename1.components,ScaleImageLabel,312,0,34,0,85,0,38,0,21,0
+codenameone-core-unittests,com.codename1.components,ButtonList,268,224,62,30,66,62,52,14,8,11
+codenameone-core-unittests,com.codename1.components,FloatingHint.new FocusListener() {...},8,6,0,0,4,1,2,1,2,1
+codenameone-core-unittests,com.codename1.components,FloatingHint.new ActionListener() {...},0,13,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.components,FloatingHint.new Button() {...},2,7,0,0,1,1,1,1,1,1
+codenameone-core-unittests,com.codename1.components,ToastBar.Status,177,0,16,0,58,0,27,0,19,0
+codenameone-core-unittests,com.codename1.components,WebBrowser.Loading,89,0,0,0,21,0,6,0,6,0
+codenameone-core-unittests,com.codename1.components,ClearableTextField.new ActionListener() {...},17,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,Progress,170,0,22,0,50,0,20,0,9,0
+codenameone-core-unittests,com.codename1.components,ButtonList.new Runnable() {...},0,10,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.components,ToastBar,977,0,142,0,237,0,99,0,28,0
+codenameone-core-unittests,com.codename1.components,StorageImageAsync.1.new Runnable() {...},0,33,0,0,0,6,0,2,0,2
+codenameone-core-unittests,com.codename1.components,FloatingActionButton,249,329,25,13,61,88,23,22,8,18
+codenameone-core-unittests,com.codename1.components,RSSReader.Listener,14,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.new ActionListener() {...},29,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.new ActionListener() {...},52,0,8,0,8,0,6,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.new Runnable() {...},26,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,SpanMultiButton,2084,0,215,0,506,0,208,0,99,0
+codenameone-core-unittests,com.codename1.components,ToastBar.new ActionListener() {...},45,0,5,0,12,0,5,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.new ActionListener() {...},47,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.components,OnOffSwitch,1153,0,102,0,270,0,90,0,39,0
+codenameone-core-unittests,com.codename1.components,SignatureComponent.SignatureDialogBody.new ActionListener() {...},60,0,2,0,11,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,SignatureComponent.SignatureDialogBody.new ActionListener() {...},22,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,SignatureComponent.SignatureDialogBody.new ActionListener() {...},20,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,FloatingActionButton.new ActionListener() {...},0,16,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.components,FloatingActionButton.new ActionListener() {...},34,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,SignatureComponent.SignaturePanel,299,55,5,1,56,11,14,2,11,2
+codenameone-core-unittests,com.codename1.components,SignatureComponent.SignatureDialogBody,144,0,4,0,30,0,8,0,6,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.6.new ActionListener() {...},26,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.6.new ActionListener() {...},52,0,0,0,11,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.6.new ActionListener() {...},26,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.6.new ActionListener() {...},51,0,2,0,11,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.6.new ActionListener() {...},25,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,FileEncodedImageAsync.new Runnable() {...},45,0,0,0,12,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.5.new ActionListener() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,RSSReader,655,0,70,0,174,0,62,0,27,0
+codenameone-core-unittests,com.codename1.components,ImageViewer.CropBox,105,19,0,0,13,7,5,2,5,2
+codenameone-core-unittests,com.codename1.components,ToastBar.Status.new TimerTask() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.Status.new TimerTask() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,MasterDetail,41,0,4,0,10,0,4,0,2,0
+codenameone-core-unittests,com.codename1.components,InfiniteScrollAdapter,31,162,1,11,9,42,4,13,3,8
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.new Runnable() {...},7,26,0,0,3,6,0,2,0,2
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.new ActionListener() {...},0,15,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.new ActionListener() {...},0,15,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.new Label() {...},22,7,0,0,6,1,1,1,1,1
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.new ActionListener() {...},51,174,3,8,13,39,3,7,0,2
+codenameone-core-unittests,com.codename1.components,SignatureComponent.3.new SignatureComponent.SignatureDialogBody() {...},17,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,SignatureComponent.3.new ActionListener() {...},27,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.new ActionListener() {...},176,26,1,1,31,6,1,2,0,2
+codenameone-core-unittests,com.codename1.components,SliderBridge.new ActionListener() {...},4,94,2,10,1,20,2,7,0,2
+codenameone-core-unittests,com.codename1.components,Ads.new ActionListener() {...},15,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,Ads.new AsyncDocumentRequestHandlerImpl() {...},23,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.ToastBarComponent,140,0,2,0,32,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,InfiniteProgress,539,38,56,0,137,15,56,4,28,4
+codenameone-core-unittests,com.codename1.components,SignatureComponent,24,194,3,11,10,40,8,12,5,8
+codenameone-core-unittests,com.codename1.components,ShareButton,102,0,4,0,29,0,13,0,11,0
+codenameone-core-unittests,com.codename1.components,SplitPane.Settings,30,161,0,0,12,49,6,15,6,15
+codenameone-core-unittests,com.codename1.components,Switch.new ActionListener() {...},43,6,2,0,10,1,2,1,1,1
+codenameone-core-unittests,com.codename1.components,Switch.new ActionListener() {...},58,6,2,0,9,1,2,1,1,1
+codenameone-core-unittests,com.codename1.components,Switch.new ActionListener() {...},247,10,30,0,36,2,17,1,2,1
+codenameone-core-unittests,com.codename1.components,Switch.new Animation() {...},64,0,4,0,14,0,5,0,3,0
+codenameone-core-unittests,com.codename1.components,SplitPane.Divider.new ComponentSelector.ComponentClosure() {...},8,21,1,1,1,4,1,2,0,2
+codenameone-core-unittests,com.codename1.components,SplitPane.Divider.new ComponentSelector.ComponentClosure() {...},8,21,1,1,1,4,1,2,0,2
+codenameone-core-unittests,com.codename1.components,SplitPane.Divider.new ActionListener() {...},5,9,0,0,2,1,1,1,1,1
+codenameone-core-unittests,com.codename1.components,SplitPane.Divider.new ActionListener() {...},5,9,0,0,2,1,1,1,1,1
+codenameone-core-unittests,com.codename1.components,SplitPane.Divider,195,335,18,26,55,86,23,16,10,7
+codenameone-core-unittests,com.codename1.components,ToastBar.Status.1.new Runnable() {...},17,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,RSSReader.EventHandler,224,0,24,0,42,0,15,0,3,0
+codenameone-core-unittests,com.codename1.components,SwitchList,0,108,0,0,0,19,0,6,0,6
+codenameone-core-unittests,com.codename1.components,WebBrowser.new ActionListener() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,WebBrowser.new AsyncDocumentRequestHandlerImpl() {...},14,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,WebBrowser.new DefaultHTMLCallback() {...},80,0,26,0,15,0,15,0,2,0
+codenameone-core-unittests,com.codename1.components,WebBrowser.new ActionListener() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,WebBrowser.new ActionListener() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,StorageImageAsync,6,85,3,9,2,27,3,11,0,8
+codenameone-core-unittests,com.codename1.components,SplitPane,124,559,12,30,31,143,18,41,7,31
+codenameone-core-unittests,com.codename1.components,InteractionDialog,893,683,86,43,180,173,91,25,29,21
+codenameone-core-unittests,com.codename1.components,Ads,630,0,66,0,173,0,78,0,45,0
+codenameone-core-unittests,com.codename1.components,StorageImageAsync.new Runnable() {...},3,31,0,0,2,7,0,2,0,2
+codenameone-core-unittests,com.codename1.components,SwitchList.new ComponentSelector.ComponentClosure() {...},0,20,0,2,0,5,0,3,0,2
+codenameone-core-unittests,com.codename1.components,SwitchList.new ActionListener() {...},0,52,2,4,0,8,2,3,0,2
+codenameone-core-unittests,com.codename1.components,ClearableTextField,72,0,2,0,20,0,5,0,4,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.6.new Runnable() {...},32,0,6,0,5,0,5,0,2,0
+codenameone-core-unittests,com.codename1.components,ShareButton.new Runnable() {...},147,0,10,0,29,0,7,0,2,0
+codenameone-core-unittests,com.codename1.components,SpanLabel,901,0,93,0,220,0,103,0,55,0
+codenameone-core-unittests,com.codename1.components,CheckBoxList.new ActionListener() {...},51,0,6,0,8,0,5,0,2,0
+codenameone-core-unittests,com.codename1.components,ScaleImageButton,240,0,18,0,69,0,27,0,18,0
+codenameone-core-unittests,com.codename1.components,FileEncodedImage,96,0,4,0,26,0,7,0,5,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer,928,0,146,0,245,0,118,0,45,0
+codenameone-core-unittests,com.codename1.components,SliderBridge,49,43,4,4,16,12,6,3,4,1
+codenameone-core-unittests,com.codename1.components,FileEncodedImageAsync,117,0,14,0,36,0,17,0,10,0
+codenameone-core-unittests,com.codename1.components,StorageImage,108,0,12,0,25,0,13,0,7,0
+codenameone-core-unittests,com.codename1.components,WebBrowser,305,0,28,0,78,0,36,0,22,0
+codenameone-core-unittests,com.codename1.components,Accordion.AccordionContent.new ActionListener() {...},62,0,10,0,10,0,7,0,2,0
+codenameone-core-unittests,com.codename1.components,ImageViewer.new SelectionListener() {...},34,34,10,4,4,5,8,2,1,2
+codenameone-core-unittests,com.codename1.components,FileEncodedImageAsync.1.new Runnable() {...},33,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,InteractionDialog.new Runnable() {...},47,0,4,0,11,0,4,0,2,0
+codenameone-core-unittests,com.codename1.components,InteractionDialog.new ActionListener() {...},57,9,12,0,10,1,7,1,1,1
+codenameone-core-unittests,com.codename1.components,InteractionDialog.new ActionListener() {...},61,9,10,0,13,1,6,1,1,1
+codenameone-core-unittests,com.codename1.components,FloatingHint,114,171,22,12,26,36,17,5,1,4
+codenameone-core-unittests,com.codename1.components,RadioButtonList,54,0,0,0,15,0,6,0,6,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new Button() {...},79,0,12,0,19,0,10,0,4,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new ActionListener() {...},24,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new ActionListener() {...},79,0,8,0,19,0,6,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new TimerTask() {...},17,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new ActionListener() {...},24,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new Runnable() {...},67,0,12,0,12,0,8,0,2,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent,58,361,6,6,12,65,10,7,4,7
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new Runnable() {...},45,0,8,0,8,0,6,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new ActionListener() {...},40,0,4,0,7,0,4,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new Runnable() {...},20,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,ToastBar.Status.2.new Runnable() {...},22,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,ImageViewer.AnimatePanX,174,0,14,0,40,0,10,0,3,0
+codenameone-core-unittests,com.codename1.components,SpanButton,834,0,81,0,214,0,103,0,61,0
+codenameone-core-unittests,com.codename1.components,ReplaceableImage,44,0,0,0,14,0,7,0,7,0
+codenameone-core-unittests,com.codename1.components,Ads.2.new ActionListener() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,MasterDetail.new Command() {...},98,0,0,0,21,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,MasterDetail.new ActionListener() {...},44,0,6,0,10,0,5,0,2,0
+codenameone-core-unittests,com.codename1.components,RadioButtonList.new ActionListener() {...},35,0,6,0,7,0,5,0,2,0
+codenameone-core-unittests,com.codename1.components,OnOffSwitch.new ActionListener() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.components,OnOffSwitch.new Animation() {...},65,0,6,0,14,0,6,0,3,0
+codenameone-core-unittests,com.codename1.components,AudioRecorderComponent.RecorderState,0,84,0,0,0,9,0,1,0,1
+codenameone-core-unittests,com.codename1.components,ImageViewer,1383,596,199,29,288,125,146,26,35,23
+codenameone-core-unittests,com.codename1.components,MultiButton,2053,0,235,0,524,0,226,0,101,0
+codenameone-core-unittests,com.codename1.components,FileTreeModel,184,0,28,0,38,0,18,0,4,0
+codenameone-core-unittests,com.codename1.components,SignatureComponent.new Animation() {...},65,6,8,0,12,1,6,1,2,1
+codenameone-core-unittests,com.codename1.components,SignatureComponent.new ActionListener() {...},45,6,0,0,10,1,1,1,1,1
+codenameone-core-unittests,com.codename1.components,SignatureComponent.new Button() {...},75,9,0,0,13,1,1,1,1,1
+codenameone-core-unittests,com.codename1.components,Accordion.AccordionContent,140,0,4,0,31,0,5,0,3,0
+codenameone-core-unittests,com.codename1.components,ToastBar.ToastBarComponent.new ActionListener() {...},28,0,4,0,5,0,4,0,2,0
+codenameone-core-unittests,com.codename1.components,WebBrowser.4.new ConnectionRequest() {...},147,0,18,0,34,0,17,0,8,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new ActionListener() {...},17,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,MediaPlayer.new Runnable() {...},23,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.components,Accordion,437,0,24,0,108,0,43,0,31,0
+codenameone-core-unittests,com.codename1.components,ShareButton.1.new ActionListener() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.charts.transitions,XYMultiSeriesTransition,143,0,12,0,30,0,11,0,5,0
+codenameone-core-unittests,com.codename1.charts.transitions,XYValueSeriesTransition,192,0,14,0,43,0,15,0,8,0
+codenameone-core-unittests,com.codename1.charts.transitions,XYSeriesTransition,164,0,12,0,39,0,14,0,8,0
+codenameone-core-unittests,com.codename1.charts.transitions,SeriesTransition,17,115,1,8,7,39,5,16,4,11
+codenameone-core-unittests,com.codename1.charts,ChartComponent,1369,450,139,25,244,102,99,19,20,16
+codenameone-core-unittests,com.codename1.charts,ChartComponent.ZoomTransitionXY,189,0,12,0,43,0,11,0,5,0
+codenameone-core-unittests,com.codename1.charts,ChartComponent.ZoomTransition,267,0,14,0,53,0,12,0,5,0
+codenameone-core-unittests,com.codename1.charts,ChartUtil,32,8,0,0,6,2,1,1,1,1
+codenameone-core-unittests,com.codename1.charts,ChartComponent.BBox,246,0,0,0,30,0,3,0,3,0
+codenameone-core-unittests,com.codename1.plugin.event,IsGalleryTypeSupportedEvent,0,11,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.plugin.event,PluginEvent,0,14,0,0,0,6,0,3,0,3
+codenameone-core-unittests,com.codename1.plugin.event,OpenGalleryEvent,0,17,0,0,0,6,0,3,0,3
+codenameone-core-unittests,com.codename1.charts.views,DialChart,685,0,46,0,99,0,28,0,5,0
+codenameone-core-unittests,com.codename1.charts.views,CubicLineChart,333,0,26,0,61,0,19,0,6,0
+codenameone-core-unittests,com.codename1.charts.views,PkgUtils,3,12,0,0,1,1,1,1,1,1
+codenameone-core-unittests,com.codename1.charts.views,PieMapper,199,0,18,0,41,0,20,0,11,0
+codenameone-core-unittests,com.codename1.charts.views,PointStyle,64,78,12,0,16,5,10,2,4,2
+codenameone-core-unittests,com.codename1.charts.views,CombinedXYChart,350,0,20,0,59,0,20,0,10,0
+codenameone-core-unittests,com.codename1.charts.views,RangeBarChart,239,0,20,0,44,0,17,0,7,0
+codenameone-core-unittests,com.codename1.charts.views,LineChart,562,0,74,0,95,0,47,0,10,0
+codenameone-core-unittests,com.codename1.charts.views,RadarChart,548,10,22,0,73,4,13,2,2,2
+codenameone-core-unittests,com.codename1.charts.views,TimeChart,474,0,58,0,95,0,39,0,10,0
+codenameone-core-unittests,com.codename1.charts.views,BarChart.Type,0,34,0,0,0,2,0,1,0,1
+codenameone-core-unittests,com.codename1.charts.views,ScatterChart,575,0,42,0,94,0,34,0,13,0
+codenameone-core-unittests,com.codename1.charts.views,PieSegment,0,169,1,9,0,26,1,12,0,8
+codenameone-core-unittests,com.codename1.charts.views,DoughnutChart,410,10,20,0,60,4,12,2,2,2
+codenameone-core-unittests,com.codename1.charts.views,CombinedXYChart.XYCombinedChartDef,44,0,6,0,12,0,8,0,5,0
+codenameone-core-unittests,com.codename1.charts.views,BubbleChart,196,0,4,0,32,0,10,0,8,0
+codenameone-core-unittests,com.codename1.charts.views,RangeStackedBarChart,6,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.charts.views,PieChart,480,0,30,0,75,0,19,0,4,0
+codenameone-core-unittests,com.codename1.charts.views,BarChart.Point,0,6,0,0,0,1,0,1,0,1
+codenameone-core-unittests,com.codename1.charts.views,RoundChart,120,18,6,0,25,7,13,1,10,1
+codenameone-core-unittests,com.codename1.charts.views,XYChart,3024,298,290,14,470,46,174,10,22,10
+codenameone-core-unittests,com.codename1.charts.views,AbstractChart,1332,7,154,0,230,2,92,2,15,2
+codenameone-core-unittests,com.codename1.charts.views,ClickableArea,0,21,0,0,0,8,0,4,0,4
+codenameone-core-unittests,com.codename1.charts.views,BarChart,393,465,26,24,66,69,20,21,5,11
+codenameone-core-unittests,com.codename1.ui.layouts.mig,Grid,6369,0,1071,0,1038,0,607,0,71,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,CodenameOneMiGContainerWrapper,62,0,6,0,15,0,11,0,8,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,DimConstraint,331,0,64,0,78,0,64,0,32,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,Grid.LinkedDimGroup,175,0,16,0,38,0,13,0,5,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,UnitValue,1211,0,165,0,190,0,123,0,31,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,LinkHandler,459,0,76,0,78,0,45,0,7,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,LayoutCallback,8,0,0,0,4,0,4,0,4,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,BoundSize,339,0,76,0,58,0,55,0,16,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,UnitConverter,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,ConstraintParser,4388,0,768,0,792,0,407,0,23,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,Grid.FlowSizeSpec,156,0,24,0,25,0,14,0,2,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,Grid.WeakCell,20,0,0,0,7,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,CodenameOneMiGComponentWrapper,432,0,69,0,115,0,74,0,39,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,PlatformDefaults,1679,0,95,0,249,0,104,0,47,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,Grid.Cell,42,0,2,0,13,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,Grid.CompWrap,949,0,152,0,147,0,99,0,22,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,MigLayout,1007,0,112,0,217,0,102,0,46,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,ResizeConstraint,48,0,0,0,13,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,LC,644,0,30,0,170,0,95,0,80,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,LayoutUtil,674,0,144,0,132,0,97,0,25,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,AC,549,0,34,0,98,0,50,0,33,0
+codenameone-core-unittests,com.codename1.ui.layouts.mig,CC,1579,0,134,0,329,0,203,0,130,0
+codenameone-core-unittests,com.codename1.charts.models,AreaSeries,67,75,5,3,13,15,8,4,5,3
+codenameone-core-unittests,com.codename1.charts.models,MultipleCategorySeries,78,37,0,0,17,10,9,2,9,2
+codenameone-core-unittests,com.codename1.charts.models,XYValueSeries,5,123,3,7,0,32,2,13,0,10
+codenameone-core-unittests,com.codename1.charts.models,Point,11,15,0,0,6,6,3,3,3,3
+codenameone-core-unittests,com.codename1.charts.models,XYEntry,6,15,0,0,2,6,1,3,1,3
+codenameone-core-unittests,com.codename1.charts.models,TimeSeries,13,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.charts.models,RangeCategorySeries,92,0,2,0,23,0,9,0,8,0
+codenameone-core-unittests,com.codename1.charts.models,XYMultipleSeriesDataset,39,24,0,0,12,6,6,4,6,4
+codenameone-core-unittests,com.codename1.charts.models,CategorySeries,75,48,2,0,17,12,6,6,5,6
+codenameone-core-unittests,com.codename1.charts.models,XYSeries,79,412,15,27,17,93,17,36,4,28
+codenameone-core-unittests,com.codename1.charts.models,XYSeries.IndexXYMap,31,142,0,6,7,31,3,11,3,8
+codenameone-core-unittests,com.codename1.charts.models,SeriesSelection,0,27,0,0,0,10,0,5,0,5
+codenameone-core-unittests,com.codename1.ui.tree,Tree.StringArrayTreeModel,116,0,18,0,21,0,12,0,3,0
+codenameone-core-unittests,com.codename1.ui.tree,Tree.Handler,65,0,8,0,17,0,7,0,3,0
+codenameone-core-unittests,com.codename1.ui.tree,Tree,1036,0,108,0,252,0,100,0,46,0
+codenameone-core-unittests,com.codename1.ui.tree,Tree.State.new ComponentSelector.ComponentClosure() {...},25,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.tree,Tree.State.new ComponentSelector.ComponentClosure() {...},51,0,8,0,11,0,6,0,2,0
+codenameone-core-unittests,com.codename1.ui.tree,Tree.State,48,0,0,0,9,0,4,0,4,0
+codenameone-core-unittests,com.codename1.io,WebServiceProxyCall.WSConnection,1125,0,173,0,265,0,120,0,7,0
+codenameone-core-unittests,com.codename1.io,Data.StringData,39,0,0,0,12,0,4,0,4,0
+codenameone-core-unittests,com.codename1.io,Util,2622,1058,552,151,567,288,361,85,57,37
+codenameone-core-unittests,com.codename1.io,FileSystemStorage.new TimerTask() {...},22,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,NetworkManager.AutoDetectAPN,163,0,20,0,42,0,17,0,7,0
+codenameone-core-unittests,com.codename1.io,Data.FileData,21,0,0,0,7,0,3,0,3,0
+codenameone-core-unittests,com.codename1.io,NetworkManager.new Runnable() {...},52,0,6,0,11,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io,AccessToken,175,107,25,7,36,37,27,12,12,11
+codenameone-core-unittests,com.codename1.io,Util.UUID,316,0,20,0,47,0,21,0,11,0
+codenameone-core-unittests,com.codename1.io,SocketConnection,10,13,0,0,5,6,2,4,2,4
+codenameone-core-unittests,com.codename1.io,URL.URLConnection,31,25,0,0,12,7,9,3,9,3
+codenameone-core-unittests,com.codename1.io,FileSystemStorage,111,23,6,0,32,6,22,6,19,6
+codenameone-core-unittests,com.codename1.io,NetworkManager.NetworkThread.new Runnable() {...},18,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io,NetworkManager.new ActionListener() {...},69,0,12,0,17,0,8,0,2,0
+codenameone-core-unittests,com.codename1.io,WebServiceProxyCall,79,0,4,0,19,0,7,0,5,0
+codenameone-core-unittests,com.codename1.io,Socket.1Listener.new Runnable() {...},46,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new ActionListener() {...},57,0,6,0,9,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new Data() {...},22,0,0,0,4,0,3,0,3,0
+codenameone-core-unittests,com.codename1.io,JSONParser,255,717,39,90,65,203,42,63,8,26
+codenameone-core-unittests,com.codename1.io,Oauth2.new ActionListener() {...},35,0,4,0,7,0,4,0,2,0
+codenameone-core-unittests,com.codename1.io,Oauth2.new WebBrowser() {...},33,0,0,0,4,0,3,0,3,0
+codenameone-core-unittests,com.codename1.io,Oauth2.new Command() {...},25,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io,Oauth2.new ActionListener() {...},38,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io,URL.HttpURLConnection,30,162,5,9,10,30,7,9,3,6
+codenameone-core-unittests,com.codename1.io,Cookie,173,10,10,0,52,5,27,2,22,2
+codenameone-core-unittests,com.codename1.io,MultipartRequest,124,733,20,50,34,175,30,30,10,15
+codenameone-core-unittests,com.codename1.io,Socket,25,78,2,6,4,13,3,7,1,5
+codenameone-core-unittests,com.codename1.io,JSONParser.KeyStack,2,24,1,1,1,8,1,4,0,4
+codenameone-core-unittests,com.codename1.io,Socket.SocketOutputStream,20,88,5,7,6,28,4,10,0,8
+codenameone-core-unittests,com.codename1.io,Util.new SuccessCallback() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new FailureCallback() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new GZConnectionRequest() {...},49,0,8,0,9,0,6,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new ActionListener() {...},35,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new ActionListener() {...},34,0,6,0,5,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new SuccessCallback() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new FailureCallback() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new SuccessCallback() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.new FailureCallback() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Properties,663,0,146,0,195,0,94,0,14,0
+codenameone-core-unittests,com.codename1.io,MalformedURLException,7,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Oauth2.new ConnectionRequest() {...},144,0,26,0,29,0,17,0,4,0
+codenameone-core-unittests,com.codename1.io,Socket.new Socket.StopListening() {...},64,0,4,0,16,0,5,0,3,0
+codenameone-core-unittests,com.codename1.io,JSONParser.ReaderClass,0,55,0,8,0,13,0,6,0,2
+codenameone-core-unittests,com.codename1.io,NetworkEvent,64,42,4,0,18,15,11,7,9,7
+codenameone-core-unittests,com.codename1.io,JSONSanitizer.State,0,84,0,0,0,9,0,1,0,1
+codenameone-core-unittests,com.codename1.io,Preferences,93,407,22,46,31,116,24,42,6,26
+codenameone-core-unittests,com.codename1.io,Storage,52,230,12,12,20,67,10,24,3,19
+codenameone-core-unittests,com.codename1.io,URL,22,109,3,9,7,25,7,18,4,15
+codenameone-core-unittests,com.codename1.io,Oauth2,1025,0,90,0,228,0,72,0,27,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.SSLCertificate,12,0,0,0,3,0,3,0,3,0
+codenameone-core-unittests,com.codename1.io,File,602,35,61,1,110,9,64,5,33,5
+codenameone-core-unittests,com.codename1.io,NetworkManager.NetworkThread,214,194,43,23,63,50,35,8,3,5
+codenameone-core-unittests,com.codename1.io,BufferedInputStream,813,0,120,0,228,0,97,0,37,0
+codenameone-core-unittests,com.codename1.io,Data.StorageData,20,0,0,0,6,0,3,0,3,0
+codenameone-core-unittests,com.codename1.io,BufferedOutputStream,247,0,20,0,75,0,30,0,20,0
+codenameone-core-unittests,com.codename1.io,Socket.new Runnable() {...},9,69,1,3,1,11,1,3,0,2
+codenameone-core-unittests,com.codename1.io,Socket.new Runnable() {...},30,72,3,1,5,8,2,2,0,2
+codenameone-core-unittests,com.codename1.io,Socket.new Socket.Close() {...},12,30,2,2,5,6,2,2,0,2
+codenameone-core-unittests,com.codename1.io,ConnectionRequest,2657,833,405,99,641,243,345,79,106,66
+codenameone-core-unittests,com.codename1.io,Data.ByteData,16,0,0,0,6,0,3,0,3,0
+codenameone-core-unittests,com.codename1.io,Log,478,214,41,9,136,61,38,18,16,15
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new FailureCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new SuccessCallback() {...},19,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new FailureCallback() {...},19,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new Runnable() {...},125,0,12,0,26,0,8,0,2,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new ActionListener() {...},81,0,6,0,18,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new Runnable() {...},0,10,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.new SuccessCallback() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io,CacheMap,540,144,47,11,109,39,40,10,13,8
+codenameone-core-unittests,com.codename1.io,CharArrayReader,244,81,41,9,53,16,33,4,9,3
+codenameone-core-unittests,com.codename1.io,JSONSanitizer,1430,720,350,121,317,144,232,49,10,18
+codenameone-core-unittests,com.codename1.io,WebServiceProxyCall.WSDefinition,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io,NetworkManager,403,360,72,35,104,103,59,36,13,28
+codenameone-core-unittests,com.codename1.io,ConnectionRequest.CachingMode,0,54,0,0,0,6,0,1,0,1
+codenameone-core-unittests,com.codename1.io,Util.8.new Runnable() {...},140,0,10,0,21,0,7,0,2,0
+codenameone-core-unittests,com.codename1.io,URL.FileURLConnection,13,32,1,1,4,8,4,5,3,5
+codenameone-core-unittests,com.codename1.io,Util.9.new Runnable() {...},25,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Oauth2.RefreshTokenRequest,6,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io,NetworkManager.new Runnable() {...},101,0,18,0,30,0,11,0,2,0
+codenameone-core-unittests,com.codename1.io,Util.8.1.new Runnable() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Socket.SocketInputStream,65,145,20,24,19,36,18,16,3,9
+codenameone-core-unittests,com.codename1.io,Log.new ConnectionRequest() {...},26,0,0,0,7,0,4,0,4,0
+codenameone-core-unittests,com.codename1.io,Log.new Command() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io,Log.new ActionListener() {...},75,0,6,0,13,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io,Log.new ActionListener() {...},0,17,1,1,0,5,1,2,0,2
+codenameone-core-unittests,com.codename1.io,NetworkManager.new Runnable() {...},59,23,11,3,21,7,7,3,1,2
+codenameone-core-unittests,com.codename1.io,CSVParser,8,246,2,30,1,68,3,20,1,6
+codenameone-core-unittests,com.codename1.analytics,AnalyticsService.new ActionListener() {...},21,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.analytics,AnalyticsService.new ActionListener() {...},21,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.analytics,AnalyticsService.new ActionListener() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.analytics,AnalyticsService,330,0,30,0,98,0,32,0,17,0
+codenameone-core-unittests,com.codename1.ads,InnerActive,320,0,38,0,76,0,26,0,7,0
+codenameone-core-unittests,com.codename1.ads,AdsService,112,0,6,0,38,0,15,0,12,0
+codenameone-core-unittests,com.codename1.charts.util,ColorUtil,3,81,0,0,1,21,1,7,1,7
+codenameone-core-unittests,com.codename1.charts.util,ColorUtil.IColor,62,184,9,1,11,32,9,5,4,5
+codenameone-core-unittests,com.codename1.charts.util,MathHelper,269,0,24,0,51,0,17,0,5,0
+codenameone-core-unittests,com.codename1.charts.util,NumberFormat,41,10,0,0,15,3,4,3,4,3
+codenameone-core-unittests,com.codename1.charts.util,ColorUtil.IColor.Transparent,99,0,0,0,15,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.list,ContainerList,420,0,56,0,110,0,55,0,27,0
+codenameone-core-unittests,com.codename1.ui.list,DefaultListModel,263,333,40,28,58,76,37,24,9,18
+codenameone-core-unittests,com.codename1.ui.list,GenericListCellRenderer,1232,0,192,0,289,0,128,0,32,0
+codenameone-core-unittests,com.codename1.ui.list,FilterProxyListModel,546,14,66,0,116,5,60,1,27,1
+codenameone-core-unittests,com.codename1.ui.list,FilterProxyListModel.new DataChangedListener() {...},54,0,6,0,11,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui.list,FilterProxyListModel.new DataChangedListener() {...},54,0,6,0,11,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui.list,ContainerList.Entry,275,0,16,0,62,0,20,0,12,0
+codenameone-core-unittests,com.codename1.ui.list,DefaultListCellRenderer,142,144,22,14,39,40,27,12,11,10
+codenameone-core-unittests,com.codename1.ui.list,ContainerList.Listeners,16,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.list,MultiList,336,0,12,0,44,0,17,0,11,0
+codenameone-core-unittests,com.codename1.ui.list,GenericListCellRenderer.Monitor,377,0,64,0,75,0,36,0,4,0
+codenameone-core-unittests,com.codename1.maps,MapComponent.new Runnable() {...},37,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.maps,MapComponent.new ActionListener() {...},15,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.maps,MapComponent.new ActionListener() {...},16,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.maps,MapComponent.new ActionListener() {...},16,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.maps,PositionedTile,15,0,0,0,6,0,3,0,3,0
+codenameone-core-unittests,com.codename1.maps,BoundingBox,311,0,20,0,54,0,24,0,14,0
+codenameone-core-unittests,com.codename1.maps,CacheProviderProxy.AgeableTile,22,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.maps,LayerWithZoomLevels,12,0,0,0,5,0,1,0,1,0
+codenameone-core-unittests,com.codename1.maps,Coord,156,0,6,0,33,0,17,0,14,0
+codenameone-core-unittests,com.codename1.maps,Tile,309,0,14,0,59,0,26,0,19,0
+codenameone-core-unittests,com.codename1.maps,ProxyHttpTile.new ActionListener() {...},33,0,0,0,8,0,2,0,2,0
+codenameone-core-unittests,com.codename1.maps,Projection,57,0,2,0,11,0,6,0,5,0
+codenameone-core-unittests,com.codename1.maps,ProxyHttpTile,60,0,2,0,13,0,3,0,2,0
+codenameone-core-unittests,com.codename1.maps,MapComponent,2425,0,192,0,516,0,166,0,70,0
+codenameone-core-unittests,com.codename1.maps,CacheProviderProxy,104,0,4,0,27,0,12,0,10,0
+codenameone-core-unittests,com.codename1.maps,Mercator,102,0,4,0,15,0,7,0,5,0
+codenameone-core-unittests,com.codename1.push,PushBuilder,0,193,1,19,0,48,1,23,0,11
+codenameone-core-unittests,com.codename1.push,Push,262,197,5,9,30,55,15,12,12,8
+codenameone-core-unittests,com.codename1.push,Push.PushConnection,0,51,0,2,0,15,0,5,0,4
+codenameone-core-unittests,com.codename1.push,PushContent,233,0,10,0,57,0,30,0,25,0
+codenameone-core-unittests,com.codename1.push,PushAction,52,0,0,0,18,0,9,0,9,0
+codenameone-core-unittests,com.codename1.push,PushActionCategory,62,0,2,0,11,0,5,0,4,0
+codenameone-core-unittests,com.codename1.ui.plaf,DefaultLookAndFeel.1.new Runnable() {...},32,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.BoxShadow,111,0,8,0,24,0,11,0,7,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.LinearGradient,77,0,4,0,15,0,5,0,3,0
+codenameone-core-unittests,com.codename1.ui.plaf,RoundRectBorder.new Runnable() {...},56,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,RoundRectBorder.new Component() {...},285,0,24,0,47,0,14,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.RadialGradient,15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.BorderInfo,1617,0,219,0,335,0,190,0,80,0
+codenameone-core-unittests,com.codename1.ui.plaf,RoundRectBorder,1704,160,199,5,344,43,154,9,49,9
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.ScalarUnit,486,0,72,0,85,0,53,0,13,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.Arrow,249,0,27,0,44,0,16,0,1,0
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.PaddingInfo,103,0,14,0,27,0,12,0,5,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.BorderRadius,950,0,71,0,136,0,55,0,18,0
+codenameone-core-unittests,com.codename1.ui.plaf,UIManager,2063,4786,355,471,358,797,288,177,28,24
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,DefaultLookAndFeel.new ComponentSelector.ComponentClosure() {...},19,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,DefaultLookAndFeel.new Animation() {...},104,0,6,0,17,0,6,0,3,0
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.MarginInfo,103,0,14,0,27,0,12,0,5,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder,3329,0,266,0,553,0,177,0,41,0
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.ImageInfo,14,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.new CSSBorder.Decorator() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.BoxInfo,69,0,4,0,12,0,8,0,6,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.Color,347,0,38,0,58,0,27,0,8,0
+codenameone-core-unittests,com.codename1.ui.plaf,Border,4089,564,327,71,711,113,270,33,70,23
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser,2434,0,327,0,482,0,209,0,41,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.BorderImage,429,0,26,0,51,0,19,0,6,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.Context,9,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.plaf,Style,2244,2314,408,248,422,504,318,184,50,120
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.ScalarValue,130,0,12,0,27,0,18,0,9,0
+codenameone-core-unittests,com.codename1.ui.plaf,DefaultLookAndFeel,5992,1052,664,92,1082,248,416,43,43,24
+codenameone-core-unittests,com.codename1.ui.plaf,RoundBorder,992,72,79,1,199,24,76,6,36,6
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.BackgroundImage,733,0,67,0,130,0,47,0,7,0
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.StyleInfo,815,0,120,0,185,0,95,0,35,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.BorderStroke,346,0,64,0,72,0,44,0,10,0
+codenameone-core-unittests,com.codename1.ui.plaf,RoundBorder.new Runnable() {...},62,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,StyleParser.FontInfo,218,0,37,0,50,0,35,0,16,0
+codenameone-core-unittests,com.codename1.ui.plaf,LookAndFeel,1259,609,140,10,307,132,120,33,45,33
+codenameone-core-unittests,com.codename1.ui.plaf,RoundBorder.CacheValue,12,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.plaf,CSSBorder.ColorStop,40,0,2,0,8,0,3,0,2,0
+codenameone-core-unittests,com.codename1.charts.compat,Paint.Cap,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.charts.compat,GradientDrawable.Orientation,84,0,0,0,9,0,1,0,1,0
+codenameone-core-unittests,com.codename1.charts.compat,Paint.Join,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.charts.compat,Paint.Style,0,34,0,0,0,4,0,1,0,1
+codenameone-core-unittests,com.codename1.charts.compat,Paint.Align,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.charts.compat,GradientDrawable,30,0,0,0,9,0,3,0,3,0
+codenameone-core-unittests,com.codename1.charts.compat,Paint,371,35,46,0,87,12,48,3,25,3
+codenameone-core-unittests,com.codename1.charts.compat,Canvas,823,35,48,0,118,9,45,1,21,1
+codenameone-core-unittests,com.codename1.charts.compat,PathMeasure,15,0,0,0,7,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui,Transform.ImmutableTransform,50,5,0,0,31,2,16,1,16,1
+codenameone-core-unittests,com.codename1.ui,MultipleGradientPaint.CycleMethod,34,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},21,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},21,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextField.CommandHandler,30,8,3,0,10,3,3,1,1,1
+codenameone-core-unittests,com.codename1.ui,Toolbar.new Command() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new SearchBar() {...},19,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},425,0,58,0,69,0,31,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},137,0,30,0,23,0,17,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},227,0,50,0,31,0,27,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},21,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},21,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Display.new TimerTask() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Display.new TimerTask() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Display.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Display.new Runnable() {...},4,51,0,2,3,14,0,3,0,2
+codenameone-core-unittests,com.codename1.ui,RunnableWrapper,82,146,11,13,31,48,10,12,2,6
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},57,0,8,0,13,0,6,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new SuccessCallback() {...},41,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},83,0,10,0,19,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.TextSelectionTrigger,24,0,0,0,3,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Command.new Command() {...},0,12,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Command.new Command() {...},0,12,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.new Runnable() {...},18,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.8.4.new Runnable() {...},12,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.JSType,28,88,10,2,10,13,6,3,0,3
+codenameone-core-unittests,com.codename1.ui,MultipleGradientPaint,63,0,0,0,26,0,13,0,13,0
+codenameone-core-unittests,com.codename1.ui,URLImage.CachedImage,53,0,8,0,14,0,8,0,4,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar,2404,3,384,0,595,2,232,1,40,1
+codenameone-core-unittests,com.codename1.ui,URLImage.5.new Runnable() {...},47,0,2,0,11,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.1.new Runnable() {...},16,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Tabs.new ActionListener() {...},26,109,8,8,6,19,8,2,0,2
+codenameone-core-unittests,com.codename1.ui,MultipleGradientPaint.ColorSpaceType,24,0,0,0,3,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,Container,4457,2127,871,269,1033,568,574,178,86,94
+codenameone-core-unittests,com.codename1.ui,Container.QueuedInsertion,11,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.FormPointerListener.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.ToolbarSideMenu,443,6,56,0,113,1,44,1,16,1
+codenameone-core-unittests,com.codename1.ui,ComboBox.new Dialog() {...},38,0,6,0,10,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui,CommonProgressAnimations.ProgressAnimation,21,107,3,11,8,32,5,10,2,6
+codenameone-core-unittests,com.codename1.ui,UIFragment.UINotationParser,1007,0,129,0,168,0,81,0,14,0
+codenameone-core-unittests,com.codename1.ui,Calendar.MonthView,1203,0,92,0,224,0,69,0,23,0
+codenameone-core-unittests,com.codename1.ui,Container.QueuedChange,9,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,BrowserWindow.EvalRequest,10,0,0,0,4,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.FormPointerListener,152,6,20,0,33,1,11,1,1,1
+codenameone-core-unittests,com.codename1.ui,TextArea.TextAreaInputDevice,28,0,6,0,12,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.9.new Runnable() {...},18,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComponentSelector,5843,813,778,78,1334,173,663,67,258,40
+codenameone-core-unittests,com.codename1.ui,InterFormContainer,243,49,31,1,51,7,22,1,6,1
+codenameone-core-unittests,com.codename1.ui,CN1Constants,0,3,0,0,0,1,0,1,0,1
+codenameone-core-unittests,com.codename1.ui,DynamicImage,124,0,2,0,33,0,14,0,13,0
+codenameone-core-unittests,com.codename1.ui,Toolbar,3155,75,406,4,845,25,314,5,107,5
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField,824,101,116,6,195,27,93,4,33,3
+codenameone-core-unittests,com.codename1.ui,TextSelection.SelectionMenu,88,0,2,0,17,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Sheet.new Object() {...},3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.CommandWrapper,142,0,10,0,35,0,13,0,8,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new ActionListener() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new ActionListener() {...},207,0,40,0,29,0,22,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new ActionListener() {...},279,0,30,0,47,0,17,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new ActionListener() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new ActionListener() {...},18,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},30,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new Command() {...},16,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new Form() {...},318,0,46,0,74,0,31,0,8,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new Painter() {...},249,0,20,0,42,0,12,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new ActionListener() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.CommandWrapper.ShowWaiter,126,0,8,0,31,0,7,0,3,0
+codenameone-core-unittests,com.codename1.ui,Component.AnimationTransitionPainter,120,0,4,0,25,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,InfiniteContainer.5.new Runnable() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},0,37,0,0,0,8,0,2,0,2
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},3,43,1,3,1,12,1,3,0,2
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new BrowserNavigationCallback() {...},0,8,0,0,0,2,0,2,0,2
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new SuccessCallback() {...},10,6,0,0,2,1,1,1,1,1
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new ActionListener() {...},0,10,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.ui,List,2664,1421,453,111,587,338,334,71,66,55
+codenameone-core-unittests,com.codename1.ui,List.Listeners,6,15,0,0,2,4,1,2,1,2
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.2.new Runnable() {...},28,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.DownloadCompleted,246,0,16,0,51,0,12,0,4,0
+codenameone-core-unittests,com.codename1.ui,SearchBar,139,0,8,0,31,0,7,0,3,0
+codenameone-core-unittests,com.codename1.ui,Tabs.TabFocusListener,69,6,14,0,18,1,9,1,2,1
+codenameone-core-unittests,com.codename1.ui,MenuBar,2949,626,563,70,691,141,361,35,49,29
+codenameone-core-unittests,com.codename1.ui,Transform.NotInvertibleException,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,NavigationCommand,38,0,2,0,16,0,8,0,7,0
+codenameone-core-unittests,com.codename1.ui,InputComponent,210,439,25,35,49,115,24,39,5,28
+codenameone-core-unittests,com.codename1.ui,UIFragment.DefaultComponentFactory,541,0,114,0,131,0,65,0,8,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.new ComponentSelector.ComponentClosure() {...},25,0,4,0,5,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.new Comparator() {...},116,0,20,0,33,0,13,0,3,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.new ActionListener() {...},883,0,98,0,156,0,51,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.new Comparator() {...},116,0,20,0,33,0,13,0,3,0
+codenameone-core-unittests,com.codename1.ui,URLImage.6.new Runnable() {...},71,0,6,0,12,0,5,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.3.new Runnable() {...},26,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.3.new Runnable() {...},26,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.3.new Runnable() {...},26,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.3.new Runnable() {...},26,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,EncodedImage,457,410,79,39,113,111,75,22,21,17
+codenameone-core-unittests,com.codename1.ui,TextComponentPassword,40,0,0,0,10,0,5,0,5,0
+codenameone-core-unittests,com.codename1.ui,PickerComponent,133,0,0,0,39,0,13,0,13,0
+codenameone-core-unittests,com.codename1.ui,Display.EdtException,61,0,6,0,18,0,7,0,4,0
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.FormPointerPressListener,50,6,6,0,11,1,4,1,1,1
+codenameone-core-unittests,com.codename1.ui,Slider.SliderActionEvent,12,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,TextArea,1478,876,299,82,391,255,259,79,84,63
+codenameone-core-unittests,com.codename1.ui,InputComponent.new Button() {...},2,8,0,0,1,1,1,1,1,1
+codenameone-core-unittests,com.codename1.ui,InputComponent.new TextArea() {...},20,0,4,0,4,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component,6699,3570,1278,447,1510,1023,957,362,206,246
+codenameone-core-unittests,com.codename1.ui,HeavyButton,96,0,12,0,35,0,16,0,10,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new SuccessCallback() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,CommonProgressAnimations,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,FontImage,1059,618,113,29,202,109,110,30,43,26
+codenameone-core-unittests,com.codename1.ui,CommonProgressAnimations.CircleProgress,89,42,2,0,18,8,4,3,3,3
+codenameone-core-unittests,com.codename1.ui,RGBImage,296,0,20,0,62,0,26,0,16,0
+codenameone-core-unittests,com.codename1.ui,SearchBar.new Command() {...},12,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SearchBar.new Command() {...},18,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SearchBar.new DataChangedListener() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,InfiniteContainer,193,0,28,0,59,0,26,0,12,0
+codenameone-core-unittests,com.codename1.ui,DynamicImage.new DynamicImage() {...},25,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,MenuBar.new Command() {...},12,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,MenuBar.new ActionListener() {...},13,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,CheckBox,208,154,30,18,54,49,33,20,14,15
+codenameone-core-unittests,com.codename1.ui,Tabs,1320,536,169,45,310,140,162,28,61,22
+codenameone-core-unittests,com.codename1.ui,InfiniteContainer.new Runnable() {...},28,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,InfiniteContainer.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,InfiniteContainer.new Runnable() {...},21,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,InfiniteContainer.new Runnable() {...},25,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,InfiniteContainer.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.10.new Runnable() {...},18,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComboBox,576,207,47,7,141,62,47,17,20,17
+codenameone-core-unittests,com.codename1.ui,Toolbar.BackCommandPolicy,64,0,0,0,7,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,URLImage.9.1.new Runnable() {...},28,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserWindow,40,97,9,9,9,30,9,10,0,10
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.JSProxy.new SuccessCallback() {...},91,0,4,0,18,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,Transform,771,394,82,28,177,91,89,25,37,19
+codenameone-core-unittests,com.codename1.ui,RadioButton,283,176,43,21,74,56,42,28,18,20
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextComponent,145,330,18,28,35,70,18,31,6,20
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.CommandWrapper.ShowWaiter.new ActionListener() {...},33,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserWindow.BrowserForm.new Command() {...},30,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserWindow.BrowserForm.new ActionListener() {...},29,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.JSProxy,583,0,20,0,106,0,33,0,23,0
+codenameone-core-unittests,com.codename1.ui,URLImage.7.1.new Runnable() {...},28,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,AnimationManager.new ScrollListener() {...},75,0,12,0,20,0,8,0,2,0
+codenameone-core-unittests,com.codename1.ui,AnimationManager.new Runnable() {...},0,29,1,3,0,4,1,3,0,2
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.new Container() {...},10,7,2,0,5,1,3,1,2,1
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.new ActionListener() {...},66,0,4,0,11,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.new ActionListener() {...},24,6,4,0,7,1,3,1,1,1
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextField.new Runnable() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.JSExpression,9,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.new Runnable() {...},236,0,10,0,39,0,11,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.new Runnable() {...},24,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.new ComponentAnimation() {...},594,0,158,0,144,0,86,0,7,0
+codenameone-core-unittests,com.codename1.ui,Component.new Runnable() {...},17,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.new ActionListener() {...},20,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextComponent.1.new Runnable() {...},35,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.new Runnable() {...},36,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.new ActionListener() {...},39,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,Container.QueuedRemoval,5,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextComponent.1.new Runnable() {...},43,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserWindow.BrowserForm,75,0,2,0,17,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Label.new Component() {...},6,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,Label.new ActionListener() {...},14,6,4,0,3,1,3,1,1,1
+codenameone-core-unittests,com.codename1.ui,Label.new TextSelection.TextSelectionSupport() {...},211,0,20,0,38,0,16,0,6,0
+codenameone-core-unittests,com.codename1.ui,InterFormContainer.new ComponentSelector.Filter() {...},11,12,1,1,2,3,1,2,0,2
+codenameone-core-unittests,com.codename1.ui,InterFormContainer.new ComponentSelector.Filter() {...},11,12,1,1,2,3,1,2,0,2
+codenameone-core-unittests,com.codename1.ui,Stroke,105,77,5,5,23,17,15,4,10,4
+codenameone-core-unittests,com.codename1.ui,CommonProgressAnimations.LoadingTextAnimation,287,91,25,5,66,23,22,3,8,2
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.8.1.new Runnable() {...},19,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.8.1.new Runnable() {...},22,0,2,0,8,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Tabs.TabsLayout,224,6,10,0,35,1,7,1,2,1
+codenameone-core-unittests,com.codename1.ui,Container.TransitionAnimation,163,25,36,0,41,9,22,1,4,1
+codenameone-core-unittests,com.codename1.ui,TextSelection.Char,94,0,0,0,15,0,5,0,5,0
+codenameone-core-unittests,com.codename1.ui,URLImage.10.1.new Runnable() {...},28,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Dialog,2674,206,297,1,580,69,244,23,95,23
+codenameone-core-unittests,com.codename1.ui,TextComponent.new TextField() {...},254,6,22,0,41,1,14,1,3,1
+codenameone-core-unittests,com.codename1.ui,URLImage.7.new Runnable() {...},18,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage,599,0,62,0,140,0,54,0,22,0
+codenameone-core-unittests,com.codename1.ui,Graphics,1210,619,78,30,215,128,108,45,61,38
+codenameone-core-unittests,com.codename1.ui,ImageFactory,51,0,6,0,16,0,8,0,5,0
+codenameone-core-unittests,com.codename1.ui,TextComponentPassword.new ActionListener() {...},53,0,4,0,11,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,Container.MorphAnimation,92,193,16,20,16,40,11,11,0,4
+codenameone-core-unittests,com.codename1.ui,IndexedImage,182,637,26,50,37,143,20,43,3,22
+codenameone-core-unittests,com.codename1.ui,AutoCompleteTextComponent.new AutoCompleteTextField() {...},250,15,20,0,41,2,13,2,3,2
+codenameone-core-unittests,com.codename1.ui,SearchBar.2.new Runnable() {...},26,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Container.TmpInsets,170,0,4,0,28,0,5,0,3,0
+codenameone-core-unittests,com.codename1.ui,TextField,2699,432,466,22,641,84,339,14,100,9
+codenameone-core-unittests,com.codename1.ui,Calendar.new ActionListener() {...},145,0,16,0,32,0,10,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.ToolbarSideMenu.new Command() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.ToolbarSideMenu.new Runnable() {...},17,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Sheet.new Painter() {...},35,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Sheet.new ComponentSelector.ComponentClosure() {...},48,0,12,0,14,0,8,0,2,0
+codenameone-core-unittests,com.codename1.ui,Sheet.new Runnable() {...},29,0,4,0,7,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.JSRef,26,16,2,0,6,6,7,3,6,3
+codenameone-core-unittests,com.codename1.ui,Sheet.new ActionListener() {...},49,0,12,0,13,0,8,0,2,0
+codenameone-core-unittests,com.codename1.ui,Sheet.new ActionListener() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Sheet.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},0,26,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new ActionListener() {...},48,0,4,0,10,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},21,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},46,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new ActionListener() {...},0,20,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},19,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BlockingDisallowedException,4,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,TextSelection,550,0,40,0,112,0,44,0,24,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Slider,1035,187,135,7,235,58,106,21,34,20
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},9,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextComponent.1.new Runnable() {...},35,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Callback() {...},49,0,0,0,13,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},99,0,14,0,16,0,9,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextComponent.1.new Runnable() {...},43,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Runnable() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Tabs.SwipeListener,892,9,146,0,161,3,76,1,2,1
+codenameone-core-unittests,com.codename1.ui,ComponentSelector.2.1.new Runnable() {...},21,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Form.TabIterator,303,0,80,0,65,0,54,0,14,0
+codenameone-core-unittests,com.codename1.ui,Calendar,1373,0,76,0,314,0,97,0,59,0
+codenameone-core-unittests,com.codename1.ui,SearchBar.2.1.new Runnable() {...},36,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Component.BGPainter,751,55,57,3,132,14,46,2,7,2
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.MenuTransition,692,0,74,0,121,0,42,0,5,0
+codenameone-core-unittests,com.codename1.ui,URLImage.ScaleToFill,92,0,8,0,21,0,8,0,4,0
+codenameone-core-unittests,com.codename1.ui,Form.new Comparator() {...},22,0,4,0,3,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,Form.new ActionListener() {...},26,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Form.new ComponentSelector.Filter() {...},9,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Form.new Container() {...},18,7,4,0,7,1,4,1,2,1
+codenameone-core-unittests,com.codename1.ui,Form.new ComponentSelector.Filter() {...},26,0,10,0,2,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui,Display.DebugRunnable,90,0,10,0,24,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui,Image,1019,1063,156,61,246,232,122,71,26,55
+codenameone-core-unittests,com.codename1.ui,ComponentGroup,503,0,66,0,122,0,56,0,23,0
+codenameone-core-unittests,com.codename1.ui,Button,548,558,127,72,149,189,114,67,29,51
+codenameone-core-unittests,com.codename1.ui,TextSelection.Span,456,0,44,0,81,0,41,0,19,0
+codenameone-core-unittests,com.codename1.ui,URLImage.8.new Runnable() {...},18,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,AnimationManager,69,137,7,11,21,38,10,11,5,7
+codenameone-core-unittests,com.codename1.ui,TooltipManager,153,0,8,0,49,0,17,0,13,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent,997,769,160,77,256,193,158,44,55,25
+codenameone-core-unittests,com.codename1.ui,EncodedImage.new Runnable() {...},46,0,2,0,12,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,CustomFont,653,0,82,0,142,0,59,0,18,0
+codenameone-core-unittests,com.codename1.ui,SwipeableContainer.SwipeListener,390,0,66,0,88,0,37,0,3,0
+codenameone-core-unittests,com.codename1.ui,SwipeableContainer,456,0,50,0,125,0,44,0,19,0
+codenameone-core-unittests,com.codename1.ui,TextArea.new Runnable() {...},26,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextArea.new ActionListener() {...},27,6,6,0,6,1,4,1,1,1
+codenameone-core-unittests,com.codename1.ui,LeadUtil,233,7,68,2,89,3,47,1,12,1
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.8.new Runnable() {...},25,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,TooltipManager.new Runnable() {...},25,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.8.new Animation() {...},41,0,2,0,9,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.8.new Animation() {...},41,0,2,0,9,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.8.new Animation() {...},66,0,6,0,12,0,6,0,3,0
+codenameone-core-unittests,com.codename1.ui,Label,834,923,164,90,206,272,135,102,28,81
+codenameone-core-unittests,com.codename1.ui,ImageFactory.new ImageFactory() {...},8,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.SelectionMask,421,0,16,0,74,0,13,0,5,0
+codenameone-core-unittests,com.codename1.ui,EncodedImage.1.new Runnable() {...},50,0,2,0,8,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui,Command,15,320,16,26,7,72,20,36,4,31
+codenameone-core-unittests,com.codename1.ui,TextArea.new TextSelection.TextSelectionSupport() {...},215,0,34,0,37,0,23,0,6,0
+codenameone-core-unittests,com.codename1.ui,TextArea.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextArea.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Display,3233,1453,443,166,905,421,483,136,212,87
+codenameone-core-unittests,com.codename1.ui,URLImage.new SuccessCallback() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new SuccessCallback() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new Runnable() {...},100,0,12,0,18,0,8,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new Runnable() {...},54,0,4,0,12,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new URLImage.ScaleToFill() {...},11,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new URLImage.ScaleToFill() {...},11,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new URLImage.ImageAdapter() {...},24,0,4,0,5,0,5,0,3,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new URLImage.ImageAdapter() {...},22,0,4,0,5,0,5,0,3,0
+codenameone-core-unittests,com.codename1.ui,LinearGradientPaint,730,0,42,0,136,0,37,0,15,0
+codenameone-core-unittests,com.codename1.ui,URLImage.new SuccessCallback() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Container.new Runnable() {...},5,85,4,6,1,17,4,3,0,2
+codenameone-core-unittests,com.codename1.ui,Container.new Runnable() {...},20,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Container.new Runnable() {...},15,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Container.new Comparator() {...},30,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui,Container.new ComponentAnimation() {...},64,0,4,0,13,0,6,0,4,0
+codenameone-core-unittests,com.codename1.ui,Container.new ComponentAnimation() {...},15,0,0,0,4,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui,Container.new ComponentAnimation() {...},39,0,2,0,10,0,5,0,4,0
+codenameone-core-unittests,com.codename1.ui,Container.new Runnable() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextComponent,520,17,50,0,114,6,54,2,29,2
+codenameone-core-unittests,com.codename1.ui,ComponentImage,380,0,16,0,94,0,28,0,20,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.DragHandle,213,0,6,0,43,0,14,0,11,0
+codenameone-core-unittests,com.codename1.ui,URLImage.CachedImage.new SuccessCallback() {...},157,0,16,0,28,0,11,0,2,0
+codenameone-core-unittests,com.codename1.ui,URLImage.CachedImage.new FailureCallback() {...},22,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,TextSelection.Spans,272,0,36,0,65,0,31,0,13,0
+codenameone-core-unittests,com.codename1.ui,URLImage.8.1.new Runnable() {...},28,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,ComponentImage.EncodedWrapper,33,0,0,0,6,0,4,0,4,0
+codenameone-core-unittests,com.codename1.ui,ButtonGroup,158,81,28,10,39,24,28,6,10,5
+codenameone-core-unittests,com.codename1.ui,UIFragment,431,0,54,0,103,0,41,0,14,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,CommonProgressAnimations.EmptyAnimation,5,13,0,0,1,3,1,2,1,2
+codenameone-core-unittests,com.codename1.ui,CN,443,62,0,0,165,20,112,15,112,15
+codenameone-core-unittests,com.codename1.ui,Font,231,313,32,32,52,69,43,31,23,19
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.ExecuteResult,6,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new ActionListener() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,SideMenuBar.new Container() {...},48,0,2,0,15,0,5,0,4,0
+codenameone-core-unittests,com.codename1.ui,PeerComponent,201,18,26,0,75,5,52,1,39,1
+codenameone-core-unittests,com.codename1.ui,Form,5111,1263,1068,127,1367,371,754,109,173,91
+codenameone-core-unittests,com.codename1.ui,Button.new ActionListener() {...},0,29,2,2,0,7,2,2,0,2
+codenameone-core-unittests,com.codename1.ui,Toolbar.new Runnable() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new Runnable() {...},7,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ScrollListener() {...},141,0,14,0,25,0,9,0,2,0
+codenameone-core-unittests,com.codename1.ui,Toolbar.new ActionListener() {...},46,0,10,0,8,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui,BrowserComponent.new Object() {...},6,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui,Sheet,1160,0,116,0,280,0,98,0,35,0
+codenameone-core-unittests,com.codename1.capture,Capture,177,0,10,0,51,0,18,0,13,0
+codenameone-core-unittests,com.codename1.capture,VideoCaptureConstraints,472,0,69,0,103,0,67,0,32,0
+codenameone-core-unittests,com.codename1.capture,Capture.CallBack,76,40,8,4,18,14,5,4,0,3
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},37,0,8,0,8,0,7,0,3,0
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},27,0,2,0,5,0,4,0,3,0
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},50,0,8,0,15,0,7,0,3,0
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType.new SQLMap.SqlType() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.properties,DoubleProperty,16,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.BooleanConverter,44,0,14,0,9,0,9,0,2,0
+codenameone-core-unittests,com.codename1.properties,MapAdapter,42,19,5,3,10,5,7,3,4,2
+codenameone-core-unittests,com.codename1.properties,PropertyIndex,874,703,120,100,220,173,104,50,22,22
+codenameone-core-unittests,com.codename1.properties,UiBinding.GroupBinding,74,0,8,0,20,0,9,0,5,0
+codenameone-core-unittests,com.codename1.properties,CharProperty,16,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.TextComponentAdapter,41,0,0,0,11,0,6,0,6,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.RadioListAdapter,92,0,12,0,18,0,11,0,5,0
+codenameone-core-unittests,com.codename1.properties,LongProperty,16,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.properties,InstantUI,521,0,64,0,116,0,46,0,14,0
+codenameone-core-unittests,com.codename1.properties,PropertyIndex.new Externalizable() {...},124,0,20,0,34,0,16,0,5,0
+codenameone-core-unittests,com.codename1.properties,PropertyIndex.new Iterator() {...},1,35,0,2,1,6,1,4,1,3
+codenameone-core-unittests,com.codename1.properties,PropertyBase,54,206,17,33,11,55,20,27,4,18
+codenameone-core-unittests,com.codename1.properties,UiBinding.BoundTableModel,465,0,48,0,98,0,47,0,23,0
+codenameone-core-unittests,com.codename1.properties,Property,13,90,5,9,3,28,5,12,1,9
+codenameone-core-unittests,com.codename1.properties,UiBinding.DoubleConverter,11,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.TextAreaAdapter,38,0,0,0,11,0,6,0,6,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.ComponentAdapter,9,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.properties,FloatProperty,16,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.properties,ByteProperty,16,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.properties,PropertyXMLElement.new Iterator() {...},16,19,1,1,3,3,3,2,2,2
+codenameone-core-unittests,com.codename1.properties,UiBinding.MappingConverter,15,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.properties,BooleanProperty,16,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.properties,SetProperty,181,0,16,0,53,0,25,0,17,0
+codenameone-core-unittests,com.codename1.properties,CollectionProperty,0,45,0,4,0,13,0,5,0,3
+codenameone-core-unittests,com.codename1.properties,UiBinding.StringConverter,10,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.DateConverter,18,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.properties,MapProperty,86,100,3,3,22,30,11,10,9,9
+codenameone-core-unittests,com.codename1.properties,SQLMap.SqlType,128,0,0,0,16,0,4,0,4,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.ObjectConverter,5,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.properties,PreferencesObject,87,168,16,16,12,37,12,10,0,6
+codenameone-core-unittests,com.codename1.properties,SQLMap.SelectBuilder,209,0,14,0,39,0,16,0,9,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.Binding,18,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.properties,PreferencesObject.new PropertyChangeListener() {...},31,64,6,8,7,12,5,4,0,2
+codenameone-core-unittests,com.codename1.properties,UiBinding,390,0,50,0,83,0,44,0,18,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.IntegerConverter,11,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.properties,ListProperty,107,108,7,3,32,31,16,11,11,11
+codenameone-core-unittests,com.codename1.properties,UiBinding.FloatConverter,11,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.properties,PropertyXMLElement,458,135,65,21,118,31,68,17,32,10
+codenameone-core-unittests,com.codename1.properties,UiBinding.CheckBoxRadioSelectionAdapter,45,0,2,0,11,0,6,0,5,0
+codenameone-core-unittests,com.codename1.properties,NumericProperty,35,34,5,3,10,8,7,4,4,3
+codenameone-core-unittests,com.codename1.properties,UiBinding.LongConverter,11,0,2,0,4,0,3,0,2,0
+codenameone-core-unittests,com.codename1.properties,SQLMap,963,0,130,0,261,0,91,0,26,0
+codenameone-core-unittests,com.codename1.properties,IntProperty,6,10,0,0,2,3,1,2,1,2
+codenameone-core-unittests,com.codename1.properties,UiBinding.PickerAdapter,94,0,12,0,24,0,14,0,6,0
+codenameone-core-unittests,com.codename1.properties,UiBinding.new PropertyChangeListener() {...},109,0,12,0,26,0,12,0,6,0
+codenameone-core-unittests,com.codename1.annotations,Async,7,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.impl,VServAds,305,0,22,0,76,0,29,0,18,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.5.1.new ActionListener() {...},26,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.6.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,VServAds.new BrowserNavigationCallback() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,VServAds.new ConnectionRequest() {...},151,0,10,0,29,0,10,0,5,0
+codenameone-core-unittests,com.codename1.impl,VServAds.new Button() {...},21,0,4,0,5,0,4,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneThread,237,24,26,0,62,9,22,3,9,3
+codenameone-core-unittests,com.codename1.impl,PlatformImplementation,7,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.impl,VServAds.3.new ActionListener() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService,175,0,10,0,57,0,20,0,15,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.5.new Runnable() {...},19,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.5.new Runnable() {...},19,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.7.new ActionListener() {...},24,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.7.new Runnable() {...},82,0,2,0,15,0,3,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.AdForm,123,0,12,0,31,0,10,0,4,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.AdForm.new Runnable() {...},26,0,2,0,9,0,3,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.AdForm.new Command() {...},30,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.AdForm.new Command() {...},24,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation,7252,1273,786,92,1623,330,898,108,456,88
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.RPush,27,0,4,0,5,0,4,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.AdForm.1.new Runnable() {...},22,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.new Runnable() {...},42,0,4,0,10,0,4,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.new Runnable() {...},22,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.impl,FullScreenAdService.new TimerTask() {...},26,0,2,0,7,0,3,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.new FileTree() {...},66,0,8,0,13,0,6,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.new Runnable() {...},37,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.new Runnable() {...},25,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.new ActionListener() {...},46,0,6,0,7,0,5,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.new ActionListener() {...},54,0,5,0,9,0,5,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.new Runnable() {...},27,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.new Runnable() {...},37,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.impl,CodenameOneImplementation.5.2.new ActionListener() {...},22,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.contacts,ContactsManager,64,0,0,0,13,0,12,0,12,0
+codenameone-core-unittests,com.codename1.contacts,ContactsModel.new Runnable() {...},36,0,0,0,6,0,2,0,2,0
+codenameone-core-unittests,com.codename1.contacts,Address,38,0,0,0,17,0,11,0,11,0
+codenameone-core-unittests,com.codename1.contacts,ContactsModel.1.new Runnable() {...},17,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.contacts,ContactsModel,265,0,30,0,72,0,24,0,9,0
+codenameone-core-unittests,com.codename1.contacts,Contact,206,0,30,0,64,0,43,0,28,0
+codenameone-core-unittests,com.codename1.processing,JSONContent,24,12,0,0,4,4,2,2,2,2
+codenameone-core-unittests,com.codename1.processing,PrettyPrinter,241,311,67,39,53,71,49,21,3,11
+codenameone-core-unittests,com.codename1.processing,EvaluatorFactory,13,100,2,18,3,21,3,10,1,2
+codenameone-core-unittests,com.codename1.processing,TextEvaluator,215,4,40,0,56,2,25,1,5,1
+codenameone-core-unittests,com.codename1.processing,AttributeEvaluator,120,30,28,4,37,10,18,3,3,2
+codenameone-core-unittests,com.codename1.processing,ContainsEvaluator,2,90,2,14,1,21,2,9,0,3
+codenameone-core-unittests,com.codename1.processing,ResultTokenizer,5,242,2,40,1,57,2,26,0,7
+codenameone-core-unittests,com.codename1.processing,XMLContent,75,95,7,7,17,21,12,10,6,9
+codenameone-core-unittests,com.codename1.processing,Result,320,666,65,90,65,160,60,47,8,21
+codenameone-core-unittests,com.codename1.processing,AbstractEvaluator,208,348,45,46,53,77,39,31,9,14
+codenameone-core-unittests,com.codename1.processing,IndexEvaluator,107,97,23,15,27,25,18,9,1,7
+codenameone-core-unittests,com.codename1.processing,MapContent,193,311,41,47,45,77,39,24,7,12
+codenameone-core-unittests,com.codename1.processing,SubContent,78,38,11,3,21,10,14,3,8,2
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent.new Runnable() {...},0,48,0,0,0,5,0,2,0,2
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent.new Runnable() {...},0,20,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent.new Runnable() {...},0,38,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent.new Runnable() {...},0,38,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent.new ActionListener() {...},6,6,0,0,2,1,1,1,1,1
+codenameone-core-unittests,com.codename1.testing,AbstractTest,451,4,0,0,213,2,111,2,111,2
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent,4,203,2,10,2,42,2,9,0,5
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent.4.new ActionListener() {...},11,6,0,0,3,1,1,1,1,1
+codenameone-core-unittests,com.codename1.testing,DeviceRunner.new Runnable() {...},0,49,0,2,0,13,0,3,0,2
+codenameone-core-unittests,com.codename1.testing,DeviceRunner,45,160,7,13,14,40,7,6,0,3
+codenameone-core-unittests,com.codename1.testing,TestReporting,8,122,0,8,6,29,4,13,4,9
+codenameone-core-unittests,com.codename1.testing,TestRunnerComponent.1.new Runnable() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.testing,TestUtils,4439,362,476,66,716,120,364,45,112,26
+codenameone-core-unittests,com.codename1.testing,TestUtils.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.testing,TestUtils.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.testing,TestUtils.new Runnable() {...},1,12,0,0,1,4,0,2,0,2
+codenameone-core-unittests,com.codename1.testing,TestUtils.new Runnable() {...},10,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.testing,TestUtils.new Runnable() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.xml,Element,570,318,127,35,159,77,98,30,25,22
+codenameone-core-unittests,com.codename1.xml,XMLWriter,284,198,41,11,66,34,27,6,2,5
+codenameone-core-unittests,com.codename1.xml,XMLParser,986,523,196,98,218,158,143,33,18,11
+codenameone-core-unittests,com.codename1.facebook,Page,124,0,4,0,34,0,15,0,13,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.Listener,25,0,4,0,9,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FBObject,74,0,10,0,23,0,14,0,9,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess,1805,68,138,0,368,18,131,5,62,5
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},25,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},24,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},21,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},21,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},37,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},25,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},24,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},21,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},37,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},37,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},24,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,Album,137,0,4,0,36,0,16,0,14,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},23,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},35,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},25,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},25,0,4,0,6,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},24,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},37,0,4,0,8,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},21,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},24,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FaceBookAccess.new ActionListener() {...},21,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.facebook,Photo,194,0,12,0,51,0,22,0,16,0
+codenameone-core-unittests,com.codename1.facebook,Post,217,0,16,0,53,0,25,0,17,0
+codenameone-core-unittests,com.codename1.facebook,FacebookRESTService.new Vector() {...},20,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.facebook,FacebookRESTService.new Vector() {...},51,0,4,0,11,0,4,0,2,0
+codenameone-core-unittests,com.codename1.facebook,User,257,0,18,0,65,0,30,0,21,0
+codenameone-core-unittests,com.codename1.facebook,FacebookRESTService,526,0,54,0,133,0,53,0,26,0
+codenameone-core-unittests,com.codename1.ui.painter,PainterChain,231,0,24,0,55,0,20,0,8,0
+codenameone-core-unittests,com.codename1.ui.painter,BackgroundPainter,113,0,16,0,26,0,10,0,2,0
+codenameone-core-unittests,com.codename1.charts.renderers,DefaultRenderer,300,167,3,1,117,53,76,11,74,11
+codenameone-core-unittests,com.codename1.charts.renderers,XYMultipleSeriesRenderer.Orientation,3,37,0,0,1,6,1,2,1,2
+codenameone-core-unittests,com.codename1.charts.renderers,BasicStroke,79,0,0,0,15,0,7,0,7,0
+codenameone-core-unittests,com.codename1.charts.renderers,DialRenderer,109,0,6,0,34,0,20,0,17,0
+codenameone-core-unittests,com.codename1.charts.renderers,XYSeriesRenderer.FillOutsideLine.Type,64,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.charts.renderers,XYSeriesRenderer,156,41,6,0,53,13,34,1,31,1
+codenameone-core-unittests,com.codename1.charts.renderers,XYMultipleSeriesRenderer,561,479,16,20,155,111,104,41,93,34
+codenameone-core-unittests,com.codename1.charts.renderers,SimpleSeriesRenderer,68,22,0,0,28,8,18,3,18,3
+codenameone-core-unittests,com.codename1.charts.renderers,DialRenderer.Type,24,0,0,0,2,0,1,0,1,0
+codenameone-core-unittests,com.codename1.charts.renderers,XYSeriesRenderer.FillOutsideLine,30,0,0,0,11,0,6,0,6,0
+codenameone-core-unittests,com.codename1.cloud,CloudListModel.new CloudResponse() {...},113,0,6,0,17,0,6,0,3,0
+codenameone-core-unittests,com.codename1.cloud,CloudListModel.new CloudResponse() {...},45,0,2,0,7,0,4,0,3,0
+codenameone-core-unittests,com.codename1.cloud,CloudImageProperty.new ConnectionRequest() {...},86,0,6,0,13,0,6,0,3,0
+codenameone-core-unittests,com.codename1.cloud,CloudException,31,0,0,0,7,0,3,0,3,0
+codenameone-core-unittests,com.codename1.cloud,CloudImageProperty,84,0,8,0,24,0,7,0,3,0
+codenameone-core-unittests,com.codename1.cloud,CloudObject.new BindTarget() {...},67,0,6,0,13,0,6,0,2,0
+codenameone-core-unittests,com.codename1.cloud,CloudPersona,10,0,0,0,6,0,6,0,6,0
+codenameone-core-unittests,com.codename1.cloud,CloudListModel,588,0,50,0,140,0,53,0,28,0
+codenameone-core-unittests,com.codename1.cloud,CloudObject,891,0,104,0,221,0,107,0,55,0
+codenameone-core-unittests,com.codename1.cloud,CloudStorage,61,0,2,0,37,0,36,0,35,0
+codenameone-core-unittests,com.codename1.codescan,CodeScanner,6,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithIOException() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},11,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},16,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},17,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},17,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},17,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},17,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},17,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},16,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new RunnableWithResultSync() {...},16,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new RunnableWithResultSync() {...},17,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},21,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new Runnable() {...},19,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},28,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},23,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},28,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.new ThreadSafeDatabase.RunnableWithIOException() {...},21,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase,159,0,4,0,36,0,16,0,14,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper,124,0,0,0,16,0,13,0,13,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},17,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},17,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},16,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.CursorWrapper.new ThreadSafeDatabase.RunnableWithResponseOrIOException() {...},12,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.db,ThreadSafeDatabase.RowWrapper,95,0,0,0,11,0,9,0,9,0
+codenameone-core-unittests,com.codename1.db,Database,163,0,26,0,41,0,24,0,11,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.4.new Functor() {...},39,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.7.new AsyncResult() {...},26,0,2,0,5,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.3.new Functor() {...},50,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.3.new Functor() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.1.new Runnable() {...},18,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.State,34,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.2.new Runnable() {...},18,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Functor() {...},9,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Functor() {...},8,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Functor() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new SuccessCallback() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new SuccessCallback() {...},14,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Runnable() {...},22,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new SuccessCallback() {...},34,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new SuccessCallback() {...},35,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise,346,0,29,0,71,0,35,0,19,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new ExecutorFunction() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new ExecutorFunction() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Functor() {...},15,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Runnable() {...},20,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Functor() {...},35,0,2,0,8,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new ExecutorFunction() {...},56,0,4,0,12,0,4,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new Functor() {...},35,0,2,0,8,0,3,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new ExecutorFunction() {...},12,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.util.promise,Promise.new ExecutorFunction() {...},44,0,4,0,9,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.animations,BubbleTransition,789,0,54,0,152,0,46,0,19,0
+codenameone-core-unittests,com.codename1.ui.animations,AnimationObject,594,0,49,0,150,0,53,0,28,0
+codenameone-core-unittests,com.codename1.ui.animations,Timeline,607,0,56,0,137,0,59,0,31,0
+codenameone-core-unittests,com.codename1.ui.animations,ComponentAnimation.CompoundAnimation,266,9,36,0,51,4,24,1,6,1
+codenameone-core-unittests,com.codename1.ui.animations,ComponentAnimation.UIMutation,71,14,10,0,16,3,8,1,3,1
+codenameone-core-unittests,com.codename1.ui.animations,Transition,146,39,28,4,35,11,23,4,7,4
+codenameone-core-unittests,com.codename1.ui.animations,MorphTransition,59,475,8,26,18,99,8,18,1,8
+codenameone-core-unittests,com.codename1.ui.animations,MorphTransition.CC,0,88,0,2,0,19,0,3,0,2
+codenameone-core-unittests,com.codename1.ui.animations,FlipTransition,487,317,37,11,89,75,26,15,3,13
+codenameone-core-unittests,com.codename1.ui.animations,Motion,917,447,64,29,170,88,59,29,21,18
+codenameone-core-unittests,com.codename1.ui.animations,CommonTransitions,2469,380,312,35,527,106,186,39,17,27
+codenameone-core-unittests,com.codename1.ui.animations,ComponentAnimation,72,51,10,8,21,18,16,5,9,3
+codenameone-core-unittests,com.codename1.ui.util,UIBuilder,4540,0,760,0,1193,0,519,0,98,0
+codenameone-core-unittests,com.codename1.ui.util,UITimer,98,0,6,0,28,0,10,0,7,0
+codenameone-core-unittests,com.codename1.ui.util,GlassTutorial,262,0,14,0,62,0,11,0,4,0
+codenameone-core-unittests,com.codename1.ui.util,EventDispatcher,635,238,91,39,136,60,65,24,12,12
+codenameone-core-unittests,com.codename1.ui.util,LazyValueC.new ActionListener() {...},16,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,EventDispatcher.CallbackClass,190,0,16,0,29,0,10,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.ManualMotion,50,0,2,0,12,0,4,0,3,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport,119,0,2,0,30,0,6,0,5,0
+codenameone-core-unittests,com.codename1.ui.util,UITimer.Internal,21,0,2,0,7,0,5,0,4,0
+codenameone-core-unittests,com.codename1.ui.util,Resources,3602,525,480,41,762,131,314,47,50,28
+codenameone-core-unittests,com.codename1.ui.util,UIBuilder.FormListener,357,0,42,0,95,0,27,0,6,0
+codenameone-core-unittests,com.codename1.ui.util,Resources.new Object() {...},6,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.util,EmbeddedContainer,13,0,0,0,5,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.2.new Animation() {...},94,0,8,0,14,0,7,0,3,0
+codenameone-core-unittests,com.codename1.ui.util,GlassTutorial.new Dialog() {...},9,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,Effects,560,0,28,0,88,0,24,0,10,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.new Form() {...},8,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.new LazyValue() {...},27,0,0,0,2,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.new Painter() {...},18,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.new ActionListener() {...},94,0,10,0,17,0,7,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.new ActionListener() {...},53,0,4,0,12,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,SwipeBackSupport.new ActionListener() {...},48,0,4,0,7,0,4,0,2,0
+codenameone-core-unittests,com.codename1.ui.util,WeakHashMap,89,8,6,0,23,2,15,1,12,1
+codenameone-core-unittests,com.codename1.ui.util,ImageIO,164,6,22,0,40,2,15,2,4,2
+codenameone-core-unittests,com.codename1.ui.util,LazyValueC,72,0,2,0,16,0,3,0,2,0
+codenameone-core-unittests,com.codename1.ui.scene,Node.RenderableContainer,69,0,0,0,18,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.scene,Point3D,33,0,0,0,14,0,7,0,7,0
+codenameone-core-unittests,com.codename1.ui.scene,Node,871,0,62,0,166,0,66,0,35,0
+codenameone-core-unittests,com.codename1.ui.scene,TextPainter,138,0,10,0,39,0,12,0,6,0
+codenameone-core-unittests,com.codename1.ui.scene,Camera,21,0,0,0,5,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.scene,PerspectiveCamera,358,0,0,0,40,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.scene,Scene,88,0,6,0,27,0,7,0,4,0
+codenameone-core-unittests,com.codename1.ui.scene,Bounds,63,0,0,0,26,0,13,0,13,0
+codenameone-core-unittests,com.codename1.l10n,DateFormat,186,14,20,0,45,6,27,2,17,2
+codenameone-core-unittests,com.codename1.l10n,DateFormatSymbols,393,587,47,35,89,102,46,26,17,14
+codenameone-core-unittests,com.codename1.l10n,SimpleDateFormat,1005,1407,175,159,205,289,135,87,6,34
+codenameone-core-unittests,com.codename1.l10n,DateFormatPatterns,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.l10n,ParseException,23,7,4,0,6,3,5,1,3,1
+codenameone-core-unittests,com.codename1.l10n,Format,0,3,0,0,0,1,0,1,0,1
+codenameone-core-unittests,com.codename1.l10n,L10NManager,281,12,32,0,61,5,40,2,24,2
+codenameone-core-unittests,com.codename1.facebook.ui,LikeButton,277,0,26,0,72,0,31,0,18,0
+codenameone-core-unittests,com.codename1.maps.providers,MapProvider,81,0,6,0,19,0,10,0,7,0
+codenameone-core-unittests,com.codename1.maps.providers,OpenStreetMapProvider,16,0,0,0,4,0,3,0,3,0
+codenameone-core-unittests,com.codename1.maps.providers,TiledProvider,214,0,0,0,26,0,9,0,9,0
+codenameone-core-unittests,com.codename1.maps.providers,GoogleMapsProvider,185,0,6,0,42,0,15,0,12,0
+codenameone-core-unittests,com.codename1.io.gzip,InfBlocks,1474,626,141,27,291,107,88,10,3,5
+codenameone-core-unittests,com.codename1.io.gzip,StaticTree,0,2596,0,0,0,12,0,2,0,2
+codenameone-core-unittests,com.codename1.io.gzip,JZlib.NONE,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io.gzip,GZIPHeader,166,196,18,18,31,54,15,16,1,12
+codenameone-core-unittests,com.codename1.io.gzip,FilterInputStream,37,13,0,0,11,4,8,2,8,2
+codenameone-core-unittests,com.codename1.io.gzip,JZlib.GZIP,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io.gzip,InfTree,780,7074,100,0,148,18,54,3,4,3
+codenameone-core-unittests,com.codename1.io.gzip,JZlib.ANY,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io.gzip,CRC32,162,86,18,8,43,20,15,9,6,5
+codenameone-core-unittests,com.codename1.io.gzip,GZIPOutputStream,10,87,2,2,2,25,2,10,0,10
+codenameone-core-unittests,com.codename1.io.gzip,Deflater,196,73,24,6,41,22,27,7,13,6
+codenameone-core-unittests,com.codename1.io.gzip,GZIPInputStream,64,187,7,15,13,45,5,16,0,10
+codenameone-core-unittests,com.codename1.io.gzip,Deflate,2262,1770,339,139,386,319,227,60,20,27
+codenameone-core-unittests,com.codename1.io.gzip,Inflater,167,50,23,5,40,15,27,5,14,4
+codenameone-core-unittests,com.codename1.io.gzip,Deflate.Config,0,18,0,0,0,7,0,1,0,1
+codenameone-core-unittests,com.codename1.io.gzip,DeflaterOutputStream,129,147,29,20,33,41,33,7,10,5
+codenameone-core-unittests,com.codename1.io.gzip,Tree,132,4239,18,34,20,83,12,21,1,6
+codenameone-core-unittests,com.codename1.io.gzip,GZConnectionRequest,41,7,8,0,9,3,6,2,2,2
+codenameone-core-unittests,com.codename1.io.gzip,GZIPException,3,4,0,0,2,2,1,1,1,1
+codenameone-core-unittests,com.codename1.io.gzip,JZlib.ZLIB,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io.gzip,Inflate,963,907,164,75,218,184,121,24,5,10
+codenameone-core-unittests,com.codename1.io.gzip,Inflate.Return,0,9,0,0,0,3,0,1,0,1
+codenameone-core-unittests,com.codename1.io.gzip,InflaterInputStream,334,136,56,19,85,38,52,5,16,3
+codenameone-core-unittests,com.codename1.io.gzip,Adler32,245,16,16,0,43,6,13,2,5,2
+codenameone-core-unittests,com.codename1.io.gzip,JZlib.WrapperType,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.io.gzip,ZStream,382,194,60,14,96,42,79,8,43,7
+codenameone-core-unittests,com.codename1.io.gzip,InfCodes,1527,592,129,28,289,119,76,13,0,6
+codenameone-core-unittests,com.codename1.io.gzip,FilterOutputStream,28,13,2,0,9,5,5,2,4,2
+codenameone-core-unittests,com.codename1.io.gzip,JZlib,32,0,0,0,8,0,5,0,5,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},48,0,6,0,11,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},22,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},22,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},90,0,6,0,21,0,5,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},54,0,4,0,12,0,4,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},46,0,4,0,9,0,4,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},37,0,2,0,8,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new ActionListener() {...},59,0,2,0,14,0,3,0,2,0
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.new Data() {...},7,16,0,0,1,3,1,2,1,2
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder.Connection,110,93,16,10,28,22,11,6,0,4
+codenameone-core-unittests,com.codename1.io.rest,RequestBuilder,479,428,14,32,129,106,41,35,31,22
+codenameone-core-unittests,com.codename1.io.rest,Response,0,21,0,0,0,8,0,4,0,4
+codenameone-core-unittests,com.codename1.io.rest,Rest,45,0,0,0,8,0,8,0,8,0
+codenameone-core-unittests,com.codename1.payment,ApplePromotionalOffer,38,0,0,0,16,0,11,0,11,0
+codenameone-core-unittests,com.codename1.payment,Purchase.new Runnable() {...},0,10,0,0,0,3,0,2,0,2
+codenameone-core-unittests,com.codename1.payment,Purchase.new SuccessCallback() {...},0,15,0,0,0,4,0,2,0,2
+codenameone-core-unittests,com.codename1.payment,Purchase.new Runnable() {...},34,0,2,0,10,0,3,0,2,0
+codenameone-core-unittests,com.codename1.payment,Purchase.new SuccessCallback() {...},0,35,0,0,0,7,0,2,0,2
+codenameone-core-unittests,com.codename1.payment,Purchase.new SuccessCallback() {...},0,40,0,2,0,8,0,3,0,2
+codenameone-core-unittests,com.codename1.payment,Purchase.new SuccessCallback() {...},35,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.payment,Purchase.new SuccessCallback() {...},7,31,1,1,2,7,1,2,0,2
+codenameone-core-unittests,com.codename1.payment,Purchase.new Runnable() {...},34,0,2,0,10,0,3,0,2,0
+codenameone-core-unittests,com.codename1.payment,Receipt,96,194,0,2,19,55,5,24,5,23
+codenameone-core-unittests,com.codename1.payment,Product,31,0,0,0,13,0,9,0,9,0
+codenameone-core-unittests,com.codename1.payment,Purchase,171,620,30,62,50,158,50,44,22,26
+codenameone-core-unittests,com.codename1.system,Lifecycle.new ActionListener() {...},11,0,0,0,3,0,2,0,2,0
+codenameone-core-unittests,com.codename1.system,Lifecycle,105,0,6,0,36,0,16,0,13,0
+codenameone-core-unittests,com.codename1.system,DefaultCrashReporter,201,0,22,0,61,0,23,0,12,0
+codenameone-core-unittests,com.codename1.system,DefaultCrashReporter.new TimerTask() {...},12,0,2,0,6,0,3,0,2,0
+codenameone-core-unittests,com.codename1.system,NativeLookup,55,0,8,0,18,0,9,0,5,0
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout.ComponentSide,6,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.BaselineGroup,555,0,87,0,143,0,57,0,12,0
+codenameone-core-unittests,com.codename1.ui.layouts,TextModeLayout,176,0,18,0,42,0,25,0,16,0
+codenameone-core-unittests,com.codename1.ui.layouts,LayoutStyle,215,0,48,0,52,0,39,0,12,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.SpringDelta,36,0,0,0,6,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagConstraints,486,0,110,0,59,0,59,0,4,0
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout.Segment,12,0,0,0,4,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.ComponentSpring,299,0,42,0,74,0,40,0,19,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.AutopaddingSpring,338,0,38,0,86,0,38,0,19,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout,1280,0,166,0,309,0,130,0,46,0
+codenameone-core-unittests,com.codename1.ui.layouts,LayeredLayout.LayeredLayoutConstraint.Inset,1674,542,225,55,314,117,172,37,36,17
+codenameone-core-unittests,com.codename1.ui.layouts,LayeredLayout,570,577,59,31,109,117,71,37,36,27
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout.RelativeTranslator,510,0,56,0,97,0,35,0,7,0
+codenameone-core-unittests,com.codename1.ui.layouts,BoxLayout,128,611,31,51,24,138,24,42,0,23
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.LinkInfo,142,0,14,0,36,0,13,0,6,0
+codenameone-core-unittests,com.codename1.ui.layouts,BorderLayout,421,1034,74,104,91,230,54,86,3,45
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.ContainerAutopaddingSpring,232,0,26,0,57,0,19,0,6,0
+codenameone-core-unittests,com.codename1.ui.layouts,Insets,133,0,12,0,19,0,13,0,7,0
+codenameone-core-unittests,com.codename1.ui.layouts,FlowLayout,167,873,23,60,25,170,20,58,0,35
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayoutInfo,16,0,0,0,7,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.AutopaddingMatch,34,0,0,0,6,0,3,0,3,0
+codenameone-core-unittests,com.codename1.ui.layouts,LayeredLayout.new Comparator() {...},36,0,8,0,10,0,6,0,2,0
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout.Grid.GridSide,912,0,76,0,170,0,64,0,26,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.ComponentInfo,247,0,44,0,68,0,37,0,15,0
+codenameone-core-unittests,com.codename1.ui.layouts,Layout,84,23,13,3,22,8,15,7,7,7
+codenameone-core-unittests,com.codename1.ui.layouts,LayeredLayout.LayeredLayoutConstraint,1972,169,230,9,369,27,146,11,27,9
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout,1200,0,113,0,262,0,93,0,31,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.GapSpring,48,0,4,0,14,0,7,0,5,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.PaddingSpring,61,0,4,0,17,0,8,0,6,0
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout.Grid,183,0,0,0,29,0,15,0,15,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.SequentialGroup,1026,0,178,0,228,0,112,0,23,0
+codenameone-core-unittests,com.codename1.ui.layouts,GridLayout,121,509,36,52,21,116,29,36,0,21
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout.ParentInfo,35,0,0,0,8,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.layouts,CoordinateLayout,0,128,0,6,0,34,0,9,0,6
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.Group,301,0,42,0,68,0,36,0,14,0
+codenameone-core-unittests,com.codename1.ui.layouts,GridBagLayout.MixedConstraints,37,0,4,0,5,0,3,0,1,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.Spring,124,0,12,0,31,0,21,0,15,0
+codenameone-core-unittests,com.codename1.ui.layouts,GroupLayout.ParallelGroup,294,0,35,0,60,0,35,0,17,0
+codenameone-core-unittests,com.codename1.ui.events,MessageEvent.PromptPromise,3,0,0,0,1,0,1,0,1,0
+codenameone-core-unittests,com.codename1.ui.events,ActionEvent,302,106,20,2,84,31,31,8,20,8
+codenameone-core-unittests,com.codename1.ui.events,MessageEvent,50,0,10,0,11,0,11,0,6,0
+codenameone-core-unittests,com.codename1.ui.events,ComponentStateChangeEvent,10,0,0,0,4,0,2,0,2,0
+codenameone-core-unittests,com.codename1.ui.events,ActionEvent.Type,0,274,0,0,0,28,0,1,0,1

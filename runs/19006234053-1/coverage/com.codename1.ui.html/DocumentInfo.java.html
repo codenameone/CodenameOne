@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocumentInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.html</a> &gt; <span class="el_source">DocumentInfo.java</span></div><h1>DocumentInfo.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.html;
+
+/**
+ * DocumentInfo holds important information about a document that is loading.
+ * This class is constructed internally by HTMLComponent and HTMLForm and is sent to the RequestHandler.
+ * It is intended for the RequestHandler to use and update (For example update encoding according to the HTTP response, update URL in case of a redirect etc.)
+ *
+ * @author Ofir Leitner
+ */
+public class DocumentInfo {
+
+    /**
+     * ISO-8859-1 encoding, the default one
+     */
+    public final static String ENCODING_ISO = &quot;ISO-8859-1&quot;;
+
+    /**
+     * UTF8 encoding, very common
+     */
+    public final static String ENCODING_UTF8 = &quot;UTF-8&quot;;
+
+    /**
+     * Indicates that the request is for a page
+     */
+<span class="nc" id="L48">    public static int TYPE_HTML = 0;</span>
+
+    /**
+     * Indicates that the request is for an image
+     */
+<span class="nc" id="L53">    public static int TYPE_IMAGE = 1;</span>
+
+    /**
+     * Indicates that the request is for a CSS file
+     */
+<span class="nc" id="L58">    public static int TYPE_CSS = 2;</span>
+
+<span class="nc" id="L60">    private static String DEFAULT_ENCODING = ENCODING_ISO;</span>
+
+    private String pageURL;
+    private String baseURL;
+    private String hostURL;
+    private String protocol;
+
+    private String params;
+    private boolean postRequest;
+<span class="nc" id="L69">    private String encoding = DEFAULT_ENCODING;</span>
+<span class="nc" id="L70">    private int expectedContentType = TYPE_HTML;</span>
+
+    /**
+     * Constructs the DocumentInfo with the given URL
+     *
+     * @param url The URL of the document
+     */
+<span class="nc" id="L77">    DocumentInfo(String url) {</span>
+<span class="nc" id="L78">        setUrl(url);</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * Constructs the DocumentInfo with the given URL
+     *
+     * @param url The URL of the document
+     */
+<span class="nc" id="L86">    DocumentInfo(String url, int type) {</span>
+<span class="nc" id="L87">        setUrl(url);</span>
+<span class="nc" id="L88">        expectedContentType = type;</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Constructs the DocumentInfo with the given URL
+     *
+     * @param url         The URL of the document
+     * @param params      The parameters
+     * @param postRequest true if this is a POST request, false otherwise (i.e. GET)
+     */
+<span class="nc" id="L98">    DocumentInfo(String url, String params, boolean postRequest) {</span>
+<span class="nc" id="L99">        this.params = params;</span>
+<span class="nc" id="L100">        this.postRequest = postRequest;</span>
+<span class="nc" id="L101">        setUrl(url);</span>
+<span class="nc" id="L102">    }</span>
+
+    /**
+     * Sets the default encoding for the document e.g. ENCODING_UTF8
+     *
+     * @param encoding the encoding string matching ISO standards
+     */
+    public static void setDefaultEncoding(String encoding) {
+<span class="nc" id="L110">        DEFAULT_ENCODING = encoding;</span>
+<span class="nc" id="L111">    }</span>
+
+    /**
+     * Check if the specified URL is an absolute URL
+     *
+     * @param url the URL to check
+     * @return true if the specified URL is an absolute URL, false otherwise
+     */
+    static boolean isAbsoluteURL(String url) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        return (url.substring(0, Math.min(10, url.length())).indexOf(&quot;://&quot;) != -1); //Absolute URL - check only the start of the string for a case where a    parameter is ....&amp;url=http://..</span>
+    }
+
+    /**
+     * Returns the absolute URL associated with this DocumentInfo object
+     *
+     * @return the absolute URL associated with this DocumentInfo object
+     */
+    public String getUrl() {
+<span class="nc" id="L129">        return pageURL;</span>
+    }
+
+    /**
+     * Sets the URL to the specified URL
+     *
+     * @param url the URL to set as the URL of the document
+     */
+    public void setUrl(String url) {
+<span class="nc" id="L138">        pageURL = convertURL(url);</span>
+
+<span class="nc" id="L140">        int index = pageURL.lastIndexOf('/');</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (index == -1) {</span>
+<span class="nc" id="L142">            setBaseURL(&quot;&quot;);</span>
+<span class="nc" id="L143">            hostURL = &quot;&quot;;</span>
+<span class="nc" id="L144">            protocol = &quot;&quot;;</span>
+        } else {
+<span class="nc" id="L146">            int questionMark = pageURL.lastIndexOf('?');</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            if (questionMark &gt; -1) {</span>
+<span class="nc" id="L148">                setBaseURL(pageURL.substring(0, questionMark));</span>
+            } else {
+<span class="nc" id="L150">                setBaseURL(pageURL.substring(0, index + 1));</span>
+            }
+<span class="nc" id="L152">            index = pageURL.indexOf(&quot;://&quot;);</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (index != -1) {</span>
+<span class="nc" id="L154">                protocol = pageURL.substring(0, index + 1); //The protocol will be http: , ftp: (without the //)</span>
+            }
+<span class="nc" id="L156">            index = pageURL.indexOf('/', index + 3);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (index != -1) {</span>
+<span class="nc" id="L158">                hostURL = pageURL.substring(0, index);</span>
+            } else {
+<span class="nc" id="L160">                hostURL = pageURL;</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (!protocol.startsWith(&quot;file&quot;)) { // for file the following is not relevant as &quot;0file:///filename&quot; means the base url is file:///</span>
+<span class="nc" id="L162">                    setBaseURL(pageURL + &quot;/&quot;); // The url was a domain without folder and missing a trailing / - i.e. http://www.sun.com</span>
+                }
+
+            }
+        }
+<span class="nc" id="L167">    }</span>
+
+    /**
+     * Returns the full url string including parameters in GET request
+     *
+     * @return the full url string including parameters in GET request
+     */
+    public String getFullUrl() {
+<span class="nc bnc" id="L175" title="All 6 branches missed.">        if ((postRequest) || (params == null) || (params.equals(&quot;&quot;))) {</span>
+<span class="nc" id="L176">            return pageURL;</span>
+        } else {
+<span class="nc" id="L178">            return pageURL + &quot;?&quot; + params;</span>
+        }
+    }
+
+    /**
+     * Returns the expected content type, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
+     *
+     * @return the expected content type, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
+     */
+    public int getExpectedContentType() {
+<span class="nc" id="L188">        return expectedContentType;</span>
+    }
+
+    /**
+     * Sets this expected content type to be either TYPE_HTML, TYPE_IMAGE or TYPE_CSS
+     * When the document itself is requested the type will be TYPE_HTML and when images in the document are requested the type will be TYPE_IMAGE
+     * The differentiation is important to handle cases in which the HTMLComponent expects one type but the URL is has a resource of another type
+     *
+     * @param requestType the requestType to set, one of TYPE_HTML, TYPE_IMAGE or TYPE_CSS
+     */
+    public void setExpectedContentType(int requestType) {
+<span class="nc" id="L199">        this.expectedContentType = requestType;</span>
+<span class="nc" id="L200">    }</span>
+
+    /**
+     * Returns whether this document request is a POST request or not
+     *
+     * @return true if the document was requested via POST, false otherwise
+     */
+    public boolean isPostRequest() {
+<span class="nc" id="L208">        return postRequest;</span>
+    }
+
+    /**
+     * Sets this DocumentInfo as using a POST request or not
+     *
+     * @param postRequest true if this is a POST request, false otherwise
+     */
+    public void setPostRequest(boolean postRequest) {
+<span class="nc" id="L217">        this.postRequest = postRequest;</span>
+<span class="nc" id="L218">    }</span>
+
+    /**
+     * Returns the request paramter as a percentage-encoded string
+     *
+     * @return the request paramter as an encoded string
+     */
+    public String getParams() {
+<span class="nc" id="L226">        return params;</span>
+    }
+
+    /**
+     * Sets the request paramters of this request
+     *
+     * @param params The request paramters to set, should be as a percentage encoded string
+     */
+    public void setParams(String params) {
+<span class="nc" id="L235">        this.params = params;</span>
+<span class="nc" id="L236">    }</span>
+
+    /**
+     * Returns a string describing the document's encoding
+     *
+     * @return the document's encoding
+     */
+    public String getEncoding() {
+<span class="nc" id="L244">        return encoding;</span>
+    }
+
+    /**
+     * Sets the document encoding (This can be determined via the charset attribute in the response)
+     *
+     * @param encoding the encoding to set. It is recommended to use the ENCODING_* constants when possible to avoid typos
+     */
+    public void setEncoding(String encoding) {
+<span class="nc" id="L253">        this.encoding = encoding;</span>
+<span class="nc" id="L254">    }</span>
+
+    /**
+     * Converts the given URL to an absolute URL based on the current page's URL
+     *
+     * @param url The url to convert (Can be relative)
+     * @return The absolute URL representing the given URL in relation to the current one.
+     */
+    String convertURL(String url) {
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L264">            return pageURL; //Refresh</span>
+        }
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (isAbsoluteURL(url)) {</span>
+<span class="nc" id="L267">            return url; //Absolute URL</span>
+        } else {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (url.startsWith(&quot;//&quot;)) { // Take just the protocol from the original url</span>
+<span class="nc" id="L270">                return protocol + url;</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            } else if (url.startsWith(&quot;/&quot;)) { // Host name root</span>
+<span class="nc" id="L272">                return hostURL + url;</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            } else if (url.startsWith(&quot;.&quot;)) { // Back or current folder</span>
+<span class="nc" id="L274">                int back = 0;</span>
+<span class="nc bnc" id="L275" title="All 4 branches missed.">                while ((url.length() &gt; 0) &amp;&amp; (url.charAt(0) == '.')) {</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                    if (url.startsWith(&quot;./&quot;)) { // Same folder</span>
+<span class="nc" id="L277">                        url = url.substring(2);</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                    } else if (url.startsWith(&quot;../&quot;)) { // Go one folder up</span>
+<span class="nc" id="L279">                        url = url.substring(3);</span>
+<span class="nc" id="L280">                        back++;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                    } else if (url.equals(&quot;..&quot;)) {</span>
+<span class="nc" id="L282">                        url = &quot;&quot;;</span>
+<span class="nc" id="L283">                        back++;</span>
+                    } else { // either &quot;.&quot; or something else not-understandable (resting the URL gets us out of the loop)
+<span class="nc" id="L285">                        url = &quot;&quot;;</span>
+                    }
+                }
+<span class="nc" id="L288">                String folder = getBaseURL().substring(hostURL.length() + 1); //+1 in order not to include the /</span>
+<span class="nc bnc" id="L289" title="All 4 branches missed.">                while ((back &gt; 0) &amp;&amp; (folder.length() &gt; 0)) {</span>
+<span class="nc" id="L290">                    back--;</span>
+<span class="nc" id="L291">                    folder = folder.substring(0, folder.length() - 1);</span>
+<span class="nc" id="L292">                    int index = folder.lastIndexOf('/');</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">                    if (index == -1) {</span>
+<span class="nc" id="L294">                        folder = &quot;&quot;;</span>
+                    } else {
+<span class="nc" id="L296">                        folder = folder.substring(0, index + 1); // +1 to include the '/'</span>
+                    }
+<span class="nc" id="L298">                }</span>
+<span class="nc" id="L299">                return hostURL + &quot;/&quot; + folder + url;</span>
+            } else { // Relative URL
+<span class="nc" id="L301">                return getBaseURL() + url;</span>
+            }
+        }
+    }
+
+    /**
+     * Returns the base URL for this document
+     *
+     * @return the baseURL
+     */
+    public String getBaseURL() {
+<span class="nc" id="L312">        return baseURL;</span>
+    }
+
+    /**
+     * Sets the base URL for this document. Usually this is deduced automatically from the page URL, but in some cases this is different, for example when an HREF attribute is provided in the BASE tag
+     *
+     * @param baseURL the baseURL to set
+     */
+    public void setBaseURL(String baseURL) {
+<span class="nc" id="L321">        this.baseURL = baseURL;</span>
+<span class="nc" id="L322">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,603 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Log.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Log.java</span></div><h1>Log.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.io;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.impl.CodenameOneThread;
+import com.codename1.ui.Command;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
+
+
+/**
+ * Pluggable logging framework that allows a developer to log into storage
+ * using the file connector API. It is highly recommended to use this
+ * class coupled with Netbeans preprocessing tags to reduce its overhead
+ * completely in runtime.
+ *
+ * @author Shai Almog
+ */
+public class Log {
+    /**
+     * Constant indicating the logging level Debug is the default and the lowest level
+     * followed by info, warning and error
+     */
+    public static final int DEBUG = 1;
+    /**
+     * Constant indicating the logging level Debug is the default and the lowest level
+     * followed by info, warning and error
+     */
+    public static final int INFO = 2;
+    /**
+     * Constant indicating the logging level Debug is the default and the lowest level
+     * followed by info, warning and error
+     */
+    public static final int WARNING = 3;
+    /**
+     * Constant indicating the logging level Debug is the default and the lowest level
+     * followed by info, warning and error
+     */
+    public static final int ERROR = 4;
+    /**
+     * Indicates that log reporting to the cloud should be disabled
+     */
+<span class="fc" id="L78">    public static int REPORTING_NONE = 0;</span>
+    /**
+     * Indicates that log reporting to the cloud should occur regardless of whether an error occurred
+     */
+<span class="fc" id="L82">    public static int REPORTING_DEBUG = 1;</span>
+    /**
+     * Indicates that log reporting to the cloud should occur only if an error occurred
+     */
+<span class="fc" id="L86">    public static int REPORTING_PRODUCTION = 3;</span>
+    private static boolean crashBound;
+<span class="fc" id="L88">    private static Log instance = new Log();</span>
+    private static boolean initialized;
+<span class="fc" id="L90">    private int level = DEBUG;</span>
+<span class="fc" id="L91">    private final long zeroTime = System.currentTimeMillis();</span>
+    private Writer output;
+<span class="fc" id="L93">    private boolean fileWriteEnabled = false;</span>
+<span class="fc" id="L94">    private String fileURL = null;</span>
+    private boolean logDirty;
+<span class="fc" id="L96">    private int reporting = REPORTING_NONE;</span>
+
+    /**
+     * Prevent new Log() syntax. Use getInstance()
+     */
+<span class="fc" id="L101">    protected Log() {</span>
+<span class="fc" id="L102">    }</span>
+
+    /**
+     * Indicates the level of log reporting, this allows developers to send device logs to the cloud
+     * thus tracking crashes or functionality in the device.
+     *
+     * @return one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
+     */
+    public static int getReportingLevel() {
+<span class="nc" id="L111">        return instance.reporting;</span>
+    }
+
+    /**
+     * Indicates the level of log reporting, this allows developers to send device logs to the cloud
+     * thus tracking crashes or functionality in the device.
+     *
+     * @param level one of REPORTING_NONE, REPORTING_DEBUG, REPORTING_PRODUCTION
+     */
+    public static void setReportingLevel(int level) {
+<span class="nc" id="L121">        instance.reporting = level;</span>
+<span class="nc" id="L122">    }</span>
+
+    /**
+     * Returns a server generated unique device id that is cached locally and is only valid per application.
+     * Notice that this device id is specific to your application and to a specific install, it is guaranteed
+     * to be completely unique or -1 if unavailable (which can be due to a network error). Warning: this
+     * method might block while accessing the server!s
+     *
+     * @return a unique device id
+     * @deprecated this will no longer work. Use {@link #getUniqueDeviceKey()}
+     */
+    public static long getUniqueDeviceId() {
+<span class="nc" id="L134">        return -1;</span>
+    }
+
+    /**
+     * Returns a server generated unique device id that is cached locally and is only valid per application.
+     * Notice that this device id is specific to your application and to a specific install, it is guaranteed
+     * to be completely unique or null if unavailable (which can be due to a network error). Warning: this
+     * method might block while accessing the server!s
+     *
+     * @return a unique device id
+     */
+    public static String getUniqueDeviceKey() {
+<span class="nc" id="L146">        String devId = Preferences.get(&quot;DeviceKey__$&quot;, null);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (devId != null) {</span>
+<span class="nc" id="L148">            return devId;</span>
+        }
+
+<span class="nc" id="L151">        devId = Preferences.get(&quot;UDeviceKey__$&quot;, null);</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (devId != null) {</span>
+<span class="nc" id="L153">            return devId;</span>
+        }
+
+<span class="nc" id="L156">        String buildKey = Display.getInstance().getProperty(&quot;build_key&quot;, null);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (buildKey == null) {</span>
+<span class="nc" id="L158">            buildKey = &quot;&quot;;</span>
+        }
+
+        // request the device id from the server
+<span class="nc" id="L162">        com.codename1.io.ConnectionRequest r = new com.codename1.io.ConnectionRequest() {</span>
+            protected void readResponse(java.io.InputStream input) throws java.io.IOException {
+<span class="nc" id="L164">                com.codename1.io.Preferences.set(&quot;UDeviceKey__$&quot;, Util.readToString(input));</span>
+<span class="nc" id="L165">            }</span>
+
+            protected void handleErrorResponseCode(int code, String message) {
+<span class="nc" id="L168">                System.out.print(&quot;Error in sending log to server: &quot; + code + &quot; &quot; + message);</span>
+<span class="nc" id="L169">            }</span>
+
+            protected void handleException(Exception err) {
+<span class="nc" id="L172">                err.printStackTrace();</span>
+<span class="nc" id="L173">            }</span>
+        };
+<span class="nc" id="L175">        r.setPost(true);</span>
+<span class="nc" id="L176">        r.setUrl(Display.getInstance().getProperty(&quot;cloudServerURL&quot;, &quot;https://cloud.codenameone.com/register/device&quot;));</span>
+<span class="nc" id="L177">        r.addArgument(&quot;appName&quot;, Display.getInstance().getProperty(&quot;AppName&quot;, &quot;&quot;));</span>
+<span class="nc" id="L178">        r.addArgument(&quot;buildKey&quot;, buildKey);</span>
+<span class="nc" id="L179">        r.addArgument(&quot;builtByUser&quot;, Display.getInstance().getProperty(&quot;built_by_user&quot;, &quot;&quot;));</span>
+<span class="nc" id="L180">        r.addArgument(&quot;packageName&quot;, Display.getInstance().getProperty(&quot;package_name&quot;, &quot;&quot;));</span>
+<span class="nc" id="L181">        r.addArgument(&quot;appVersion&quot;, Display.getInstance().getProperty(&quot;AppVersion&quot;, &quot;0.1&quot;));</span>
+<span class="nc" id="L182">        r.addArgument(&quot;platformName&quot;, Display.getInstance().getPlatformName());</span>
+        //r.addArgument(&quot;u&quot;, Display.getInstance().getProperty(&quot;udid&quot;, &quot;&quot;));
+<span class="nc" id="L184">        com.codename1.io.NetworkManager.getInstance().addToQueueAndWait(r);</span>
+<span class="nc" id="L185">        return Preferences.get(&quot;UDeviceKey__$&quot;, null);</span>
+    }
+
+    /**
+     * Sends the current log to the cloud. Notice that this method is synchronous and
+     * returns only when the sending completes
+     */
+    public static void sendLog() {
+<span class="nc" id="L193">        sendLogImpl(true);</span>
+<span class="nc" id="L194">    }</span>
+
+    /**
+     * Sends the current log to the cloud and returns immediately
+     */
+    public static void sendLogAsync() {
+<span class="nc" id="L200">        sendLogImpl(true);</span>
+<span class="nc" id="L201">    }</span>
+
+    /**
+     * Sends the current log to the cloud regardless of the reporting level
+     */
+    private static void sendLogImpl(boolean sync) {
+        try {
+            // this can cause a crash
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            if (!Display.isInitialized()) {</span>
+<span class="nc" id="L210">                return;</span>
+            }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            if (!instance.logDirty) {</span>
+<span class="nc" id="L213">                return;</span>
+            }
+<span class="nc" id="L215">            instance.logDirty = false;</span>
+<span class="nc" id="L216">            String devId = getUniqueDeviceKey();</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">            if (devId == null) {</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                if (Display.getInstance().isSimulator()) {</span>
+<span class="nc" id="L219">                    Dialog.show(&quot;Send Log Error&quot;, &quot;Device Not Registered: Sending a log from an unregistered device is impossible&quot;, &quot;OK&quot;, null);</span>
+                } else {
+<span class="nc" id="L221">                    Log.p(&quot;Device Not Registered: Sending a log from an unregistered device is impossible&quot;);</span>
+                }
+<span class="nc" id="L223">                return;</span>
+            }
+<span class="nc" id="L225">            ConnectionRequest r = new ConnectionRequest();</span>
+<span class="nc" id="L226">            r.setPost(false);</span>
+<span class="nc" id="L227">            MultipartRequest m = new MultipartRequest();</span>
+<span class="nc" id="L228">            m.setUrl(&quot;https://crashreport.codenameone.com/CrashReporterEmail/sendCrashReport&quot;);</span>
+<span class="nc" id="L229">            byte[] read = Util.readInputStream(Storage.getInstance().createInputStream(&quot;CN1Log__$&quot;));</span>
+<span class="nc" id="L230">            m.addArgument(&quot;i&quot;, devId);</span>
+<span class="nc" id="L231">            m.addArgument(&quot;u&quot;, Display.getInstance().getProperty(&quot;built_by_user&quot;, &quot;&quot;));</span>
+<span class="nc" id="L232">            m.addArgument(&quot;p&quot;, Display.getInstance().getProperty(&quot;package_name&quot;, &quot;&quot;));</span>
+<span class="nc" id="L233">            m.addArgument(&quot;v&quot;, Display.getInstance().getProperty(&quot;AppVersion&quot;, &quot;0.1&quot;));</span>
+<span class="nc" id="L234">            m.addData(&quot;log&quot;, read, &quot;text/plain&quot;);</span>
+<span class="nc" id="L235">            m.setFailSilently(true);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            if (sync) {</span>
+<span class="nc" id="L237">                NetworkManager.getInstance().addToQueueAndWait(m);</span>
+            } else {
+<span class="nc" id="L239">                NetworkManager.getInstance().addToQueue(m);</span>
+            }
+<span class="nc" id="L241">        } catch (Throwable ex) {</span>
+<span class="nc" id="L242">            ex.printStackTrace();</span>
+<span class="nc" id="L243">        }</span>
+<span class="nc" id="L244">    }</span>
+
+    /**
+     * Installs a log subclass that can replace the logging destination/behavior
+     *
+     * @param newInstance the new instance for the Log object
+     */
+    public static void install(Log newInstance) {
+<span class="fc" id="L252">        instance = newInstance;</span>
+<span class="fc" id="L253">    }</span>
+
+    /**
+     * Default println method invokes the print instance method, uses DEBUG level
+     *
+     * @param text the text to print
+     */
+    public static void p(String text) {
+<span class="fc" id="L261">        p(text, DEBUG);</span>
+<span class="fc" id="L262">    }</span>
+
+    /**
+     * Default println method invokes the print instance method, uses given level
+     *
+     * @param text  the text to print
+     * @param level one of DEBUG, INFO, WARNING, ERROR
+     */
+    public static void p(String text, int level) {
+<span class="fc" id="L271">        instance.print(text, level);</span>
+<span class="fc" id="L272">    }</span>
+
+    /**
+     * This method is a shorthand form for logThrowable
+     *
+     * @param t the exception
+     */
+    public static void e(Throwable t) {
+<span class="fc" id="L280">        instance.logThrowable(t);</span>
+<span class="fc" id="L281">    }</span>
+
+    /**
+     * Deletes the current log file
+     */
+    public static void deleteLog() {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (instance.output != null) {</span>
+<span class="nc" id="L288">            Util.cleanup(instance.output);</span>
+<span class="nc" id="L289">            instance.output = null;</span>
+        }
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (instance.getFileURL() == null) {</span>
+<span class="nc" id="L292">            Storage.getInstance().deleteStorageFile(&quot;CN1Log__$&quot;);</span>
+        } else {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (FileSystemStorage.getInstance().exists(instance.getFileURL())) {</span>
+<span class="nc" id="L295">                FileSystemStorage.getInstance().delete(instance.getFileURL());</span>
+            }
+        }
+<span class="nc" id="L298">    }</span>
+
+    /**
+     * Returns the logging level for printing log details, the lower the value
+     * the more verbose would the printouts be
+     *
+     * @return one of DEBUG, INFO, WARNING, ERROR
+     */
+    public static int getLevel() {
+<span class="nc" id="L307">        return instance.level;</span>
+    }
+
+    /**
+     * Sets the logging level for printing log details, the lower the value
+     * the more verbose would the printouts be
+     *
+     * @param level one of DEBUG, INFO, WARNING, ERROR
+     */
+    public static void setLevel(int level) {
+<span class="fc" id="L317">        instance.level = level;</span>
+<span class="fc" id="L318">    }</span>
+
+    /**
+     * Returns the contents of the log as a single long string to be displayed by
+     * the application any way it sees fit
+     *
+     * @return string containing the whole log
+     * @deprecated this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
+     */
+    public static String getLogContent() {
+        try {
+<span class="nc" id="L329">            String text = &quot;&quot;;</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">            if (instance.isFileWriteEnabled()) {</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">                if (instance.getFileURL() == null) {</span>
+<span class="nc" id="L332">                    instance.setFileURL(&quot;file:///&quot; + FileSystemStorage.getInstance().getRoots()[0] + &quot;/codenameOne.log&quot;);</span>
+                }
+<span class="nc" id="L334">                Reader r = new InputStreamReader(FileSystemStorage.getInstance().openInputStream(instance.getFileURL()));</span>
+<span class="nc" id="L335">                char[] buffer = new char[1024];</span>
+<span class="nc" id="L336">                int size = r.read(buffer);</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                while (size &gt; -1) {</span>
+<span class="nc" id="L338">                    text += new String(buffer, 0, size);</span>
+<span class="nc" id="L339">                    size = r.read(buffer);</span>
+                }
+<span class="nc" id="L341">                r.close();</span>
+            }
+<span class="nc" id="L343">            return text;</span>
+<span class="nc" id="L344">        } catch (Exception ex) {</span>
+<span class="nc" id="L345">            ex.printStackTrace();</span>
+<span class="nc" id="L346">            return &quot;&quot;;</span>
+        }
+    }
+
+    /**
+     * Places a form with the log as a TextArea on the screen, this method can
+     * be attached to appear at a given time or using a fixed global key. Using
+     * this method might cause a problem with further log output
+     *
+     * @deprecated this method is an outdated method that's no longer supported
+     */
+    public static void showLog() {
+        try {
+<span class="nc" id="L359">            String text = getLogContent();</span>
+<span class="nc" id="L360">            TextArea area = new TextArea(text, 5, 20);</span>
+<span class="nc" id="L361">            Form f = new Form(&quot;Log&quot;);</span>
+<span class="nc" id="L362">            f.setScrollable(false);</span>
+<span class="nc" id="L363">            final Form current = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L364">            Command back = new Command(&quot;Back&quot;) {</span>
+                public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L366">                    current.show();</span>
+<span class="nc" id="L367">                }</span>
+            };
+<span class="nc" id="L369">            f.addCommand(back);</span>
+<span class="nc" id="L370">            f.setBackCommand(back);</span>
+<span class="nc" id="L371">            f.setLayout(new BorderLayout());</span>
+<span class="nc" id="L372">            f.addComponent(BorderLayout.CENTER, area);</span>
+<span class="nc" id="L373">            f.show();</span>
+<span class="nc" id="L374">        } catch (Exception ex) {</span>
+<span class="nc" id="L375">            ex.printStackTrace();</span>
+<span class="nc" id="L376">        }</span>
+<span class="nc" id="L377">    }</span>
+
+    /**
+     * Returns the singleton instance of the log
+     *
+     * @return the singleton instance of the log
+     */
+    public static Log getInstance() {
+<span class="fc" id="L385">        return instance;</span>
+    }
+
+    /**
+     * Binds pro based crash protection logic that will send out an email in case of an exception thrown on the EDT
+     *
+     * @param consumeError true will hide the error from the user, false will leave the builtin logic that defaults to
+     *                     showing an error dialog to the user
+     */
+    public static void bindCrashProtection(final boolean consumeError) {
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (Display.getInstance().isSimulator()) {</span>
+<span class="nc" id="L396">            return;</span>
+        }
+<span class="nc" id="L398">        Display.getInstance().addEdtErrorHandler(new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L400" title="All 2 branches missed.">                if (consumeError) {</span>
+<span class="nc" id="L401">                    evt.consume();</span>
+                }
+<span class="nc" id="L403">                p(&quot;Exception in &quot; + Display.getInstance().getProperty(&quot;AppName&quot;, &quot;app&quot;) + &quot; version &quot; + Display.getInstance().getProperty(&quot;AppVersion&quot;, &quot;Unknown&quot;));</span>
+<span class="nc" id="L404">                p(&quot;OS &quot; + Display.getInstance().getPlatformName());</span>
+<span class="nc" id="L405">                p(&quot;Error &quot; + evt.getSource());</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                if (Display.getInstance().getCurrent() != null) {</span>
+<span class="nc" id="L407">                    p(&quot;Current Form &quot; + Display.getInstance().getCurrent().getName());</span>
+                } else {
+<span class="nc" id="L409">                    p(&quot;Before the first form!&quot;);</span>
+                }
+<span class="nc" id="L411">                e((Throwable) evt.getSource());</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                if (getUniqueDeviceKey() != null) {</span>
+<span class="nc" id="L413">                    sendLog();</span>
+                }
+<span class="nc" id="L415">            }</span>
+        });
+<span class="nc" id="L417">        crashBound = true;</span>
+<span class="nc" id="L418">    }</span>
+
+    /**
+     * Returns true if the user bound crash protection
+     *
+     * @return true if crash protection is bound
+     */
+    public static boolean isCrashBound() {
+<span class="nc" id="L426">        return crashBound;</span>
+    }
+
+    /**
+     * Logs an exception to the log, by default print is called with the exception
+     * details, on supported devices the stack trace is also physically written to
+     * the log
+     *
+     * @param t
+     */
+    protected void logThrowable(Throwable t) {
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L438">            p(&quot;Exception logging invoked with null exception...&quot;);</span>
+<span class="nc" id="L439">            return;</span>
+        }
+<span class="nc" id="L441">        print(&quot;Exception: &quot; + t.getClass().getName() + &quot; - &quot; + t.getMessage(), ERROR);</span>
+<span class="nc" id="L442">        Thread thr = Thread.currentThread();</span>
+<span class="nc bnc" id="L443" title="All 4 branches missed.">        if (thr instanceof CodenameOneThread &amp;&amp; ((CodenameOneThread) thr).hasStackFrame()) {</span>
+<span class="nc" id="L444">            print(((CodenameOneThread) thr).getStack(t), ERROR);</span>
+        }
+<span class="nc" id="L446">        t.printStackTrace();</span>
+        try {
+<span class="nc" id="L448">            synchronized (this) {</span>
+<span class="nc" id="L449">                Writer w = getWriter();</span>
+<span class="nc" id="L450">                Util.getImplementation().printStackTraceToStream(t, w);</span>
+<span class="nc" id="L451">                w.flush();</span>
+<span class="nc" id="L452">            }</span>
+<span class="nc" id="L453">        } catch (IOException err) {</span>
+<span class="nc" id="L454">            err.printStackTrace();</span>
+<span class="nc" id="L455">        }</span>
+<span class="nc" id="L456">    }</span>
+
+    /**
+     * Default log implementation prints to the console and the file connector
+     * if applicable. Also prepends the thread information and time before
+     *
+     * @param text  the text to print
+     * @param level one of DEBUG, INFO, WARNING, ERROR
+     */
+    protected void print(String text, int level) {
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (!initialized) {</span>
+<span class="fc" id="L467">            initialized = true;</span>
+            try {
+<span class="fc" id="L469">                InputStream is = Display.getInstance().getResourceAsStream(getClass(), &quot;/cn1-version-numbers&quot;);</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">                if (is != null) {</span>
+<span class="nc" id="L471">                    print(&quot;Codename One revisions: &quot; + Util.readToString(is), INFO);</span>
+                }
+<span class="nc" id="L473">            } catch (IOException err) {</span>
+                // shouldn't happen...
+<span class="nc" id="L475">                err.printStackTrace();</span>
+<span class="fc" id="L476">            }</span>
+        }
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        if (this.level &gt; level) {</span>
+<span class="fc" id="L479">            return;</span>
+        }
+<span class="fc" id="L481">        logDirty = true;</span>
+<span class="fc" id="L482">        text = getThreadAndTimeStamp() + &quot; - &quot; + text;</span>
+<span class="fc" id="L483">        Util.getImplementation().systemOut(text);</span>
+        try {
+<span class="fc" id="L485">            synchronized (this) {</span>
+<span class="fc" id="L486">                Writer w = getWriter();</span>
+<span class="fc" id="L487">                w.write(text + &quot;\n&quot;);</span>
+<span class="fc" id="L488">                w.flush();</span>
+<span class="fc" id="L489">            }</span>
+<span class="nc" id="L490">        } catch (Throwable err) {</span>
+<span class="nc" id="L491">            err.printStackTrace();</span>
+<span class="fc" id="L492">        }</span>
+<span class="fc" id="L493">    }</span>
+
+    /**
+     * Default method for creating the output writer into which we write, this method
+     * creates a simple log file using the file connector
+     *
+     * @return writer object
+     * @throws IOException when thrown by the connector
+     */
+    protected Writer createWriter() throws IOException {
+        try {
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">            if (getFileURL() == null) {</span>
+<span class="fc" id="L505">                return new OutputStreamWriter(Storage.getInstance().createOutputStream(&quot;CN1Log__$&quot;));</span>
+            }
+<span class="nc bnc" id="L507" title="All 2 branches missed.">            if (FileSystemStorage.getInstance().exists(getFileURL())) {</span>
+<span class="nc" id="L508">                return new OutputStreamWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL(),</span>
+<span class="nc" id="L509">                        (int) FileSystemStorage.getInstance().getLength(getFileURL())));</span>
+            } else {
+<span class="nc" id="L511">                return new OutputStreamWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL()));</span>
+            }
+<span class="nc" id="L513">        } catch (Exception err) {</span>
+<span class="nc" id="L514">            setFileWriteEnabled(false);</span>
+            // currently return a &quot;dummy&quot; writer so we won't fail on device
+<span class="nc" id="L516">            return new OutputStreamWriter(new ByteArrayOutputStream());</span>
+        }
+    }
+
+    private Writer getWriter() throws IOException {
+<span class="fc bfc" id="L521" title="All 2 branches covered.">        if (output == null) {</span>
+<span class="fc" id="L522">            output = createWriter();</span>
+        }
+<span class="fc" id="L524">        return output;</span>
+    }
+
+    /**
+     * Returns a simple string containing a timestamp and thread name.
+     *
+     * @return timestamp string for use in the log
+     */
+    protected String getThreadAndTimeStamp() {
+<span class="fc" id="L533">        long time = System.currentTimeMillis() - zeroTime;</span>
+<span class="fc" id="L534">        long milli = time % 1000;</span>
+<span class="fc" id="L535">        time /= 1000;</span>
+<span class="fc" id="L536">        long sec = time % 60;</span>
+<span class="fc" id="L537">        time /= 60;</span>
+<span class="fc" id="L538">        long min = time % 60;</span>
+<span class="fc" id="L539">        time /= 60;</span>
+<span class="fc" id="L540">        long hour = time % 60;</span>
+
+<span class="fc" id="L542">        return &quot;[&quot; + Thread.currentThread().getName() + &quot;] &quot; + hour + &quot;:&quot; + min + &quot;:&quot; + sec + &quot;,&quot; + milli;</span>
+    }
+
+    /**
+     * Indicates whether GCF's file writing should be used to generate the log file
+     *
+     * @return the fileWriteEnabled
+     */
+    public boolean isFileWriteEnabled() {
+<span class="nc" id="L551">        return fileWriteEnabled;</span>
+    }
+
+    /**
+     * Indicates whether GCF's file writing should be used to generate the log file
+     *
+     * @param fileWriteEnabled the fileWriteEnabled to set
+     */
+    public void setFileWriteEnabled(boolean fileWriteEnabled) {
+<span class="nc" id="L560">        this.fileWriteEnabled = fileWriteEnabled;</span>
+<span class="nc" id="L561">    }</span>
+
+    /**
+     * Indicates the URL where the log file is saved
+     *
+     * @return the fileURL
+     */
+    public String getFileURL() {
+<span class="fc" id="L569">        return fileURL;</span>
+    }
+
+    /**
+     * Indicates the URL where the log file is saved
+     *
+     * @param fileURL the fileURL to set
+     */
+    public void setFileURL(String fileURL) {
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">        if (!Objects.equals(this.fileURL, fileURL)) {</span>
+            try {
+<span class="fc" id="L580">                this.fileURL = fileURL;</span>
+<span class="fc" id="L581">                output = createWriter();</span>
+<span class="nc" id="L582">            } catch (IOException ex) {</span>
+<span class="nc" id="L583">                ex.printStackTrace();</span>
+<span class="fc" id="L584">            }</span>
+        }
+<span class="fc" id="L586">    }</span>
+
+    /**
+     * Activates the filesystem tracking of file open/close operations
+     */
+    public void trackFileSystem() {
+<span class="fc" id="L592">        Util.getImplementation().setLogListener(new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L594">                String s = (String) evt.getSource();</span>
+                // don't log the creation of the log itself
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">                if (output != null) {</span>
+<span class="fc" id="L597">                    p(s);</span>
+                }
+<span class="fc" id="L599">            }</span>
+        });
+<span class="fc" id="L601">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

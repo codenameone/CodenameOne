@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Coord.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps</a> &gt; <span class="el_source">Coord.java</span></div><h1>Coord.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2010, 2011 Itiner.pl. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Itiner designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Itiner in the LICENSE.txt file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+package com.codename1.maps;
+
+/**
+ * This class declares a coordinate point on a map.
+ *
+ * @author Roman Kamyk roman.kamyk@itiner.pl
+ */
+public class Coord {
+
+    private static final double DELTA = 0.0000001;
+    private double longitude;
+    private double latitude;
+    // Projected to local coordinate system. False means WGS84
+    private boolean projected;
+
+    /**
+     * Creates a isProjected Coord
+     *
+     * @param latitude  the getLatitude of this Coordinate
+     * @param longitude the getLongitude of this Coordinate
+     */
+    public Coord(double latitude, double longitude) {
+<span class="nc" id="L42">        this(latitude, longitude, false);</span>
+<span class="nc" id="L43">    }</span>
+
+
+    /**
+     * a Constructor with getLatitude, getLongitude
+     *
+     * @param latitude  the Coordinate getLatitude
+     * @param longitude the Coordinate getLongitude
+     * @param projected declares if this is a isProjected Coordinate
+     */
+<span class="nc" id="L53">    public Coord(double latitude, double longitude, boolean projected) {</span>
+<span class="nc" id="L54">        this.latitude = latitude;</span>
+<span class="nc" id="L55">        this.longitude = longitude;</span>
+<span class="nc" id="L56">        this.projected = projected;</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Copy Constructor
+     *
+     * @param toClone to copy
+     */
+<span class="nc" id="L64">    public Coord(Coord toClone) {</span>
+<span class="nc" id="L65">        longitude = toClone.getLongitude();</span>
+<span class="nc" id="L66">        latitude = toClone.getLatitude();</span>
+<span class="nc" id="L67">        projected = toClone.isProjected();</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Gets the Coord Longitude.
+     *
+     * @return the Coord Longitude
+     */
+    public double getLongitude() {
+<span class="nc" id="L76">        return longitude;</span>
+    }
+
+    /**
+     * Sets the Coord Longitude.
+     */
+    public void setLongitude(double longitude) {
+<span class="nc" id="L83">        this.longitude = longitude;</span>
+<span class="nc" id="L84">    }</span>
+
+    /**
+     * Gets the Coord Latitude
+     *
+     * @return the Coord Latitude
+     */
+    public double getLatitude() {
+<span class="nc" id="L92">        return latitude;</span>
+    }
+
+    /**
+     * Sets the Coord Latitude.
+     */
+    public void setLatitude(double latitude) {
+<span class="nc" id="L99">        this.latitude = latitude;</span>
+<span class="nc" id="L100">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L107">        return &quot;{'longitude':&quot; + getLongitude() + &quot;, 'latitude':&quot; +</span>
+<span class="nc" id="L108">                getLatitude() + &quot;}&quot;;</span>
+    }
+
+    /**
+     * Create a new Coord object which is translated with the given coordinates
+     *
+     * @param latitude  translate current latitude with this latitude
+     * @param longitude translate current longitude with this longitude
+     * @return a new translated Coord object
+     */
+    public Coord translate(double latitude, double longitude) {
+<span class="nc" id="L119">        return new Coord(latitude + getLatitude(), longitude + getLongitude(), isProjected());</span>
+    }
+
+    /**
+     * Create a new Coord object which is translated with the given coordinates
+     *
+     * @param coordinates translate current Coord with the given coordinates
+     * @return a new translated Coord object
+     */
+    public Coord translate(Coord coordinates) {
+<span class="nc" id="L129">        return translate(coordinates.getLatitude(), coordinates.getLongitude());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (!(other instanceof Coord)) {</span>
+<span class="nc" id="L137">            return false;</span>
+        }
+<span class="nc" id="L139">        Coord o = (Coord) other;</span>
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        return (Math.abs(longitude - o.longitude) &lt; DELTA) &amp;&amp; (Math.abs(latitude - o.latitude) &lt; DELTA);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+<span class="nc" id="L147">        int hash = 5;</span>
+<span class="nc" id="L148">        hash = 17 * hash + (int) (Double.doubleToLongBits(this.longitude) ^ (Double.doubleToLongBits(this.longitude) &gt;&gt;&gt; 32));</span>
+<span class="nc" id="L149">        hash = 17 * hash + (int) (Double.doubleToLongBits(this.latitude) ^ (Double.doubleToLongBits(this.latitude) &gt;&gt;&gt; 32));</span>
+<span class="nc" id="L150">        return hash;</span>
+    }
+
+    /**
+     * Returns true if this is a projected Coordinate
+     *
+     * @return true if projected
+     */
+    public final boolean isProjected() {
+<span class="nc" id="L159">        return projected;</span>
+    }
+
+    /**
+     * Sets Coord projected
+     *
+     * @param projected flag
+     */
+    public void setProjected(boolean projected) {
+<span class="nc" id="L168">        this.projected = projected;</span>
+<span class="nc" id="L169">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

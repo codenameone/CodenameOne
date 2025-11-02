@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundingBox.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps</a> &gt; <span class="el_source">BoundingBox.java</span></div><h1>BoundingBox.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2010, 2011 Itiner.pl. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Itiner designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Itiner in the LICENSE.txt file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+package com.codename1.maps;
+
+import java.util.Vector;
+
+/**
+ * This class declares a bounding box of coordinates on the map.
+ *
+ * @author Roman Kamyk roman.kamyk@itiner.pl
+ */
+public class BoundingBox {
+
+    private final Coord _southWest;
+    private final Coord _northEast;
+
+    /**
+     * Creates a bounding box around a coordinate with a given radius.
+     *
+     * @param c    The coordinate at the center of the bounding box.
+     * @param rLat The latitude radius of the box (in degrees).
+     * @param rLng The longitude radius of the box (in degrees).
+     */
+<span class="nc" id="L41">    public BoundingBox(Coord c, double rLat, double rLng) {</span>
+<span class="nc" id="L42">        _southWest = new Coord(c.getLatitude() - rLat, c.getLongitude() - rLng);</span>
+<span class="nc" id="L43">        _northEast = new Coord(c.getLatitude() + rLat, c.getLongitude() + rLng);</span>
+<span class="nc" id="L44">    }</span>
+
+    /**
+     * Constructor with 2 coordinates for south west and north east
+     *
+     * @param southWest coordinate
+     * @param northEast coordinate
+     */
+<span class="nc" id="L52">    public BoundingBox(Coord southWest, Coord northEast) {</span>
+<span class="nc" id="L53">        _southWest = southWest;</span>
+<span class="nc" id="L54">        _northEast = northEast;</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * create a smallest bounding box that contains all of the given coordinates
+     *
+     * @param coords given coordinates to create a wrapping bounding box.
+     * @return a bounding box that contains all of the coordinates
+     */
+    public static BoundingBox create(Coord[] coords) {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (coords.length &lt;= 0) {</span>
+<span class="nc" id="L65">            throw new RuntimeException(&quot;There must be at least 1 coordinate.&quot;);</span>
+        }
+
+<span class="nc" id="L68">        double north = coords[0].getLatitude();</span>
+<span class="nc" id="L69">        double south = coords[0].getLatitude();</span>
+<span class="nc" id="L70">        double east = coords[0].getLongitude();</span>
+<span class="nc" id="L71">        double west = coords[0].getLongitude();</span>
+
+<span class="nc" id="L73">        boolean projected = true;</span>
+<span class="nc" id="L74">        int clen = coords.length;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        for (int i = 0; i &lt; clen; i++) {</span>
+<span class="nc" id="L76">            Coord c = coords[i];</span>
+<span class="nc" id="L77">            projected = c.isProjected();</span>
+<span class="nc" id="L78">            north = Math.max(north, c.getLatitude());</span>
+<span class="nc" id="L79">            east = Math.max(east, c.getLongitude());</span>
+<span class="nc" id="L80">            south = Math.min(south, c.getLatitude());</span>
+<span class="nc" id="L81">            west = Math.min(west, c.getLongitude());</span>
+        }
+<span class="nc" id="L83">        return new BoundingBox(new Coord(south, west, projected), new Coord(north, east, projected));</span>
+    }
+
+    /**
+     * /**
+     * create a smallest bounding box that contains all of the given coordinates
+     *
+     * @param coords given coordinates to create a wrapping bounding box.
+     * @return a bounding box that contains all of the coordinates
+     */
+    public static BoundingBox create(Vector coords) {
+<span class="nc" id="L94">        int length = coords.size();</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (length &lt;= 0) {</span>
+<span class="nc" id="L96">            throw new RuntimeException(&quot;There must be at least 1 coordinate.&quot;);</span>
+        }
+<span class="nc" id="L98">        Coord[] coordsArray = new Coord[length];</span>
+<span class="nc" id="L99">        coords.copyInto(coordsArray);</span>
+<span class="nc" id="L100">        return create(coordsArray);</span>
+    }
+
+    /**
+     * Gets the /south west coordinate
+     *
+     * @return
+     */
+    public Coord getSouthWest() {
+<span class="nc" id="L109">        return _southWest;</span>
+    }
+
+    /**
+     * Gets the north east coordinate
+     *
+     * @return
+     */
+    public Coord getNorthEast() {
+<span class="nc" id="L118">        return _northEast;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L125">        return &quot;SW: &quot; + _southWest + &quot; NE: &quot; + _northEast;</span>
+    }
+
+    /**
+     * @return The difference between SE and NW getLongitude in degrees.
+     */
+    public double latitudeDifference() {
+<span class="nc" id="L132">        return _northEast.getLatitude() - _southWest.getLatitude();</span>
+    }
+
+    /**
+     * @return The difference between SE and NW latitudes in degrees.
+     */
+    public double longitudeDifference() {
+<span class="nc" id="L139">        return _northEast.getLongitude() - _southWest.getLongitude();</span>
+    }
+
+    /**
+     * indicates if the given coordinate is inside the counding box
+     *
+     * @param cur coordinate to check
+     * @return true if the given coordinate is contained in the bounding box
+     */
+    public boolean contains(Coord cur) {
+<span class="nc" id="L149">        double latitude = cur.getLatitude();</span>
+<span class="nc bnc" id="L150" title="All 4 branches missed.">        if (latitude &gt; getNorthEast().getLatitude() || latitude &lt; getSouthWest().getLatitude()) {</span>
+<span class="nc" id="L151">            return false;</span>
+        }
+<span class="nc" id="L153">        double longitude = cur.getLongitude();</span>
+<span class="nc bnc" id="L154" title="All 4 branches missed.">        return !(longitude &lt; getSouthWest().getLongitude()) &amp;&amp; !(longitude &gt; getNorthEast().getLongitude());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (!(other instanceof BoundingBox)) {</span>
+<span class="nc" id="L162">            return false;</span>
+        }
+<span class="nc" id="L164">        BoundingBox o = (BoundingBox) other;</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">        return _southWest.equals(o._southWest) &amp;&amp; _northEast.equals(o._northEast);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+<span class="nc" id="L172">        int hash = 5;</span>
+<span class="nc" id="L173">        hash = 29 * hash + this._southWest.hashCode();</span>
+<span class="nc" id="L174">        hash = 29 * hash + this._northEast.hashCode();</span>
+<span class="nc" id="L175">        return hash;</span>
+    }
+
+    /**
+     * create a new bounding box that extends this bounding box with the given
+     * bounding box
+     *
+     * @param other a bounding box that needs to extends the current bounding box
+     * @return a new bounding box that was extended from the current and the other
+     */
+    public BoundingBox extend(BoundingBox other) {
+<span class="nc" id="L186">        double north = Math.max(getNorthEast().getLatitude(), other.getNorthEast().getLatitude());</span>
+<span class="nc" id="L187">        double east = Math.max(getNorthEast().getLongitude(), other.getNorthEast().getLongitude());</span>
+<span class="nc" id="L188">        double south = Math.min(getSouthWest().getLatitude(), other.getSouthWest().getLatitude());</span>
+<span class="nc" id="L189">        double west = Math.min(getSouthWest().getLongitude(), other.getSouthWest().getLongitude());</span>
+<span class="nc" id="L190">        return new BoundingBox(new Coord(south, west, projected()), new Coord(north, east, projected()));</span>
+    }
+
+    /**
+     * Indicates if this bounding box is isProjected
+     *
+     * @return true if it's a isProjected bounding box
+     */
+    public boolean projected() {
+<span class="nc" id="L199">        return _southWest.isProjected();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

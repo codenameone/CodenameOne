@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FacebookConnect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">FacebookConnect.java</span></div><h1>FacebookConnect.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.facebook.FaceBookAccess;
+import com.codename1.io.AccessToken;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Oauth2;
+import com.codename1.util.Callback;
+
+/**
+ * Invokes the native bundled facebook SDK to login/logout of facebook, notice
+ * that in order for this to work server build arguments must indicate that you
+ * are using the facebook sdk! To accomplish this just define:
+ * facebook.appId=YourAppId in your build arguments. In order to obtain the app
+ * ID you need to create a native Android/iOS application and generate the right
+ * app id.
+ *
+ * @author Shai Almog
+ */
+public class FacebookConnect extends Login {
+
+    static Class implClass;
+    private static FacebookConnect instance;
+<span class="fc" id="L47">    private final String[] permissions = new String[]{&quot;public_profile&quot;, &quot;email&quot;, &quot;user_friends&quot;};</span>
+
+    static {
+<span class="fc" id="L50">        implClass = null;</span>
+<span class="fc" id="L51">    }</span>
+
+<span class="fc" id="L53">    FacebookConnect() {</span>
+<span class="fc" id="L54">        setOauth2URL(&quot;https://www.facebook.com/dialog/oauth&quot;);</span>
+<span class="fc" id="L55">    }</span>
+
+
+    /**
+     * Gets the FacebookConnect singleton instance
+     * .
+     *
+     * @return the FacebookConnect instance
+     */
+    public static FacebookConnect getInstance() {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (instance == null) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            if (implClass != null) {</span>
+                try {
+<span class="nc" id="L68">                    instance = (FacebookConnect) implClass.newInstance();</span>
+<span class="nc" id="L69">                } catch (Throwable t) {</span>
+<span class="nc" id="L70">                    Log.e(t);</span>
+<span class="nc" id="L71">                    instance = new FacebookConnect();</span>
+<span class="nc" id="L72">                }</span>
+            } else {
+<span class="nc" id="L74">                instance = new FacebookConnect();</span>
+            }
+        }
+<span class="nc" id="L77">        return instance;</span>
+    }
+
+    /**
+     * Indicates whether the native platform supports native facebook login
+     *
+     * @return true if supported
+     */
+    public boolean isFacebookSDKSupported() {
+<span class="fc" id="L86">        return false;</span>
+    }
+
+    /**
+     * Logs into facebook, notice that this call might suspend the application
+     * which might trigger repeated invocations of stop()/start() etc. This is
+     * due to the facebook SDK spawning a separate process to perform the login
+     * then returning to the application. Once logged in the facebook
+     * credentials will be available.
+     *
+     * @deprecated use doLogin
+     */
+    public void login() {
+<span class="fc" id="L99">        throw new RuntimeException(&quot;Native facebook unsupported&quot;);</span>
+    }
+
+
+    /**
+     * Logs out the current user from facebook
+     */
+    public void doLogout() {
+<span class="fc" id="L107">        super.doLogout();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!isNativeLoginSupported()) {</span>
+<span class="fc" id="L109">            FaceBookAccess.logOut();</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    /**
+     * The facebook token that can be used to access facebook functionality
+     *
+     * @return the token
+     */
+    public AccessToken getAccessToken() {
+<span class="fc" id="L119">        AccessToken t = super.getAccessToken();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (t != null) {</span>
+<span class="fc" id="L121">            return t;</span>
+        }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (isNativeLoginSupported()) {</span>
+<span class="fc" id="L124">            return new AccessToken(getToken(), null);</span>
+        } else {
+<span class="fc" id="L126">            return null;</span>
+        }
+    }
+
+    /**
+     * Indicates if the user is currently logged in
+     *
+     * @return true if logged in
+     * @deprecated use isUserLoggedIn() instead
+     */
+    public boolean isLoggedIn() {
+<span class="fc" id="L137">        throw new RuntimeException(&quot;Native facebook unsupported, if you are running on the Simulator use isUserLoggedIn&quot;);</span>
+    }
+
+    /**
+     * The facebook token that can be used to access facebook functionality
+     *
+     * @return the token
+     * @deprecated use getAccessToken instead
+     */
+    public String getToken() {
+<span class="fc" id="L147">        throw new RuntimeException(&quot;Native facebook unsupported, if you are running on the Simulator use getAccessToken&quot;);</span>
+    }
+
+    /**
+     * Logs out the current user from facebook
+     *
+     * @deprecated use doLogout instead
+     */
+    public void logout() {
+<span class="fc" id="L156">        throw new RuntimeException(&quot;Native facebook unsupported, if you are running on the Simulator use doLogout&quot;);</span>
+    }
+
+    /**
+     * Asks for publish permissions, this call might suspend the application
+     * which might trigger repeated invocations of stop()/start().
+     */
+    public void askPublishPermissions(LoginCallback lc) {
+<span class="fc" id="L164">        throw new RuntimeException(&quot;Native facebook unsupported&quot;);</span>
+    }
+
+    /**
+     * Returns true if the current session already has publish permissions
+     *
+     * @return
+     */
+    public boolean hasPublishPermissions() {
+<span class="fc" id="L173">        throw new RuntimeException(&quot;Native facebook unsupported&quot;);</span>
+    }
+
+    @Override
+    public boolean isNativeLoginSupported() {
+<span class="fc" id="L178">        return isFacebookSDKSupported();</span>
+
+    }
+
+    @Override
+    protected Oauth2 createOauth2() {
+<span class="nc" id="L184">        FaceBookAccess.setClientId(clientId);</span>
+<span class="nc" id="L185">        FaceBookAccess.setClientSecret(clientSecret);</span>
+<span class="nc" id="L186">        FaceBookAccess.setRedirectURI(redirectURI);</span>
+<span class="nc" id="L187">        FaceBookAccess.setPermissions(permissions);</span>
+<span class="nc" id="L188">        return FaceBookAccess.getInstance().createOAuth();</span>
+    }
+
+    @Override
+    public void nativelogin() {
+<span class="fc" id="L193">        login();</span>
+<span class="fc" id="L194">    }</span>
+
+    @Override
+    public void nativeLogout() {
+<span class="fc" id="L198">        logout();</span>
+<span class="fc" id="L199">    }</span>
+
+    @Override
+    public boolean nativeIsLoggedIn() {
+<span class="nc" id="L203">        return isLoggedIn();</span>
+    }
+
+
+    /**
+     * Opens and invite dialog to invite friends to the app
+     * https://developers.facebook.com/docs/app-invites
+     *
+     * @param appLinkUrl      App Link for what should be opened when the recipient
+     *                        clicks on the install/play button on the app invite page.
+     * @param previewImageUrl url to an image to be used in the invite, can be null
+     * @deprecated The Facebook SDK no longer supports app invites. https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
+     */
+    public void inviteFriends(String appLinkUrl, String previewImageUrl) {
+<span class="nc" id="L217">    }</span>
+
+    /**
+     * Opens and invite dialog to invite friends to the app
+     * https://developers.facebook.com/docs/app-invites
+     *
+     * @param appLinkUrl      App Link for what should be opened when the recipient
+     *                        clicks on the install/play button on the app invite page.
+     * @param previewImageUrl url to an image to be used in the invite, can be null
+     * @param cb              a Callback to be used when we need to know if the Facebook invite was successful.
+     *                        If the invite was successful the onSucess method will be called
+     *                        If the user canceled the onError method will be called with error code -1.
+     *                        If an error occurred the onError method will be called with error code 0.
+     * @deprecated The Facebook SDK no longer supports app invites https://developers.facebook.com/blog/post/2017/11/07/changes-developer-offerings/
+     */
+    public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
+<span class="nc" id="L233">    }</span>
+
+    /**
+     * Returns true if inviteFriends is implemented, it is supported on iOS and
+     * Android
+     *
+     * &lt;p&gt;&lt;em&gt;NOTE:&lt;/em&gt; Since updating to Facebook SDK 5.6.0 (April 1, 2020), invite friends is no longer
+     * supported on iOS.  It will eventually be removed from Android as well, as Facebook
+     * no longer supports App invites in its native SDKs.&lt;/p&gt;
+     *
+     * @return true if inviteFriends is implemented
+     */
+    public boolean isInviteFriendsSupported() {
+<span class="nc" id="L246">        return false;</span>
+    }
+
+    @Override
+    protected boolean validateToken(String token) {
+        //make a call to the API if the return value is 40X the token is not 
+        //valid anymore
+<span class="nc" id="L253">        final boolean[] retval = new boolean[1];</span>
+<span class="nc" id="L254">        retval[0] = true;</span>
+<span class="nc" id="L255">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                //access token not valid anymore
+<span class="nc bnc" id="L259" title="All 4 branches missed.">                if (code &gt;= 400 &amp;&amp; code &lt;= 410) {</span>
+<span class="nc" id="L260">                    retval[0] = false;</span>
+<span class="nc" id="L261">                    return;</span>
+                }
+<span class="nc" id="L263">                super.handleErrorResponseCode(code, message);</span>
+<span class="nc" id="L264">            }</span>
+
+        };
+<span class="nc" id="L267">        req.setPost(false);</span>
+<span class="nc" id="L268">        req.setUrl(&quot;https://graph.facebook.com/v2.4/me&quot;);</span>
+<span class="nc" id="L269">        req.addArgumentNoEncoding(&quot;access_token&quot;, token);</span>
+<span class="nc" id="L270">        NetworkManager.getInstance().addToQueueAndWait(req);</span>
+<span class="nc" id="L271">        return retval[0];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

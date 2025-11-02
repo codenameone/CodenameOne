@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ArrowLinesLayer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.maps.layers</a> &gt; <span class="el_source">ArrowLinesLayer.java</span></div><h1>ArrowLinesLayer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2010, 2011 Itiner.pl. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Itiner designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Itiner in the LICENSE.txt file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+package com.codename1.maps.layers;
+
+import com.codename1.maps.Coord;
+import com.codename1.maps.Mercator;
+import com.codename1.maps.Projection;
+import com.codename1.maps.Tile;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Point;
+import com.codename1.util.MathUtil;
+
+/**
+ * This class is responsible for painting arrows that indicates direction
+ * of walk on map.
+ *
+ * @author Michal Koperski
+ */
+public class ArrowLinesLayer extends LinesLayer {
+
+<span class="nc" id="L38">    private final int minArrowSementLength = 20;</span>
+<span class="nc" id="L39">    private int arrowSegmentLength = 60;</span>
+<span class="nc" id="L40">    private int arrowWidth = 5;</span>
+<span class="nc" id="L41">    private int arrowHeight = 10;</span>
+
+    /**
+     * Constructor with default projection Mercator.
+     */
+    public ArrowLinesLayer() {
+<span class="nc" id="L47">        this(new Mercator(), &quot;&quot;);</span>
+<span class="nc" id="L48">    }</span>
+
+    /**
+     * Constructor with default projection Mercator.
+     */
+    public ArrowLinesLayer(String name) {
+<span class="nc" id="L54">        this(new Mercator(), name);</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public ArrowLinesLayer(Projection p, String name) {
+<span class="nc" id="L61">        super(p, name);</span>
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * Paints arrows on each segment. arrowSegmentLength decides how many
+     * arrows will be on each segment.
+     *
+     * @param g
+     * @param segment
+     * @param tile
+     */
+    protected void paintSegment(Graphics g, Coord[] segment, Tile tile) {
+<span class="nc" id="L73">        super.paintSegment(g, segment, tile);</span>
+<span class="nc" id="L74">        int pointsNo = segment.length;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        for (int i = 1; i &lt; pointsNo; i++) {</span>
+<span class="nc" id="L76">            Coord start = segment[i - 1];</span>
+<span class="nc" id="L77">            Coord end = segment[i];</span>
+<span class="nc" id="L78">            Point s = tile.pointPosition(start);</span>
+<span class="nc" id="L79">            Point e = tile.pointPosition(end);</span>
+<span class="nc" id="L80">            int noOfSegments = calculateLength(s, e) / arrowSegmentLength;</span>
+<span class="nc bnc" id="L81" title="All 4 branches missed.">            if (noOfSegments == 0 &amp;&amp; calculateLength(s, e) &gt; minArrowSementLength) {</span>
+<span class="nc" id="L82">                noOfSegments = 1;</span>
+            }
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            for (int j = 1; j &lt;= noOfSegments; j++) {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                if (j == 1) {</span>
+<span class="nc" id="L86">                    double div = 1.0 / noOfSegments;</span>
+<span class="nc" id="L87">                    drawArrow(g, new Point(s.getX(), s.getY()),</span>
+<span class="nc" id="L88">                            new Point((int) (div * e.getX() + s.getX() * (1 - div)),</span>
+<span class="nc" id="L89">                                    (int) (div * e.getY() + s.getY() * (1 - div))));</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                } else if (j == noOfSegments) {</span>
+<span class="nc" id="L91">                    double div = (noOfSegments - 1) / (noOfSegments * 1.0);</span>
+<span class="nc" id="L92">                    drawArrow(g, new Point((int) (div * e.getX() + s.getX() * (1 - div)),</span>
+<span class="nc" id="L93">                                    (int) (div * e.getY() + s.getY() * (1 - div))),</span>
+<span class="nc" id="L94">                            new Point(e.getX(), e.getY()));</span>
+<span class="nc" id="L95">                } else {</span>
+<span class="nc" id="L96">                    double div = ((j - 1) * 1.0) / noOfSegments;</span>
+<span class="nc" id="L97">                    double div2 = (j * 1.0) / noOfSegments;</span>
+<span class="nc" id="L98">                    drawArrow(g, new Point((int) (div * e.getX() + s.getX() * (1 - div)),</span>
+<span class="nc" id="L99">                                    (int) (div * e.getY() + s.getY() * (1 - div))),</span>
+<span class="nc" id="L100">                            new Point((int) (div2 * e.getX() + s.getX() * (1 - div2)),</span>
+<span class="nc" id="L101">                                    (int) (div2 * e.getY() + s.getY() * (1 - div2))));</span>
+                }
+            }
+        }
+<span class="nc" id="L105">    }</span>
+
+    /**
+     * This method clones arrowHead object which represents arrow and translate
+     * it to position on the map.
+     *
+     * @param g Graphics Object to paint on
+     * @param s starting Point
+     * @param e ending Point
+     */
+    private void drawArrow(Graphics g, Point s, Point e) {
+<span class="nc" id="L116">        double aDir = MathUtil.atan2(e.getY() - s.getY(), e.getX() - s.getX());</span>
+
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (aDir &lt; -Math.PI / 2) {</span>
+<span class="nc" id="L119">            aDir = MathUtil.atan2(s.getY() - e.getY(), s.getX() - e.getX());</span>
+<span class="nc" id="L120">            aDir -= Math.PI;</span>
+        }
+<span class="nc" id="L122">        aDir -= Math.PI / 2;</span>
+
+<span class="nc" id="L124">        ArrowHead arrowHead = new ArrowHead(arrowHeight, arrowWidth);</span>
+<span class="nc" id="L125">        arrowHead.rotate(aDir);</span>
+<span class="nc" id="L126">        arrowHead.translate(s.getX() + ((e.getX() - s.getX()) / 2), s.getY() + ((e.getY() - s.getY()) / 2));</span>
+<span class="nc" id="L127">        arrowHead.paint(g);</span>
+<span class="nc" id="L128">    }</span>
+
+    private int calculateLength(Point s, Point e) {
+<span class="nc" id="L131">        return (int) Math.sqrt(sqr(s.getX() - e.getX()) + sqr(s.getY() - e.getY()));</span>
+    }
+
+    private double sqr(double a) {
+<span class="nc" id="L135">        return a * a;</span>
+    }
+
+    /**
+     * Returns the arrow height in pixels
+     *
+     * @return the arrow height
+     */
+    public int getArrowHeight() {
+<span class="nc" id="L144">        return arrowHeight;</span>
+    }
+
+    /**
+     * Sets the arrow height
+     *
+     * @param arrowHeight
+     */
+    public void setArrowHeight(int arrowHeight) {
+<span class="nc" id="L153">        this.arrowHeight = arrowHeight;</span>
+<span class="nc" id="L154">    }</span>
+
+    /**
+     * Gets the arrow segment length
+     *
+     * @return segment length
+     */
+    public int getArrowSegmentLength() {
+<span class="nc" id="L162">        return arrowSegmentLength;</span>
+    }
+
+    /**
+     * Sets the arrow segment length
+     *
+     * @param arrowSegmentLength to set
+     */
+    public void setArrowSegmentLength(int arrowSegmentLength) {
+<span class="nc" id="L171">        this.arrowSegmentLength = arrowSegmentLength;</span>
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * Gets the arrow width in pixels
+     *
+     * @return the arrow width
+     */
+    public int getArrowWidth() {
+<span class="nc" id="L180">        return arrowWidth;</span>
+    }
+
+    /**
+     * Sets the arrow width
+     *
+     * @param arrowWidth to set
+     */
+    public void setArrowWidth(int arrowWidth) {
+<span class="nc" id="L189">        this.arrowWidth = arrowWidth;</span>
+<span class="nc" id="L190">    }</span>
+
+    private class ArrowHead {
+
+        private final int _height;
+        private final int _width;
+        private final Point[] _nodes;
+
+<span class="nc" id="L198">        ArrowHead(int height, int width) {</span>
+<span class="nc" id="L199">            _height = height;</span>
+<span class="nc" id="L200">            _width = width;</span>
+<span class="nc" id="L201">            _nodes = new Point[3];</span>
+<span class="nc" id="L202">            _nodes[0] = new Point(0, 0);</span>
+<span class="nc" id="L203">            _nodes[1] = new Point(_width, -_height);</span>
+<span class="nc" id="L204">            _nodes[2] = new Point(-_width, -_height);</span>
+<span class="nc" id="L205">        }</span>
+
+        public int getHeight() {
+<span class="nc" id="L208">            return _height;</span>
+        }
+
+        public int getWidth() {
+<span class="nc" id="L212">            return _width;</span>
+        }
+
+        public Point[] getNodes() {
+<span class="nc" id="L216">            return _nodes;</span>
+        }
+
+        public void rotate(double aDir) {
+<span class="nc" id="L220">            int nlen = _nodes.length;</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            for (int i = 0; i &lt; nlen; i++) {</span>
+<span class="nc" id="L222">                _nodes[i] = new Point(rotateX(_nodes[i].getX(), _nodes[i].getY(), aDir),</span>
+<span class="nc" id="L223">                        rotateY(_nodes[i].getX(), _nodes[i].getY(), aDir));</span>
+            }
+<span class="nc" id="L225">        }</span>
+
+        private int rotateX(int x, int y, double aDir) {
+<span class="nc" id="L228">            return (int) ((x * Math.cos(aDir)) - (y * Math.sin(aDir)));</span>
+        }
+
+        private int rotateY(int x, int y, double aDir) {
+<span class="nc" id="L232">            return (int) ((x * Math.sin(aDir)) + (y * Math.cos(aDir)));</span>
+        }
+
+        public void translate(int x, int y) {
+<span class="nc" id="L236">            int nlen = _nodes.length;</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            for (int i = 0; i &lt; nlen; i++) {</span>
+<span class="nc" id="L238">                _nodes[i] = new Point(_nodes[i].getX() + x, _nodes[i].getY() + y);</span>
+            }
+<span class="nc" id="L240">        }</span>
+
+        public void paint(Graphics g) {
+<span class="nc" id="L243">            g.fillTriangle(_nodes[0].getX(), _nodes[0].getY(),</span>
+<span class="nc" id="L244">                    _nodes[1].getX(), _nodes[1].getY(),</span>
+<span class="nc" id="L245">                    _nodes[2].getX(), _nodes[2].getY());</span>
+<span class="nc" id="L246">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
