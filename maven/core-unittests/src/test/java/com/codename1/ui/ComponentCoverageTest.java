@@ -355,20 +355,17 @@ class ComponentCoverageTest extends UITestBase {
     }
 
     @Test
-    void testFireClickedEvent() {
+    void testPointerReleasedEvent() {
         TestableComponent component = new TestableComponent();
 
-        final boolean[] clickCalled = {false};
-        component.addActionListener(evt -> clickCalled[0] = true);
+        final boolean[] releaseCalled = {false};
+        component.addPointerReleasedListener(evt -> releaseCalled[0] = true);
 
-        // Simulate click through pointer events
+        // Simulate pointer press and release
         component.pointerPressed(10, 10);
         component.pointerReleased(10, 10);
 
-        // Or directly fire click event
-        component.fireActionEvent();
-
-        assertTrue(clickCalled[0]);
+        assertTrue(releaseCalled[0]);
     }
 
     @Test
