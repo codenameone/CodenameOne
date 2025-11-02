@@ -7,6 +7,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextHolder;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Border;
@@ -422,6 +423,102 @@ class ComponentTest extends UITestBase {
 
         component.setScrollAnimationSpeed(750);
         assertEquals(750, component.getScrollAnimationSpeed());
+    }
+
+    @Test
+    void testExtendedPropertyAndListenerCoverage() {
+        InspectableComponent component = new InspectableComponent();
+        component.setWidth(40);
+        component.setHeight(30);
+        component.forceInitialized(true);
+        component.setVisible(true);
+
+        Style pressed = new Style();
+        Style selected = new Style();
+        Style disabled = new Style();
+        component.setPressedStyle(pressed);
+        component.setSelectedStyle(selected);
+        component.setDisabledStyle(disabled);
+        assertSame(pressed, component.getPressedStyle());
+        assertSame(selected, component.getSelectedStyle());
+        assertSame(disabled, component.getDisabledStyle());
+
+        component.setCloudBoundProperty("bound");
+        component.setCloudDestinationProperty("dest");
+        assertEquals("bound", component.getCloudBoundProperty());
+        assertEquals("dest", component.getCloudDestinationProperty());
+
+        component.setTooltip("tip");
+        assertEquals("tip", component.getTooltip());
+
+        component.setDisableSmoothScrolling(true);
+        assertTrue(component.isDisableSmoothScrolling());
+
+        component.setDropTarget(true);
+        assertTrue(component.isDropTarget());
+
+        component.setHideInLandscape(true);
+        component.setHideInPortrait(true);
+        assertTrue(component.isHideInLandscape());
+        assertTrue(component.isHideInPortrait());
+
+        component.setPinchBlocksDragAndDrop(true);
+        assertTrue(component.isPinchBlocksDragAndDrop());
+
+        component.setSnapToGrid(true);
+        component.setFlatten(true);
+        component.setTensileDragEnabled(true);
+        component.setTensileLength(75);
+        assertTrue(component.isSnapToGrid());
+        assertTrue(component.isFlatten());
+        assertTrue(component.isTensileDragEnabled());
+        assertEquals(75, component.getTensileLength());
+
+        component.setScrollOpacityChangeSpeed(30);
+        assertEquals(30, component.getScrollOpacityChangeSpeed());
+
+        component.setScrollAnimationSpeed(5);
+        assertEquals(5, component.getScrollAnimationSpeed());
+
+        component.setAnimationMotion(Motion.createLinearMotion(0, 10, 100));
+        assertNotNull(component.getAnimationMotion());
+
+        Component.setDefaultDragTransparency((byte) 123);
+        component.setDragTransparency((byte) 110);
+        assertEquals(123, Component.getDefaultDragTransparency());
+        assertEquals(110, component.getDragTransparency());
+
+        component.setDragActivated(true);
+        assertTrue(component.isDragActivatedPublic());
+
+        component.setBlockLead(true);
+        assertTrue(component.isBlockLead());
+
+        component.setTraversable(true);
+        assertTrue(component.isTraversable());
+
+        component.setTabIndex(4);
+        assertEquals(4, component.getTabIndex());
+
+        component.setNextFocusUp(component);
+        component.setNextFocusDown(component);
+        component.setNextFocusLeft(component);
+        component.setNextFocusRight(component);
+        assertSame(component, component.getNextFocusUp());
+        assertSame(component, component.getNextFocusDown());
+        assertSame(component, component.getNextFocusLeft());
+        assertSame(component, component.getNextFocusRight());
+
+        component.setOwner(component);
+        assertSame(component, component.getOwner());
+
+        component.setUIID("Test", "Test");
+        assertEquals("Test", component.getUIID());
+
+        component.setCloudBoundProperty(null);
+        component.setCloudDestinationProperty(null);
+        assertNull(component.getCloudBoundProperty());
+        assertNull(component.getCloudDestinationProperty());
     }
 
     private static class CountingComponent extends Component {
