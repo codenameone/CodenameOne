@@ -1,0 +1,195 @@
+// HelloCodenameOneUITests.m.tmpl
+// Objective-C, no modules required
+
+#import <XCTest/XCTest.h>
+#import <UIKit/UIKit.h>
+
+@interface HelloCodenameOneUITests : XCTestCase
+@end
+
+@implementation HelloCodenameOneUITests {
+    XCUIApplication *_app;
+}
+
+#pragma mark - Setup/Teardown (non-failable)
+
+- (void)setUp {
+    [super setUp];
+    self.continueAfterFailure = YES;
+
+    NSDictionary *env = NSProcessInfo.processInfo.environment;
+    NSLog(@"CN1SS:INFO:env=%@", env);
+
+    NSString *bundleID = env[@"CN1_AUT_BUNDLE_ID"];
+    if (bundleID.length == 0) {
+        // Last resort: your normal AUT id
+        bundleID = @"com.codenameone.examples";
+    }
+    NSLog(@"CN1SS:INFO:ui_test_target_bundle_id=%@", bundleID);
+    _app = [[XCUIApplication alloc] initWithBundleIdentifier:bundleID];
+
+    // Keep iOS from restoring previous state and force English locale.
+    _app.launchArguments = @[
+        @"-AppleLocale", @"en_US",
+        @"-AppleLanguages", @"(en)",
+        @"-ApplePersistenceIgnoreState", @"YES",
+        @"--cn1-test-mode", @"1"
+    ];
+
+    // Pre-launch snapshot (may be SpringBoard)
+    [self cn1_saveScreenPreferApp:@"pre_launch"];
+
+    NSLog(@"CN1SS:INFO:launch:start args=%@", _app.launchArguments);
+    [_app launch];
+    [_app activate];
+    [self cn1_waitForeground:_app timeout:45.0 step:0.5 label:@"post_launch"];
+
+    NSLog(@"CN1SS:INFO:state_after_activation=%ld exists=%d",
+          (long)_app.state, _app.exists ? 1 : 0);
+
+    // As a last resort, terminate and relaunch once (no SpringBoard)
+    if (_app.state != XCUIApplicationStateRunningForeground) {
+        @try { [_app terminate]; } @catch (__unused NSException *e) {}
+        [self cn1_saveScreenPreferApp:@"pre_relaunch"];
+        [_app launch];
+        [_app activate];
+        [self cn1_waitForeground:_app timeout:45.0 step:0.5 label:@"post_relaunch"];
+        // One extra nudge if still not foreground
+        if (_app.state != XCUIApplicationStateRunningForeground) {
+            @try { [_app terminate]; } @catch (__unused NSException *e) {}
+            [_app launch];
+            [_app activate];
+            [self cn1_waitForeground:_app timeout:20.0 step:0.5 label:@"post_second_relaunch"];
+        }
+    }
+}
+
+- (void)tearDown {
+    @try { [_app terminate]; } @catch (__unused NSException *e) {}
+    _app = nil;
+    [super tearDown];
+}
+
+#pragma mark - Single smoke test (no assertions)
+
+- (void)testSmokeLaunchAndScreenshot {
+    @try {
+        [self cn1_emitScreenshotNamed:@"MainActivity" app:_app];
+        NSLog(@"CN1SS:INFO:final_app_state=%ld exists=%d",
+              (long)_app.state, _app.exists ? 1 : 0);
+    } @catch (__unused NSException *e) {
+        NSLog(@"CN1SS:WARN:testSmokeLaunchAndScreenshot caught exception; continuing");
+    }
+    // No asserts — we only emit CN1SS output for the Java side to parse.
+}
+
+#pragma mark - CN1SS emission
+
+- (void)cn1_emitScreenshotNamed:(NSString *)name app:(XCUIApplication *)app {
+    // SAFETY: avoid failable app.screenshot if app isn't ready
+    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot;
+    if (!shot && app && app.exists && app.state == XCUIApplicationStateRunningForeground) {
+        @try { shot = app.screenshot; } @catch (__unused NSException *e) { shot = nil; }
+    }
+    if (!shot) { NSLog(@"CN1SS:WARN:test=%@ no_screenshot", name); return; }
+
+    NSData *png = shot.PNGRepresentation;
+    if (png.length == 0) { NSLog(@"CN1SS:WARN:test=%@ empty_png", name); return; }
+
+    [self cn1ssEmitChannel:@"" name:name bytes:png];
+
+    UIImage *img = [UIImage imageWithData:png];
+    if (img) {
+        NSData *jpeg = UIImageJPEGRepresentation(img, 0.12);
+        if (jpeg.length > 0) [self cn1ssEmitChannel:@"PREVIEW" name:name bytes:jpeg];
+    }
+
+    @try {
+        XCTAttachment *att = [XCTAttachment attachmentWithUniformTypeIdentifier:@"public.png"
+                                                                           name:name
+                                                                        payload:png
+                                                                        userInfo:nil];
+        att.lifetime = XCTAttachmentLifetimeKeepAlways;
+        [self addAttachment:att];
+    } @catch (__unused NSException *e) {}
+
+    [self cn1_saveScreenPreferApp:[NSString stringWithFormat:@"attach_%@", name]];
+}
+
+- (void)cn1ssEmitChannel:(NSString *)channel name:(NSString *)name bytes:(NSData *)bytes {
+    if (bytes.length == 0) return;
+    NSString *prefix = channel.length ? [@"CN1SS" stringByAppendingString:channel] : @"CN1SS";
+    NSString *b64 = [bytes base64EncodedStringWithOptions:0];
+
+    const NSUInteger chunk = 2000;
+    NSUInteger pos = 0, chunks = 0;
+    while (pos < b64.length) {
+        @autoreleasepool {
+            NSUInteger len = MIN(chunk, b64.length - pos);
+            NSString *seg = [b64 substringWithRange:NSMakeRange(pos, len)];
+            printf("%s:%s:%06lu:%s\n",
+                   prefix.UTF8String, name.UTF8String,
+                   (unsigned long)pos, seg.UTF8String);
+            pos += len; chunks += 1;
+        }
+    }
+    printf("CN1SS:END:%s\n", name.UTF8String);
+    printf("CN1SS:INFO:test=%s chunks=%lu total_b64_len=%lu\n",
+           name.UTF8String, (unsigned long)chunks, (unsigned long)b64.length);
+}
+
+#pragma mark - Snapshots & waits (prefer app image)
+
+- (void)cn1_saveScreenPreferApp:(NSString *)name {
+    XCUIScreenshot *shot = XCUIScreen.mainScreen.screenshot;
+    if (!shot && _app && _app.exists && _app.state == XCUIApplicationStateRunningForeground) {
+        @try { shot = _app.screenshot; } @catch (__unused NSException *e) { shot = nil; }
+    }
+    if (!shot) return;
+
+    NSData *png = shot.PNGRepresentation;
+    if (png.length == 0) return;
+
+    NSString *tmp = NSTemporaryDirectory(); if (tmp.length == 0) tmp = @"/tmp";
+    NSString *dir = [tmp stringByAppendingPathComponent:@"cn1screens"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    NSString *path = [dir stringByAppendingPathComponent:[name stringByAppendingString:@".png"]];
+    [png writeToFile:path atomically:NO];
+    NSLog(@"CN1SS:INFO:saved_screenshot name=%@ path=%@", name, path);
+}
+
+- (void)cn1_waitForeground:(XCUIApplication *)app
+                   timeout:(NSTimeInterval)timeout
+                      step:(NSTimeInterval)step
+                     label:(NSString *)label
+{
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+    NSUInteger attempt = 0;
+
+    while ([[NSDate date] compare:deadline] == NSOrderedAscending) {
+        attempt++;
+        XCUIApplicationState state = app.state;
+        NSLog(@"CN1SS:INFO:launch_state attempt=%lu state=%ld",
+              (unsigned long)attempt, (long)state);
+
+        if (state == XCUIApplicationStateRunningForeground) {
+            [self cn1_saveScreenPreferApp:[NSString stringWithFormat:@"%@_foreground_%lu",
+                                           label, (unsigned long)attempt]];
+            return;
+        } else {
+            [self cn1_saveScreenPreferApp:[NSString stringWithFormat:@"%@_state_%lu",
+                                           label, (unsigned long)attempt]];
+        }
+
+        // Nudge: re-activate periodically in case of transient backgrounding
+        if ((attempt % 8) == 0) { @try { [app activate]; } @catch (__unused NSException *e) {} }
+
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:step]];
+    }
+    NSLog(@"CN1SS:WARN:%@_timeout state=%ld", label, (long)app.state);
+}
+
+@end
