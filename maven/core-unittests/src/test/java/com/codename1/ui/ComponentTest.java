@@ -8,6 +8,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextHolder;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.Test;
@@ -228,6 +229,201 @@ class ComponentTest extends UITestBase {
         assertTrue(component.hideNativeOverlayCalled);
     }
 
+    @Test
+    void testPreferredSizeParsingAndScrollSizing() {
+        Dimension base = new Dimension(10, 20);
+        Dimension parsed = Component.parsePreferredSize("15px 25px", base);
+        assertSame(base, parsed, "Parser should reuse the provided dimension instance");
+        assertEquals(15, parsed.getWidth());
+        assertEquals(25, parsed.getHeight());
+
+        Dimension inherit = Component.parsePreferredSize("inherit inherit", new Dimension(7, 9));
+        assertEquals(7, inherit.getWidth(), "inherit should leave the width untouched");
+        assertEquals(9, inherit.getHeight(), "inherit should leave the height untouched");
+
+        InspectableComponent component = new InspectableComponent();
+        component.setPreferredDimension(12, 18);
+
+        Dimension preferred = component.getPreferredSize();
+        assertEquals(new Dimension(12, 18), preferred);
+        assertEquals(1, component.calcPrefCalls, "Initial preferred size should be calculated once");
+
+        component.getStyle().setMargin(2, 3, 4, 5);
+        Dimension withMargin = component.getPreferredSizeWithMargin();
+        assertEquals(new Dimension(12 + 4 + 5, 18 + 2 + 3), withMargin, "Preferred size with margin should include style margins");
+
+        component.setPreferredSizeStr("30 40");
+        Dimension stringPreferred = component.getPreferredSize();
+        assertEquals(new Dimension(30, 40), stringPreferred, "Preferred size string should override calculated size");
+        assertEquals("30 40", component.getPreferredSizeStr());
+
+        component.setScrollSize(new Dimension(100, 90));
+        Dimension customScroll = component.getScrollDimension();
+        assertEquals(new Dimension(100, 90), customScroll, "Custom scroll size should be returned as-is");
+
+        component.setScrollSize(null);
+        component.setPreferredDimension(50, 60);
+        component.setShouldCalcPreferredSize(true);
+        Dimension recalculatedScroll = component.getScrollDimension();
+        assertEquals(new Dimension(50, 60), recalculatedScroll, "Resetting scroll size should defer to calculated preferred size");
+        assertTrue(component.calcScrollCalls > 0, "Scroll dimension recalculation should invoke calcScrollSize");
+    }
+
+    @Test
+    void testInlineStylesAndGrouping() {
+        InspectableComponent first = new InspectableComponent();
+        InspectableComponent second = new InspectableComponent();
+        first.setPreferredDimension(10, 15);
+        second.setPreferredDimension(12, 22);
+
+        Component.setSameHeight(first, second);
+        assertNotNull(first.getSameHeight());
+        assertNotNull(second.getSameHeight());
+
+        int sharedHeight = first.getPreferredSize().getHeight();
+        assertEquals(sharedHeight, second.getPreferredSize().getHeight(), "Grouped components should share the largest preferred height");
+        assertEquals(22, sharedHeight, "Preferred height should match the tallest component");
+
+        Component.setSameHeight(first);
+        assertNull(first.getSameHeight(), "Removing a group should clear references");
+
+        InspectableComponent inline = new InspectableComponent();
+        inline.setInlineAllStyles("fgColor:ff0000");
+        inline.setInlineSelectedStyles("font:2mm");
+        inline.setInlineUnselectedStyles("bgColor:00ff00");
+        inline.setInlineDisabledStyles("opacity:0.5");
+        inline.setInlinePressedStyles("border:1px");
+
+        assertEquals("fgColor:ff0000", inline.getInlineAllStyles());
+        assertEquals("font:2mm", inline.getInlineSelectedStyles());
+        assertEquals("bgColor:00ff00", inline.getInlineUnselectedStyles());
+        assertEquals("opacity:0.5", inline.getInlineDisabledStyles());
+        assertEquals("border:1px", inline.getInlinePressedStyles());
+
+        inline.setInlineAllStyles("   ");
+        inline.setInlineSelectedStyles("   ");
+        inline.setInlineUnselectedStyles("   ");
+        inline.setInlineDisabledStyles("   ");
+        inline.setInlinePressedStyles("   ");
+
+        assertNull(inline.getInlineAllStyles(), "Whitespace should clear inline styles");
+        assertNull(inline.getInlineSelectedStyles());
+        assertNull(inline.getInlineUnselectedStyles());
+        assertNull(inline.getInlineDisabledStyles());
+        assertNull(inline.getInlinePressedStyles());
+    }
+
+    @Test
+    void testGeometryOwnershipAndVisibilityHelpers() {
+        InspectableContainer root = new InspectableContainer();
+        root.setX(50);
+        root.setY(60);
+        root.setWidth(200);
+        root.setHeight(150);
+        root.forceInitialized(true);
+        root.setVisible(true);
+
+        InspectableComponent child = new InspectableComponent();
+        child.setX(10);
+        child.setY(15);
+        child.setWidth(40);
+        child.setHeight(30);
+        child.getStyle().setMargin(2, 3, 4, 5);
+        child.getStyle().setPadding(6, 7, 8, 9);
+        root.addComponent(child);
+        child.forceInitialized(true);
+        child.setVisible(true);
+
+        Rectangle bounds = child.getBounds(new Rectangle());
+        assertEquals(new Rectangle(10, 15, 40, 30), bounds);
+
+        Rectangle visibleBounds = child.getVisibleBounds(new Rectangle());
+        assertEquals(bounds, visibleBounds);
+
+        Rectangle visibleRect = new Rectangle();
+        child.getVisibleRect(visibleRect, true);
+        assertEquals(child.getAbsoluteX(), visibleRect.getX());
+        assertEquals(child.getAbsoluteY(), visibleRect.getY());
+        assertEquals(child.getWidth(), visibleRect.getWidth());
+        assertEquals(child.getHeight(), visibleRect.getHeight());
+
+        int innerX = child.getInnerX();
+        int outerX = child.getOuterX();
+        int innerY = child.getInnerY();
+        int outerY = child.getOuterY();
+        assertEquals(child.getX() + 8, innerX);
+        assertEquals(child.getX() - 4, outerX);
+        assertEquals(child.getY() + 6, innerY);
+        assertEquals(child.getY() - 2, outerY);
+
+        assertEquals(child.getWidth() + child.getStyle().getHorizontalMargins(), child.getOuterWidth());
+        assertEquals(child.getWidth() - child.getStyle().getHorizontalPadding(), child.getInnerWidth());
+
+        int relativeX = child.getRelativeX(root);
+        int relativeY = child.getRelativeY(root);
+        assertEquals(child.getX(), relativeX);
+        assertEquals(child.getY(), relativeY);
+
+        int insideX = child.getAbsoluteX() + 1;
+        int insideY = child.getAbsoluteY() + 1;
+        assertTrue(child.contains(insideX, insideY));
+        assertTrue(child.visibleBoundsContains(insideX, insideY));
+        assertTrue(child.containsOrOwns(insideX, insideY));
+
+        Component owner = new Component();
+        child.setOwner(owner);
+        assertTrue(child.isOwnedBy(owner));
+
+        Component outside = new Component();
+        assertFalse(child.visibleBoundsContains(outside.getAbsoluteX(), outside.getAbsoluteY()));
+    }
+
+    @Test
+    void testFocusTraversalAndDragFlags() {
+        InspectableComponent component = new InspectableComponent();
+        InspectableComponent next = new InspectableComponent();
+        InspectableComponent prev = new InspectableComponent();
+        InspectableComponent left = new InspectableComponent();
+        InspectableComponent right = new InspectableComponent();
+
+        component.setFocusable(true);
+        component.setVisible(true);
+        component.setEnabled(true);
+
+        component.setPreferredTabIndex(-1);
+        component.setTraversable(true);
+        assertTrue(component.isTraversable(), "Enabling traversable should set a non-negative preferred tab index");
+        assertEquals(0, component.getPreferredTabIndex());
+
+        component.setTraversable(false);
+        assertFalse(component.isTraversable());
+        assertEquals(-1, component.getPreferredTabIndex());
+
+        component.setTabIndex(5);
+        assertEquals(5, component.getTabIndex());
+
+        component.setNextFocusDown(next);
+        component.setNextFocusUp(prev);
+        component.setNextFocusLeft(left);
+        component.setNextFocusRight(right);
+        assertSame(next, component.getNextFocusDown());
+        assertSame(prev, component.getNextFocusUp());
+        assertSame(left, component.getNextFocusLeft());
+        assertSame(right, component.getNextFocusRight());
+
+        component.setBlockLead(true);
+        assertTrue(component.isBlockLead());
+
+        component.setDragTransparency((byte) 120);
+        assertEquals(120, component.getDragTransparency());
+
+        component.setDragActivated(true);
+        assertTrue(component.isDragActivatedPublic());
+
+        component.setScrollAnimationSpeed(750);
+        assertEquals(750, component.getScrollAnimationSpeed());
+    }
+
     private static class CountingComponent extends Component {
         int repaintCalls;
 
@@ -330,6 +526,43 @@ class ComponentTest extends UITestBase {
         @Override
         public void setText(String text) {
             this.text = text;
+        }
+    }
+
+    private static class InspectableComponent extends Component {
+        private Dimension preferred = new Dimension(10, 10);
+        int calcPrefCalls;
+        int calcScrollCalls;
+
+        void setPreferredDimension(int width, int height) {
+            preferred = new Dimension(width, height);
+            setShouldCalcPreferredSize(true);
+        }
+
+        void forceInitialized(boolean value) {
+            setInitialized(value);
+        }
+
+        boolean isDragActivatedPublic() {
+            return isDragActivated();
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+            calcPrefCalls++;
+            return new Dimension(preferred);
+        }
+
+        @Override
+        protected Dimension calcScrollSize() {
+            calcScrollCalls++;
+            return new Dimension(preferred);
+        }
+    }
+
+    private static class InspectableContainer extends Container {
+        void forceInitialized(boolean value) {
+            setInitialized(value);
         }
     }
 }
