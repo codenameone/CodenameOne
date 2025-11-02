@@ -356,7 +356,12 @@ class ComponentCoverageTest extends UITestBase {
 
     @Test
     void testPointerReleasedEvent() {
+        Form form = new Form(new BorderLayout());
         TestableComponent component = new TestableComponent();
+        component.setWidth(100);
+        component.setHeight(100);
+        form.add(BorderLayout.CENTER, component);
+        form.show();
 
         final boolean[] releaseCalled = {false};
         component.addPointerReleasedListener(evt -> releaseCalled[0] = true);
@@ -766,8 +771,15 @@ class ComponentCoverageTest extends UITestBase {
     void testTactileTouch() {
         TestableComponent component = new TestableComponent();
 
+        // tactileTouch defaults to isFocusable(), so set focusable to false first
+        component.setFocusable(false);
+        component.setTactileTouch(false);
+
         assertFalse(component.isTactileTouch(10, 20));
         assertFalse(component.isTactileTouch());
+
+        component.setTactileTouch(true);
+        assertTrue(component.isTactileTouch());
     }
 
     @Test
@@ -806,14 +818,15 @@ class ComponentCoverageTest extends UITestBase {
     void testHintLabel() {
         TestableComponent component = new TestableComponent();
 
+        // Base Component class has stub implementations that always return null
         assertNull(component.getHintLabelImpl());
 
         Label hint = new Label("Hint");
-        component.setHintLabelImpl(hint);
-        assertSame(hint, component.getHintLabelImpl());
+        // setHintLabelImpl is a stub in base Component - meant to be overridden
+        assertDoesNotThrow(() -> component.setHintLabelImpl(hint));
 
-        boolean shouldShow = component.shouldShowHint();
-        assertNotNull(shouldShow);
+        // shouldShowHint returns false in base Component
+        assertFalse(component.shouldShowHint());
     }
 
     @Test
@@ -865,6 +878,10 @@ class ComponentCoverageTest extends UITestBase {
         boolean painted = false;
         boolean dragFinishedCalled = false;
 
+        TestableComponent() {
+            setUIID("Label");
+        }
+
         @Override
         public void paint(Graphics g) {
             painted = true;
@@ -889,6 +906,10 @@ class ComponentCoverageTest extends UITestBase {
     }
 
     private static class ScrollableComponent extends Component {
+        ScrollableComponent() {
+            setUIID("Label");
+        }
+
         @Override
         public boolean isScrollableY() {
             return true;
