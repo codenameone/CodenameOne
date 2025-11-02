@@ -199,19 +199,8 @@ XCODE_TEST_FILTERS=(
 )
 
 set -o pipefail
-if ! xcodebuild \
-  -workspace "$WORKSPACE_PATH" \
-  -scheme "$SCHEME" \
-  -sdk iphonesimulator \
-  -configuration Debug \
-  -destination "$SIM_DESTINATION" \
-  -derivedDataPath "$DERIVED_DATA_DIR" \
-  -resultBundlePath "$RESULT_BUNDLE" \
-  "${XCODE_TEST_FILTERS[@]}" \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-  GENERATE_INFOPLIST_FILE=YES \
-  test | tee "$TEST_LOG"; then
-  ri_log "STAGE:XCODE_TEST_FAILED -> See $TEST_LOG"
+if ! "$JAVA17_HOME/bin/java" -cp scripts/java BuildAndRun ios | tee "$TEST_LOG"; then
+  ri_log "STAGE:TEST_FAILED -> See $TEST_LOG"
   exit 10
 fi
 set +o pipefail
