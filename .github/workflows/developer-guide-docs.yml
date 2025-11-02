@@ -114,6 +114,20 @@ jobs:
             echo "REV_HUMAN_DATE=$REV_HUMAN_DATE"
           } >> "$GITHUB_ENV"
 
+      - name: Determine Codename One release version
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 scripts/developer-guide/determine_release_version.py)"
+          if [ -z "$VERSION" ]; then
+            echo "Unable to determine Codename One release version" >&2
+            exit 1
+          fi
+          echo "Using Codename One release version: $VERSION" >&2
+          {
+            echo "CN1_RELEASE_VERSION=$VERSION"
+            echo "CN1_PLUGIN_RELEASE_VERSION=$VERSION"
+          } >> "$GITHUB_ENV"
+
       - name: Render publication cover artwork
         run: |
           set -euo pipefail

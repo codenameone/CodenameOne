@@ -28,7 +28,17 @@
 :copyright: Codename One, all rights reserved
 :publication-type: book
 :producer: Codename One Ltd.
-:partnums:
+:cn1-release-version: {env:CN1_RELEASE_VERSION}
+ifeval::["{cn1-release-version}" == ""]
+:cn1-release-version: 7.0.21
+endif::[]
+
+:cn1-plugin-release-version: {env:CN1_PLUGIN_RELEASE_VERSION}
+ifeval::["{cn1-plugin-release-version}" == ""]
+:cn1-plugin-release-version: {cn1-release-version}
+endif::[]
+
+:cn1-snapshot-version: {cn1-release-version}-SNAPSHOT
 
 = {doctitle}
 {author}
@@ -37,11 +47,7 @@ toc::[]
 
 include::About-This-Guide.asciidoc[]
 
-= Part I. Project Setup
-
 include::Maven-Project-Workflow.asciidoc[]
-
-= Part II. Foundations
 
 include::Index.asciidoc[]
 
@@ -53,8 +59,6 @@ include::Advanced-Theming.asciidoc[]
 
 include::css.asciidoc[]
 
-= Part III. User Interface and Experience
-
 include::The-Components-Of-Codename-One.asciidoc[]
 
 include::Animations.asciidoc[]
@@ -62,8 +66,6 @@ include::Animations.asciidoc[]
 include::The-EDT---Event-Dispatch-Thread.asciidoc[]
 
 include::graphics.asciidoc[]
-
-= Part IV. Application Services
 
 include::Events.asciidoc[]
 
@@ -77,8 +79,6 @@ include::performance.asciidoc[]
 
 include::Monetization.asciidoc[]
 
-= Part V. Platform and Deployment
-
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
 include::security.asciidoc[]
@@ -91,9 +91,17 @@ include::Working-With-Javascript.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
 
-= Part VI. Contributing and Appendices
-
 include::Working-With-CodenameOne-Sources.asciidoc[]
+
+include::Maven-Appendix-Archetypes.adoc[]
+
+include::Maven-Appendix-Goals.adoc[]
+
+include::Maven-Appendix-API.adoc[]
+
+include::Maven-Appendix-Control-Center.adoc[]
+
+include::Maven-Appendix-Rich-Properties.adoc[]
 
 = Historical Reference
 

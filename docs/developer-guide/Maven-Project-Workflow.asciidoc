@@ -8,8 +8,5 @@ include::Maven-Getting-Started.adoc[leveloffset=+1]
 include::Maven-Updating-Codename-One.adoc[leveloffset=+1]
 include::Maven-Project-Templates.adoc[leveloffset=+1]
 include::Maven-Creating-CN1Libs.adoc[leveloffset=+1]
-include::Maven-Appendix-Archetypes.adoc[leveloffset=+1]
-include::Maven-Appendix-Goals.adoc[leveloffset=+1]
-include::Maven-Appendix-API.adoc[leveloffset=+1]
-include::Maven-Appendix-Control-Center.adoc[leveloffset=+1]
-include::Maven-Appendix-Rich-Properties.adoc[leveloffset=+1]
+
+// The detailed Maven appendices now live alongside the other appendices at the end of the guide.

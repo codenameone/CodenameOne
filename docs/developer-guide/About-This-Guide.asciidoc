@@ -17,7 +17,7 @@ While this guide focuses on tutorial and conceptual material, the complete API r
 
 This document includes content from multiple authors and community wiki edits. If you edit pages within the guide feel free to add your name here alphabetized by surname:
 
-- https://github.com/codenameone/[Shai Almog]
+- https://github.com/shai-almog[Shai Almog]
 - https://github.com/Isborg[Ismael Baum]
 - https://twitter.com/ericcoolmandev[Eric Coolman]
 - http://github.com/chen-fishbein/[Chen Fishbein]
