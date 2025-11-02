@@ -76,7 +76,7 @@ The https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.h
 
 Here is an example which generates a project based on the bare-bones kotlin template:
 
-[source,bash]
+[source,bash,subs="+attributes"]
 ----
 mvn com.codenameone:codenameone-maven-plugin:{cn1-plugin-release-version}:generate-app-project \
   -DarchetypeGroupId=$archetypeGroupId \
@@ -116,7 +116,7 @@ If you have an existing Codename One application project that uses the old Ant p
 
 A minimal invocation of this goal would look like:
 
-[source,bash]
+[source,bash,subs="+attributes"]
 ----
 # Specify your the version of the codenameone-maven-plugin.
 # Find the latest version at
@@ -137,7 +137,7 @@ After building the project, try running it to make sure that the migration worke
 
 ==== Command Line
 
-[source,bash]
+[source,bash,subs="+attributes"]
 ----
 cd myapp
 ./run.sh
