@@ -351,9 +351,9 @@ class ComponentTest extends UITestBase {
         int outerX = child.getOuterX();
         int innerY = child.getInnerY();
         int outerY = child.getOuterY();
-        assertEquals(child.getX() + 8, innerX);
+        assertEquals(child.getX() + child.getStyle().getMarginLeftNoRTL(), innerX);
         assertEquals(child.getX() - 4, outerX);
-        assertEquals(child.getY() + 6, innerY);
+        assertEquals(child.getY() + child.getStyle().getPaddingTop(), innerY);
         assertEquals(child.getY() - 2, outerY);
 
         assertEquals(child.getWidth() + child.getStyle().getHorizontalMargins(), child.getOuterWidth());
