@@ -230,6 +230,86 @@ class ComponentTest extends UITestBase {
     }
 
     @Test
+    void testPointerAnimationAndRenderingUtilities() {
+        Form form = new Form();
+        Container wrapper = new Container();
+        form.add(wrapper);
+
+        CoverageComponent component = new CoverageComponent();
+        component.setWidth(40);
+        component.setHeight(30);
+        component.setX(5);
+        component.setY(7);
+        component.setDraggable(true);
+        component.setScrollableX(true);
+        component.setScrollableY(true);
+        component.setScrollOpacityChangeSpeed(120);
+        component.setDragTransparency((byte) 200);
+        component.setDropTarget(true);
+        assertTrue(component.draggingOver(component, 1, 1));
+        component.setDragActivated(true);
+        component.setTensileDragEnabled(true);
+        component.setTensileLength(50);
+        component.setSnapToGrid(true);
+        component.setFlatten(true);
+        component.setPreferredSizeStr("20 25");
+        assertEquals("20 25", component.getPreferredSizeStr());
+
+        wrapper.add(component);
+
+        Image canvas = Image.createImage(80, 80, 0x0);
+        Graphics g = canvas.getGraphics();
+
+        assertFalse(component.animate());
+
+        Style source = component.getUnselectedStyle();
+        Style target = component.getSelectedStyle();
+        assertNotNull(component.createStyleAnimation(source, target, 100, component.getUIID()));
+
+        assertNotNull(component.getDragImage());
+        assertNotNull(component.toImage());
+        assertEquals(Component.DRAG_REGION_LIKELY_DRAG_XY, component.getDragRegionStatus(1, 1));
+        assertTrue(component.isDraggable());
+        assertTrue(component.isDragActivated());
+        assertTrue(component.isTensileDragEnabled());
+        assertEquals(50, component.getTensileLength());
+        assertTrue(component.isSnapToGrid());
+        assertTrue(component.isFlatten());
+        assertEquals(120, component.getScrollOpacityChangeSpeed());
+        assertEquals(0xff, component.getScrollOpacity());
+        assertEquals(200, component.getDragTransparency());
+        assertTrue(component.isDropTarget());
+        assertNotNull(component.paintLock(false));
+        component.paintLockRelease();
+
+        component.paintRippleOverlay(g, component.getX(), component.getY(), 500);
+        component.paintRippleOverlay(g, component.getX(), component.getY(), 1000);
+
+        assertEquals(component, component.getScrollable());
+        assertTrue(component.respondsToPointerEvents());
+
+        final boolean[] pointerDragTriggered = {false};
+        component.addPointerDraggedListener(evt -> pointerDragTriggered[0] = true);
+
+        form.pointerPressed(component.getAbsoluteX() + 1, component.getAbsoluteY() + 1);
+        component.pointerDragged(new int[]{component.getAbsoluteX() + 2}, new int[]{component.getAbsoluteY() + 2});
+        assertTrue(pointerDragTriggered[0], "Pointer drag listener should trigger");
+
+        component.pointerPressed(new int[]{component.getAbsoluteX()}, new int[]{component.getAbsoluteY()});
+        component.pointerReleased(new int[]{component.getAbsoluteX()}, new int[]{component.getAbsoluteY()});
+
+        component.repaint(0, 0, 10, 10);
+
+        component.drawDraggedImage(g);
+        component.drawDraggedImage(g, component.getDragImage(), component.getX(), component.getY());
+
+        component.registerElevatedInternal(component);
+        component.tryDeregisterAnimated();
+
+        assertTrue(component.isInClippingRegion(g));
+    }
+
+    @Test
     void testPreferredSizeParsingAndScrollSizing() {
         Dimension base = new Dimension(10, 20);
         Dimension parsed = Component.parsePreferredSize("15px 25px", base);
@@ -663,6 +743,24 @@ class ComponentTest extends UITestBase {
     private static class InspectableContainer extends Container {
         void forceInitialized(boolean value) {
             setInitialized(value);
+        }
+    }
+
+    private static class CoverageComponent extends Component {
+        CoverageComponent() {
+            setUIID("Label");
+        }
+
+        @Override
+        protected void paintBackground(Graphics g) {
+            g.setColor(0xff00ff);
+            g.fillRect(getX(), getY(), getWidth(), getHeight());
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            g.setColor(0);
+            g.drawRect(getX(), getY(), getWidth(), getHeight());
         }
     }
 }
