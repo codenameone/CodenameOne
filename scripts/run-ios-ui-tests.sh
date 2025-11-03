@@ -117,96 +117,102 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
+trim_whitespace() {
+  local value="$1"
+  value="${value#${value%%[![:space:]]*}}"
+  value="${value%${value##*[![:space:]]}}"
+  printf '%s' "$value"
+}
+
+normalize_destination() {
+  local raw="$1"
+  IFS=',' read -r -a parts <<< "$raw"
+  local platform="" id="" os="" name="" normalized
+  local extras=()
+  for part in "${parts[@]}"; do
+    part="$(trim_whitespace "$part")"
+    case "$part" in
+      platform=*) platform="${part#platform=}" ;;
+      id=*) id="${part#id=}" ;;
+      OS=*) os="${part#OS=}" ;;
+      os=*) os="${part#os=}" ;;
+      name=*) name="${part#name=}" ;;
+      '') ;;
+      *) extras+=("$part") ;;
+    esac
+  done
+  [ -z "$platform" ] && platform="iOS Simulator"
+  normalized="platform=$platform"
+  [ -n "$id" ] && normalized+="\,id=$id"
+  [ -n "$os" ] && normalized+="\,OS=$os"
+  [ -n "$name" ] && normalized+="\,name=$name"
+  if [ ${#extras[@]} -gt 0 ]; then
+    for extra in "${extras[@]}"; do
+      [ -n "$extra" ] && normalized+="\,$extra"
+    done
+  fi
+  printf '%s\n' "$normalized"
+}
+
 auto_select_destination() {
   local show_dest selected rc=0
   set +e
-  show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>&1)"
+  show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
   rc=$?
   set -e
 
-  if command -v python3 >/dev/null 2>&1 && [ -n "${show_dest:-}" ]; then
-    selected="$(
-      printf '%s\n' "$show_dest" | python3 - <<'PY'
-import re
-import sys
-
-def version_key(value: str):
-    digits = [int(part) for part in re.findall(r\"\d+\", value or \"")]
-    return tuple(digits)
-
-def parse_blocks(text: str):
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith('{') and line.endswith('}'):
-            yield line.strip('{}')
-        elif '{' in line and '}' in line:
-            yield line[line.find('{') + 1:line.rfind('}')]
-
-candidates = []
-for block in parse_blocks(sys.stdin.read()):
-    fields = {}
-    for segment in block.split(','):
-        if ':' not in segment:
-            continue
-        key, value = segment.split(':', 1)
-        fields[key.strip().lower()] = value.strip()
-    if fields.get('platform') != 'iOS Simulator':
-        continue
-    ident = fields.get('id')
-    if not ident:
-        continue
-    name = fields.get('name', '')
-    os_version = fields.get('os', fields.get('osversion', ''))
-    priority = 2 if 'iphone' in name.lower() else (1 if 'ipad' in name.lower() else 0)
-    candidates.append((priority, version_key(os_version), name.strip(), ident.strip(), os_version.strip()))
-
-if candidates:
-    priority, os_key, name, ident, os_version = sorted(candidates, reverse=True)[0]
-    extra = f",OS={os_version}" if os_version else ""
-    print(f"platform=iOS Simulator,id={ident}{extra},name={name}")
-PY
-    )"
-  fi
-
-  if [ -z "${selected:-}" ] && command -v python3 >/dev/null 2>&1 && command -v xcrun >/dev/null 2>&1; then
-    selected="$(
-      xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
-import json
-import re
-import sys
-
-def version_key(value: str):
-    return tuple(int(part) for part in re.findall(r\"\d+\", value or \""))
-
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(0)
-
-candidates = []
-for runtime, entries in (data.get('devices') or {}).items():
-    if 'iOS' not in runtime:
-        continue
-    version = runtime.split('iOS-')[-1].replace('-', '.')
-    vkey = version_key(version)
-    for entry in entries or []:
-        if not entry.get('isAvailable'):
-            continue
-        ident = (entry.get('udid') or '').strip()
-        name = (entry.get('name') or '').strip()
-        if not ident:
-            continue
-        priority = 2 if 'iphone' in name.lower() else (1 if 'ipad' in name.lower() else 0)
-        candidates.append((priority, vkey, name, ident, version))
-
-if candidates:
-    priority, vkey, name, ident, version = sorted(candidates, reverse=True)[0]
-    extra = f",OS={version}" if version else ""
-    print(f"platform=iOS Simulator,id={ident}{extra},name={name}")
-PY
-    )"
+  if [ -n "${show_dest:-}" ]; then
+    selected="$(printf '%s\n' "$show_dest" | awk '
+      BEGIN {
+        section="";
+        best="";
+        bestpri=-1;
+        bestv1=-1;
+        bestv2=-1;
+        bestv3=-1;
+      }
+      /Available destinations/ { section="available"; next }
+      /Ineligible destinations/ { section="other"; next }
+      /Local destinations/ { section="other"; next }
+      section != "available" { next }
+      index($0, "{") == 0 { next }
+      line=$0
+      gsub(/[{}]/, "", line)
+      platform=""
+      id=""
+      name=""
+      os=""
+      while (match(line, /[A-Za-z][A-Za-z[:space:]]*:[^,]+/)) {
+        segment=substr(line, RSTART, RLENGTH)
+        line=substr(line, RSTART + RLENGTH + 1)
+        split(segment, kv, ":")
+        key=kv[1]
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+        value=substr(segment, length(kv[1]) + 2)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        if (key == "platform") platform=value
+        else if (key == "id") id=value
+        else if (key == "name") name=value
+        else if (key == "OS" || key == "OS version") os=value
+      }
+      if (platform != "iOS Simulator" || id == "") next
+      lname=tolower(name)
+      pri = index(lname, "iphone") ? 2 : (index(lname, "ipad") ? 1 : 0)
+      split(os, parts, ".")
+      v1 = parts[1] + 0
+      v2 = parts[2] + 0
+      v3 = parts[3] + 0
+      if (pri > bestpri || (pri == bestpri && (v1 > bestv1 || (v1 == bestv1 && (v2 > bestv2 || (v2 == bestv2 && v3 > bestv3)))))) {
+        bestpri = pri
+        bestv1 = v1
+        bestv2 = v2
+        bestv3 = v3
+        best = sprintf("platform=iOS Simulator,id=%s%s,name=%s", id, os != "" ? sprintf(",OS=%s", os) : "", name)
+      }
+      END {
+        if (bestpri >= 0) print best
+      }
+    ')"
   fi
 
   if [ -n "${selected:-}" ]; then
@@ -220,49 +226,66 @@ PY
 
 
 fallback_sim_destination() {
-  if ! command -v xcrun >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+  if ! command -v xcrun >/dev/null 2>&1; then
     return
   fi
 
-  xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
-import json
-import re
-import sys
+  local best_line="" best_key="" current_version="" lower_name="" lower_state=""
 
-def version_key(value: str):
-    return tuple(int(part) for part in re.findall(r\"\d+\", value or \""))
-
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit()
-
-best = None
-best_info = None
-for runtime, entries in (data.get('devices') or {}).items():
-    if 'iOS' not in runtime:
+  while IFS= read -r raw_line; do
+    case "$raw_line" in
+      --\ iOS\ *--)
+        current_version="$(printf '%s\n' "$raw_line" | sed -n 's/.*-- iOS \([0-9.]*\) --.*/\1/p')"
         continue
-    version = runtime.split('iOS-')[-1].replace('-', '.')
-    vkey = version_key(version)
-    for entry in entries or []:
-        if not entry.get('isAvailable'):
-            continue
-        ident = (entry.get('udid') or '').strip()
-        name = (entry.get('name') or '').strip()
-        if not ident or not name:
-            continue
-        priority = 2 if 'iphone' in name.lower() else (1 if 'ipad' in name.lower() else 0)
-        booted = 1 if (entry.get('state') or '').lower() == 'booted' else 0
-        candidate = (priority, vkey, booted, name.lower(), ident)
-        if best is None or candidate > best:
-            best = candidate
-            best_info = (name, ident, version)
+        ;;
+      --\ *--)
+        current_version=""
+        continue
+        ;;
+    esac
 
-if best_info:
-    name, ident, version = best_info
-    extra = f",OS={version}" if version else ""
-    print(f"platform=iOS Simulator,id={ident}{extra},name={name}")
-PY
+    [ -z "$current_version" ] && continue
+    line="${raw_line#${raw_line%%[![:space:]]*}}"
+    [ -z "$line" ] && continue
+
+    name="${line%% (*}"
+    rest="${line#* (}"
+    [ "$rest" = "$line" ] && continue
+    id="${rest%%)*}"
+    state="${line##*(}"
+    state="${state%)}"
+    name="$(trim_whitespace "$name")"
+    id="$(trim_whitespace "$id")"
+    state="$(trim_whitespace "$state")"
+    [ -z "$name" ] && continue
+    [ -z "$id" ] && continue
+
+    lower_name="$(printf '%s' "$name" | tr 'A-Z' 'a-z')"
+    case "$lower_name" in
+      *iphone*) priority=2 ;;
+      *ipad*) priority=1 ;;
+      *) priority=0 ;;
+    esac
+
+    lower_state="$(printf '%s' "$state" | tr 'A-Z' 'a-z')"
+    boot=0
+    [ "$lower_state" = "booted" ] && boot=1
+
+    IFS='.' read -r v1 v2 v3 <<< "$current_version"
+    v1=${v1:-0}; v2=${v2:-0}; v3=${v3:-0}
+
+    candidate_key=$(printf '%d-%03d-%03d-%03d-%d' "$priority" "$v1" "$v2" "$v3" "$boot")
+    if [ -z "$best_key" ] || [[ "$candidate_key" > "$best_key" ]]; then
+      best_key="$candidate_key"
+      best_line="platform=iOS Simulator,id=$id"
+      [ -n "$current_version" ] && best_line="$best_line,OS=$current_version"
+      best_line="$best_line,name=$name"
+    fi
+  done < <(xcrun simctl list devices 2>/dev/null)
+
+  if [ -n "$best_line" ]; then
+    printf '%s\n' "$best_line"
+  fi
 }
 
 
@@ -283,10 +306,12 @@ if [ -z "$SIM_DESTINATION" ]; then
     SIM_DESTINATION="$FALLBACK_DESTINATION"
     ri_log "Using fallback simulator destination '$SIM_DESTINATION'"
   else
-    SIM_DESTINATION="platform=iOS Simulator,name=iPhone 14"
+    SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16"
     ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
   fi
 fi
+
+SIM_DESTINATION="$(normalize_destination "$SIM_DESTINATION")"
 
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
 
@@ -350,44 +375,30 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   SIM_DEVICE_ID=""
   SIM_DEVICE_ID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r' | sed 's/[[:space:]]//g')"
   if [ -z "$SIM_DEVICE_ID" ] || [ "$SIM_DEVICE_ID" = "$SIM_DESTINATION" ]; then
-    SIM_DEVICE_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p' | sed 's/^ *//;s/ *$//')"
-    if [ -n "$SIM_DEVICE_NAME" ] && command -v python3 >/dev/null 2>&1; then
-      SIM_DEVICE_ID="$(xcrun simctl list devices --json 2>/dev/null | python3 - "$SIM_DEVICE_NAME" <<'EOS'
-import json, sys
-name = sys.argv[1]
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit()
-for runtime, devices in (data.get("devices") or {}).items():
-    for device in devices or []:
-        if not device.get("isAvailable"):
-            continue
-        if device.get("name") == name:
-            print(device.get("udid") or "")
-            sys.exit()
-EOS
-)"
-    fi
-    if [ -z "$SIM_DEVICE_ID" ] && [ -n "$SIM_DEVICE_NAME" ]; then
-      SIM_DEVICE_ID="$(xcrun simctl list devices 2>/dev/null | awk -v target="$SIM_DEVICE_NAME" '
-        /^-- iOS / { ios=1; next }
-        /^-- / { ios=0 }
-        !ios { next }
-        {
-          line=$0
-          gsub(/^\s+/, "", line)
-          name=line
-          sub(/\s*\(.*/, "", name)
-          if (name != target) next
-          udid=line
-          sub(/^[^(]*\(/, "", udid)
-          sub(/\).*/, "", udid)
-          gsub(/^[[:space:]]+|[[:space:]]+$/, "", udid)
-          print udid
-          exit
-        }
-      ')"
+    SIM_DEVICE_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
+    SIM_DEVICE_NAME="$(trim_whitespace "${SIM_DEVICE_NAME:-}")"
+    if [ -n "$SIM_DEVICE_NAME" ]; then
+      resolved_id=""
+      in_ios=0
+      while IFS= read -r raw_line; do
+        case "$raw_line" in
+          --\ iOS\ *--) in_ios=1; continue ;;
+          --\ *--) in_ios=0; continue ;;
+        esac
+        [ "$in_ios" -eq 0 ] && continue
+        line="${raw_line#${raw_line%%[![:space:]]*}}"
+        [ -z "$line" ] && continue
+        name_part="${line%% (*}"
+        rest="${line#* (}"
+        [ "$rest" = "$line" ] && continue
+        id_part="${rest%%)*}"
+        name_candidate="$(trim_whitespace "$name_part")"
+        if [ "$name_candidate" = "$SIM_DEVICE_NAME" ]; then
+          resolved_id="$(trim_whitespace "$id_part")"
+          break
+        fi
+      done < <(xcrun simctl list devices 2>/dev/null)
+      SIM_DEVICE_ID="$resolved_id"
     fi
   fi
 

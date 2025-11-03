@@ -36,7 +36,7 @@ public class BrowserComponentScreenshotTest extends AbstractTest {
             return false;
         }
 
-        Cn1ssDeviceRunnerHelper.waitForMillis(1500);
+        Cn1ssDeviceRunnerHelper.waitForMillis(3000);
 
         final boolean[] result = new boolean[1];
         Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
