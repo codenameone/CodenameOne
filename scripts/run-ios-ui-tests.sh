@@ -288,8 +288,11 @@ if [ -z "$BUNDLE_IDENTIFIER" ]; then
 fi
 APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
-SIM_DEVICE_ID="${SIM_DESTINATION##*id=}"
-SIM_DEVICE_ID="${SIM_DEVICE_ID%%,*}"
+SIM_DEVICE_ID=""
+if printf '%s' "$SIM_DESTINATION" | grep -q 'id='; then
+  SIM_DEVICE_ID="${SIM_DESTINATION##*id=}"
+  SIM_DEVICE_ID="${SIM_DEVICE_ID%%,*}"
+fi
 if [ -z "$SIM_DEVICE_ID" ] || [ "$SIM_DEVICE_ID" = "$SIM_DESTINATION" ]; then
   SIM_DEVICE_NAME="$(echo "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
   if [ -n "$SIM_DEVICE_NAME" ] && command -v python3 >/dev/null 2>&1; then

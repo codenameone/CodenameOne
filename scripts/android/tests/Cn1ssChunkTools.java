@@ -14,7 +14,7 @@ public class Cn1ssChunkTools {
     private static final String DEFAULT_TEST_NAME = "default";
     private static final String DEFAULT_CHANNEL = "";
     private static final Pattern CHUNK_PATTERN = Pattern.compile(
-            "CN1SS(?:(?<channel>[A-Z]+))?:(?:(?<test>[A-Za-z0-9_.-]+):)?(?<index>\\d{6}):(?<payload>.*)");
+            "CN1SS(?:(?<channel>[A-Z]+))?:(?:(?<test>[A-Za-z0-9_.-]+):)?(?<index>\\d{6,}):(?<payload>.*)");
 
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
