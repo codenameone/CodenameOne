@@ -69,13 +69,14 @@ class ComponentCoverageTest extends UITestBase {
         component.setWidth(100);
         component.setHeight(100);
 
-        // Setting elevation will trigger shadow calculations during rendering
-        Style style = component.getAllStyles();
-        style.setElevation(10);
-        assertEquals(10, style.getElevation());
-
         form.add(BorderLayout.CENTER, component);
         // Don't call form.show() - paint directly instead
+
+        // Setting elevation will trigger shadow calculations during rendering
+        // Set on unselected style which is the base style
+        Style style = component.getUnselectedStyle();
+        style.setElevation(10);
+        assertEquals(10, style.getElevation());
 
         // Trigger paint directly
         Image img = Image.createImage(200, 200, 0xFFFFFF);
