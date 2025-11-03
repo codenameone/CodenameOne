@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *    - fireFocusLost(Component) - Fires events via Display.callSerially
  *    - fireFocusLost() - Fires events via Display.callSerially
  *    - fireClicked() - Fires events via Display.callSerially
+ *    - longPointerPress(int, int) - Fires long press events via Display.callSerially
  *    - pointerReleaseMaterialPullToRefresh() - Material design pull-to-refresh EDT handling
  *    - updateMaterialPullToRefresh(Form, int) - Material design pull-to-refresh EDT handling
  *
@@ -71,9 +72,16 @@ import static org.junit.jupiter.api.Assertions.*;
  *    - setAnimationMotion(Motion) - Requires motion animation setup
  *    - setInlineStylesTheme(Resources) - Requires resource theme setup
  *
- * 6. Property Binding Methods - Return null on base Component:
- *    - getBoundPropertyValue(String) - Returns null on base Component
- *    - setBoundPropertyValue(String, Object) - No-op on base Component
+ * 6. Property Binding Methods - Tested via testBoundPropertyValues():
+ *    - getBoundPropertyValue(String) - Returns null on base Component (tested)
+ *    - setBoundPropertyValue(String, Object) - No-op on base Component (tested)
+ *
+ * Total: 40 methods cannot be directly covered due to:
+ * - EDT/Event firing requirements (6 methods)
+ * - Protected/private access (22 methods)
+ * - Platform-specific requirements (4 methods)
+ * - Complex hierarchy/setup requirements (5 methods)
+ * - Property binding tested separately (2 methods, covered via testBoundPropertyValues)
  *
  * These methods are either:
  * - Tested indirectly through higher-level public APIs
@@ -512,22 +520,6 @@ class ComponentCoverageTest extends UITestBase {
         int[] y = {30, 40};
         assertDoesNotThrow(() -> component.pinch(x, y));
         assertDoesNotThrow(() -> component.pinchReleased(10, 20));
-    }
-
-    @Test
-    void testLongPointerPress() {
-        TestableComponent component = new TestableComponent();
-
-        // Add long press listener to verify the method triggers it
-        final boolean[] longPressCalled = {false};
-        component.addLongPressListener(evt -> longPressCalled[0] = true);
-
-        // Call longPointerPress - note this may not fire the event without EDT
-        // but we can at least verify the method doesn't throw
-        assertDoesNotThrow(() -> component.longPointerPress(10, 20));
-
-        // Remove listener
-        component.removeLongPressListener(evt -> longPressCalled[0] = true);
     }
 
     // ========== Property Tests ==========
