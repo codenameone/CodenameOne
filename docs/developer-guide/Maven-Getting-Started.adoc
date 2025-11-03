@@ -210,7 +210,7 @@ Let's consider a concrete example, now.  Download the KitchenSink Ant project fr
 
 The following is a bash script that uses curl to download this project as a zip file, and then converts it to a fully-functional Maven project.
 
-[source,bash]
+[source,bash,subs="+attributes"]
 ----
 CN1_VERSION={cn1-plugin-release-version}
 curl -L https://github.com/codenameone/KitchenSink/archive/v1.0-cn7.0.11.zip > master.zip

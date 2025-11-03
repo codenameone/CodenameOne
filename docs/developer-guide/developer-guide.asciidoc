@@ -28,15 +28,11 @@
 :copyright: Codename One, all rights reserved
 :publication-type: book
 :producer: Codename One Ltd.
-:cn1-release-version: {env:CN1_RELEASE_VERSION}
-ifeval::["{cn1-release-version}" == ""]
-:cn1-release-version: 7.0.21
-endif::[]
+:cn1-release-version: 7.0.210
+ifdef::env-CN1_RELEASE_VERSION[:cn1-release-version: {env:CN1_RELEASE_VERSION}]
 
-:cn1-plugin-release-version: {env:CN1_PLUGIN_RELEASE_VERSION}
-ifeval::["{cn1-plugin-release-version}" == ""]
 :cn1-plugin-release-version: {cn1-release-version}
-endif::[]
+ifdef::env-CN1_PLUGIN_RELEASE_VERSION[:cn1-plugin-release-version: {env:CN1_PLUGIN_RELEASE_VERSION}]
 
 :cn1-snapshot-version: {cn1-release-version}-SNAPSHOT
 
