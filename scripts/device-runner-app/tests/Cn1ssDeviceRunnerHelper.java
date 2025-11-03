@@ -111,7 +111,7 @@ final class Cn1ssDeviceRunnerHelper {
             System.out.flush();
             return;
         }
-        String base64 = Base64.encode(bytes);
+        String base64 = Base64.encodeNoNewline(bytes);
         int count = 0;
         for (int pos = 0; pos < base64.length(); pos += CHUNK_SIZE) {
             int end = Math.min(pos + CHUNK_SIZE, base64.length());

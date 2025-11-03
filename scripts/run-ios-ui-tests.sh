@@ -214,9 +214,93 @@ PY
   return 0
 }
 
+fallback_sim_destination() {
+  if ! command -v xcrun >/dev/null 2>&1; then
+    return
+  fi
+
+  local chosen=""
+  if command -v python3 >/dev/null 2>&1; then
+    chosen="$(xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
+import json
+import re
+import sys
+
+def version_key(value: str):
+    parts = []
+    for chunk in re.split(r"[^0-9]+", value or ""):
+        if chunk:
+            try:
+                parts.append(int(chunk))
+            except ValueError:
+                parts.append(0)
+    return tuple(parts)
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+
+best = None
+best_info = None
+for runtime, devices in (data.get("devices") or {}).items():
+    if "iOS" not in runtime:
+        continue
+    version = runtime.split("iOS-")[-1]
+    vkey = version_key(version)
+    for device in devices or []:
+        if not device.get("isAvailable"):
+            continue
+        udid = (device.get("udid") or "").strip()
+        name = (device.get("name") or "").strip()
+        if not udid or not name:
+            continue
+        priority = 2 if "iPhone" in name else (1 if "iPad" in name else 0)
+        booted = 1 if (device.get("state") or "").lower() == "booted" else 0
+        candidate = (priority, vkey, booted, name.lower(), udid)
+        if best is None or candidate > best:
+            best = candidate
+            best_info = (name, udid)
+
+if best_info:
+    name, udid = best_info
+    print(f"platform=iOS Simulator,id={udid},name={name}")
+PY
+    )"
+  fi
+
+  if [ -z "${chosen:-}" ]; then
+    chosen="$(xcrun simctl list devices 2>/dev/null | awk '
+      /^-- iOS / { ios=1; next }
+      /^-- / { ios=0 }
+      ios && $0 ~ /\(.*\)/ {
+        sub(/^\s+/, "")
+        line=$0
+        name=line
+        sub(/\s*\(.*/, "", name)
+        udid=line
+        sub(/^[^(]*\(/, "", udid)
+        sub(/\).*/, "", udid)
+        state=line
+        sub(/.*\(/, "", state)
+        sub(/\)/, "", state)
+        if (state ~ /Booted/) booted=1; else booted=0
+        if (name ~ /iPhone/) pri=2
+        else if (name ~ /iPad/) pri=1
+        else pri=0
+        printf "%d\t%d\t%s\t%s\n", pri, booted, name, udid
+      }
+    ' | sort -t $'\t' -k1,1nr -k2,2nr | head -n1 | awk -F '\t' '{ if (NF>=4) printf "platform=iOS Simulator,id=%s,name=%s", $4, $3 }')"
+  fi
+
+  if [ -n "${chosen:-}" ]; then
+    printf '%s\n' "$chosen"
+  fi
+}
+
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
 if [ -z "$SIM_DESTINATION" ]; then
-  SELECTED_DESTINATION="$(auto_select_destination)"
+  SELECTED_DESTINATION="$(auto_select_destination || true)"
   if [ -n "${SELECTED_DESTINATION:-}" ]; then
     SIM_DESTINATION="$SELECTED_DESTINATION"
     ri_log "Auto-selected simulator destination '$SIM_DESTINATION'"
@@ -225,8 +309,14 @@ if [ -z "$SIM_DESTINATION" ]; then
   fi
 fi
 if [ -z "$SIM_DESTINATION" ]; then
-  SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16"
-  ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
+  FALLBACK_DESTINATION="$(fallback_sim_destination || true)"
+  if [ -n "${FALLBACK_DESTINATION:-}" ]; then
+    SIM_DESTINATION="$FALLBACK_DESTINATION"
+    ri_log "Using fallback simulator destination '$SIM_DESTINATION'"
+  else
+    SIM_DESTINATION="platform=iOS Simulator,name=iPhone 14"
+    ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
+  fi
 fi
 
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
@@ -288,15 +378,15 @@ if [ -z "$BUNDLE_IDENTIFIER" ]; then
 fi
 APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
-SIM_DEVICE_ID=""
-if printf '%s' "$SIM_DESTINATION" | grep -q 'id='; then
-  SIM_DEVICE_ID="${SIM_DESTINATION##*id=}"
-  SIM_DEVICE_ID="${SIM_DEVICE_ID%%,*}"
-fi
-if [ -z "$SIM_DEVICE_ID" ] || [ "$SIM_DEVICE_ID" = "$SIM_DESTINATION" ]; then
-  SIM_DEVICE_NAME="$(echo "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
-  if [ -n "$SIM_DEVICE_NAME" ] && command -v python3 >/dev/null 2>&1; then
-    SIM_DEVICE_ID="$(xcrun simctl list devices --json 2>/dev/null | python3 - "$SIM_DEVICE_NAME" <<'EOS'
+  SIM_DEVICE_ID=""
+  if printf '%s' "$SIM_DESTINATION" | grep -q 'id='; then
+    SIM_DEVICE_ID="${SIM_DESTINATION##*id=}"
+    SIM_DEVICE_ID="${SIM_DEVICE_ID%%,*}"
+  fi
+  if [ -z "$SIM_DEVICE_ID" ] || [ "$SIM_DEVICE_ID" = "$SIM_DESTINATION" ]; then
+    SIM_DEVICE_NAME="$(echo "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
+    if [ -n "$SIM_DEVICE_NAME" ] && command -v python3 >/dev/null 2>&1; then
+      SIM_DEVICE_ID="$(xcrun simctl list devices --json 2>/dev/null | python3 - "$SIM_DEVICE_NAME" <<'EOS'
 import json, sys
 name = sys.argv[1]
 try:
@@ -312,60 +402,80 @@ for runtime, devices in (data.get("devices") or {}).items():
             sys.exit()
 EOS
 )"
+    fi
+    if [ -z "$SIM_DEVICE_ID" ] && [ -n "$SIM_DEVICE_NAME" ]; then
+      SIM_DEVICE_ID="$(xcrun simctl list devices 2>/dev/null | awk -v target="$SIM_DEVICE_NAME" '
+        /^-- iOS / { ios=1; next }
+        /^-- / { ios=0 }
+        !ios { next }
+        {
+          line=$0
+          gsub(/^\s+/, "", line)
+          name=line
+          sub(/\s*\(.*/, "", name)
+          if (name != target) next
+          udid=line
+          sub(/^[^(]*\(/, "", udid)
+          sub(/\).*/, "", udid)
+          print udid
+          exit
+        }
+      ')"
+    fi
   fi
-fi
-if [ -n "$SIM_DEVICE_ID" ]; then
-  ri_log "Booting simulator $SIM_DEVICE_ID"
-  xcrun simctl boot "$SIM_DEVICE_ID" >/dev/null 2>&1 || true
-  xcrun simctl bootstatus "$SIM_DEVICE_ID" -b
-else
-  ri_log "Warning: simulator UDID not resolved; relying on default booted device"
-  xcrun simctl bootstatus booted -b || true
-fi
 
-LOG_STREAM_PID=0
-cleanup() {
-  if [ "$LOG_STREAM_PID" -ne 0 ]; then
-    kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
-    wait "$LOG_STREAM_PID" 2>/dev/null || true
+  if [ -n "$SIM_DEVICE_ID" ]; then
+    ri_log "Booting simulator $SIM_DEVICE_ID"
+    xcrun simctl boot "$SIM_DEVICE_ID" >/dev/null 2>&1 || true
+    xcrun simctl bootstatus "$SIM_DEVICE_ID" -b
+  else
+    ri_log "Warning: simulator UDID not resolved; relying on default booted device"
+    xcrun simctl bootstatus booted -b || true
   fi
-  if [ -n "$SIM_DEVICE_ID" ] && [ -n "$BUNDLE_IDENTIFIER" ]; then
+
+  LOG_STREAM_PID=0
+  cleanup() {
+    if [ "$LOG_STREAM_PID" -ne 0 ]; then
+      kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
+      wait "$LOG_STREAM_PID" 2>/dev/null || true
+    fi
+    if [ -n "$SIM_DEVICE_ID" ] && [ -n "$BUNDLE_IDENTIFIER" ]; then
+      xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    fi
+  }
+  trap cleanup EXIT
+
+  ri_log "Streaming simulator logs to $TEST_LOG"
+  if [ -n "$SIM_DEVICE_ID" ]; then
     xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    xcrun simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
+    xcrun simctl spawn "$SIM_DEVICE_ID" log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
+  else
+    xcrun simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
   fi
-}
-trap cleanup EXIT
+  LOG_STREAM_PID=$!
+  sleep 2
 
-ri_log "Streaming simulator logs to $TEST_LOG"
-if [ -n "$SIM_DEVICE_ID" ]; then
-  xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
-  xcrun simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
-  xcrun simctl spawn "$SIM_DEVICE_ID" log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
-else
-  xcrun simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
-fi
-LOG_STREAM_PID=$!
-sleep 2
-
-ri_log "Installing simulator app bundle"
-if [ -n "$SIM_DEVICE_ID" ]; then
-  if ! xcrun simctl install "$SIM_DEVICE_ID" "$APP_BUNDLE_PATH"; then
-    ri_log "FATAL: simctl install failed"
-    exit 11
+  ri_log "Installing simulator app bundle"
+  if [ -n "$SIM_DEVICE_ID" ]; then
+    if ! xcrun simctl install "$SIM_DEVICE_ID" "$APP_BUNDLE_PATH"; then
+      ri_log "FATAL: simctl install failed"
+      exit 11
+    fi
+    if ! xcrun simctl launch "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+      ri_log "FATAL: simctl launch failed"
+      exit 11
+    fi
+  else
+    if ! xcrun simctl install booted "$APP_BUNDLE_PATH"; then
+      ri_log "FATAL: simctl install failed"
+      exit 11
+    fi
+    if ! xcrun simctl launch booted "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+      ri_log "FATAL: simctl launch failed"
+      exit 11
+    fi
   fi
-  if ! xcrun simctl launch "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
-    ri_log "FATAL: simctl launch failed"
-    exit 11
-  fi
-else
-  if ! xcrun simctl install booted "$APP_BUNDLE_PATH"; then
-    ri_log "FATAL: simctl install failed"
-    exit 11
-  fi
-  if ! xcrun simctl launch booted "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
-    ri_log "FATAL: simctl launch failed"
-    exit 11
-  fi
-fi
 
 END_MARKER="CN1SS:SUITE:FINISHED"
 TIMEOUT_SECONDS=300
