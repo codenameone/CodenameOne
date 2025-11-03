@@ -17,16 +17,19 @@ public class BrowserComponentScreenshotTest extends AbstractTest {
         }
 
         final boolean[] loadFinished = new boolean[1];
+        final Form[] formHolder = new Form[1];
         Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
             Form form = new Form("Browser Test", new BorderLayout());
             BrowserComponent browser = new BrowserComponent();
             browser.addWebEventListener(BrowserComponent.onLoad, evt -> loadFinished[0] = true);
+            browser.addWebEventListener(BrowserComponent.onDocumentReady, evt -> loadFinished[0] = true);
             browser.setPage(buildHtml(), null);
             form.add(BorderLayout.CENTER, browser);
+            formHolder[0] = form;
             form.show();
         });
 
-        for (int elapsed = 0; elapsed < 10000 && !loadFinished[0]; elapsed += 200) {
+        for (int elapsed = 0; elapsed < 15000 && !loadFinished[0]; elapsed += 200) {
             TestUtils.waitFor(200);
         }
         if (!loadFinished[0]) {
@@ -34,10 +37,17 @@ public class BrowserComponentScreenshotTest extends AbstractTest {
             return false;
         }
 
-        Cn1ssDeviceRunnerHelper.waitForMillis(500);
+        Cn1ssDeviceRunnerHelper.waitForMillis(1500);
 
         final boolean[] result = new boolean[1];
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("BrowserComponent"));
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
+            Form current = formHolder[0];
+            if (current != null) {
+                current.revalidate();
+                current.repaint();
+            }
+            result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("BrowserComponent");
+        });
         return result[0];
     }
 

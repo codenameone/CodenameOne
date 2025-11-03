@@ -118,33 +118,36 @@ else
 fi
 
 auto_select_destination() {
-  if ! command -v python3 >/dev/null 2>&1; then
-    return
-  fi
+  local show_dest selected rc=0
+  set +e
+  show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>&1)"
+  rc=$?
+  set -e
 
-  local show_dest selected
-  if show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -showdestinations 2>/dev/null)"; then
+  if command -v python3 >/dev/null 2>&1 && [ -n "${show_dest:-}" ]; then
     selected="$(
       printf '%s\n' "$show_dest" | python3 - <<'PY'
+import re
 import sys
 
 def version_key(value: str):
-    value = (value or '').replace('latest', '').replace('(', '').replace(')', '')
-    parts = []
-    for part in value.split('.'):
-        if part.isdigit():
-            parts.append(int(part))
-        elif part:
-            parts.append(0)
-    return tuple(parts)
+    digits = [int(part) for part in re.findall(r\"\d+\", value or \"")]
+    return tuple(digits)
+
+def parse_blocks(text: str):
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith('{') and line.endswith('}'):
+            yield line.strip('{}')
+        elif '{' in line and '}' in line:
+            yield line[line.find('{') + 1:line.rfind('}')]
 
 candidates = []
-for line in sys.stdin:
-    text = line.strip()
-    if not (text.startswith('{') and text.endswith('}')):
-        continue
+for block in parse_blocks(sys.stdin.read()):
     fields = {}
-    for segment in text.strip('{}').split(','):
+    for segment in block.split(','):
         if ':' not in segment:
             continue
         key, value = segment.split(':', 1)
@@ -155,32 +158,27 @@ for line in sys.stdin:
     if not ident:
         continue
     name = fields.get('name', '')
-    os_version = fields.get('os', '')
-    priority = 2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
-    candidates.append((priority, version_key(os_version), name, ident))
+    os_version = fields.get('os', fields.get('osversion', ''))
+    priority = 2 if 'iphone' in name.lower() else (1 if 'ipad' in name.lower() else 0)
+    candidates.append((priority, version_key(os_version), name.strip(), ident.strip(), os_version.strip()))
 
 if candidates:
-    priority, os_version, name, ident = sorted(candidates, reverse=True)[0]
-    print(f"platform=iOS Simulator,id={ident}")
+    priority, os_key, name, ident, os_version = sorted(candidates, reverse=True)[0]
+    extra = f",OS={os_version}" if os_version else ""
+    print(f"platform=iOS Simulator,id={ident}{extra},name={name}")
 PY
     )"
   fi
 
-  if [ -z "${selected:-}" ] && command -v xcrun >/dev/null 2>&1; then
+  if [ -z "${selected:-}" ] && command -v python3 >/dev/null 2>&1 && command -v xcrun >/dev/null 2>&1; then
     selected="$(
       xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
 import json
+import re
 import sys
 
 def version_key(value: str):
-    value = (value or '').replace('latest', '')
-    parts = []
-    for part in value.replace('-', '.').split('.'):
-        if part.isdigit():
-            parts.append(int(part))
-        elif part:
-            parts.append(0)
-    return tuple(parts)
+    return tuple(int(part) for part in re.findall(r\"\d+\", value or \""))
 
 try:
     data = json.load(sys.stdin)
@@ -191,112 +189,83 @@ candidates = []
 for runtime, entries in (data.get('devices') or {}).items():
     if 'iOS' not in runtime:
         continue
-    version = runtime.split('iOS-')[-1]
+    version = runtime.split('iOS-')[-1].replace('-', '.')
     vkey = version_key(version)
     for entry in entries or []:
         if not entry.get('isAvailable'):
             continue
-        name = entry.get('name') or ''
-        ident = entry.get('udid') or ''
-        priority = 2 if 'iPhone' in name else (1 if 'iPad' in name else 0)
-        candidates.append((priority, vkey, name, ident))
+        ident = (entry.get('udid') or '').strip()
+        name = (entry.get('name') or '').strip()
+        if not ident:
+            continue
+        priority = 2 if 'iphone' in name.lower() else (1 if 'ipad' in name.lower() else 0)
+        candidates.append((priority, vkey, name, ident, version))
 
 if candidates:
-    priority, version_key_value, name, ident = sorted(candidates, reverse=True)[0]
-    print(f"platform=iOS Simulator,id={ident}")
+    priority, vkey, name, ident, version = sorted(candidates, reverse=True)[0]
+    extra = f",OS={version}" if version else ""
+    print(f"platform=iOS Simulator,id={ident}{extra},name={name}")
 PY
     )"
   fi
 
   if [ -n "${selected:-}" ]; then
     printf '%s\n' "$selected"
+    return 0
   fi
-  return 0
+
+  return $rc
 }
 
+
+
 fallback_sim_destination() {
-  if ! command -v xcrun >/dev/null 2>&1; then
+  if ! command -v xcrun >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
     return
   fi
 
-  local chosen=""
-  if command -v python3 >/dev/null 2>&1; then
-    chosen="$(xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
+  xcrun simctl list devices --json 2>/dev/null | python3 - <<'PY'
 import json
 import re
 import sys
 
 def version_key(value: str):
-    parts = []
-    for chunk in re.split(r"[^0-9]+", value or ""):
-        if chunk:
-            try:
-                parts.append(int(chunk))
-            except ValueError:
-                parts.append(0)
-    return tuple(parts)
+    return tuple(int(part) for part in re.findall(r\"\d+\", value or \""))
 
 try:
     data = json.load(sys.stdin)
 except Exception:
-    sys.exit(0)
+    sys.exit()
 
 best = None
 best_info = None
-for runtime, devices in (data.get("devices") or {}).items():
-    if "iOS" not in runtime:
+for runtime, entries in (data.get('devices') or {}).items():
+    if 'iOS' not in runtime:
         continue
-    version = runtime.split("iOS-")[-1]
+    version = runtime.split('iOS-')[-1].replace('-', '.')
     vkey = version_key(version)
-    for device in devices or []:
-        if not device.get("isAvailable"):
+    for entry in entries or []:
+        if not entry.get('isAvailable'):
             continue
-        udid = (device.get("udid") or "").strip()
-        name = (device.get("name") or "").strip()
-        if not udid or not name:
+        ident = (entry.get('udid') or '').strip()
+        name = (entry.get('name') or '').strip()
+        if not ident or not name:
             continue
-        priority = 2 if "iPhone" in name else (1 if "iPad" in name else 0)
-        booted = 1 if (device.get("state") or "").lower() == "booted" else 0
-        candidate = (priority, vkey, booted, name.lower(), udid)
+        priority = 2 if 'iphone' in name.lower() else (1 if 'ipad' in name.lower() else 0)
+        booted = 1 if (entry.get('state') or '').lower() == 'booted' else 0
+        candidate = (priority, vkey, booted, name.lower(), ident)
         if best is None or candidate > best:
             best = candidate
-            best_info = (name, udid)
+            best_info = (name, ident, version)
 
 if best_info:
-    name, udid = best_info
-    print(f"platform=iOS Simulator,id={udid},name={name}")
+    name, ident, version = best_info
+    extra = f",OS={version}" if version else ""
+    print(f"platform=iOS Simulator,id={ident}{extra},name={name}")
 PY
-    )"
-  fi
-
-  if [ -z "${chosen:-}" ]; then
-    chosen="$(xcrun simctl list devices 2>/dev/null | awk '
-      /^-- iOS / { ios=1; next }
-      /^-- / { ios=0 }
-      ios && $0 ~ /\(.*\)/ {
-        sub(/^\s+/, "")
-        line=$0
-        name=line
-        sub(/\s*\(.*/, "", name)
-        udid=line
-        sub(/^[^(]*\(/, "", udid)
-        sub(/\).*/, "", udid)
-        state=line
-        sub(/.*\(/, "", state)
-        sub(/\)/, "", state)
-        if (state ~ /Booted/) booted=1; else booted=0
-        if (name ~ /iPhone/) pri=2
-        else if (name ~ /iPad/) pri=1
-        else pri=0
-        printf "%d\t%d\t%s\t%s\n", pri, booted, name, udid
-      }
-    ' | sort -t $'\t' -k1,1nr -k2,2nr | head -n1 | awk -F '\t' '{ if (NF>=4) printf "platform=iOS Simulator,id=%s,name=%s", $4, $3 }')"
-  fi
-
-  if [ -n "${chosen:-}" ]; then
-    printf '%s\n' "$chosen"
-  fi
 }
+
+
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
 if [ -z "$SIM_DESTINATION" ]; then
@@ -379,12 +348,9 @@ fi
 APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
   SIM_DEVICE_ID=""
-  if printf '%s' "$SIM_DESTINATION" | grep -q 'id='; then
-    SIM_DEVICE_ID="${SIM_DESTINATION##*id=}"
-    SIM_DEVICE_ID="${SIM_DEVICE_ID%%,*}"
-  fi
+  SIM_DEVICE_ID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r' | sed 's/[[:space:]]//g')"
   if [ -z "$SIM_DEVICE_ID" ] || [ "$SIM_DEVICE_ID" = "$SIM_DESTINATION" ]; then
-    SIM_DEVICE_NAME="$(echo "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p')"
+    SIM_DEVICE_NAME="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*name=\([^,]*\).*/\1/p' | sed 's/^ *//;s/ *$//')"
     if [ -n "$SIM_DEVICE_NAME" ] && command -v python3 >/dev/null 2>&1; then
       SIM_DEVICE_ID="$(xcrun simctl list devices --json 2>/dev/null | python3 - "$SIM_DEVICE_NAME" <<'EOS'
 import json, sys
@@ -417,6 +383,7 @@ EOS
           udid=line
           sub(/^[^(]*\(/, "", udid)
           sub(/\).*/, "", udid)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", udid)
           print udid
           exit
         }
