@@ -3,7 +3,6 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
 import com.codename1.ui.BrowserComponent;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -11,14 +10,14 @@ public class BrowserComponentScreenshotTest extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
         final boolean[] supported = new boolean[1];
-        Display.getInstance().callSeriallyAndWait(() -> supported[0] = BrowserComponent.isNativeBrowserSupported());
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> supported[0] = BrowserComponent.isNativeBrowserSupported());
         if (!supported[0]) {
             TestUtils.log("BrowserComponent native support unavailable; skipping screenshot test");
             return true;
         }
 
         final boolean[] loadFinished = new boolean[1];
-        Display.getInstance().callSeriallyAndWait(() -> {
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
             Form form = new Form("Browser Test", new BorderLayout());
             BrowserComponent browser = new BrowserComponent();
             browser.addWebEventListener(BrowserComponent.onLoad, evt -> loadFinished[0] = true);
@@ -38,7 +37,7 @@ public class BrowserComponentScreenshotTest extends AbstractTest {
         Cn1ssDeviceRunnerHelper.waitForMillis(500);
 
         final boolean[] result = new boolean[1];
-        Display.getInstance().callSeriallyAndWait(() -> result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("BrowserComponent"));
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("BrowserComponent"));
         return result[0];
     }
 

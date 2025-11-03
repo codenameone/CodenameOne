@@ -2,7 +2,6 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.Container;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
@@ -11,7 +10,7 @@ import com.codename1.ui.layouts.BoxLayout;
 public class MainScreenScreenshotTest extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
-        Display.getInstance().callSeriallyAndWait(() -> {
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
             Form form = new Form("Main Screen", new BorderLayout());
 
             Container content = new Container(BoxLayout.y());
@@ -37,7 +36,7 @@ public class MainScreenScreenshotTest extends AbstractTest {
         Cn1ssDeviceRunnerHelper.waitForMillis(500);
 
         final boolean[] result = new boolean[1];
-        Display.getInstance().callSeriallyAndWait(() -> result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("MainActivity"));
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("MainActivity"));
         return result[0];
     }
 }

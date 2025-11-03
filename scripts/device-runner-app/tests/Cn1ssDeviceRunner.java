@@ -20,7 +20,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     @Override
     protected void startApplicationInstance() {
-        Display.getInstance().callSeriallyAndWait(() -> {
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
             Form current = Display.getInstance().getCurrent();
             if (current != null) {
                 current.revalidate();
@@ -33,7 +33,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     @Override
     protected void stopApplicationInstance() {
-        Display.getInstance().callSeriallyAndWait(() -> {
+        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
             Form current = Display.getInstance().getCurrent();
             if (current != null) {
                 current.removeAll();

@@ -251,11 +251,32 @@ fi
 BUILD_SETTINGS="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
-if [ -z "$TARGET_BUILD_DIR" ] || [ -z "$WRAPPER_NAME" ]; then
-  ri_log "FATAL: Unable to determine build output paths"
+if [ -z "$WRAPPER_NAME" ]; then
+  ri_log "FATAL: Unable to determine build wrapper name"
   exit 11
 fi
-APP_BUNDLE_PATH="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+if [ -z "$APP_BUNDLE_PATH" ]; then
+  CANDIDATE_BUNDLE="$DERIVED_DATA_DIR/Build/Products/Debug-iphonesimulator/$WRAPPER_NAME"
+  if [ -d "$CANDIDATE_BUNDLE" ]; then
+    APP_BUNDLE_PATH="$CANDIDATE_BUNDLE"
+  fi
+fi
+if [ -z "$APP_BUNDLE_PATH" ] && [ -n "$TARGET_BUILD_DIR" ]; then
+  CANDIDATE_BUNDLE="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+  if [ -d "$CANDIDATE_BUNDLE" ]; then
+    APP_BUNDLE_PATH="$CANDIDATE_BUNDLE"
+  fi
+fi
+if [ -z "$APP_BUNDLE_PATH" ]; then
+  CANDIDATE_BUNDLE="$(find "$DERIVED_DATA_DIR" -path "*/Debug-iphonesimulator/$WRAPPER_NAME" -type d -print -quit 2>/dev/null || true)"
+  if [ -d "$CANDIDATE_BUNDLE" ]; then
+    APP_BUNDLE_PATH="$CANDIDATE_BUNDLE"
+  fi
+fi
+if [ -z "$APP_BUNDLE_PATH" ]; then
+  ri_log "FATAL: Simulator app bundle missing for wrapper $WRAPPER_NAME"
+  exit 11
+fi
 if [ ! -d "$APP_BUNDLE_PATH" ]; then
   ri_log "FATAL: Simulator app bundle missing at $APP_BUNDLE_PATH"
   exit 11

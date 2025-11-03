@@ -19,6 +19,15 @@ final class Cn1ssDeviceRunnerHelper {
     private Cn1ssDeviceRunnerHelper() {
     }
 
+    static void runOnEdtSync(Runnable runnable) {
+        Display display = Display.getInstance();
+        if (display.isEdt()) {
+            runnable.run();
+        } else {
+            display.callSeriallyAndWait(runnable);
+        }
+    }
+
     static void waitForMillis(long millis) {
         int duration = (int) Math.max(1, Math.min(Integer.MAX_VALUE, millis));
         Util.sleep(duration);
