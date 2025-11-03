@@ -254,8 +254,8 @@ class ComponentCoverageTest extends UITestBase {
         component.setTensileDragEnabled(false);
         assertFalse(component.isTensileDragEnabled());
 
-        // Test tensile length
-        assertEquals(0, component.getTensileLength());
+        // Test tensile length - default is -1
+        assertEquals(-1, component.getTensileLength());
         component.setTensileLength(50);
         assertEquals(50, component.getTensileLength());
     }
