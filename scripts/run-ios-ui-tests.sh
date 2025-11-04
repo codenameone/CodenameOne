@@ -155,75 +155,66 @@ normalize_destination() {
 }
 
 auto_select_destination() {
-  local show_dest selected rc=0
+  local show_dest rc=0 best_line="" best_key="" line payload platform id name os priority key part value
   set +e
   show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
   rc=$?
   set -e
 
-  if [ -n "${show_dest:-}" ]; then
-    selected="$(printf '%s\n' "$show_dest" | awk '
-      BEGIN {
-        section="";
-        best="";
-        bestpri=-1;
-        bestv1=-1;
-        bestv2=-1;
-        bestv3=-1;
-      }
-      /Available destinations/ { section="available"; next }
-      /Ineligible destinations/ { section="other"; next }
-      /Local destinations/ { section="other"; next }
-      section != "available" { next }
-      index($0, "{") == 0 { next }
-      line=$0
-      gsub(/[{}]/, "", line)
-      platform=""
-      id=""
-      name=""
-      os=""
-      while (match(line, /[A-Za-z][A-Za-z[:space:]]*:[^,]+/)) {
-        segment=substr(line, RSTART, RLENGTH)
-        line=substr(line, RSTART + RLENGTH + 1)
-        split(segment, kv, ":")
-        key=kv[1]
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
-        value=substr(segment, length(kv[1]) + 2)
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-        if (key == "platform") platform=value
-        else if (key == "id") id=value
-        else if (key == "name") name=value
-        else if (key == "OS" || key == "OS version") os=value
-      }
-      if (platform != "iOS Simulator" || id == "") next
-      lname=tolower(name)
-      pri = index(lname, "iphone") ? 2 : (index(lname, "ipad") ? 1 : 0)
-      split(os, parts, ".")
-      v1 = parts[1] + 0
-      v2 = parts[2] + 0
-      v3 = parts[3] + 0
-      if (pri > bestpri || (pri == bestpri && (v1 > bestv1 || (v1 == bestv1 && (v2 > bestv2 || (v2 == bestv2 && v3 > bestv3)))))) {
-        bestpri = pri
-        bestv1 = v1
-        bestv2 = v2
-        bestv3 = v3
-        best = sprintf("platform=iOS Simulator,id=%s%s,name=%s", id, os != "" ? sprintf(",OS=%s", os) : "", name)
-      }
-      END {
-        if (bestpri >= 0) print best
-      }
-    ')"
-  fi
+  [ -z "${show_dest:-}" ] && return $rc
 
-  if [ -n "${selected:-}" ]; then
-    printf '%s\n' "$selected"
-    return 0
-  fi
+  local section=""
+  while IFS= read -r line; do
+    case "$line" in
+      *"Available destinations"*) section="available"; continue ;;
+      *"Ineligible destinations"*|*"Local destinations"*) section="other"; continue ;;
+    esac
+    [ "$section" != "available" ] && continue
+    case "$line" in
+      *{*}*)
+        payload="$(printf '%s\n' "$line" | sed -n 's/.*{\(.*\)}/\1/p')"
+        [ -z "$payload" ] && continue
+        platform=""; id=""; name=""; os=""
+        IFS=',' read -r -a parts <<< "$payload"
+        for part in "${parts[@]}"; do
+          part="$(trim_whitespace "$part")"
+          key="${part%%:*}"
+          value="${part#*:}"
+          [ "$value" = "$part" ] && continue
+          key="$(trim_whitespace "$key")"
+          value="$(trim_whitespace "$value")"
+          case "$key" in
+            platform) platform="$value" ;;
+            id) id="$value" ;;
+            name) name="$value" ;;
+            OS|os|"OS version") os="$value" ;;
+          esac
+        done
+        [ "$platform" != "iOS Simulator" ] && continue
+        [ -z "$id" ] && continue
+        priority=0
+        case "$(printf '%s' "$name" | tr 'A-Z' 'a-z')" in
+          *iphone*) priority=2 ;;
+          *ipad*) priority=1 ;;
+        esac
+        IFS='.' read -r v1 v2 v3 <<< "$os"
+        v1=${v1:-0}; v2=${v2:-0}; v3=${v3:-0}
+        key=$(printf '%d-%03d-%03d-%03d' "$priority" "$v1" "$v2" "$v3")
+        if [ -z "$best_key" ] || [[ "$key" > "$best_key" ]]; then
+          best_key="$key"
+          best_line="platform=iOS Simulator,id=$id"
+          [ -n "$os" ] && best_line="$best_line,OS=$os"
+          [ -n "$name" ] && best_line="$best_line,name=$name"
+        fi
+        ;;
+    esac
+  done <<< "$show_dest"
+
+  [ -n "$best_line" ] && printf '%s\n' "$best_line"
+  [ -n "$best_line" ] && return 0
 
   return $rc
 }
-
-
 
 fallback_sim_destination() {
   if ! command -v xcrun >/dev/null 2>&1; then
