@@ -199,10 +199,6 @@ else
   bia_log "Podfile not found in generated project; skipping pod install"
 fi
 
-# Remove any user schemes that could shadow shared schemes
-rm -rf "$PROJECT_DIR"/xcuserdata 2>/dev/null || true
-find "$PROJECT_DIR" -maxdepth 1 -name "*.xcworkspace" -type d -exec rm -rf {}/xcuserdata \; 2>/dev/null || true
-
 # Locate workspace for the next step
 WORKSPACE=""
 for candidate in "$PROJECT_DIR"/*.xcworkspace; do

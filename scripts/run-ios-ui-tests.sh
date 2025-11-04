@@ -326,6 +326,14 @@ fi
 
 SIM_DESTINATION="$(normalize_destination "$SIM_DESTINATION")"
 
+# Extract UDID and prefer id-only destination to avoid OS/SDK mismatches
+SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
+if [ -n "$SIM_UDID" ]; then
+  ri_log "Booting simulator $SIM_UDID"
+  xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+  xcrun simctl bootstatus "$SIM_UDID" -b
+  SIM_DESTINATION="id=$SIM_UDID"
+fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
 
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
@@ -339,6 +347,7 @@ if ! xcodebuild \
   -sdk iphonesimulator \
   -configuration Debug \
   -destination "$SIM_DESTINATION" \
+  -destination-timeout 120 \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   build | tee "$BUILD_LOG"; then
   ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
