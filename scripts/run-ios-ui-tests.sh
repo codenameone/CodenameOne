@@ -117,6 +117,8 @@ else
   ri_log "Scheme file not found for env injection: $SCHEME_FILE"
 fi
 
+MAX_SIM_OS_MAJOR=20
+
 trim_whitespace() {
   local value="$1"
   value="${value#${value%%[![:space:]]*}}"
@@ -127,7 +129,7 @@ trim_whitespace() {
 normalize_destination() {
   local raw="$1"
   IFS=',' read -r -a parts <<< "$raw"
-  local platform="" id="" os="" name="" normalized
+  local platform="" id="" os="" name=""
   local extras=()
   for part in "${parts[@]}"; do
     part="$(trim_whitespace "$part")"
@@ -142,16 +144,23 @@ normalize_destination() {
     esac
   done
   [ -z "$platform" ] && platform="iOS Simulator"
-  normalized="platform=$platform"
-  [ -n "$id" ] && normalized+="\,id=$id"
-  [ -n "$os" ] && normalized+="\,OS=$os"
-  [ -n "$name" ] && normalized+="\,name=$name"
+
+  local components=("platform=$platform")
+  [ -n "$id" ] && components+=("id=$id")
+  [ -n "$os" ] && components+=("OS=$os")
+  [ -n "$name" ] && components+=("name=$name")
   if [ ${#extras[@]} -gt 0 ]; then
     for extra in "${extras[@]}"; do
-      [ -n "$extra" ] && normalized+="\,$extra"
+      [ -n "$extra" ] && components+=("$extra")
     done
   fi
-  printf '%s\n' "$normalized"
+
+  local joined="${components[0]}" part
+  for part in "${components[@]:1}"; do
+    joined+=",$part"
+  done
+
+  printf '%s\n' "$joined"
 }
 
 auto_select_destination() {
@@ -197,9 +206,15 @@ auto_select_destination() {
           *iphone*) priority=2 ;;
           *ipad*) priority=1 ;;
         esac
+        validity=1
+        major="${os%%.*}"
+        case "$major" in ''|*[!0-9]*) major=0 ;; esac
+        if [ "$major" -gt "$MAX_SIM_OS_MAJOR" ] 2>/dev/null; then
+          validity=0
+        fi
         IFS='.' read -r v1 v2 v3 <<< "$os"
         v1=${v1:-0}; v2=${v2:-0}; v3=${v3:-0}
-        key=$(printf '%d-%03d-%03d-%03d' "$priority" "$v1" "$v2" "$v3")
+        key=$(printf '%d-%d-%03d-%03d-%03d' "$validity" "$priority" "$v1" "$v2" "$v3")
         if [ -z "$best_key" ] || [[ "$key" > "$best_key" ]]; then
           best_key="$key"
           best_line="platform=iOS Simulator,id=$id"
@@ -262,10 +277,17 @@ fallback_sim_destination() {
     boot=0
     [ "$lower_state" = "booted" ] && boot=1
 
+    validity=1
+    major="${current_version%%.*}"
+    case "$major" in ''|*[!0-9]*) major=0 ;; esac
+    if [ "$major" -gt "$MAX_SIM_OS_MAJOR" ] 2>/dev/null; then
+      validity=0
+    fi
+
     IFS='.' read -r v1 v2 v3 <<< "$current_version"
     v1=${v1:-0}; v2=${v2:-0}; v3=${v3:-0}
 
-    candidate_key=$(printf '%d-%03d-%03d-%03d-%d' "$priority" "$v1" "$v2" "$v3" "$boot")
+    candidate_key=$(printf '%d-%d-%03d-%03d-%03d-%d' "$validity" "$priority" "$v1" "$v2" "$v3" "$boot")
     if [ -z "$best_key" ] || [[ "$candidate_key" > "$best_key" ]]; then
       best_key="$candidate_key"
       best_line="platform=iOS Simulator,id=$id"
