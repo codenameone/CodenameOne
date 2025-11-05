@@ -615,6 +615,8 @@ COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
 ri_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
 if ! cn1ss_java_run "$RENDER_SCREENSHOT_REPORT_CLASS" \
+  --title "iOS screenshot updates" \
+  --success-message "✅ Native iOS screenshot tests passed." \
   --compare-json "$COMPARE_JSON" \
   --comment-out "$COMMENT_FILE" \
   --summary-out "$SUMMARY_FILE"; then
