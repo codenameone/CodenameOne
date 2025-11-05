@@ -449,7 +449,11 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   if [ -n "$SIM_DEVICE_ID" ]; then
     xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
     xcrun simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
-    xcrun simctl spawn "$SIM_DEVICE_ID" log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
+
+    xcrun simctl spawn "$SIM_DEVICE_ID" \
+      log stream --style json --level debug \
+      --predicate 'eventMessage CONTAINS "CN1SS"' \
+      > "$TEST_LOG" 2>&1 &
   else
     xcrun simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
   fi
@@ -500,6 +504,12 @@ kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
 wait "$LOG_STREAM_PID" 2>/dev/null || true
 LOG_STREAM_PID=0
 
+FALLBACK_LOG="$ARTIFACTS_DIR/device-runner-fallback.log"
+xcrun simctl spawn "$SIM_DEVICE_ID" \
+  log show --style syslog --last 30m \
+  --predicate 'eventMessage CONTAINS "CN1SS"' \
+  > "$FALLBACK_LOG" 2>/dev/null || true
+
 if [ -n "$SIM_DEVICE_ID" ]; then
   xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 fi
@@ -545,21 +555,26 @@ for test in "${TEST_NAMES[@]}"; do
       rm -f "$preview_dest" 2>/dev/null || true
     fi
   else
-    ri_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
-    RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
-    {
-      for entry in "${CN1SS_SOURCES[@]}"; do
-        path="${entry#*:}"
-        [ -s "$path" ] || continue
-        count="$(cn1ss_count_chunks "$path" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
-        if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$path" "$test"; fi
-      done
-    } > "$RAW_B64_OUT" 2>/dev/null || true
-    if [ -s "$RAW_B64_OUT" ]; then
-      head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-      ri_log "Partial base64 saved at: $RAW_B64_OUT"
+    ri_log "Primary decode failed for '$test'; trying fallback log"
+    if [ -s "$FALLBACK_LOG" ] && source_label="$(cn1ss_decode_test_png "$test" "$dest" "SIMLOG:$FALLBACK_LOG")"; then
+      ri_log "Decoded screenshot for '$test' from fallback (size: $(cn1ss_file_size "$dest") bytes)"
+    else
+      ri_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
+      RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
+      {
+        for entry in "${CN1SS_SOURCES[@]}" "SIMLOG:$FALLBACK_LOG"; do
+          path="${entry#*:}"
+          [ -s "$path" ] || continue
+          count="$(cn1ss_count_chunks "$path" "$test")"; count="${count//[^0-9]/}"; : "${count:=0}"
+          if [ "$count" -gt 0 ]; then cn1ss_extract_base64 "$path" "$test"; fi
+        done
+      } > "$RAW_B64_OUT" 2>/dev/null || true
+      if [ -s "$RAW_B64_OUT" ]; then
+        head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
+        ri_log "Partial base64 saved at: $RAW_B64_OUT"
+      fi
+      exit 12
     fi
-    exit 12
   fi
 done
 
