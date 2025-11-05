@@ -104,6 +104,34 @@ APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 [ -d "$APP_DIR" ] || { bia_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
 
+ROOT_POM="$APP_DIR/pom.xml"
+NS="mvn=http://maven.apache.org/POM/4.0.0"
+
+# 1) Ensure <properties><codenameone.version> exists/updated (root pom)
+if [ "$(q -t -v 'count(/mvn:project/mvn:properties)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
+  x -s "/mvn:project" -t elem -n properties -v "" "$ROOT_POM"
+fi
+if [ "$(q -t -v 'count(/mvn:project/mvn:properties/mvn:codenameone.version)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
+  x -s "/mvn:project/mvn:properties" -t elem -n codenameone.version -v "$CN1_VERSION" "$ROOT_POM"
+else
+  x -u "/mvn:project/mvn:properties/mvn:codenameone.version" -v "$CN1_VERSION" "$ROOT_POM"
+fi
+
+# 2) Parent must be a LITERAL version (no property allowed)
+while IFS= read -r -d '' P; do
+  x -u "/mvn:project[mvn:parent/mvn:groupId='com.codenameone' and mvn:parent/mvn:artifactId='codenameone-maven-parent']/mvn:parent/mvn:version" -v "$CN1_VERSION" "$P" || true
+done < <(find "$APP_DIR" -type f -name pom.xml -print0)
+
+# 3) Point com.codenameone deps/plugins to ${codenameone.version}
+while IFS= read -r -d '' P; do
+  # Dependencies
+  x -u "/mvn:project//mvn:dependencies/mvn:dependency[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
+  # Plugins (regular)
+  x -u "/mvn:project//mvn:build/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
+  # Plugins (pluginManagement)
+  x -u "/mvn:project//mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
+done < <(find "$APP_DIR" -type f -name pom.xml -print0)
+
 SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
 if [ ! -f "$SETTINGS_FILE" ]; then
   bia_log "codenameone_settings.properties not found at $SETTINGS_FILE" >&2
