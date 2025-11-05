@@ -1202,6 +1202,19 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Tries to grab an OS native screenshot which would include peer components etc.
+     * On fallback draws the current Form object.
+     *
+     * @param callback invoked with the screenshot
+     */
+    public void screenshot(SuccessCallback<Image> callback) {
+        Form current = getCurrentForm();
+        Image img = Image.createImage(current.getWidth(), current.getHeight());
+        current.paintComponent(img.getGraphics(), true);
+        callback.onSucess(img);
+    }
+
+    /**
      * Returns true if the platform supports a native image cache.  The native image cache
      * is different than just {@link FileSystemStorage#hasCachesDir()}.  A native image cache
      * is an image cache that the platform provides that is full transparent to Codename One

@@ -376,6 +376,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public void screenshot(SuccessCallback<Image> callback) {
+        final Activity activity = (Activity) getContext();
+        final AndroidScreenshotTask task = new AndroidScreenshotTask(myView, activity, callback);
+        activity.runOnUiThread(task);
+    }
+
+    @Override
     public void setPlatformHint(String key, String value) {
         if(key.equals("platformHint.compatPaintMode")) {
             compatPaintMode = value.equalsIgnoreCase("true");
