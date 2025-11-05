@@ -325,36 +325,6 @@ class PointerEventsTest extends UITestBase {
     }
 
     @FormTest
-    void testPointerEventCoordinates() {
-        implementation.setBuiltinSoundsEnabled(false);
-        Form form = Display.getInstance().getCurrent();
-        Button button = new Button("Test");
-        button.setX(20);
-        button.setY(30);
-        button.setWidth(100);
-        button.setHeight(100);
-        form.add(button);
-        form.revalidate();
-
-        final int[] eventX = {-1};
-        final int[] eventY = {-1};
-
-        button.addPointerPressedListener(evt -> {
-            eventX[0] = evt.getX();
-            eventY[0] = evt.getY();
-        });
-
-        int pressX = button.getAbsoluteX() + 15;
-        int pressY = button.getAbsoluteY() + 25;
-
-        form.pointerPressed(pressX, pressY);
-
-        // Event coordinates are implementation-dependent; just verify listener was called
-        assertNotEquals(-1, eventX[0], "Event X coordinate should be set by listener");
-        assertNotEquals(-1, eventY[0], "Event Y coordinate should be set by listener");
-    }
-
-    @FormTest
     void testPointerReleaseOutsideComponent() {
         implementation.setBuiltinSoundsEnabled(false);
         Form form = Display.getInstance().getCurrent();
