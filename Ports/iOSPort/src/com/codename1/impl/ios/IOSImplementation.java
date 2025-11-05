@@ -33,6 +33,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.location.Location;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
@@ -299,6 +300,25 @@ public class IOSImplementation extends CodenameOneImplementation {
             super.addCookie(c);
         }
     }
+
+    /*private static SuccessCallback<Image> screenshotCallback;
+
+    @Override
+    public void screenshot(SuccessCallback<Image> callback) {
+        screenshotCallback = callback;
+        nativeInstance.screenshot();
+    }
+
+    static void onScreenshot(final byte[] imageData) {
+        if(screenshotCallback != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    screenshotCallback.onSucess(EncodedImage.createImage(imageData));
+                }
+            });
+        }
+    }*/
 
     /**
      * Used to enable/disable native cookies from native code.
