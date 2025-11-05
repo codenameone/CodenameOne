@@ -43,7 +43,24 @@ final class Cn1ssDeviceRunnerHelper {
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
-        Image screenshot = Image.createImage(width, height);
+        Image[] img = new Image[1];
+        Display.getInstance().screenshot(screen -> img[0] = screen);
+        long time = System.currentTimeMillis();
+        Display.getInstance().invokeAndBlock(() -> {
+            while(img[0] == null) {
+                Util.sleep(50);
+                // timeout
+                if (System.currentTimeMillis() - time > 2000) {
+                    return;
+                }
+            }
+        });
+        if (img[0] == null) {
+            println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
+            println("CN1SS:END:" + safeName);
+            return false;
+        }
+        Image screenshot = img[0];
         current.paintComponent(screenshot.getGraphics(), true);
         try {
             ImageIO io = ImageIO.getImageIO();
