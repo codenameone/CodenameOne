@@ -126,7 +126,7 @@ class PointerEventsTest extends UITestBase {
         ScrollableComponent scrollable = new ScrollableComponent();
         scrollable.setWidth(200);
         scrollable.setHeight(100);
-        form.add(BorderLayout.CENTER, scrollable);
+        form.add(scrollable);
         form.revalidate();
 
         final int[] scrollYChanged = {0};
@@ -156,7 +156,7 @@ class PointerEventsTest extends UITestBase {
         TestableComponent component = new TestableComponent();
         component.setWidth(200);
         component.setHeight(200);
-        form.add(BorderLayout.CENTER, component);
+        form.add(component);
         form.revalidate();
 
         final boolean[] multiTouchReceived = {false};
@@ -181,7 +181,7 @@ class PointerEventsTest extends UITestBase {
         TestableComponent component = new TestableComponent();
         component.setWidth(100);
         component.setHeight(100);
-        form.add(BorderLayout.CENTER, component);
+        form.add(component);
         form.revalidate();
 
         int[] xCoords = {component.getAbsoluteX() + 10};
@@ -204,7 +204,7 @@ class PointerEventsTest extends UITestBase {
         Container container = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         container.add(button1);
         container.add(button2);
-        form.add(BorderLayout.CENTER, container);
+        form.add(container);
         form.revalidate();
 
         final boolean[] button1Pressed = {false};
@@ -260,7 +260,7 @@ class PointerEventsTest extends UITestBase {
         Container container = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         container.add(source);
         container.add(target);
-        form.add(BorderLayout.CENTER, container);
+        form.add(container);
         form.revalidate();
 
         // Drag from source towards target
@@ -304,7 +304,7 @@ class PointerEventsTest extends UITestBase {
         ScrollableComponent scrollable = new ScrollableComponent();
         scrollable.setWidth(200);
         scrollable.setHeight(100);
-        form.add(BorderLayout.CENTER, scrollable);
+        form.add(scrollable);
         form.revalidate();
 
         final int[] eventCount = {0};
@@ -333,7 +333,7 @@ class PointerEventsTest extends UITestBase {
         component.setY(30);
         component.setWidth(100);
         component.setHeight(100);
-        form.add(BorderLayout.CENTER, component);
+        form.add(component);
         form.revalidate();
 
         final int[] eventX = {-1};
@@ -385,7 +385,7 @@ class PointerEventsTest extends UITestBase {
         component.setWidth(100);
         component.setHeight(100);
         component.setDraggable(true);
-        form.add(BorderLayout.CENTER, component);
+        form.add(component);
         form.revalidate();
 
         final int[] listener1Count = {0};
@@ -448,7 +448,7 @@ class PointerEventsTest extends UITestBase {
 
         inner.add(BorderLayout.CENTER, button);
         outer.add(BorderLayout.CENTER, inner);
-        form.add(BorderLayout.CENTER, outer);
+        form.add(outer);
         form.revalidate();
 
         final boolean[] pressedCalled = {false};
@@ -466,7 +466,7 @@ class PointerEventsTest extends UITestBase {
         ScrollableComponent scrollable = new ScrollableComponent();
         scrollable.setWidth(200);
         scrollable.setHeight(100);
-        form.add(BorderLayout.CENTER, scrollable);
+        form.add(scrollable);
         form.revalidate();
 
         assertTrue(scrollable.isScrollableY(), "Component should be scrollable in Y");
@@ -493,7 +493,7 @@ class PointerEventsTest extends UITestBase {
 
         Container container = new Container(new BorderLayout());
         container.add(BorderLayout.CENTER, parent);
-        form.add(BorderLayout.CENTER, container);
+        form.add(container);
         form.revalidate();
 
         final boolean[] parentPressed = {false};
@@ -544,7 +544,7 @@ class PointerEventsTest extends UITestBase {
         buttonContainer.add(BorderLayout.NORTH, button);
 
         scrollable.add(buttonContainer);
-        form.add(BorderLayout.CENTER, scrollable);
+        form.add(scrollable);
         form.revalidate();
 
         final boolean[] buttonPressed = {false};
