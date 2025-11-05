@@ -62,6 +62,7 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.RunnableWithResultSync;
+import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -4995,12 +4996,25 @@ public final class Display extends CN1Constants {
      *
      * @return An image of the screen, or null if it failed.
      * @since 7.0
+     * @deprecated use screenshot(SuccessCallback) instead
      */
     public Image captureScreen() {
         return impl.captureScreen();
     }
 
     /**
+     * Captures a screenshot in the native layer which should include peer
+     * components as well.
+     *
+     * @param callback will be invoked on the EDT with a screenshot
+     * @since 7.0.211
+     */
+    public void screenshot(SuccessCallback<Image> callback) {
+        impl.screenshot(callback);
+    }
+
+
+                           /**
      * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
      *
      * @param timeout The timeout in milliseconds.

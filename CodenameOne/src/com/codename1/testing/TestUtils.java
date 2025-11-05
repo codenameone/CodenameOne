@@ -584,7 +584,8 @@ public class TestUtils {
                 return true;
             }
 
-            Image mute = Image.createImage(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+
+            Image mute = Display.getInstance().captureScreen();
             Display.getInstance().getCurrent().paintComponent(mute.getGraphics(), true);
             screenshotName = screenshotName + ".png";
             if (Storage.getInstance().exists(screenshotName)) {

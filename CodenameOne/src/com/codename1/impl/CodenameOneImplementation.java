@@ -5699,6 +5699,7 @@ public abstract class CodenameOneImplementation {
      *
      * @return An image of the screen, or null if it failed.
      * @since 7.0
+     * @deprecated replaced by screenshot()
      */
     public Image captureScreen() {
         Form form = getCurrentForm();
