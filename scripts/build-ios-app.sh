@@ -104,10 +104,26 @@ APP_DIR="$WORK_DIR/$ARTIFACT_ID"
 [ -d "$APP_DIR" ] || { bia_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
 
+# --- Normalize Codename One versions in generated iOS project POMs ---
 ROOT_POM="$APP_DIR/pom.xml"
 NS="mvn=http://maven.apache.org/POM/4.0.0"
 
-# 1) Ensure <properties><codenameone.version> exists/updated (root pom)
+# Ensure xmlstarlet is available (macOS runners use Homebrew)
+if ! command -v xmlstarlet >/dev/null 2>&1; then
+  if command -v brew >/dev/null 2>&1; then
+    brew install xmlstarlet
+  elif command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -y && sudo apt-get install -y xmlstarlet
+  else
+    bia_log "xmlstarlet not found and no installer available"; exit 1
+  fi
+fi
+
+# Helpers
+x() { xmlstarlet ed -L -N "$NS" "$@"; }
+q() { xmlstarlet sel -N "$NS" "$@"; }
+
+# 1) Ensure <properties><codenameone.version>${CN1_VERSION}</codenameone.version>
 if [ "$(q -t -v 'count(/mvn:project/mvn:properties)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
   x -s "/mvn:project" -t elem -n properties -v "" "$ROOT_POM"
 fi
@@ -117,20 +133,49 @@ else
   x -u "/mvn:project/mvn:properties/mvn:codenameone.version" -v "$CN1_VERSION" "$ROOT_POM"
 fi
 
-# 2) Parent must be a LITERAL version (no property allowed)
+# 2) Force the com.codenameone parent to a literal version (no property)
 while IFS= read -r -d '' P; do
   x -u "/mvn:project[mvn:parent/mvn:groupId='com.codenameone' and mvn:parent/mvn:artifactId='codenameone-maven-parent']/mvn:parent/mvn:version" -v "$CN1_VERSION" "$P" || true
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 3) Point com.codenameone deps/plugins to ${codenameone.version}
+# 3) Point all com.codenameone deps/plugins to ${codenameone.version}
 while IFS= read -r -d '' P; do
-  # Dependencies
   x -u "/mvn:project//mvn:dependencies/mvn:dependency[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-  # Plugins (regular)
   x -u "/mvn:project//mvn:build/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-  # Plugins (pluginManagement)
   x -u "/mvn:project//mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
+
+# 4) Ensure common Maven plugins have versions (helps before parent resolves)
+declare -A PIN=(
+  [org.apache.maven.plugins:maven-compiler-plugin]=3.11.0
+  [org.apache.maven.plugins:maven-resources-plugin]=3.3.1
+  [org.apache.maven.plugins:maven-surefire-plugin]=3.2.5
+  [org.apache.maven.plugins:maven-failsafe-plugin]=3.2.5
+  [org.apache.maven.plugins:maven-jar-plugin]=3.3.0
+  [org.apache.maven.plugins:maven-clean-plugin]=3.3.2
+  [org.apache.maven.plugins:maven-deploy-plugin]=3.1.2
+  [org.apache.maven.plugins:maven-install-plugin]=3.1.2
+  [org.apache.maven.plugins:maven-assembly-plugin]=3.6.0
+  [org.apache.maven.plugins:maven-site-plugin]=4.0.0-M15
+  [com.codenameone:codenameone-maven-plugin]='${codenameone.version}'
+)
+add_version_if_missing() {
+  local pom="$1" g="$2" a="$3" v="$4"
+  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
+     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
+    x -s "/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
+  fi
+  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
+     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
+    x -s "/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
+  fi
+}
+while IFS= read -r -d '' P; do
+  for ga in "${!PIN[@]}"; do add_version_if_missing "$P" "${ga%%:*}" "${ga##*:}" "${PIN[$ga]}"; done
+done < <(find "$APP_DIR" -type f -name pom.xml -print0)
+
+# 5) Also pass the property when building (already present below)
+EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 
 SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
 if [ ! -f "$SETTINGS_FILE" ]; then
