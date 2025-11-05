@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.geom.Shape;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,11 +14,10 @@ class GraphicsTest extends UITestBase {
 
     private Graphics graphics;
     private Object nativeGraphics;
-
     @BeforeEach
     void setupGraphics() throws Exception {
         graphics = createGraphics();
-        nativeGraphics = getNativeGraphics(graphics);
+        nativeGraphics = graphics.getGraphics();
         implementation.resetTranslateTracking();
         implementation.resetShapeTracking();
         implementation.resetClipTracking();
@@ -63,6 +63,20 @@ class GraphicsTest extends UITestBase {
     }
 
     @Test
+    void testSetAndConcatenateAlpha() {
+        graphics.setAlpha(200);
+        int oldAlpha = graphics.setAndGetAlpha(100);
+        assertEquals(200, oldAlpha);
+        assertEquals(100, graphics.getAlpha());
+
+        int previous = graphics.concatenateAlpha(128);
+        assertEquals(100, previous);
+        int expected = (int) (100 * (128 / 255f));
+        assertEquals(expected, graphics.getAlpha());
+        assertEquals(expected, implementation.getAlpha(nativeGraphics));
+    }
+
+    @Test
     void testSetClipRectangleAppliesTranslation() {
         graphics.translate(2, 3);
         graphics.setClip(4, 5, 6, 7);
@@ -99,6 +113,26 @@ class GraphicsTest extends UITestBase {
     }
 
     @Test
+    void testSetClipNullRestoresFullDisplay() {
+        graphics.setClip(10, 20, 30, 40);
+        graphics.setClip((Shape) null);
+        assertEquals(0, implementation.getClipX(nativeGraphics));
+        assertEquals(0, implementation.getClipY(nativeGraphics));
+        assertEquals(implementation.getDisplayWidth(), implementation.getClipWidth(nativeGraphics));
+        assertEquals(implementation.getDisplayHeight(), implementation.getClipHeight(nativeGraphics));
+    }
+
+    @Test
+    void testClipRectShrinksExistingClip() {
+        graphics.setClip(0, 0, 20, 20);
+        graphics.clipRect(5, -5, 10, 10);
+        assertEquals(5, implementation.getClipX(nativeGraphics));
+        assertEquals(0, implementation.getClipY(nativeGraphics));
+        assertEquals(10, implementation.getClipWidth(nativeGraphics));
+        assertEquals(5, implementation.getClipHeight(nativeGraphics));
+    }
+
+    @Test
     void testDrawShapeDelegatesWhenSupported() {
         implementation.setShapeSupported(true);
         Rectangle rectangle = new Rectangle(0, 0, 5, 5);
@@ -120,6 +154,38 @@ class GraphicsTest extends UITestBase {
     }
 
     @Test
+    void testDrawShapeWithTranslationWrapsShape() {
+        implementation.setShapeSupported(true);
+        graphics.translate(4, 6);
+        Rectangle rectangle = new Rectangle(0, 0, 5, 5);
+        graphics.drawShape(rectangle, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));
+        Shape transformed = implementation.getLastDrawShape();
+        assertNotSame(rectangle, transformed);
+        Rectangle bounds = transformed.getBounds();
+        assertEquals(4, bounds.getX());
+        assertEquals(6, bounds.getY());
+        assertEquals(5, bounds.getWidth());
+        assertEquals(5, bounds.getHeight());
+    }
+
+    @Test
+    void testFillShapeDelegatesWhenSupportedAndNoPaint() {
+        implementation.setShapeSupported(true);
+        Rectangle rectangle = new Rectangle(0, 0, 4, 4);
+        graphics.fillShape(rectangle);
+        assertTrue(implementation.wasFillShapeInvoked());
+        assertSame(rectangle, implementation.getLastFillShape());
+    }
+
+    @Test
+    void testSetFontUpdatesNativeFont() {
+        Font font = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
+        graphics.setFont(font);
+        assertSame(font, graphics.getFont());
+        assertSame(font.getNativeFont(), implementation.getFont(nativeGraphics));
+    }
+
+    @Test
     void testLighterAndDarkerColorAdjustments() {
         graphics.setColor(0x00101010);
         graphics.lighterColor(0x20);
@@ -129,16 +195,10 @@ class GraphicsTest extends UITestBase {
     }
 
     private Graphics createGraphics() throws Exception {
-        java.lang.reflect.Constructor<Graphics> constructor = Graphics.class.getDeclaredConstructor(Object.class);
-        constructor.setAccessible(true);
-        Object nativeObject = implementation.getNativeGraphics();
-        return constructor.newInstance(nativeObject);
-    }
-
-    private Object getNativeGraphics(Graphics g) throws Exception {
-        java.lang.reflect.Field field = Graphics.class.getDeclaredField("nativeGraphics");
-        field.setAccessible(true);
-        return field.get(g);
+        Image image = Image.createImage(20, 20);
+        Graphics g = image.getGraphics();
+        implementation.setClip(g.getGraphics(), 0, 0, 20, 20);
+        return g;
     }
 
     private static class DummyPaint implements Paint {
