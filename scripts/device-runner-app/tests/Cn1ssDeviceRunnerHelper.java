@@ -61,19 +61,6 @@ final class Cn1ssDeviceRunnerHelper {
             return false;
         }
         Image screenshot = img[0];
-        Image originalScreenshot = screenshot;
-
-        // If the screenshot is an EncodedImage (iOS), we need to create a mutable image
-        // to paint the form onto. For Android, it's already mutable.
-        if (screenshot.getGraphics() == null) {
-            // Create a mutable image to paint the form onto
-            Image mutableImage = Image.createImage(width, height);
-            current.paintComponent(mutableImage.getGraphics(), true);
-            screenshot = mutableImage;
-        } else {
-            // Already mutable (Android), paint the form onto it
-            current.paintComponent(screenshot.getGraphics(), true);
-        }
 
         try {
             ImageIO io = ImageIO.getImageIO();
@@ -103,9 +90,6 @@ final class Cn1ssDeviceRunnerHelper {
         } finally {
             if (screenshot != null) {
                 screenshot.dispose();
-            }
-            if (originalScreenshot != null && originalScreenshot != screenshot) {
-                originalScreenshot.dispose();
             }
         }
     }
