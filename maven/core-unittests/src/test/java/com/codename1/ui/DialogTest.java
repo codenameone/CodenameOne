@@ -2,7 +2,11 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import org.junit.jupiter.api.Test;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Container;
+import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -15,7 +19,6 @@ class DialogTest extends UITestBase {
 
         Dialog dialog = new Dialog("Outside", new BorderLayout());
         dialog.getContentPane().addComponent(BorderLayout.CENTER, new Label("Body"));
-        dialog.setAnimateShow(false);
         dialog.setDisposeWhenPointerOutOfBounds(true);
         dialog.showModeless();
 
@@ -40,7 +43,6 @@ class DialogTest extends UITestBase {
 
         Dialog dialog = new Dialog("Commands", new BorderLayout());
         dialog.getContentPane().addComponent(BorderLayout.CENTER, new Label("Body"));
-        dialog.setAnimateShow(false);
 
         Command ok = new Command("OK");
         Command cancel = new Command("Cancel");
@@ -76,7 +78,6 @@ class DialogTest extends UITestBase {
 
         Dialog dialog = new Dialog("Timeout", new BorderLayout());
         dialog.getContentPane().addComponent(BorderLayout.CENTER, new Label("Body"));
-        dialog.setAnimateShow(false);
         dialog.showModeless();
         form.getAnimationManager().flush();
 
