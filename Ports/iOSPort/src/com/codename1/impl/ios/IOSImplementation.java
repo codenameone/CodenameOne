@@ -325,12 +325,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     public void run() {
                         try {
                             if(imageData != null) {
-                                // Create an EncodedImage first, then decode it to a mutable Image
-                                // This is necessary because the test helper calls screenshot.getGraphics()
-                                // which only works on mutable images
-                                EncodedImage encoded = EncodedImage.createImage(imageData);
-                                Image decoded = encoded.getInternal();
-                                screenshotCallback.onSucess(decoded);
+                                screenshotCallback.onSucess(EncodedImage.createImage(imageData));
                             } else {
                                 Log.e(new RuntimeException("Screenshot failed: imageData is null"));
                                 screenshotCallback.onSucess(null);
