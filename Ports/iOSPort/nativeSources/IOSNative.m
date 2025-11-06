@@ -5212,15 +5212,18 @@ static UIImage* cn1_captureView(UIView *view) {
 }
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
         UIView *view = [CodenameOne_GLViewController instance].view;
         UIImage *img = cn1_captureView(view);
         if (!img) {
+            POOL_END();
             return;
         }
 
         NSData *png = UIImagePNGRepresentation(img);
         if (!png) {
+            POOL_END();
             return;
         }
 
@@ -5231,6 +5234,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
         memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)byteArr)->data, (const jbyte*)[png bytes], len);
 
         com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG byteArr);
+        POOL_END();
     });
 }
 
