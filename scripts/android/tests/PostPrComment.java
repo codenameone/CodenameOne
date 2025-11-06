@@ -381,13 +381,28 @@ public class PostPrComment {
     }
 
     private static AttachmentReplacement replaceAttachments(String body, Map<String, String> urls) {
+        // Build a case-insensitive lookup alongside the original map
+        Map<String, String> urlsCI = new HashMap<>();
+        for (Map.Entry<String, String> e : urls.entrySet()) {
+            if (e.getKey() != null && e.getValue() != null) {
+                urlsCI.put(e.getKey().toLowerCase(), e.getValue());
+            }
+        }
+
         Pattern pattern = Pattern.compile("\\(attachment:([^\\)]+)\\)");
         Matcher matcher = pattern.matcher(body);
         StringBuffer sb = new StringBuffer();
         List<String> missing = new ArrayList<>();
         while (matcher.find()) {
             String name = matcher.group(1);
+            if (name != null) {
+                name = name.trim();
+            }
             String url = urls.get(name);
+            if (url == null && name != null) {
+                // try case-insensitive match
+                url = urlsCI.get(name.toLowerCase());
+            }
             if (url != null) {
                 matcher.appendReplacement(sb, Matcher.quoteReplacement("(" + url + ")"));
             } else {

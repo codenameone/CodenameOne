@@ -82,6 +82,7 @@ rm -rf "$WORK_DIR"; mkdir -p "$WORK_DIR"
 
 GROUP_ID="com.codenameone.examples"
 ARTIFACT_ID="hello-codenameone"
+PACKAGE_NAME="com.codenameone.examples.hellocodenameone"
 MAIN_NAME="HelloCodenameOne"
 
 SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
@@ -204,47 +205,48 @@ SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
 echo "codename1.arg.android.useAndroidX=true" >> "$SETTINGS_FILE"
 [ -f "$SETTINGS_FILE" ] || { ba_log "codenameone_settings.properties not found at $SETTINGS_FILE" >&2; exit 1; }
 
-# --- Read settings ---
-read_prop() { grep -E "^$1=" "$SETTINGS_FILE" | head -n1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//'; }
+set_prop() {
+  local key="$1" value="$2"
+  if grep -q "^${key}=" "$SETTINGS_FILE"; then
+    if sed --version >/dev/null 2>&1; then
+      sed -i -E "s|^${key}=.*$|${key}=${value}|" "$SETTINGS_FILE"
+    else
+      sed -i '' -E "s|^${key}=.*$|${key}=${value}|" "$SETTINGS_FILE"
+    fi
+  else
+    printf '\n%s=%s\n' "$key" "$value" >> "$SETTINGS_FILE"
+  fi
+}
 
-PACKAGE_NAME="$(read_prop 'codename1.packageName' || true)"
-CURRENT_MAIN_NAME="$(read_prop 'codename1.mainName' || true)"
-
-if [ -z "$PACKAGE_NAME" ]; then
-  PACKAGE_NAME="$GROUP_ID"
-  ba_log "Package name not found in settings. Falling back to groupId $PACKAGE_NAME"
-fi
-if [ -z "$CURRENT_MAIN_NAME" ]; then
-  CURRENT_MAIN_NAME="$MAIN_NAME"
-  ba_log "Main class name not found in settings. Falling back to target $CURRENT_MAIN_NAME"
-fi
-
-# --- Generate Java from external template ---
+# --- Install Codename One application sources ---
 PACKAGE_PATH="${PACKAGE_NAME//.//}"
 JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}"
 mkdir -p "$JAVA_DIR"
-MAIN_FILE="$JAVA_DIR/${MAIN_NAME}.java"
-
-TEMPLATE="$SCRIPT_DIR/templates/HelloCodenameOne.java.tmpl"
-if [ ! -f "$TEMPLATE" ]; then
-  ba_log "Template not found: $TEMPLATE" >&2
+MAIN_FILE_SOURCE="$SCRIPT_DIR/device-runner-app/main/${MAIN_NAME}.java"
+if [ ! -f "$MAIN_FILE_SOURCE" ]; then
+  ba_log "Sample application source not found: $MAIN_FILE_SOURCE" >&2
   exit 1
 fi
+cp "$MAIN_FILE_SOURCE" "$JAVA_DIR/${MAIN_NAME}.java"
 
-sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
-    -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
-    "$TEMPLATE" > "$MAIN_FILE"
-
-# --- Ensure codename1.mainName is set ---
-ba_log "Setting codename1.mainName to $MAIN_NAME"
-if grep -q '^codename1.mainName=' "$SETTINGS_FILE"; then
-  # GNU sed in CI: in-place edit without backup
-  sed -E -i 's|^codename1\.mainName=.*$|codename1.mainName='"$MAIN_NAME"'|' "$SETTINGS_FILE"
-else
-  printf '\ncodename1.mainName=%s\n' "$MAIN_NAME" >> "$SETTINGS_FILE"
-fi
+ba_log "Setting Codename One application metadata"
+set_prop "codename1.packageName" "$PACKAGE_NAME"
+set_prop "codename1.mainName" "$MAIN_NAME"
+# DeviceRunner integration is handled inside the copied sources, so unit test
+# build mode is not required (and is unsupported for local Android builds).
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
+
+# --- Install DeviceRunner UI tests ---
+TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/tests"
+TEST_JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}/tests"
+mkdir -p "$TEST_JAVA_DIR"
+if [ ! -d "$TEST_SOURCE_DIR" ]; then
+  ba_log "DeviceRunner test sources not found: $TEST_SOURCE_DIR" >&2
+  exit 1
+fi
+cp "$TEST_SOURCE_DIR"/*.java "$TEST_JAVA_DIR"/
+ba_log "Installed DeviceRunner UI tests in $TEST_JAVA_DIR"
 
 # --- Normalize Codename One versions (use Maven Versions Plugin) ---
 ba_log "Normalizing Codename One Maven coordinates to $CN1_VERSION"
@@ -266,7 +268,7 @@ if [ -z "$GRADLE_PROJECT_DIR" ]; then
   exit 1
 fi
 
-ba_log "Configuring instrumentation test sources in $GRADLE_PROJECT_DIR"
+ba_log "Normalizing Android Gradle project in $GRADLE_PROJECT_DIR"
 
 # Ensure AndroidX flags in gradle.properties
 # --- BEGIN: robust Gradle patch for AndroidX tests ---
@@ -301,30 +303,6 @@ echo "----- app/build.gradle tail -----"
 tail -n 80 "$APP_BUILD_GRADLE" | sed 's/^/| /'
 echo "---------------------------------"
 
-TEST_SRC_DIR="$GRADLE_PROJECT_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
-mkdir -p "$TEST_SRC_DIR"
-TEST_CLASS="$TEST_SRC_DIR/HelloCodenameOneInstrumentedTest.java"
-TEST_TEMPLATE="$SCRIPT_DIR/android/tests/HelloCodenameOneInstrumentedTest.java"
-
-if [ ! -f "$TEST_TEMPLATE" ]; then
-  ba_log "Missing instrumentation test template: $TEST_TEMPLATE" >&2
-  exit 1
-fi
-
-sed "s|@PACKAGE@|$PACKAGE_NAME|g" "$TEST_TEMPLATE" > "$TEST_CLASS"
-ba_log "Created instrumentation test at $TEST_CLASS"
-
-DEFAULT_ANDROID_TEST="$GRADLE_PROJECT_DIR/app/src/androidTest/java/com/example/myapplication2/ExampleInstrumentedTest.java"
-if [ -f "$DEFAULT_ANDROID_TEST" ]; then
-  rm -f "$DEFAULT_ANDROID_TEST"
-  ba_log "Removed default instrumentation stub at $DEFAULT_ANDROID_TEST"
-  DEFAULT_ANDROID_TEST_DIR="$(dirname "$DEFAULT_ANDROID_TEST")"
-  DEFAULT_ANDROID_TEST_PARENT="$(dirname "$DEFAULT_ANDROID_TEST_DIR")"
-  rmdir "$DEFAULT_ANDROID_TEST_DIR" 2>/dev/null || true
-  rmdir "$DEFAULT_ANDROID_TEST_PARENT" 2>/dev/null || true
-  rmdir "$(dirname "$DEFAULT_ANDROID_TEST_PARENT")" 2>/dev/null || true
-fi
-
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
@@ -348,7 +326,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "gradle_project_dir=$GRADLE_PROJECT_DIR"
     echo "apk_path=$APK_PATH"
-    echo "instrumentation_test_class=$PACKAGE_NAME.HelloCodenameOneInstrumentedTest"
+    echo "package_name=$PACKAGE_NAME"
   } >> "$GITHUB_OUTPUT"
   ba_log "Published GitHub Actions outputs for downstream steps"
 fi
