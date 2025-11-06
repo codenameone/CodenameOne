@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
@@ -63,23 +64,39 @@ final class Cn1ssDeviceRunnerHelper {
         Image screenshot = img[0];
 
         try {
-            ImageIO io = ImageIO.getImageIO();
-            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
-                println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
-                println("CN1SS:END:" + safeName);
-                return false;
+            byte[] pngBytes;
+
+            // If the screenshot is already an EncodedImage (iOS), extract the bytes directly
+            // Otherwise, encode it with ImageIO (Android)
+            if (screenshot instanceof EncodedImage) {
+                EncodedImage encoded = (EncodedImage) screenshot;
+                pngBytes = encoded.getImageData();
+                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length + " (direct)");
+            } else {
+                // Mutable image - need to encode it
+                ImageIO io = ImageIO.getImageIO();
+                if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
+                    println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
+                    println("CN1SS:END:" + safeName);
+                    return false;
+                }
+                ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
+                io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
+                pngBytes = pngOut.toByteArray();
+                println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
             }
-            ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
-            io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
-            byte[] pngBytes = pngOut.toByteArray();
-            println("CN1SS:INFO:test=" + safeName + " png_bytes=" + pngBytes.length);
+
             emitChannel(pngBytes, safeName, "");
 
-            byte[] preview = encodePreview(io, screenshot, safeName);
-            if (preview != null && preview.length > 0) {
-                emitChannel(preview, safeName, PREVIEW_CHANNEL);
-            } else {
-                println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
+            // Generate preview - always needs to be encoded as JPEG
+            ImageIO io = ImageIO.getImageIO();
+            if (io != null) {
+                byte[] preview = encodePreview(io, screenshot, safeName);
+                if (preview != null && preview.length > 0) {
+                    emitChannel(preview, safeName, PREVIEW_CHANNEL);
+                } else {
+                    println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
+                }
             }
             return true;
         } catch (IOException ex) {
