@@ -5193,7 +5193,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-/*static UIImage* cn1_captureView(UIView *view) {
+static UIImage* cn1_captureView(UIView *view) {
     CGSize size = view.bounds.size;
     if (size.width <= 0 || size.height <= 0) return nil;
 
@@ -5232,7 +5232,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 
         com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG byteArr);
     });
-}*/
+}
 
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {

@@ -301,7 +301,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /*private static SuccessCallback<Image> screenshotCallback;
+    private static SuccessCallback<Image> screenshotCallback;
 
     @Override
     public void screenshot(SuccessCallback<Image> callback) {
@@ -318,7 +318,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             });
         }
-    }*/
+    }
 
     /**
      * Used to enable/disable native cookies from native code.
