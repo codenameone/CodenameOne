@@ -306,17 +306,39 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void screenshot(SuccessCallback<Image> callback) {
         screenshotCallback = callback;
-        nativeInstance.screenshot();
+        try {
+            nativeInstance.screenshot();
+        } catch(Exception e) {
+            Log.e(e);
+            if(screenshotCallback != null) {
+                screenshotCallback.onSucess(null);
+                screenshotCallback = null;
+            }
+        }
     }
 
     static void onScreenshot(final byte[] imageData) {
-        if(screenshotCallback != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    screenshotCallback.onSucess(EncodedImage.createImage(imageData));
-                }
-            });
+        try {
+            if(screenshotCallback != null) {
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if(imageData != null) {
+                                screenshotCallback.onSucess(EncodedImage.createImage(imageData));
+                            } else {
+                                Log.e(new RuntimeException("Screenshot failed: imageData is null"));
+                                screenshotCallback.onSucess(null);
+                            }
+                        } catch(Exception e) {
+                            Log.e(e);
+                            screenshotCallback.onSucess(null);
+                        }
+                    }
+                });
+            }
+        } catch(Exception e) {
+            Log.e(e);
         }
     }
 

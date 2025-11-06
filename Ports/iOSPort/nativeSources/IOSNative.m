@@ -5212,28 +5212,52 @@ static UIImage* cn1_captureView(UIView *view) {
 }
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView *view = [CodenameOne_GLViewController instance].view;
-        UIImage *img = cn1_captureView(view);
-        if (!img) {
-            POOL_END();
-            return;
+        @try {
+            UIView *view = [CodenameOne_GLViewController instance].view;
+            if (!view) {
+                NSLog(@"Screenshot failed: view is nil");
+                com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG nil);
+                POOL_END();
+                return;
+            }
+
+            UIImage *img = cn1_captureView(view);
+            if (!img) {
+                NSLog(@"Screenshot failed: cn1_captureView returned nil");
+                com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG nil);
+                POOL_END();
+                return;
+            }
+
+            NSData *png = UIImagePNGRepresentation(img);
+            if (!png) {
+                NSLog(@"Screenshot failed: UIImagePNGRepresentation returned nil");
+                com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG nil);
+                POOL_END();
+                return;
+            }
+
+            // Create Java byte[]
+            int len = (int)[png length];
+            NSLog(@"Screenshot captured: %d bytes", len);
+            JAVA_OBJECT byteArr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG len);
+
+            if (!byteArr) {
+                NSLog(@"Screenshot failed: could not allocate Java byte array");
+                com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG nil);
+                POOL_END();
+                return;
+            }
+
+            memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)byteArr)->data, (const jbyte*)[png bytes], len);
+
+            com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG byteArr);
+        } @catch (NSException *exception) {
+            NSLog(@"Screenshot failed with exception: %@", exception);
+            com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG nil);
         }
-
-        NSData *png = UIImagePNGRepresentation(img);
-        if (!png) {
-            POOL_END();
-            return;
-        }
-
-        // Create Java byte[]
-        int len = (int)[png length];
-        JAVA_OBJECT byteArr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG len);
-
-        memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)byteArr)->data, (const jbyte*)[png bytes], len);
-
-        com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG byteArr);
         POOL_END();
     });
 }
