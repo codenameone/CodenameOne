@@ -83,8 +83,35 @@ class AndroidScreenshotTask implements Runnable {
         try {
             final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
             final Canvas canvas = new Canvas(bmp);
-            // Draw the view hierarchy (includes background + children)
-            ((View)view).draw(canvas);
+
+            // Get the parent container that holds both the CodenameOneSurface and PeerComponents
+            View viewToDraw = (View)view;
+            android.view.ViewParent parent = viewToDraw.getParent();
+
+            // If the view has a parent (relativeLayout), draw the parent to include PeerComponents
+            // Otherwise fall back to drawing just the view
+            if (parent instanceof View) {
+                View parentView = (View) parent;
+                // Save the parent's current position
+                final int[] parentLoc = new int[2];
+                parentView.getLocationInWindow(parentLoc);
+                final int[] viewLoc = new int[2];
+                viewToDraw.getLocationInWindow(viewLoc);
+
+                // Calculate offset between view and parent
+                final int offsetX = viewLoc[0] - parentLoc[0];
+                final int offsetY = viewLoc[1] - parentLoc[1];
+
+                // Translate canvas to align view content correctly
+                canvas.translate(-offsetX, -offsetY);
+
+                // Draw the parent view hierarchy (includes PeerComponents as siblings)
+                parentView.draw(canvas);
+            } else {
+                // Fallback: draw only the view if no parent found
+                viewToDraw.draw(canvas);
+            }
+
             postSuccess(bmp);
         } catch (Throwable t) {
             Log.e(t);
