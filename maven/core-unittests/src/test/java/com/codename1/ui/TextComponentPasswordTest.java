@@ -27,6 +27,7 @@ class TextComponentPasswordTest extends UITestBase {
     @FormTest
     void testToggleConstraintAndIcon() {
         TextComponentPassword password = new TextComponentPassword();
+        password.constructUI();
         Form form = Display.getInstance().getCurrent();
         form.add(password);
         form.revalidate();

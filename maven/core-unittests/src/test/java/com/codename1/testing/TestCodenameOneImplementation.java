@@ -688,6 +688,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public Object makeTransformRotation(float angle, float x, float y, float z) {
+        TestTransform transform = new TestTransform();
+        transform.setRotation(angle, x, y);
+        return transform;
+    }
+
+    @Override
+    public void setTransformRotation(Object transform, float angle, float x, float y, float z) {
+        ((TestTransform) transform).setRotation(angle, x, y);
+    }
+
+    @Override
     public Object makeTransformAffine(double m00, double m10, double m01, double m11, double m02, double m12) {
         TestTransform transform = new TestTransform();
         transform.setAffine((float) m00, (float) m01, (float) m02, (float) m10, (float) m11, (float) m12);
@@ -1333,6 +1345,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public L10NManager getLocalizationManager() {
+        if (localizationManager == null) {
+            localizationManager = new L10NManager("en", "US") {
+            };
+        }
         return localizationManager;
     }
 
@@ -1542,6 +1558,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             m00 = sx;
             m11 = sy;
             m22 = sz;
+        }
+
+        void setRotation(float angle, float px, float py) {
+            setIdentity();
+            float cos = (float) Math.cos(angle);
+            float sin = (float) Math.sin(angle);
+            m00 = cos;
+            m01 = -sin;
+            m10 = sin;
+            m11 = cos;
+            m02 = px - px * cos + py * sin;
+            m12 = py - px * sin - py * cos;
         }
 
         void setAffine(float nm00, float nm01, float nm02, float nm10, float nm11, float nm12) {

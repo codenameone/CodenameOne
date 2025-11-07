@@ -20,13 +20,14 @@ class InfiniteContainerTest extends UITestBase {
             fetchCount++;
             lastIndex = index;
             lastAmount = amount;
-            if (index > 0) {
+            if (index >= 9) {
                 return new Component[0];
             }
+            int start = Math.max(0, index < 0 ? 0 : index + (index == 0 ? 0 : 1));
             int size = Math.min(3, amount);
             Component[] components = new Component[size];
             for (int i = 0; i < size; i++) {
-                components[i] = new Label("Item " + (index + i));
+                components[i] = new Label("Item " + (start + i));
             }
             return components;
         }
@@ -40,6 +41,7 @@ class InfiniteContainerTest extends UITestBase {
         form.revalidate();
 
         container.refresh();
+        flushSerialCalls();
         assertTrue(container.getComponentCount() > 0);
         assertEquals(1, container.fetchCount);
         assertEquals(0, container.lastIndex);
@@ -54,15 +56,20 @@ class InfiniteContainerTest extends UITestBase {
         form.revalidate();
 
         container.refresh();
+        flushSerialCalls();
         int initialCount = container.getComponentCount();
         container.fetchMore();
-        assertTrue(container.getComponentCount() >= initialCount);
+        flushSerialCalls();
+        assertTrue(container.getComponentCount() > initialCount);
         assertTrue(container.fetchCount >= 2);
     }
 
     @FormTest
     void testInfiniteProgressAvailable() {
+        Form form = Display.getInstance().getCurrent();
         TestContainer container = new TestContainer();
+        form.add(container);
+        form.revalidate();
         assertNotNull(container.getInfiniteProgress());
     }
 }

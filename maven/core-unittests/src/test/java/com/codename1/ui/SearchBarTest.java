@@ -34,6 +34,7 @@ class SearchBarTest extends UITestBase {
         Toolbar parent = new Toolbar();
         form.setToolBar(parent);
         TestSearchBar searchBar = new TestSearchBar(parent, 0);
+        form.setToolBar(searchBar);
         searchBar.initSearchBar();
 
         assertTrue(searchBar.getTitleComponent() instanceof TextField);

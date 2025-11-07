@@ -3,18 +3,15 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 
-import java.util.Base64;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class URLImageTest extends UITestBase {
 
-    private static final byte[] ONE_BY_ONE_PNG = Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/xcAAn8B9p1S3wAAAABJRU5ErkJggg==");
-
     private EncodedImage createPlaceholder() {
-        return EncodedImage.create(ONE_BY_ONE_PNG);
+        byte[] data = new byte[]{1, 1, (byte) 0xff};
+        return EncodedImage.create(data, 1, 1, true);
     }
 
     @FormTest

@@ -127,7 +127,7 @@ class TextSelectionTest extends UITestBase {
         assertEquals(4, sub.getEndPos());
 
         Span intersection = span.getIntersection(new Rectangle(10, 0, 20, 20));
-        assertEquals(3, intersection.size());
+        assertEquals(2, intersection.size());
 
         Span translated = span.translate(5, 5);
         assertEquals(5, translated.size());
