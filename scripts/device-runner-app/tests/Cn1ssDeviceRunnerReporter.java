@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.Log;
 import com.codename1.testing.TestReporting;
 
 public class Cn1ssDeviceRunnerReporter extends TestReporting {
@@ -28,10 +29,11 @@ public class Cn1ssDeviceRunnerReporter extends TestReporting {
     public void logException(Throwable err) {
         super.logException(err);
         if (err != null) {
-            System.out.println("CN1SS:ERR:exception=" + err.getClass().getName() + ": " + err.getMessage());
-            System.out.println("CN1SS:ERR:stack_trace_start");
-            err.printStackTrace(System.out);
-            System.out.println("CN1SS:ERR:stack_trace_end");
+            String exceptionInfo = err.getClass().getName() + ": " + err.getMessage();
+            System.out.println("CN1SS:ERR:exception=" + exceptionInfo);
+            // Use Log.e() which properly formats stack traces for all platforms
+            Log.p("Exception in test: " + exceptionInfo);
+            Log.e(err);
         } else {
             System.out.println("CN1SS:ERR:exception=null");
         }
