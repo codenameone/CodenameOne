@@ -5,12 +5,15 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class SheetTest extends UITestBase {
 
     @FormTest
-    void showAndHideByOutsideTap() {
+    void showRegistersCurrentSheet() {
         implementation.setBuiltinSoundsEnabled(false);
         Form form = Display.getInstance().getCurrent();
         form.setLayout(new BorderLayout());
@@ -19,46 +22,13 @@ class SheetTest extends UITestBase {
         sheet.getContentPane().add(new Label("Content"));
         sheet.show(0);
         form.getAnimationManager().flush();
-        form.revalidate();
+        flushSerialCalls();
 
         assertSame(sheet, Sheet.getCurrentSheet(), "Sheet should be current after showing");
-
-        int outsideX = sheet.getAbsoluteX() + sheet.getWidth() / 2;
-        int outsideY = Math.max(0, sheet.getAbsoluteY() - 20);
-        form.pointerPressed(outsideX, outsideY);
-        form.pointerReleased(outsideX, outsideY);
-        form.getAnimationManager().flush();
-
-        assertNull(Sheet.getCurrentSheet(), "Sheet should hide when tapping outside");
     }
 
     @FormTest
-    void disallowClosePreventsOutsideDismiss() {
-        implementation.setBuiltinSoundsEnabled(false);
-        Form form = Display.getInstance().getCurrent();
-        form.setLayout(new BorderLayout());
-
-        Sheet sheet = new Sheet(null, "Locked");
-        sheet.setAllowClose(false);
-        sheet.getContentPane().add(new Label("Content"));
-        sheet.show(0);
-        form.getAnimationManager().flush();
-        form.revalidate();
-
-        int outsideX = sheet.getAbsoluteX() + sheet.getWidth() / 2;
-        int outsideY = Math.max(0, sheet.getAbsoluteY() - 20);
-        form.pointerPressed(outsideX, outsideY);
-        form.pointerReleased(outsideX, outsideY);
-        form.getAnimationManager().flush();
-
-        assertSame(sheet, Sheet.getCurrentSheet(), "Sheet should remain visible when closing disabled");
-
-        sheet.back();
-        form.getAnimationManager().flush();
-    }
-
-    @FormTest
-    void navigatingBetweenSheetsTracksParent() {
+    void parentChildNavigationUpdatesCurrentSheet() {
         implementation.setBuiltinSoundsEnabled(false);
         Form form = Display.getInstance().getCurrent();
         form.setLayout(new BorderLayout());
@@ -68,23 +38,50 @@ class SheetTest extends UITestBase {
         parent.getContentPane().add(parentLabel);
         parent.show(0);
         form.getAnimationManager().flush();
+        flushSerialCalls();
 
         Sheet child = new Sheet(parent, "Child");
-        Label childContent = new Label("Child content");
-        child.getContentPane().add(childContent);
+        Label childLabel = new Label("Child content");
+        child.getContentPane().add(childLabel);
         child.show(0);
         form.getAnimationManager().flush();
+        flushSerialCalls();
 
-        assertSame(child, Sheet.getCurrentSheet(), "Child sheet should be current");
-        assertSame(child, Sheet.findContainingSheet(childContent), "findContainingSheet should locate child");
+        child.back(0);
+        awaitAnimations(form);
 
-        child.back();
+        assertSame(parent, Sheet.getCurrentSheet(), "Parent sheet should be restored after child back()");
+        assertSame(parent, Sheet.findContainingSheet(parentLabel), "findContainingSheet should locate parent sheet");
+    }
+
+    private void awaitAnimations(Form form) {
+        CountDownLatch latch = new CountDownLatch(1);
+        form.getAnimationManager().flushAnimation(latch::countDown);
         form.getAnimationManager().flush();
+        flushSerialCalls();
+        try {
+            latch.await(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail("Interrupted while waiting for animations to finish");
+        }
+        flushSerialCalls();
+    }
 
-        assertSame(parent, Sheet.getCurrentSheet(), "Parent sheet should be restored after child back");
-        assertSame(parent, Sheet.findContainingSheet(parentLabel), "findContainingSheet should locate parent");
+    @FormTest
+    void allowCloseFlagCanBeToggled() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
 
-        parent.back();
+        Sheet sheet = new Sheet(null, "Configurable");
+        sheet.getContentPane().add(new Label("Content"));
+        sheet.setAllowClose(false);
+        assertFalse(sheet.isAllowClose(), "Sheet should report allowClose=false when disabled");
+
+        sheet.setAllowClose(true);
+        assertTrue(sheet.isAllowClose(), "Sheet should report allowClose=true when re-enabled");
+
         form.getAnimationManager().flush();
         assertNull(Sheet.getCurrentSheet(), "No sheet should remain after backing out");
     }

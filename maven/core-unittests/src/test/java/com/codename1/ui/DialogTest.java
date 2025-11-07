@@ -55,8 +55,8 @@ class DialogTest extends UITestBase {
         form.getAnimationManager().flush();
         form.revalidate();
 
-        Container buttonArea = (Container) dialog.getContentPane().getComponentAt(dialog.getContentPane().getComponentCount() - 1);
-        Button okButton = (Button) buttonArea.getComponentAt(0);
+        Button okButton = findButton(dialog, ok);
+        assertNotNull(okButton, "OK button should be created for command");
 
         int px = okButton.getAbsoluteX() + okButton.getWidth() / 2;
         int py = okButton.getAbsoluteY() + okButton.getHeight() / 2;
@@ -85,5 +85,24 @@ class DialogTest extends UITestBase {
         dialog.animate();
 
         assertTrue(dialog.isDisposed(), "Dialog should be disposed after timeout");
+    }
+
+    private Button findButton(Container root, Command target) {
+        for (int i = 0; i < root.getComponentCount(); i++) {
+            Component cmp = root.getComponentAt(i);
+            if (cmp instanceof Button) {
+                Button button = (Button) cmp;
+                if (button.getCommand() == target) {
+                    return button;
+                }
+            }
+            if (cmp instanceof Container) {
+                Button found = findButton((Container) cmp, target);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 }

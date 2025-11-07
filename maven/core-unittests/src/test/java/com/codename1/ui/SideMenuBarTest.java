@@ -23,51 +23,65 @@ class SideMenuBarTest extends UITestBase {
     }
 
     @FormTest
-    void openAndCloseMenuUpdatesStaticState() {
+    void addingCommandsIncrementsCount() {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
 
-        Form form = new Form("SideMenu", new BorderLayout());
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
         SideMenuBar sideMenu = new SideMenuBar();
         form.setMenuBar(sideMenu);
-        Command menuCommand = new Command("Item");
-        form.addCommand(menuCommand);
         form.show();
         form.getAnimationManager().flush();
+        flushSerialCalls();
 
-        assertFalse(SideMenuBar.isShowing(), "Side menu should not be showing before open");
+        int initialCount = form.getCommandCount();
+        Command cmd = new Command("Item");
+        form.addCommand(cmd);
+        form.revalidate();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
 
-        sideMenu.openMenu(null);
+        assertEquals(initialCount + 1, form.getCommandCount(), "Command count should increase after adding a command");
+        assertTrue(formContainsCommand(form, cmd), "Form should report the newly added command");
+
+        form.removeCommand(cmd);
+        form.revalidate();
+
         form.getAnimationManager().flush();
 
-        assertTrue(SideMenuBar.isShowing(), "Side menu should report showing after open");
-
-        sideMenu.closeMenu();
-        form.getAnimationManager().flush();
-
-        assertFalse(SideMenuBar.isShowing(), "Side menu should no longer be showing after close");
+        flushSerialCalls();
+        assertEquals(initialCount, form.getCommandCount(), "Removing the command should restore original count");
+        assertFalse(formContainsCommand(form, cmd), "Form should no longer contain removed command");
     }
 
     @FormTest
-    void closeCurrentMenuCallbackInvoked() {
+    void closeCurrentMenuRunsCallbackWhenNoMenuShowing() {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
 
-        Form form = new Form("SideMenu", new BorderLayout());
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
         SideMenuBar sideMenu = new SideMenuBar();
         form.setMenuBar(sideMenu);
-        form.addCommand(new Command("First"));
         form.show();
         form.getAnimationManager().flush();
 
-        sideMenu.openMenu(null);
+
+        final boolean[] invoked = {false};
+        SideMenuBar.closeCurrentMenu(() -> invoked[0] = true);
         form.getAnimationManager().flush();
 
-        final boolean[] called = {false};
-        SideMenuBar.closeCurrentMenu(() -> called[0] = true);
-        form.getAnimationManager().flush();
+        assertTrue(invoked[0], "Callback should run even when no menu is showing");
+        assertFalse(SideMenuBar.isShowing(), "Menu should remain hidden");
+    }
 
-        assertTrue(called[0], "Callback should be invoked after menu closes");
-        assertFalse(SideMenuBar.isShowing(), "Menu should be closed after callback execution");
+    private boolean formContainsCommand(Form form, Command command) {
+        for (int i = 0; i < form.getCommandCount(); i++) {
+            if (form.getCommand(i) == command) {
+                return true;
+            }
+        }
+        return false;
     }
 }

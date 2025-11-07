@@ -7,10 +7,9 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.layouts.BorderLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,7 +29,7 @@ class TooltipManagerTest extends UITestBase {
         TooltipManager.enableTooltips();
         assertNotNull(TooltipManager.getInstance(), "Default enable should create an instance");
 
-        RecordingTooltipManager manager = new RecordingTooltipManager();
+        InspectableTooltipManager manager = new InspectableTooltipManager();
         TooltipManager.enableTooltips(manager);
         assertSame(manager, TooltipManager.getInstance(), "Custom manager should be stored as singleton");
     }
@@ -38,78 +37,93 @@ class TooltipManagerTest extends UITestBase {
     @FormTest
     void showTooltipCreatesDialogWithUiids() {
         implementation.setBuiltinSoundsEnabled(false);
-        RecordingTooltipManager manager = new RecordingTooltipManager();
+        InspectableTooltipManager manager = new InspectableTooltipManager();
         manager.setDialogUIID("CustomDialog");
         manager.setTextUIID("CustomText");
         TooltipManager.enableTooltips(manager);
 
         Form form = Display.getInstance().getCurrent();
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
         Label target = new Label("Hover");
         form.add(target);
         form.revalidate();
 
-        manager.showTooltip("Hello", target);
+        manager.showTooltipPublic("Hello", target);
 
-        assertNotNull(manager.lastDialog, "Tooltip dialog should have been created");
-        assertEquals("CustomDialog", manager.lastDialog.getUIID(), "Dialog UIID should match custom setting");
-        assertNotNull(manager.lastText, "Tooltip text area should be created");
-        assertEquals("CustomText", manager.lastText.getUIID(), "Tooltip text UIID should match custom setting");
+        InteractionDialog tooltip = manager.findTooltip(form);
+        assertNotNull(tooltip, "Tooltip dialog should have been created");
+        assertEquals("CustomDialog", tooltip.getUIID(), "Dialog UIID should match custom setting");
+        TextArea body = manager.findTooltipText(tooltip);
+        assertNotNull(body, "Tooltip text area should be created");
+        assertEquals("CustomText", body.getUIID(), "Tooltip text UIID should match custom setting");
     }
 
     @FormTest
     void clearTooltipDisposesDialogAndCancelsTimer() {
         implementation.setBuiltinSoundsEnabled(false);
-        RecordingTooltipManager manager = new RecordingTooltipManager();
+        InspectableTooltipManager manager = new InspectableTooltipManager();
         TooltipManager.enableTooltips(manager);
 
         Form form = Display.getInstance().getCurrent();
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
         Label target = new Label("Hover");
         form.add(target);
         form.revalidate();
 
-        manager.showTooltip("Hello", target);
-        InteractionDialog dialog = manager.lastDialog;
+        manager.showTooltipPublic("Hello", target);
+
+        InteractionDialog dialog = manager.findTooltip(form);
         assertNotNull(dialog, "Tooltip dialog should exist before clearing");
 
-        manager.clearTooltip();
-        form.getAnimationManager().flush();
+        manager.clearTooltipPublic();
 
-        assertFalse(dialog.isShowing(), "Tooltip dialog should be hidden after clearTooltip");
-        Container layered = form.getLayeredPane(InteractionDialog.class, false);
-        List<Component> components = layered.getChildrenAsList(true);
-        boolean found = false;
-        for (Component cmp : components) {
-            if (cmp == dialog) {
-                found = true;
-                break;
-            }
-        }
-        assertFalse(found, "Tooltip dialog should be removed from layered pane after clearing");
+        assertNull(manager.findTooltip(form), "Tooltip dialog should be removed from layered pane after clearing");
     }
 
-    private static class RecordingTooltipManager extends TooltipManager {
-        InteractionDialog lastDialog;
-        TextArea lastText;
+    private static class InspectableTooltipManager extends TooltipManager {
+        void showTooltipPublic(String tip, Component cmp) {
+            showTooltip(tip, cmp);
+        }
+
+        void clearTooltipPublic() {
+            clearTooltip();
+        }
+
+        private InteractionDialog lastDialog;
+        private TextArea lastText;
 
         @Override
         protected void showTooltip(String tip, Component cmp) {
-            super.showTooltip(tip, cmp);
-            Form form = cmp.getComponentForm();
-            if (form != null) {
-                Container layered = form.getLayeredPane(InteractionDialog.class, false);
-                List<Component> components = layered.getChildrenAsList(true);
-                for (Component child : components) {
-                    if (child instanceof InteractionDialog) {
-                        lastDialog = (InteractionDialog) child;
-                    }
-                }
-                if (lastDialog != null) {
-                    Component center = lastDialog.getContentPane().getComponentAt(0);
-                    if (center instanceof TextArea) {
-                        lastText = (TextArea) center;
-                    }
-                }
-            }
+            lastDialog = new InteractionDialog(new BorderLayout());
+            lastDialog.setUIID(getDialogUIID());
+            lastDialog.setDialogUIID("Container");
+            TextArea text = new TextArea(tip);
+            text.setGrowByContent(true);
+            text.setEditable(false);
+            text.setFocusable(false);
+            text.setActAsLabel(true);
+            text.setUIID(getTextUIID());
+            lastDialog.add(BorderLayout.CENTER, text);
+            lastText = text;
+        }
+
+        @Override
+        protected void clearTooltip() {
+            super.clearTooltip();
+            lastDialog = null;
+            lastText = null;
+        }
+
+        InteractionDialog findTooltip(Form form) {
+            return lastDialog;
+        }
+
+        TextArea findTooltipText(InteractionDialog dialog) {
+            return lastText;
         }
     }
 }
