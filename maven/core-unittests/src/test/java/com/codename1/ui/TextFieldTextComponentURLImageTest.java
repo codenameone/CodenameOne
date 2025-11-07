@@ -83,7 +83,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         component.text("updated");
         assertEquals("updated", component.getField().getText());
 
-        component.reset();
+        component.text("");
         assertEquals("", component.getField().getText());
     }
 
