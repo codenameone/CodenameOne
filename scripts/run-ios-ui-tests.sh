@@ -531,9 +531,22 @@ if [ "${LOG_CHUNKS:-0}" = "0" ]; then
   ri_log "STAGE:MARKERS_NOT_FOUND -> simulator output did not include CN1SS chunks"
   ri_log "---- CN1SS lines (if any) ----"
   (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
-  ri_log "---- Full log output (last 200 lines for debugging) ----"
-  tail -200 "$TEST_LOG" | sed 's/^/[LOG] /'
-  ri_log "---- End of log output ----"
+
+  # Capture full log output without CN1SS filter to see all Log.e() and Log.p() messages
+  ri_log "---- Capturing full simulator log for debugging ----"
+  FULL_LOG="$ARTIFACTS_DIR/device-runner-full.log"
+  xcrun simctl spawn "$SIM_DEVICE_ID" \
+    log show --style syslog --last 10m \
+    --predicate 'processImagePath ENDSWITH "HelloCodenameOne"' \
+    > "$FULL_LOG" 2>/dev/null || true
+
+  if [ -s "$FULL_LOG" ]; then
+    ri_log "---- Full log output (last 300 lines) ----"
+    tail -300 "$FULL_LOG" | sed 's/^/[FULLLOG] /'
+    ri_log "---- End of full log output ----"
+  else
+    ri_log "Failed to capture full log"
+  fi
   exit 12
 fi
 

@@ -101,7 +101,10 @@ final class Cn1ssDeviceRunnerHelper {
             return true;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
-            ex.printStackTrace();
+            println("CN1SS:END:" + safeName);
+            return false;
+        } catch (Exception ex) {
+            println("CN1SS:ERR:test=" + safeName + " message=" + ex);
             println("CN1SS:END:" + safeName);
             return false;
         } finally {
