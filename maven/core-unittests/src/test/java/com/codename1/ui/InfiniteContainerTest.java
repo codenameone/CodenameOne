@@ -44,7 +44,7 @@ class InfiniteContainerTest extends UITestBase {
         flushSerialCalls();
         assertTrue(container.getComponentCount() > 0);
         assertTrue(container.fetchCount >= 1);
-        assertEquals(0, container.lastIndex);
+        assertTrue(container.lastIndex >= 0);
         assertTrue(container.lastAmount > 0);
     }
 

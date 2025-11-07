@@ -95,6 +95,7 @@ class TextSelectionTest extends UITestBase {
     void testSpanOperations() {
         Form form = Display.getInstance().getCurrent();
         TextSelection selection = form.getTextSelection();
+        selection.getSelectionRoot();
         DummySelectionComponent component = new DummySelectionComponent("HELLO");
 
         Span span = selection.newSpan(component);

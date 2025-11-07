@@ -16,6 +16,7 @@ class SearchBarTest extends UITestBase {
     private static class TestSearchBar extends SearchBar {
         private String lastQuery;
         private int callCount;
+        private Command clearCommand;
 
         TestSearchBar(Toolbar parent, float iconSize) {
             super(parent, iconSize);
@@ -25,6 +26,19 @@ class SearchBarTest extends UITestBase {
         public void onSearch(String text) {
             lastQuery = text;
             callCount++;
+        }
+
+        @Override
+        public void addCommandToRightBar(Command command) {
+            super.addCommandToRightBar(command);
+            clearCommand = command;
+        }
+
+        void triggerClear() {
+            if (clearCommand == null) {
+                throw new IllegalStateException("Clear command not initialized");
+            }
+            clearCommand.actionPerformed(new ActionEvent(this));
         }
     }
 
@@ -46,8 +60,9 @@ class SearchBarTest extends UITestBase {
         assertEquals("hello", searchBar.lastQuery);
         assertTrue(searchBar.callCount >= 1);
 
-        Command clearCommand = searchBar.getRightBarCommands().iterator().next();
-        clearCommand.actionPerformed(new ActionEvent(searchBar));
+        searchBar.triggerClear();
+        flushSerialCalls();
         assertEquals("", field.getText());
+        assertEquals("", searchBar.lastQuery);
     }
 }
