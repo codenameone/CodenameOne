@@ -12,7 +12,7 @@ class LinearGradientPaintTest extends UITestBase {
     void testGradientPropertiesAndPainting() {
         float[] fractions = new float[]{0f, 0.5f, 1f};
         int[] colors = new int[]{0xff0000, 0x00ff00, 0x0000ff};
-        LinearGradientPaint paint = new LinearGradientPaint(0f, 0f, 10f, 10f, fractions, colors,
+        LinearGradientPaint paint = new LinearGradientPaint(0f, 0f, 10f, 0f, fractions, colors,
                 MultipleGradientPaint.CycleMethod.NO_CYCLE,
                 MultipleGradientPaint.ColorSpaceType.SRGB,
                 null);

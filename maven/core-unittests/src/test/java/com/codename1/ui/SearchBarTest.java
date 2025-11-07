@@ -32,7 +32,7 @@ class SearchBarTest extends UITestBase {
     void testInitSearchBarSetsTitleComponent() {
         Form form = Display.getInstance().getCurrent();
         Toolbar parent = new Toolbar();
-        form.setToolbar(parent);
+        form.setToolBar(parent);
         TestSearchBar searchBar = new TestSearchBar(parent, 0);
         searchBar.initSearchBar();
 

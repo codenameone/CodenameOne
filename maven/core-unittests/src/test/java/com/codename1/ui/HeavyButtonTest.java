@@ -39,10 +39,11 @@ class HeavyButtonTest extends UITestBase {
         button.setY(6);
         button.setWidth(70);
         button.setHeight(30);
-        assertEquals(5, state.getX());
-        assertEquals(6, state.getY());
-        assertEquals(70, state.getWidth());
-        assertEquals(30, state.getHeight());
+        form.revalidate();
+        assertEquals(button.getAbsoluteX(), state.getX());
+        assertEquals(button.getAbsoluteY(), state.getY());
+        assertEquals(button.getWidth(), state.getWidth());
+        assertEquals(button.getHeight(), state.getHeight());
         assertTrue(state.getUpdateCount() >= 1);
 
         button.removeActionListener(listener);

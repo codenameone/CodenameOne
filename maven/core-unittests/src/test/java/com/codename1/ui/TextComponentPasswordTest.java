@@ -3,6 +3,7 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -26,6 +27,9 @@ class TextComponentPasswordTest extends UITestBase {
     @FormTest
     void testToggleConstraintAndIcon() {
         TextComponentPassword password = new TextComponentPassword();
+        Form form = Display.getInstance().getCurrent();
+        form.add(password);
+        form.revalidate();
         TextField field = password.getField();
         assertEquals(TextArea.PASSWORD, field.getConstraint());
         Button action = password.getAction();

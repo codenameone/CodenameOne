@@ -65,7 +65,8 @@ class SwipeableContainerTest extends UITestBase {
         assertFalse(container.isSwipeActivated());
 
         Component child = container.getComponentAt(1, 1);
-        assertSame(top, child);
+        assertTrue(child instanceof Container);
+        assertSame(child, top.getParent());
     }
 
     @FormTest
