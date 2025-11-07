@@ -327,10 +327,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                             if(imageData != null) {
                                 screenshotCallback.onSucess(EncodedImage.createImage(imageData));
                             } else {
-                                Log.e(new RuntimeException("Screenshot failed: imageData is null"));
+                                Log.p("Screenshot failed: imageData is null");
                                 screenshotCallback.onSucess(null);
                             }
                         } catch(Exception e) {
+                            Log.p("Screenshot callback exception: " + e.getMessage());
                             Log.e(e);
                             screenshotCallback.onSucess(null);
                         }
@@ -338,6 +339,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 });
             }
         } catch(Exception e) {
+            Log.p("Screenshot onScreenshot exception: " + e.getMessage());
             Log.e(e);
         }
     }

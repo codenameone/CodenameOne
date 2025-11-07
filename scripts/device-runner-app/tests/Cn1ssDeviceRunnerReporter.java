@@ -27,9 +27,13 @@ public class Cn1ssDeviceRunnerReporter extends TestReporting {
     @Override
     public void logException(Throwable err) {
         super.logException(err);
-        System.out.println("CN1SS:ERR:exception=" + err);
         if (err != null) {
-            err.printStackTrace();
+            System.out.println("CN1SS:ERR:exception=" + err.getClass().getName() + ": " + err.getMessage());
+            System.out.println("CN1SS:ERR:stack_trace_start");
+            err.printStackTrace(System.out);
+            System.out.println("CN1SS:ERR:stack_trace_end");
+        } else {
+            System.out.println("CN1SS:ERR:exception=null");
         }
     }
 
