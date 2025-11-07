@@ -37,7 +37,7 @@ class SearchBarTest extends UITestBase {
         searchBar.initSearchBar();
 
         assertTrue(searchBar.getTitleComponent() instanceof TextField);
-        assertNotNull(searchBar.getBackCommand());
+        assertNotNull(form.getBackCommand());
 
         TextField field = (TextField) searchBar.getTitleComponent();
         field.setText("hello");

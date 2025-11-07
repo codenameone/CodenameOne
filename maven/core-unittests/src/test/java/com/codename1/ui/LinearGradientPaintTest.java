@@ -40,7 +40,7 @@ class LinearGradientPaintTest extends UITestBase {
 
         Image img = Image.createImage(20, 20);
         Graphics g = img.getGraphics();
-        g.setPaint(paint);
+        g.setColor(paint);
         paint.paint(g, new Rectangle2D(0, 0, 20, 20));
         paint.paint(g, 0, 0, 20, 20);
     }
