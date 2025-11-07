@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.FontImage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -100,6 +101,29 @@ class ToolbarTest extends UITestBase {
         toolbar.setTitleCentered(true);
 
         assertTrue(toolbar.isTitleCentered(), "setTitleCentered(true) should center the title");
-}
+    }
 
+    @FormTest
+    void rightBarCommandsAndTitleComponentCustomization() {
+        implementation.setBuiltinSoundsEnabled(false);
+
+        Form form = Display.getInstance().getCurrent();
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command right = toolbar.addMaterialCommandToRightBar("Settings", FontImage.MATERIAL_SETTINGS, evt -> {
+        });
+        Button rightButton = toolbar.findCommandComponent(right);
+        assertNotNull(rightButton, "Right bar command should create a visible button");
+
+        Label customTitle = new Label("Custom Title");
+        toolbar.setTitleComponent(customTitle);
+        assertSame(customTitle, toolbar.getTitleComponent());
+
+        toolbar.removeCommand(right);
+        assertNull(toolbar.findCommandComponent(right), "Removed command should no longer have a button");
+    }
 }
