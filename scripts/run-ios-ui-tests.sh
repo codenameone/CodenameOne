@@ -531,6 +531,9 @@ if [ "${LOG_CHUNKS:-0}" = "0" ]; then
   ri_log "STAGE:MARKERS_NOT_FOUND -> simulator output did not include CN1SS chunks"
   ri_log "---- CN1SS lines (if any) ----"
   (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
+  ri_log "---- Full log output (last 200 lines for debugging) ----"
+  tail -200 "$TEST_LOG" | sed 's/^/[LOG] /'
+  ri_log "---- End of log output ----"
   exit 12
 fi
 
