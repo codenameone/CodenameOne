@@ -112,12 +112,21 @@ final class Cn1ssDeviceRunnerHelper {
     }
 
     private static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
+        // If screenshot is an EncodedImage, we need to decode it first before re-encoding as JPEG
+        // ImageIO.save() may not be able to convert encoded formats directly
+        Image imageToEncode = screenshot;
+        if (screenshot instanceof EncodedImage) {
+            // Create a decoded mutable image by scaling to the same size
+            // This forces decoding of the EncodedImage
+            imageToEncode = screenshot.scaled(screenshot.getWidth(), screenshot.getHeight());
+        }
+
         byte[] chosenPreview = null;
         int chosenQuality = 0;
         int smallestBytes = Integer.MAX_VALUE;
         for (int quality : PREVIEW_QUALITIES) {
-            ByteArrayOutputStream previewOut = new ByteArrayOutputStream(Math.max(512, screenshot.getWidth() * screenshot.getHeight() / 4));
-            io.save(screenshot, previewOut, ImageIO.FORMAT_JPEG, quality / 100f);
+            ByteArrayOutputStream previewOut = new ByteArrayOutputStream(Math.max(512, imageToEncode.getWidth() * imageToEncode.getHeight() / 4));
+            io.save(imageToEncode, previewOut, ImageIO.FORMAT_JPEG, quality / 100f);
             byte[] previewBytes = previewOut.toByteArray();
             if (previewBytes.length == 0) {
                 continue;
