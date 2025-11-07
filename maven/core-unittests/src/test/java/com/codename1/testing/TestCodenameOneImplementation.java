@@ -8,11 +8,13 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.ui.Button;
 import com.codename1.ui.Display;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TextSelection;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.ImageIO;
@@ -99,11 +101,61 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean nativeBrowserWindowShowInvoked;
     private boolean nativeBrowserWindowCleanupInvoked;
     private boolean nativeBrowserWindowHideInvoked;
+    private boolean nativeImageCacheSupported;
+    private int initializeTextSelectionCount;
+    private int deinitializeTextSelectionCount;
+    private TextSelection lastInitializedTextSelection;
+    private TextSelection lastDeinitializedTextSelection;
+    private final Map<Object, HeavyButtonPeerState> heavyButtonPeers = new HashMap<Object, HeavyButtonPeerState>();
+    private boolean requiresHeavyButton;
 
 
     public TestCodenameOneImplementation() {
         this(true);
         instance = this;
+    }
+
+    public static class HeavyButtonPeerState {
+        private final List<ActionListener> listeners = new ArrayList<ActionListener>();
+        private int x;
+        private int y;
+        private int width;
+        private int height;
+        private boolean initCalled;
+        private boolean deinitCalled;
+        private int updateCount;
+
+        public List<ActionListener> getListeners() {
+            return listeners;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public boolean isInitCalled() {
+            return initCalled;
+        }
+
+        public boolean isDeinitCalled() {
+            return deinitCalled;
+        }
+
+        public int getUpdateCount() {
+            return updateCount;
+        }
     }
 
     @Override
@@ -113,6 +165,45 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void putResource(String s, InputStream i) {
         resourceAsStreams.put(s, i);
+    }
+
+    public void setSupportsNativeImageCache(boolean supported) {
+        nativeImageCacheSupported = supported;
+    }
+
+    public void resetTextSelectionTracking() {
+        initializeTextSelectionCount = 0;
+        deinitializeTextSelectionCount = 0;
+        lastInitializedTextSelection = null;
+        lastDeinitializedTextSelection = null;
+    }
+
+    public int getInitializeTextSelectionCount() {
+        return initializeTextSelectionCount;
+    }
+
+    public int getDeinitializeTextSelectionCount() {
+        return deinitializeTextSelectionCount;
+    }
+
+    public TextSelection getLastInitializedTextSelection() {
+        return lastInitializedTextSelection;
+    }
+
+    public TextSelection getLastDeinitializedTextSelection() {
+        return lastDeinitializedTextSelection;
+    }
+
+    public void setRequiresHeavyButton(boolean requiresHeavyButton) {
+        this.requiresHeavyButton = requiresHeavyButton;
+    }
+
+    public void resetHeavyButtonTracking() {
+        heavyButtonPeers.clear();
+    }
+
+    public HeavyButtonPeerState getHeavyButtonPeerState(Object peer) {
+        return heavyButtonPeers.get(peer);
     }
 
     @Override
@@ -131,6 +222,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setMutableImagesFast(boolean mutableImagesFast) {
         this.mutableImagesFast = mutableImagesFast;
+    }
+
+    @Override
+    public boolean supportsNativeImageCache() {
+        return nativeImageCacheSupported;
     }
 
     @Override
@@ -175,6 +271,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void initializeTextSelection(TextSelection aThis) {
+        initializeTextSelectionCount++;
+        lastInitializedTextSelection = aThis;
+    }
+
+    @Override
+    public void deinitializeTextSelection(TextSelection aThis) {
+        deinitializeTextSelectionCount++;
+        lastDeinitializedTextSelection = aThis;
+    }
+
+    @Override
     public void startRemoteControl() {
         startRemoteControlInvocations++;
     }
@@ -182,6 +290,62 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void stopRemoteControl() {
         stopRemoteControlInvocations++;
+    }
+
+    @Override
+    public Object createHeavyButton(Button aThis) {
+        HeavyButtonPeerState state = new HeavyButtonPeerState();
+        heavyButtonPeers.put(state, state);
+        return state;
+    }
+
+    @Override
+    public void addHeavyActionListener(Object peer, ActionListener l) {
+        HeavyButtonPeerState state = heavyButtonPeers.get(peer);
+        if (state != null) {
+            state.getListeners().add(l);
+        }
+    }
+
+    @Override
+    public void removeHeavyActionListener(Object peer, ActionListener l) {
+        HeavyButtonPeerState state = heavyButtonPeers.get(peer);
+        if (state != null) {
+            state.getListeners().remove(l);
+        }
+    }
+
+    @Override
+    public void updateHeavyButtonBounds(Object peer, int x, int y, int width, int height) {
+        HeavyButtonPeerState state = heavyButtonPeers.get(peer);
+        if (state != null) {
+            state.x = x;
+            state.y = y;
+            state.width = width;
+            state.height = height;
+            state.updateCount++;
+        }
+    }
+
+    @Override
+    public void initHeavyButton(Object peer) {
+        HeavyButtonPeerState state = heavyButtonPeers.get(peer);
+        if (state != null) {
+            state.initCalled = true;
+        }
+    }
+
+    @Override
+    public void deinitializeHeavyButton(Object peer) {
+        HeavyButtonPeerState state = heavyButtonPeers.get(peer);
+        if (state != null) {
+            state.deinitCalled = true;
+        }
+    }
+
+    @Override
+    public boolean requiresHeavyButtonForCopyToClipboard() {
+        return requiresHeavyButton;
     }
 
     public int getStartRemoteControlInvocations() {
