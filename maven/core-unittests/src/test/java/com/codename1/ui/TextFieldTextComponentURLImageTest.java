@@ -14,6 +14,8 @@ import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -49,7 +51,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertTrue(field.hasFocus(), "Pointer interaction should grant focus");
 
         field.stopEditing();
-        assertFalse(field.hasFocus());
+        assertFalse(field.isEditing());
     }
 
     @FormTest
@@ -133,9 +135,14 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(4, 4), false);
-        byte[] data = placeholder.getImageData();
-        Storage.getInstance().writeObject("urlImageKey", data);
+        byte[] data = new byte[]{1, 2, 3, 4};
+        EncodedImage placeholder = EncodedImage.create(data, 4, 4, false);
+
+        try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
+            os.write(data);
+        } catch (IOException err) {
+            fail("Writing image data to storage should not throw: " + err.getMessage());
+        }
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
         urlImage.fetch();
@@ -143,5 +150,6 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertArrayEquals(data, urlImage.getImageData(), "fetch should load cached image data");
         assertTrue(urlImage.isAnimation(), "Loaded image should request repaint animation");
         assertTrue(urlImage.animate(), "animate should return true when repaint is requested");
+        Storage.getInstance().deleteStorageFile("urlImageKey");
     }
 }

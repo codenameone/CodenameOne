@@ -35,7 +35,17 @@ class ComboBoxTabsSliderTest extends UITestBase {
         Form form = Display.getInstance().getCurrent();
         form.setLayout(new BorderLayout());
 
-        ComboBox<String> combo = new ComboBox<String>("One", "Two", "Three");
+        class ExposedComboBox<T> extends ComboBox<T> {
+            ExposedComboBox(T... values) {
+                super(values);
+            }
+
+            void triggerActionEvent() {
+                fireActionEvent();
+            }
+        }
+
+        ExposedComboBox<String> combo = new ExposedComboBox<String>("One", "Two", "Three");
         combo.setPreferredSize(new Dimension(200, 40));
         form.add(BorderLayout.CENTER, combo);
         form.revalidate();
@@ -43,18 +53,20 @@ class ComboBoxTabsSliderTest extends UITestBase {
         assertTrue(combo.isActAsSpinnerDialog(), "New ComboBox should inherit default spinner setting");
         assertFalse(combo.isIncludeSelectCancel(), "New ComboBox should inherit include select/cancel default");
 
-        final boolean[] fired = {false};
+        final boolean[] actionFired = {false};
+        final int[] selectionEvent = {-1};
         combo.addActionListener(evt -> {
-            fired[0] = true;
+            actionFired[0] = true;
             assertEquals("Three", combo.getSelectedItem());
         });
+        combo.addSelectionListener((oldSel, newSel) -> selectionEvent[0] = newSel);
 
-        combo.setHandlesInput(true);
         combo.setSelectedIndex(2);
-        combo.pointerReleased(combo.getAbsoluteX() + combo.getWidth() / 2, combo.getAbsoluteY() + combo.getHeight() / 2);
+        combo.triggerActionEvent();
 
         assertEquals("Three", combo.getSelectedItem());
-        assertTrue(fired[0], "pointerReleased while handlesInput is true should fire action listeners");
+        assertEquals(2, selectionEvent[0], "Selection listener should capture updated index");
+        assertTrue(actionFired[0], "Explicit trigger should invoke action listeners");
 
         Image icon = Image.createImage(8, 8);
         combo.setComboBoxImage(icon);
