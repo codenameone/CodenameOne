@@ -13,6 +13,7 @@ import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.codename1.io.Log;
 import com.codename1.ui.Container;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Display;
@@ -162,7 +163,8 @@ public class HelloCodenameOneInstrumentedTest {
                 bmp.recycle();
             } catch (Throwable t) {
                 println("CN1SS:ERR:test=" + testName + " " + t);
-                t.printStackTrace(System.out);
+                Log.p("Exception in screenshot capture: " + t.getMessage());
+                Log.e(t);
             }
         });
         if (holder[0] == null) {
