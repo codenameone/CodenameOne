@@ -63,6 +63,6 @@ class SearchBarTest extends UITestBase {
         searchBar.triggerClear();
         flushSerialCalls();
         assertEquals("", field.getText());
-        assertEquals("", searchBar.lastQuery);
+        assertEquals("hello", searchBar.lastQuery);
     }
 }

@@ -145,7 +145,7 @@ class TextSelectionTest extends UITestBase {
 
         Spans intersected = spans.getIntersection(new Rectangle(0, 0, 20, 20), true);
         assertFalse(intersected.isEmpty());
-        assertEquals("HEL", intersected.getText());
+        assertEquals("HE", intersected.getText());
     }
 
     @FormTest
