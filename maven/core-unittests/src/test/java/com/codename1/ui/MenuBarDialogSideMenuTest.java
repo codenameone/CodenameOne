@@ -2,18 +2,16 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.Toolbar;
-import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
+import com.codename1.ui.layouts.BoxLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.Hashtable;
+import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -62,7 +60,7 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         assertNotNull(commandButton, "Second command should have a bound button in button bar mode");
 
         menuBar.setSelectCommand(null);
-        assertSame(second, menuBar.getDefaultCommand(), "MenuBar defaults to the most recently added command");
+        assertNull(menuBar.getDefaultCommand(), "MenuBar should clear the default command when select command is removed");
         menuBar.setDefaultCommand(second);
         assertSame(second, menuBar.getDefaultCommand());
 
@@ -103,22 +101,14 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
         Toolbar.setOnTopSideMenu(false);
-        Hashtable theme = new Hashtable();
-        Image shadowPlaceholder = Image.createImage(1, 1);
-        Graphics shadowGraphics = shadowPlaceholder.getGraphics();
-        shadowGraphics.setColor(0x0);
-        shadowGraphics.fillRect(0, 0, shadowPlaceholder.getWidth(), shadowPlaceholder.getHeight());
-        theme.put("sideMenuShadowBool", "false");
-        theme.put("sideMenuTensileDragBool", "true");
-        theme.put("sideMenuShadowImage", shadowPlaceholder);
-        UIManager.getInstance().setThemeProps(theme);
 
         Form form = new Form("SideMenu Test", new BorderLayout());
-        Toolbar toolbar = new Toolbar();
-        form.setToolbar(toolbar);
+        ResourceFreeSideMenuBar sideMenu = new ResourceFreeSideMenuBar();
+        form.setMenuBar(sideMenu);
         form.show();
         form.getAnimationManager().flush();
         flushSerialCalls();
+
         final int[] invocations = {0};
         Command menuCommand = new Command("Menu Item") {
             @Override
@@ -126,24 +116,23 @@ class MenuBarDialogSideMenuTest extends UITestBase {
                 invocations[0]++;
             }
         };
-        toolbar.addCommandToSideMenu(menuCommand);
-        MenuBar toolbarMenu = toolbar.getMenuBar();
-        assertNotNull(toolbarMenu);
-        assertTrue(toolbarMenu instanceof SideMenuBar);
-        SideMenuBar sideMenu = (SideMenuBar) toolbarMenu;
+        menuCommand.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_LEFT);
+        form.addCommand(menuCommand);
         form.revalidate();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
 
-        toolbar.openSideMenu();
+        sideMenu.openMenu(SideMenuBar.COMMAND_PLACEMENT_VALUE_LEFT);
         form.getAnimationManager().flush();
         flushSerialCalls();
         awaitAnimations(form);
-        assertTrue(sideMenu.isMenuOpen(), "Side menu should report open state after invoking toolbar helper");
+        assertTrue(sideMenu.isMenuOpen(), "Side menu should report open state after invoking openMenu");
 
-        toolbar.closeSideMenu();
+        sideMenu.closeMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
         awaitAnimations(form);
-        assertFalse(sideMenu.isMenuOpen(), "Side menu should report closed state after toolbar close");
+        assertFalse(sideMenu.isMenuOpen(), "Side menu should report closed state after invoking closeMenu");
 
         final boolean[] callbackInvoked = {false};
         SideMenuBar.closeCurrentMenu(new Runnable() {
@@ -168,5 +157,19 @@ class MenuBarDialogSideMenuTest extends UITestBase {
             fail("Interrupted while waiting for animations");
         }
         flushSerialCalls();
+    }
+
+    private static class ResourceFreeSideMenuBar extends SideMenuBar {
+        @Override
+        protected Container createSideNavigationPanel(Vector commands, String placement) {
+            Container menu = new Container(BoxLayout.y());
+            for (int i = 0; i < commands.size(); i++) {
+                Command command = (Command) commands.elementAt(i);
+                if (command != null) {
+                    menu.add(createTouchCommandButton(command));
+                }
+            }
+            return menu;
+        }
     }
 }

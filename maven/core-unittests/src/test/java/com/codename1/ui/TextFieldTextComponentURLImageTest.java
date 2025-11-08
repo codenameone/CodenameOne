@@ -10,12 +10,10 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
-import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
-import java.io.IOException;
-import java.io.OutputStream;
+import com.codename1.ui.URLImage;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -146,16 +144,12 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertNotNull(cachedData);
         assertTrue(cachedData.length > 0);
 
-        try (OutputStream out = Storage.getInstance().createOutputStream("urlImageKey")) {
-            out.write(cachedData);
-        } catch (IOException ioe) {
-            fail("Unable to seed storage for URLImage cache test", ioe);
-        }
+        implementation.putStorageEntry("urlImageKey", cachedData);
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
         assertNotNull(urlImage, "URLImage factory should return an instance");
 
-        assertTrue(Storage.getInstance().exists("urlImageKey"));
+        assertTrue(implementation.storageFileExists("urlImageKey"));
         urlImage.fetch();
         flushSerialCalls();
 
@@ -166,6 +160,6 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         byte[] result = urlImage.getImageData();
         assertNotNull(result, "URLImage should load cached image data");
         assertArrayEquals(cachedData, result);
-        Storage.getInstance().deleteStorageFile("urlImageKey");
+        implementation.deleteStorageFile("urlImageKey");
     }
 }
