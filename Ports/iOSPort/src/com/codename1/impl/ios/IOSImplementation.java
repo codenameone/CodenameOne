@@ -301,24 +301,85 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /*private static SuccessCallback<Image> screenshotCallback;
+    private static SuccessCallback<Image> screenshotCallback;
 
     @Override
     public void screenshot(SuccessCallback<Image> callback) {
-        screenshotCallback = callback;
-        nativeInstance.screenshot();
-    }
+        if (callback == null) {
+            return;
+        }
 
-    static void onScreenshot(final byte[] imageData) {
-        if(screenshotCallback != null) {
+        if (screenshotCallback != null) {
+            final SuccessCallback<Image> cb = callback;
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    screenshotCallback.onSucess(EncodedImage.createImage(imageData));
+                    fallbackScreenshot(cb);
+                }
+            });
+            return;
+        }
+
+        screenshotCallback = callback;
+        try {
+            nativeInstance.screenshot();
+        } catch (Throwable t) {
+            screenshotCallback = null;
+            Log.e(t);
+            final SuccessCallback<Image> cb = callback;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    fallbackScreenshot(cb);
                 }
             });
         }
-    }*/
+    }
+
+    private static void fallbackScreenshot(SuccessCallback<Image> callback) {
+        if (callback == null) {
+            return;
+        }
+
+        Form current = Display.getInstance().getCurrent();
+        if (current == null || current.getWidth() <= 0 || current.getHeight() <= 0) {
+            callback.onSucess(null);
+            return;
+        }
+
+        try {
+            Image img = Image.createImage(current.getWidth(), current.getHeight());
+            current.paintComponent(img.getGraphics(), true);
+            callback.onSucess(img);
+        } catch (Throwable ex) {
+            Log.e(ex);
+            callback.onSucess(null);
+        }
+    }
+
+    static void onScreenshot(final byte[] imageData) {
+        final SuccessCallback<Image> callback = screenshotCallback;
+        screenshotCallback = null;
+        if (callback == null) {
+            return;
+        }
+
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (imageData != null && imageData.length > 0) {
+                        callback.onSucess(EncodedImage.create(imageData));
+                        return;
+                    }
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+
+                fallbackScreenshot(callback);
+            }
+        });
+    }
 
     /**
      * Used to enable/disable native cookies from native code.

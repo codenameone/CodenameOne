@@ -37,6 +37,7 @@
 #import "CN1AudioUnit.h"
 #import <UIKit/UIKit.h>
 #import "CodenameOne_GLViewController.h"
+#import <QuartzCore/QuartzCore.h>
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_ui_Display.h"
@@ -5193,12 +5194,16 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-/*static UIImage* cn1_captureView(UIView *view) {
+static UIImage* cn1_captureView(UIView *view) {
+    if (view == nil) {
+        return nil;
+    }
     CGSize size = view.bounds.size;
-    if (size.width <= 0 || size.height <= 0) return nil;
+    if (size.width <= 0 || size.height <= 0) {
+        return nil;
+    }
 
-    // Prefer drawViewHierarchyInRect (renders with effects), fallback to CALayer
-    UIGraphicsBeginImageContextWithOptions(size, view.opaque, 0.0); // scale=0 → device scale
+    UIGraphicsBeginImageContextWithOptions(size, view.opaque, 0.0);
     BOOL ok = NO;
     if ([view respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
         ok = [view drawViewHierarchyInRect:view.bounds afterScreenUpdates:YES];
@@ -5213,26 +5218,36 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
         UIView *view = [CodenameOne_GLViewController instance].view;
         UIImage *img = cn1_captureView(view);
-        if (!img) {
-            return;
+        NSData *png = nil;
+        if (img != nil) {
+            png = UIImagePNGRepresentation(img);
         }
 
-        NSData *png = UIImagePNGRepresentation(img);
-        if (!png) {
-            return;
+        JAVA_OBJECT byteArr = JAVA_NULL;
+        if (png != nil) {
+            int len = (int)[png length];
+            if (len > 0) {
+#ifndef NEW_CODENAME_ONE_VM
+                org_xmlvm_runtime_XMLVMArray* arr = XMLVMArray_createSingleDimension(__CLASS_byte, len);
+                memcpy(arr->fields.org_xmlvm_runtime_XMLVMArray.array_, [png bytes], len);
+                byteArr = arr;
+#else
+                enteringNativeAllocations();
+                JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG len);
+                memcpy(((JAVA_ARRAY)arr)->data, [png bytes], len);
+                finishedNativeAllocations();
+                byteArr = arr;
+#endif
+            }
         }
-
-        // Create Java byte[]
-        int len = (int)[png length];
-        JAVA_OBJECT byteArr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG len);
-
-        memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)byteArr)->data, (const jbyte*)[png bytes], len);
 
         com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG byteArr);
+        POOL_END();
     });
-}*/
+}
 
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getPersonWithRecordID___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
