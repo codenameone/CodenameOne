@@ -303,6 +303,26 @@ echo "----- app/build.gradle tail -----"
 tail -n 80 "$APP_BUILD_GRADLE" | sed 's/^/| /'
 echo "---------------------------------"
 
+INSTRUMENTATION_TEMPLATE="$SCRIPT_DIR/android/tests/HelloCodenameOneInstrumentedTest.java"
+if [ -f "$INSTRUMENTATION_TEMPLATE" ]; then
+  ANDROID_TEST_DIR="$GRADLE_PROJECT_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
+  mkdir -p "$ANDROID_TEST_DIR"
+  ba_log "Installing Android instrumentation tests into $ANDROID_TEST_DIR"
+  python3 - <<'PY' "$INSTRUMENTATION_TEMPLATE" "$PACKAGE_NAME" "$ANDROID_TEST_DIR/HelloCodenameOneInstrumentedTest.java"
+import pathlib
+import sys
+
+template_path = pathlib.Path(sys.argv[1])
+package_name = sys.argv[2]
+output_path = pathlib.Path(sys.argv[3])
+
+text = template_path.read_text()
+output_path.write_text(text.replace("@PACKAGE@", package_name))
+PY
+else
+  ba_log "WARNING: Instrumentation test template missing at $INSTRUMENTATION_TEMPLATE"
+fi
+
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"

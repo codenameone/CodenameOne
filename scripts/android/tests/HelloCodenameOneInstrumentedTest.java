@@ -25,12 +25,12 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.AfterClass;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import com.codename1.io.Log;
 
 @RunWith(AndroidJUnit4.class)
 public class HelloCodenameOneInstrumentedTest {
@@ -45,6 +45,7 @@ public class HelloCodenameOneInstrumentedTest {
 
     private static void println(String s) {
         System.out.println(s);
+        android.util.Log.i("CN1SS", s);
     }
 
     private static void settle(long millis) {
@@ -190,7 +191,7 @@ public class HelloCodenameOneInstrumentedTest {
                 }
             } catch (Throwable t) {
                 println("CN1SS:ERR:test=" + testName + " " + t);
-                Log.e(t);
+                com.codename1.io.Log.e(t);
             } finally {
                 latch.countDown();
             }
@@ -242,18 +243,22 @@ public class HelloCodenameOneInstrumentedTest {
         for (int pos = 0; pos < b64.length(); pos += CHUNK_SIZE) {
             int end = Math.min(pos + CHUNK_SIZE, b64.length());
             String chunk = b64.substring(pos, end);
-            System.out.println(
+            String line =
                     prefix
                             + ":"
                             + safeName
                             + ":"
                             + String.format(Locale.US, "%06d", pos)
                             + ":"
-                            + chunk);
+                            + chunk;
+            System.out.println(line);
+            android.util.Log.i("CN1SS", line);
             count++;
         }
         println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + b64.length());
-        System.out.println(prefix + ":END:" + safeName);
+        String endLine = prefix + ":END:" + safeName;
+        System.out.println(endLine);
+        android.util.Log.i("CN1SS", endLine);
         System.out.flush();
     }
 
@@ -378,5 +383,11 @@ public class HelloCodenameOneInstrumentedTest {
         }
 
         emitScreenshot(capture, BROWSER_TEST);
+    }
+
+    @AfterClass
+    public static void suiteFinished() {
+        println("CN1SS:SUITE:FINISHED");
+        System.out.flush();
     }
 }

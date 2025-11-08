@@ -113,13 +113,22 @@ public class ProcessScreenshots {
 
     private static CommentPayload loadExternalPreviewPayload(String testName, Path previewDir) throws IOException {
         String slug = slugify(testName);
-        Path jpg = previewDir.resolve(slug + ".jpg");
-        Path jpeg = previewDir.resolve(slug + ".jpeg");
-        Path png = previewDir.resolve(slug + ".png");
+        List<String> baseNames = new ArrayList<>();
+        if (slug != null && !slug.isEmpty()) {
+            baseNames.add(slug);
+        }
+        if (testName != null && !testName.isEmpty() && baseNames.stream().noneMatch(s -> s.equals(testName))) {
+            baseNames.add(testName);
+        }
         List<Path> candidates = new ArrayList<>();
-        if (Files.exists(jpg)) candidates.add(jpg);
-        if (Files.exists(jpeg)) candidates.add(jpeg);
-        if (Files.exists(png)) candidates.add(png);
+        for (String base : baseNames) {
+            Path jpg = previewDir.resolve(base + ".jpg");
+            Path jpeg = previewDir.resolve(base + ".jpeg");
+            Path png = previewDir.resolve(base + ".png");
+            if (Files.exists(jpg)) candidates.add(jpg);
+            if (Files.exists(jpeg)) candidates.add(jpeg);
+            if (Files.exists(png)) candidates.add(png);
+        }
         if (candidates.isEmpty()) {
             return null;
         }

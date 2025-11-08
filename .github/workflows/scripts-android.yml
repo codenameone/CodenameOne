@@ -1,7 +1,7 @@
 ---
 name: Test Android build scripts
 
-'on':
+on:
   pull_request:
     paths:
       - '.github/workflows/scripts-android.yml'
@@ -90,12 +90,86 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Run Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CN1SS_SKIP_COMMENT: "1"
         with:
           api-level: 31
           arch: x86_64
           target: google_apis
           script: |
             ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+      - name: Collect Android coverage artifacts
+        if: always()
+        run: ./scripts/android/collect-android-coverage-artifacts.sh
+      - name: Upload Android coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-coverage-artifacts
+          path: android-quality-artifacts
+          if-no-files-found: ignore
+      - name: Publish Android coverage preview
+        if: ${{ always() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        id: publish-android-coverage
+        env:
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: ./scripts/android/publish-android-coverage-preview.sh
+      - name: Generate Android test report comment
+        if: always()
+        env:
+          COVERAGE_HTML_URL: ${{ steps.publish-android-coverage.outputs.coverage_url }}
+          ANDROID_PREVIEW_BASE_URL: ${{ steps.publish-android-coverage.outputs.preview_base }}
+        run: python3 ./scripts/android/generate-android-report-comment.py
+      - name: Upload Android report comment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-report-comment
+          path: android-comment.md
+      - name: Publish Android test report comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- CN1SS_ANDROID_COMMENT -->';
+            const commentPath = 'android-comment.md';
+            if (!fs.existsSync(commentPath)) {
+              core.warning('android-comment.md was not generated.');
+              return;
+            }
+            const body = fs.readFileSync(commentPath, 'utf8');
+            if (!body.includes(marker)) {
+              core.warning('Comment marker missing from android-comment.md.');
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find(comment => comment.body && comment.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
       - name: Upload emulator screenshot
         if: always()   # still collect it if tests fail
         uses: actions/upload-artifact@v4

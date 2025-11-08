@@ -188,6 +188,17 @@ public class RenderScreenshotReport {
         String previewNote = stringValue(entry.get("preview_note"), null);
         String base64Note = stringValue(entry.get("base64_note"), null);
         String previewMime = stringValue(entry.get("preview_mime"), null);
+        String base64 = stringValue(entry.get("base64"), null);
+        String base64Mime = stringValue(entry.get("base64_mime"), "image/png");
+        String previewPath = stringValue(entry.get("preview_path"), null);
+        if ((previewName == null || previewName.isEmpty()) && previewPath != null && !previewPath.isEmpty()) {
+            try {
+                previewName = java.nio.file.Path.of(previewPath).getFileName().toString();
+                entry.put("preview_name", previewName);
+            } catch (Exception ignored) {
+                // Fall back to data URI if the path cannot be parsed.
+            }
+        }
         List<String> notes = new ArrayList<>();
         if ("image/jpeg".equals(previewMime) && previewQuality != null) {
             notes.add("JPEG preview quality " + previewQuality);
@@ -204,9 +215,9 @@ public class RenderScreenshotReport {
             if (!notes.isEmpty()) {
                 lines.add("  _Preview info: " + String.join("; ", notes) + "._");
             }
-        } else if (entry.get("base64") != null) {
+        } else if (base64 != null && !base64.isEmpty()) {
             lines.add("");
-            lines.add("  _Preview generated but could not be published; see workflow artifacts for JPEG preview._");
+            lines.add("  ![" + entry.get("test") + "](data:" + base64Mime + ";base64," + base64 + ")");
             if (!notes.isEmpty()) {
                 lines.add("  _Preview info: " + String.join("; ", notes) + "._");
             }
