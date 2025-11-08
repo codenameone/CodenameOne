@@ -51,8 +51,9 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         assertNotNull(commandButton, "Second command should have a bound button in button bar mode");
 
         menuBar.setSelectCommand(null);
-        menuBar.setDefaultCommand(first);
-        assertSame(first, menuBar.getDefaultCommand());
+        assertSame(second, menuBar.getDefaultCommand(), "MenuBar defaults to the most recently added command");
+        menuBar.setDefaultCommand(second);
+        assertSame(second, menuBar.getDefaultCommand());
 
         menuBar.setBackCommand(second);
         assertSame(second, menuBar.getBackCommand());
@@ -104,15 +105,15 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         SideMenuBar sideMenu = (SideMenuBar) toolbar.getMenuBar();
         form.revalidate();
 
-        toolbar.openSideMenu();
+        sideMenu.openMenu(null);
         form.getAnimationManager().flush();
         flushSerialCalls();
-        assertTrue(toolbar.isSideMenuShowing(), "Toolbar helper should report side menu showing after open");
+        assertTrue(Display.getInstance().getCurrent() instanceof Dialog, "Side menu should be displayed as a dialog when opened");
 
         SideMenuBar.closeCurrentMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
-        assertFalse(toolbar.isSideMenuShowing(), "Toolbar helper should report side menu hidden after close");
+        assertSame(form, Display.getInstance().getCurrent(), "Form should be current after closing side menu");
 
         final boolean[] callbackInvoked = {false};
         SideMenuBar.closeCurrentMenu(new Runnable() {

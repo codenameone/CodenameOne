@@ -12,6 +12,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -139,7 +140,15 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         byte[] encoded = Base64.getDecoder().decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMB9oNuvfQAAAAASUVORK5CYII="
         );
-        EncodedImage placeholder = EncodedImage.create(encoded);
+
+        Image decoded;
+        try {
+            decoded = Image.createImage(encoded, 0, encoded.length);
+        } catch (IOException err) {
+            fail("Decoding placeholder image should not throw: " + err.getMessage());
+            return;
+        }
+        EncodedImage placeholder = EncodedImage.createFromImage(decoded, false);
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
             os.write(encoded);
@@ -148,11 +157,14 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         }
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
+        assertNotNull(urlImage, "URLImage factory should return an instance");
+
+        assertTrue(Storage.getInstance().exists("urlImageKey"));
         urlImage.fetch();
 
         byte[] result = urlImage.getImageData();
         assertNotNull(result, "URLImage should load cached image data");
-        assertEquals(encoded.length, result.length);
+        assertArrayEquals(encoded, result);
         Storage.getInstance().deleteStorageFile("urlImageKey");
     }
 }
