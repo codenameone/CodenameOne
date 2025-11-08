@@ -84,27 +84,55 @@ public class HelloCodenameOneInstrumentedTest {
     private static ScreenshotCapture captureScreenshot(ActivityScenario<Activity> scenario, String testName) {
         final byte[][] holder = new byte[2][];
         final int[] qualityHolder = new int[1];
-        scenario.onActivity(activity -> {
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        scenario.onActivity(activity -> Display.getInstance().callSerially(() -> {
             try {
-                View root = activity.getWindow().getDecorView().getRootView();
-                int w = root.getWidth();
-                int h = root.getHeight();
-                if (w <= 0 || h <= 0) {
-                    DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-                    w = Math.max(1, dm.widthPixels);
-                    h = Math.max(1, dm.heightPixels);
-                    int sw = View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY);
-                    int sh = View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY);
-                    root.measure(sw, sh);
-                    root.layout(0, 0, w, h);
-                    println("CN1SS:INFO:test=" + testName + " forced layout to " + w + "x" + h);
-                } else {
-                    println("CN1SS:INFO:test=" + testName + " natural layout " + w + "x" + h);
+                // Use Codename One screenshot API which properly captures PeerComponents
+                final com.codename1.ui.Image[] screenshotHolder = new com.codename1.ui.Image[1];
+                Display.getInstance().screenshot(img -> {
+                    screenshotHolder[0] = img;
+                });
+
+                // Wait for screenshot to complete using invokeAndBlock to yield EDT
+                // This allows the screenshot callback to execute on the EDT
+                final long startTime = System.currentTimeMillis();
+                Display.getInstance().invokeAndBlock(() -> {
+                    while (screenshotHolder[0] == null) {
+                        try {
+                            Thread.sleep(50);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        if (System.currentTimeMillis() - startTime > 5000) {
+                            println("CN1SS:ERR:test=" + testName + " screenshot timeout");
+                            break;
+                        }
+                    }
+                });
+
+                if (screenshotHolder[0] == null) {
+                    println("CN1SS:ERR:test=" + testName + " screenshot returned null");
+                    return;
                 }
 
-                Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                Canvas c = new Canvas(bmp);
-                root.draw(c);
+                // Convert CN1 Image to Android Bitmap
+                com.codename1.ui.Image screenshot = screenshotHolder[0];
+                Object nativeImage = screenshot.getImage();
+                Bitmap bmp;
+
+                if (nativeImage instanceof Bitmap) {
+                    bmp = (Bitmap) nativeImage;
+                } else {
+                    println("CN1SS:ERR:test=" + testName + " unexpected native image type: " +
+                            (nativeImage != null ? nativeImage.getClass().getName() : "null"));
+                    return;
+                }
+
+                int w = bmp.getWidth();
+                int h = bmp.getHeight();
+                println("CN1SS:INFO:test=" + testName + " screenshot size " + w + "x" + h);
 
                 ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, w * h / 2));
                 if (!bmp.compress(Bitmap.CompressFormat.PNG, 100, pngOut)) {
@@ -160,12 +188,23 @@ public class HelloCodenameOneInstrumentedTest {
                 } else {
                     println("CN1SS:INFO:test=" + testName + " preview_jpeg_bytes=0 preview_quality=0");
                 }
-                bmp.recycle();
             } catch (Throwable t) {
                 println("CN1SS:ERR:test=" + testName + " " + t);
                 Log.e(t);
+            } finally {
+                latch.countDown();
             }
-        });
+        }));
+
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                println("CN1SS:ERR:test=" + testName + " latch timeout");
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            println("CN1SS:ERR:test=" + testName + " interrupted");
+        }
+
         if (holder[0] == null) {
             return new ScreenshotCapture(null, null, 0);
         }
