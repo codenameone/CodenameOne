@@ -5270,12 +5270,53 @@ static UIImage* cn1_captureView(UIView *view) {
     }
 
     UIGraphicsBeginImageContextWithOptions(size, rootView.opaque, 0.0);
-    BOOL ok = NO;
-    if ([rootView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-        ok = [rootView drawViewHierarchyInRect:rootView.bounds afterScreenUpdates:YES];
-    }
-    if (!ok) {
-        [rootView.layer renderInContext:UIGraphicsGetCurrentContext()];
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+    if ([rootView isKindOfClass:[UIWindow class]]) {
+        UIWindow *targetWindow = (UIWindow *)rootView;
+        NSArray<UIWindow *> *windows = nil;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+        if (@available(iOS 13.0, *)) {
+            if (targetWindow.windowScene != nil) {
+                windows = targetWindow.windowScene.windows;
+            }
+        }
+#endif
+        if (windows == nil || windows.count == 0) {
+            windows = [UIApplication sharedApplication].windows;
+        }
+        // Render every visible window that shares the same screen as the Codename One GL window
+        // so that native peer components hosted outside of the GL view (e.g. BrowserComponent)
+        // are composited into the captured image.
+        for (UIWindow *window in windows) {
+            if (window.hidden || window.alpha <= 0.0f) {
+                continue;
+            }
+            if (window.screen != targetWindow.screen) {
+                continue;
+            }
+            CGContextSaveGState(ctx);
+            CGRect translated = window.bounds;
+            if (window != targetWindow) {
+                translated = [targetWindow convertRect:window.bounds fromWindow:window];
+            }
+            CGContextTranslateCTM(ctx, translated.origin.x, translated.origin.y);
+            BOOL windowDrawn = NO;
+            if ([window respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+                windowDrawn = [window drawViewHierarchyInRect:window.bounds afterScreenUpdates:YES];
+            }
+            if (!windowDrawn) {
+                [window.layer renderInContext:ctx];
+            }
+            CGContextRestoreGState(ctx);
+        }
+    } else {
+        BOOL ok = NO;
+        if ([rootView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+            ok = [rootView drawViewHierarchyInRect:rootView.bounds afterScreenUpdates:YES];
+        }
+        if (!ok) {
+            [rootView.layer renderInContext:ctx];
+        }
     }
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
