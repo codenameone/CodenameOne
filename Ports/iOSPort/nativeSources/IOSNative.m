@@ -5220,7 +5220,8 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #ifdef NEW_CODENAME_ONE_VM
     struct ThreadLocalData* capturedThreadStateData = threadStateData;
 #endif
-    dispatch_async(dispatch_get_main_queue(), ^{
+
+    void (^performCapture)(void) = ^{
 #ifdef NEW_CODENAME_ONE_VM
         struct ThreadLocalData* threadStateData = capturedThreadStateData;
 #endif
@@ -5252,7 +5253,13 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 
         com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG byteArr);
         POOL_END();
-    });
+    };
+
+    if ([NSThread isMainThread]) {
+        performCapture();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), performCapture);
+    }
 }
 
 
