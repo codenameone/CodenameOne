@@ -100,8 +100,8 @@ class TooltipSelectionComponentTest extends UITestBase {
         form.setLayout(new BorderLayout());
 
         Container container = new Container(BoxLayout.y());
+        container.setUIID("Container");
         Label label = new Label("Primary");
-        label.setUIID("InfoLabel");
         label.setName("labelOne");
         Button button = new Button("Action");
         button.setName("targetButton");
@@ -115,6 +115,7 @@ class TooltipSelectionComponentTest extends UITestBase {
         assertTrue(important.contains(label));
 
         ComponentSelector labels = $("Label", form);
+        assertTrue(labels.size() > 0, "Label selector should locate the label in the form");
         final boolean[] mutated = {false};
         labels.each(new ComponentClosure() {
             public void call(Component c) {

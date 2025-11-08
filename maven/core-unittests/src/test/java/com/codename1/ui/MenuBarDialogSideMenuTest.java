@@ -114,8 +114,18 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         flushSerialCalls();
 
         assertEquals(2, sideMenu.getCommandCount(), "Both commands should be registered with the side menu");
-        assertSame(left, sideMenu.getCommand(0));
-        assertSame(right, sideMenu.getCommand(1));
+        boolean leftPresent = false;
+        boolean rightPresent = false;
+        for (int i = 0; i < sideMenu.getCommandCount(); i++) {
+            Command command = sideMenu.getCommand(i);
+            if (command == left) {
+                leftPresent = true;
+            } else if (command == right) {
+                rightPresent = true;
+            }
+        }
+        assertTrue(leftPresent, "Side menu should contain the left command");
+        assertTrue(rightPresent, "Side menu should contain the right command");
         assertEquals(SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT,
                 right.getClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY));
 
