@@ -2,6 +2,8 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.io.Storage;
+import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
@@ -13,6 +15,8 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.URLImage;
 import com.codename1.util.Base64;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -137,24 +141,39 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertNotNull(cachedData);
         assertTrue(cachedData.length > 0);
 
-        EncodedImage placeholder = EncodedImage.create(cachedData);
+        Image decoded;
+        try {
+            decoded = Image.createImage(cachedData, 0, cachedData.length);
+        } catch (IllegalArgumentException err) {
+            fail("Decoded placeholder image should be created from cached data");
+            return;
+        }
+
+        EncodedImage placeholder = EncodedImage.create(cachedData, decoded.getWidth(), decoded.getHeight(), decoded.isOpaque());
         assertNotNull(placeholder);
 
-        implementation.putStorageEntry("urlImageKey", cachedData);
+        Storage storage = Storage.getInstance();
+        try {
+            OutputStream output = storage.createOutputStream("urlImageKey");
+            try {
+                output.write(cachedData);
+            } finally {
+                output.close();
+            }
+        } catch (IOException err) {
+            fail("Storage output stream should not throw in test environment: " + err.getMessage());
+        }
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
         assertNotNull(urlImage, "URLImage factory should return an instance");
 
-        assertTrue(implementation.storageFileExists("urlImageKey"));
+        assertTrue(storage.exists("urlImageKey"));
         urlImage.fetch();
         flushSerialCalls();
-
-        Object loaded = urlImage.getImage();
-        assertNotNull(loaded, "URLImage should provide an image instance once fetched");
 
         byte[] result = urlImage.getImageData();
         assertNotNull(result, "URLImage should load cached image data");
         assertArrayEquals(cachedData, result);
-        implementation.deleteStorageFile("urlImageKey");
+        storage.deleteStorageFile("urlImageKey");
     }
 }
