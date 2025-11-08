@@ -106,6 +106,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private int deinitializeTextSelectionCount;
     private TextSelection lastInitializedTextSelection;
     private TextSelection lastDeinitializedTextSelection;
+    private int copySelectionInvocations;
+    private TextSelection lastCopiedTextSelection;
+    private String lastCopiedText;
     private final Map<Object, HeavyButtonPeerState> heavyButtonPeers = new HashMap<Object, HeavyButtonPeerState>();
     private boolean requiresHeavyButton;
 
@@ -176,6 +179,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         deinitializeTextSelectionCount = 0;
         lastInitializedTextSelection = null;
         lastDeinitializedTextSelection = null;
+        copySelectionInvocations = 0;
+        lastCopiedTextSelection = null;
+        lastCopiedText = null;
     }
 
     public int getInitializeTextSelectionCount() {
@@ -192,6 +198,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public TextSelection getLastDeinitializedTextSelection() {
         return lastDeinitializedTextSelection;
+    }
+
+    public int getCopySelectionInvocations() {
+        return copySelectionInvocations;
+    }
+
+    public TextSelection getLastCopiedTextSelection() {
+        return lastCopiedTextSelection;
+    }
+
+    public String getLastCopiedText() {
+        return lastCopiedText;
     }
 
     public void setRequiresHeavyButton(boolean requiresHeavyButton) {
@@ -280,6 +298,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void deinitializeTextSelection(TextSelection aThis) {
         deinitializeTextSelectionCount++;
         lastDeinitializedTextSelection = aThis;
+    }
+
+    @Override
+    public void copySelectionToClipboard(TextSelection sel) {
+        copySelectionInvocations++;
+        lastCopiedTextSelection = sel;
+        lastCopiedText = sel == null ? null : sel.getSelectionAsText();
     }
 
     @Override
@@ -1233,6 +1258,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         storageEntries.remove(name);
     }
 
+    public void putStorageEntry(String name, byte[] data) {
+        if (data == null) {
+            storageEntries.remove(name);
+        } else {
+            storageEntries.put(name, data.clone());
+        }
+    }
+
     @Override
     public OutputStream createStorageOutputStream(String name) {
         return new StorageOutput(name);
@@ -1250,6 +1283,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public boolean storageFileExists(String name) {
         return storageEntries.containsKey(name);
+    }
+
+    @Override
+    public int getStorageEntrySize(String name) {
+        byte[] data = storageEntries.get(name);
+        return data == null ? -1 : data.length;
     }
 
     @Override
