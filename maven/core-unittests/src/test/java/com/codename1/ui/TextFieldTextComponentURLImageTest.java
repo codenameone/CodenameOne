@@ -12,8 +12,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Hashtable;
 import com.codename1.util.Base64;
 
@@ -144,11 +142,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         byte[] storedData = placeholder.getImageData();
         assertNotNull(storedData);
 
-        try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
-            os.write(cachedData);
-        } catch (IOException err) {
-            fail("Writing image data to storage should not throw: " + err.getMessage());
-        }
+        implementation.putStorageEntry("urlImageKey", cachedData);
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
         assertNotNull(urlImage, "URLImage factory should return an instance");

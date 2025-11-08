@@ -1258,6 +1258,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         storageEntries.remove(name);
     }
 
+    public void putStorageEntry(String name, byte[] data) {
+        if (data == null) {
+            storageEntries.remove(name);
+        } else {
+            storageEntries.put(name, data.clone());
+        }
+    }
+
     @Override
     public OutputStream createStorageOutputStream(String name) {
         return new StorageOutput(name);

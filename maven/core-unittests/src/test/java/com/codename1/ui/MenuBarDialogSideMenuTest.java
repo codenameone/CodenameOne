@@ -5,11 +5,13 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.Toolbar;
+import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -98,6 +100,10 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
         Toolbar.setOnTopSideMenu(false);
+        Hashtable theme = new Hashtable();
+        theme.put("sideMenuShadowBool", "false");
+        theme.put("sideMenuTensileDragBool", "true");
+        UIManager.getInstance().addThemeProps(theme);
 
         Form form = new Form("SideMenu Test", new BorderLayout());
         Toolbar toolbar = new Toolbar();

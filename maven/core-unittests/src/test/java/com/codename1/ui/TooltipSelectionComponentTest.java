@@ -120,7 +120,7 @@ class TooltipSelectionComponentTest extends UITestBase {
                 c.getAllStyles().setFgColor(0xff00ff);
             }
         });
-        assertEquals(0xff00ff, label.getAllStyles().getFgColor());
+        assertEquals(0xff00ff, label.getUnselectedStyle().getFgColor());
 
         ComponentSelector parents = $(label).getParent();
         assertTrue(parents.contains(container));
