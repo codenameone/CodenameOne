@@ -159,7 +159,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         urlImage.fetch();
         flushSerialCalls();
 
-        Image loaded = urlImage.getImage();
+        Object loaded = urlImage.getImage();
         assertNotNull(loaded, "URLImage should provide an image instance once fetched");
 
         byte[] result = urlImage.getImageData();
