@@ -12,11 +12,10 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Hashtable;
+import com.codename1.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -136,15 +135,14 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        Image base = Image.createImage(2, 2);
-        Graphics graphics = base.getGraphics();
-        graphics.setColor(0xff00ff);
-        graphics.fillRect(0, 0, 2, 2);
-
-        EncodedImage placeholder = EncodedImage.createFromImage(base, true);
+        String base64Png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGP4z/D/PwgzwBgAaagL9TZTdecAAAAASUVORK5CYII=";
+        byte[] cachedData = Base64.decode(base64Png.getBytes());
+        assertNotNull(cachedData);
+        assertTrue(cachedData.length > 0);
+        EncodedImage placeholder = EncodedImage.create(cachedData);
+        assertNotNull(placeholder, "Placeholder image should decode from Base64 data");
         byte[] storedData = placeholder.getImageData();
-        byte[] cachedData = new byte[storedData.length];
-        System.arraycopy(storedData, 0, cachedData, 0, storedData.length);
+        assertNotNull(storedData);
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
             os.write(cachedData);

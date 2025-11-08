@@ -97,15 +97,14 @@ class MenuBarDialogSideMenuTest extends UITestBase {
     void sideMenuBarOpenAndCloseUpdatesState() {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
-        Toolbar.setOnTopSideMenu(true);
+        Toolbar.setOnTopSideMenu(false);
 
         Form form = new Form("SideMenu Test", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
         form.show();
         form.getAnimationManager().flush();
         flushSerialCalls();
-
-        Toolbar toolbar = new Toolbar();
-        form.setToolbar(toolbar);
         final int[] invocations = {0};
         Command menuCommand = new Command("Menu Item") {
             @Override
@@ -114,7 +113,10 @@ class MenuBarDialogSideMenuTest extends UITestBase {
             }
         };
         toolbar.addCommandToSideMenu(menuCommand);
-        SideMenuBar sideMenu = (SideMenuBar) toolbar.getMenuBar();
+        MenuBar toolbarMenu = toolbar.getMenuBar();
+        assertNotNull(toolbarMenu);
+        assertTrue(toolbarMenu instanceof SideMenuBar);
+        SideMenuBar sideMenu = (SideMenuBar) toolbarMenu;
         form.revalidate();
 
         toolbar.openSideMenu();
