@@ -5217,7 +5217,13 @@ static UIImage* cn1_captureView(UIView *view) {
 }
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef NEW_CODENAME_ONE_VM
+    struct ThreadLocalData* capturedThreadStateData = threadStateData;
+#endif
     dispatch_async(dispatch_get_main_queue(), ^{
+#ifdef NEW_CODENAME_ONE_VM
+        struct ThreadLocalData* threadStateData = capturedThreadStateData;
+#endif
         POOL_BEGIN();
         UIView *view = [CodenameOne_GLViewController instance].view;
         UIImage *img = cn1_captureView(view);
@@ -5236,7 +5242,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
                 byteArr = arr;
 #else
                 enteringNativeAllocations();
-                JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG len);
+                JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG len);
                 memcpy(((JAVA_ARRAY)arr)->data, [png bytes], len);
                 finishedNativeAllocations();
                 byteArr = arr;
@@ -5244,7 +5250,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
             }
         }
 
-        com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG byteArr);
+        com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG byteArr);
         POOL_END();
     });
 }
