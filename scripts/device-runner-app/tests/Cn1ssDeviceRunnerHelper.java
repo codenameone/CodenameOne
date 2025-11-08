@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
