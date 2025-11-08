@@ -139,12 +139,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         byte[] encoded = Base64.getDecoder().decode(
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMB9oNuvfQAAAAASUVORK5CYII="
         );
-        EncodedImage placeholder;
-        try {
-            placeholder = EncodedImage.create(encoded);
-        } catch (IOException err) {
-            throw new AssertionError("Failed to decode placeholder image", err);
-        }
+        EncodedImage placeholder = EncodedImage.create(encoded);
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
             os.write(encoded);
