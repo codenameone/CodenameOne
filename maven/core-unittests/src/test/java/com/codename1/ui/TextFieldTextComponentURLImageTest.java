@@ -141,13 +141,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMB9oNuvfQAAAAASUVORK5CYII="
         );
 
-        Image decoded;
-        try {
-            decoded = Image.createImage(encoded, 0, encoded.length);
-        } catch (IOException err) {
-            fail("Decoding placeholder image should not throw: " + err.getMessage());
-            return;
-        }
+        Image decoded = Image.createImage(encoded, 0, encoded.length);
         EncodedImage placeholder = EncodedImage.createFromImage(decoded, false);
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
