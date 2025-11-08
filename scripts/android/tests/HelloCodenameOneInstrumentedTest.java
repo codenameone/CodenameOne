@@ -30,6 +30,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import com.codename1.io.Log;
 
 @RunWith(AndroidJUnit4.class)
 public class HelloCodenameOneInstrumentedTest {
@@ -162,7 +163,7 @@ public class HelloCodenameOneInstrumentedTest {
                 bmp.recycle();
             } catch (Throwable t) {
                 println("CN1SS:ERR:test=" + testName + " " + t);
-                t.printStackTrace(System.out);
+                Log.e(t);
             }
         });
         if (holder[0] == null) {

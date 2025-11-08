@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.io.Util;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -84,7 +85,7 @@ final class Cn1ssDeviceRunnerHelper {
             return true;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
-            ex.printStackTrace();
+            Log.e(ex);
             println("CN1SS:END:" + safeName);
             return false;
         } finally {
