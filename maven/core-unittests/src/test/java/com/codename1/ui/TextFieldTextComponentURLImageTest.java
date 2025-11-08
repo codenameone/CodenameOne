@@ -11,7 +11,6 @@ import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.URLImage;
 import java.util.Hashtable;
@@ -134,15 +133,13 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        Image placeholderImage = Image.createImage(4, 4);
-        Graphics g = placeholderImage.getGraphics();
-        g.setColor(0x3366ff);
-        g.fillRect(0, 0, placeholderImage.getWidth(), placeholderImage.getHeight());
-
-        EncodedImage placeholder = EncodedImage.createFromImage(placeholderImage, true);
-        byte[] cachedData = placeholder.getImageData();
+        byte[] cachedData = com.codename1.io.Util.decodeBase64(
+                "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIElEQVR42mNgYGD4z4AFwDiqgGEYBBgYGL4DRAaGAQYAAGxwAh5YQ+RtAAAAAElFTkSuQmCC");
         assertNotNull(cachedData);
         assertTrue(cachedData.length > 0);
+
+        EncodedImage placeholder = EncodedImage.create(cachedData);
+        assertNotNull(placeholder);
 
         implementation.putStorageEntry("urlImageKey", cachedData);
 

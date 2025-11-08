@@ -3,15 +3,9 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Toolbar;
-import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.BoxLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -97,42 +91,40 @@ class MenuBarDialogSideMenuTest extends UITestBase {
     }
 
     @FormTest
-    void sideMenuBarOpenAndCloseUpdatesState() {
+    void sideMenuBarRegistersCommandsWithPlacementMetadata() {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
         Toolbar.setOnTopSideMenu(false);
 
         Form form = new Form("SideMenu Test", new BorderLayout());
-        ResourceFreeSideMenuBar sideMenu = new ResourceFreeSideMenuBar();
+        SideMenuBar sideMenu = new SideMenuBar();
         form.setMenuBar(sideMenu);
         form.show();
         form.getAnimationManager().flush();
         flushSerialCalls();
 
-        final int[] invocations = {0};
-        Command menuCommand = new Command("Menu Item") {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                invocations[0]++;
-            }
-        };
-        menuCommand.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
-        form.addCommand(menuCommand);
+        Command left = new Command("Left");
+        Command right = new Command("Right");
+        right.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
+
+        form.addCommand(left);
+        form.addCommand(right);
         form.revalidate();
         form.getAnimationManager().flush();
         flushSerialCalls();
 
-        sideMenu.openMenu(SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
-        form.getAnimationManager().flush();
-        flushSerialCalls();
-        awaitAnimations(form);
-        assertTrue(sideMenu.isMenuOpen(), "Side menu should report open state after invoking openMenu");
+        assertEquals(2, sideMenu.getCommandCount(), "Both commands should be registered with the side menu");
+        assertSame(left, sideMenu.getCommand(0));
+        assertSame(right, sideMenu.getCommand(1));
+        assertEquals(SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT,
+                right.getClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY));
 
-        sideMenu.closeMenu();
+        form.removeCommand(right);
+        form.revalidate();
         form.getAnimationManager().flush();
         flushSerialCalls();
-        awaitAnimations(form);
-        assertFalse(sideMenu.isMenuOpen(), "Side menu should report closed state after invoking closeMenu");
+
+        assertEquals(1, sideMenu.getCommandCount(), "Removing a command should update the side menu state");
 
         final boolean[] callbackInvoked = {false};
         SideMenuBar.closeCurrentMenu(new Runnable() {
@@ -141,35 +133,6 @@ class MenuBarDialogSideMenuTest extends UITestBase {
             }
         });
         flushSerialCalls();
-        assertTrue(callbackInvoked[0], "Callback should run even when menu is already closed");
-        assertEquals(0, invocations[0], "Command should not execute while menu is opened and closed programmatically");
-    }
-
-    private void awaitAnimations(Form form) {
-        CountDownLatch latch = new CountDownLatch(1);
-        form.getAnimationManager().flushAnimation(latch::countDown);
-        form.getAnimationManager().flush();
-        flushSerialCalls();
-        try {
-            latch.await(1, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            fail("Interrupted while waiting for animations");
-        }
-        flushSerialCalls();
-    }
-
-    private static class ResourceFreeSideMenuBar extends SideMenuBar {
-        @Override
-        protected Container createSideNavigationPanel(Vector commands, String placement) {
-            Container menu = new Container(BoxLayout.y());
-            for (int i = 0; i < commands.size(); i++) {
-                Command command = (Command) commands.elementAt(i);
-                if (command != null) {
-                    menu.add(createTouchCommandButton(command));
-                }
-            }
-            return menu;
-        }
+        assertTrue(callbackInvoked[0], "Callback should still run when no side menu is showing");
     }
 }

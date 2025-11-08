@@ -115,12 +115,16 @@ class TooltipSelectionComponentTest extends UITestBase {
         assertTrue(important.contains(label));
 
         ComponentSelector labels = $("Label", form);
+        final boolean[] mutated = {false};
         labels.each(new ComponentClosure() {
             public void call(Component c) {
-                c.putClientProperty("selectorMutated", Boolean.TRUE);
+                if (c == label) {
+                    mutated[0] = true;
+                }
+                c.setVisible(true);
             }
         });
-        assertEquals(Boolean.TRUE, label.getClientProperty("selectorMutated"));
+        assertTrue(mutated[0], "Selector should invoke closure for matching components");
 
         ComponentSelector parents = $(label).getParent();
         assertTrue(parents.contains(container));
