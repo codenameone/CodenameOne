@@ -5194,25 +5194,110 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-static UIImage* cn1_captureView(UIView *view) {
+static UIView* cn1_rootViewForCapture(UIView *view) {
     if (view == nil) {
         return nil;
     }
-    CGSize size = view.bounds.size;
+
+    UIView *rootView = view;
+    UIWindow *window = view.window;
+
+    if (window == nil) {
+        NSArray<UIWindow*> *windows = [UIApplication sharedApplication].windows;
+        for (UIWindow *candidate in windows) {
+            if ([view isDescendantOfView:candidate]) {
+                window = candidate;
+                break;
+            }
+        }
+    }
+
+    if (window == nil) {
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+        if (@available(iOS 13.0, *)) {
+            NSSet<UIScene *> *connectedScenes = [UIApplication sharedApplication].connectedScenes;
+            for (UIScene *scene in connectedScenes) {
+                if (![scene isKindOfClass:[UIWindowScene class]]) {
+                    continue;
+                }
+                if (scene.activationState != UISceneActivationStateForegroundActive) {
+                    continue;
+                }
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                for (UIWindow *candidate in windowScene.windows) {
+                    if ([view isDescendantOfView:candidate]) {
+                        window = candidate;
+                        break;
+                    }
+                }
+                if (window != nil) {
+                    break;
+                }
+                if (windowScene.windows.count > 0 && window == nil) {
+                    window = windowScene.windows.firstObject;
+                }
+            }
+        }
+#endif
+    }
+
+    if (window == nil) {
+        window = [UIApplication sharedApplication].keyWindow;
+    }
+
+    if (window != nil) {
+        rootView = window;
+    } else {
+        UIView *candidate = view;
+        while (candidate.superview != nil) {
+            candidate = candidate.superview;
+        }
+        rootView = candidate;
+    }
+
+    return rootView;
+}
+
+static UIImage* cn1_captureView(UIView *view) {
+    UIView *rootView = cn1_rootViewForCapture(view);
+    if (rootView == nil) {
+        return nil;
+    }
+
+    CGSize size = rootView.bounds.size;
     if (size.width <= 0 || size.height <= 0) {
         return nil;
     }
 
-    UIGraphicsBeginImageContextWithOptions(size, view.opaque, 0.0);
+    UIGraphicsBeginImageContextWithOptions(size, rootView.opaque, 0.0);
     BOOL ok = NO;
-    if ([view respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-        ok = [view drawViewHierarchyInRect:view.bounds afterScreenUpdates:YES];
+    if ([rootView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+        ok = [rootView drawViewHierarchyInRect:rootView.bounds afterScreenUpdates:YES];
     }
     if (!ok) {
-        [view.layer renderInContext:UIGraphicsGetCurrentContext()];
+        [rootView.layer renderInContext:UIGraphicsGetCurrentContext()];
     }
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
+
+    if (rootView != view) {
+        CGRect targetFrame = [rootView convertRect:view.bounds fromView:view];
+        targetFrame = CGRectIntersection(targetFrame, CGRectMake(0, 0, size.width, size.height));
+        if (!CGRectIsNull(targetFrame) && targetFrame.size.width > 0 && targetFrame.size.height > 0) {
+            CGRect integralTarget = CGRectIntegral(targetFrame);
+            CGRect pixelRect = CGRectMake(integralTarget.origin.x * image.scale,
+                                          integralTarget.origin.y * image.scale,
+                                          integralTarget.size.width * image.scale,
+                                          integralTarget.size.height * image.scale);
+            CGImageRef cropped = CGImageCreateWithImageInRect(image.CGImage, pixelRect);
+            if (cropped != nil) {
+                UIImage *croppedImage = [UIImage imageWithCGImage:cropped scale:image.scale orientation:image.imageOrientation];
+                CGImageRelease(cropped);
+                image = croppedImage;
+            }
+        }
+    }
+
     return image;
 }
 
