@@ -33,7 +33,6 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.location.Location;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
-import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
@@ -113,7 +112,6 @@ import com.codename1.util.SuccessCallback;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.util.Arrays;
 import java.util.Collections;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 
@@ -301,24 +299,85 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /*private static SuccessCallback<Image> screenshotCallback;
+    private static SuccessCallback<Image> screenshotCallback;
 
     @Override
-    public void screenshot(SuccessCallback<Image> callback) {
-        screenshotCallback = callback;
-        nativeInstance.screenshot();
-    }
+    public void screenshot(final SuccessCallback<Image> callback) {
+        if (callback == null) {
+            return;
+        }
 
-    static void onScreenshot(final byte[] imageData) {
-        if(screenshotCallback != null) {
+        if (screenshotCallback != null) {
+            Log.p("Screenshot request ignored: another capture is already in progress.");
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    screenshotCallback.onSucess(EncodedImage.createImage(imageData));
+                    callback.onSucess(null);
+                }
+            });
+            return;
+        }
+
+        screenshotCallback = callback;
+        try {
+            nativeInstance.screenshot();
+        } catch (Throwable t) {
+            screenshotCallback = null;
+            Log.e(t);
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    callback.onSucess(null);
                 }
             });
         }
-    }*/
+    }
+
+    static void onScreenshot(final byte[] imageData) {
+        final SuccessCallback<Image> callback = screenshotCallback;
+        screenshotCallback = null;
+        if (callback == null) {
+            return;
+        }
+
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (imageData != null && imageData.length > 0) {
+                    try {
+                        Image image = Image.createImage(imageData, 0, imageData.length);
+                        if (image != null) {
+                            if (image.getGraphics() == null) {
+                                int width = Math.max(1, image.getWidth());
+                                int height = Math.max(1, image.getHeight());
+                                try {
+                                    int[] rgb = image.getRGB();
+                                    if (rgb != null && rgb.length >= width * height) {
+                                        Image mutable = Image.createImage(rgb, width, height);
+                                        if (mutable != null && mutable.getGraphics() != null) {
+                                            image = mutable;
+                                        }
+                                    }
+                                } catch (OutOfMemoryError oom) {
+                                    Log.e(oom);
+                                } catch (Throwable t) {
+                                    Log.e(t);
+                                }
+                            }
+
+                            if (image != null && image.getGraphics() != null) {
+                                callback.onSucess(image);
+                                return;
+                            }
+                        }
+                    } catch (Throwable t) {
+                        Log.e(t);
+                    }
+                }
+                callback.onSucess(null);
+            }
+        });
+    }
 
     /**
      * Used to enable/disable native cookies from native code.
