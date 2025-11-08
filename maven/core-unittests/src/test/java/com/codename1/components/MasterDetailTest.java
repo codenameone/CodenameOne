@@ -2,68 +2,79 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MasterDetailTest extends UITestBase {
 
     @FormTest
-    void testDefaultConstructor() {
-        MasterDetail md = new MasterDetail();
-        assertNotNull(md);
+    void testBindTabletLandscapeMasterWithNullIcon() {
+        Form rootForm = new Form("Root", new BorderLayout());
+        Container parentContainer = new Container(new BorderLayout());
+        Component landscapeUI = new Label("Landscape");
+        Component portraitUI = new Label("Portrait");
+
+        MasterDetail.bindTabletLandscapeMaster(
+            rootForm,
+            parentContainer,
+            landscapeUI,
+            portraitUI,
+            "Master",
+            null
+        );
+
+        // Verify landscape UI is added
+        assertTrue(parentContainer.contains(landscapeUI));
     }
 
     @FormTest
-    void testSetMasterAndDetailForms() {
-        MasterDetail md = new MasterDetail();
-        Container master = new Container();
-        master.add(new Label("Master"));
-        Container detail = new Container();
-        detail.add(new Label("Detail"));
+    void testBindTabletLandscapeMasterWithIcon() {
+        Form rootForm = new Form("Root", new BorderLayout());
+        Container parentContainer = new Container(new BorderLayout());
+        Component landscapeUI = new Label("Landscape");
+        Component portraitUI = new Label("Portrait");
+        Image icon = Image.createImage(20, 20, 0xFF0000);
 
-        md.setMaster(master, null);
-        md.setDetail(detail, null);
+        MasterDetail.bindTabletLandscapeMaster(
+            rootForm,
+            parentContainer,
+            landscapeUI,
+            portraitUI,
+            "Master",
+            icon
+        );
 
-        assertNotNull(md);
+        // Verify landscape UI is added
+        assertTrue(parentContainer.contains(landscapeUI));
     }
 
     @FormTest
-    void testPortraitModeGetterAndSetter() {
-        MasterDetail md = new MasterDetail();
-        md.setPortraitMode(true);
-        assertTrue(md.isPortraitMode());
+    void testLandscapeUIIsHiddenInPortrait() {
+        Form rootForm = new Form("Root", new BorderLayout());
+        rootForm.show();
 
-        md.setPortraitMode(false);
-        assertFalse(md.isPortraitMode());
-    }
+        Container parentContainer = new Container(new BorderLayout());
+        rootForm.add(BorderLayout.CENTER, parentContainer);
 
-    @FormTest
-    void testLandscapeModeGetterAndSetter() {
-        MasterDetail md = new MasterDetail();
-        md.setLandscapeMode(true);
-        assertTrue(md.isLandscapeMode());
+        Component landscapeUI = new Label("Landscape");
+        Component portraitUI = new Label("Portrait");
 
-        md.setLandscapeMode(false);
-        assertFalse(md.isLandscapeMode());
-    }
+        MasterDetail.bindTabletLandscapeMaster(
+            rootForm,
+            parentContainer,
+            landscapeUI,
+            portraitUI,
+            "Master",
+            null
+        );
 
-    @FormTest
-    void testMasterContainerReturnsContainer() {
-        MasterDetail md = new MasterDetail();
-        Container master = new Container();
-        md.setMaster(master, null);
-
-        assertNotNull(md.getMaster());
-    }
-
-    @FormTest
-    void testDetailContainerReturnsContainer() {
-        MasterDetail md = new MasterDetail();
-        Container detail = new Container();
-        md.setDetail(detail, null);
-
-        assertNotNull(md.getDetail());
+        // Landscape UI should have hideInPortrait set
+        assertTrue(landscapeUI.isHideInPortrait());
     }
 }

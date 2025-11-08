@@ -179,20 +179,22 @@ class SpanButtonTest extends UITestBase {
     }
 
     @FormTest
-    void testMaskNameGetterAndSetter() {
+    void testTextComponentGetter() {
         SpanButton button = new SpanButton("Test");
-        button.setMaskName("TestMask");
-        assertEquals("TestMask", button.getMaskName());
+        assertNotNull(button.getTextComponent());
+        assertEquals("Test", button.getTextComponent().getText());
     }
 
     @FormTest
-    void testTextAllCaps() {
-        SpanButton button = new SpanButton("test");
-        button.setTextAllCaps(true);
-        assertTrue(button.isTextAllCaps());
+    void testTextAllStylesGetter() {
+        SpanButton button = new SpanButton("Test");
+        assertNotNull(button.getTextAllStyles());
+    }
 
-        button.setTextAllCaps(false);
-        assertFalse(button.isTextAllCaps());
+    @FormTest
+    void testTextStyleGetter() {
+        SpanButton button = new SpanButton("Test");
+        assertNotNull(button.getTextStyle());
     }
 
     @FormTest
@@ -222,11 +224,5 @@ class SpanButtonTest extends UITestBase {
     void testIsFocusable() {
         SpanButton button = new SpanButton("Test");
         assertTrue(button.isFocusable());
-    }
-
-    @FormTest
-    void testActualButton() {
-        SpanButton button = new SpanButton("Test");
-        assertNotNull(button.getActualButton());
     }
 }
