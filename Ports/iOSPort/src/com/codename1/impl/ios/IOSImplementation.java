@@ -112,7 +112,6 @@ import com.codename1.util.SuccessCallback;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.util.Arrays;
 import java.util.Collections;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 
@@ -303,17 +302,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static SuccessCallback<Image> screenshotCallback;
 
     @Override
-    public void screenshot(SuccessCallback<Image> callback) {
+    public void screenshot(final SuccessCallback<Image> callback) {
         if (callback == null) {
             return;
         }
 
         if (screenshotCallback != null) {
-            final SuccessCallback<Image> cb = callback;
+            Log.p("Screenshot request ignored: another capture is already in progress.");
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    fallbackScreenshot(cb);
+                    callback.onSucess(null);
                 }
             });
             return;
@@ -325,63 +324,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         } catch (Throwable t) {
             screenshotCallback = null;
             Log.e(t);
-            final SuccessCallback<Image> cb = callback;
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    fallbackScreenshot(cb);
+                    callback.onSucess(null);
                 }
             });
         }
-    }
-
-    private static void fallbackScreenshot(SuccessCallback<Image> callback) {
-        if (callback == null) {
-            return;
-        }
-
-        Display display = Display.getInstance();
-        Form current = display.getCurrent();
-
-        int width = current != null ? current.getWidth() : 0;
-        int height = current != null ? current.getHeight() : 0;
-
-        if (width <= 0 || height <= 0) {
-            width = Math.max(1, display.getDisplayWidth());
-            height = Math.max(1, display.getDisplayHeight());
-        }
-
-        width = Math.max(1, width);
-        height = Math.max(1, height);
-
-        Image img = null;
-        try {
-            img = Image.createImage(width, height);
-        } catch (OutOfMemoryError oom) {
-            Log.e(oom);
-        } catch (Throwable t) {
-            Log.e(t);
-        }
-
-        if (img == null) {
-            try {
-                img = Image.createImage(1, 1);
-            } catch (Throwable t) {
-                Log.e(t);
-                callback.onSucess(null);
-                return;
-            }
-        }
-
-        if (current != null) {
-            try {
-                current.paintComponent(img.getGraphics(), true);
-            } catch (Throwable t) {
-                Log.e(t);
-            }
-        }
-
-        callback.onSucess(img);
     }
 
     static void onScreenshot(final byte[] imageData) {
@@ -398,25 +347,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                     try {
                         Image image = Image.createImage(imageData, 0, imageData.length);
                         if (image != null) {
-                            Graphics g = image.getGraphics();
-                            if (g == null) {
-                                Image mutable = null;
+                            if (image.getGraphics() == null) {
+                                int width = Math.max(1, image.getWidth());
+                                int height = Math.max(1, image.getHeight());
                                 try {
-                                    mutable = Image.createImage(Math.max(1, image.getWidth()), Math.max(1, image.getHeight()));
-                                } catch (Throwable copyError) {
-                                    Log.e(copyError);
-                                }
-                                if (mutable != null) {
-                                    try {
-                                        Graphics mg = mutable.getGraphics();
-                                        if (mg != null) {
-                                            mg.drawImage(image, 0, 0);
+                                    int[] rgb = image.getRGB();
+                                    if (rgb != null && rgb.length >= width * height) {
+                                        Image mutable = Image.createImage(rgb, width, height);
+                                        if (mutable != null && mutable.getGraphics() != null) {
                                             image = mutable;
-                                            g = mg;
                                         }
-                                    } catch (Throwable t) {
-                                        Log.e(t);
                                     }
+                                } catch (OutOfMemoryError oom) {
+                                    Log.e(oom);
+                                } catch (Throwable t) {
+                                    Log.e(t);
                                 }
                             }
 
@@ -429,8 +374,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         Log.e(t);
                     }
                 }
-
-                fallbackScreenshot(callback);
+                callback.onSucess(null);
             }
         });
     }
