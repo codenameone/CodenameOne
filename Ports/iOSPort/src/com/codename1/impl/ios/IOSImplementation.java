@@ -341,20 +341,48 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
 
-        Form current = Display.getInstance().getCurrent();
-        if (current == null || current.getWidth() <= 0 || current.getHeight() <= 0) {
-            callback.onSucess(null);
-            return;
+        Display display = Display.getInstance();
+        Form current = display.getCurrent();
+
+        int width = current != null ? current.getWidth() : 0;
+        int height = current != null ? current.getHeight() : 0;
+
+        if (width <= 0 || height <= 0) {
+            width = Math.max(1, display.getDisplayWidth());
+            height = Math.max(1, display.getDisplayHeight());
         }
 
+        width = Math.max(1, width);
+        height = Math.max(1, height);
+
+        Image img = null;
         try {
-            Image img = Image.createImage(current.getWidth(), current.getHeight());
-            current.paintComponent(img.getGraphics(), true);
-            callback.onSucess(img);
-        } catch (Throwable ex) {
-            Log.e(ex);
-            callback.onSucess(null);
+            img = Image.createImage(width, height);
+        } catch (OutOfMemoryError oom) {
+            Log.e(oom);
+        } catch (Throwable t) {
+            Log.e(t);
         }
+
+        if (img == null) {
+            try {
+                img = Image.createImage(1, 1);
+            } catch (Throwable t) {
+                Log.e(t);
+                callback.onSucess(null);
+                return;
+            }
+        }
+
+        if (current != null) {
+            try {
+                current.paintComponent(img.getGraphics(), true);
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+
+        callback.onSucess(img);
     }
 
     static void onScreenshot(final byte[] imageData) {
