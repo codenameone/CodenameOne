@@ -12,11 +12,8 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Image;
-
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Base64;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -137,15 +134,13 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        byte[] encoded = Base64.getDecoder().decode(
-                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMB9oNuvfQAAAAASUVORK5CYII="
-        );
+        byte[] placeholderData = new byte[]{1, 2, 3, 4};
+        EncodedImage placeholder = EncodedImage.create(placeholderData, 2, 2, true);
 
-        Image decoded = Image.createImage(encoded, 0, encoded.length);
-        EncodedImage placeholder = EncodedImage.createFromImage(decoded, false);
+        byte[] cachedData = new byte[]{9, 8, 7, 6, 5};
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
-            os.write(encoded);
+            os.write(cachedData);
         } catch (IOException err) {
             fail("Writing image data to storage should not throw: " + err.getMessage());
         }
@@ -158,7 +153,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
 
         byte[] result = urlImage.getImageData();
         assertNotNull(result, "URLImage should load cached image data");
-        assertArrayEquals(encoded, result);
+        assertArrayEquals(cachedData, result);
         Storage.getInstance().deleteStorageFile("urlImageKey");
     }
 }

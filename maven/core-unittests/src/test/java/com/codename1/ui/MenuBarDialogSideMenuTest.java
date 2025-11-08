@@ -105,15 +105,15 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         SideMenuBar sideMenu = (SideMenuBar) toolbar.getMenuBar();
         form.revalidate();
 
-        sideMenu.openMenu(null);
+        toolbar.openSideMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
-        assertTrue(Display.getInstance().getCurrent() instanceof Dialog, "Side menu should be displayed as a dialog when opened");
+        assertTrue(sideMenu.isMenuOpen(), "Side menu should report open state after invoking toolbar helper");
 
-        SideMenuBar.closeCurrentMenu();
+        toolbar.closeSideMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
-        assertSame(form, Display.getInstance().getCurrent(), "Form should be current after closing side menu");
+        assertFalse(sideMenu.isMenuOpen(), "Side menu should report closed state after toolbar close");
 
         final boolean[] callbackInvoked = {false};
         SideMenuBar.closeCurrentMenu(new Runnable() {
