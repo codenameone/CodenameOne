@@ -165,7 +165,6 @@ public class HelloCodenameOneInstrumentedTest {
                 println("CN1SS:ERR:test=" + testName + " " + t);
                 Log.p("Exception in screenshot capture: " + t.getMessage());
                 Log.e(t);
-                Log.sendLogAsync();
             }
         });
         if (holder[0] == null) {
@@ -269,22 +268,6 @@ public class HelloCodenameOneInstrumentedTest {
         }
     }
 
-    private static void configureDisplayForLogging(ActivityScenario<Activity> scenario) throws InterruptedException {
-        final CountDownLatch latch = new CountDownLatch(1);
-        scenario.onActivity(activity -> Display.getInstance().callSerially(() -> {
-            try {
-                Display.getInstance().setProperty("built_by_user", "support@codenameone.com");
-                Display.getInstance().setProperty("package_name", "com.codename1.ci.testing");
-            } finally {
-                latch.countDown();
-            }
-        }));
-
-        if (!latch.await(5, TimeUnit.SECONDS)) {
-            Assert.fail("Timed out configuring Display properties");
-        }
-    }
-
     private static void prepareMainActivityContent(ActivityScenario<Activity> scenario) throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
         scenario.onActivity(activity -> Display.getInstance().callSerially(() -> {
@@ -336,7 +319,6 @@ public class HelloCodenameOneInstrumentedTest {
         ScreenshotCapture capture;
         try (ActivityScenario<Activity> scenario = launchMainActivity(ctx)) {
             settle(750);
-            configureDisplayForLogging(scenario);
             prepareMainActivityContent(scenario);
             settle(500);
             capture = captureScreenshot(scenario, MAIN_SCREEN_TEST);
@@ -352,7 +334,6 @@ public class HelloCodenameOneInstrumentedTest {
 
         try (ActivityScenario<Activity> scenario = launchMainActivity(ctx)) {
             settle(750);
-            configureDisplayForLogging(scenario);
             prepareBrowserComponentContent(scenario);
             settle(500);
             capture = captureScreenshot(scenario, BROWSER_TEST);

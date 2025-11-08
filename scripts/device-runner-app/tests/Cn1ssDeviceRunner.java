@@ -20,6 +20,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     @Override
     protected void startApplicationInstance() {
+        // Configure Display properties for logging
+        Display.getInstance().setProperty("built_by_user", "support@codenameone.com");
+        Display.getInstance().setProperty("package_name", "com.codename1.ci.testing");
+
         Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
             Form current = Display.getInstance().getCurrent();
             if (current != null) {
