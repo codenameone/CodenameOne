@@ -107,8 +107,8 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         Command right = new Command("Right");
         right.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
 
-        form.addCommand(left);
-        form.addCommand(right);
+        sideMenu.addCommand(left);
+        sideMenu.addCommand(right);
         form.revalidate();
         form.getAnimationManager().flush();
         flushSerialCalls();
@@ -119,7 +119,7 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         assertEquals(SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT,
                 right.getClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY));
 
-        form.removeCommand(right);
+        sideMenu.removeCommand(right);
         form.revalidate();
         form.getAnimationManager().flush();
         flushSerialCalls();

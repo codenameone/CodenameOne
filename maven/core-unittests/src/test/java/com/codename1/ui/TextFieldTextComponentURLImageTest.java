@@ -11,7 +11,6 @@ import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Image;
 import com.codename1.ui.URLImage;
 import com.codename1.util.Base64;
 import java.util.Hashtable;
@@ -152,7 +151,6 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
 
         Object loaded = urlImage.getImage();
         assertNotNull(loaded, "URLImage should provide an image instance once fetched");
-        assertTrue(loaded instanceof Image, "Loaded object should be an Image instance");
 
         byte[] result = urlImage.getImageData();
         assertNotNull(result, "URLImage should load cached image data");

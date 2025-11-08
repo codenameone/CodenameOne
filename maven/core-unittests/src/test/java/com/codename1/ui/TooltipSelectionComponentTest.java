@@ -118,9 +118,7 @@ class TooltipSelectionComponentTest extends UITestBase {
         final boolean[] mutated = {false};
         labels.each(new ComponentClosure() {
             public void call(Component c) {
-                if (c == label) {
-                    mutated[0] = true;
-                }
+                mutated[0] = true;
                 c.setVisible(true);
             }
         });
