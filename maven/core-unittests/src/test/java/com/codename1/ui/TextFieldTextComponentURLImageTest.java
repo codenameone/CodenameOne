@@ -51,6 +51,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertTrue(field.hasFocus(), "Pointer interaction should grant focus");
 
         field.stopEditing();
+        flushSerialCalls();
         assertFalse(field.isEditing());
     }
 
@@ -135,19 +136,20 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        byte[] data = new byte[]{1, 2, 3, 4};
-        EncodedImage placeholder = EncodedImage.create(data, 4, 4, false);
+        Image solid = Image.createImage(8, 8, 0xff336699);
+        EncodedImage placeholder = EncodedImage.createFromImage(solid, false);
+        byte[] encoded = placeholder.getImageData();
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
-            os.write(data);
+            os.write(encoded);
         } catch (IOException err) {
             fail("Writing image data to storage should not throw: " + err.getMessage());
         }
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
-        urlImage.fetch();
+        assertTrue(urlImage.fetch());
 
-        assertArrayEquals(data, urlImage.getImageData(), "fetch should load cached image data");
+        assertArrayEquals(encoded, urlImage.getImageData(), "fetch should load cached image data");
         assertTrue(urlImage.isAnimation(), "Loaded image should request repaint animation");
         assertTrue(urlImage.animate(), "animate should return true when repaint is requested");
         Storage.getInstance().deleteStorageFile("urlImageKey");
