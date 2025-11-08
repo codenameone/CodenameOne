@@ -33,7 +33,6 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.location.Location;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
-import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
@@ -395,13 +394,40 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                try {
-                    if (imageData != null && imageData.length > 0) {
-                        callback.onSucess(EncodedImage.create(imageData));
-                        return;
+                if (imageData != null && imageData.length > 0) {
+                    try {
+                        Image image = Image.createImage(imageData, 0, imageData.length);
+                        if (image != null) {
+                            Graphics g = image.getGraphics();
+                            if (g == null) {
+                                Image mutable = null;
+                                try {
+                                    mutable = Image.createImage(Math.max(1, image.getWidth()), Math.max(1, image.getHeight()));
+                                } catch (Throwable copyError) {
+                                    Log.e(copyError);
+                                }
+                                if (mutable != null) {
+                                    try {
+                                        Graphics mg = mutable.getGraphics();
+                                        if (mg != null) {
+                                            mg.drawImage(image, 0, 0);
+                                            image = mutable;
+                                            g = mg;
+                                        }
+                                    } catch (Throwable t) {
+                                        Log.e(t);
+                                    }
+                                }
+                            }
+
+                            if (image != null && image.getGraphics() != null) {
+                                callback.onSucess(image);
+                                return;
+                            }
+                        }
+                    } catch (Throwable t) {
+                        Log.e(t);
                     }
-                } catch (Throwable t) {
-                    Log.e(t);
                 }
 
                 fallbackScreenshot(callback);
