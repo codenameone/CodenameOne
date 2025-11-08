@@ -12,11 +12,10 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Image;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Base64;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -137,17 +136,14 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        Image solid = Image.createImage(8, 8, 0xff336699);
-        EncodedImage placeholder = EncodedImage.createFromImage(solid, false);
-        byte[] encoded = placeholder.getImageData();
-        if (encoded == null) {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            try {
-                com.codename1.ui.util.ImageIO.getImageIO().save(solid, baos, com.codename1.ui.util.ImageIO.FORMAT_PNG, 1f);
-            } catch (IOException err) {
-                fail("Encoding placeholder image should not throw: " + err.getMessage());
-            }
-            encoded = baos.toByteArray();
+        byte[] encoded = Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMB9oNuvfQAAAAASUVORK5CYII="
+        );
+        EncodedImage placeholder;
+        try {
+            placeholder = EncodedImage.create(encoded);
+        } catch (IOException err) {
+            throw new AssertionError("Failed to decode placeholder image", err);
         }
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
