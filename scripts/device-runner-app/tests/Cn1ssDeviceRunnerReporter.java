@@ -34,6 +34,7 @@ public class Cn1ssDeviceRunnerReporter extends TestReporting {
             // Use Log.e() which properly formats stack traces for all platforms
             Log.p("Exception in test: " + exceptionInfo);
             Log.e(err);
+            Log.sendLogAsync();
         } else {
             System.out.println("CN1SS:ERR:exception=null");
         }
