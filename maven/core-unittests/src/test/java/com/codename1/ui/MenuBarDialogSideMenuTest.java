@@ -8,19 +8,25 @@ import com.codename1.ui.Toolbar;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class MenuBarDialogSideMenuTest extends UITestBase {
     private int originalCommandBehavior;
+    private boolean originalOnTopSideMenu;
 
     @BeforeEach
     void captureCommandBehavior() {
         originalCommandBehavior = Display.getInstance().getCommandBehavior();
+        originalOnTopSideMenu = Toolbar.isOnTopSideMenu();
     }
 
     @AfterEach
     void restoreCommandBehavior() {
         Display.getInstance().setCommandBehavior(originalCommandBehavior);
+        Toolbar.setOnTopSideMenu(originalOnTopSideMenu);
         Form form = Display.getInstance().getCurrent();
         form.setMenuBar(new MenuBar());
         form.revalidate();
@@ -91,9 +97,12 @@ class MenuBarDialogSideMenuTest extends UITestBase {
     void sideMenuBarOpenAndCloseUpdatesState() {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
+        Toolbar.setOnTopSideMenu(true);
 
         Form form = new Form("SideMenu Test", new BorderLayout());
         form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
 
         Toolbar toolbar = new Toolbar();
         form.setToolbar(toolbar);
@@ -111,11 +120,13 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         toolbar.openSideMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
+        awaitAnimations(form);
         assertTrue(sideMenu.isMenuOpen(), "Side menu should report open state after invoking toolbar helper");
 
         toolbar.closeSideMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
+        awaitAnimations(form);
         assertFalse(sideMenu.isMenuOpen(), "Side menu should report closed state after toolbar close");
 
         final boolean[] callbackInvoked = {false};
@@ -124,7 +135,22 @@ class MenuBarDialogSideMenuTest extends UITestBase {
                 callbackInvoked[0] = true;
             }
         });
+        flushSerialCalls();
         assertTrue(callbackInvoked[0], "Callback should run even when menu is already closed");
         assertEquals(0, invocations[0], "Command should not execute while menu is opened and closed programmatically");
+    }
+
+    private void awaitAnimations(Form form) {
+        CountDownLatch latch = new CountDownLatch(1);
+        form.getAnimationManager().flushAnimation(latch::countDown);
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        try {
+            latch.await(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail("Interrupted while waiting for animations");
+        }
+        flushSerialCalls();
     }
 }

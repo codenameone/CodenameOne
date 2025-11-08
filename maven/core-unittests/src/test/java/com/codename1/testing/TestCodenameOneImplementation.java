@@ -1278,6 +1278,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public int getStorageEntrySize(String name) {
+        byte[] data = storageEntries.get(name);
+        return data == null ? -1 : data.length;
+    }
+
+    @Override
     public String[] listStorageEntries() {
         return storageEntries.keySet().toArray(new String[0]);
     }
