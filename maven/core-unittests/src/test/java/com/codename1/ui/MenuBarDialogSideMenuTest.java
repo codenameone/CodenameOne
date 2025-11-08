@@ -116,13 +116,13 @@ class MenuBarDialogSideMenuTest extends UITestBase {
                 invocations[0]++;
             }
         };
-        menuCommand.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_LEFT);
+        menuCommand.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
         form.addCommand(menuCommand);
         form.revalidate();
         form.getAnimationManager().flush();
         flushSerialCalls();
 
-        sideMenu.openMenu(SideMenuBar.COMMAND_PLACEMENT_VALUE_LEFT);
+        sideMenu.openMenu(SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
         form.getAnimationManager().flush();
         flushSerialCalls();
         awaitAnimations(form);
