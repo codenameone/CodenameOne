@@ -31,8 +31,8 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR);
 
-        Form form = Display.getInstance().getCurrent();
-        form.setLayout(new BorderLayout());
+        Form form = new Form("MenuBar Test", new BorderLayout());
+        form.show();
 
         MenuBar menuBar = new MenuBar();
         form.setMenuBar(menuBar);
@@ -68,6 +68,9 @@ class MenuBarDialogSideMenuTest extends UITestBase {
     void dialogShowPackedAndDisposeLifecycle() {
         implementation.setBuiltinSoundsEnabled(false);
 
+        Form owner = new Form("Dialog Owner", new BorderLayout());
+        owner.show();
+
         Dialog dialog = new Dialog("Alert", new BorderLayout());
         dialog.setDisposeWhenPointerOutOfBounds(true);
         dialog.setDialogUIID("CustomDialog");
@@ -89,8 +92,8 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         implementation.setBuiltinSoundsEnabled(false);
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
 
-        Form form = Display.getInstance().getCurrent();
-        form.setLayout(new BorderLayout());
+        Form form = new Form("SideMenu Test", new BorderLayout());
+        form.show();
 
         Toolbar toolbar = new Toolbar();
         form.setToolbar(toolbar);

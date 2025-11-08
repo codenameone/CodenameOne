@@ -12,6 +12,8 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Hashtable;
@@ -134,10 +136,15 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        byte[] placeholderData = new byte[]{1, 2, 3, 4};
-        EncodedImage placeholder = EncodedImage.create(placeholderData, 2, 2, true);
+        Image base = Image.createImage(2, 2);
+        Graphics graphics = base.getGraphics();
+        graphics.setColor(0xff00ff);
+        graphics.fillRect(0, 0, 2, 2);
 
-        byte[] cachedData = new byte[]{9, 8, 7, 6, 5};
+        EncodedImage placeholder = EncodedImage.createFromImage(base, true);
+        byte[] storedData = placeholder.getImageData();
+        byte[] cachedData = new byte[storedData.length];
+        System.arraycopy(storedData, 0, cachedData, 0, storedData.length);
 
         try (OutputStream os = Storage.getInstance().createOutputStream("urlImageKey")) {
             os.write(cachedData);
@@ -150,6 +157,10 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
 
         assertTrue(Storage.getInstance().exists("urlImageKey"));
         urlImage.fetch();
+        flushSerialCalls();
+
+        Image loaded = urlImage.getImage();
+        assertNotNull(loaded, "URLImage should provide an image instance once fetched");
 
         byte[] result = urlImage.getImageData();
         assertNotNull(result, "URLImage should load cached image data");
