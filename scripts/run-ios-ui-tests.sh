@@ -201,6 +201,10 @@ auto_select_destination() {
         done
         [ "$platform" != "iOS Simulator" ] && continue
         [ -z "$id" ] && continue
+        # Skip placeholder device IDs
+        case "$id" in
+          *Placeholder*|*placeholder*) continue ;;
+        esac
         priority=0
         case "$(printf '%s' "$name" | tr 'A-Z' 'a-z')" in
           *iphone*) priority=2 ;;
@@ -265,6 +269,10 @@ fallback_sim_destination() {
     state="$(trim_whitespace "$state")"
     [ -z "$name" ] && continue
     [ -z "$id" ] && continue
+    # Skip placeholder device IDs
+    case "$id" in
+      *Placeholder*|*placeholder*) continue ;;
+    esac
 
     lower_name="$(printf '%s' "$name" | tr 'A-Z' 'a-z')"
     case "$lower_name" in
