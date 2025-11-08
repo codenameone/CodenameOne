@@ -5286,8 +5286,33 @@ static UIImage* cn1_captureView(UIView *view) {
         }
         // Render every visible window that shares the same screen as the Codename One GL window
         // so that native peer components hosted outside of the GL view (e.g. BrowserComponent)
-        // are composited into the captured image.
-        for (UIWindow *window in windows) {
+        // are composited into the captured image.  Windows need to be rendered from back to front
+        // based on their window level so that overlay windows (e.g. ones hosting peer components)
+        // appear above the GL view in the resulting screenshot.
+        NSArray<UIWindow *> *orderedWindows = windows;
+        if (windows.count > 1) {
+            orderedWindows = [windows sortedArrayUsingComparator:^NSComparisonResult(UIWindow * _Nonnull lhs, UIWindow * _Nonnull rhs) {
+                CGFloat lhsLevel = lhs.windowLevel;
+                CGFloat rhsLevel = rhs.windowLevel;
+                if (lhsLevel < rhsLevel) {
+                    return NSOrderedAscending;
+                }
+                if (lhsLevel > rhsLevel) {
+                    return NSOrderedDescending;
+                }
+                NSUInteger lhsIndex = [windows indexOfObjectIdenticalTo:lhs];
+                NSUInteger rhsIndex = [windows indexOfObjectIdenticalTo:rhs];
+                if (lhsIndex < rhsIndex) {
+                    return NSOrderedAscending;
+                }
+                if (lhsIndex > rhsIndex) {
+                    return NSOrderedDescending;
+                }
+                return NSOrderedSame;
+            }];
+        }
+
+        for (UIWindow *window in orderedWindows) {
             if (window.hidden || window.alpha <= 0.0f) {
                 continue;
             }
