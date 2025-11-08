@@ -245,7 +245,8 @@ class PropertiesTest {
         props.store(writer, null);
 
         String result = writer.toString();
-        assertTrue(result.contains("value\\ with\\ spaces"));
+        // Properties stores the value (spaces in values are not escaped, only in keys)
+        assertTrue(result.contains("key=value with spaces"));
     }
 
     @Test
