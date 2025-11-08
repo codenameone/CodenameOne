@@ -141,8 +141,9 @@ class DataTest {
         String path = "/test/file.txt";
         byte[] content = {5, 10, 15, 20};
 
-        FileSystemStorage.getInstance().getOutputStream(path).write(content);
-        FileSystemStorage.getInstance().getOutputStream(path).close();
+        OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
+        os.write(content);
+        os.close();
 
         File file = new File(path);
         Data.FileData data = new Data.FileData(file);
@@ -158,8 +159,9 @@ class DataTest {
         String path = "/test/sizefile.txt";
         byte[] content = new byte[50];
 
-        FileSystemStorage.getInstance().getOutputStream(path).write(content);
-        FileSystemStorage.getInstance().getOutputStream(path).close();
+        OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
+        os.write(content);
+        os.close();
 
         File file = new File(path);
         Data.FileData data = new Data.FileData(file);
