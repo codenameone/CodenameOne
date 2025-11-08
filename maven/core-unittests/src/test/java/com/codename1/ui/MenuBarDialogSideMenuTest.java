@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.Toolbar;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -89,8 +90,8 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         Form form = Display.getInstance().getCurrent();
         form.setLayout(new BorderLayout());
 
-        SideMenuBar sideMenu = new SideMenuBar();
-        form.setMenuBar(sideMenu);
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
         final int[] invocations = {0};
         Command menuCommand = new Command("Menu Item") {
             @Override
@@ -98,10 +99,11 @@ class MenuBarDialogSideMenuTest extends UITestBase {
                 invocations[0]++;
             }
         };
-        sideMenu.addCommand(menuCommand);
+        toolbar.addCommandToSideMenu(menuCommand);
+        SideMenuBar sideMenu = (SideMenuBar) toolbar.getMenuBar();
         form.revalidate();
 
-        sideMenu.openMenu(null);
+        toolbar.openSideMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
         assertTrue(SideMenuBar.isShowing(), "Side menu should report as showing after openMenu");

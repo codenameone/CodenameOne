@@ -7,6 +7,7 @@ import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -115,7 +116,8 @@ class TooltipSelectionComponentTest extends UITestBase {
         assertTrue(important.contains(label));
 
         ComponentSelector labels = $("Label", form);
-        labels.getStyle().setFgColor(0xff00ff);
+        Style labelStyle = labels.getStyle(label);
+        labelStyle.setFgColor(0xff00ff);
         assertEquals(0xff00ff, label.getStyle().getFgColor());
 
         ComponentSelector parents = $("Label", form).getParent();
