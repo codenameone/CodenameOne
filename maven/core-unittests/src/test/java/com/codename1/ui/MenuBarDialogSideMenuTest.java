@@ -6,6 +6,8 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -53,7 +55,8 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         form.revalidate();
 
         assertEquals(2, menuBar.getCommandCount());
-        assertSame(first, menuBar.getCommand(0));
+        assertSame(second, menuBar.getCommand(0));
+        assertSame(first, menuBar.getCommand(1));
 
         Button commandButton = menuBar.findCommandComponent(second);
         assertNotNull(commandButton, "Second command should have a bound button in button bar mode");
@@ -101,9 +104,14 @@ class MenuBarDialogSideMenuTest extends UITestBase {
         Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
         Toolbar.setOnTopSideMenu(false);
         Hashtable theme = new Hashtable();
+        Image shadowPlaceholder = Image.createImage(1, 1);
+        Graphics shadowGraphics = shadowPlaceholder.getGraphics();
+        shadowGraphics.setColor(0x0);
+        shadowGraphics.fillRect(0, 0, shadowPlaceholder.getWidth(), shadowPlaceholder.getHeight());
         theme.put("sideMenuShadowBool", "false");
         theme.put("sideMenuTensileDragBool", "true");
-        UIManager.getInstance().addThemeProps(theme);
+        theme.put("sideMenuShadowImage", shadowPlaceholder);
+        UIManager.getInstance().setThemeProps(theme);
 
         Form form = new Form("SideMenu Test", new BorderLayout());
         Toolbar toolbar = new Toolbar();

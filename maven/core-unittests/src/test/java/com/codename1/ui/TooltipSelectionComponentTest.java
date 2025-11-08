@@ -117,10 +117,10 @@ class TooltipSelectionComponentTest extends UITestBase {
         ComponentSelector labels = $("Label", form);
         labels.each(new ComponentClosure() {
             public void call(Component c) {
-                c.getAllStyles().setFgColor(0xff00ff);
+                c.getStyle().setFgColor(0xff00ff);
             }
         });
-        assertEquals(0xff00ff, label.getUnselectedStyle().getFgColor());
+        assertEquals(0xff00ff, label.getStyle().getFgColor());
 
         ComponentSelector parents = $(label).getParent();
         assertTrue(parents.contains(container));

@@ -12,8 +12,11 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.io.Storage;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Hashtable;
-import com.codename1.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -133,16 +136,21 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        String base64Png = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGP4z/D/PwgzwBgAaagL9TZTdecAAAAASUVORK5CYII=";
-        byte[] cachedData = Base64.decode(base64Png.getBytes());
+        Image placeholderImage = Image.createImage(4, 4);
+        Graphics g = placeholderImage.getGraphics();
+        g.setColor(0x3366ff);
+        g.fillRect(0, 0, placeholderImage.getWidth(), placeholderImage.getHeight());
+
+        EncodedImage placeholder = EncodedImage.createFromImage(placeholderImage, true);
+        byte[] cachedData = placeholder.getImageData();
         assertNotNull(cachedData);
         assertTrue(cachedData.length > 0);
-        EncodedImage placeholder = EncodedImage.create(cachedData);
-        assertNotNull(placeholder, "Placeholder image should decode from Base64 data");
-        byte[] storedData = placeholder.getImageData();
-        assertNotNull(storedData);
 
-        implementation.putStorageEntry("urlImageKey", cachedData);
+        try (OutputStream out = Storage.getInstance().createOutputStream("urlImageKey")) {
+            out.write(cachedData);
+        } catch (IOException ioe) {
+            fail("Unable to seed storage for URLImage cache test", ioe);
+        }
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
         assertNotNull(urlImage, "URLImage factory should return an instance");
@@ -153,6 +161,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
 
         Object loaded = urlImage.getImage();
         assertNotNull(loaded, "URLImage should provide an image instance once fetched");
+        assertTrue(loaded instanceof Image, "Loaded object should be an Image instance");
 
         byte[] result = urlImage.getImageData();
         assertNotNull(result, "URLImage should load cached image data");
