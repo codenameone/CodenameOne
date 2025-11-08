@@ -139,7 +139,7 @@ class TooltipSelectionComponentTest extends UITestBase {
         });
         assertEquals(2, invocationCount[0]);
 
-        Iterator<Component> iterator = $("Container > *", container).iterator();
+        Iterator<Component> iterator = $(container).children().iterator();
         assertTrue(iterator.hasNext());
         assertSame(label, iterator.next());
         assertTrue(iterator.hasNext());
