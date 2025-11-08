@@ -122,9 +122,14 @@ class BufferedOutputStreamTest {
         bos.write(3);
         bos.write(4);
 
+        // Buffer is full but not yet flushed
+        assertEquals(0, baos.toByteArray().length);
+
+        // Writing 5th byte triggers flush of the first 4 bytes
+        bos.write(5);
+
         assertEquals(4, baos.toByteArray().length);
 
-        bos.write(5);
         bos.flush();
 
         assertEquals(5, baos.toByteArray().length);
