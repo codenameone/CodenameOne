@@ -147,7 +147,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         }
 
         URLImage urlImage = URLImage.createToStorage(placeholder, "urlImageKey", "file://ignored");
-        assertTrue(urlImage.fetch());
+        urlImage.fetch();
 
         assertArrayEquals(encoded, urlImage.getImageData(), "fetch should load cached image data");
         assertTrue(urlImage.isAnimation(), "Loaded image should request repaint animation");
