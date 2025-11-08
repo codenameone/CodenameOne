@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.testing.TestReporting;
+import com.codename1.io.Log;
 
 public class Cn1ssDeviceRunnerReporter extends TestReporting {
     @Override
@@ -29,7 +30,7 @@ public class Cn1ssDeviceRunnerReporter extends TestReporting {
         super.logException(err);
         System.out.println("CN1SS:ERR:exception=" + err);
         if (err != null) {
-            err.printStackTrace();
+            Log.e(err);
         }
     }
 
