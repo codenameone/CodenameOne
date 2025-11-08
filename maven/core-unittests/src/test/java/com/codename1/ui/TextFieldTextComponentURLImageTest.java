@@ -13,6 +13,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.URLImage;
+import com.codename1.util.Base64;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -133,8 +134,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void urlImageFetchesFromStorageCache() {
         implementation.setBuiltinSoundsEnabled(false);
 
-        byte[] cachedData = com.codename1.io.Util.decodeBase64(
-                "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIElEQVR42mNgYGD4z4AFwDiqgGEYBBgYGL4DRAaGAQYAAGxwAh5YQ+RtAAAAAElFTkSuQmCC");
+        byte[] cachedData = Base64.decode("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIElEQVR42mNgYGD4z4AFwDiqgGEYBBgYGL4DRAaGAQYAAGxwAh5YQ+RtAAAAAElFTkSuQmCC".getBytes());
         assertNotNull(cachedData);
         assertTrue(cachedData.length > 0);
 
