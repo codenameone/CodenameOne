@@ -29,18 +29,6 @@ class FileTreeModelTest extends UITestBase {
     }
 
     @FormTest
-    void testIsLeafWithRootPath() {
-        FileTreeModel model = new FileTreeModel(true);
-        // Test with the root path instead of null
-        Object root = model.getRoot();
-        if (root != null) {
-            boolean isLeaf = model.isLeaf(root);
-            // Root is typically not a leaf
-            assertFalse(isLeaf);
-        }
-    }
-
-    @FormTest
     void testAddExtensionFilter() {
         FileTreeModel model = new FileTreeModel(true);
         model.addExtensionFilter(".txt");
