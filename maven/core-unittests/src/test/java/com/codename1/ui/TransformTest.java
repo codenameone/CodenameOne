@@ -98,7 +98,7 @@ class TransformTest extends UITestBase {
     @Test
     void testInvert() {
         Transform t = Transform.makeScale(2.0f, 2.0f);
-        t.invert();
+        assertDoesNotThrow(() -> t.invert());
         assertNotNull(t);
     }
 
@@ -201,7 +201,7 @@ class TransformTest extends UITestBase {
     @Test
     void testInvertIdentity() {
         Transform t = Transform.makeIdentity();
-        t.invert();
+        assertDoesNotThrow(() -> t.invert());
         assertTrue(t.isIdentity());
     }
 
