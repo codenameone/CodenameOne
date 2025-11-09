@@ -8,36 +8,47 @@ import static org.junit.jupiter.api.Assertions.*;
 class StorageImageTest extends UITestBase {
 
     @FormTest
-    void testCreateWithStorageName() {
-        StorageImage img = StorageImage.create("test-image", null, 100, 100);
+    void testCreateWithByteArray() {
+        byte[] data = new byte[100];
+        StorageImage img = StorageImage.create("test-image", data, 100, 100);
         assertNotNull(img);
     }
 
     @FormTest
-    void testGetFileNameReturnsFileName() {
-        StorageImage img = StorageImage.create("test-image", null, 100, 100);
-        assertEquals("test-image", img.getFileName());
-    }
-
-    @FormTest
     void testGetWidthReturnsWidth() {
-        StorageImage img = StorageImage.create("test", null, 50, 60);
+        byte[] data = new byte[100];
+        StorageImage img = StorageImage.create("test", data, 50, 60);
         assertEquals(50, img.getWidth());
     }
 
     @FormTest
     void testGetHeightReturnsHeight() {
-        StorageImage img = StorageImage.create("test", null, 50, 60);
+        byte[] data = new byte[100];
+        StorageImage img = StorageImage.create("test", data, 50, 60);
         assertEquals(60, img.getHeight());
     }
 
     @FormTest
-    void testKeepCacheGetterAndSetter() {
-        StorageImage img = StorageImage.create("test", null, 100, 100);
-        img.setKeepCache(true);
-        assertTrue(img.isKeepCache());
+    void testCreateWithKeepParameter() {
+        byte[] data = new byte[100];
+        StorageImage img = StorageImage.create("test", data, 100, 100, true);
+        assertNotNull(img);
 
-        img.setKeepCache(false);
-        assertFalse(img.isKeepCache());
+        StorageImage img2 = StorageImage.create("test2", data, 100, 100, false);
+        assertNotNull(img2);
+    }
+
+    @FormTest
+    void testCreateWithFilenameOnly() {
+        StorageImage img = StorageImage.create("test-file", 100, 100);
+        assertNotNull(img);
+    }
+
+    @FormTest
+    void testGetImageDataReturnsData() {
+        byte[] data = new byte[]{1, 2, 3, 4, 5};
+        StorageImage img = StorageImage.create("test-data", data, 10, 10);
+        byte[] retrieved = img.getImageData();
+        assertNotNull(retrieved);
     }
 }

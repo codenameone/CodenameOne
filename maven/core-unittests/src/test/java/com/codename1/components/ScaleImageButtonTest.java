@@ -34,8 +34,8 @@ class ScaleImageButtonTest extends UITestBase {
         button.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
         assertEquals(Style.BACKGROUND_IMAGE_SCALED_FILL, button.getBackgroundType());
 
-        button.setBackgroundType(Style.BACKGROUND_IMAGE_SCALE);
-        assertEquals(Style.BACKGROUND_IMAGE_SCALE, button.getBackgroundType());
+        button.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED);
+        assertEquals(Style.BACKGROUND_IMAGE_SCALED, button.getBackgroundType());
     }
 
     @FormTest

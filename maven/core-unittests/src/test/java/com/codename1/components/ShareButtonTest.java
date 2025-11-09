@@ -36,18 +36,12 @@ class ShareButtonTest extends UITestBase {
     @FormTest
     void testAddShareService() {
         ShareButton button = new ShareButton();
-        ShareService customService = new ShareService() {
-            @Override
-            public String getShareTitle() { return "Custom"; }
-
+        ShareService customService = new ShareService("Custom", null) {
             @Override
             public void share(String toShare) {}
 
             @Override
             public boolean canShareImage() { return false; }
-
-            @Override
-            public void share(String imageFilePath, String mimeType) {}
         };
 
         button.addShareService(customService);

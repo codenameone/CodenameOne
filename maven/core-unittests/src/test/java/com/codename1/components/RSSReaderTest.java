@@ -43,11 +43,12 @@ class RSSReaderTest extends UITestBase {
     }
 
     @FormTest
-    void testDisplayProgressPercentageGetterAndSetter() {
+    void testBlockListGetterAndSetter() {
         RSSReader reader = new RSSReader();
-        assertTrue(reader.isDisplayProgressPercentage());
+        reader.setBlockList(true);
+        assertTrue(reader.isBlockList());
 
-        reader.setDisplayProgressPercentage(false);
-        assertFalse(reader.isDisplayProgressPercentage());
+        reader.setBlockList(false);
+        assertFalse(reader.isBlockList());
     }
 }
