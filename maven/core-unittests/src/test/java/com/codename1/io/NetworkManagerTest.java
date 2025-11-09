@@ -32,7 +32,8 @@ class NetworkManagerTest {
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
+        resetManagerState();
         Util.setImplementation(null);
         Storage.setStorageInstance(null);
     }
