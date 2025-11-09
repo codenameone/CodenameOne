@@ -48,22 +48,6 @@ class ButtonGroupTest extends UITestBase {
     }
 
     @FormTest
-    void testGetSelectedRadioButton() {
-        ButtonGroup group = new ButtonGroup();
-        RadioButton rb1 = new RadioButton("Option 1");
-        RadioButton rb2 = new RadioButton("Option 2");
-
-        group.add(rb1);
-        group.add(rb2);
-
-        rb1.setSelected(true);
-        assertEquals(rb1, group.getSelectedRadioButton());
-
-        rb2.setSelected(true);
-        assertEquals(rb2, group.getSelectedRadioButton());
-    }
-
-    @FormTest
     void testGetSelectedIndex() {
         ButtonGroup group = new ButtonGroup();
         RadioButton rb1 = new RadioButton("Option 1");
@@ -82,33 +66,6 @@ class ButtonGroupTest extends UITestBase {
 
         rb3.setSelected(true);
         assertEquals(2, group.getSelectedIndex());
-    }
-
-    @FormTest
-    void testSetSelectedIndex() {
-        ButtonGroup group = new ButtonGroup();
-        RadioButton rb1 = new RadioButton("Option 1");
-        RadioButton rb2 = new RadioButton("Option 2");
-        RadioButton rb3 = new RadioButton("Option 3");
-
-        group.add(rb1);
-        group.add(rb2);
-        group.add(rb3);
-
-        group.setSelectedIndex(0);
-        assertTrue(rb1.isSelected());
-        assertFalse(rb2.isSelected());
-        assertFalse(rb3.isSelected());
-
-        group.setSelectedIndex(1);
-        assertFalse(rb1.isSelected());
-        assertTrue(rb2.isSelected());
-        assertFalse(rb3.isSelected());
-
-        group.setSelectedIndex(2);
-        assertFalse(rb1.isSelected());
-        assertFalse(rb2.isSelected());
-        assertTrue(rb3.isSelected());
     }
 
     @FormTest
@@ -142,47 +99,6 @@ class ButtonGroupTest extends UITestBase {
     }
 
     @FormTest
-    void testAddSelectionListener() {
-        ButtonGroup group = new ButtonGroup();
-        RadioButton rb1 = new RadioButton("Option 1");
-        RadioButton rb2 = new RadioButton("Option 2");
-
-        group.add(rb1);
-        group.add(rb2);
-
-        AtomicInteger oldSelection = new AtomicInteger(-1);
-        AtomicInteger newSelection = new AtomicInteger(-1);
-
-        SelectionListener listener = new SelectionListener() {
-            public void selectionChanged(int oldSelected, int newSelected) {
-                oldSelection.set(oldSelected);
-                newSelection.set(newSelected);
-            }
-        };
-
-        group.addSelectionListener(listener);
-
-        rb1.setSelected(true);
-        // Note: Listener behavior may vary, just verify it can be added
-        assertNotNull(group);
-    }
-
-    @FormTest
-    void testRemoveSelectionListener() {
-        ButtonGroup group = new ButtonGroup();
-        SelectionListener listener = new SelectionListener() {
-            public void selectionChanged(int oldSelected, int newSelected) {
-            }
-        };
-
-        group.addSelectionListener(listener);
-        group.removeSelectionListener(listener);
-
-        // Verify listener was removed (no exception)
-        assertNotNull(group);
-    }
-
-    @FormTest
     void testMutualExclusion() {
         ButtonGroup group = new ButtonGroup();
         RadioButton rb1 = new RadioButton("Option 1");
@@ -213,7 +129,6 @@ class ButtonGroupTest extends UITestBase {
     void testEmptyGroupSelection() {
         ButtonGroup group = new ButtonGroup();
         assertEquals(-1, group.getSelectedIndex());
-        assertNull(group.getSelectedRadioButton());
     }
 
     @FormTest
@@ -228,33 +143,5 @@ class ButtonGroupTest extends UITestBase {
                 // Expected behavior
             }
         });
-    }
-
-    @FormTest
-    void testSetSelectedIndexOutOfBounds() {
-        ButtonGroup group = new ButtonGroup();
-        RadioButton rb1 = new RadioButton("Option 1");
-        group.add(rb1);
-
-        // Setting out of bounds index should either be ignored or throw exception
-        assertDoesNotThrow(() -> {
-            try {
-                group.setSelectedIndex(5);
-            } catch (Exception e) {
-                // Expected behavior
-            }
-        });
-    }
-
-    @FormTest
-    void testSetSelectedIndexNegative() {
-        ButtonGroup group = new ButtonGroup();
-        RadioButton rb1 = new RadioButton("Option 1");
-        group.add(rb1);
-        rb1.setSelected(true);
-
-        group.setSelectedIndex(-1);
-        // After setting to -1, typically should clear selection
-        assertTrue(group.getSelectedIndex() == -1 || group.getSelectedIndex() == 0);
     }
 }

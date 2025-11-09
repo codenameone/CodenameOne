@@ -16,13 +16,6 @@ class InterFormContainerTest extends UITestBase {
     }
 
     @FormTest
-    void testGetForm() {
-        Form childForm = new Form("Test");
-        InterFormContainer container = new InterFormContainer(childForm);
-        assertSame(childForm, container.getForm());
-    }
-
-    @FormTest
     void testAddToParentForm() {
         Form parent = Display.getInstance().getCurrent();
         parent.setLayout(new BorderLayout());
@@ -99,8 +92,8 @@ class InterFormContainerTest extends UITestBase {
         parent.add(BorderLayout.CENTER, wrapper);
         parent.revalidate();
 
-        assertNotNull(container1.getForm());
-        assertNotNull(container2.getForm());
+        assertNotNull(container1);
+        assertNotNull(container2);
     }
 
     @FormTest

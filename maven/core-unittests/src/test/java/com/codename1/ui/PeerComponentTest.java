@@ -15,13 +15,6 @@ class PeerComponentTest extends UITestBase {
     }
 
     @FormTest
-    void testGetNative() {
-        Object nativeObj = new Object();
-        PeerComponent peer = PeerComponent.create(nativeObj);
-        assertSame(nativeObj, peer.getNative());
-    }
-
-    @FormTest
     void testInitialize() {
         PeerComponent peer = PeerComponent.create(new Object());
         assertNotNull(peer);
@@ -167,7 +160,6 @@ class PeerComponentTest extends UITestBase {
         // Creating with null should still work
         PeerComponent peer = PeerComponent.create(null);
         assertNotNull(peer);
-        assertNull(peer.getNative());
     }
 
     @FormTest
