@@ -5218,6 +5218,18 @@ static void cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
 #if defined(ENABLE_WKWEBVIEW) && defined(supportsWKWebKit)
     if ([renderView isKindOfClass:[WKWebView class]]) {
         WKWebView *webView = (WKWebView *)renderView;
+        // Paint a diagnostic fallback so we can tell if the WKWebView failed to render.
+        if (localBounds.size.width > 0.0f && localBounds.size.height > 0.0f) {
+            CGContextSaveGState(ctx);
+            CGContextSetStrokeColorWithColor(ctx, [UIColor redColor].CGColor);
+            CGContextSetLineWidth(ctx, 4.0f);
+            CGContextMoveToPoint(ctx, 0.0f, 0.0f);
+            CGContextAddLineToPoint(ctx, localBounds.size.width, localBounds.size.height);
+            CGContextMoveToPoint(ctx, localBounds.size.width, 0.0f);
+            CGContextAddLineToPoint(ctx, 0.0f, localBounds.size.height);
+            CGContextStrokePath(ctx);
+            CGContextRestoreGState(ctx);
+        }
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
         if (@available(iOS 11.0, *)) {
             CGRect snapshotRect = CGRectIntersection(webView.bounds, localBounds);
