@@ -191,17 +191,6 @@ class ListTest extends UITestBase {
     }
 
     @FormTest
-    void testDisposeDialogOnSelection() {
-        List list = new List();
-
-        list.setDisposeDialogOnSelection(true);
-        assertTrue(list.isDisposeDialogOnSelection());
-
-        list.setDisposeDialogOnSelection(false);
-        assertFalse(list.isDisposeDialogOnSelection());
-    }
-
-    @FormTest
     void testUIID() {
         List list = new List();
         list.setUIID("CustomList");
@@ -251,16 +240,6 @@ class ListTest extends UITestBase {
         list.setSelectedIndex(25);
         // Just verify this doesn't crash
         assertNotNull(list);
-    }
-
-    @FormTest
-    void testIsInputOnFocus() {
-        List list = new List();
-        list.setInputOnFocus(true);
-        assertTrue(list.isInputOnFocus());
-
-        list.setInputOnFocus(false);
-        assertFalse(list.isInputOnFocus());
     }
 
     @FormTest

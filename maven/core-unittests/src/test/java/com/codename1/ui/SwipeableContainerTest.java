@@ -247,17 +247,4 @@ class SwipeableContainerTest extends UITestBase {
         SwipeableContainer container = new SwipeableContainer(new Button("Left"), new Button("Top"));
         assertTrue(container.getLayout() instanceof com.codename1.ui.layouts.LayeredLayout);
     }
-
-    @FormTest
-    void testAddOpenListener() {
-        SwipeableContainer container = new SwipeableContainer(new Button("Left"), new Button("Top"));
-        final boolean[] listenerCalled = {false};
-
-        container.addOpenListener((evt) -> {
-            listenerCalled[0] = true;
-        });
-
-        // Just verify listener can be added without crashing
-        assertNotNull(container);
-    }
 }

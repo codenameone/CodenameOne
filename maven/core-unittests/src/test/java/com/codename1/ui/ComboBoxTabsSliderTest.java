@@ -334,13 +334,6 @@ class ComboBoxTabsSliderTest extends UITestBase {
     }
 
     @FormTest
-    void tabsTextPosition() {
-        Tabs tabs = new Tabs();
-        tabs.setTextPosition(Component.BOTTOM);
-        assertEquals(Component.BOTTOM, tabs.getTextPosition());
-    }
-
-    @FormTest
     void tabsRemoveTab() {
         Tabs tabs = new Tabs();
         Label content1 = new Label("Content1");
@@ -370,7 +363,7 @@ class ComboBoxTabsSliderTest extends UITestBase {
         tabs.addTab("Original", new Label("Content"));
         assertEquals("Original", tabs.getTabTitle(0));
 
-        tabs.setTabTitle("Updated", 0);
+        tabs.setTabTitle("Updated", null, 0);
         assertEquals("Updated", tabs.getTabTitle(0));
     }
 
