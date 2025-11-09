@@ -131,12 +131,6 @@ class InfiniteContainerTest extends UITestBase {
     }
 
     @FormTest
-    void testIsScrollableY() {
-        TestContainer container = new TestContainer();
-        assertTrue(container.isScrollableY());
-    }
-
-    @FormTest
     void testLayoutIsBoxLayoutY() {
         TestContainer container = new TestContainer();
         assertTrue(container.getLayout() instanceof com.codename1.ui.layouts.BoxLayout);

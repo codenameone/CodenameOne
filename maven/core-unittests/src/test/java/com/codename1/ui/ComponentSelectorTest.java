@@ -39,7 +39,7 @@ class ComponentSelectorTest extends UITestBase {
 
         Label label = new Label("Test");
         label.setUIID("UniqueLabel");
-        form.add(label);
+        form.add(BorderLayout.CENTER, label);
         form.revalidate();
 
         ComponentSelector selector = ComponentSelector.$("UniqueLabel", form);

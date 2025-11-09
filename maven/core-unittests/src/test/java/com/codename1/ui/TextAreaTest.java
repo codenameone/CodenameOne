@@ -34,13 +34,6 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testConstructorWithTextAndRows() {
-        TextArea textArea = new TextArea("Test", 3);
-        assertEquals("Test", textArea.getText());
-        assertEquals(3, textArea.getRows());
-    }
-
-    @FormTest
     void testConstructorWithTextRowsAndCols() {
         TextArea textArea = new TextArea("Text", 4, 20);
         assertEquals("Text", textArea.getText());

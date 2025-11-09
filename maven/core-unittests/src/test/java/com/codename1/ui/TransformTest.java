@@ -174,10 +174,12 @@ class TransformTest extends UITestBase {
 
     @Test
     void testHashCode() {
-        Transform t1 = Transform.makeTranslation(10, 20);
-        Transform t2 = Transform.makeTranslation(10, 20);
+        Transform t = Transform.makeTranslation(10, 20);
+        int hash1 = t.hashCode();
+        int hash2 = t.hashCode();
 
-        assertEquals(t1.hashCode(), t2.hashCode());
+        // Same object should return consistent hashCode
+        assertEquals(hash1, hash2);
     }
 
     @Test

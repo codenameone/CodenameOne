@@ -100,7 +100,7 @@ class InterFormContainerTest extends UITestBase {
     void testInterFormContainerSize() {
         Form childForm = new Form("Child");
         childForm.setLayout(new BorderLayout());
-        childForm.add(new Label("Content"));
+        childForm.add(BorderLayout.CENTER, new Label("Content"));
 
         InterFormContainer container = new InterFormContainer(childForm);
 
