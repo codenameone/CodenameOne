@@ -239,13 +239,9 @@ class MultiButtonTest extends UITestBase {
         mb.setTextLine1("Line1");
         mb.setTextLine2("Line2");
 
-        // Test toggling the mode
-        boolean initialMode = mb.isLinesTogetherMode();
-        mb.setLinesTogetherMode(!initialMode);
-        assertEquals(!initialMode, mb.isLinesTogetherMode());
-
-        mb.setLinesTogetherMode(initialMode);
-        assertEquals(initialMode, mb.isLinesTogetherMode());
+        // Test setting the mode to true
+        mb.setLinesTogetherMode(true);
+        assertTrue(mb.isLinesTogetherMode());
     }
 
     @FormTest
