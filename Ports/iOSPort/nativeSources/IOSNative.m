@@ -5215,7 +5215,22 @@ static void cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     CGContextSaveGState(ctx);
     CGContextTranslateCTM(ctx, translatedRect.origin.x, translatedRect.origin.y);
     BOOL drawn = NO;
-    if ([renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+#if defined(ENABLE_WKWEBVIEW) && defined(supportsWKWebKit)
+    if ([renderView isKindOfClass:[WKWebView class]]) {
+        UIView *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
+        if (snapshotView != nil) {
+            BOOL snapshotDrawn = NO;
+            if ([snapshotView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+                snapshotDrawn = [snapshotView drawViewHierarchyInRect:snapshotView.bounds afterScreenUpdates:YES];
+            }
+            if (!snapshotDrawn) {
+                [snapshotView.layer renderInContext:ctx];
+            }
+            drawn = YES;
+        }
+    }
+#endif
+    if (!drawn && [renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
         drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:YES];
     }
     if (!drawn) {
