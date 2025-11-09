@@ -207,21 +207,9 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     }
 
     @FormTest
-    void textFieldOverlayMode() {
-        TextField field = new TextField();
-        assertFalse(field.isOverlayMode());
-
-        field.setOverlayMode(true);
-        assertTrue(field.isOverlayMode());
-    }
-
-    @FormTest
     void textComponentConstructors() {
         TextComponent tc1 = new TextComponent();
         assertNotNull(tc1);
-
-        TextComponent tc2 = TextComponent.create();
-        assertNotNull(tc2);
     }
 
     @FormTest
@@ -264,22 +252,11 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     void textComponentEditable() {
         TextComponent tc = new TextComponent();
 
-        tc.editable(true);
+        tc.getField().setEditable(true);
         assertTrue(tc.getField().isEditable());
 
-        tc.editable(false);
+        tc.getField().setEditable(false);
         assertFalse(tc.getField().isEditable());
-    }
-
-    @FormTest
-    void textComponentLabelAndInputUIID() {
-        TextComponent tc = new TextComponent();
-
-        tc.labelUIID("CustomLabel");
-        tc.inputUIID("CustomInput");
-
-        // Just verify these can be set without error
-        assertNotNull(tc);
     }
 
     @FormTest
@@ -299,7 +276,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         final boolean[] listenerCalled = {false};
 
         ActionListener listener = evt -> listenerCalled[0] = true;
-        tc.addActionListener(listener);
+        tc.getField().addActionListener(listener);
 
         // Just verify listener can be added
         assertNotNull(tc);
@@ -310,7 +287,7 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         TextComponent tc = new TextComponent();
         final boolean[] listenerCalled = {false};
 
-        tc.addDataChangedListener((type, index) -> listenerCalled[0] = true);
+        tc.getField().addDataChangeListener((type, index) -> listenerCalled[0] = true);
 
         // Just verify listener can be added
         assertNotNull(tc);
@@ -324,30 +301,17 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
     }
 
     @FormTest
-    void autoCompleteTextFieldFilter() {
+    void autoCompleteTextFieldMinimumLength() {
         DefaultListModel<String> model = new DefaultListModel<String>(
             new String[]{"Apple", "Apricot", "Banana", "Cherry"}
         );
         AutoCompleteTextField field = new AutoCompleteTextField(model);
 
-        field.setFilter((text) -> {
-            return text != null && !text.isEmpty();
-        });
+        field.setMinimumLength(2);
+        assertEquals(2, field.getMinimumLength());
 
-        // Just verify filter can be set
-        assertNotNull(field);
-    }
-
-    @FormTest
-    void autoCompleteTextFieldCompletionMode() {
-        DefaultListModel<String> model = new DefaultListModel<String>();
-        AutoCompleteTextField field = new AutoCompleteTextField(model);
-
-        field.setCompletionMode(true);
-        assertTrue(field.isCompletionMode());
-
-        field.setCompletionMode(false);
-        assertFalse(field.isCompletionMode());
+        field.setMinimumLength(3);
+        assertEquals(3, field.getMinimumLength());
     }
 
     @FormTest

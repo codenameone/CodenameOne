@@ -260,17 +260,4 @@ class SwipeableContainerTest extends UITestBase {
         // Just verify listener can be added without crashing
         assertNotNull(container);
     }
-
-    @FormTest
-    void testAddCloseListener() {
-        SwipeableContainer container = new SwipeableContainer(new Button("Left"), new Button("Top"));
-        final boolean[] listenerCalled = {false};
-
-        container.addCloseListener((evt) -> {
-            listenerCalled[0] = true;
-        });
-
-        // Just verify listener can be added without crashing
-        assertNotNull(container);
-    }
 }

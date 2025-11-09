@@ -31,7 +31,7 @@ class TransformTest extends UITestBase {
 
     @Test
     void testMakeRotation() {
-        Transform t = Transform.makeRotation(Math.PI / 4, 0, 0);
+        Transform t = Transform.makeRotation((float)(Math.PI / 4), 0, 0);
         assertNotNull(t);
         assertFalse(t.isIdentity());
     }
@@ -68,7 +68,7 @@ class TransformTest extends UITestBase {
     @Test
     void testRotate() {
         Transform t = Transform.makeIdentity();
-        t.rotate(Math.PI / 2, 0, 0);
+        t.rotate((float)(Math.PI / 2), 0, 0);
         assertFalse(t.isIdentity());
     }
 
@@ -80,9 +80,10 @@ class TransformTest extends UITestBase {
     }
 
     @Test
-    void testShear() {
+    void testConcatenateTransforms() {
         Transform t = Transform.makeIdentity();
-        t.shear(0.5f, 0.5f);
+        Transform t2 = Transform.makeTranslation(5, 5);
+        t.concatenate(t2);
         assertFalse(t.isIdentity());
     }
 
@@ -192,7 +193,7 @@ class TransformTest extends UITestBase {
         Transform t = Transform.makeIdentity();
         t.translate(10, 20);
         t.scale(2.0f, 2.0f);
-        t.rotate(Math.PI / 4, 0, 0);
+        t.rotate((float)(Math.PI / 4), 0, 0);
         assertFalse(t.isIdentity());
         assertNotNull(t);
     }
@@ -223,21 +224,21 @@ class TransformTest extends UITestBase {
     @Test
     void testRotation90Degrees() {
         Transform t = Transform.makeIdentity();
-        t.rotate(Math.PI / 2, 0, 0);
+        t.rotate((float)(Math.PI / 2), 0, 0);
         assertFalse(t.isIdentity());
     }
 
     @Test
     void testRotation180Degrees() {
         Transform t = Transform.makeIdentity();
-        t.rotate(Math.PI, 0, 0);
+        t.rotate((float)Math.PI, 0, 0);
         assertFalse(t.isIdentity());
     }
 
     @Test
     void testRotation360Degrees() {
         Transform t = Transform.makeIdentity();
-        t.rotate(2 * Math.PI, 0, 0);
+        t.rotate((float)(2 * Math.PI), 0, 0);
         // After 360 degrees rotation, should be close to identity
         assertNotNull(t);
     }
