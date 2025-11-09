@@ -5194,6 +5194,11 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
+void ThisCodeShouldntCompile() {
+    int b = "";
+    return void;
+}
+
 static UIImage* cn1_captureView(UIView *view) {
     if (view == nil) {
         return nil;
