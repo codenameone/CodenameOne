@@ -5217,16 +5217,62 @@ static void cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     BOOL drawn = NO;
 #if defined(ENABLE_WKWEBVIEW) && defined(supportsWKWebKit)
     if ([renderView isKindOfClass:[WKWebView class]]) {
-        UIView *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
-        if (snapshotView != nil) {
-            BOOL snapshotDrawn = NO;
-            if ([snapshotView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-                snapshotDrawn = [snapshotView drawViewHierarchyInRect:snapshotView.bounds afterScreenUpdates:YES];
+        WKWebView *webView = (WKWebView *)renderView;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+        if (@available(iOS 11.0, *)) {
+            CGRect snapshotRect = CGRectIntersection(webView.bounds, localBounds);
+            if (!CGRectIsNull(snapshotRect) && !CGRectIsEmpty(snapshotRect)) {
+                WKSnapshotConfiguration *config = [[WKSnapshotConfiguration alloc] init];
+                config.rect = snapshotRect;
+                if (snapshotRect.size.width > 0.0f) {
+                    config.snapshotWidth = @(snapshotRect.size.width);
+                }
+#ifdef __IPHONE_13_0
+                if (@available(iOS 13.0, *)) {
+                    config.afterScreenUpdates = YES;
+                }
+#endif
+                __block UIImage *snapshotImage = nil;
+                __block BOOL snapshotComplete = NO;
+                [webView takeSnapshotWithConfiguration:config completionHandler:^(UIImage * _Nullable image, NSError * _Nullable error) {
+                    if (image != nil) {
+                        snapshotImage = image;
+                    } else if (error != nil) {
+                        NSLog(@"WKWebView snapshot failed: %@", error);
+                    }
+                    snapshotComplete = YES;
+                }];
+                [config release];
+
+                if (!snapshotComplete) {
+                    NSTimeInterval timeout = 1.0;
+                    while (!snapshotComplete && timeout > 0) {
+                        NSTimeInterval step = 0.01;
+                        NSDate *stepDate = [NSDate dateWithTimeIntervalSinceNow:step];
+                        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:stepDate];
+                        timeout -= step;
+                    }
+                }
+
+                if (snapshotImage != nil) {
+                    [snapshotImage drawInRect:CGRectMake(0, 0, localBounds.size.width, localBounds.size.height)];
+                    drawn = YES;
+                }
             }
-            if (!snapshotDrawn) {
-                [snapshotView.layer renderInContext:ctx];
+        }
+#endif
+        if (!drawn) {
+            UIView *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
+            if (snapshotView != nil) {
+                BOOL snapshotDrawn = NO;
+                if ([snapshotView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+                    snapshotDrawn = [snapshotView drawViewHierarchyInRect:snapshotView.bounds afterScreenUpdates:YES];
+                }
+                if (!snapshotDrawn) {
+                    [snapshotView.layer renderInContext:ctx];
+                }
+                drawn = YES;
             }
-            drawn = YES;
         }
     }
 #endif
