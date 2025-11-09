@@ -5194,6 +5194,65 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
+static void cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
+    if (renderView == nil || rootView == nil || ctx == NULL) {
+        return;
+    }
+    if (renderView.hidden || renderView.alpha <= 0.0f) {
+        return;
+    }
+
+    CGRect localBounds = renderView.bounds;
+    if (CGRectIsEmpty(localBounds) || localBounds.size.width <= 0.0f || localBounds.size.height <= 0.0f) {
+        return;
+    }
+
+    CGRect translatedRect = [rootView convertRect:localBounds fromView:renderView];
+    if (CGRectIsNull(translatedRect) || CGRectIsEmpty(translatedRect)) {
+        return;
+    }
+
+    CGContextSaveGState(ctx);
+    CGContextTranslateCTM(ctx, translatedRect.origin.x, translatedRect.origin.y);
+    BOOL drawn = NO;
+    if ([renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+        drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:YES];
+    }
+    if (!drawn) {
+        [renderView.layer renderInContext:ctx];
+    }
+    CGContextRestoreGState(ctx);
+}
+
+static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
+    CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
+    EAGLView *glView = [controller eaglView];
+    if (glView == nil || rootView == nil || ctx == NULL) {
+        return;
+    }
+
+    UIView *peerLayer = glView.peerComponentsLayer;
+    NSArray<UIView *> *peerCandidates = nil;
+    if (peerLayer != nil) {
+        [peerLayer layoutIfNeeded];
+        peerCandidates = peerLayer.subviews;
+    } else {
+        [glView layoutIfNeeded];
+        peerCandidates = glView.subviews;
+    }
+
+    if (peerCandidates.count == 0) {
+        return;
+    }
+
+    for (UIView *peerView in peerCandidates) {
+        if (![peerView isKindOfClass:[UIView class]]) {
+            continue;
+        }
+        cn1_renderViewIntoContext(peerView, rootView, ctx);
+    }
+}
+
 static UIView* cn1_rootViewForCapture(UIView *view) {
     if (view == nil) {
         return nil;
@@ -5319,6 +5378,7 @@ static UIImage* cn1_captureView(UIView *view) {
             if (window.screen != targetWindow.screen) {
                 continue;
             }
+            [window layoutIfNeeded];
             CGContextSaveGState(ctx);
             CGRect translated = window.bounds;
             if (window != targetWindow) {
@@ -5334,6 +5394,7 @@ static UIImage* cn1_captureView(UIView *view) {
             }
             CGContextRestoreGState(ctx);
         }
+        cn1_renderPeerComponents(rootView, ctx);
     } else {
         BOOL ok = NO;
         if ([rootView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
@@ -5342,6 +5403,7 @@ static UIImage* cn1_captureView(UIView *view) {
         if (!ok) {
             [rootView.layer renderInContext:ctx];
         }
+        cn1_renderPeerComponents(rootView, ctx);
     }
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
