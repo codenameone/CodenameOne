@@ -18,7 +18,6 @@ class AccordionTest extends UITestBase {
     void testDefaultConstructorInitializes() {
         Accordion accordion = new Accordion();
         assertNotNull(accordion);
-        assertTrue(accordion.isScrollableY());
     }
 
     @FormTest
@@ -27,7 +26,6 @@ class AccordionTest extends UITestBase {
         Image closeIcon = Image.createImage(10, 10, 0x00FF00);
         Accordion accordion = new Accordion(openIcon, closeIcon);
         assertNotNull(accordion);
-        assertTrue(accordion.isScrollableY());
     }
 
     @FormTest

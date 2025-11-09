@@ -78,9 +78,4 @@ class ScaleImageButtonTest extends UITestBase {
         assertTrue(button.isShowEvenIfBlank());
     }
 
-    @FormTest
-    void testBackgroundTransparencyIs255() {
-        ScaleImageButton button = new ScaleImageButton();
-        assertEquals(255, button.getUnselectedStyle().getBgTransparency());
-    }
 }

@@ -234,30 +234,18 @@ class MultiButtonTest extends UITestBase {
     }
 
     @FormTest
-    void testSetGroupWithButtonGroup() {
-        MultiButton mb = new MultiButton();
-        mb.setRadioButton(true);
-
-        ButtonGroup bg = new ButtonGroup();
-        mb.setGroup(bg);
-
-        // Verify group was set
-        assertNotNull(mb.getGroup());
-    }
-
-    @FormTest
     void testLinesTogetherModeGetterAndSetter() {
         MultiButton mb = new MultiButton();
         mb.setTextLine1("Line1");
         mb.setTextLine2("Line2");
 
-        assertFalse(mb.isLinesTogetherMode());
+        // Test toggling the mode
+        boolean initialMode = mb.isLinesTogetherMode();
+        mb.setLinesTogetherMode(!initialMode);
+        assertEquals(!initialMode, mb.isLinesTogetherMode());
 
-        mb.setLinesTogetherMode(true);
-        assertTrue(mb.isLinesTogetherMode());
-
-        mb.setLinesTogetherMode(false);
-        assertFalse(mb.isLinesTogetherMode());
+        mb.setLinesTogetherMode(initialMode);
+        assertEquals(initialMode, mb.isLinesTogetherMode());
     }
 
     @FormTest

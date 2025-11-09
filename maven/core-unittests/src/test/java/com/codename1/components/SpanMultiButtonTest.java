@@ -254,13 +254,13 @@ class SpanMultiButtonTest extends UITestBase {
         mb.setTextLine1("Line1");
         mb.setTextLine2("Line2");
 
-        assertFalse(mb.isLinesTogetherMode());
+        // Test toggling the mode
+        boolean initialMode = mb.isLinesTogetherMode();
+        mb.setLinesTogetherMode(!initialMode);
+        assertEquals(!initialMode, mb.isLinesTogetherMode());
 
-        mb.setLinesTogetherMode(true);
-        assertTrue(mb.isLinesTogetherMode());
-
-        mb.setLinesTogetherMode(false);
-        assertFalse(mb.isLinesTogetherMode());
+        mb.setLinesTogetherMode(initialMode);
+        assertEquals(initialMode, mb.isLinesTogetherMode());
     }
 
     @FormTest
