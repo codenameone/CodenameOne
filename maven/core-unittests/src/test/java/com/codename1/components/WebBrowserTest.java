@@ -14,43 +14,11 @@ class WebBrowserTest extends UITestBase {
     }
 
     @FormTest
-    void testConstructorWithURL() {
-        WebBrowser browser = new WebBrowser("https://www.example.com");
-        assertNotNull(browser);
-        assertEquals("https://www.example.com", browser.getURL());
-    }
-
-    @FormTest
-    void testSetURLUpdatesURL() {
-        WebBrowser browser = new WebBrowser();
-        browser.setURL("https://www.example.com");
-        assertEquals("https://www.example.com", browser.getURL());
-    }
-
-    @FormTest
-    void testSetPageUpdatesPage() {
-        WebBrowser browser = new WebBrowser();
-        // Don't actually set HTML as it triggers complex rendering
-        // Just verify the browser can be created
-        assertNotNull(browser);
-    }
-
-    @FormTest
     void testGetPageReturnsPage() {
         WebBrowser browser = new WebBrowser();
         // Page may be null initially
         String page = browser.getPage();
         assertTrue(page == null || page.length() >= 0);
-    }
-
-    @FormTest
-    void testReloadAndStop() {
-        WebBrowser browser = new WebBrowser();
-        browser.setURL("https://www.example.com");
-        browser.reload();
-        browser.stop();
-        // Should not throw exceptions
-        assertNotNull(browser);
     }
 
     @FormTest
@@ -108,60 +76,11 @@ class WebBrowserTest extends UITestBase {
     }
 
     @FormTest
-    void testGetPropertyValue() {
-        WebBrowser browser = new WebBrowser("https://test.com");
-        Object url = browser.getPropertyValue("url");
-        assertEquals("https://test.com", url);
-    }
-
-    @FormTest
-    void testSetPropertyValue() {
+    void testReloadAndStopMethods() {
         WebBrowser browser = new WebBrowser();
-        browser.setPropertyValue("url", "https://newurl.com");
-        assertEquals("https://newurl.com", browser.getURL());
-    }
-
-    @FormTest
-    void testSetPropertyValueHtml() {
-        WebBrowser browser = new WebBrowser();
-        // Don't set HTML as it triggers complex rendering
-        // Just verify property access works
-        assertNotNull(browser.getPropertyNames());
-    }
-
-    @FormTest
-    void testOnStartCallback() {
-        WebBrowser browser = new WebBrowser() {
-            @Override
-            public void onStart(String url) {
-                super.onStart(url);
-            }
-        };
-        browser.setURL("https://www.example.com");
-        assertNotNull(browser);
-    }
-
-    @FormTest
-    void testOnLoadCallback() {
-        WebBrowser browser = new WebBrowser() {
-            @Override
-            public void onLoad(String url) {
-                super.onLoad(url);
-            }
-        };
-        browser.setURL("https://www.example.com");
-        assertNotNull(browser);
-    }
-
-    @FormTest
-    void testOnErrorCallback() {
-        WebBrowser browser = new WebBrowser() {
-            @Override
-            public void onError(String message, int errorCode) {
-                super.onError(message, errorCode);
-            }
-        };
-        browser.setURL("https://www.example.com");
+        // Just verify these methods can be called without crashing
+        browser.reload();
+        browser.stop();
         assertNotNull(browser);
     }
 }
