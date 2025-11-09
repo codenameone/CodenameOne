@@ -11,25 +11,26 @@ class FileTreeTest extends UITestBase {
     void testDefaultConstructor() {
         FileTree tree = new FileTree();
         assertNotNull(tree);
-    }
-
-    @FormTest
-    void testConstructorWithRoots() {
-        String[] roots = {"/root1", "/root2"};
-        FileTree tree = new FileTree(roots);
-        assertNotNull(tree);
+        assertEquals("FileTree", tree.getUIID());
     }
 
     @FormTest
     void testConstructorWithModel() {
-        String[] roots = {"/test"};
-        FileTreeModel model = new FileTreeModel(roots);
+        FileTreeModel model = new FileTreeModel(true);
+        FileTree tree = new FileTree(model);
+        assertNotNull(tree);
+        assertEquals("FileTree", tree.getUIID());
+    }
+
+    @FormTest
+    void testConstructorWithShowFilesModel() {
+        FileTreeModel model = new FileTreeModel(false);
         FileTree tree = new FileTree(model);
         assertNotNull(tree);
     }
 
     @FormTest
-    void testGetModelReturnsModel() {
+    void testTreeIsNotNull() {
         FileTree tree = new FileTree();
         assertNotNull(tree.getModel());
     }

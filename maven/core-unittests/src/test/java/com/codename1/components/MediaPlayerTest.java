@@ -42,20 +42,19 @@ class MediaPlayerTest extends UITestBase {
     }
 
     @FormTest
-    void testNativePlayerGetterAndSetter() {
-        MediaPlayer player = new MediaPlayer();
-        player.setNativePlayer(true);
-        assertTrue(player.isNativePlayer());
-
-        player.setNativePlayer(false);
-        assertFalse(player.isNativePlayer());
-    }
-
-    @FormTest
     void testDataSourceGetterAndSetter() {
         MediaPlayer player = new MediaPlayer();
         player.setDataSource("http://example.com/video.mp4");
         assertEquals("http://example.com/video.mp4", player.getDataSource());
+    }
+
+    @FormTest
+    void testHideNativeVideoControls() {
+        MediaPlayer player = new MediaPlayer();
+        assertFalse(player.isHideNativeVideoControls());
+
+        player.setHideNativeVideoControls(true);
+        assertTrue(player.isHideNativeVideoControls());
     }
 
     private static class MockMedia implements Media {
@@ -64,6 +63,9 @@ class MediaPlayerTest extends UITestBase {
 
         @Override
         public void pause() {}
+
+        @Override
+        public void prepare() {}
 
         @Override
         public void cleanup() {}

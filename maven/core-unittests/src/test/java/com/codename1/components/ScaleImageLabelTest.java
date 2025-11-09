@@ -34,8 +34,8 @@ class ScaleImageLabelTest extends UITestBase {
         label.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
         assertEquals(Style.BACKGROUND_IMAGE_SCALED_FILL, label.getBackgroundType());
 
-        label.setBackgroundType(Style.BACKGROUND_IMAGE_SCALE);
-        assertEquals(Style.BACKGROUND_IMAGE_SCALE, label.getBackgroundType());
+        label.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED);
+        assertEquals(Style.BACKGROUND_IMAGE_SCALED, label.getBackgroundType());
     }
 
     @FormTest

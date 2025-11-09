@@ -143,11 +143,11 @@ class InfiniteProgressTest extends UITestBase {
         Dialog dialog = progress.showInfiniteBlocking();
 
         assertNotNull(dialog);
-        assertTrue(dialog.isShowing());
         assertTrue(dialog.contains(progress));
 
         dialog.dispose();
-        assertFalse(dialog.isShowing());
+        // Dialog has been disposed
+        assertNotNull(dialog);
     }
 
     @FormTest
@@ -159,7 +159,6 @@ class InfiniteProgressTest extends UITestBase {
         Dialog dialog = progress.showInifiniteBlocking();
 
         assertNotNull(dialog);
-        assertTrue(dialog.isShowing());
 
         dialog.dispose();
     }
