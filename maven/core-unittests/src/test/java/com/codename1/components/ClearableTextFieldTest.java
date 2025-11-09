@@ -63,8 +63,9 @@ class ClearableTextFieldTest extends UITestBase {
 
         assertNotNull(clearButton);
 
-        // Simulate button click with coordinates
-        clearButton.fireActionEvent(0, 0);
+        // Simulate button click by pressing and releasing
+        clearButton.pressed();
+        clearButton.released();
 
         assertEquals("", tf.getText(), "Text should be cleared");
     }
@@ -130,15 +131,18 @@ class ClearableTextFieldTest extends UITestBase {
             }
         }
 
-        clearButton.fireActionEvent(0, 0);
+        clearButton.pressed();
+        clearButton.released();
         assertEquals("", tf.getText());
 
         tf.setText("Text 2");
-        clearButton.fireActionEvent(0, 0);
+        clearButton.pressed();
+        clearButton.released();
         assertEquals("", tf.getText());
 
         tf.setText("Text 3");
-        clearButton.fireActionEvent(0, 0);
+        clearButton.pressed();
+        clearButton.released();
         assertEquals("", tf.getText());
     }
 }
