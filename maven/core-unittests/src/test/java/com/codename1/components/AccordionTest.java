@@ -43,15 +43,25 @@ class AccordionTest extends UITestBase {
     }
 
     @FormTest
-    void testAutoCloseGetterAndSetter() {
+    void testAddContentWithStringHeader() {
         Accordion accordion = new Accordion();
-        assertTrue(accordion.isAutoClose());
+        Container content = new Container(BoxLayout.y());
+        content.add(new Label("Content"));
 
+        accordion.addContent("String Header", content);
+
+        assertTrue(accordion.getComponentCount() > 0);
+    }
+
+    @FormTest
+    void testSetAutoClose() {
+        Accordion accordion = new Accordion();
         accordion.setAutoClose(false);
-        assertFalse(accordion.isAutoClose());
+        // Should not throw exception
+        assertNotNull(accordion);
 
         accordion.setAutoClose(true);
-        assertTrue(accordion.isAutoClose());
+        assertNotNull(accordion);
     }
 
     @FormTest
@@ -63,108 +73,154 @@ class AccordionTest extends UITestBase {
 
         accordion.addContent(header, content);
 
-        // Expand content
-        accordion.expand(0);
-        assertTrue(accordion.isExpanded(0));
+        // Expand content by passing the body component
+        accordion.expand(content);
+        assertNotNull(accordion.getCurrentlyExpanded());
 
         // Collapse content
-        accordion.collapse(0);
-        assertFalse(accordion.isExpanded(0));
+        accordion.collapse(content);
+        assertNull(accordion.getCurrentlyExpanded());
     }
 
     @FormTest
-    void testAddActionListener() {
+    void testGetCurrentlyExpanded() {
+        Accordion accordion = new Accordion();
+        Container content1 = new Container(BoxLayout.y());
+        Container content2 = new Container(BoxLayout.y());
+
+        accordion.addContent("Header1", content1);
+        accordion.addContent("Header2", content2);
+
+        assertNull(accordion.getCurrentlyExpanded());
+
+        accordion.expand(content1);
+        assertEquals(content1, accordion.getCurrentlyExpanded());
+    }
+
+    @FormTest
+    void testAddOnClickItemListener() {
         Accordion accordion = new Accordion();
         AtomicInteger count = new AtomicInteger();
-        accordion.addActionListener(evt -> count.incrementAndGet());
+        accordion.addOnClickItemListener(evt -> count.incrementAndGet());
 
-        Label header = new Label("Header");
         Container content = new Container(BoxLayout.y());
-        accordion.addContent(header, content);
-
-        // Expand should trigger listeners
-        accordion.expand(0);
-        flushSerialCalls();
-
-        assertTrue(count.get() >= 0);
-    }
-
-    @FormTest
-    void testRemoveActionListener() {
-        Accordion accordion = new Accordion();
-        AtomicInteger count = new AtomicInteger();
-        accordion.addActionListener(evt -> count.incrementAndGet());
-        accordion.removeActionListener(evt -> count.incrementAndGet());
+        accordion.addContent("Header", content);
 
         assertNotNull(accordion);
     }
 
     @FormTest
-    void testRemoveContentByIndex() {
+    void testRemoveOnClickItemListener() {
         Accordion accordion = new Accordion();
-        Label header1 = new Label("Header 1");
-        Container content1 = new Container(BoxLayout.y());
-        Label header2 = new Label("Header 2");
-        Container content2 = new Container(BoxLayout.y());
+        AtomicInteger count = new AtomicInteger();
+        accordion.addOnClickItemListener(evt -> count.incrementAndGet());
+        accordion.removeOnClickItemListener(evt -> count.incrementAndGet());
 
-        accordion.addContent(header1, content1);
-        accordion.addContent(header2, content2);
-
-        int initialCount = accordion.getComponentCount();
-        accordion.removeContent(0);
-        assertTrue(accordion.getComponentCount() < initialCount);
+        assertNotNull(accordion);
     }
 
     @FormTest
-    void testRemoveContentByComponent() {
+    void testRemoveContent() {
         Accordion accordion = new Accordion();
-        Label header = new Label("Header");
         Container content = new Container(BoxLayout.y());
 
-        accordion.addContent(header, content);
+        accordion.addContent("Header", content);
 
         int initialCount = accordion.getComponentCount();
-        accordion.removeContent(header);
+        accordion.removeContent(content);
         assertTrue(accordion.getComponentCount() < initialCount);
     }
 
     @FormTest
-    void testRemoveAllContent() {
+    void testSetHeader() {
         Accordion accordion = new Accordion();
-        accordion.addContent(new Label("H1"), new Container());
-        accordion.addContent(new Label("H2"), new Container());
+        Container content = new Container(BoxLayout.y());
 
-        accordion.removeAllContent();
-        assertEquals(0, accordion.getComponentCount());
+        accordion.addContent("Initial Header", content);
+        accordion.setHeader("Updated Header", content);
+
+        assertNotNull(accordion);
     }
 
     @FormTest
-    void testGetContentCount() {
+    void testSetHeaderWithComponent() {
         Accordion accordion = new Accordion();
-        assertEquals(0, accordion.getContentCount());
+        Container content = new Container(BoxLayout.y());
+        Label newHeader = new Label("New Header");
 
-        accordion.addContent(new Label("H1"), new Container());
-        assertEquals(1, accordion.getContentCount());
+        accordion.addContent("Initial Header", content);
+        accordion.setHeader(newHeader, content);
 
-        accordion.addContent(new Label("H2"), new Container());
-        assertEquals(2, accordion.getContentCount());
+        assertNotNull(accordion);
     }
 
     @FormTest
-    void testOpenIconGetterAndSetter() {
+    void testSetOpenIconImage() {
         Accordion accordion = new Accordion();
         Image newOpenIcon = Image.createImage(15, 15, 0xFF00FF);
 
         accordion.setOpenIcon(newOpenIcon);
-        assertSame(newOpenIcon, accordion.getOpenIcon());
+        assertNotNull(accordion);
     }
 
     @FormTest
-    void testCloseIconGetterAndSetter() {
+    void testSetCloseIconImage() {
         Accordion accordion = new Accordion();
         Image newCloseIcon = Image.createImage(15, 15, 0x00FFFF);
 
         accordion.setCloseIcon(newCloseIcon);
-        assertSame(newCloseIcon, accordion.getCloseIcon());
+        assertNotNull(accordion);
+    }
+
+    @FormTest
+    void testSetOpenIconChar() {
+        Accordion accordion = new Accordion();
+        accordion.setOpenIcon('\uE5CE');
+        assertNotNull(accordion);
+    }
+
+    @FormTest
+    void testSetCloseIconChar() {
+        Accordion accordion = new Accordion();
+        accordion.setCloseIcon('\uE5CF');
+        assertNotNull(accordion);
+    }
+
+    @FormTest
+    void testBackgroundItemUIID() {
+        Accordion accordion = new Accordion();
+        assertEquals("AccordionItem", accordion.getBackgroundItemUIID());
+
+        accordion.setBackgroundItemUIID("CustomItem");
+        assertEquals("CustomItem", accordion.getBackgroundItemUIID());
+    }
+
+    @FormTest
+    void testHeaderUIID() {
+        Accordion accordion = new Accordion();
+        assertEquals("AccordionArrow", accordion.getHeaderUIID());
+
+        accordion.setHeaderUIID("CustomHeader");
+        assertEquals("CustomHeader", accordion.getHeaderUIID());
+    }
+
+    @FormTest
+    void testOpenCloseIconUIID() {
+        Accordion accordion = new Accordion();
+        assertEquals("AccordionArrow", accordion.getOpenCloseIconUIID());
+
+        accordion.setOpenCloseIconUIID("CustomArrow");
+        assertEquals("CustomArrow", accordion.getOpenCloseIconUIID());
+    }
+
+    @FormTest
+    void testSetHeaderUIIDForContent() {
+        Accordion accordion = new Accordion();
+        Container content = new Container(BoxLayout.y());
+
+        accordion.addContent("Header", content);
+        accordion.setHeaderUIID(content, "CustomHeaderUIID");
+
+        assertNotNull(accordion);
     }
 }

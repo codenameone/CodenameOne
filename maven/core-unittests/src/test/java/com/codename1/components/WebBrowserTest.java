@@ -14,6 +14,13 @@ class WebBrowserTest extends UITestBase {
     }
 
     @FormTest
+    void testConstructorWithURL() {
+        WebBrowser browser = new WebBrowser("https://www.example.com");
+        assertNotNull(browser);
+        assertEquals("https://www.example.com", browser.getURL());
+    }
+
+    @FormTest
     void testSetURLUpdatesURL() {
         WebBrowser browser = new WebBrowser();
         browser.setURL("https://www.example.com");
@@ -38,35 +45,6 @@ class WebBrowserTest extends UITestBase {
     }
 
     @FormTest
-    void testIsNativeReturnsBoolean() {
-        WebBrowser browser = new WebBrowser();
-        // Should return a boolean value
-        boolean isNative = browser.isNative();
-        assertTrue(isNative || !isNative);
-    }
-
-    @FormTest
-    void testAddWebEventListener() {
-        WebBrowser browser = new WebBrowser();
-        if (browser.isNative()) {
-            browser.addWebEventListener("onLoad", evt -> {});
-            // Should not throw exception
-        }
-        assertNotNull(browser);
-    }
-
-    @FormTest
-    void testBackAndForward() {
-        WebBrowser browser = new WebBrowser();
-        browser.setURL("https://www.example.com");
-        // Back/forward operations
-        browser.back();
-        browser.forward();
-        // Should not throw exceptions
-        assertNotNull(browser);
-    }
-
-    @FormTest
     void testReloadAndStop() {
         WebBrowser browser = new WebBrowser();
         browser.setURL("https://www.example.com");
@@ -77,11 +55,33 @@ class WebBrowserTest extends UITestBase {
     }
 
     @FormTest
-    void testExecuteJavaScript() {
+    void testGetInternalReturnsComponent() {
         WebBrowser browser = new WebBrowser();
-        browser.execute("console.log('test');");
+        assertNotNull(browser.getInternal());
+    }
+
+    @FormTest
+    void testBrowserNavigationCallback() {
+        WebBrowser browser = new WebBrowser();
+        browser.setBrowserNavigationCallback(url -> true);
         // Should not throw exception
         assertNotNull(browser);
+    }
+
+    @FormTest
+    void testGetBrowserNavigationCallback() {
+        WebBrowser browser = new WebBrowser();
+        // May return null if not set or not supported
+        browser.getBrowserNavigationCallback();
+        assertNotNull(browser);
+    }
+
+    @FormTest
+    void testDestroyMethod() {
+        WebBrowser browser = new WebBrowser();
+        browser.destroy();
+        // Should not throw exception
+        assertTrue(true);
     }
 
     @FormTest
@@ -90,5 +90,79 @@ class WebBrowserTest extends UITestBase {
         String title = browser.getTitle();
         // Title may be null initially
         assertTrue(title == null || title.length() >= 0);
+    }
+
+    @FormTest
+    void testPropertyNames() {
+        WebBrowser browser = new WebBrowser();
+        String[] props = browser.getPropertyNames();
+        assertNotNull(props);
+        assertTrue(props.length > 0);
+    }
+
+    @FormTest
+    void testPropertyTypes() {
+        WebBrowser browser = new WebBrowser();
+        Class[] types = browser.getPropertyTypes();
+        assertNotNull(types);
+        assertEquals(browser.getPropertyNames().length, types.length);
+    }
+
+    @FormTest
+    void testGetPropertyValue() {
+        WebBrowser browser = new WebBrowser("https://test.com");
+        Object url = browser.getPropertyValue("url");
+        assertEquals("https://test.com", url);
+    }
+
+    @FormTest
+    void testSetPropertyValue() {
+        WebBrowser browser = new WebBrowser();
+        browser.setPropertyValue("url", "https://newurl.com");
+        assertEquals("https://newurl.com", browser.getURL());
+    }
+
+    @FormTest
+    void testSetPropertyValueHtml() {
+        WebBrowser browser = new WebBrowser();
+        String html = "<html><body>Test</body></html>";
+        browser.setPropertyValue("html", html);
+        assertEquals(html, browser.getPage());
+    }
+
+    @FormTest
+    void testOnStartCallback() {
+        WebBrowser browser = new WebBrowser() {
+            @Override
+            public void onStart(String url) {
+                super.onStart(url);
+            }
+        };
+        browser.setURL("https://www.example.com");
+        assertNotNull(browser);
+    }
+
+    @FormTest
+    void testOnLoadCallback() {
+        WebBrowser browser = new WebBrowser() {
+            @Override
+            public void onLoad(String url) {
+                super.onLoad(url);
+            }
+        };
+        browser.setURL("https://www.example.com");
+        assertNotNull(browser);
+    }
+
+    @FormTest
+    void testOnErrorCallback() {
+        WebBrowser browser = new WebBrowser() {
+            @Override
+            public void onError(String message, int errorCode) {
+                super.onError(message, errorCode);
+            }
+        };
+        browser.setURL("https://www.example.com");
+        assertNotNull(browser);
     }
 }

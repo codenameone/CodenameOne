@@ -158,44 +158,64 @@ class SpanLabelTest extends UITestBase {
     }
 
     @FormTest
-    void testTextAllCaps() {
-        SpanLabel label = new SpanLabel("test");
-        label.setTextAllCaps(true);
-        assertTrue(label.isTextAllCaps());
-
-        label.setTextAllCaps(false);
-        assertFalse(label.isTextAllCaps());
+    void testTextComponentGetter() {
+        SpanLabel label = new SpanLabel("Test");
+        assertNotNull(label.getTextComponent());
+        assertEquals("Test", label.getTextComponent().getText());
     }
 
     @FormTest
-    void testMaskNameGetterAndSetter() {
+    void testTextAllStylesGetter() {
         SpanLabel label = new SpanLabel("Test");
-        label.setMaskName("TestMask");
-        assertEquals("TestMask", label.getMaskName());
+        assertNotNull(label.getTextAllStyles());
     }
 
     @FormTest
-    void testIconComponent() {
+    void testTextSelectedAndUnselectedStyle() {
         SpanLabel label = new SpanLabel("Test");
-        assertNotNull(label.getIconComponent());
+        assertNotNull(label.getTextUnselectedStyle());
+        assertNotNull(label.getTextSelectedStyle());
     }
 
     @FormTest
-    void testIconsFromState() {
+    void testTextBlockAlign() {
         SpanLabel label = new SpanLabel("Test");
-        Image icon = Image.createImage(10, 10, 0x00FF00);
-        label.setIcon(icon);
+        int initialAlign = label.getTextBlockAlign();
 
-        Image rollover = Image.createImage(10, 10, 0xFF0000);
-        label.setRolloverIcon(rollover);
-        assertSame(rollover, label.getRolloverIcon());
+        label.setTextBlockAlign(com.codename1.ui.Component.CENTER);
+        assertEquals(com.codename1.ui.Component.CENTER, label.getTextBlockAlign());
+    }
 
-        Image pressed = Image.createImage(10, 10, 0x0000FF);
-        label.setPressedIcon(pressed);
-        assertSame(pressed, label.getPressedIcon());
+    @FormTest
+    void testTextSelectionEnabled() {
+        SpanLabel label = new SpanLabel("Test");
+        assertFalse(label.isTextSelectionEnabled());
 
-        Image disabled = Image.createImage(10, 10, 0xCCCCCC);
-        label.setDisabledIcon(disabled);
-        assertSame(disabled, label.getDisabledIcon());
+        label.setTextSelectionEnabled(true);
+        assertTrue(label.isTextSelectionEnabled());
+    }
+
+    @FormTest
+    void testIconValign() {
+        SpanLabel label = new SpanLabel("Test");
+        label.setIcon(Image.createImage(10, 10, 0xFF0000));
+
+        label.setIconValign(com.codename1.ui.Component.TOP);
+        assertEquals(com.codename1.ui.Component.TOP, label.getIconValign());
+    }
+
+    @FormTest
+    void testGetMaterialIconAndSize() {
+        SpanLabel label = new SpanLabel("Test");
+        label.setMaterialIcon('\uE855', 4.0f);
+        assertEquals('\uE855', label.getMaterialIcon());
+        assertEquals(4.0f, label.getMaterialIconSize(), 0.01f);
+    }
+
+    @FormTest
+    void testGetFontIconAndSize() {
+        SpanLabel label = new SpanLabel("Test");
+        label.setMaterialIcon('\uE855');
+        assertEquals('\uE855', label.getFontIcon());
     }
 }
