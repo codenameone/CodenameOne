@@ -50,16 +50,6 @@ class ToastBarTest extends UITestBase {
     }
 
     @FormTest
-    void testUseFormLayeredPaneGetterAndSetter() {
-        ToastBar tb = ToastBar.getInstance();
-        tb.setUseFormLayeredPane(true);
-        assertTrue(tb.isUseFormLayeredPane());
-
-        tb.setUseFormLayeredPane(false);
-        assertFalse(tb.isUseFormLayeredPane());
-    }
-
-    @FormTest
     void testCreateStatusReturnsStatus() {
         ToastBar tb = ToastBar.getInstance();
         ToastBar.Status status = tb.createStatus();

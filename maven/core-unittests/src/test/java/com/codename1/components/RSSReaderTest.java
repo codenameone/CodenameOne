@@ -36,9 +36,18 @@ class RSSReaderTest extends UITestBase {
     }
 
     @FormTest
-    void testGetProgressPercentage() {
+    void testProgressTitleGetterAndSetter() {
         RSSReader reader = new RSSReader();
-        int progress = reader.getProgressPercentage();
-        assertTrue(progress >= 0 && progress <= 100);
+        reader.setProgressTitle("Loading Feed");
+        assertEquals("Loading Feed", reader.getProgressTitle());
+    }
+
+    @FormTest
+    void testDisplayProgressPercentageGetterAndSetter() {
+        RSSReader reader = new RSSReader();
+        assertTrue(reader.isDisplayProgressPercentage());
+
+        reader.setDisplayProgressPercentage(false);
+        assertFalse(reader.isDisplayProgressPercentage());
     }
 }

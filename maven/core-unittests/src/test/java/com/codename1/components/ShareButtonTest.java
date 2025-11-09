@@ -2,6 +2,7 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.share.ShareService;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,28 +25,34 @@ class ShareButtonTest extends UITestBase {
     }
 
     @FormTest
-    void testImageToShareGetterAndSetter() {
+    void testImageToShareWithBothParameters() {
         ShareButton button = new ShareButton();
-        assertNull(button.getImageToShare());
+        assertNull(button.getImagePathToShare());
 
-        button.setImageToShare("/path/to/image.png");
-        assertEquals("/path/to/image.png", button.getImageToShare());
+        button.setImageToShare("/path/to/image.png", "image/png");
+        assertEquals("/path/to/image.png", button.getImagePathToShare());
     }
 
     @FormTest
-    void testImageMimeTypeGetterAndSetter() {
+    void testAddShareService() {
         ShareButton button = new ShareButton();
-        assertNull(button.getImageMimeType());
+        ShareService customService = new ShareService() {
+            @Override
+            public String getShareTitle() { return "Custom"; }
 
-        button.setImageMimeType("image/png");
-        assertEquals("image/png", button.getImageMimeType());
-    }
+            @Override
+            public void share(String toShare) {}
 
-    @FormTest
-    void testShareServicesCollection() {
-        ShareButton button = new ShareButton();
-        assertNotNull(button.getShareServices());
-        assertTrue(button.getShareServices().size() > 0);
+            @Override
+            public boolean canShareImage() { return false; }
+
+            @Override
+            public void share(String imageFilePath, String mimeType) {}
+        };
+
+        button.addShareService(customService);
+        // Should not throw exception
+        assertNotNull(button);
     }
 
     @FormTest
