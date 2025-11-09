@@ -176,4 +176,207 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertArrayEquals(cachedData, result);
         storage.deleteStorageFile("urlImageKey");
     }
+
+    @FormTest
+    void textFieldConstructorsAndBasicMethods() {
+        TextField tf1 = new TextField();
+        assertNotNull(tf1);
+        assertTrue(tf1.getText() == null || tf1.getText().isEmpty());
+
+        TextField tf2 = new TextField("Hello");
+        assertEquals("Hello", tf2.getText());
+
+        TextField tf3 = new TextField("", 20);
+        assertEquals(20, tf3.getColumns());
+
+        TextField tf4 = new TextField("Text", 15);
+        assertEquals("Text", tf4.getText());
+        assertEquals(15, tf4.getColumns());
+    }
+
+    @FormTest
+    void textFieldDoneListener() {
+        TextField field = new TextField();
+        final boolean[] listenerCalled = {false};
+
+        ActionListener listener = evt -> listenerCalled[0] = true;
+        field.setDoneListener(listener);
+
+        // Just verify listener can be set
+        assertNotNull(field);
+    }
+
+    @FormTest
+    void textFieldOverlayMode() {
+        TextField field = new TextField();
+        assertFalse(field.isOverlayMode());
+
+        field.setOverlayMode(true);
+        assertTrue(field.isOverlayMode());
+    }
+
+    @FormTest
+    void textComponentConstructors() {
+        TextComponent tc1 = new TextComponent();
+        assertNotNull(tc1);
+
+        TextComponent tc2 = TextComponent.create();
+        assertNotNull(tc2);
+    }
+
+    @FormTest
+    void textComponentLabelAndHint() {
+        TextComponent tc = new TextComponent();
+
+        tc.label("Name");
+        assertEquals("Name", tc.getLabel().getText());
+
+        tc.hint("Enter name");
+        assertEquals("Enter name", tc.getField().getHint());
+    }
+
+    @FormTest
+    void textComponentTextAndColumns() {
+        TextComponent tc = new TextComponent();
+
+        tc.text("Hello");
+        assertEquals("Hello", tc.getField().getText());
+
+        tc.columns(25);
+        assertEquals(25, tc.getField().getColumns());
+
+        tc.rows(5);
+        assertEquals(5, tc.getField().getRows());
+    }
+
+    @FormTest
+    void textComponentConstraint() {
+        TextComponent tc = new TextComponent();
+
+        tc.constraint(TextArea.NUMERIC);
+        assertEquals(TextArea.NUMERIC, tc.getField().getConstraint());
+
+        tc.constraint(TextArea.PASSWORD);
+        assertEquals(TextArea.PASSWORD, tc.getField().getConstraint());
+    }
+
+    @FormTest
+    void textComponentEditable() {
+        TextComponent tc = new TextComponent();
+
+        tc.editable(true);
+        assertTrue(tc.getField().isEditable());
+
+        tc.editable(false);
+        assertFalse(tc.getField().isEditable());
+    }
+
+    @FormTest
+    void textComponentLabelAndInputUIID() {
+        TextComponent tc = new TextComponent();
+
+        tc.labelUIID("CustomLabel");
+        tc.inputUIID("CustomInput");
+
+        // Just verify these can be set without error
+        assertNotNull(tc);
+    }
+
+    @FormTest
+    void textComponentErrorMessage() {
+        TextComponent tc = new TextComponent();
+
+        tc.errorMessage("Invalid input");
+        assertEquals("Invalid input", tc.getErrorMessage());
+
+        tc.errorMessage(null);
+        assertNull(tc.getErrorMessage());
+    }
+
+    @FormTest
+    void textComponentActionListener() {
+        TextComponent tc = new TextComponent();
+        final boolean[] listenerCalled = {false};
+
+        ActionListener listener = evt -> listenerCalled[0] = true;
+        tc.addActionListener(listener);
+
+        // Just verify listener can be added
+        assertNotNull(tc);
+    }
+
+    @FormTest
+    void textComponentDataChangeListener() {
+        TextComponent tc = new TextComponent();
+        final boolean[] listenerCalled = {false};
+
+        tc.addDataChangedListener((type, index) -> listenerCalled[0] = true);
+
+        // Just verify listener can be added
+        assertNotNull(tc);
+    }
+
+    @FormTest
+    void autoCompleteTextFieldConstructors() {
+        DefaultListModel<String> model = new DefaultListModel<String>();
+        AutoCompleteTextField field = new AutoCompleteTextField(model);
+        assertNotNull(field);
+    }
+
+    @FormTest
+    void autoCompleteTextFieldFilter() {
+        DefaultListModel<String> model = new DefaultListModel<String>(
+            new String[]{"Apple", "Apricot", "Banana", "Cherry"}
+        );
+        AutoCompleteTextField field = new AutoCompleteTextField(model);
+
+        field.setFilter((text) -> {
+            return text != null && !text.isEmpty();
+        });
+
+        // Just verify filter can be set
+        assertNotNull(field);
+    }
+
+    @FormTest
+    void autoCompleteTextFieldCompletionMode() {
+        DefaultListModel<String> model = new DefaultListModel<String>();
+        AutoCompleteTextField field = new AutoCompleteTextField(model);
+
+        field.setCompletionMode(true);
+        assertTrue(field.isCompletionMode());
+
+        field.setCompletionMode(false);
+        assertFalse(field.isCompletionMode());
+    }
+
+    @FormTest
+    void autoCompleteTextFieldPopupPosition() {
+        DefaultListModel<String> model = new DefaultListModel<String>();
+        AutoCompleteTextField field = new AutoCompleteTextField(model);
+
+        field.setPopupPosition(AutoCompleteTextField.POPUP_POSITION_OVER);
+        assertEquals(AutoCompleteTextField.POPUP_POSITION_OVER, field.getPopupPosition());
+
+        field.setPopupPosition(AutoCompleteTextField.POPUP_POSITION_UNDER);
+        assertEquals(AutoCompleteTextField.POPUP_POSITION_UNDER, field.getPopupPosition());
+    }
+
+    @FormTest
+    void urlImageCreateToStorage() {
+        byte[] data = new byte[]{1, 2, 3, 4};
+        EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(4, 4), false);
+
+        URLImage urlImage = URLImage.createToStorage(placeholder, "testKey", "file://test.png");
+        assertNotNull(urlImage);
+    }
+
+    @FormTest
+    void urlImageCreateToFileSystem() {
+        byte[] data = new byte[]{1, 2, 3, 4};
+        EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(4, 4), false);
+
+        URLImage urlImage = URLImage.createToFileSystem(placeholder, "test.png", "file://test.png");
+        assertNotNull(urlImage);
+    }
 }
