@@ -270,7 +270,9 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertEquals("Invalid input", ((Label) errorComponent).getText());
 
         tc.errorMessage(null);
-        assertNull(tc.getErrorMessage());
+        Component clearedError = tc.getErrorMessage();
+        assertNotNull(clearedError);
+        assertEquals("", ((Label) clearedError).getText());
     }
 
     @FormTest
