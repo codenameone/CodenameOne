@@ -101,6 +101,8 @@
 #else
 #define CN1_AVPLAYERVIEWCONTROLLER id
 #endif
+#import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES2/glext.h>
 extern int popoverSupported();
 //#define CN1_INCLUDE_NOTIFICATIONS2
 #define INCLUDE_CN1_PUSH2
@@ -5194,44 +5196,139 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-static void cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
+static void cn1_releaseImageBuffer(void *info, const void *data, size_t size) {
+    if (data != NULL) {
+        free((void *)data);
+    }
+}
+
+static BOOL cn1_renderEAGLViewIntoContext(EAGLView *glView, CGContextRef ctx, CGRect localBounds) {
+    if (glView == nil || ctx == NULL) {
+        return NO;
+    }
+
+    EAGLContext *activeContext = [EAGLContext currentContext];
+    GLint previousFramebuffer = 0;
+    if (activeContext != nil) {
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
+    }
+
+    EAGLContext *targetContext = glView.context;
+    if (targetContext == nil) {
+        return NO;
+    }
+
+    [EAGLContext setCurrentContext:targetContext];
+
+    GLint glViewFramebuffer = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &glViewFramebuffer);
+    [glView setFramebuffer];
+    glFinish();
+
+    GLint viewport[4] = {0, 0, 0, 0};
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    GLint width = viewport[2];
+    GLint height = viewport[3];
+    if (width <= 0 || height <= 0) {
+        glBindFramebuffer(GL_FRAMEBUFFER, glViewFramebuffer);
+        [EAGLContext setCurrentContext:activeContext];
+        if (activeContext != nil) {
+            glBindFramebuffer(GL_FRAMEBUFFER, previousFramebuffer);
+        }
+        return NO;
+    }
+
+    size_t dataLength = (size_t)width * (size_t)height * 4;
+    GLubyte *pixelData = (GLubyte *)malloc(dataLength);
+    if (pixelData == NULL) {
+        glBindFramebuffer(GL_FRAMEBUFFER, glViewFramebuffer);
+        [EAGLContext setCurrentContext:activeContext];
+        if (activeContext != nil) {
+            glBindFramebuffer(GL_FRAMEBUFFER, previousFramebuffer);
+        }
+        return NO;
+    }
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixelData);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, glViewFramebuffer);
+    [EAGLContext setCurrentContext:activeContext];
+    if (activeContext != nil) {
+        glBindFramebuffer(GL_FRAMEBUFFER, previousFramebuffer);
+    }
+
+    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, pixelData, dataLength, cn1_releaseImageBuffer);
+    if (provider == NULL) {
+        free(pixelData);
+        return NO;
+    }
+
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    if (colorSpace == NULL) {
+        CGDataProviderRelease(provider);
+        return NO;
+    }
+
+    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
+    CGImageRef imageRef = CGImageCreate(width,
+                                        height,
+                                        8,
+                                        32,
+                                        width * 4,
+                                        colorSpace,
+                                        bitmapInfo,
+                                        provider,
+                                        NULL,
+                                        NO,
+                                        kCGRenderingIntentDefault);
+    CGColorSpaceRelease(colorSpace);
+    CGDataProviderRelease(provider);
+
+    if (imageRef == NULL) {
+        return NO;
+    }
+
+    CGContextSaveGState(ctx);
+    CGContextTranslateCTM(ctx, 0.0f, localBounds.size.height);
+    CGContextScaleCTM(ctx, 1.0f, -1.0f);
+    CGContextDrawImage(ctx, CGRectMake(0.0f, 0.0f, localBounds.size.width, localBounds.size.height), imageRef);
+    CGContextRestoreGState(ctx);
+
+    CGImageRelease(imageRef);
+
+    return YES;
+}
+
+static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
     if (renderView == nil || rootView == nil || ctx == NULL) {
-        return;
+        return NO;
     }
     if (renderView.hidden || renderView.alpha <= 0.0f) {
-        return;
+        return NO;
     }
 
     CGRect localBounds = renderView.bounds;
     if (CGRectIsEmpty(localBounds) || localBounds.size.width <= 0.0f || localBounds.size.height <= 0.0f) {
-        return;
+        return NO;
     }
 
     CGRect translatedRect = [rootView convertRect:localBounds fromView:renderView];
     if (CGRectIsNull(translatedRect) || CGRectIsEmpty(translatedRect)) {
-        return;
+        return NO;
     }
 
     CGContextSaveGState(ctx);
     CGContextTranslateCTM(ctx, translatedRect.origin.x, translatedRect.origin.y);
     BOOL drawn = NO;
+    if ([renderView isKindOfClass:[EAGLView class]]) {
+        drawn = cn1_renderEAGLViewIntoContext((EAGLView *)renderView, ctx, localBounds);
+    }
 #if defined(ENABLE_WKWEBVIEW) && defined(supportsWKWebKit)
     if ([renderView isKindOfClass:[WKWebView class]]) {
         WKWebView *webView = (WKWebView *)renderView;
-        // Paint a diagnostic fallback so we can tell if the WKWebView failed to render.
-        if (localBounds.size.width > 0.0f && localBounds.size.height > 0.0f) {
-            CGContextSaveGState(ctx);
-            CGContextSetStrokeColorWithColor(ctx, [UIColor redColor].CGColor);
-            CGContextSetLineWidth(ctx, 4.0f);
-            CGContextMoveToPoint(ctx, 0.0f, 0.0f);
-            CGContextAddLineToPoint(ctx, localBounds.size.width, localBounds.size.height);
-            CGContextMoveToPoint(ctx, localBounds.size.width, 0.0f);
-            CGContextAddLineToPoint(ctx, 0.0f, localBounds.size.height);
-            CGContextStrokePath(ctx);
-            CGContextRestoreGState(ctx);
-        }
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
-        if (@available(iOS 11.0, *)) {
+        if (!drawn && @available(iOS 11.0, *)) {
             CGRect snapshotRect = CGRectIntersection(webView.bounds, localBounds);
             if (!CGRectIsNull(snapshotRect) && !CGRectIsEmpty(snapshotRect)) {
                 WKSnapshotConfiguration *config = [[WKSnapshotConfiguration alloc] init];
@@ -5293,8 +5390,10 @@ static void cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     }
     if (!drawn) {
         [renderView.layer renderInContext:ctx];
+        drawn = YES;
     }
     CGContextRestoreGState(ctx);
+    return drawn;
 }
 
 static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
@@ -5403,81 +5502,22 @@ static UIImage* cn1_captureView(UIView *view) {
 
     UIGraphicsBeginImageContextWithOptions(size, rootView.opaque, 0.0);
     CGContextRef ctx = UIGraphicsGetCurrentContext();
-    if ([rootView isKindOfClass:[UIWindow class]]) {
-        UIWindow *targetWindow = (UIWindow *)rootView;
-        NSArray<UIWindow *> *windows = nil;
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
-        if (@available(iOS 13.0, *)) {
-            if (targetWindow.windowScene != nil) {
-                windows = targetWindow.windowScene.windows;
-            }
-        }
-#endif
-        if (windows == nil || windows.count == 0) {
-            windows = [UIApplication sharedApplication].windows;
-        }
-        // Render every visible window that shares the same screen as the Codename One GL window
-        // so that native peer components hosted outside of the GL view (e.g. BrowserComponent)
-        // are composited into the captured image.  Windows need to be rendered from back to front
-        // based on their window level so that overlay windows (e.g. ones hosting peer components)
-        // appear above the GL view in the resulting screenshot.
-        NSArray<UIWindow *> *orderedWindows = windows;
-        if (windows.count > 1) {
-            orderedWindows = [windows sortedArrayUsingComparator:^NSComparisonResult(UIWindow * _Nonnull lhs, UIWindow * _Nonnull rhs) {
-                CGFloat lhsLevel = lhs.windowLevel;
-                CGFloat rhsLevel = rhs.windowLevel;
-                if (lhsLevel < rhsLevel) {
-                    return NSOrderedAscending;
-                }
-                if (lhsLevel > rhsLevel) {
-                    return NSOrderedDescending;
-                }
-                NSUInteger lhsIndex = [windows indexOfObjectIdenticalTo:lhs];
-                NSUInteger rhsIndex = [windows indexOfObjectIdenticalTo:rhs];
-                if (lhsIndex < rhsIndex) {
-                    return NSOrderedAscending;
-                }
-                if (lhsIndex > rhsIndex) {
-                    return NSOrderedDescending;
-                }
-                return NSOrderedSame;
-            }];
-        }
-
-        for (UIWindow *window in orderedWindows) {
-            if (window.hidden || window.alpha <= 0.0f) {
-                continue;
-            }
-            if (window.screen != targetWindow.screen) {
-                continue;
-            }
-            [window layoutIfNeeded];
-            CGContextSaveGState(ctx);
-            CGRect translated = window.bounds;
-            if (window != targetWindow) {
-                translated = [targetWindow convertRect:window.bounds fromWindow:window];
-            }
-            CGContextTranslateCTM(ctx, translated.origin.x, translated.origin.y);
-            BOOL windowDrawn = NO;
-            if ([window respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-                windowDrawn = [window drawViewHierarchyInRect:window.bounds afterScreenUpdates:YES];
-            }
-            if (!windowDrawn) {
-                [window.layer renderInContext:ctx];
-            }
-            CGContextRestoreGState(ctx);
-        }
-        cn1_renderPeerComponents(rootView, ctx);
-    } else {
-        BOOL ok = NO;
-        if ([rootView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-            ok = [rootView drawViewHierarchyInRect:rootView.bounds afterScreenUpdates:YES];
-        }
-        if (!ok) {
-            [rootView.layer renderInContext:ctx];
-        }
-        cn1_renderPeerComponents(rootView, ctx);
+    if (ctx == NULL) {
+        UIGraphicsEndImageContext();
+        return nil;
     }
+
+    [rootView layoutIfNeeded];
+
+    cn1_renderViewIntoContext(view, rootView, ctx);
+
+    CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
+    EAGLView *glView = [controller eaglView];
+    if (glView != nil && glView != view) {
+        cn1_renderViewIntoContext(glView, rootView, ctx);
+    }
+
+    cn1_renderPeerComponents(rootView, ctx);
 
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
