@@ -95,27 +95,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     }
 
     private Image capture(Form form) {
-        final Display display = Display.getInstance();
-        final Image[] holder = new Image[1];
-        display.screenshot(screen -> holder[0] = screen);
-
-        display.invokeAndBlock(() -> {
-            long deadline = System.currentTimeMillis() + 2000L;
-            while (holder[0] == null && System.currentTimeMillis() < deadline) {
-                Util.sleep(20);
-            }
-        });
-
-        Image screenshot = holder[0];
-        if (screenshot == null) {
-            fail("Timed out waiting for native screenshot result.");
-            throw new IllegalStateException("Timed out waiting for native screenshot result.");
-        }
-
-        if (screenshot.getGraphics() != null) {
-            form.paintComponent(screenshot.getGraphics(), true);
-        }
-
+        Image screenshot = Image.createImage(form.getWidth(), form.getHeight());
+        form.paintComponent(screenshot.getGraphics(), true);
         return screenshot;
     }
 
