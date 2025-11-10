@@ -5297,154 +5297,6 @@ static void cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     CGContextRestoreGState(ctx);
 }
 
-static void cn1_collectViewHierarchy(UIView *view, NSMutableArray<NSString *> *lines, NSInteger depth, UIView *targetView, UIView *rootView) {
-    if (view == nil || lines == nil) {
-        return;
-    }
-
-    NSMutableString *line = [NSMutableString string];
-    for (NSInteger i = 0; i < depth; i++) {
-        [line appendString:@"  "];
-    }
-
-    NSString *className = NSStringFromClass([view class]);
-    [line appendFormat:@"%@<%p>", className, view];
-
-    if (view == rootView) {
-        [line appendString:@" [captureRoot]"];
-    }
-
-    if (view == targetView) {
-        [line appendString:@" [targetView]"];
-    }
-
-    CGRect frame = view.frame;
-    [line appendFormat:@" frame=%@", NSStringFromCGRect(frame)];
-
-    [line appendFormat:@" hidden=%@", view.hidden ? @"YES" : @"NO"];
-    [line appendFormat:@" alpha=%.2f", view.alpha];
-    [line appendFormat:@" userInteraction=%@", view.userInteractionEnabled ? @"YES" : @"NO"];
-
-    if (view.tag != 0) {
-        [line appendFormat:@" tag=%ld", (long)view.tag];
-    }
-
-    NSString *identifier = nil;
-    if ([view respondsToSelector:@selector(accessibilityIdentifier)]) {
-        identifier = view.accessibilityIdentifier;
-    }
-
-    if (identifier.length > 0) {
-        [line appendFormat:@" accessibilityIdentifier=%@", identifier];
-    }
-
-    [lines addObject:line];
-
-    for (UIView *subview in view.subviews) {
-        cn1_collectViewHierarchy(subview, lines, depth + 1, targetView, rootView);
-    }
-}
-
-static void cn1_appendWindowHierarchyLines(NSArray<UIWindow *> *windows, UIWindow *targetWindow, UIView *targetView, NSMutableArray<NSString *> *lines) {
-    if (windows == nil || lines == nil || windows.count == 0) {
-        return;
-    }
-
-    [lines addObject:@"Window capture order (back to front):"];
-
-    NSInteger index = 0;
-    for (UIWindow *window in windows) {
-        NSMutableString *header = [NSMutableString string];
-        [header appendFormat:@"[%ld] %@<%p>", (long)index, NSStringFromClass([window class]), window];
-        if (window == targetWindow) {
-            [header appendString:@" [targetWindow]"];
-        }
-        [header appendFormat:@" level=%.2f", window.windowLevel];
-        [header appendFormat:@" hidden=%@", window.hidden ? @"YES" : @"NO"];
-        [header appendFormat:@" alpha=%.2f", window.alpha];
-        [header appendFormat:@" frame=%@", NSStringFromCGRect(window.frame)];
-        [lines addObject:header];
-        cn1_collectViewHierarchy(window, lines, 1, targetView, targetWindow);
-        index++;
-    }
-}
-
-static void cn1_drawHierarchyOverlay(CGContextRef ctx, UIView *rootView, CGRect targetRect, NSArray<NSString *> *lines) {
-    if (ctx == nil || rootView == nil || lines == nil || lines.count == 0) {
-        return;
-    }
-
-    NSString *text = [lines componentsJoinedByString:@"\n"];
-    if (text.length == 0) {
-        return;
-    }
-
-    UIFont *font = nil;
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
-    if (@available(iOS 13.0, *)) {
-        font = [UIFont monospacedSystemFontOfSize:12.0 weight:UIFontWeightRegular];
-    }
-#endif
-    if (font == nil) {
-        font = [UIFont fontWithName:@"Menlo" size:12.0];
-    }
-    if (font == nil) {
-        font = [UIFont systemFontOfSize:12.0];
-    }
-
-    NSDictionary<NSAttributedStringKey, id> *attributes = @{ NSFontAttributeName : font, NSForegroundColorAttributeName : [UIColor whiteColor] };
-
-    CGSize canvasSize = rootView.bounds.size;
-    if (canvasSize.width <= 0.0f || canvasSize.height <= 0.0f) {
-        return;
-    }
-
-    CGFloat outerPadding = 12.0f;
-    CGFloat innerPadding = 8.0f;
-    CGFloat availableWidth = MAX(0.0f, canvasSize.width - (outerPadding * 2.0f));
-    CGSize constraint = CGSizeMake(availableWidth, CGFLOAT_MAX);
-    CGRect textBounds = [text boundingRectWithSize:constraint options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading attributes:attributes context:nil];
-    textBounds.size.width = ceil(textBounds.size.width);
-    textBounds.size.height = ceil(textBounds.size.height);
-
-    if (CGRectIsNull(targetRect) || CGRectIsInfinite(targetRect)) {
-        targetRect = rootView.bounds;
-    }
-
-    CGPoint anchor = CGPointMake(CGRectGetMinX(targetRect) + outerPadding, CGRectGetMinY(targetRect) + outerPadding);
-
-    CGRect backgroundRect = CGRectMake(anchor.x - innerPadding,
-                                       anchor.y - innerPadding,
-                                       textBounds.size.width + innerPadding * 2.0f,
-                                       textBounds.size.height + innerPadding * 2.0f);
-
-    if (backgroundRect.origin.x < outerPadding) {
-        backgroundRect.origin.x = outerPadding;
-    }
-    if (backgroundRect.origin.y < outerPadding) {
-        backgroundRect.origin.y = outerPadding;
-    }
-
-    if (CGRectGetMaxX(backgroundRect) > canvasSize.width - outerPadding) {
-        backgroundRect.origin.x = MAX(outerPadding, canvasSize.width - outerPadding - backgroundRect.size.width);
-    }
-
-    if (CGRectGetMaxY(backgroundRect) > canvasSize.height - outerPadding) {
-        backgroundRect.origin.y = MAX(outerPadding, canvasSize.height - outerPadding - backgroundRect.size.height);
-    }
-
-    CGRect textRect = CGRectMake(backgroundRect.origin.x + innerPadding,
-                                 backgroundRect.origin.y + innerPadding,
-                                 textBounds.size.width,
-                                 textBounds.size.height);
-
-    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:backgroundRect cornerRadius:8.0f];
-    [[UIColor colorWithWhite:0 alpha:0.7f] setFill];
-    [path fill];
-
-    [text drawInRect:textRect withAttributes:attributes];
-}
-
 static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
     EAGLView *glView = [controller eaglView];
@@ -5549,16 +5401,6 @@ static UIImage* cn1_captureView(UIView *view) {
         return nil;
     }
 
-    CGRect overlayTargetRect = rootView.bounds;
-    if (rootView != view && view != nil) {
-        CGRect converted = [rootView convertRect:view.bounds fromView:view];
-        if (!CGRectIsNull(converted) && converted.size.width > 0 && converted.size.height > 0) {
-            overlayTargetRect = converted;
-        }
-    }
-
-    NSMutableArray<NSString *> *hierarchyLines = [NSMutableArray array];
-
     UIGraphicsBeginImageContextWithOptions(size, rootView.opaque, 0.0);
     CGContextRef ctx = UIGraphicsGetCurrentContext();
     if ([rootView isKindOfClass:[UIWindow class]]) {
@@ -5602,8 +5444,6 @@ static UIImage* cn1_captureView(UIView *view) {
             }];
         }
 
-        cn1_appendWindowHierarchyLines(orderedWindows, targetWindow, view, hierarchyLines);
-
         for (UIWindow *window in orderedWindows) {
             if (window.hidden || window.alpha <= 0.0f) {
                 continue;
@@ -5638,12 +5478,6 @@ static UIImage* cn1_captureView(UIView *view) {
         }
         cn1_renderPeerComponents(rootView, ctx);
     }
-
-    if (hierarchyLines.count == 0) {
-        cn1_collectViewHierarchy(rootView, hierarchyLines, 0, view, rootView);
-    }
-
-    cn1_drawHierarchyOverlay(ctx, rootView, overlayTargetRect, hierarchyLines);
 
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
