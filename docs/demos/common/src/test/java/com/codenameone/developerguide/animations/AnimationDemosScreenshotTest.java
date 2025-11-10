@@ -95,10 +95,26 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     }
 
     private Image capture(Form form) {
-        Image screenshot = Image.createImage(form.getWidth(), form.getHeight());
-        if (Display.getInstance().shouldPaintNativeScreenshot(screenshot)) {
+        final Display display = Display.getInstance();
+        final Image[] holder = new Image[1];
+        display.screenshot(screen -> holder[0] = screen);
+
+        display.invokeAndBlock(() -> {
+            long deadline = System.currentTimeMillis() + 2000L;
+            while (holder[0] == null && System.currentTimeMillis() < deadline) {
+                Util.sleep(20);
+            }
+        });
+
+        Image screenshot = holder[0];
+        if (screenshot == null) {
+            screenshot = Image.createImage(form.getWidth(), form.getHeight());
+        }
+
+        if (screenshot.getGraphics() != null && display.shouldPaintNativeScreenshot(screenshot)) {
             form.paintComponent(screenshot.getGraphics(), true);
         }
+
         return screenshot;
     }
 
