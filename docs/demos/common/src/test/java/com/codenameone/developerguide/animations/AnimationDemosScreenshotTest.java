@@ -108,7 +108,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
 
         Image screenshot = holder[0];
         if (screenshot == null) {
-            screenshot = Image.createImage(form.getWidth(), form.getHeight());
+            fail("Timed out waiting for native screenshot result.");
+            throw new IllegalStateException("Timed out waiting for native screenshot result.");
         }
 
         if (screenshot.getGraphics() != null && display.shouldPaintNativeScreenshot(screenshot)) {
