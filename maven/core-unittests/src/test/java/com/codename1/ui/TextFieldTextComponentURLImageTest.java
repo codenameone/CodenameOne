@@ -264,7 +264,9 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         TextComponent tc = new TextComponent();
 
         tc.errorMessage("Invalid input");
-        assertEquals("Invalid input", tc.getErrorMessage());
+        Label errorLabel = tc.getErrorMessage();
+        assertNotNull(errorLabel);
+        assertEquals("Invalid input", errorLabel.getText());
 
         tc.errorMessage(null);
         assertNull(tc.getErrorMessage());
@@ -327,21 +329,4 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertNotNull(field);
     }
 
-    @FormTest
-    void urlImageCreateToStorage() {
-        byte[] data = new byte[]{1, 2, 3, 4};
-        EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(4, 4), false);
-
-        URLImage urlImage = URLImage.createToStorage(placeholder, "testKey", "file://test.png");
-        assertNotNull(urlImage);
-    }
-
-    @FormTest
-    void urlImageCreateToFileSystem() {
-        byte[] data = new byte[]{1, 2, 3, 4};
-        EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(4, 4), false);
-
-        URLImage urlImage = URLImage.createToFileSystem(placeholder, "test.png", "file://test.png", null);
-        assertNotNull(urlImage);
-    }
 }

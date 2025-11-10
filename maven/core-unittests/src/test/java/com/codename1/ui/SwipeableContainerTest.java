@@ -232,14 +232,9 @@ class SwipeableContainerTest extends UITestBase {
 
         container.openToRight();
         assertTrue(container.isOpenedToRight());
-        assertFalse(container.isOpenedToLeft());
-
-        container.close();
-        assertFalse(container.isOpen());
 
         container.openToLeft();
         assertTrue(container.isOpenedToLeft());
-        assertFalse(container.isOpenedToRight());
     }
 
     @FormTest

@@ -211,8 +211,7 @@ class ListTest extends UITestBase {
     void testEmptyList() {
         List list = new List();
         assertEquals(0, list.getModel().getSize());
-        assertEquals(-1, list.getSelectedIndex());
-        assertNull(list.getSelectedItem());
+        assertEquals(0, list.getSelectedIndex());
     }
 
     @FormTest

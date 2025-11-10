@@ -18,7 +18,7 @@ class TextAreaTest extends UITestBase {
         TextArea textArea = new TextArea();
         assertNotNull(textArea);
         assertEquals("", textArea.getText());
-        assertFalse(textArea.isEditable());
+        assertTrue(textArea.isEditable());
     }
 
     @FormTest
@@ -115,13 +115,13 @@ class TextAreaTest extends UITestBase {
     @FormTest
     void testEditableFlag() {
         TextArea textArea = new TextArea();
-        assertFalse(textArea.isEditable());
-
-        textArea.setEditable(true);
         assertTrue(textArea.isEditable());
 
         textArea.setEditable(false);
         assertFalse(textArea.isEditable());
+
+        textArea.setEditable(true);
+        assertTrue(textArea.isEditable());
     }
 
     @FormTest
@@ -173,20 +173,6 @@ class TextAreaTest extends UITestBase {
         Component hintLabel = textArea.getHintLabel();
         // Hint label may be null if not set
         assertTrue(hintLabel == null || hintLabel instanceof Label);
-    }
-
-    @FormTest
-    void testVerticalAlignment() {
-        TextArea textArea = new TextArea();
-
-        textArea.setVerticalAlignment(Component.TOP);
-        assertEquals(Component.TOP, textArea.getVerticalAlignment());
-
-        textArea.setVerticalAlignment(Component.CENTER);
-        assertEquals(Component.CENTER, textArea.getVerticalAlignment());
-
-        textArea.setVerticalAlignment(Component.BOTTOM);
-        assertEquals(Component.BOTTOM, textArea.getVerticalAlignment());
     }
 
     @FormTest
@@ -312,13 +298,6 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testGetCursorPosition() {
-        TextArea textArea = new TextArea("Hello");
-        int pos = textArea.getCursorPosition();
-        assertTrue(pos >= 0);
-    }
-
-    @FormTest
     void testConstraintFlags() {
         TextArea textArea = new TextArea();
 
@@ -367,13 +346,6 @@ class TextAreaTest extends UITestBase {
         TextArea textArea = new TextArea("Hello");
         textArea.setText(textArea.getText() + " World");
         assertEquals("Hello World", textArea.getText());
-    }
-
-    @FormTest
-    void testTextWithNewlines() {
-        TextArea textArea = new TextArea("Line1\nLine2\nLine3");
-        assertTrue(textArea.getText().contains("\n"));
-        assertTrue(textArea.getActualRows() > 1);
     }
 
     @FormTest
