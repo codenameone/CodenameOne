@@ -96,7 +96,9 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
 
     private Image capture(Form form) {
         Image screenshot = Image.createImage(form.getWidth(), form.getHeight());
-        form.paintComponent(screenshot.getGraphics(), true);
+        if (Display.getInstance().shouldPaintNativeScreenshot(screenshot)) {
+            form.paintComponent(screenshot.getGraphics(), true);
+        }
         return screenshot;
     }
 

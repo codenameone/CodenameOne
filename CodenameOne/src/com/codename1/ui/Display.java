@@ -5013,6 +5013,20 @@ public final class Display extends CN1Constants {
         impl.screenshot(callback);
     }
 
+    /**
+     * Indicates whether callers should repaint Codename One components onto a screenshot image
+     * returned from {@link #screenshot(SuccessCallback)}. Platforms that already composite
+     * peer components into the native screenshot can return {@code false} to keep the captured
+     * pixels intact.
+     *
+     * @param screenshot the image returned from {@link #screenshot(SuccessCallback)}.
+     * @return {@code true} if the caller should repaint Codename One components onto the
+     *         screenshot, {@code false} otherwise.
+     */
+    public boolean shouldPaintNativeScreenshot(Image screenshot) {
+        return impl.shouldPaintNativeScreenshot(screenshot);
+    }
+
 
                            /**
      * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.

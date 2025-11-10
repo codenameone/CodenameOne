@@ -1215,6 +1215,20 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Indicates whether the Codename One implementation expects caller-side painting to run
+     * after a native screenshot has been captured. Implementations that composite peer
+     * components into the screenshot can override this to {@code false} so downstream code
+     * won't immediately repaint the captured image and accidentally hide native peers.
+     *
+     * @param screenshot the screenshot image produced by {@link #screenshot(SuccessCallback)}
+     * @return {@code true} if the caller should repaint Codename One components onto the
+     *         screenshot, {@code false} otherwise.
+     */
+    public boolean shouldPaintNativeScreenshot(Image screenshot) {
+        return true;
+    }
+
+    /**
      * Returns true if the platform supports a native image cache.  The native image cache
      * is different than just {@link FileSystemStorage#hasCachesDir()}.  A native image cache
      * is an image cache that the platform provides that is full transparent to Codename One

@@ -300,6 +300,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static SuccessCallback<Image> screenshotCallback;
+    private static volatile boolean lastScreenshotHasNativePeers;
 
     @Override
     public void screenshot(final SuccessCallback<Image> callback) {
@@ -337,6 +338,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         final SuccessCallback<Image> callback = screenshotCallback;
         screenshotCallback = null;
         if (callback == null) {
+            lastScreenshotHasNativePeers = false;
             return;
         }
 
@@ -366,6 +368,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                             }
 
                             if (image != null && image.getGraphics() != null) {
+                                lastScreenshotHasNativePeers = true;
                                 callback.onSucess(image);
                                 return;
                             }
@@ -374,9 +377,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                         Log.e(t);
                     }
                 }
+                lastScreenshotHasNativePeers = false;
                 callback.onSucess(null);
             }
         });
+    }
+
+    @Override
+    public boolean shouldPaintNativeScreenshot(Image screenshot) {
+        boolean shouldPaint = !lastScreenshotHasNativePeers;
+        lastScreenshotHasNativePeers = false;
+        return shouldPaint;
     }
 
     /**
