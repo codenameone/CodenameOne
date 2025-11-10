@@ -112,7 +112,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             throw new IllegalStateException("Timed out waiting for native screenshot result.");
         }
 
-        if (screenshot.getGraphics() != null && display.shouldPaintNativeScreenshot(screenshot)) {
+        if (screenshot.getGraphics() != null) {
             form.paintComponent(screenshot.getGraphics(), true);
         }
 

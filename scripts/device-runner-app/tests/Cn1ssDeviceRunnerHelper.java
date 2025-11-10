@@ -62,7 +62,7 @@ final class Cn1ssDeviceRunnerHelper {
             return false;
         }
         Image screenshot = img[0];
-        if (Display.getInstance().shouldPaintNativeScreenshot(screenshot)) {
+        if (screenshot.getGraphics() != null) {
             current.paintComponent(screenshot.getGraphics(), true);
         }
         try {
