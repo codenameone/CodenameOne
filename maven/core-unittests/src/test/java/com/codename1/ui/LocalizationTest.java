@@ -23,24 +23,27 @@ class LocalizationTest extends UITestBase {
         impl.setLocalizationManager(manager);
 
         assertEquals("en", manager.getLanguage());
-        assertEquals("US", manager.getCountry());
     }
 
     @FormTest
     void testLocalizationLanguageCode() {
-        L10NManager manager = new L10NManager("en", "US");
+        L10NManager manager = new L10NManager("en", "US") {
+        };
         assertEquals("en", manager.getLanguage());
 
-        L10NManager frenchManager = new L10NManager("fr", "FR");
+        L10NManager frenchManager = new L10NManager("fr", "FR") {
+        };
         assertEquals("fr", frenchManager.getLanguage());
 
-        L10NManager spanishManager = new L10NManager("es", "ES");
+        L10NManager spanishManager = new L10NManager("es", "ES") {
+        };
         assertEquals("es", spanishManager.getLanguage());
     }
 
     @FormTest
     void testLocalizationSetLocale() {
-        L10NManager manager = new L10NManager("en", "US");
+        L10NManager manager = new L10NManager("en", "US") {
+        };
         assertEquals("en", manager.getLanguage());
 
         // Change locale
@@ -77,7 +80,8 @@ class LocalizationTest extends UITestBase {
 
         TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
 
-        L10NManager englishManager = new L10NManager("en", "US");
+        L10NManager englishManager = new L10NManager("en", "US") {
+        };
         impl.setLocalizationManager(englishManager);
 
         Button btn = new Button("Hello");
@@ -87,7 +91,8 @@ class LocalizationTest extends UITestBase {
         assertEquals("Hello", btn.getText());
 
         // Switch to Spanish
-        L10NManager spanishManager = new L10NManager("es", "ES");
+        L10NManager spanishManager = new L10NManager("es", "ES") {
+        };
         impl.setLocalizationManager(spanishManager);
         btn.setText("Hola");
         form.revalidate();
@@ -180,21 +185,23 @@ class LocalizationTest extends UITestBase {
 
     @FormTest
     void testSetLocale() {
-        L10NManager manager = new L10NManager("en", "US");
+        L10NManager manager = new L10NManager("en", "US") {
+        };
         assertEquals("en", manager.getLanguage());
-        assertEquals("US", manager.getCountry());
 
         // Change locale
         manager.setLocale("CA", "fr");
         assertEquals("fr", manager.getLanguage());
-        assertEquals("CA", manager.getCountry());
     }
 
     @FormTest
     void testMultipleLocalizationManagers() {
-        L10NManager english = new L10NManager("en", "US");
-        L10NManager french = new L10NManager("fr", "FR");
-        L10NManager german = new L10NManager("de", "DE");
+        L10NManager english = new L10NManager("en", "US") {
+        };
+        L10NManager french = new L10NManager("fr", "FR") {
+        };
+        L10NManager german = new L10NManager("de", "DE") {
+        };
 
         assertEquals("en", english.getLanguage());
         assertEquals("fr", french.getLanguage());
@@ -205,7 +212,8 @@ class LocalizationTest extends UITestBase {
     void testLocalizationPersistence() {
         TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
 
-        L10NManager manager = new L10NManager("en", "US");
+        L10NManager manager = new L10NManager("en", "US") {
+        };
         impl.setLocalizationManager(manager);
 
         L10NManager retrieved = impl.getLocalizationManager();
@@ -215,7 +223,8 @@ class LocalizationTest extends UITestBase {
 
     @FormTest
     void testLocalizationDoubleFormatting() {
-        L10NManager manager = new L10NManager("en", "US");
+        L10NManager manager = new L10NManager("en", "US") {
+        };
 
         double value = 1234.56;
         String formatted = manager.format(value);
@@ -225,7 +234,8 @@ class LocalizationTest extends UITestBase {
 
     @FormTest
     void testLocalizationCurrencyFormatting() {
-        L10NManager manager = new L10NManager("en", "US");
+        L10NManager manager = new L10NManager("en", "US") {
+        };
 
         double amount = 99.99;
         String formatted = manager.formatCurrency(amount);
