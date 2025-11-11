@@ -101,8 +101,6 @@
 #else
 #define CN1_AVPLAYERVIEWCONTROLLER id
 #endif
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES2/glext.h>
 extern int popoverSupported();
 //#define CN1_INCLUDE_NOTIFICATIONS2
 #define INCLUDE_CN1_PUSH2
@@ -5196,110 +5194,6 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-static void cn1_releaseImageBuffer(void *info, const void *data, size_t size) {
-    if (data != NULL) {
-        free((void *)data);
-    }
-}
-
-static BOOL cn1_renderEAGLViewIntoContext(EAGLView *glView, CGContextRef ctx, CGRect localBounds) {
-    if (glView == nil || ctx == NULL) {
-        return NO;
-    }
-
-    EAGLContext *activeContext = [EAGLContext currentContext];
-    GLint previousFramebuffer = 0;
-    if (activeContext != nil) {
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
-    }
-
-    EAGLContext *targetContext = glView.context;
-    if (targetContext == nil) {
-        return NO;
-    }
-
-    [EAGLContext setCurrentContext:targetContext];
-
-    GLint glViewFramebuffer = 0;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &glViewFramebuffer);
-    [glView setFramebuffer];
-    glFinish();
-
-    GLint viewport[4] = {0, 0, 0, 0};
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    GLint width = viewport[2];
-    GLint height = viewport[3];
-    if (width <= 0 || height <= 0) {
-        glBindFramebuffer(GL_FRAMEBUFFER, glViewFramebuffer);
-        [EAGLContext setCurrentContext:activeContext];
-        if (activeContext != nil) {
-            glBindFramebuffer(GL_FRAMEBUFFER, previousFramebuffer);
-        }
-        return NO;
-    }
-
-    size_t dataLength = (size_t)width * (size_t)height * 4;
-    GLubyte *pixelData = (GLubyte *)malloc(dataLength);
-    if (pixelData == NULL) {
-        glBindFramebuffer(GL_FRAMEBUFFER, glViewFramebuffer);
-        [EAGLContext setCurrentContext:activeContext];
-        if (activeContext != nil) {
-            glBindFramebuffer(GL_FRAMEBUFFER, previousFramebuffer);
-        }
-        return NO;
-    }
-
-    glPixelStorei(GL_PACK_ALIGNMENT, 4);
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixelData);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, glViewFramebuffer);
-    [EAGLContext setCurrentContext:activeContext];
-    if (activeContext != nil) {
-        glBindFramebuffer(GL_FRAMEBUFFER, previousFramebuffer);
-    }
-
-    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, pixelData, dataLength, cn1_releaseImageBuffer);
-    if (provider == NULL) {
-        free(pixelData);
-        return NO;
-    }
-
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    if (colorSpace == NULL) {
-        CGDataProviderRelease(provider);
-        return NO;
-    }
-
-    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
-    CGImageRef imageRef = CGImageCreate(width,
-                                        height,
-                                        8,
-                                        32,
-                                        width * 4,
-                                        colorSpace,
-                                        bitmapInfo,
-                                        provider,
-                                        NULL,
-                                        NO,
-                                        kCGRenderingIntentDefault);
-    CGColorSpaceRelease(colorSpace);
-    CGDataProviderRelease(provider);
-
-    if (imageRef == NULL) {
-        return NO;
-    }
-
-    CGContextSaveGState(ctx);
-    CGContextTranslateCTM(ctx, localBounds.size.width, localBounds.size.height);
-    CGContextScaleCTM(ctx, -1.0f, -1.0f);
-    CGContextDrawImage(ctx, CGRectMake(0.0f, 0.0f, localBounds.size.width, localBounds.size.height), imageRef);
-    CGContextRestoreGState(ctx);
-
-    CGImageRelease(imageRef);
-
-    return YES;
-}
-
 static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
     if (renderView == nil || rootView == nil || ctx == NULL) {
         return NO;
@@ -5321,9 +5215,6 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     CGContextSaveGState(ctx);
     CGContextTranslateCTM(ctx, translatedRect.origin.x, translatedRect.origin.y);
     BOOL drawn = NO;
-    if ([renderView isKindOfClass:[EAGLView class]]) {
-        drawn = cn1_renderEAGLViewIntoContext((EAGLView *)renderView, ctx, localBounds);
-    }
 #if defined(ENABLE_WKWEBVIEW) && defined(supportsWKWebKit)
     if ([renderView isKindOfClass:[WKWebView class]]) {
         WKWebView *webView = (WKWebView *)renderView;
