@@ -672,6 +672,7 @@ ri_log "STAGE:COMMENT_POST -> Submitting PR feedback"
 comment_rc=0
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_IOS_COMMENT -->"
 export CN1SS_COMMENT_LOG_PREFIX="[run-ios-device-tests]"
+export CN1SS_PREVIEW_SUBDIR="ios"
 if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
   comment_rc=$?
 fi

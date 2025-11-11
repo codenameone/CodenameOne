@@ -93,7 +93,7 @@ public class PostPrComment {
         Map<String, String> attachmentUrls = new HashMap<>();
         if (body.contains("(attachment:")) {
             try {
-                attachmentUrls = publishPreviewsToBranch(previewDir, repo, prNumber, token, !isForkPr);
+                attachmentUrls = publishPreviewsToBranch(previewDir, repo, prNumber, token, !isForkPr, arguments.previewSubdir);
                 for (Map.Entry<String, String> entry : attachmentUrls.entrySet()) {
                     log("Preview available for " + entry.getKey() + ": " + entry.getValue());
                 }
@@ -258,7 +258,7 @@ public class PostPrComment {
         return null;
     }
 
-    private static Map<String, String> publishPreviewsToBranch(Path previewDir, String repo, int prNumber, String token, boolean allowPush) throws IOException, InterruptedException {
+    private static Map<String, String> publishPreviewsToBranch(Path previewDir, String repo, int prNumber, String token, boolean allowPush, String previewSubdir) throws IOException, InterruptedException {
         if (previewDir == null || !Files.isDirectory(previewDir)) {
             return Map.of();
         }
@@ -302,6 +302,9 @@ public class PostPrComment {
             runGit(worktree, env, "checkout", "--orphan", "cn1ss-previews");
         }
         Path dest = worktree.resolve("pr-" + prNumber);
+        if (previewSubdir != null && !previewSubdir.isBlank()) {
+            dest = dest.resolve(previewSubdir);
+        }
         deleteRecursively(dest);
         Files.createDirectories(dest);
         for (Path source : imageFiles) {
@@ -320,6 +323,9 @@ public class PostPrComment {
             log("Preview branch already up-to-date for PR #" + prNumber);
         }
         String rawBase = "https://raw.githubusercontent.com/" + repo + "/cn1ss-previews/pr-" + prNumber;
+        if (previewSubdir != null && !previewSubdir.isBlank()) {
+            rawBase += "/" + previewSubdir;
+        }
         Map<String, String> urls = new LinkedHashMap<>();
         try (var stream = Files.list(dest)) {
             stream.filter(Files::isRegularFile)
@@ -444,12 +450,14 @@ public class PostPrComment {
         final Path previewDir;
         final String marker;
         final String logPrefix;
+        final String previewSubdir;
 
-        private Arguments(Path body, Path previewDir, String marker, String logPrefix) {
+        private Arguments(Path body, Path previewDir, String marker, String logPrefix, String previewSubdir) {
             this.body = body;
             this.previewDir = previewDir;
             this.marker = marker;
             this.logPrefix = logPrefix;
+            this.previewSubdir = previewSubdir;
         }
 
         static Arguments parse(String[] args) {
@@ -457,6 +465,7 @@ public class PostPrComment {
             Path previewDir = null;
             String marker = null;
             String logPrefix = null;
+            String previewSubdir = null;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
@@ -488,6 +497,13 @@ public class PostPrComment {
                         }
                         logPrefix = args[i];
                     }
+                    case "--preview-subdir" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --preview-subdir");
+                            return null;
+                        }
+                        previewSubdir = args[i];
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -498,7 +514,7 @@ public class PostPrComment {
                 System.err.println("--body is required");
                 return null;
             }
-            return new Arguments(body, previewDir, marker, logPrefix);
+            return new Arguments(body, previewDir, marker, logPrefix, previewSubdir);
         }
     }
 
