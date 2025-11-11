@@ -5013,7 +5013,6 @@ public final class Display extends CN1Constants {
         impl.screenshot(callback);
     }
 
-
                            /**
      * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
      *

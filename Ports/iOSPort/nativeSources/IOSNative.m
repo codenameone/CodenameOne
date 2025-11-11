@@ -5194,25 +5194,243 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #endif
 }
 
-static UIImage* cn1_captureView(UIView *view) {
+static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
+    if (renderView == nil || rootView == nil || ctx == NULL) {
+        return NO;
+    }
+    if (renderView.hidden || renderView.alpha <= 0.0f) {
+        return NO;
+    }
+
+    CGRect localBounds = renderView.bounds;
+    if (CGRectIsEmpty(localBounds) || localBounds.size.width <= 0.0f || localBounds.size.height <= 0.0f) {
+        return NO;
+    }
+
+    CGRect translatedRect = [rootView convertRect:localBounds fromView:renderView];
+    if (CGRectIsNull(translatedRect) || CGRectIsEmpty(translatedRect)) {
+        return NO;
+    }
+
+    CGContextSaveGState(ctx);
+    CGContextTranslateCTM(ctx, translatedRect.origin.x, translatedRect.origin.y);
+    BOOL drawn = NO;
+#if defined(ENABLE_WKWEBVIEW) && defined(supportsWKWebKit)
+    if ([renderView isKindOfClass:[WKWebView class]]) {
+        WKWebView *webView = (WKWebView *)renderView;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+        if (!drawn && @available(iOS 11.0, *)) {
+            CGRect snapshotRect = CGRectIntersection(webView.bounds, localBounds);
+            if (!CGRectIsNull(snapshotRect) && !CGRectIsEmpty(snapshotRect)) {
+                WKSnapshotConfiguration *config = [[WKSnapshotConfiguration alloc] init];
+                config.rect = snapshotRect;
+                if (snapshotRect.size.width > 0.0f) {
+                    config.snapshotWidth = @(snapshotRect.size.width);
+                }
+#ifdef __IPHONE_13_0
+                if (@available(iOS 13.0, *)) {
+                    config.afterScreenUpdates = YES;
+                }
+#endif
+                __block UIImage *snapshotImage = nil;
+                __block BOOL snapshotComplete = NO;
+                [webView takeSnapshotWithConfiguration:config completionHandler:^(UIImage * _Nullable image, NSError * _Nullable error) {
+                    if (image != nil) {
+                        snapshotImage = image;
+                    } else if (error != nil) {
+                        NSLog(@"WKWebView snapshot failed: %@", error);
+                    }
+                    snapshotComplete = YES;
+                }];
+                [config release];
+
+                if (!snapshotComplete) {
+                    NSTimeInterval timeout = 1.0;
+                    while (!snapshotComplete && timeout > 0) {
+                        NSTimeInterval step = 0.01;
+                        NSDate *stepDate = [NSDate dateWithTimeIntervalSinceNow:step];
+                        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:stepDate];
+                        timeout -= step;
+                    }
+                }
+
+                if (snapshotImage != nil) {
+                    [snapshotImage drawInRect:CGRectMake(0, 0, localBounds.size.width, localBounds.size.height)];
+                    drawn = YES;
+                }
+            }
+        }
+#endif
+        if (!drawn) {
+            UIView *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
+            if (snapshotView != nil) {
+                BOOL snapshotDrawn = NO;
+                if ([snapshotView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+                    snapshotDrawn = [snapshotView drawViewHierarchyInRect:snapshotView.bounds afterScreenUpdates:YES];
+                }
+                if (!snapshotDrawn) {
+                    [snapshotView.layer renderInContext:ctx];
+                }
+                drawn = YES;
+            }
+        }
+    }
+#endif
+    if (!drawn && [renderView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
+        drawn = [renderView drawViewHierarchyInRect:localBounds afterScreenUpdates:YES];
+    }
+    if (!drawn) {
+        [renderView.layer renderInContext:ctx];
+        drawn = YES;
+    }
+    CGContextRestoreGState(ctx);
+    return drawn;
+}
+
+static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
+    CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
+    EAGLView *glView = [controller eaglView];
+    if (glView == nil || rootView == nil || ctx == NULL) {
+        return;
+    }
+
+    UIView *peerLayer = glView.peerComponentsLayer;
+    NSArray<UIView *> *peerCandidates = nil;
+    if (peerLayer != nil) {
+        [peerLayer layoutIfNeeded];
+        peerCandidates = peerLayer.subviews;
+    } else {
+        [glView layoutIfNeeded];
+        peerCandidates = glView.subviews;
+    }
+
+    if (peerCandidates.count == 0) {
+        return;
+    }
+
+    for (UIView *peerView in peerCandidates) {
+        if (![peerView isKindOfClass:[UIView class]]) {
+            continue;
+        }
+        cn1_renderViewIntoContext(peerView, rootView, ctx);
+    }
+}
+
+static UIView* cn1_rootViewForCapture(UIView *view) {
     if (view == nil) {
         return nil;
     }
-    CGSize size = view.bounds.size;
+
+    UIView *rootView = view;
+    UIWindow *window = view.window;
+
+    if (window == nil) {
+        NSArray<UIWindow*> *windows = [UIApplication sharedApplication].windows;
+        for (UIWindow *candidate in windows) {
+            if ([view isDescendantOfView:candidate]) {
+                window = candidate;
+                break;
+            }
+        }
+    }
+
+    if (window == nil) {
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+        if (@available(iOS 13.0, *)) {
+            NSSet<UIScene *> *connectedScenes = [UIApplication sharedApplication].connectedScenes;
+            for (UIScene *scene in connectedScenes) {
+                if (![scene isKindOfClass:[UIWindowScene class]]) {
+                    continue;
+                }
+                if (scene.activationState != UISceneActivationStateForegroundActive) {
+                    continue;
+                }
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                for (UIWindow *candidate in windowScene.windows) {
+                    if ([view isDescendantOfView:candidate]) {
+                        window = candidate;
+                        break;
+                    }
+                }
+                if (window != nil) {
+                    break;
+                }
+                if (windowScene.windows.count > 0 && window == nil) {
+                    window = windowScene.windows.firstObject;
+                }
+            }
+        }
+#endif
+    }
+
+    if (window == nil) {
+        window = [UIApplication sharedApplication].keyWindow;
+    }
+
+    if (window != nil) {
+        rootView = window;
+    } else {
+        UIView *candidate = view;
+        while (candidate.superview != nil) {
+            candidate = candidate.superview;
+        }
+        rootView = candidate;
+    }
+
+    return rootView;
+}
+
+static UIImage* cn1_captureView(UIView *view) {
+    UIView *rootView = cn1_rootViewForCapture(view);
+    if (rootView == nil) {
+        return nil;
+    }
+
+    CGSize size = rootView.bounds.size;
     if (size.width <= 0 || size.height <= 0) {
         return nil;
     }
 
-    UIGraphicsBeginImageContextWithOptions(size, view.opaque, 0.0);
-    BOOL ok = NO;
-    if ([view respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
-        ok = [view drawViewHierarchyInRect:view.bounds afterScreenUpdates:YES];
+    UIGraphicsBeginImageContextWithOptions(size, rootView.opaque, 0.0);
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
+    if (ctx == NULL) {
+        UIGraphicsEndImageContext();
+        return nil;
     }
-    if (!ok) {
-        [view.layer renderInContext:UIGraphicsGetCurrentContext()];
+
+    [rootView layoutIfNeeded];
+
+    cn1_renderViewIntoContext(view, rootView, ctx);
+
+    CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
+    EAGLView *glView = [controller eaglView];
+    if (glView != nil && glView != view) {
+        cn1_renderViewIntoContext(glView, rootView, ctx);
     }
+
+    cn1_renderPeerComponents(rootView, ctx);
+
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
+
+    if (rootView != view) {
+        CGRect targetFrame = [rootView convertRect:view.bounds fromView:view];
+        targetFrame = CGRectIntersection(targetFrame, CGRectMake(0, 0, size.width, size.height));
+        if (!CGRectIsNull(targetFrame) && targetFrame.size.width > 0 && targetFrame.size.height > 0) {
+            CGRect integralTarget = CGRectIntegral(targetFrame);
+            CGRect pixelRect = CGRectMake(integralTarget.origin.x * image.scale,
+                                          integralTarget.origin.y * image.scale,
+                                          integralTarget.size.width * image.scale,
+                                          integralTarget.size.height * image.scale);
+            CGImageRef cropped = CGImageCreateWithImageInRect(image.CGImage, pixelRect);
+            if (cropped != nil) {
+                UIImage *croppedImage = [UIImage imageWithCGImage:cropped scale:image.scale orientation:image.imageOrientation];
+                CGImageRelease(cropped);
+                image = croppedImage;
+            }
+        }
+    }
+
     return image;
 }
 
