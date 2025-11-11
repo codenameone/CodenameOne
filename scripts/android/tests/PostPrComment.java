@@ -326,11 +326,12 @@ public class PostPrComment {
         if (previewSubdir != null && !previewSubdir.isBlank()) {
             rawBase += "/" + previewSubdir;
         }
+        final String rawBaseUrl = rawBase;
         Map<String, String> urls = new LinkedHashMap<>();
         try (var stream = Files.list(dest)) {
             stream.filter(Files::isRegularFile)
                     .sorted()
-                    .forEach(path -> urls.put(path.getFileName().toString(), rawBase + "/" + path.getFileName()));
+                    .forEach(path -> urls.put(path.getFileName().toString(), rawBaseUrl + "/" + path.getFileName()));
         }
         deleteRecursively(worktree);
         return urls;
