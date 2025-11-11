@@ -53,13 +53,13 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Test");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(5.0f);
+        btn.getAllStyles().setElevation(5);
 
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
         assertTrue(btn.getAllStyles().isSurface());
-        assertEquals(5.0f, btn.getAllStyles().getElevation(), 0.01f);
+        assertEquals(5, btn.getAllStyles().getElevation());
     }
 
     @FormTest
@@ -69,15 +69,15 @@ class SurfaceModeTest extends UITestBase {
 
         Button low = new Button("Low Elevation");
         low.getAllStyles().setSurface(true);
-        low.getAllStyles().setElevation(1.0f);
+        low.getAllStyles().setElevation(1);
 
         Button medium = new Button("Medium Elevation");
         medium.getAllStyles().setSurface(true);
-        medium.getAllStyles().setElevation(4.0f);
+        medium.getAllStyles().setElevation(4);
 
         Button high = new Button("High Elevation");
         high.getAllStyles().setSurface(true);
-        high.getAllStyles().setElevation(8.0f);
+        high.getAllStyles().setElevation(8);
 
         form.addAll(low, medium, high);
         form.revalidate();
@@ -93,7 +93,7 @@ class SurfaceModeTest extends UITestBase {
 
         Container container = new Container(BoxLayout.y());
         container.getAllStyles().setSurface(true);
-        container.getAllStyles().setElevation(3.0f);
+        container.getAllStyles().setElevation(3);
 
         container.add(new Label("Content"));
         form.add(BorderLayout.CENTER, container);
@@ -109,7 +109,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Rounded Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(4.0f);
+        btn.getAllStyles().setElevation(4);
 
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
@@ -124,7 +124,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Colored Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(3.0f);
+        btn.getAllStyles().setElevation(3);
         btn.getAllStyles().setBgColor(0xFF5722);
         btn.getAllStyles().setBgTransparency(255);
 
@@ -177,7 +177,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Animated Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(4.0f);
+        btn.getAllStyles().setElevation(4);
 
         form.add(btn);
         form.revalidate();
@@ -195,12 +195,12 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Zero Elevation");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(0.0f);
+        btn.getAllStyles().setElevation(0);
 
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertEquals(0.0f, btn.getAllStyles().getElevation(), 0.01f);
+        assertEquals(0, btn.getAllStyles().getElevation());
     }
 
     @FormTest
@@ -210,12 +210,12 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Max Elevation");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(24.0f);
+        btn.getAllStyles().setElevation(24);
 
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertEquals(24.0f, btn.getAllStyles().getElevation(), 0.01f);
+        assertEquals(24, btn.getAllStyles().getElevation());
     }
 
     @FormTest
@@ -226,13 +226,13 @@ class SurfaceModeTest extends UITestBase {
         Button btn = new Button("Multi-State");
 
         btn.getUnselectedStyle().setSurface(true);
-        btn.getUnselectedStyle().setElevation(2.0f);
+        btn.getUnselectedStyle().setElevation(2);
 
         btn.getSelectedStyle().setSurface(true);
-        btn.getSelectedStyle().setElevation(8.0f);
+        btn.getSelectedStyle().setElevation(8);
 
         btn.getPressedStyle().setSurface(true);
-        btn.getPressedStyle().setElevation(1.0f);
+        btn.getPressedStyle().setElevation(1);
 
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
@@ -249,7 +249,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Transparent Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(4.0f);
+        btn.getAllStyles().setElevation(4);
         btn.getAllStyles().setBgTransparency(128);
 
         form.add(BorderLayout.CENTER, btn);
@@ -268,7 +268,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Dialog Button");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(4.0f);
+        btn.getAllStyles().setElevation(4);
 
         dialog.add(BorderLayout.CENTER, btn);
 
@@ -282,7 +282,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Padded Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(3.0f);
+        btn.getAllStyles().setElevation(3);
         btn.getAllStyles().setMargin(10, 10, 10, 10);
         btn.getAllStyles().setPadding(15, 15, 15, 15);
 
@@ -299,7 +299,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Border Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(3.0f);
+        btn.getAllStyles().setElevation(3);
         btn.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createLineBorder(2));
 
         form.add(BorderLayout.CENTER, btn);
@@ -319,7 +319,7 @@ class SurfaceModeTest extends UITestBase {
         for (int i = 0; i < 20; i++) {
             Button btn = new Button("Surface " + i);
             btn.getAllStyles().setSurface(true);
-            btn.getAllStyles().setElevation(2.0f + i * 0.1f);
+            btn.getAllStyles().setElevation(2 + i);
             scrollable.add(btn);
         }
 
@@ -336,7 +336,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("Persistent Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(5.0f);
+        btn.getAllStyles().setElevation(5);
 
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
@@ -349,7 +349,7 @@ class SurfaceModeTest extends UITestBase {
         }
 
         assertTrue(btn.getAllStyles().isSurface());
-        assertEquals(5.0f, btn.getAllStyles().getElevation(), 0.01f);
+        assertEquals(5, btn.getAllStyles().getElevation());
     }
 
     @FormTest
@@ -359,7 +359,7 @@ class SurfaceModeTest extends UITestBase {
 
         Button btn = new Button("RTL Surface");
         btn.getAllStyles().setSurface(true);
-        btn.getAllStyles().setElevation(4.0f);
+        btn.getAllStyles().setElevation(4);
 
         form.add(BorderLayout.CENTER, btn);
         form.setRTL(true);

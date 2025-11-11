@@ -269,10 +269,11 @@ class AnimationEdgeCasesTest extends UITestBase {
         form.addAll(btn1, btn2, btn3);
         form.revalidate();
 
-        // Animate unlayout and remove component
-        form.animateUnlayoutAndWait(btn2, 200);
+        // Remove component and animate unlayout
+        form.removeComponent(btn2);
+        form.animateUnlayoutAndWait(200, 255);
 
-        assertEquals(2, form.getComponentCount());
+        assertEquals(2, form.getContentPane().getComponentCount());
         assertFalse(form.contains(btn2));
     }
 

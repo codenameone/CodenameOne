@@ -39,15 +39,13 @@ class LocalizationTest extends UITestBase {
     }
 
     @FormTest
-    void testLocalizationCountryCode() {
-        L10NManager usManager = new L10NManager("en", "US");
-        assertEquals("US", usManager.getCountry());
+    void testLocalizationSetLocale() {
+        L10NManager manager = new L10NManager("en", "US");
+        assertEquals("en", manager.getLanguage());
 
-        L10NManager ukManager = new L10NManager("en", "GB");
-        assertEquals("GB", ukManager.getCountry());
-
-        L10NManager canadaManager = new L10NManager("en", "CA");
-        assertEquals("CA", canadaManager.getCountry());
+        // Change locale
+        manager.setLocale("CA", "fr");
+        assertEquals("fr", manager.getLanguage());
     }
 
     @FormTest
@@ -213,23 +211,6 @@ class LocalizationTest extends UITestBase {
         L10NManager retrieved = impl.getLocalizationManager();
 
         assertEquals("en", retrieved.getLanguage());
-        assertEquals("US", retrieved.getCountry());
-    }
-
-    @FormTest
-    void testLocalizationWithDifferentRegions() {
-        L10NManager usEnglish = new L10NManager("en", "US");
-        L10NManager ukEnglish = new L10NManager("en", "GB");
-        L10NManager ausEnglish = new L10NManager("en", "AU");
-
-        assertEquals("US", usEnglish.getCountry());
-        assertEquals("GB", ukEnglish.getCountry());
-        assertEquals("AU", ausEnglish.getCountry());
-
-        // All should have same language
-        assertEquals("en", usEnglish.getLanguage());
-        assertEquals("en", ukEnglish.getLanguage());
-        assertEquals("en", ausEnglish.getLanguage());
     }
 
     @FormTest

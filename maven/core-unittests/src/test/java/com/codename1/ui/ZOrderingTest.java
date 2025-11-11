@@ -102,9 +102,12 @@ class ZOrderingTest extends UITestBase {
         Button btn = new Button("Click Me");
         form.add(BorderLayout.CENTER, btn);
 
-        Container glassPane = new Container();
-        glassPane.getAllStyles().setBgTransparency(128);
-        glassPane.getAllStyles().setBgColor(0x000000);
+        // Create a simple painter for glass pane
+        Painter glassPane = (g, rect) -> {
+            g.setAlpha(128);
+            g.setColor(0x000000);
+            g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+        };
 
         form.setGlassPane(glassPane);
         form.revalidate();
@@ -120,12 +123,11 @@ class ZOrderingTest extends UITestBase {
         Button btn = new Button("Click Me");
         form.add(BorderLayout.CENTER, btn);
 
-        Container glassPane = new Container();
-        glassPane.setBlockFocus(true);
+        Painter glassPane = (g, rect) -> {};
         form.setGlassPane(glassPane);
         form.revalidate();
 
-        // Glass pane should be on top
+        // Glass pane should be set
         assertNotNull(form.getGlassPane());
     }
 

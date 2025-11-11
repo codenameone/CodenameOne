@@ -143,11 +143,11 @@ class ContainerMethodsTest extends UITestBase {
         form.addAll(btn1, btn2, btn3);
         form.revalidate();
 
-        // Update tab indices
-        form.getContentPane().updateTabIndices();
+        // Update tab indices with offset
+        int result = form.getContentPane().updateTabIndices(0);
 
-        // Tab indices should be set
-        assertNotNull(form);
+        // Tab indices should be updated
+        assertTrue(result >= 0);
     }
 
     @FormTest
