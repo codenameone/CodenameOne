@@ -5290,8 +5290,8 @@ static BOOL cn1_renderEAGLViewIntoContext(EAGLView *glView, CGContextRef ctx, CG
     }
 
     CGContextSaveGState(ctx);
-    CGContextTranslateCTM(ctx, 0.0f, localBounds.size.height);
-    CGContextScaleCTM(ctx, 1.0f, -1.0f);
+    CGContextTranslateCTM(ctx, localBounds.size.width, localBounds.size.height);
+    CGContextScaleCTM(ctx, -1.0f, -1.0f);
     CGContextDrawImage(ctx, CGRectMake(0.0f, 0.0f, localBounds.size.width, localBounds.size.height), imageRef);
     CGContextRestoreGState(ctx);
 
