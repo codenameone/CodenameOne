@@ -278,6 +278,9 @@ cn1ss_post_pr_comment() {
   if [ -n "${CN1SS_COMMENT_LOG_PREFIX:-}" ]; then
     extra_args+=(--log-prefix "${CN1SS_COMMENT_LOG_PREFIX}")
   fi
+  if [ -n "${CN1SS_PREVIEW_SUBDIR:-}" ]; then
+    extra_args+=(--preview-subdir "${CN1SS_PREVIEW_SUBDIR}")
+  fi
   GITHUB_TOKEN="$comment_token" cn1ss_java_run "$CN1SS_POST_COMMENT_CLASS" \
     --body "$body_file" \
     --preview-dir "$preview_dir" \
