@@ -5,6 +5,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.TextSelection.Span;
+import com.codename1.ui.TextSelection.TextSelectionSupport;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
