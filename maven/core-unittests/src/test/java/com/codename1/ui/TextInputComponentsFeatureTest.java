@@ -51,6 +51,7 @@ class TextInputComponentsFeatureTest extends UITestBase {
             field.setAlignment(Component.LEFT);
             field.setCursorBlinkTimeOn(0);
             field.setCursorBlinkTimeOff(0);
+            field.setUseNativeTextInput(false);
 
             AtomicInteger actionCount = new AtomicInteger();
             field.addActionListener(new ActionListener() {
@@ -192,10 +193,10 @@ class TextInputComponentsFeatureTest extends UITestBase {
         area.setAlignment(Component.CENTER);
         assertEquals(Component.CENTER, area.getAlignment());
 
+        implementation.resetTextSelectionTracking();
         TextSelection selection = form.getTextSelection();
         selection.setEnabled(true);
         area.setTextSelectionEnabled(true);
-        implementation.resetTextSelectionTracking();
         selection.selectAll();
         assertEquals(1, implementation.getInitializeTextSelectionCount(), "Enabling selection should initialize implementation tracking");
         selection.copy();
@@ -297,8 +298,8 @@ class TextInputComponentsFeatureTest extends UITestBase {
             rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
         }
         int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
-        form.pointerPressed(selectX, selectY);
-        form.pointerReleased(selectX, selectY);
+        Display.getInstance().pointerPressed(selectX, selectY);
+        Display.getInstance().pointerReleased(selectX, selectY);
         flushSerialCalls();
 
         assertEquals("alpha", field.getText());
@@ -347,8 +348,8 @@ class TextInputComponentsFeatureTest extends UITestBase {
             rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
         }
         int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
-        form.pointerPressed(selectX, selectY);
-        form.pointerReleased(selectX, selectY);
+        Display.getInstance().pointerPressed(selectX, selectY);
+        Display.getInstance().pointerReleased(selectX, selectY);
         flushSerialCalls();
 
         assertEquals("green", field.getText(), "Selecting from popup should update the field text");
