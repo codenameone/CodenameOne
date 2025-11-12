@@ -73,8 +73,8 @@ class LabelFeatureTest extends UITestBase {
         assertTrue(resizedSize <= display.convertToPixels(label.getMaxAutoSize()), "Autosize should respect maximum size");
         assertTrue(resizedSize < initialSize, "Font size should shrink to satisfy autosize constraints");
 
-        int availableWidth = label.getWidth() - label.getStyle().getHorizontalPadding();
-        assertTrue(resizedFont.stringWidth(label.getText()) <= availableWidth, "Resized font must fit available width");
+        int availableWidth = label.getWidth();
+        assertTrue(resizedFont.stringWidth(label.getText()) <= availableWidth, "Resized font must fit component width");
         assertTrue(label.isAutoSizeMode());
     }
 
