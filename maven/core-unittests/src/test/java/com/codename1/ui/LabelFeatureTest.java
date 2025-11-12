@@ -47,8 +47,15 @@ class LabelFeatureTest extends UITestBase {
         Form form = Display.getInstance().getCurrent();
         form.removeAll();
 
+        Display display = Display.getInstance();
         Label label = new Label("Autosize verification text that should stretch");
-        label.setPreferredSize(new Dimension(120, 40));
+
+        Font baseFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE);
+        Font oversizedFont = baseFont.derive(display.convertToPixels(12f), baseFont.getStyle());
+        label.getAllStyles().setFont(oversizedFont);
+
+        int preferredWidth = display.convertToPixels(20f);
+        label.setPreferredSize(new Dimension(preferredWidth, display.convertToPixels(8f)));
         label.setAutoSizeMode(true);
         label.setMinAutoSize(2f);
         label.setMaxAutoSize(30f);
@@ -62,9 +69,9 @@ class LabelFeatureTest extends UITestBase {
         Font resizedFont = label.getUnselectedStyle().getFont();
         float resizedSize = resizedFont.getPixelSize();
 
-        assertTrue(resizedSize >= Display.getInstance().convertToPixels(2), "Autosize should respect minimum size");
-        assertTrue(resizedSize <= Display.getInstance().convertToPixels(30), "Autosize should respect maximum size");
-        assertNotEquals(initialSize, resizedSize, "Font size should change to satisfy autosize constraints");
+        assertTrue(resizedSize >= display.convertToPixels(label.getMinAutoSize()), "Autosize should respect minimum size");
+        assertTrue(resizedSize <= display.convertToPixels(label.getMaxAutoSize()), "Autosize should respect maximum size");
+        assertTrue(resizedSize < initialSize, "Font size should shrink to satisfy autosize constraints");
 
         int availableWidth = label.getWidth() - label.getStyle().getHorizontalPadding();
         assertTrue(resizedFont.stringWidth(label.getText()) <= availableWidth, "Resized font must fit available width");
