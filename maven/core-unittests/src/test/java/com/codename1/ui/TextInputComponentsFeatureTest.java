@@ -298,8 +298,8 @@ class TextInputComponentsFeatureTest extends UITestBase {
             rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
         }
         int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
-        Display.getInstance().pointerPressed(selectX, selectY);
-        Display.getInstance().pointerReleased(selectX, selectY);
+        Display.getInstance().pointerPressed(new int[]{selectX}, new int[]{selectY});
+        Display.getInstance().pointerReleased(new int[]{selectX}, new int[]{selectY});
         flushSerialCalls();
 
         assertEquals("alpha", field.getText());
@@ -348,8 +348,8 @@ class TextInputComponentsFeatureTest extends UITestBase {
             rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
         }
         int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
-        Display.getInstance().pointerPressed(selectX, selectY);
-        Display.getInstance().pointerReleased(selectX, selectY);
+        Display.getInstance().pointerPressed(new int[]{selectX}, new int[]{selectY});
+        Display.getInstance().pointerReleased(new int[]{selectX}, new int[]{selectY});
         flushSerialCalls();
 
         assertEquals("green", field.getText(), "Selecting from popup should update the field text");
