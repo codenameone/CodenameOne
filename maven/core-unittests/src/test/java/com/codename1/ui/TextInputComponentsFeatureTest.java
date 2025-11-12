@@ -254,11 +254,16 @@ class TextInputComponentsFeatureTest extends UITestBase {
         form.setLayout(BoxLayout.y());
 
         ListModel<String> model = new DefaultListModel<String>(new String[]{"alpha", "beta", "gamma"});
+        final DefaultListCellRenderer<String> baseRenderer = new DefaultListCellRenderer<String>();
         AtomicBoolean rendererInvoked = new AtomicBoolean(false);
-        ListCellRenderer<String> renderer = new DefaultListCellRenderer<String>() {
+        ListCellRenderer<String> renderer = new ListCellRenderer<String>() {
             public Component getListCellRendererComponent(com.codename1.ui.List list, Object value, int index, boolean isSelected) {
                 rendererInvoked.set(true);
-                return super.getListCellRendererComponent(list, value, index, isSelected);
+                return baseRenderer.getListCellRendererComponent(list, value, index, isSelected);
+            }
+
+            public Component getListFocusComponent(com.codename1.ui.List list) {
+                return baseRenderer.getListFocusComponent(list);
             }
         };
         AtomicReference<String> selected = new AtomicReference<String>(null);
@@ -287,7 +292,11 @@ class TextInputComponentsFeatureTest extends UITestBase {
         assertTrue(rendererInvoked.get(), "Custom renderer should be applied");
 
         int selectX = popupList.getAbsoluteX() + 2;
-        int selectY = popupList.getAbsoluteY() + popupList.getRowHeight() / 2;
+        int rowHeight = popupList.getHeight() / Math.max(1, popupList.getModel().getSize());
+        if (rowHeight <= 0) {
+            rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
+        }
+        int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
         form.pointerPressed(selectX, selectY);
         form.pointerReleased(selectX, selectY);
         flushSerialCalls();
@@ -333,7 +342,11 @@ class TextInputComponentsFeatureTest extends UITestBase {
         assertEquals(1, lists.size());
         com.codename1.ui.List popupList = (com.codename1.ui.List) lists.iterator().next();
         int selectX = popupList.getAbsoluteX() + 2;
-        int selectY = popupList.getAbsoluteY() + popupList.getRowHeight() / 2;
+        int rowHeight = popupList.getHeight() / Math.max(1, popupList.getModel().getSize());
+        if (rowHeight <= 0) {
+            rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
+        }
+        int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
         form.pointerPressed(selectX, selectY);
         form.pointerReleased(selectX, selectY);
         flushSerialCalls();
