@@ -1,6 +1,7 @@
 package com.codename1.components;
 
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Image;
 
@@ -45,11 +46,16 @@ class FileEncodedImageAsyncTest extends UITestBase {
 
     @FormTest
     void testGetImageDataReturnsPlaceholder() {
-        byte[] placeholder = new byte[10];
-        FileEncodedImageAsync img = FileEncodedImageAsync.create("non-existent-file", placeholder, 100, 100);
-        // File doesn't exist, so getImageData should return placeholder or null
-        byte[] data = img.getImageData();
-        assertTrue(data == null || data.length >= 0);
+        TestLogger.install();
+        try {
+            byte[] placeholder = new byte[10];
+            FileEncodedImageAsync img = FileEncodedImageAsync.create("non-existent-file", placeholder, 100, 100);
+            // File doesn't exist, so getImageData should return placeholder or null
+            byte[] data = img.getImageData();
+            assertTrue(data == null || data.length >= 0);
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     @FormTest

@@ -24,6 +24,7 @@
 package com.codename1.ui.plaf;
 
 import com.codename1.components.InfiniteProgress;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -1070,7 +1071,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         String text = l.getText();
         Font font = style.getFont();
         if (font == null) {
-            System.out.println("Missing font for " + l);
+            Log.p("Missing font for " + l);
             font = Font.getDefaultFont();
         }
         if (text != null && text.length() > 0) {

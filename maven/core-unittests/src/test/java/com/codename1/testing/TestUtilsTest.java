@@ -2,6 +2,7 @@ package com.codename1.testing;
 
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -90,24 +91,30 @@ class TestUtilsTest extends UITestBase {
 
     @FormTest
     void assertionHelpersValidateExpectations() {
-        TestUtils.assertEqual(5, 5);
-        RuntimeException mismatch = assertThrows(RuntimeException.class, () -> TestUtils.assertEqual(5, 4));
-        assertTrue(mismatch.getMessage().contains("Expected [5], Actual [4]"));
+        TestLogger.install();
+        try {
+            TestUtils.assertEqual(5, 5);
+            RuntimeException mismatch = assertThrows(RuntimeException.class, () -> TestUtils.assertEqual(5, 4));
+            assertTrue(mismatch.getMessage().contains("Expected [5], Actual [4]"));
 
-        TestUtils.assertNotEqual("a", "b");
-        assertThrows(RuntimeException.class, () -> TestUtils.assertNotEqual("a", "a"));
+            TestUtils.assertNotEqual("a", "b");
+            assertThrows(RuntimeException.class, () -> TestUtils.assertNotEqual("a", "a"));
 
-        TestUtils.assertTrue(true);
-        assertThrows(RuntimeException.class, () -> TestUtils.assertTrue(false));
+            TestUtils.assertTrue(true);
+            assertThrows(RuntimeException.class, () -> TestUtils.assertTrue(false));
 
-        TestUtils.assertFalse(false);
-        assertThrows(RuntimeException.class, () -> TestUtils.assertFalse(true));
+            TestUtils.assertFalse(false);
+            assertThrows(RuntimeException.class, () -> TestUtils.assertFalse(true));
 
-        TestUtils.assertNull(null);
-        assertThrows(RuntimeException.class, () -> TestUtils.assertNull("value"));
+            TestUtils.assertNull(null);
+            assertThrows(RuntimeException.class, () -> TestUtils.assertNull("value"));
 
-        TestUtils.assertNotNull("value");
-        assertThrows(RuntimeException.class, () -> TestUtils.assertNotNull(null));
+            TestUtils.assertNotNull("value");
+            assertThrows(RuntimeException.class, () -> TestUtils.assertNotNull(null));
+            assertEquals(2, TestLogger.getPrinted().size());
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     private static class RecordingButton extends Button {

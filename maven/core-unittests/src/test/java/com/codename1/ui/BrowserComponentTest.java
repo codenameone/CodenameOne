@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -37,16 +38,23 @@ public class BrowserComponentTest extends UITestBase {
 
     @FormTest
     void constructorKeepsPlaceholderWhenPeerUnavailable() throws Exception {
-        implementation.setBrowserComponent(null);
+        TestLogger.install();
+        try {
+            implementation.setBrowserComponent(null);
 
-        BrowserComponent browser = new BrowserComponent();
-        flushSerialCalls();
+            BrowserComponent browser = new BrowserComponent();
+            flushSerialCalls();
 
-        PeerComponent internal = getPrivateField(browser, "internal", PeerComponent.class);
-        assertNull(internal, "Internal peer should remain null when implementation cannot create it");
-        Component placeholder = getPrivateField(browser, "placeholder", Component.class);
-        assertEquals(1, browser.getComponentCount());
-        assertSame(placeholder, browser.getComponentAt(0));
+            PeerComponent internal = getPrivateField(browser, "internal", PeerComponent.class);
+            assertNull(internal, "Internal peer should remain null when implementation cannot create it");
+            Component placeholder = getPrivateField(browser, "placeholder", Component.class);
+            assertEquals(1, browser.getComponentCount());
+            assertSame(placeholder, browser.getComponentAt(0));
+            assertEquals(1, TestLogger.getPrinted().size());
+            assertTrue(TestLogger.getPrinted().get(0).contains("Failed to create browser component."));
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     @FormTest

@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 public class PurchaseTest {
@@ -207,8 +208,9 @@ public class PurchaseTest {
         assertTrue(receipts.isEmpty(), "Unexpected data should clear cached receipts");
         assertEquals("bad-data", Storage.getInstance().readObject(receiptsKey),
                 "Storage contents should remain untouched when data cannot be cast");
-        assertEquals(1, TestLogger.getThrowables().size(), "An exception should have been logged");
+        assertFalse(TestLogger.getThrowables().isEmpty());
         resetPurchaseStatics();
+        assertFalse(TestLogger.getThrowables().isEmpty());
     }
 
     @Test

@@ -24,6 +24,7 @@
 
 package com.codename1.io;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.util.StringUtil;
 
 import java.io.DataInputStream;
@@ -196,7 +197,8 @@ public class Storage {
      */
     public boolean exists(String name) {
         name = fixFileName(name);
-        return Util.getImplementation().storageFileExists(name);
+        CodenameOneImplementation implementation = Util.getImplementation();
+        return implementation != null && implementation.storageFileExists(name);
     }
 
     /**

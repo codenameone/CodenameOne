@@ -56,6 +56,7 @@ class NetworkManagerTest {
 
     @FormTest
     void errorListenersReceiveEvents() {
+        Util.setImplementation(implementation);
         AtomicInteger invocations = new AtomicInteger();
         ActionListener<NetworkEvent> listener = evt -> {
             invocations.incrementAndGet();
