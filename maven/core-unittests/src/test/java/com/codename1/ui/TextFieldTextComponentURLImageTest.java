@@ -176,4 +176,160 @@ class TextFieldTextComponentURLImageTest extends UITestBase {
         assertArrayEquals(cachedData, result);
         storage.deleteStorageFile("urlImageKey");
     }
+
+    @FormTest
+    void textFieldConstructorsAndBasicMethods() {
+        TextField tf1 = new TextField();
+        assertNotNull(tf1);
+        assertTrue(tf1.getText() == null || tf1.getText().isEmpty());
+
+        TextField tf2 = new TextField("Hello");
+        assertEquals("Hello", tf2.getText());
+
+        TextField tf3 = new TextField("", 20);
+        assertEquals(20, tf3.getColumns());
+
+        TextField tf4 = new TextField("Text", 15);
+        assertEquals("Text", tf4.getText());
+        assertEquals(15, tf4.getColumns());
+    }
+
+    @FormTest
+    void textFieldDoneListener() {
+        TextField field = new TextField();
+        final boolean[] listenerCalled = {false};
+
+        ActionListener listener = evt -> listenerCalled[0] = true;
+        field.setDoneListener(listener);
+
+        // Just verify listener can be set
+        assertNotNull(field);
+    }
+
+    @FormTest
+    void textComponentConstructors() {
+        TextComponent tc1 = new TextComponent();
+        assertNotNull(tc1);
+    }
+
+    @FormTest
+    void textComponentLabelAndHint() {
+        TextComponent tc = new TextComponent();
+
+        tc.label("Name");
+        assertEquals("Name", tc.getLabel().getText());
+
+        tc.hint("Enter name");
+        assertEquals("Enter name", tc.getField().getHint());
+    }
+
+    @FormTest
+    void textComponentTextAndColumns() {
+        TextComponent tc = new TextComponent();
+
+        tc.text("Hello");
+        assertEquals("Hello", tc.getField().getText());
+
+        tc.columns(25);
+        assertEquals(25, tc.getField().getColumns());
+
+        tc.rows(5);
+        assertEquals(5, tc.getField().getRows());
+    }
+
+    @FormTest
+    void textComponentConstraint() {
+        TextComponent tc = new TextComponent();
+
+        tc.constraint(TextArea.NUMERIC);
+        assertEquals(TextArea.NUMERIC, tc.getField().getConstraint());
+
+        tc.constraint(TextArea.PASSWORD);
+        assertEquals(TextArea.PASSWORD, tc.getField().getConstraint());
+    }
+
+    @FormTest
+    void textComponentEditable() {
+        TextComponent tc = new TextComponent();
+
+        tc.getField().setEditable(true);
+        assertTrue(tc.getField().isEditable());
+
+        tc.getField().setEditable(false);
+        assertFalse(tc.getField().isEditable());
+    }
+
+    @FormTest
+    void textComponentErrorMessage() {
+        TextComponent tc = new TextComponent();
+
+        tc.errorMessage("Invalid input");
+        Component errorComponent = tc.getErrorMessage();
+        assertNotNull(errorComponent);
+        assertTrue(errorComponent instanceof Label);
+        assertEquals("Invalid input", ((Label) errorComponent).getText());
+
+        tc.errorMessage(null);
+        Component clearedError = tc.getErrorMessage();
+        assertNotNull(clearedError);
+        assertEquals("", ((Label) clearedError).getText());
+    }
+
+    @FormTest
+    void textComponentActionListener() {
+        TextComponent tc = new TextComponent();
+        final boolean[] listenerCalled = {false};
+
+        ActionListener listener = evt -> listenerCalled[0] = true;
+        tc.getField().addActionListener(listener);
+
+        // Just verify listener can be added
+        assertNotNull(tc);
+    }
+
+    @FormTest
+    void textComponentDataChangeListener() {
+        TextComponent tc = new TextComponent();
+        final boolean[] listenerCalled = {false};
+
+        tc.getField().addDataChangeListener((type, index) -> listenerCalled[0] = true);
+
+        // Just verify listener can be added
+        assertNotNull(tc);
+    }
+
+    @FormTest
+    void autoCompleteTextFieldConstructors() {
+        DefaultListModel<String> model = new DefaultListModel<String>();
+        AutoCompleteTextField field = new AutoCompleteTextField(model);
+        assertNotNull(field);
+    }
+
+    @FormTest
+    void autoCompleteTextFieldMinimumLength() {
+        DefaultListModel<String> model = new DefaultListModel<String>(
+            new String[]{"Apple", "Apricot", "Banana", "Cherry"}
+        );
+        AutoCompleteTextField field = new AutoCompleteTextField(model);
+
+        field.setMinimumLength(2);
+        assertEquals(2, field.getMinimumLength());
+
+        field.setMinimumLength(3);
+        assertEquals(3, field.getMinimumLength());
+    }
+
+    @FormTest
+    void autoCompleteTextFieldPopupPosition() {
+        DefaultListModel<String> model = new DefaultListModel<String>();
+        AutoCompleteTextField field = new AutoCompleteTextField(model);
+
+        field.setPopupPosition(AutoCompleteTextField.POPUP_POSITION_OVER);
+        // Just verify it can be set without crashing
+        assertNotNull(field);
+
+        field.setPopupPosition(AutoCompleteTextField.POPUP_POSITION_UNDER);
+        assertNotNull(field);
+    }
+
 }

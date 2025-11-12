@@ -300,7 +300,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static SuccessCallback<Image> screenshotCallback;
-
     @Override
     public void screenshot(final SuccessCallback<Image> callback) {
         if (callback == null) {
