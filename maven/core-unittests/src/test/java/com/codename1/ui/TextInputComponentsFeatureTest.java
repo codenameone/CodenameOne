@@ -257,7 +257,7 @@ class TextInputComponentsFeatureTest extends UITestBase {
         final DefaultListCellRenderer<String> baseRenderer = new DefaultListCellRenderer<String>();
         AtomicBoolean rendererInvoked = new AtomicBoolean(false);
         ListCellRenderer<String> renderer = new ListCellRenderer<String>() {
-            public Component getListCellRendererComponent(com.codename1.ui.List list, Object value, int index, boolean isSelected) {
+            public Component getListCellRendererComponent(com.codename1.ui.List list, String value, int index, boolean isSelected) {
                 rendererInvoked.set(true);
                 return baseRenderer.getListCellRendererComponent(list, value, index, isSelected);
             }
