@@ -24,7 +24,7 @@ class SurfaceModeTest extends UITestBase {
         btn.getAllStyles().setSurface(true);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -37,7 +37,7 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
 
         // Disable surface mode
         btn.getAllStyles().setSurface(false);
@@ -58,8 +58,8 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
-        assertEquals(5, btn.getAllStyles().getElevation());
+        assertTrue(btn.getUnselectedStyle().isSurface());
+        assertEquals(5, btn.getUnselectedStyle().getElevation());
     }
 
     @FormTest
@@ -82,8 +82,8 @@ class SurfaceModeTest extends UITestBase {
         form.addAll(low, medium, high);
         form.revalidate();
 
-        assertTrue(low.getAllStyles().getElevation() < medium.getAllStyles().getElevation());
-        assertTrue(medium.getAllStyles().getElevation() < high.getAllStyles().getElevation());
+        assertTrue(low.getUnselectedStyle().getElevation() < medium.getUnselectedStyle().getElevation());
+        assertTrue(medium.getUnselectedStyle().getElevation() < high.getUnselectedStyle().getElevation());
     }
 
     @FormTest
@@ -99,7 +99,7 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, container);
         form.revalidate();
 
-        assertTrue(container.getAllStyles().isSurface());
+        assertTrue(container.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -114,7 +114,7 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -131,8 +131,8 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
-        assertEquals(0xFF5722, btn.getAllStyles().getBgColor());
+        assertTrue(btn.getUnselectedStyle().isSurface());
+        assertEquals(0xFF5722, btn.getUnselectedStyle().getBgColor());
     }
 
     @FormTest
@@ -149,7 +149,7 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, parent);
         form.revalidate();
 
-        assertTrue(parent.getAllStyles().isSurface());
+        assertTrue(parent.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -185,7 +185,7 @@ class SurfaceModeTest extends UITestBase {
         // Animate layout
         form.animateLayout(200);
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -215,7 +215,7 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertEquals(24, btn.getAllStyles().getElevation());
+        assertEquals(24, btn.getUnselectedStyle().getElevation());
     }
 
     @FormTest
@@ -250,13 +250,13 @@ class SurfaceModeTest extends UITestBase {
         Button btn = new Button("Transparent Surface");
         btn.getAllStyles().setSurface(true);
         btn.getAllStyles().setElevation(4);
-        btn.getAllStyles().setBgTransparency(128);
+        btn.getAllStyles().setBgTransparency(20);
 
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
-        assertEquals(128, btn.getAllStyles().getBgTransparency());
+        assertTrue(btn.getUnselectedStyle().isSurface());
+        assertEquals(20, btn.getUnselectedStyle().getBgTransparency());
     }
 
     @FormTest
@@ -272,7 +272,7 @@ class SurfaceModeTest extends UITestBase {
 
         dialog.add(BorderLayout.CENTER, btn);
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -289,7 +289,7 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -305,7 +305,7 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
     }
 
     @FormTest
@@ -341,15 +341,15 @@ class SurfaceModeTest extends UITestBase {
         form.add(BorderLayout.CENTER, btn);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
 
         // Revalidate multiple times
         for (int i = 0; i < 5; i++) {
             form.revalidate();
         }
 
-        assertTrue(btn.getAllStyles().isSurface());
-        assertEquals(5, btn.getAllStyles().getElevation());
+        assertTrue(btn.getUnselectedStyle().isSurface());
+        assertEquals(5, btn.getUnselectedStyle().getElevation());
     }
 
     @FormTest
@@ -365,7 +365,7 @@ class SurfaceModeTest extends UITestBase {
         form.setRTL(true);
         form.revalidate();
 
-        assertTrue(btn.getAllStyles().isSurface());
+        assertTrue(btn.getUnselectedStyle().isSurface());
         assertTrue(form.isRTL());
     }
 }

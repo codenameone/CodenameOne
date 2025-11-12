@@ -57,7 +57,8 @@ class LeadComponentTest extends UITestBase {
         });
 
         // Simulate click on lead component
-        mb.fireActionEvent();
+        mb.getLeadComponent().pointerPressed(5, 5);
+        mb.getLeadComponent().pointerReleased(5, 5);
 
         assertTrue(clicked[0]);
     }

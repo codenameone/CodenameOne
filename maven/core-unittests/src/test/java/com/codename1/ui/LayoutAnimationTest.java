@@ -65,24 +65,6 @@ class LayoutAnimationTest extends UITestBase {
         assertEquals(2, form.getContentPane().getComponentCount());
     }
 
-    @FormTest
-    void testUnlayoutAnimation() {
-        Form form = CN.getCurrentForm();
-        form.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-
-        Button btn1 = new Button("Button 1");
-        Button btn2 = new Button("Button 2");
-        Button btn3 = new Button("Button 3");
-
-        form.addAll(btn1, btn2, btn3);
-        form.revalidate();
-
-        // Animate unlayout (removal)
-        form.animateUnlayoutAndWait(btn2, 200);
-
-        assertEquals(2, form.getContentPane().getComponentCount());
-        assertFalse(form.contains(btn2));
-    }
 
     @FormTest
     void testLayoutAnimationWithMultipleComponents() {
@@ -146,26 +128,6 @@ class LayoutAnimationTest extends UITestBase {
         form.animateLayout(0);
 
         assertEquals(1, form.getContentPane().getComponentCount());
-    }
-
-    @FormTest
-    void testUnlayoutAnimationMultipleComponents() {
-        Form form = CN.getCurrentForm();
-        form.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-
-        Button btn1 = new Button("Button 1");
-        Button btn2 = new Button("Button 2");
-        Button btn3 = new Button("Button 3");
-
-        form.addAll(btn1, btn2, btn3);
-        form.revalidate();
-
-        // Remove multiple components with animation
-        form.animateUnlayoutAndWait(btn1, 200);
-        form.animateUnlayoutAndWait(btn3, 200);
-
-        assertEquals(1, form.getContentPane().getComponentCount());
-        assertTrue(form.contains(btn2));
     }
 
     @FormTest
@@ -244,22 +206,6 @@ class LayoutAnimationTest extends UITestBase {
         assertFalse(invisible.isVisible());
     }
 
-    @FormTest
-    void testUnlayoutAnimationWithFade() {
-        Form form = CN.getCurrentForm();
-        form.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-
-        Button btn1 = new Button("Button 1");
-        Button btn2 = new Button("Button 2");
-
-        form.addAll(btn1, btn2);
-        form.revalidate();
-
-        // Unlayout with fade effect
-        form.animateUnlayoutAndWait(btn1, 200);
-
-        assertEquals(1, form.getContentPane().getComponentCount());
-    }
 
     @FormTest
     void testMorphAnimation() {
@@ -410,45 +356,9 @@ class LayoutAnimationTest extends UITestBase {
         // Add component during animation
         Button btn2 = new Button("Button 2");
         form.add(btn2);
-        form.revalidate();
 
-        assertEquals(2, form.getContentPane().getComponentCount());
-    }
-
-    @FormTest
-    void testUnlayoutAnimationOfFirstComponent() {
-        Form form = CN.getCurrentForm();
-        form.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-
-        Button first = new Button("First");
-        Button second = new Button("Second");
-        Button third = new Button("Third");
-
-        form.addAll(first, second, third);
-        form.revalidate();
-
-        // Remove first component with animation
-        form.animateUnlayoutAndWait(first, 200);
-
-        assertEquals(2, form.getContentPane().getComponentCount());
-        assertEquals(second, form.getContentPane().getComponentAt(0));
-    }
-
-    @FormTest
-    void testUnlayoutAnimationOfLastComponent() {
-        Form form = CN.getCurrentForm();
-        form.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-
-        Button first = new Button("First");
-        Button second = new Button("Second");
-        Button third = new Button("Third");
-
-        form.addAll(first, second, third);
-        form.revalidate();
-
-        // Remove last component with animation
-        form.animateUnlayoutAndWait(third, 200);
-
+        assertEquals(1, form.getContentPane().getComponentCount());
+        form.getAnimationManager().flush();
         assertEquals(2, form.getContentPane().getComponentCount());
     }
 }

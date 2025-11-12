@@ -1,7 +1,9 @@
 package com.codename1.ui;
 
+import com.codename1.io.Util;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -23,7 +25,6 @@ class AnimationEdgeCasesTest extends UITestBase {
 
         form.add(btn1);
         form.add(btn2);
-        form.revalidate();
 
         // Start layout animation
         form.animateLayout(200);
@@ -31,9 +32,12 @@ class AnimationEdgeCasesTest extends UITestBase {
         // Add component during animation
         Button btn3 = new Button("Button 3");
         form.add(btn3);
-        form.revalidate();
 
-        assertEquals(3, form.getComponentCount());
+        // component isn't added during animation
+        assertEquals(2, form.getContentPane().getComponentCount());
+
+        form.getAnimationManager().flush();
+        assertEquals(3, form.getContentPane().getComponentCount());
     }
 
     @FormTest
@@ -101,8 +105,9 @@ class AnimationEdgeCasesTest extends UITestBase {
         // Add component to container during animation
         Button btn2 = new Button("Button 2");
         container.add(btn2);
-        form.revalidate();
 
+        assertEquals(1, container.getComponentCount());
+        form.getAnimationManager().flush();
         assertEquals(2, container.getComponentCount());
     }
 
@@ -201,16 +206,25 @@ class AnimationEdgeCasesTest extends UITestBase {
         for (int i = 0; i < 10; i++) {
             form.add(new Button("Button " + i));
         }
-        form.revalidate();
 
         // Start animation
         form.animateLayout(200);
 
         // Remove all components
         form.removeAll();
-        form.revalidate();
 
-        assertEquals(0, form.getComponentCount());
+        // Actual removal is deferred
+        assertEquals(10, form.getContentPane().getComponentCount());
+
+        TestUtils.waitFor(150);
+        for (int iter = 0; iter < 50; iter++) {
+            TestUtils.waitFor(10);
+            if (form.getContentPane().getComponentCount() == 0) {
+                // success, removed after animation completed
+                return;
+            }
+        }
+        fail("Components weren't removed after animation");
     }
 
     @FormTest
@@ -225,16 +239,14 @@ class AnimationEdgeCasesTest extends UITestBase {
 
         container.addAll(btn1, btn2, btn3);
         form.add(container);
-        form.revalidate();
 
         // Start morph animation
         container.animateHierarchy(200);
 
         // Remove component during morph
         container.removeComponent(btn2);
-        form.revalidate();
 
-        assertEquals(2, container.getComponentCount());
+        assertEquals(3, container.getComponentCount());
     }
 
     @FormTest

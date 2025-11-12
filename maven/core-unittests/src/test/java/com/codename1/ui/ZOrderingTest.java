@@ -83,7 +83,6 @@ class ZOrderingTest extends UITestBase {
         Label fullScreen = new Label("Full Screen");
         Label topCenter = new Label("Top Center");
 
-        form.add(LayeredLayout.encloseIn(fullScreen));
         form.add(LayeredLayout.encloseIn(
             fullScreen,
             topCenter
@@ -145,7 +144,7 @@ class ZOrderingTest extends UITestBase {
         }
 
         form.revalidate();
-        assertEquals(5, form.getComponentCount());
+        assertEquals(5, form.getContentPane().getComponentCount());
     }
 
     @FormTest
@@ -289,7 +288,7 @@ class ZOrderingTest extends UITestBase {
         form.add(label1);
         form.revalidate();
 
-        assertEquals(form.getComponentCount() - 1, form.getComponentIndex(label1));
+        assertEquals(form.getContentPane().getComponentCount() - 1, form.getComponentIndex(label1));
     }
 
     @FormTest

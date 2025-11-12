@@ -387,10 +387,10 @@ class ScrollComponentToVisibleTest extends UITestBase {
 
         Container scrollable = new Container(BoxLayout.y());
         scrollable.setScrollableY(true);
-        scrollable.setHeight(200);
+        scrollable.setPreferredSize(new Dimension(200, 200));
 
         Button zeroHeight = new Button("Zero");
-        zeroHeight.setHeight(0);
+        zeroHeight.setPreferredH(0);
 
         scrollable.add(new Button("Before"));
         scrollable.add(zeroHeight);

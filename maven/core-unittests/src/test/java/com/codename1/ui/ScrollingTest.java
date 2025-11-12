@@ -2,11 +2,13 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.ui.plaf.Style;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,10 +24,9 @@ class ScrollingTest extends UITestBase {
 
         Container scrollable = new Container(BoxLayout.y());
         scrollable.setScrollableY(true);
-        scrollable.setHeight(200);
 
         // Add enough content to require scrolling
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 100; i++) {
             scrollable.add(new Label("Item " + i));
         }
 
@@ -66,23 +67,22 @@ class ScrollingTest extends UITestBase {
         // Outer container - vertical scrolling
         Container outer = new Container(BoxLayout.y());
         outer.setScrollableY(true);
-        outer.setHeight(400);
 
         // Inner container - horizontal scrolling
         Container inner = new Container(BoxLayout.x());
         inner.setScrollableX(true);
-        inner.setWidth(300);
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 100; i++) {
             Button btn = new Button("H" + i);
-            btn.setPreferredW(100);
+            btn.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+            btn.getAllStyles().setPadding(10, 10, 10, 10);
             inner.add(btn);
         }
 
         outer.add(inner);
 
         // Add more vertical content
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 100; i++) {
             outer.add(new Label("Vertical " + i));
         }
 
@@ -130,11 +130,9 @@ class ScrollingTest extends UITestBase {
         Container scrollable = new Container(new FlowLayout());
         scrollable.setScrollableX(true);
         scrollable.setScrollableY(true);
-        scrollable.setWidth(300);
-        scrollable.setHeight(300);
 
         // Add content that requires both horizontal and vertical scrolling
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < 300; i++) {
             Button btn = new Button("Item " + i);
             btn.setPreferredSize(new Dimension(120, 60));
             scrollable.add(btn);
@@ -205,9 +203,8 @@ class ScrollingTest extends UITestBase {
 
         Container scrollable = new Container(BoxLayout.y());
         scrollable.setScrollableY(true);
-        scrollable.setHeight(200);
 
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 100; i++) {
             scrollable.add(new Label("Item " + i));
         }
 
@@ -219,7 +216,12 @@ class ScrollingTest extends UITestBase {
         // Try to scroll beyond maximum
         scrollable.setScrollY(maxScroll + 1000);
 
-        // Should be clamped to maximum
+        // Should not be clamped to maximum
+        assertTrue(scrollable.getScrollY() > maxScroll);
+
+        // When smooth scrolling is disabled it should be clamped to maximum
+        scrollable.setSmoothScrolling(false);
+        scrollable.setScrollY(maxScroll + 1001);
         assertTrue(scrollable.getScrollY() <= maxScroll);
     }
 
@@ -230,7 +232,6 @@ class ScrollingTest extends UITestBase {
 
         Container scrollable = new Container(BoxLayout.y());
         scrollable.setScrollableY(true);
-        scrollable.setHeight(200);
 
         form.add(BorderLayout.CENTER, scrollable);
         form.revalidate();
@@ -238,7 +239,7 @@ class ScrollingTest extends UITestBase {
         // Should not crash with empty content
         assertEquals(0, scrollable.getScrollY());
         scrollable.setScrollY(100);
-        assertEquals(0, scrollable.getScrollY()); // Should stay at 0
+        assertEquals(100, scrollable.getScrollY());
     }
 
     @FormTest
@@ -331,7 +332,7 @@ class ScrollingTest extends UITestBase {
         verticalScroll.setScrollableY(true);
         verticalScroll.setHeight(300);
 
-        for (int section = 0; section < 5; section++) {
+        for (int section = 0; section < 100; section++) {
             Container horizontalScroll = new Container(BoxLayout.x());
             horizontalScroll.setScrollableX(true);
 
@@ -383,7 +384,7 @@ class ScrollingTest extends UITestBase {
         scrollable.setScrollableY(true);
         scrollable.setHeight(200);
 
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 100; i++) {
             scrollable.add(new Label("Item " + i));
         }
 

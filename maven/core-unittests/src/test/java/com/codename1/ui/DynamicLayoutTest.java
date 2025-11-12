@@ -201,7 +201,7 @@ class DynamicLayoutTest extends UITestBase {
         Container scrollable = new Container(BoxLayout.y());
         scrollable.setScrollableY(true);
 
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 130; i++) {
             scrollable.add(new Label("Item " + i));
         }
 
@@ -335,6 +335,7 @@ class DynamicLayoutTest extends UITestBase {
 
         // Change layout and observe position change
         form.setLayout(new BorderLayout());
+        btn.remove();
         form.add(BorderLayout.SOUTH, btn);
         form.revalidate();
 

@@ -3,14 +3,12 @@ package com.codename1.components;
 import com.codename1.io.Storage;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.Display;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.Image;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -53,7 +51,10 @@ class StorageImageAsyncTest extends UITestBase {
         StorageImageAsync image = StorageImageAsync.create("async", placeholder);
         image.getInternal();
 
-        waitForImageData(image);
+        while(image.getInternal() == placeholder) {
+            TestUtils.waitFor(10);
+        }
+
         assertArrayEquals(encoded, image.getImageData());
 
         Image loaded = image.getInternal();
@@ -81,25 +82,6 @@ class StorageImageAsyncTest extends UITestBase {
         TestImage placeholder = new TestImage(6, 6);
         StorageImageAsync image = StorageImageAsync.create("anything", placeholder);
         assertTrue(image.isAnimation());
-    }
-
-    private void waitForImageData(StorageImageAsync image) throws Exception {
-        Method processSerialCalls = Display.class.getDeclaredMethod("processSerialCalls");
-        processSerialCalls.setAccessible(true);
-        long start = System.currentTimeMillis();
-        while (getImageDataField(image) == null) {
-            processSerialCalls.invoke(Display.getInstance());
-            if (System.currentTimeMillis() - start > 2000) {
-                fail("Timed out waiting for image data to load");
-            }
-            Thread.sleep(10);
-        }
-    }
-
-    private byte[] getImageDataField(StorageImageAsync image) throws Exception {
-        Field field = StorageImageAsync.class.getDeclaredField("imageData");
-        field.setAccessible(true);
-        return (byte[]) field.get(image);
     }
 
     private boolean isImageCreated(StorageImageAsync image) throws Exception {

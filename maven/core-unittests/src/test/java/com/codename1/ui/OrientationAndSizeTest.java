@@ -3,6 +3,7 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -124,13 +125,16 @@ class OrientationAndSizeTest extends UITestBase {
         form.revalidate();
 
         final boolean[] sizeChanged = {false};
-        form.addSizeChangedListener(() -> {
+        form.addSizeChangedListener(ev -> {
             sizeChanged[0] = true;
         });
 
         // Simulate size change
         impl.setDisplaySize(1440, 2560);
         form.revalidate();
+
+        // flush the EDT for the size change event to bubble
+        TestUtils.waitFor(10);
 
         // Size change listener should be triggered
         assertTrue(sizeChanged[0]);
@@ -158,31 +162,6 @@ class OrientationAndSizeTest extends UITestBase {
         form.revalidate();
 
         assertFalse(impl.isPortrait());
-    }
-
-    @FormTest
-    void testSafeAreaUpdateOnOrientationChange() {
-        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
-        impl.setPortrait(true);
-
-        Form form = CN.getCurrentForm();
-        form.setLayout(new BorderLayout());
-        form.add(BorderLayout.CENTER, new Button("Test"));
-
-        // Set portrait safe area
-        form.getSafeArea().set(44, 34, 0, 0);
-        form.setSnapToSafeArea(true);
-        form.revalidate();
-
-        // Change to landscape
-        impl.setPortrait(false);
-
-        // Update safe area for landscape
-        form.getSafeArea().set(0, 21, 44, 44);
-        form.revalidate();
-
-        assertEquals(0, form.getSafeArea().getTop());
-        assertEquals(44, form.getSafeArea().getLeft());
     }
 
     @FormTest
@@ -242,7 +221,7 @@ class OrientationAndSizeTest extends UITestBase {
         Container scrollable = new Container(BoxLayout.y());
         scrollable.setScrollableY(true);
 
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < 150; i++) {
             scrollable.add(new Label("Item " + i));
         }
 

@@ -369,6 +369,6 @@ class FocusReplacementTest extends UITestBase {
         form.revalidate();
 
         // Form should handle lack of focusable components
-        assertEquals(3, form.getComponentCount());
+        assertEquals(3, form.getContentPane().getComponentCount());
     }
 }

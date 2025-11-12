@@ -89,7 +89,7 @@ class ContainerMethodsTest extends UITestBase {
         form.addAll(btn1, btn2, btn3);
         form.revalidate();
 
-        List<Component> children = form.getChildrenAsList(false);
+        List<Component> children = form.getContentPane().getChildrenAsList(false);
 
         assertEquals(3, children.size());
         assertTrue(children.contains(btn1));
@@ -125,7 +125,7 @@ class ContainerMethodsTest extends UITestBase {
         form.removeAll();
         form.revalidate();
 
-        List<Component> children = form.getChildrenAsList(false);
+        List<Component> children = form.getContentPane().getChildrenAsList(false);
 
         assertNotNull(children);
         assertEquals(0, children.size());
@@ -275,9 +275,8 @@ class ContainerMethodsTest extends UITestBase {
 
         Container scrollable = new Container(BoxLayout.y());
         scrollable.setScrollableY(true);
-        scrollable.setHeight(200);
 
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 100; i++) {
             Button btn = new Button("Button " + i);
             scrollable.add(btn);
         }
@@ -302,13 +301,13 @@ class ContainerMethodsTest extends UITestBase {
 
         form.addAll(btn1, btn2, btn3);
         form.revalidate();
-        form.getContentPane().updateTabIndices();
+        form.getContentPane().updateTabIndices(0);
 
         // Reorder components
         form.removeComponent(btn1);
         form.addComponent(btn1);
         form.revalidate();
-        form.getContentPane().updateTabIndices();
+        form.getContentPane().updateTabIndices(0);
 
         assertEquals(3, form.getContentPane().getComponentCount());
     }
@@ -325,7 +324,7 @@ class ContainerMethodsTest extends UITestBase {
         form.addAll(btn1, btn2, btn3);
         form.revalidate();
 
-        List<Component> before = form.getChildrenAsList(false);
+        List<Component> before = form.getContentPane().getChildrenAsList(false);
         assertEquals(3, before.size());
 
         form.removeComponent(btn2);
@@ -360,21 +359,19 @@ class ContainerMethodsTest extends UITestBase {
     @FormTest
     void testGetResponderAtWithDisabledComponent() {
         Form form = CN.getCurrentForm();
-        form.setLayout(new BorderLayout());
-
         Button disabled = new Button("Disabled");
         disabled.setEnabled(false);
-        disabled.setX(50);
-        disabled.setY(50);
-        disabled.setWidth(100);
-        disabled.setHeight(50);
 
-        form.add(BorderLayout.CENTER, disabled);
+        form.add(disabled);
         form.revalidate();
 
-        Component responder = form.getResponderAt(75, 75);
+        Component responder = form.getResponderAt(disabled.getX() + 1, disabled.getAbsoluteY() + 1);
 
-        // May still return disabled component as responder
+        // Disabled component can't be a responder
+        assertNull(responder);
+
+        disabled.setEnabled(true);
+        responder = form.getResponderAt(disabled.getX() + 1, disabled.getAbsoluteY() + 1);
         assertNotNull(responder);
     }
 
@@ -410,7 +407,7 @@ class ContainerMethodsTest extends UITestBase {
         form.addAll(btn1, btn2);
         form.revalidate();
 
-        List<Component> children = form.getChildrenAsList(false);
+        List<Component> children = form.getContentPane().getChildrenAsList(false);
         int originalSize = children.size();
 
         // Add another component
@@ -418,7 +415,7 @@ class ContainerMethodsTest extends UITestBase {
         form.add(btn3);
         form.revalidate();
 
-        List<Component> updatedChildren = form.getChildrenAsList(false);
+        List<Component> updatedChildren = form.getContentPane().getChildrenAsList(false);
 
         assertEquals(originalSize + 1, updatedChildren.size());
     }
