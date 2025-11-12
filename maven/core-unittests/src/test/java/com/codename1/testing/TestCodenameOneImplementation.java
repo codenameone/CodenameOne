@@ -800,6 +800,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isAsyncEditMode() {
+        return true;
+    }
+
+    @Override
+    public void stopTextEditing() {
+        hideTextEditor();
+    }
+
+    public void dispatchKeyPress(int keyCode) {
+        Display display = Display.getInstance();
+        display.keyPressed(keyCode);
+        display.keyReleased(keyCode);
+    }
+
+    @Override
     public void flushGraphics(int x, int y, int width, int height) {
     }
 
