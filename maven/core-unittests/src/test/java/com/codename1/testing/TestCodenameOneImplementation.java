@@ -908,19 +908,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         hideTextEditor();
     }
 
-    public void dispatchKeyPress(int keyCode) {
+    public void dispatchKeyPress(final int keyCode) {
         Display display = Display.getInstance();
         if (display == null) {
             return;
         }
-        boolean reenter = beginAllowingEditDuringKey(keyCode);
-        try {
-            display.keyPressed(keyCode);
-            display.keyReleased(keyCode);
-        } finally {
-            if (reenter) {
-                allowKeyEventReentry = false;
-            }
+        final boolean reenter = beginAllowingEditDuringKey(keyCode);
+        display.keyPressed(keyCode);
+        display.keyReleased(keyCode);
+        if (reenter) {
+            display.callSerially(new Runnable() {
+                public void run() {
+                    allowKeyEventReentry = false;
+                }
+            });
         }
     }
 
