@@ -9,7 +9,10 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
@@ -111,6 +114,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private String lastCopiedText;
     private final Map<Object, HeavyButtonPeerState> heavyButtonPeers = new HashMap<Object, HeavyButtonPeerState>();
     private boolean requiresHeavyButton;
+    private boolean allowKeyEventReentry;
 
 
     public TestCodenameOneImplementation() {
@@ -304,7 +308,41 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void copySelectionToClipboard(TextSelection sel) {
         copySelectionInvocations++;
         lastCopiedTextSelection = sel;
-        lastCopiedText = sel == null ? null : sel.getSelectionAsText();
+        if (sel == null) {
+            lastCopiedText = null;
+            return;
+        }
+        String text = sel.getSelectionAsText();
+        if (text == null || text.length() == 0) {
+            TextArea area = findFirstTextArea(sel.getSelectionRoot());
+            if (area == null) {
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    area = findFirstTextArea(current);
+                }
+            }
+            if (area != null) {
+                text = area.getText();
+            }
+        }
+        lastCopiedText = text;
+    }
+
+    private TextArea findFirstTextArea(Component root) {
+        if (root instanceof TextArea) {
+            return (TextArea) root;
+        }
+        if (root instanceof Container) {
+            Container container = (Container) root;
+            int count = container.getComponentCount();
+            for (int i = 0; i < count; i++) {
+                TextArea area = findFirstTextArea(container.getComponentAt(i));
+                if (area != null) {
+                    return area;
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -793,10 +831,128 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void editString(com.codename1.ui.Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
         if (cmp instanceof TextField) {
-            ((TextField) cmp).setText(text);
-        } else if (cmp instanceof TextArea) {
-            ((TextArea) cmp).setText(text);
+            TextField field = (TextField) cmp;
+            if (shouldInsertCharacter(field.isEditable(), initiatingKeycode)) {
+                field.insertChars(String.valueOf((char) initiatingKeycode));
+                return;
+            }
+            field.setText(text);
+            return;
         }
+        if (cmp instanceof TextArea) {
+            TextArea area = (TextArea) cmp;
+            if (shouldInsertCharacter(area.isEditable(), initiatingKeycode)) {
+                insertCharacter(area, (char) initiatingKeycode, maxSize);
+                return;
+            }
+            area.setText(text);
+            return;
+        }
+    }
+
+    @Override
+    public boolean isEditingText() {
+        if (allowKeyEventReentry && getEditingText() != null) {
+            return false;
+        }
+        return super.isEditingText();
+    }
+
+    @Override
+    public boolean isEditingText(com.codename1.ui.Component c) {
+        if (allowKeyEventReentry && c == getEditingText()) {
+            return false;
+        }
+        return super.isEditingText(c);
+    }
+
+    private boolean shouldInsertCharacter(boolean editable, int initiatingKeycode) {
+        if (!editable) {
+            return false;
+        }
+        if (initiatingKeycode <= 0) {
+            return false;
+        }
+        char c = (char) initiatingKeycode;
+        return !Character.isISOControl(c) || c == '\n' || c == '\r' || c == '\t';
+    }
+
+    private void insertCharacter(TextArea area, char character, int maxSize) {
+        String current = area.getText();
+        if (current == null) {
+            current = "";
+        }
+        if (maxSize > 0 && current.length() >= maxSize) {
+            return;
+        }
+        int cursor = area.getCursorPosition();
+        if (cursor < 0 || cursor > current.length()) {
+            cursor = current.length();
+        }
+        StringBuilder sb = new StringBuilder(current.length() + 1);
+        sb.append(current, 0, cursor);
+        sb.append(character);
+        if (cursor < current.length()) {
+            sb.append(current.substring(cursor));
+        }
+        area.setText(sb.toString());
+    }
+
+    @Override
+    public boolean isAsyncEditMode() {
+        return true;
+    }
+
+    @Override
+    public void stopTextEditing() {
+        hideTextEditor();
+    }
+
+    public void dispatchKeyPress(final int keyCode) {
+        Display display = Display.getInstance();
+        if (display == null) {
+            return;
+        }
+        final boolean reenter = beginAllowingEditDuringKey(keyCode);
+        display.keyPressed(keyCode);
+        display.keyReleased(keyCode);
+        if (reenter) {
+            display.callSerially(new Runnable() {
+                public void run() {
+                    allowKeyEventReentry = false;
+                }
+            });
+        }
+    }
+
+    public void dispatchPointerPressAndRelease(int x, int y) {
+        Display display = Display.getInstance();
+        if (display == null) {
+            return;
+        }
+        int[] xs = new int[]{x};
+        int[] ys = new int[]{y};
+        display.pointerPressed(xs, ys);
+        display.pointerReleased(xs, ys);
+    }
+
+    private boolean beginAllowingEditDuringKey(int keyCode) {
+        Component editing = getEditingText();
+        if (!(editing instanceof TextArea)) {
+            return false;
+        }
+        TextArea area = (TextArea) editing;
+        if (!shouldInsertCharacter(area.isEditable(), keyCode)) {
+            return false;
+        }
+        if (editing instanceof TextField) {
+            TextField tf = (TextField) editing;
+            if (!tf.isQwertyInput()) {
+                return false;
+            }
+        }
+        allowKeyEventReentry = true;
+        return true;
     }
 
     @Override
