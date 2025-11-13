@@ -913,9 +913,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (display == null) {
             return;
         }
-        display.keyPressed(keyCode);
         boolean reenter = beginAllowingEditDuringKey(keyCode);
         try {
+            display.keyPressed(keyCode);
             display.keyReleased(keyCode);
         } finally {
             if (reenter) {
