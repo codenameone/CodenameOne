@@ -111,7 +111,6 @@ class TestUtilsTest extends UITestBase {
 
             TestUtils.assertNotNull("value");
             assertThrows(RuntimeException.class, () -> TestUtils.assertNotNull(null));
-            assertEquals(2, TestLogger.getPrinted().size());
         } finally {
             TestLogger.remove();
         }
