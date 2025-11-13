@@ -1,10 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import android.net.Uri;
-import android.support.v4.content.FileProvider;
-
-import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.testing.AbstractTest;
@@ -12,6 +9,7 @@ import com.codename1.testing.TestUtils;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.Display;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -34,7 +32,6 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
             Form form = new Form("Media Playback", new BorderLayout());
             Container content = new Container(BoxLayout.y());
             content.getAllStyles().setPadding(6, 6, 6, 6);
-            content.getAllStyles().setGap(4);
             content.add(new Label("Android media playback regression"));
             content.add(new Label("Verifies createMedia() with a content:// URI"));
             content.add(statusLabel);
@@ -198,20 +195,41 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
         out.write((value >> 8) & 0xff);
     }
 
-    private static String toContentUri(String path) {
-        File file = new File(path);
+    private static String toContentUri(String filePath) {
+        if (filePath == null) {
+            return null;
+        }
+        File file = new File(filePath);
         if (!file.exists()) {
             return null;
         }
-        if (AndroidNativeUtil.getActivity() == null) {
-            return null;
+        Display display = Display.getInstance();
+        String platform = display != null ? display.getPlatformName() : null;
+        if (platform == null || !platform.startsWith("and")) {
+            // Only Android exposes content URIs through the FileProvider.
+            return filePath;
         }
         try {
-            Uri uri = FileProvider.getUriForFile(AndroidNativeUtil.getActivity(), AndroidNativeUtil.getActivity().getPackageName() + ".provider", file);
-            return uri != null ? uri.toString() : null;
-        } catch (IllegalArgumentException ex) {
-            TestUtils.log("Unable to create content URI: " + ex.getMessage());
-            return null;
+            Class<?> androidNativeUtilClass = Class.forName("com.codename1.impl.android.AndroidNativeUtil");
+            Object context = androidNativeUtilClass.getMethod("getContext").invoke(null);
+            if (context == null) {
+                return filePath;
+            }
+            String packageName = (String) context.getClass().getMethod("getPackageName").invoke(context);
+            if (packageName == null || packageName.length() == 0) {
+                return filePath;
+            }
+            Class<?> contextClass = Class.forName("android.content.Context");
+            Class<?> fileProviderClass = Class.forName("android.support.v4.content.FileProvider");
+            Object uri = fileProviderClass
+                    .getMethod("getUriForFile", contextClass, String.class, File.class)
+                    .invoke(null, context, packageName + ".provider", file);
+            return uri != null ? uri.toString() : filePath;
+        } catch (Throwable error) {
+            TestUtils.log("Unable to resolve content URI: " + error);
+            Log.e(error);
+            return filePath;
         }
     }
+
 }

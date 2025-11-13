@@ -3673,10 +3673,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 player = MediaPlayer.create(getActivity(), parsedUri != null ? parsedUri : Uri.parse(uri));
                 if (player == null && isContentUri) {
-                    // Android 13+ requires persisted access when working with content URIs that come
-                    // from the document picker. Some devices refuse to hand a media player a raw
-                    // content URI even when we hold the permission, but they succeed if we open the
-                    // stream ourselves and pass the file descriptor instead.
+                    // Android 13+ introduces stricter access rules for content:// URIs returned
+                    // from the system document picker. The picker grants our activity a
+                    // persistable read permission, but some OEM builds still reject the URI when it
+                    // is passed directly to MediaPlayer. Opening the descriptor ourselves keeps the
+                    // same permission grant while avoiding the OEM bug.
                     ContentResolver resolver = getContext().getContentResolver();
                     if (resolver != null && parsedUri != null) {
                         AssetFileDescriptor afd = null;
