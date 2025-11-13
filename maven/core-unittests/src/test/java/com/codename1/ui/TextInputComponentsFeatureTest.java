@@ -84,16 +84,20 @@ class TextInputComponentsFeatureTest extends UITestBase {
             assertTrue(field.isEditing(), "startEditingAsync should mark the field as editing");
 
             implementation.dispatchKeyPress('h');
+            flushSerialCalls();
             implementation.dispatchKeyPress('i');
+            flushSerialCalls();
             assertEquals("hi", field.getText(), "Typing keys should append to the text field");
             assertEquals(2, field.getCursorPosition(), "Cursor should track inserted characters");
 
             field.setHandlesInput(true);
             int leftKeyCode = Display.getInstance().getKeyCode(Display.GAME_LEFT);
             implementation.dispatchKeyPress(leftKeyCode);
+            flushSerialCalls();
             assertEquals(1, field.getCursorPosition(), "Left navigation should move the caret");
             int rightKeyCode = Display.getInstance().getKeyCode(Display.GAME_RIGHT);
             implementation.dispatchKeyPress(rightKeyCode);
+            flushSerialCalls();
             assertEquals(2, field.getCursorPosition(), "Right navigation should restore caret position");
 
             field.deleteChar();
@@ -146,15 +150,20 @@ class TextInputComponentsFeatureTest extends UITestBase {
             field.startEditingAsync();
             flushSerialCalls();
             implementation.dispatchKeyPress('2');
+            flushSerialCalls();
             assertEquals("A", field.getText(), "T9 key should start cycling characters");
             implementation.dispatchKeyPress('2');
+            flushSerialCalls();
             assertEquals("B", field.getText(), "Repeated T9 press should advance character");
             implementation.dispatchKeyPress('2');
+            flushSerialCalls();
             assertEquals("C", field.getText(), "Third press should wrap to next letter");
             implementation.dispatchKeyPress(rightKeyCode);
+            flushSerialCalls();
             assertEquals("C", field.getText(), "Cursor navigation should commit pending T9 sequence");
 
             implementation.dispatchKeyPress('*');
+            flushSerialCalls();
             assertTrue(field.wasSymbolDialogShown(), "Symbol dialog key should trigger dialog");
 
             field.stopEditing();
