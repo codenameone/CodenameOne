@@ -8,7 +8,8 @@ import com.codename1.ui.Form;
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final String[] TEST_CLASSES = new String[] {
             MainScreenScreenshotTest.class.getName(),
-            BrowserComponentScreenshotTest.class.getName()
+            BrowserComponentScreenshotTest.class.getName(),
+            MediaPlaybackScreenshotTest.class.getName()
     };
 
     public void runSuite() {

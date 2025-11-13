@@ -40,6 +40,7 @@ import com.codename1.ui.geom.Dimension;
 import android.webkit.CookieSyncManager;
 import android.content.*;
 import android.content.pm.*;
+import android.content.res.AssetFileDescriptor;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -3603,11 +3604,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
-        if(!uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
-            if(!PermissionsHelper.checkForPermission(isVideo ? DevicePermission.PERMISSION_READ_VIDEO : DevicePermission.PERMISSION_READ_AUDIO, "This is required to play media")){
-                return null;
-            }
-        }
         if (uri.startsWith("file://")) {
             return createMedia(removeFilePrefix(uri), isVideo, onCompletion);
         }
@@ -3618,12 +3614,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             file = new File(uri);
         }
 
+        Uri parsedUri = null;
+        boolean isContentUri = false;
+        if (file == null) {
+            parsedUri = Uri.parse(uri);
+            isContentUri = parsedUri != null && "content".equalsIgnoreCase(parsedUri.getScheme());
+        }
+
+        // The document picker grants temporary permissions for content URIs. Requesting
+        // READ_EXTERNAL_STORAGE again would surface a redundant prompt on Android 13+, so we only
+        // ask for classic file paths that require the legacy permission.
+        if(!isContentUri && !uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
+            if(!PermissionsHelper.checkForPermission(isVideo ? DevicePermission.PERMISSION_READ_VIDEO : DevicePermission.PERMISSION_READ_AUDIO, "This is required to play media")){
+                return null;
+            }
+        }
+
         Media retVal;
 
         if (isVideo) {
             final AndroidImplementation.Video[] video = new AndroidImplementation.Video[1];
             final boolean[] flag = new boolean[1];
             final File f = file;
+            final Uri videoUri = parsedUri;
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -3632,7 +3645,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (f != null) {
                         v.setVideoURI(Uri.fromFile(f));
                     } else {
-                        v.setVideoURI(Uri.parse(uri));
+                        v.setVideoURI(videoUri != null ? videoUri : Uri.parse(uri));
                     }
                     video[0] = new AndroidImplementation.Video(v, getActivity(), onCompletion);
                     flag[0] = true;
@@ -3658,7 +3671,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 player.setDataSource(is.getFD());
                 player.prepare();
             } else {
-                player = MediaPlayer.create(getActivity(), Uri.parse(uri));
+                player = MediaPlayer.create(getActivity(), parsedUri != null ? parsedUri : Uri.parse(uri));
+                if (player == null && isContentUri) {
+                    // Android 13+ requires persisted access when working with content URIs that come
+                    // from the document picker. Some devices refuse to hand a media player a raw
+                    // content URI even when we hold the permission, but they succeed if we open the
+                    // stream ourselves and pass the file descriptor instead.
+                    ContentResolver resolver = getContext().getContentResolver();
+                    if (resolver != null && parsedUri != null) {
+                        AssetFileDescriptor afd = null;
+                        try {
+                            afd = resolver.openAssetFileDescriptor(parsedUri, "r");
+                            if (afd != null) {
+                                player = new MediaPlayer();
+                                player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                                player.prepare();
+                            }
+                        } finally {
+                            if (afd != null) {
+                                try {
+                                    afd.close();
+                                } catch (IOException ignore) {
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (player == null) {
+                throw new IOException("Unable to create media player for uri " + uri);
             }
             retVal = new Audio(getActivity(), player, null, onCompletion);
         }
@@ -8077,6 +8118,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
 
+        takePersistablePermissionsFromIntent(intent);
+
         if (requestCode == REQUEST_SELECT_FILE || requestCode == FILECHOOSER_RESULTCODE) {
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 if (requestCode == REQUEST_SELECT_FILE) {
@@ -8619,6 +8662,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
+        galleryIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         if (multi) {
             galleryIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         }
@@ -8636,6 +8680,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 galleryIntent.setAction(Intent.ACTION_GET_CONTENT);
             }
             galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
+            galleryIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+                galleryIntent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            }
 
             // set MIME type for image
             galleryIntent.setType("*/*");
@@ -8650,6 +8698,48 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public NativeImage(Bitmap nativeImage) {
             super(nativeImage);
+        }
+    }
+
+    /**
+     * Persist read permissions that were granted by an activity result so that media playback can
+     * continue after {@link Activity#onActivityResult(int, int, Intent)} returns.
+     *
+     * <p>Android 13 and newer revoke temporary grants immediately after the callback unless the
+     * app calls {@link ContentResolver#takePersistableUriPermission(Uri, int)}. Without this call
+     * {@link #createMedia(String, boolean, Runnable)} loses access to the {@code content://} URI
+     * provided by the system picker and playback fails on Android 15.</p>
+     */
+    private void takePersistablePermissionsFromIntent(Intent intent) {
+        if (intent == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+            return;
+        }
+        int takeFlags = intent.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        if (takeFlags == 0) {
+            return;
+        }
+        ContentResolver resolver = getContext().getContentResolver();
+        if (resolver == null) {
+            return;
+        }
+        ClipData clip = intent.getClipData();
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) {
+                Uri uri = clip.getItemAt(i).getUri();
+                if (uri != null) {
+                    try {
+                        resolver.takePersistableUriPermission(uri, takeFlags);
+                    } catch (SecurityException ignored) {
+                    }
+                }
+            }
+        }
+        Uri dataUri = intent.getData();
+        if (dataUri != null) {
+            try {
+                resolver.takePersistableUriPermission(dataUri, takeFlags);
+            } catch (SecurityException ignored) {
+            }
         }
     }
 
