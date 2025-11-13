@@ -843,7 +843,6 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             sb.append(current.substring(cursor));
         }
         area.setText(sb.toString());
-        area.setCursorPosition(cursor + 1);
     }
 
     @Override
