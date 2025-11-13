@@ -857,22 +857,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void dispatchKeyPress(int keyCode) {
         Display display = Display.getInstance();
-        Form current = display.getCurrent();
-        if (current == null) {
+        if (display == null) {
             return;
         }
-        current.keyPressed(keyCode);
-        current.keyReleased(keyCode);
+        display.keyPressed(keyCode);
+        display.keyReleased(keyCode);
     }
 
     public void dispatchPointerPressAndRelease(int x, int y) {
         Display display = Display.getInstance();
-        Form current = display.getCurrent();
-        if (current == null) {
+        if (display == null) {
             return;
         }
-        current.pointerPressed(x, y);
-        current.pointerReleased(x, y);
+        int[] xs = new int[]{x};
+        int[] ys = new int[]{y};
+        display.pointerPressed(xs, ys);
+        display.pointerReleased(xs, ys);
     }
 
     @Override
