@@ -4,20 +4,19 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
+import com.codename1.system.NativeLookup;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.Display;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 
 public class MediaPlaybackScreenshotTest extends AbstractTest {
     private static final int SAMPLE_RATE = 44100;
@@ -179,8 +178,12 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
     }
 
     private static void writeAscii(ByteArrayOutputStream out, String text) {
-        byte[] bytes = text.getBytes(StandardCharsets.US_ASCII);
-        out.write(bytes, 0, bytes.length);
+        if (text == null) {
+            return;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            out.write((byte) (text.charAt(i) & 0x7f));
+        }
     }
 
     private static void writeIntLE(ByteArrayOutputStream out, int value) {
@@ -199,8 +202,8 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
         if (filePath == null) {
             return null;
         }
-        File file = new File(filePath);
-        if (!file.exists()) {
+        FileSystemStorage storage = FileSystemStorage.getInstance();
+        if (!storage.exists(filePath)) {
             return null;
         }
         Display display = Display.getInstance();
@@ -209,27 +212,12 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
             // Only Android exposes content URIs through the FileProvider.
             return filePath;
         }
-        try {
-            Class<?> androidNativeUtilClass = Class.forName("com.codename1.impl.android.AndroidNativeUtil");
-            Object context = androidNativeUtilClass.getMethod("getContext").invoke(null);
-            if (context == null) {
-                return filePath;
-            }
-            String packageName = (String) context.getClass().getMethod("getPackageName").invoke(context);
-            if (packageName == null || packageName.length() == 0) {
-                return filePath;
-            }
-            Class<?> contextClass = Class.forName("android.content.Context");
-            Class<?> fileProviderClass = Class.forName("android.support.v4.content.FileProvider");
-            Object uri = fileProviderClass
-                    .getMethod("getUriForFile", contextClass, String.class, File.class)
-                    .invoke(null, context, packageName + ".provider", file);
-            return uri != null ? uri.toString() : filePath;
-        } catch (Throwable error) {
-            TestUtils.log("Unable to resolve content URI: " + error);
-            Log.e(error);
+        MediaPlaybackNative nativeBridge = NativeLookup.create(MediaPlaybackNative.class);
+        if (nativeBridge == null || !nativeBridge.isSupported()) {
             return filePath;
         }
+        String resolved = nativeBridge.resolveContentUri(filePath);
+        return resolved != null && resolved.length() > 0 ? resolved : filePath;
     }
 
 }
