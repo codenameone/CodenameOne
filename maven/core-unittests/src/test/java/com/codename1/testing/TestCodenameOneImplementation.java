@@ -9,6 +9,8 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
@@ -112,6 +114,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private String lastCopiedText;
     private final Map<Object, HeavyButtonPeerState> heavyButtonPeers = new HashMap<Object, HeavyButtonPeerState>();
     private boolean requiresHeavyButton;
+    private boolean allowKeyEventReentry;
 
 
     public TestCodenameOneImplementation() {
@@ -305,7 +308,41 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void copySelectionToClipboard(TextSelection sel) {
         copySelectionInvocations++;
         lastCopiedTextSelection = sel;
-        lastCopiedText = sel == null ? null : sel.getSelectionAsText();
+        if (sel == null) {
+            lastCopiedText = null;
+            return;
+        }
+        String text = sel.getSelectionAsText();
+        if (text == null || text.length() == 0) {
+            TextArea area = findFirstTextArea(sel.getSelectionRoot());
+            if (area == null) {
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    area = findFirstTextArea(current);
+                }
+            }
+            if (area != null) {
+                text = area.getText();
+            }
+        }
+        lastCopiedText = text;
+    }
+
+    private TextArea findFirstTextArea(Component root) {
+        if (root instanceof TextArea) {
+            return (TextArea) root;
+        }
+        if (root instanceof Container) {
+            Container container = (Container) root;
+            int count = container.getComponentCount();
+            for (int i = 0; i < count; i++) {
+                TextArea area = findFirstTextArea(container.getComponentAt(i));
+                if (area != null) {
+                    return area;
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -813,6 +850,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public boolean isEditingText() {
+        if (allowKeyEventReentry && getEditingText() != null) {
+            return false;
+        }
+        return super.isEditingText();
+    }
+
+    @Override
+    public boolean isEditingText(com.codename1.ui.Component c) {
+        if (allowKeyEventReentry && c == getEditingText()) {
+            return false;
+        }
+        return super.isEditingText(c);
+    }
+
     private boolean shouldInsertCharacter(boolean editable, int initiatingKeycode) {
         if (!editable) {
             return false;
@@ -861,7 +914,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             return;
         }
         display.keyPressed(keyCode);
-        display.keyReleased(keyCode);
+        boolean reenter = beginAllowingEditDuringKey(keyCode);
+        try {
+            display.keyReleased(keyCode);
+        } finally {
+            if (reenter) {
+                allowKeyEventReentry = false;
+            }
+        }
     }
 
     public void dispatchPointerPressAndRelease(int x, int y) {
@@ -873,6 +933,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int[] ys = new int[]{y};
         display.pointerPressed(xs, ys);
         display.pointerReleased(xs, ys);
+    }
+
+    private boolean beginAllowingEditDuringKey(int keyCode) {
+        Component editing = getEditingText();
+        if (!(editing instanceof TextArea)) {
+            return false;
+        }
+        TextArea area = (TextArea) editing;
+        if (!shouldInsertCharacter(area.isEditable(), keyCode)) {
+            return false;
+        }
+        if (editing instanceof TextField) {
+            TextField tf = (TextField) editing;
+            if (!tf.isQwertyInput()) {
+                return false;
+            }
+        }
+        allowKeyEventReentry = true;
+        return true;
     }
 
     @Override
